@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star,
 } from "lucide-react";
+import ScoutReview from "@/components/ScoutReview";
 
 function scoreColor(s) {
   if (typeof s !== "number") return "text-white";
@@ -613,6 +614,11 @@ export default function ReportPage() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Scout Review — bonus human review on top of AI report */}
+              {unlocked && (
+                <ScoutReview reportId={id} />
               )}
 
               {/* If unlocked but report not yet generated */}

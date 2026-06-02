@@ -5,9 +5,11 @@ import api from "@/lib/api";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
 } from "lucide-react";
+import ScoutQueue from "@/components/ScoutQueue";
 
 const tabs = [
   { id: "stats", label: "Overview" },
+  { id: "scouts", label: "Scout Queue" },
   { id: "reports", label: "Reports" },
   { id: "users", label: "Users" },
   { id: "payments", label: "Payments" },
@@ -139,6 +141,8 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+
+              {activeTab === "scouts" && <ScoutQueue />}
 
               {activeTab === "reports" && (
                 <div className="border border-white/10 overflow-x-auto">

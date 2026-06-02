@@ -124,6 +124,15 @@ class CheckoutInit(BaseModel):
     origin_url: str
 
 
+class AgentReviewSubmit(BaseModel):
+    review_text: str = Field(min_length=10)
+    agent_name: Optional[str] = "Elite Scout Team"
+
+
+class AgentMessageSubmit(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
 # ============== AUTH UTILITIES ==============
 
 def hash_password(password: str) -> str:
@@ -692,6 +701,47 @@ async def my_reports(user=Depends(get_current_user)):
     return docs
 
 
+def _default_agent_review(unlock_iso: Optional[str] = None) -> dict:
+    """Default 'pending' agent review when a report is just unlocked."""
+    return {
+        "status": "pending",
+        "created_at": unlock_iso or now_iso(),
+        "delivered_at": None,
+        "agent_name": None,
+        "review_text": None,
+        "messages": [],
+    }
+
+
+async def _ensure_agent_review(doc: dict) -> dict:
+    """If the report is unlocked but has no agent_review yet, lazily create one."""
+    if doc.get("agent_review"):
+        return doc["agent_review"]
+    unlocked = doc.get("is_paid") or doc.get("manually_unlocked")
+    if not unlocked:
+        return None
+    if doc.get("demo"):
+        # demo reports get a default delivered review with a sample message
+        review = {
+            "status": "delivered",
+            "created_at": doc.get("paid_at") or doc.get("created_at") or now_iso(),
+            "delivered_at": doc.get("paid_at") or doc.get("created_at") or now_iso(),
+            "agent_name": "Elite Scout Team",
+            "review_text": (
+                "Lukas has a wonderful blend of game intelligence and left-foot quality that's "
+                "rare in his age group. I'd recommend pairing his fitness work with regular play "
+                "against older boys at training — the gap will close fast. He's the type of "
+                "player I'd want a second look at in 3 months. Keep going."
+            ),
+            "messages": [],
+        }
+    else:
+        review = _default_agent_review(doc.get("paid_at"))
+    await db.reports.update_one({"id": doc["id"]}, {"$set": {"agent_review": review}})
+    doc["agent_review"] = review
+    return review
+
+
 def _serialize_report(doc: dict, include_full: bool) -> dict:
     poster_filename = doc.get("poster_filename")
     marker_filename = doc.get("marker_filename")
@@ -712,6 +762,7 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
     }
     if include_full:
         out["full_report"] = doc.get("full_report")
+        out["agent_review"] = doc.get("agent_review")
     return out
 
 
@@ -723,6 +774,8 @@ async def get_report(report_id: str, user=Depends(get_current_user)):
     if doc["user_id"] != user["id"] and user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
     unlocked = doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"
+    if unlocked:
+        await _ensure_agent_review(doc)
     return _serialize_report(doc, include_full=bool(unlocked))
 
 
@@ -770,6 +823,106 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
         {"$set": {"full_report": full, "full_generated_at": now_iso()}},
     )
     return {"status": "generated", "report_id": report_id}
+
+
+# ============== AGENT REVIEW (user side) ==============
+
+@api_router.get("/reports/{report_id}/agent-review")
+async def get_agent_review(report_id: str, user=Depends(get_current_user)):
+    doc = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    unlocked = doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"
+    if not unlocked:
+        raise HTTPException(status_code=402, detail="Payment required")
+    review = await _ensure_agent_review(doc)
+    return review
+
+
+@api_router.post("/reports/{report_id}/agent-messages")
+async def user_send_agent_message(report_id: str, payload: AgentMessageSubmit, user=Depends(get_current_user)):
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (doc.get("is_paid") or doc.get("manually_unlocked")):
+        raise HTTPException(status_code=402, detail="Payment required")
+    review = doc.get("agent_review") or await _ensure_agent_review(doc)
+    if review.get("status") != "delivered":
+        raise HTTPException(status_code=400, detail="Your scout has not posted their review yet. Please wait.")
+    msg = {"sender": "user", "text": payload.text.strip(), "created_at": now_iso()}
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$push": {"agent_review.messages": msg}, "$set": {"agent_review.last_user_message_at": now_iso()}},
+    )
+    return {"status": "sent", "message": msg}
+
+
+# ============== AGENT REVIEW (admin / scout side) ==============
+
+@api_router.get("/admin/agent-queue")
+async def admin_agent_queue(_=Depends(get_current_admin)):
+    """All unlocked reports with their agent review state — oldest pending first."""
+    cursor = db.reports.find(
+        {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
+        {"_id": 0, "full_report": 0, "preview": 0},
+    ).sort("paid_at", 1)
+    out = []
+    async for d in cursor:
+        review = d.get("agent_review")
+        if not review:
+            review = await _ensure_agent_review(d)
+        out.append({
+            "report_id": d["id"],
+            "user_email": d.get("user_email"),
+            "player_name": d.get("player_details", {}).get("player_name"),
+            "player_position": d.get("player_details", {}).get("position"),
+            "paid_at": d.get("paid_at"),
+            "demo": d.get("demo", False),
+            "agent_review": review,
+            "video_url": f"/api/uploads/{d['video_filename']}",
+            "poster_url": f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None,
+            "marker_url": f"/api/uploads/{d['marker_filename']}" if d.get("marker_filename") else None,
+        })
+    # sort pending first, then by oldest
+    out.sort(key=lambda x: (x["agent_review"].get("status") != "pending", x.get("paid_at") or ""))
+    return out
+
+
+@api_router.put("/admin/reports/{report_id}/agent-review")
+async def admin_deliver_review(report_id: str, payload: AgentReviewSubmit, admin=Depends(get_current_admin)):
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if not (doc.get("is_paid") or doc.get("manually_unlocked")):
+        raise HTTPException(status_code=400, detail="Report is not unlocked yet")
+    review = doc.get("agent_review") or _default_agent_review(doc.get("paid_at"))
+    review["status"] = "delivered"
+    review["review_text"] = payload.review_text.strip()
+    review["agent_name"] = payload.agent_name or "Elite Scout Team"
+    review["delivered_at"] = now_iso()
+    review.setdefault("messages", [])
+    await db.reports.update_one({"id": report_id}, {"$set": {"agent_review": review}})
+    return review
+
+
+@api_router.post("/admin/reports/{report_id}/agent-messages")
+async def admin_send_agent_message(report_id: str, payload: AgentMessageSubmit, admin=Depends(get_current_admin)):
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    review = doc.get("agent_review")
+    if not review or review.get("status") != "delivered":
+        raise HTTPException(status_code=400, detail="Deliver the initial review before sending messages.")
+    msg = {"sender": "agent", "text": payload.text.strip(), "created_at": now_iso(), "agent_name": review.get("agent_name") or "Elite Scout Team"}
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$push": {"agent_review.messages": msg}, "$set": {"agent_review.last_agent_message_at": now_iso()}},
+    )
+    return {"status": "sent", "message": msg}
 
 
 # ============== PDF GENERATION ==============
