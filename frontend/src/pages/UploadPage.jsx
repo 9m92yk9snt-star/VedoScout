@@ -85,6 +85,10 @@ export default function UploadPage() {
       return;
     }
 
+    // Capture the exact moment of the video at the click time
+    const captureTime = video.currentTime || 0;
+    setMarkerTimestamp(captureTime);
+
     const canvas = document.createElement("canvas");
     canvas.width = w;
     canvas.height = h;
@@ -268,8 +272,11 @@ export default function UploadPage() {
                     <div className="flex flex-col items-center gap-3">
                       <UploadCloud className="w-11 h-11 text-volt" strokeWidth={1.25} />
                       <p className="font-barlow font-black uppercase text-white text-lg">Drop video here</p>
-                      <p className="text-xs text-white/50">MP4, MOV or WebM · up to 200MB</p>
+                      <p className="text-xs text-white/50">MP4, MOV or WebM · max 5 minutes</p>
                       <span className="mt-1 text-xs text-volt uppercase tracking-widest font-bold">or click to browse</span>
+                      <p className="mt-3 text-[11px] text-white/45 leading-relaxed max-w-[260px] text-center">
+                        Tip: pick your child's best moments — scouts decide in the first 3 minutes. Quality beats quantity.
+                      </p>
                     </div>
                   )}
                 </label>
@@ -297,6 +304,7 @@ export default function UploadPage() {
                         controls={!isMarking}
                         playsInline
                         preload="metadata"
+                        onLoadedMetadata={handleVideoLoadedMetadata}
                         data-testid="upload-video-preview"
                         className="w-full aspect-video bg-black"
                       />

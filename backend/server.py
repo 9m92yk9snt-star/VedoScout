@@ -373,6 +373,67 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
     return src_path
 
 
+def get_video_duration_seconds(path: Path) -> float:
+    """Return video duration in seconds (0 on failure)."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True, timeout=15, text=True,
+        )
+        if result.returncode == 0:
+            return float(result.stdout.strip() or 0)
+    except Exception as e:
+        logger.warning(f"ffprobe failed: {e}")
+    return 0.0
+
+
+def make_preview_clip(video_path: Path, marker_seconds: float, window_seconds: int = 15) -> Path:
+    """
+    Cut a short window (~window_seconds) centered around the marker timestamp.
+    Returns the new clip path. Falls back to the original video on failure or if
+    the video is already shorter than the window.
+    """
+    import subprocess
+    duration = get_video_duration_seconds(video_path)
+    if duration <= window_seconds + 0.5:
+        return video_path  # already short enough — analyse the whole thing
+
+    half_before = 8.0
+    start = max(0.0, float(marker_seconds) - half_before)
+    end = start + window_seconds
+    if end > duration:
+        end = duration
+        start = max(0.0, end - window_seconds)
+    actual_window = end - start
+
+    out_path = video_path.with_name(video_path.stem + ".preview.mp4")
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{start:.2f}",
+        "-i", str(video_path),
+        "-t", f"{actual_window:.2f}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-c:a", "aac", "-b:a", "96k",
+        "-movflags", "+faststart",
+        "-loglevel", "error",
+        str(out_path),
+    ]
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=60)
+        if r.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0:
+            return out_path
+        logger.warning(f"preview clip ffmpeg failed: {r.stderr[:300]}")
+    except Exception as e:
+        logger.warning(f"preview clip failed: {e}")
+    return video_path
+
+
 def generate_poster(video_path: Path) -> Optional[Path]:
     """Extract a single-frame poster JPG from the video. Returns None on failure."""
     import subprocess
@@ -484,6 +545,7 @@ async def upload_video_and_create_preview(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     marker_image: UploadFile = File(...),
+    marker_timestamp: float = Form(0.0),
     player_name: str = Form(...),
     age: int = Form(...),
     position: str = Form(...),
@@ -521,6 +583,20 @@ async def upload_video_and_create_preview(
     web_path = transcode_to_web_mp4(file_path)
     web_filename = web_path.name
 
+    # Enforce 5-minute (300 sec) cap server-side
+    duration_sec = get_video_duration_seconds(web_path)
+    if duration_sec > 305:  # tiny buffer for rounding
+        # cleanup
+        for p in {file_path, web_path, marker_path}:
+            try:
+                p.unlink()
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=400,
+            detail=f"Video is {duration_sec / 60:.1f} minutes. Maximum is 5 minutes — please trim and try again.",
+        )
+
     # Generate poster thumbnail from the playable video
     poster_path = generate_poster(web_path)
     poster_filename = poster_path.name if poster_path else None
@@ -537,17 +613,20 @@ async def upload_video_and_create_preview(
     }
     details_str = json.dumps(details, ensure_ascii=False)
 
-    # Generate FREE preview synchronously (Gemini receives marker image + video)
+    # Build a short preview clip (15s window around the marker) for the FREE preview
+    preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
+
+    # Generate FREE preview synchronously (Gemini receives marker image + short clip)
     try:
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=PREVIEW_PROMPT.replace("{player_details}", details_str),
-            video_path=str(web_path),
+            video_path=str(preview_clip_path),
             marker_path=str(marker_path),
         )
     except HTTPException:
-        # Cleanup
-        for p in {file_path, web_path, marker_path}:
+        # Cleanup on failure
+        for p in {file_path, web_path, marker_path, preview_clip_path}:
             try:
                 p.unlink()
             except Exception:
@@ -560,7 +639,7 @@ async def upload_video_and_create_preview(
         raise
     except Exception as e:
         logger.exception("Preview generation failed")
-        for p in {file_path, web_path, marker_path}:
+        for p in {file_path, web_path, marker_path, preview_clip_path}:
             try:
                 p.unlink()
             except Exception:
@@ -577,6 +656,8 @@ async def upload_video_and_create_preview(
         "original_video_filename": stored_name if stored_name != web_filename else None,
         "poster_filename": poster_filename,
         "marker_filename": marker_filename,
+        "marker_timestamp": float(marker_timestamp),
+        "video_duration_sec": duration_sec,
         "video_size_bytes": file_size,
         "preview": preview,
         "full_report": None,
