@@ -31,9 +31,12 @@ export default function Navigation({ transparent = false }) {
         </Link>
 
         <nav className="hidden md:flex items-center gap-8">
-          <a href="/#how-it-works" data-testid="nav-how-it-works" className="text-sm text-white/70 hover:text-volt uppercase tracking-widest font-semibold transition-colors">How it works</a>
-          <a href="/#what-you-get" data-testid="nav-what-you-get" className="text-sm text-white/70 hover:text-volt uppercase tracking-widest font-semibold transition-colors">Report</a>
-          <a href="/#trust" data-testid="nav-trust" className="text-sm text-white/70 hover:text-volt uppercase tracking-widest font-semibold transition-colors">Trust</a>
+          {!user && (
+            <>
+              <Link to="/login" data-testid="nav-link-login" className="text-sm text-white/70 hover:text-volt uppercase tracking-widest font-semibold transition-colors">Sign in</Link>
+              <Link to="/signup" data-testid="nav-link-signup" className="text-sm text-white/70 hover:text-volt uppercase tracking-widest font-semibold transition-colors">Sign up</Link>
+            </>
+          )}
         </nav>
 
         <div className="flex items-center gap-3">
