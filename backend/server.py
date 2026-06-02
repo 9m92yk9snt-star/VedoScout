@@ -512,6 +512,7 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
         "preview": doc.get("preview"),
         "is_paid": doc.get("is_paid", False),
         "manually_unlocked": doc.get("manually_unlocked", False),
+        "demo": doc.get("demo", False),
         "created_at": doc.get("created_at"),
         "paid_at": doc.get("paid_at"),
     }

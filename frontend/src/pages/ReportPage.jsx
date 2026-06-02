@@ -253,12 +253,33 @@ export default function ReportPage() {
           {/* ===== Header ===== */}
           <div className="mt-6 grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10">
             <div className="bg-surface p-6 md:p-8 lg:col-span-2">
-              <video
-                src={`${ASSET_BASE}${video_url}`}
-                controls
-                data-testid="report-video"
-                className="w-full bg-black"
-              />
+              {report.demo ? (
+                <div className="relative w-full bg-deepnavy border border-volt/20 aspect-video flex flex-col items-center justify-center text-center p-6">
+                  <div className="absolute top-3 right-3 bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1">Demo</div>
+                  <div
+                    className="absolute inset-0 opacity-30"
+                    style={{
+                      backgroundImage: "url('https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg')",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-deepnavy via-deepnavy/70 to-transparent" />
+                  <div className="relative">
+                    <div className="font-barlow font-black uppercase text-3xl text-volt">Sample report</div>
+                    <p className="mt-2 text-sm text-white/70 max-w-sm">
+                      This is a demo report so you can explore the premium experience. Upload your own video to get a real analysis.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <video
+                  src={`${ASSET_BASE}${video_url}`}
+                  controls
+                  data-testid="report-video"
+                  className="w-full bg-black"
+                />
+              )}
               <div className="mt-4 grid grid-cols-3 gap-px bg-white/5">
                 <div className="bg-surface p-3">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">Type</div>
