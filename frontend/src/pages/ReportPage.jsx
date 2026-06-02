@@ -224,7 +224,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, is_paid, manually_unlocked } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -317,6 +317,23 @@ export default function ReportPage() {
                     {(full_report?.player_type) || preview?.player_type || "Player Analysis"}
                   </span>
                 </div>
+
+                {marker_url && (
+                  <div className="mt-5 border border-white/10 bg-deepnavy/60 p-3 max-w-md" data-testid="marker-card">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Star className="w-3 h-3 text-volt" fill="currentColor" />
+                      <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Verified player</span>
+                    </div>
+                    <img
+                      src={`${ASSET_BASE}${marker_url}`}
+                      alt="Marked player"
+                      className="w-full aspect-video object-cover border border-white/5"
+                    />
+                    <p className="mt-2 text-[11px] text-white/55">
+                      AI analysed only the player you circled above.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {unlocked && full_report && (

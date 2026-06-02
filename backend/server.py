@@ -173,37 +173,59 @@ async def get_current_admin(user=Depends(get_current_user)):
 
 # ============== GEMINI ANALYSIS ==============
 
-PREVIEW_PROMPT = """You are an experienced football coach giving honest, friendly feedback to a young player or their parent. Watch the video and write a short FREE PREVIEW using NATURAL, EVERYDAY FOOTBALL LANGUAGE — the way a real coach talks to a 14-year-old and their family. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking", "half-turn", "high-intensity transitions", "block", "vertical progression". Instead say things like "stays calm under pressure", "always looks around before the ball arrives", "his left foot is dangerous", "gets tired late in the game", "smart playmaker", "reads the game well".
+PREVIEW_PROMPT = """You are an experienced football coach giving honest, friendly feedback to a young player or their parent. You speak in NATURAL, EVERYDAY FOOTBALL LANGUAGE — the way a real coach talks to a 14-year-old and their family. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking", "half-turn", "high-intensity transitions", "block", "vertical progression". Instead say things like "stays calm under pressure", "always looks around before the ball arrives", "his left foot is dangerous", "gets tired late in the game", "smart playmaker", "reads the game well".
 
-Produce a JSON object EXACTLY in this format (no extra fields, no commentary outside JSON):
+⚠️ CRITICAL PLAYER IDENTIFICATION ⚠️
+A REFERENCE FRAME image has been provided alongside the video. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER" in the reference image. This is a frame taken directly from the video and the user has explicitly pointed at the player they want analysed.
+
+YOU MUST:
+1. First locate this exact player in the reference image (look at the bright green circle and "THIS PLAYER" label).
+2. Identify visual cues — jersey colour, number, hair, position on the pitch, body type.
+3. Track THIS PLAYER across the entire video. Ignore all other players.
+4. If at any moment you cannot identify the player with confidence, say so honestly in the summary rather than guess.
+5. Cross-check with the user's text description below, but the CIRCLED PLAYER IN THE REFERENCE FRAME is the ground truth.
+
+The player's text description: {player_details}
+
+Now produce a JSON object EXACTLY in this format (no extra fields, no commentary outside JSON):
 
 {
-  "player_type": "<short, friendly label e.g. 'Smart playmaker with a strong left foot' or 'Box-to-box midfielder with engine'>",
-  "brief_summary": "<2-3 sentences in plain football language describing how he plays and what makes him stand out>",
+  "player_type": "<short, friendly label e.g. 'Smart playmaker with a strong left foot' or 'Direct winger with pace'>",
+  "brief_summary": "<2-3 sentences in plain football language describing how THE CIRCLED PLAYER plays and what makes him stand out>",
   "top_strengths": ["<strength 1 in plain words>", "<strength 2>", "<strength 3>"],
-  "area_for_improvement": "<one specific thing to work on, in simple words>",
+  "area_for_improvement": "<one specific thing for THIS PLAYER to work on, in simple words>",
   "sample_section": {
     "title": "Sample: Technical Snapshot",
     "content": "<3-4 sentence preview teaser of the deeper technical breakdown — still in natural football language>"
   }
 }
 
-The player provided these details: {player_details}
-
 Important: This is independent developmental feedback. Do NOT imply trials, contracts, or academy selection. Return ONLY valid JSON."""
 
 
-FULL_REPORT_PROMPT = """You are an experienced football coach writing a PREMIUM development report for a young player and their family. Watch the video THOROUGHLY. Write in NATURAL, EVERYDAY FOOTBALL LANGUAGE — the way a real coach talks. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking passes", "half-turn", "high-intensity transitions", "vertical progression", "false-9 in possession systems". Instead use plain language: "stays calm when defenders close him down", "always looks around before getting the ball", "his left foot can find any pass", "gets tired late in matches", "ready to step up to a stronger team", "best as a creative #10 behind the striker".
+FULL_REPORT_PROMPT = """You are an experienced football coach writing a PREMIUM development report for a young player and their family. Write in NATURAL, EVERYDAY FOOTBALL LANGUAGE — the way a real coach talks. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking passes", "half-turn", "high-intensity transitions", "vertical progression", "false-9 in possession systems". Instead use plain language: "stays calm when defenders close him down", "always looks around before getting the ball", "his left foot can find any pass", "gets tired late in matches", "ready to step up to a stronger team", "best as a creative #10 behind the striker".
+
+⚠️ CRITICAL PLAYER IDENTIFICATION ⚠️
+A REFERENCE FRAME image has been provided alongside the video. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER" in the reference image. This frame was taken from the video and the user has explicitly pointed at the player they want analysed.
+
+YOU MUST:
+1. Locate this exact player in the reference frame (bright green circle, "THIS PLAYER" label).
+2. Note their jersey colour, number, body type, hair, and any distinguishing features.
+3. Track ONLY THIS PLAYER across the entire video. Completely ignore other players.
+4. Every score, every note, every comment must be about THIS PLAYER only.
+5. If you lose sight of the player in some moments, only score what you actually observed of him.
 
 Each rating field must be an integer 1-10. Narrative fields should be specific, encouraging, and substantive (2-4 sentences each unless otherwise noted). Speak directly about the player ("he", "she", or use the name) — not abstractly.
+
+Player text details: {player_details}
 
 Produce a JSON object EXACTLY in this format:
 
 {
   "player_type": "<short friendly label>",
-  "executive_summary": "<4-6 sentences describing the player's style and what makes him stand out, in plain football language>",
+  "executive_summary": "<4-6 sentences describing THE CIRCLED PLAYER's style and what makes him stand out, in plain football language>",
   "technical": {
-    "first_touch": {"score": 1-10, "notes": "<specific observation in plain words>"},
+    "first_touch": {"score": 1-10, "notes": "<specific observation of THIS PLAYER in plain words>"},
     "ball_control": {"score": 1-10, "notes": "..."},
     "dribbling": {"score": 1-10, "notes": "..."},
     "passing": {"score": 1-10, "notes": "..."},
@@ -250,7 +272,7 @@ Produce a JSON object EXACTLY in this format:
   },
   "training_plan": {
     "exercises": [
-      {"name": "<exercise — short, clear>", "description": "<2 sentence drill description in everyday language>", "duration": "<e.g. '15 min'>"},
+      {"name": "<exercise>", "description": "<2 sentence drill description in everyday language>", "duration": "<e.g. '15 min'>"},
       {"name": "...", "description": "...", "duration": "..."},
       {"name": "...", "description": "...", "duration": "..."},
       {"name": "...", "description": "...", "duration": "..."},
@@ -261,7 +283,7 @@ Produce a JSON object EXACTLY in this format:
     "ninety_day_plan": "<paragraph on 90-day development plan in plain language>"
   },
   "video_comments": [
-    {"timestamp": "<MM:SS or 'General'>", "comment": "<specific observation in plain football words>"},
+    {"timestamp": "<MM:SS or 'General'>", "comment": "<specific observation of THIS PLAYER in plain football words>"},
     {"timestamp": "...", "comment": "..."}
   ],
   "scores": {
@@ -271,10 +293,8 @@ Produce a JSON object EXACTLY in this format:
     "mentality": 1-10,
     "overall_development": 1-10
   },
-  "final_summary": "<3-5 sentence encouraging closing summary, plain football language>"
+  "final_summary": "<3-5 sentence encouraging closing summary about THIS PLAYER, plain football language>"
 }
-
-Player details: {player_details}
 
 CRITICAL: This is independent developmental analysis. Do NOT imply trials, contracts, or selection. Use language like 'developmental guidance' rather than 'scouting evaluation'. Use 'next level to aim for' rather than 'should be signed'. Write the way a real football coach talks — warm, specific, and clear. Return ONLY valid JSON, no markdown, no commentary."""
 
@@ -294,19 +314,28 @@ def extract_json(text: str) -> dict:
     return json.loads(candidate)
 
 
-async def call_gemini_with_video(session_id: str, prompt: str, video_path: str) -> dict:
-    """Send a video file + prompt to Gemini and return parsed JSON."""
+async def call_gemini_with_video(session_id: str, prompt: str, video_path: str, marker_path: Optional[str] = None) -> dict:
+    """Send a video file (+ optional marker image) + prompt to Gemini and return parsed JSON."""
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
         system_message="You are an experienced football coach giving honest, friendly feedback to a young player and their family. You speak in plain, natural football language — never jargon. You ALWAYS respond with valid JSON only.",
     ).with_model("gemini", "gemini-2.5-pro")
 
+    file_contents = []
+    if marker_path and Path(marker_path).exists():
+        marker_file = FileContentWithMimeType(
+            file_path=marker_path,
+            mime_type="image/jpeg",
+        )
+        file_contents.append(marker_file)
     video_file = FileContentWithMimeType(
         file_path=video_path,
         mime_type="video/mp4",
     )
-    user_message = UserMessage(text=prompt, file_contents=[video_file])
+    file_contents.append(video_file)
+
+    user_message = UserMessage(text=prompt, file_contents=file_contents)
     response = await chat.send_message(user_message)
     response_text = response if isinstance(response, str) else str(response)
     try:
@@ -454,6 +483,7 @@ async def get_current_price() -> float:
 async def upload_video_and_create_preview(
     background: BackgroundTasks,
     file: UploadFile = File(...),
+    marker_image: UploadFile = File(...),
     player_name: str = Form(...),
     age: int = Form(...),
     position: str = Form(...),
@@ -468,7 +498,7 @@ async def upload_video_and_create_preview(
     if file.content_type not in allowed_mimes:
         raise HTTPException(status_code=400, detail=f"Unsupported video format: {file.content_type}. Use MP4, MOV, or WebM.")
 
-    # Save file
+    # Save video file
     report_id = str(uuid.uuid4())
     ext = (file.filename or "video.mp4").split(".")[-1].lower()
     if ext not in {"mp4", "mov", "m4v", "webm"}:
@@ -481,8 +511,13 @@ async def upload_video_and_create_preview(
 
     file_size = file_path.stat().st_size
 
-    # Convert to a web-friendly MP4 (H.264) so it plays in every browser.
-    # Skip if already MP4 with a small size hint, otherwise always transcode.
+    # Save marker image (the frame with the player circled)
+    marker_filename = f"{report_id}-marker.jpg"
+    marker_path = UPLOAD_DIR / marker_filename
+    with marker_path.open("wb") as buffer:
+        shutil.copyfileobj(marker_image.file, buffer)
+
+    # Convert video to a web-friendly MP4 (H.264) so it plays in every browser.
     web_path = transcode_to_web_mp4(file_path)
     web_filename = web_path.name
 
@@ -502,16 +537,17 @@ async def upload_video_and_create_preview(
     }
     details_str = json.dumps(details, ensure_ascii=False)
 
-    # Generate FREE preview synchronously (Gemini happily reads mp4, mov etc.)
+    # Generate FREE preview synchronously (Gemini receives marker image + video)
     try:
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=PREVIEW_PROMPT.replace("{player_details}", details_str),
             video_path=str(web_path),
+            marker_path=str(marker_path),
         )
     except HTTPException:
         # Cleanup
-        for p in {file_path, web_path}:
+        for p in {file_path, web_path, marker_path}:
             try:
                 p.unlink()
             except Exception:
@@ -524,7 +560,7 @@ async def upload_video_and_create_preview(
         raise
     except Exception as e:
         logger.exception("Preview generation failed")
-        for p in {file_path, web_path}:
+        for p in {file_path, web_path, marker_path}:
             try:
                 p.unlink()
             except Exception:
@@ -540,6 +576,7 @@ async def upload_video_and_create_preview(
         "video_filename": web_filename,
         "original_video_filename": stored_name if stored_name != web_filename else None,
         "poster_filename": poster_filename,
+        "marker_filename": marker_filename,
         "video_size_bytes": file_size,
         "preview": preview,
         "full_report": None,
@@ -555,6 +592,7 @@ async def upload_video_and_create_preview(
         "player_details": details,
         "video_url": f"/api/uploads/{web_filename}",
         "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
+        "marker_url": f"/api/uploads/{marker_filename}",
         "preview": preview,
         "is_paid": False,
         "created_at": report_doc["created_at"],
@@ -575,6 +613,7 @@ async def my_reports(user=Depends(get_current_user)):
 
 def _serialize_report(doc: dict, include_full: bool) -> dict:
     poster_filename = doc.get("poster_filename")
+    marker_filename = doc.get("marker_filename")
     out = {
         "id": doc["id"],
         "user_id": doc["user_id"],
@@ -582,6 +621,7 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
         "player_details": doc["player_details"],
         "video_url": f"/api/uploads/{doc['video_filename']}",
         "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
+        "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
         "preview": doc.get("preview"),
         "is_paid": doc.get("is_paid", False),
         "manually_unlocked": doc.get("manually_unlocked", False),
@@ -624,12 +664,19 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Video file missing")
 
+    marker_path = None
+    if doc.get("marker_filename"):
+        mp = UPLOAD_DIR / doc["marker_filename"]
+        if mp.exists():
+            marker_path = str(mp)
+
     details_str = json.dumps(doc["player_details"], ensure_ascii=False)
     try:
         full = await call_gemini_with_video(
             session_id=f"full-{report_id}",
             prompt=FULL_REPORT_PROMPT.replace("{player_details}", details_str),
             video_path=str(file_path),
+            marker_path=marker_path,
         )
     except HTTPException:
         raise
