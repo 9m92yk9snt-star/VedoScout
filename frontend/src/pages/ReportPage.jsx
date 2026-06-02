@@ -224,7 +224,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, is_paid, manually_unlocked } = report;
+  const { preview, full_report, player_details, video_url, poster_url, is_paid, manually_unlocked } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -275,9 +275,12 @@ export default function ReportPage() {
               ) : (
                 <video
                   src={`${ASSET_BASE}${video_url}`}
+                  poster={poster_url ? `${ASSET_BASE}${poster_url}` : undefined}
                   controls
+                  playsInline
+                  preload="metadata"
                   data-testid="report-video"
-                  className="w-full bg-black"
+                  className="w-full bg-black aspect-video"
                 />
               )}
               <div className="mt-4 grid grid-cols-3 gap-px bg-white/5">

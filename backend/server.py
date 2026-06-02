@@ -71,8 +71,8 @@ DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_DKK", "399"))
 app = FastAPI(title="Elite Football AI Scout API")
 api_router = APIRouter(prefix="/api")
 
-# Mount uploads as static
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+# Mount uploads as static (under /api so Kubernetes ingress routes it to backend)
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # ============== MODELS ==============
 
@@ -316,6 +316,57 @@ async def call_gemini_with_video(session_id: str, prompt: str, video_path: str) 
         raise HTTPException(status_code=500, detail="AI analysis returned invalid format. Please try again.")
 
 
+def transcode_to_web_mp4(src_path: Path) -> Path:
+    """
+    Convert the uploaded video to a browser-friendly MP4 (H.264 + AAC, faststart).
+    Returns the new file path. Falls back to original if ffmpeg fails.
+    """
+    import subprocess
+    out_path = src_path.with_suffix(".web.mp4")
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(src_path),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
+                "-vf", "scale='min(1280,iw)':-2",
+                "-c:a", "aac", "-b:a", "128k",
+                "-movflags", "+faststart",
+                "-loglevel", "error",
+                str(out_path),
+            ],
+            capture_output=True, timeout=180,
+        )
+        if result.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0:
+            return out_path
+        logger.warning(f"ffmpeg returncode={result.returncode}, stderr={result.stderr[:300]}")
+    except Exception as e:
+        logger.warning(f"ffmpeg transcode failed: {e}")
+    return src_path
+
+
+def generate_poster(video_path: Path) -> Optional[Path]:
+    """Extract a single-frame poster JPG from the video. Returns None on failure."""
+    import subprocess
+    poster_path = video_path.with_suffix(".poster.jpg")
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(video_path),
+                "-ss", "00:00:02", "-vframes", "1",
+                "-vf", "scale='min(1280,iw)':-2",
+                "-q:v", "4",
+                "-loglevel", "error",
+                str(poster_path),
+            ],
+            capture_output=True, timeout=30,
+        )
+        if result.returncode == 0 and poster_path.exists():
+            return poster_path
+    except Exception as e:
+        logger.warning(f"Poster generation failed: {e}")
+    return None
+
+
 # ============== ROUTES: HEALTH ==============
 
 @api_router.get("/")
@@ -430,6 +481,15 @@ async def upload_video_and_create_preview(
 
     file_size = file_path.stat().st_size
 
+    # Convert to a web-friendly MP4 (H.264) so it plays in every browser.
+    # Skip if already MP4 with a small size hint, otherwise always transcode.
+    web_path = transcode_to_web_mp4(file_path)
+    web_filename = web_path.name
+
+    # Generate poster thumbnail from the playable video
+    poster_path = generate_poster(web_path)
+    poster_filename = poster_path.name if poster_path else None
+
     # Build player details summary
     details = {
         "player_name": player_name,
@@ -442,26 +502,33 @@ async def upload_video_and_create_preview(
     }
     details_str = json.dumps(details, ensure_ascii=False)
 
-    # Generate FREE preview synchronously
+    # Generate FREE preview synchronously (Gemini happily reads mp4, mov etc.)
     try:
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=PREVIEW_PROMPT.replace("{player_details}", details_str),
-            video_path=str(file_path),
+            video_path=str(web_path),
         )
     except HTTPException:
         # Cleanup
-        try:
-            file_path.unlink()
-        except Exception:
-            pass
+        for p in {file_path, web_path}:
+            try:
+                p.unlink()
+            except Exception:
+                pass
+        if poster_path:
+            try:
+                poster_path.unlink()
+            except Exception:
+                pass
         raise
     except Exception as e:
         logger.exception("Preview generation failed")
-        try:
-            file_path.unlink()
-        except Exception:
-            pass
+        for p in {file_path, web_path}:
+            try:
+                p.unlink()
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail=f"AI preview generation failed: {str(e)}")
 
     # Persist report
@@ -470,7 +537,9 @@ async def upload_video_and_create_preview(
         "user_id": user["id"],
         "user_email": user["email"],
         "player_details": details,
-        "video_filename": stored_name,
+        "video_filename": web_filename,
+        "original_video_filename": stored_name if stored_name != web_filename else None,
+        "poster_filename": poster_filename,
         "video_size_bytes": file_size,
         "preview": preview,
         "full_report": None,
@@ -484,7 +553,8 @@ async def upload_video_and_create_preview(
     return {
         "id": report_id,
         "player_details": details,
-        "video_url": f"/uploads/{stored_name}",
+        "video_url": f"/api/uploads/{web_filename}",
+        "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
         "preview": preview,
         "is_paid": False,
         "created_at": report_doc["created_at"],
@@ -498,17 +568,20 @@ async def my_reports(user=Depends(get_current_user)):
         {"_id": 0, "full_report": 0},
     ).sort("created_at", -1).to_list(100)
     for d in docs:
-        d["video_url"] = f"/uploads/{d['video_filename']}"
+        d["video_url"] = f"/api/uploads/{d['video_filename']}"
+        d["poster_url"] = f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None
     return docs
 
 
 def _serialize_report(doc: dict, include_full: bool) -> dict:
+    poster_filename = doc.get("poster_filename")
     out = {
         "id": doc["id"],
         "user_id": doc["user_id"],
         "user_email": doc.get("user_email"),
         "player_details": doc["player_details"],
-        "video_url": f"/uploads/{doc['video_filename']}",
+        "video_url": f"/api/uploads/{doc['video_filename']}",
+        "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
         "preview": doc.get("preview"),
         "is_paid": doc.get("is_paid", False),
         "manually_unlocked": doc.get("manually_unlocked", False),
@@ -970,7 +1043,8 @@ async def admin_users(_=Depends(get_current_admin)):
 async def admin_reports(_=Depends(get_current_admin)):
     docs = await db.reports.find({}, {"_id": 0, "full_report": 0}).sort("created_at", -1).to_list(500)
     for d in docs:
-        d["video_url"] = f"/uploads/{d['video_filename']}"
+        d["video_url"] = f"/api/uploads/{d['video_filename']}"
+        d["poster_url"] = f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None
     return docs
 
 

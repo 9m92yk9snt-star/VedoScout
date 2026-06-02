@@ -66,31 +66,50 @@ export default function DashboardPage() {
                       to={`/report/${r.id}`}
                       key={r.id}
                       data-testid={`dashboard-report-${r.id}`}
-                      className="group bg-surface p-6 hover:bg-deepnavy transition-colors flex flex-col"
+                      className="group bg-surface hover:bg-deepnavy transition-colors flex flex-col overflow-hidden"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/40">
-                          {new Date(r.created_at).toLocaleDateString()}
-                        </span>
-                        {unlocked ? (
-                          <span className="flex items-center gap-1.5 text-volt text-xs uppercase tracking-widest font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Premium
-                          </span>
+                      {/* Thumbnail */}
+                      <div className="relative aspect-video bg-deepnavy overflow-hidden">
+                        {r.poster_url ? (
+                          <img
+                            src={`${process.env.REACT_APP_BACKEND_URL}${r.poster_url}`}
+                            alt={r.player_details?.player_name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          />
                         ) : (
-                          <span className="flex items-center gap-1.5 text-white/60 text-xs uppercase tracking-widest font-bold">
-                            <Lock className="w-3.5 h-3.5" /> Preview
-                          </span>
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface to-deepnavy">
+                            <Film className="w-10 h-10 text-volt/40" strokeWidth={1.5} />
+                          </div>
                         )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-deepnavy via-transparent to-transparent" />
+                        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/80 bg-deepnavy/70 backdrop-blur px-2 py-1">
+                            {new Date(r.created_at).toLocaleDateString()}
+                          </span>
+                          {unlocked ? (
+                            <span className="flex items-center gap-1 bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1">
+                              <CheckCircle2 className="w-3 h-3" /> Premium
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 bg-deepnavy/80 backdrop-blur border border-white/20 text-white/80 text-[10px] uppercase tracking-widest font-bold px-2 py-1">
+                              <Lock className="w-3 h-3" /> Preview
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <h3 className="mt-4 font-barlow font-black uppercase text-2xl text-white group-hover:text-volt transition-colors">
-                        {r.player_details?.player_name}
-                      </h3>
-                      <p className="mt-1 text-sm text-white/60">
-                        {r.player_details?.position} · age {r.player_details?.age}
-                      </p>
-                      <div className="mt-6 pt-6 border-t border-white/10 flex items-center justify-between">
-                        <span className="text-xs uppercase tracking-widest text-white/40">{r.player_details?.video_type}</span>
-                        <span className="text-volt text-xs uppercase tracking-widest font-bold">View →</span>
+
+                      {/* Body */}
+                      <div className="p-5 flex-1 flex flex-col">
+                        <h3 className="font-barlow font-black uppercase text-xl text-white group-hover:text-volt transition-colors leading-tight">
+                          {r.player_details?.player_name}
+                        </h3>
+                        <p className="mt-1 text-sm text-white/60">
+                          {r.player_details?.position} · age {r.player_details?.age}
+                        </p>
+                        <div className="mt-auto pt-4 flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{r.player_details?.video_type}</span>
+                          <span className="text-volt text-[10px] uppercase tracking-widest font-bold">View →</span>
+                        </div>
                       </div>
                     </Link>
                   );
