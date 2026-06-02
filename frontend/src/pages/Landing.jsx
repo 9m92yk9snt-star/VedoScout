@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import {
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
+} from "recharts";
 import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
   ArrowRight, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
-  Activity, Heart, Eye, Trophy, Footprints, Lock,
+  Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
+  TrendingUp, Clock, Award,
 } from "lucide-react";
 
 const fadeUp = {
@@ -14,16 +18,134 @@ const fadeUp = {
   visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.5, ease: "easeOut" } }),
 };
 
+/* ===== Feature cards — richer with example snippets ===== */
 const featureCards = [
-  { icon: Brain, title: "AI Player Report", text: "Full written analysis of style, role and decisions." },
-  { icon: Footprints, title: "Technical Analysis", text: "First touch, ball control, passing, shooting & 1v1." },
-  { icon: Target, title: "Tactical Analysis", text: "Positioning, scanning, runs and game intelligence." },
-  { icon: Activity, title: "Physical Analysis", text: "Acceleration, balance, agility and intensity." },
-  { icon: Heart, title: "Mentality Analysis", text: "Confidence, work rate, focus and competitive edge." },
-  { icon: Eye, title: "Scout View", text: "How a scout might assess this player — strengths & concerns." },
-  { icon: Trophy, title: "Training Plan", text: "5 exercises, weekly focus, 30 & 90-day development." },
-  { icon: FileText, title: "Premium PDF", text: "Download a clean, premium report you can share." },
+  {
+    icon: Brain,
+    title: "AI Player Report",
+    text: "Written analysis of your style, role, decisions and competitive identity.",
+    preview: '"Press-resistant creator with elite scanning frequency and a left-foot range that opens lines vertically."',
+  },
+  {
+    icon: Footprints,
+    title: "Technical",
+    text: "First touch · ball control · dribbling · passing · shooting · weak foot · 1v1.",
+    preview: "7 technical sub-scores · drill recommendations per attribute.",
+  },
+  {
+    icon: Target,
+    title: "Tactical",
+    text: "Positioning · off-ball movement · scanning · decision-making · timing of runs.",
+    preview: "Heatmap-style narrative on game intelligence & pattern recognition.",
+  },
+  {
+    icon: Activity,
+    title: "Physical",
+    text: "Acceleration · top speed · balance · agility · intensity · body control.",
+    preview: "Physical profile mapped to your position's modern demands.",
+  },
+  {
+    icon: Heart,
+    title: "Mentality",
+    text: "Confidence · work rate · courage in duels · focus · response to mistakes.",
+    preview: "How you compete when the score is against you.",
+  },
+  {
+    icon: Eye,
+    title: "Scout View",
+    text: "How a scout might assess this player — strengths, concerns & next level.",
+    preview: "Positional suitability + appropriate next competitive level.",
+  },
+  {
+    icon: Trophy,
+    title: "Training Plan",
+    text: "5 specific exercises + weekly focus + 30-day & 90-day development plans.",
+    preview: "Drill-by-drill schedule tailored to your weakest attributes.",
+  },
+  {
+    icon: FileText,
+    title: "Premium PDF",
+    text: "A clean, premium PDF you can share with coaches, parents and academies.",
+    preview: "Dark, professional layout — print-ready.",
+  },
 ];
+
+/* ===== Sample report data (rich, realistic, hard-coded for landing) ===== */
+const sample = {
+  player: {
+    name: "Lukas A.",
+    age: 14,
+    position: "Attacking Midfielder",
+    foot: "Left",
+    club: "IK Falken U15",
+    type: "Creative Press-Resistant #10",
+  },
+  scores: { technical: 8, tactical: 9, physical: 7, mentality: 9, overall: 8 },
+  summary:
+    "A press-resistant creator with elite scanning frequency for his age. Receives on the half-turn with consistency and breaks lines with a left-foot range that punishes narrow defensive blocks. Decisions in the final third are mature — selects the killer pass when it's on, recycles when it isn't. Physical profile lags slightly behind technical and tactical, particularly in repeated high-intensity sprints.",
+  strengths: [
+    "Scans 2–3 times before receiving (above peer average)",
+    "Line-breaking left-foot passing range",
+    "Composed body orientation under press",
+  ],
+  improvement:
+    "High-intensity sprint repeatability — needs targeted physical work to sustain late-game pressing actions.",
+  technical: [
+    { k: "First touch", v: 8 },
+    { k: "Ball control", v: 8 },
+    { k: "Dribbling", v: 7 },
+    { k: "Passing", v: 9 },
+    { k: "Shooting", v: 7 },
+    { k: "Weak foot", v: 5 },
+    { k: "1v1", v: 7 },
+  ],
+  tactical: [
+    { k: "Positioning", v: 9 },
+    { k: "Off-ball movement", v: 8 },
+    { k: "Scanning", v: 9 },
+    { k: "Decision-making", v: 9 },
+    { k: "Timing of runs", v: 8 },
+    { k: "Game understanding", v: 9 },
+  ],
+  timeline: [
+    { t: "00:24", c: "Strong first touch on diagonal ball, immediately scans both shoulders." },
+    { t: "01:12", c: "Effective 1v1 — feints inside, drives outside, delivers cut-back." },
+    { t: "02:40", c: "Should scan earlier — receives blind, loses possession to back-press." },
+    { t: "03:55", c: "Excellent timing of run between centre-back and full-back." },
+  ],
+  exercise: {
+    name: "Half-turn under pressure",
+    duration: "15 min",
+    desc: "Receive in tight space with mannequin behind. Three touches max — turn, pass, repeat. Builds press-resistance and body orientation.",
+  },
+};
+
+const radarData = [
+  { axis: "Technical", v: sample.scores.technical },
+  { axis: "Tactical", v: sample.scores.tactical },
+  { axis: "Physical", v: sample.scores.physical },
+  { axis: "Mentality", v: sample.scores.mentality },
+  { axis: "Overall", v: sample.scores.overall },
+];
+
+function ScoreBar({ label, value, locked = false }) {
+  return (
+    <div className={locked ? "opacity-70" : ""}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/70">{label}</span>
+        <span className="font-barlow font-black text-volt text-base">
+          {locked ? "—" : value}<span className="text-white/30 text-xs">/10</span>
+        </span>
+      </div>
+      <div className="h-1 bg-white/10 overflow-hidden">
+        <div
+          className="h-full bg-volt"
+          style={{ width: locked ? "0%" : `${value * 10}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function Landing() {
   const [price, setPrice] = useState(399);
@@ -40,11 +162,8 @@ export default function Landing() {
     <div className="min-h-screen bg-deepnavy text-white relative overflow-hidden">
       <Navigation transparent />
 
-      {/* ============ HERO — focused, single viewport ============ */}
-      <section
-        data-testid="hero-section"
-        className="relative min-h-screen flex items-center pt-24 pb-12"
-      >
+      {/* ============ HERO ============ */}
+      <section data-testid="hero-section" className="relative min-h-screen flex items-center pt-24 pb-12">
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.unsplash.com/photo-1706675780107-7c43cc487928?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwyfHxzb2NjZXIlMjBwbGF5ZXIlMjBzdGFkaXVtJTIwbGlnaHRzJTIwbmlnaHR8ZW58MHx8fHwxNzgwNDE1ODUwfDA&ixlib=rb-4.1.0&q=85"
@@ -57,7 +176,6 @@ export default function Landing() {
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            {/* Left — copy + CTAs */}
             <div className="lg:col-span-7">
               <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
                 <div className="inline-flex items-center gap-2 border border-volt/30 bg-volt/10 px-4 py-2">
@@ -69,24 +187,16 @@ export default function Landing() {
               </motion.div>
 
               <motion.h1
-                initial="hidden"
-                animate="visible"
-                variants={fadeUp}
-                custom={1}
+                initial="hidden" animate="visible" variants={fadeUp} custom={1}
                 data-testid="hero-title"
                 className="mt-6 font-barlow font-black uppercase text-5xl sm:text-6xl md:text-7xl leading-[0.92] tracking-tighter"
               >
                 Upload your football video.
-                <span className="block text-gradient-volt mt-1">
-                  Get a professional player analysis.
-                </span>
+                <span className="block text-gradient-volt mt-1">Get a professional player analysis.</span>
               </motion.h1>
 
               <motion.p
-                initial="hidden"
-                animate="visible"
-                variants={fadeUp}
-                custom={2}
+                initial="hidden" animate="visible" variants={fadeUp} custom={2}
                 className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed"
               >
                 Instant AI feedback on strengths, weaknesses & a personalized development plan.
@@ -94,10 +204,7 @@ export default function Landing() {
               </motion.p>
 
               <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={fadeUp}
-                custom={3}
+                initial="hidden" animate="visible" variants={fadeUp} custom={3}
                 className="mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-xl"
               >
                 <Link
@@ -121,10 +228,7 @@ export default function Landing() {
               </motion.div>
 
               <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={fadeUp}
-                custom={4}
+                initial="hidden" animate="visible" variants={fadeUp} custom={4}
                 className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-white/50"
               >
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
@@ -132,7 +236,6 @@ export default function Landing() {
                 <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
               </motion.div>
 
-              {/* Scroll hint */}
               <motion.a
                 href="#what-you-get"
                 initial={{ opacity: 0 }}
@@ -140,12 +243,11 @@ export default function Landing() {
                 transition={{ delay: 0.8 }}
                 className="mt-10 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-white/40 hover:text-volt transition-colors"
               >
-                Scroll to learn more
+                See an example report below
                 <span className="w-8 h-px bg-current" />
               </motion.a>
             </div>
 
-            {/* Right — 3 steps card */}
             <motion.div
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
@@ -162,7 +264,7 @@ export default function Landing() {
                   {[
                     { n: "01", t: "Sign up", d: "Free account. No card required to start." },
                     { n: "02", t: "Upload video & details", d: "Highlight, match or training clip." },
-                    { n: "03", t: "Get instant free preview", d: "Unlock full report for " + price + " DKK." },
+                    { n: "03", t: "Get instant free preview", d: `Unlock full report for ${price} DKK.` },
                   ].map((s, i) => (
                     <li key={i} className="flex gap-4 items-start">
                       <span className="font-barlow font-black text-3xl text-volt/40 leading-none w-10 flex-shrink-0">{s.n}</span>
@@ -201,27 +303,27 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ WHAT YOU RECEIVE — proof of value ============ */}
+      {/* ============ WHAT YOU RECEIVE — rich feature cards ============ */}
       <section id="what-you-get" data-testid="what-you-get" className="relative py-24 md:py-32 border-t border-white/10">
-        <div className="absolute inset-0 z-0 opacity-20">
+        <div className="absolute inset-0 z-0 opacity-15">
           <img
             src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
             alt="Pitch"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-deepnavy/85" />
+          <div className="absolute inset-0 bg-deepnavy/90" />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
           <div className="mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div className="max-w-3xl">
-              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Premium Report</span>
+              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Inside the Premium Report</span>
               <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
-                Everything you receive
+                Eleven sections.<br />Built like a real scout report.
               </h2>
             </div>
             <p className="text-white/60 max-w-md text-sm md:text-base">
-              A scout-grade breakdown across technical, tactical, physical and mental dimensions, with concrete
-              development steps.
+              Each card below is a real section of your unlocked report. Scores, narratives, drills — written
+              specifically about the player in your video.
             </p>
           </div>
 
@@ -230,76 +332,274 @@ export default function Landing() {
               <div
                 key={i}
                 data-testid={`feature-card-${i}`}
-                className="bg-deepnavy p-6 md:p-8 hover:bg-surface hover:-translate-y-1 transition-all group cursor-default"
+                className="bg-deepnavy p-6 md:p-7 hover:bg-surface hover:-translate-y-1 transition-all group cursor-default flex flex-col"
               >
-                <f.icon className="w-8 h-8 text-volt mb-6" strokeWidth={1.5} />
-                <h3 className="font-barlow font-black uppercase text-lg text-white mb-2">{f.title}</h3>
-                <p className="text-xs text-white/55 leading-relaxed">{f.text}</p>
+                <div className="flex items-start justify-between mb-5">
+                  <f.icon className="w-7 h-7 text-volt" strokeWidth={1.5} />
+                  <span className="font-barlow font-black text-xs text-white/20 tracking-widest">0{i + 1}</span>
+                </div>
+                <h3 className="font-barlow font-black uppercase text-lg text-white mb-2 leading-tight">{f.title}</h3>
+                <p className="text-xs text-white/55 leading-relaxed mb-4 flex-1">{f.text}</p>
+                <div className="mt-auto pt-4 border-t border-white/5">
+                  <p className="text-[11px] italic text-volt/80 leading-snug">"{f.preview}"</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ============ SAMPLE REPORT PREVIEW — strongest conversion ============ */}
-      <section data-testid="example-report" className="relative py-24 md:py-32 border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-6 md:px-10">
-          <div className="mb-12 max-w-3xl">
-            <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Sample Preview</span>
-            <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
-              A glimpse of the report
-            </h2>
-            <p className="mt-4 text-white/60 max-w-xl">Free preview is unlocked. Premium sections appear blurred until purchase.</p>
+      {/* ============ SAMPLE REPORT — RICH, COMPELLING, WOW ============ */}
+      <section
+        data-testid="example-report"
+        className="relative py-24 md:py-32 border-t border-white/10 overflow-hidden"
+      >
+        {/* Soft background */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute -top-32 -left-32 w-96 h-96 bg-volt/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-volt/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
+          <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div className="max-w-3xl">
+              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Live Sample Report</span>
+              <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
+                This is what you get.
+              </h2>
+              <p className="mt-4 text-white/65 max-w-2xl">
+                A real example below. The first card is unlocked (your free preview). Everything else is what
+                you unlock when you pay <span className="text-volt font-bold">{price} DKK</span>.
+              </p>
+            </div>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-px bg-white/10 border border-white/10">
-            <div className="bg-surface p-8 lg:col-span-1">
-              <span className="text-xs uppercase tracking-[0.25em] text-volt font-bold">Free preview</span>
-              <h3 className="mt-3 font-barlow font-black uppercase text-3xl">Creative Attacking Midfielder</h3>
-              <p className="mt-4 text-sm text-white/70 leading-relaxed">
-                Press-resistant, scans well between lines. Strong left-footed passing range and timing of arrival in
-                the half-spaces.
-              </p>
-              <div className="mt-6">
-                <div className="text-xs uppercase tracking-[0.2em] text-white/40 font-bold mb-3">Top strengths</div>
-                <ul className="space-y-2 text-sm text-white">
-                  <li className="flex items-start gap-2"><span className="text-volt mt-1">▶</span> Vision & line-breaking passes</li>
-                  <li className="flex items-start gap-2"><span className="text-volt mt-1">▶</span> Body orientation when receiving</li>
-                  <li className="flex items-start gap-2"><span className="text-volt mt-1">▶</span> Calm under high pressure</li>
-                </ul>
+          {/* === SAMPLE REPORT HEADER === */}
+          <div className="grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10 mb-px">
+            {/* Player card */}
+            <div className="bg-surface p-6 md:p-8 lg:col-span-2 relative overflow-hidden">
+              {/* Mini stadium bg */}
+              <div className="absolute inset-0 opacity-20 pointer-events-none">
+                <img
+                  src="https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg"
+                  alt="Pitch"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-surface via-surface/70 to-surface/30" />
+              </div>
+              <div className="relative">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Sample · Free preview</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.9]">
+                  {sample.player.name}
+                </h3>
+                <p className="mt-2 text-sm text-white/60">
+                  {sample.player.position} · age {sample.player.age} · {sample.player.foot}-footed
+                </p>
+                <p className="mt-1 text-xs text-white/40 uppercase tracking-widest font-bold">{sample.player.club}</p>
+
+                <div className="mt-6 inline-flex items-center gap-2 bg-deepnavy/80 border border-volt/30 px-3 py-1.5">
+                  <Star className="w-3.5 h-3.5 text-volt" />
+                  <span className="font-barlow font-bold uppercase text-sm">{sample.player.type}</span>
+                </div>
+
+                <div className="mt-6 grid grid-cols-4 gap-px bg-white/10 border border-white/10">
+                  {[
+                    { k: "TECH", v: sample.scores.technical },
+                    { k: "TACT", v: sample.scores.tactical },
+                    { k: "PHYS", v: sample.scores.physical },
+                    { k: "MENT", v: sample.scores.mentality },
+                  ].map((s, i) => (
+                    <div key={i} className="bg-deepnavy p-2 text-center">
+                      <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">{s.k}</div>
+                      <div className="font-barlow font-black text-2xl text-volt mt-0.5">{s.v}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {[
-              { title: "Tactical Analysis", lines: ["Positioning: 8/10", "Off-ball movement: 7/10", "Scanning frequency: 9/10", "Timing of runs: 8/10"] },
-              { title: "Physical & Mentality", lines: ["Acceleration: 8/10", "Balance: 7/10", "Work rate: 9/10", "Courage in duels: 8/10"] },
-            ].map((card, i) => (
-              <div key={i} className="bg-surface p-8 relative overflow-hidden">
-                <div className="blur-locked">
-                  <span className="text-xs uppercase tracking-[0.25em] text-volt font-bold">Premium</span>
-                  <h3 className="mt-3 font-barlow font-black uppercase text-3xl">{card.title}</h3>
-                  <ul className="mt-6 space-y-3">
-                    {card.lines.map((l, j) => (
-                      <li key={j} className="flex items-center justify-between text-sm">
-                        <span className="text-white/80">{l.split(":")[0]}</span>
-                        <span className="text-volt font-barlow font-black text-lg">{l.split(":")[1]}</span>
+            {/* Brief summary card */}
+            <div className="bg-surface p-6 md:p-8 lg:col-span-3">
+              <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Brief Summary · Free</span>
+              <p className="mt-3 text-white/85 text-base leading-relaxed">{sample.summary}</p>
+
+              <div className="mt-6 grid sm:grid-cols-2 gap-6">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Top strengths</div>
+                  <ul className="space-y-2">
+                    {sample.strengths.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-white/90">
+                        <CheckCircle2 className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
+                        <span>{s}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div className="absolute inset-0 bg-deepnavy/40 backdrop-blur-md flex flex-col items-center justify-center text-center p-8">
-                  <Lock className="w-8 h-8 text-volt mb-4" strokeWidth={1.5} />
-                  <p className="font-barlow font-black uppercase text-xl text-white">Unlock full report</p>
-                  <p className="mt-2 text-xs text-white/60 max-w-[220px]">Single payment unlocks every premium section.</p>
+                <div>
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Area for improvement</div>
+                  <p className="text-sm text-white/85 leading-relaxed">{sample.improvement}</p>
                 </div>
               </div>
-            ))}
+            </div>
+          </div>
+
+          {/* === PREMIUM SECTIONS — blurred but visually rich === */}
+          <div className="relative">
+            {/* The actual content (blurred) */}
+            <div className="blur-locked grid lg:grid-cols-3 gap-px bg-white/10 border border-white/10">
+              {/* Radar chart card */}
+              <div className="bg-surface p-6 md:p-8">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Performance Radar</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Performance map</h3>
+                <div className="mt-4 h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart data={radarData}>
+                      <PolarGrid stroke="rgba(255,255,255,0.15)" />
+                      <PolarAngleAxis dataKey="axis" tick={{ fill: "#94A3B8", fontSize: 10 }} />
+                      <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+                      <Radar dataKey="v" stroke="#CCFF00" fill="#CCFF00" fillOpacity={0.4} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Technical scores card */}
+              <div className="bg-surface p-6 md:p-8">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Technical</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Technical analysis</h3>
+                <div className="mt-5 space-y-3">
+                  {sample.technical.slice(0, 5).map((t, i) => (
+                    <ScoreBar key={i} label={t.k} value={t.v} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Tactical scores card */}
+              <div className="bg-surface p-6 md:p-8">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Tactical</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Tactical analysis</h3>
+                <div className="mt-5 space-y-3">
+                  {sample.tactical.slice(0, 5).map((t, i) => (
+                    <ScoreBar key={i} label={t.k} value={t.v} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Scout view */}
+              <div className="bg-surface p-6 md:p-8 lg:col-span-2">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Scout View</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">How a scout might assess this player</h3>
+                <div className="mt-5 grid sm:grid-cols-2 gap-6">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">Key strengths</div>
+                    <ul className="space-y-2 text-sm text-white/85">
+                      <li className="flex gap-2"><span className="text-volt mt-1">▶</span>Elite scanning frequency for his age</li>
+                      <li className="flex gap-2"><span className="text-volt mt-1">▶</span>Vertical line-breaking left foot</li>
+                      <li className="flex gap-2"><span className="text-volt mt-1">▶</span>Composure under counter-press</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-yellow-400 mb-2">Areas of concern</div>
+                    <ul className="space-y-2 text-sm text-white/85">
+                      <li className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>Repeated high-intensity sprints</li>
+                      <li className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>Weak-foot deliveries</li>
+                      <li className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>Defensive transitions</li>
+                    </ul>
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-white/10 grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Next competitive level</div>
+                    <div className="text-sm text-white/90">Regional academy U15 development squad</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Positional suitability</div>
+                    <div className="text-sm text-white/90">Press-resistant #10, false-9 in possession-based systems</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Training exercise card */}
+              <div className="bg-surface p-6 md:p-8">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Training Plan</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Drill of the week</h3>
+                <div className="mt-5 border border-volt/30 bg-deepnavy p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-barlow font-black uppercase text-white text-base">{sample.exercise.name}</span>
+                    <span className="flex items-center gap-1 text-xs text-volt font-bold"><Clock className="w-3 h-3" />{sample.exercise.duration}</span>
+                  </div>
+                  <p className="text-xs text-white/70 leading-relaxed">{sample.exercise.desc}</p>
+                </div>
+                <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-white/40">
+                  <span className="flex items-center gap-1"><Award className="w-3 h-3 text-volt" />4 more drills</span>
+                  <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-volt" />30 & 90-day plan</span>
+                </div>
+              </div>
+
+              {/* Video timeline */}
+              <div className="bg-surface p-6 md:p-8 lg:col-span-3">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Video Comments</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Timestamped feedback</h3>
+                <div className="mt-5 space-y-2">
+                  {sample.timeline.map((c, i) => (
+                    <div key={i} className="flex items-start gap-4 bg-deepnavy/60 border border-white/5 px-4 py-3">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Play className="w-3 h-3 text-volt" fill="currentColor" />
+                        <span className="font-barlow font-black text-volt text-base min-w-[44px]">{c.t}</span>
+                      </div>
+                      <p className="text-sm text-white/85">{c.c}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* The premium CTA overlay */}
+            <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.5 }}
+                className="pointer-events-auto border border-volt/30 bg-deepnavy/95 backdrop-blur-2xl p-8 md:p-10 max-w-md mx-6 text-center shadow-2xl"
+                style={{ boxShadow: "0 20px 80px rgba(204,255,0,0.15)" }}
+              >
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-volt/10 border border-volt/30 mb-5">
+                  <Lock className="w-6 h-6 text-volt" strokeWidth={1.5} />
+                </div>
+                <span className="text-volt text-[11px] uppercase tracking-[0.3em] font-bold">Premium</span>
+                <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
+                  Unlock the<br />full report
+                </h3>
+                <p className="mt-4 text-sm text-white/65 leading-relaxed">
+                  Radar map · all 4 score categories · scout view · 5 personalised drills · 30 & 90-day plan · timestamped feedback · premium PDF.
+                </p>
+
+                <div className="mt-6 flex items-baseline justify-center gap-2">
+                  <span className="font-barlow font-black text-5xl md:text-6xl text-volt leading-none">{price}</span>
+                  <span className="text-white/60 uppercase tracking-widest font-bold text-sm">DKK</span>
+                </div>
+                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mt-1">one-time · no subscription</p>
+
+                <Link
+                  to={startHref}
+                  data-testid="sample-unlock-cta"
+                  className="mt-6 w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+                >
+                  {startLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <p className="mt-3 text-[10px] text-white/40 flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
+                </p>
+              </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ============ TRUST ============ */}
-      <section id="trust" data-testid="trust-section" className="relative py-24 border-t border-white/10">
+      <section id="trust" data-testid="trust-section" className="relative py-20 border-t border-white/10">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
           <div className="border border-white/10 bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
             <ShieldCheck className="w-12 h-12 text-volt flex-shrink-0" strokeWidth={1.5} />
@@ -346,7 +646,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ FOOTER ============ */}
       <footer className="border-t border-white/10 py-10">
         <div className="max-w-7xl mx-auto px-6 md:px-10 flex flex-col md:flex-row justify-between gap-4 items-center">
           <div className="flex items-center gap-3">
