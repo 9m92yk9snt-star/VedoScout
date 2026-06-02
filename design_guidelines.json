@@ -1,0 +1,92 @@
+{
+  "theme": "dark",
+  "archetype": "2 (Performance Pro)",
+  "emotional_tone": "Intense, Elite, Professional, Action-oriented",
+  "colors": {
+    "background": "#050A0F",
+    "surface": "#0F1623",
+    "surface_glass": "rgba(15, 22, 35, 0.7)",
+    "primary": "#CCFF00",
+    "primary_hover": "#B3E600",
+    "text_main": "#FFFFFF",
+    "text_muted": "#94A3B8",
+    "border": "rgba(255, 255, 255, 0.1)",
+    "success": "#00FF66",
+    "danger": "#FF3B30",
+    "warning": "#FFB800"
+  },
+  "typography": {
+    "heading_font": "Barlow Condensed",
+    "body_font": "DM Sans",
+    "heading_classes": "font-barlow-condensed uppercase tracking-tight",
+    "body_classes": "font-dm-sans tracking-wide",
+    "h1": "text-5xl sm:text-6xl font-black uppercase tracking-tighter",
+    "h2": "text-4xl sm:text-5xl font-black uppercase tracking-tighter",
+    "h3": "text-2xl sm:text-3xl font-bold uppercase tracking-tight",
+    "body": "text-base leading-relaxed text-slate-300",
+    "labels": "text-xs font-bold uppercase tracking-[0.2em] text-slate-400"
+  },
+  "spacing_and_layout": {
+    "grid_system": "Bento Grid (Mode B: Control Room Grid for Dashboards, Mode A for Landing)",
+    "container_padding": "p-6 md:p-12 lg:p-24",
+    "card_padding": "p-6 md:p-8",
+    "gap_strategy": "gap-4 md:gap-8",
+    "border_radius": "rounded-none",
+    "alignment": "Left-aligned for stats and data, optical alignment for icons."
+  },
+  "surface_strategies": {
+    "cards": "Tactical Minimalism: bg-[#0F1623] border border-white/10 shadow-none. Hover: border-[#CCFF00]/50",
+    "glassmorphism": "Used only for sticky headers and blurred premium overlays. bg-black/60 backdrop-blur-xl border-b border-white/10",
+    "locked_premium": "backdrop-blur-xl bg-[#050A0F]/80 absolute inset-0 z-10 flex flex-col items-center justify-center border border-white/5",
+    "buttons": "bg-[#CCFF00] text-black font-black uppercase tracking-widest hover:bg-white hover:text-black transition-colors rounded-none px-8 py-4"
+  },
+  "icons_and_assets": {
+    "icon_library": "@phosphor-icons/react",
+    "icon_style": "Duotone or Bold weight for tactical feel"
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1706675780107-7c43cc487928?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwyfHxzb2NjZXIlMjBwbGF5ZXIlMjBzdGFkaXVtJTIwbGlnaHRzJTIwbmlnaHR8ZW58MHx8fHwxNzgwNDE1ODUwfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Dramatic night match stadium lights, used for the main landing hero section with bg-black/50 overlay."
+    },
+    "feature_pitch": {
+      "url": "https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg",
+      "description": "Football resting on the pitch under floodlights. Good for 'How it Works' or 'Upload Video' section backgrounds."
+    },
+    "scout_portrait": {
+      "url": "https://images.pexels.com/photos/34424872/pexels-photo-34424872.jpeg",
+      "description": "Black and white image of a focused football coach. Use in the 'Scout View' section to add authority."
+    },
+    "player_action": {
+      "url": "https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg",
+      "description": "Player kicking ball under stadium lights. Use for the 'Sample Premium Report' background or feature cards."
+    }
+  },
+  "components_strategy": {
+    "charts": "Recharts for spider/radar charts to show 1-10 scores (Technical, Tactical, Physical, Mentality)",
+    "forms": "Shadcn UI, highly customized. Square corners, 1px borders, focus:border-[#CCFF00] focus:ring-1 focus:ring-[#CCFF00]",
+    "upload_zone": "Dashed border border-white/20 hover:border-[#CCFF00] bg-[#0F1623] transition-colors p-12 text-center flex flex-col items-center gap-4",
+    "score_badges": "High contrast text on Volt Green background for high scores, Warning Yellow for mid, Red for low.",
+    "premium_blur": "A visual blur effect over dummy data for the free preview, with a prominent 'Unlock Full Report' button."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Cards lift slightly (-translate-y-1) with border color shifting to Volt Green.",
+    "page_transitions": "Framer Motion for smooth staggered entrances of dashboard widgets.",
+    "scroll": "Lenis smooth scrolling mandatory for landing page to feel premium and heavy."
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure pure white text on deep navy meets WCAG AAA.",
+    "testing_attributes": "All interactive elements MUST have data-testid attributes (e.g., data-testid='upload-video-button')."
+  },
+  "instructions_to_main_agent": [
+    "Install required dependencies: yarn add @phosphor-icons/react framer-motion recharts @studio-freight/react-lenis clsx tailwind-merge",
+    "Use pure HTML/Tailwind for the landing page layouts to achieve asymmetry and heavy overlapping.",
+    "Implement Shadcn for forms, modals, and the user/admin dashboards.",
+    "Ensure the hero image has a max bg-black/50 overlay. Do not hide the image completely.",
+    "Implement the 'Locked Premium' effect using CSS backdrop-blur and a pseudo-element overlay to tease content.",
+    "Avoid generic border-radius. Use rounded-none to maintain the 'Tactical/Pro' aesthetic.",
+    "All navigation elements must be visible on desktop, no hiding behind hamburger menus.",
+    "Admin dashboard should utilize pure screen estate, dense data tables, and minimal padding for high-density scanability.",
+    "In Tailwind config, set colors: { volt: '#CCFF00', deepnavy: '#050A0F', surface: '#0F1623' } and fonts: { barlow: ['Barlow Condensed', 'sans-serif'], dm: ['DM Sans', 'sans-serif'] }."
+  ]
+}
