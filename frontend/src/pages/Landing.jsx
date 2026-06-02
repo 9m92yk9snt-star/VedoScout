@@ -18,78 +18,81 @@ const fadeUp = {
   visible: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.5, ease: "easeOut" } }),
 };
 
-/* ===== Feature cards — richer with example snippets ===== */
+/* ===== Feature cards — natural football language ===== */
 const featureCards = [
   {
     icon: Brain,
     title: "AI Player Report",
-    text: "Written analysis of your style, role, decisions and competitive identity.",
-    preview: '"Press-resistant creator with elite scanning frequency and a left-foot range that opens lines vertically."',
+    text: "A full written breakdown of how you play, your strengths, and what makes you unique on the pitch.",
+    preview: "\"Lukas plays like a smart playmaker. He sees passes before others, and his left foot is dangerous.\"",
   },
   {
     icon: Footprints,
     title: "Technical",
-    text: "First touch · ball control · dribbling · passing · shooting · weak foot · 1v1.",
-    preview: "7 technical sub-scores · drill recommendations per attribute.",
+    text: "First touch · ball control · dribbling · passing · shooting · weak foot · 1v1 battles.",
+    preview: "Score from 1–10 for every skill, with a tip on how to improve each one.",
   },
   {
     icon: Target,
     title: "Tactical",
-    text: "Positioning · off-ball movement · scanning · decision-making · timing of runs.",
-    preview: "Heatmap-style narrative on game intelligence & pattern recognition.",
+    text: "Where you stand · how you move without the ball · how you read the game.",
+    preview: "We tell you when your positioning is great and when you need to think faster.",
   },
   {
     icon: Activity,
     title: "Physical",
-    text: "Acceleration · top speed · balance · agility · intensity · body control.",
-    preview: "Physical profile mapped to your position's modern demands.",
+    text: "Speed · acceleration · balance · agility · stamina · body control.",
+    preview: "How your body holds up across a full match — and what fitness work will help most.",
   },
   {
     icon: Heart,
     title: "Mentality",
-    text: "Confidence · work rate · courage in duels · focus · response to mistakes.",
-    preview: "How you compete when the score is against you.",
+    text: "Confidence · work rate · bravery in duels · focus · how you react to mistakes.",
+    preview: "We look at how you compete when the score is against your team.",
   },
   {
     icon: Eye,
     title: "Scout View",
-    text: "How a scout might assess this player — strengths, concerns & next level.",
-    preview: "Positional suitability + appropriate next competitive level.",
+    text: "How a real scout would look at you — what they'd love, what they'd worry about, and what level fits you next.",
+    preview: "Strengths · areas to work on · best position · next competitive level to target.",
   },
   {
     icon: Trophy,
     title: "Training Plan",
-    text: "5 specific exercises + weekly focus + 30-day & 90-day development plans.",
-    preview: "Drill-by-drill schedule tailored to your weakest attributes.",
+    text: "5 specific exercises just for you · a weekly focus · a 30-day plan · a 90-day plan.",
+    preview: "Real drills you can do at training or at home — not generic gym work.",
   },
   {
     icon: FileText,
     title: "Premium PDF",
-    text: "A clean, premium PDF you can share with coaches, parents and academies.",
-    preview: "Dark, professional layout — print-ready.",
+    text: "A clean, professional PDF you can share with your coach, your parents, or academies.",
+    preview: "Designed to look like a real scout dossier — print-ready.",
   },
 ];
 
-/* ===== Sample report data (rich, realistic, hard-coded for landing) ===== */
+/* ===== Sample report data — natural football language ===== */
 const sample = {
   player: {
     name: "Lukas A.",
+    number: 10,
     age: 14,
     position: "Attacking Midfielder",
+    positionShort: "CAM",
     foot: "Left",
     club: "IK Falken U15",
-    type: "Creative Press-Resistant #10",
+    videoType: "Match clip",
+    type: "Smart playmaker · strong left foot",
   },
   scores: { technical: 8, tactical: 9, physical: 7, mentality: 9, overall: 8 },
   summary:
-    "A press-resistant creator with elite scanning frequency for his age. Receives on the half-turn with consistency and breaks lines with a left-foot range that punishes narrow defensive blocks. Decisions in the final third are mature — selects the killer pass when it's on, recycles when it isn't. Physical profile lags slightly behind technical and tactical, particularly in repeated high-intensity sprints.",
+    "Lukas is a smart playmaker who sees the game two steps ahead of others his age. He stays calm when defenders close him down and loves to play forward passes that cut the defence in half. His left foot is his weapon — he can find a teammate from almost anywhere on the pitch. The one thing to work on: he gets tired in the second half when he has to sprint again and again. Build the legs, and the rest is already there.",
   strengths: [
-    "Scans 2–3 times before receiving (above peer average)",
-    "Line-breaking left-foot passing range",
-    "Composed body orientation under press",
+    "Always looks around before the ball arrives",
+    "Strong left foot — passes that open up defences",
+    "Stays calm even when two players close him down",
   ],
   improvement:
-    "High-intensity sprint repeatability — needs targeted physical work to sustain late-game pressing actions.",
+    "Gets tired late in matches. Needs more fitness work so he can keep pressing and running in the last 20 minutes.",
   technical: [
     { k: "First touch", v: 8 },
     { k: "Ball control", v: 8 },
@@ -101,22 +104,34 @@ const sample = {
   ],
   tactical: [
     { k: "Positioning", v: 9 },
-    { k: "Off-ball movement", v: 8 },
-    { k: "Scanning", v: 9 },
-    { k: "Decision-making", v: 9 },
+    { k: "Off-ball runs", v: 8 },
+    { k: "Game awareness", v: 9 },
+    { k: "Decision making", v: 9 },
     { k: "Timing of runs", v: 8 },
-    { k: "Game understanding", v: 9 },
+    { k: "Reading the game", v: 9 },
   ],
+  scoutStrengths: [
+    "Always looks around before he gets the ball",
+    "Left foot can pick out any pass",
+    "Calm under pressure",
+  ],
+  scoutConcerns: [
+    "Tires late in matches",
+    "Right foot needs work",
+    "Slow to react when team loses the ball",
+  ],
+  nextLevel: "Ready to step up to a stronger U15 team or an academy trial",
+  bestPosition: "Best as a creative #10 right behind the striker",
   timeline: [
-    { t: "00:24", c: "Strong first touch on diagonal ball, immediately scans both shoulders." },
-    { t: "01:12", c: "Effective 1v1 — feints inside, drives outside, delivers cut-back." },
-    { t: "02:40", c: "Should scan earlier — receives blind, loses possession to back-press." },
-    { t: "03:55", c: "Excellent timing of run between centre-back and full-back." },
+    { t: "00:24", c: "Great first touch on a tough ball — already checking his shoulder before it arrives." },
+    { t: "01:12", c: "Beats his man cleanly — fakes inside, goes outside, plays a perfect cut-back." },
+    { t: "02:40", c: "Should look around earlier here — gets caught with the ball and loses it." },
+    { t: "03:55", c: "Smart run in behind the defence — perfect timing between the two defenders." },
   ],
   exercise: {
-    name: "Half-turn under pressure",
+    name: "Receive and turn",
     duration: "15 min",
-    desc: "Receive in tight space with mannequin behind. Three touches max — turn, pass, repeat. Builds press-resistance and body orientation.",
+    desc: "Stand in tight space with a teammate or cone behind you. Maximum three touches — open your body, turn, pass, repeat. Builds confidence on the ball when defenders are close.",
   },
 };
 
@@ -374,44 +389,83 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* === SAMPLE REPORT HEADER === */}
+          {/* === SAMPLE REPORT HEADER — pro football card === */}
           <div className="grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10 mb-px">
-            {/* Player card */}
-            <div className="bg-surface p-6 md:p-8 lg:col-span-2 relative overflow-hidden">
-              {/* Mini stadium bg */}
-              <div className="absolute inset-0 opacity-20 pointer-events-none">
+            {/* Player card — premium football style */}
+            <div className="bg-surface lg:col-span-2 relative overflow-hidden">
+              {/* Pitch background */}
+              <div className="absolute inset-0 opacity-25 pointer-events-none">
                 <img
                   src="https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg"
                   alt="Pitch"
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-surface via-surface/70 to-surface/30" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-deepnavy via-deepnavy/85 to-deepnavy/40" />
               </div>
-              <div className="relative">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Sample · Free preview</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.9]">
-                  {sample.player.name}
-                </h3>
-                <p className="mt-2 text-sm text-white/60">
-                  {sample.player.position} · age {sample.player.age} · {sample.player.foot}-footed
-                </p>
-                <p className="mt-1 text-xs text-white/40 uppercase tracking-widest font-bold">{sample.player.club}</p>
 
-                <div className="mt-6 inline-flex items-center gap-2 bg-deepnavy/80 border border-volt/30 px-3 py-1.5">
-                  <Star className="w-3.5 h-3.5 text-volt" />
-                  <span className="font-barlow font-bold uppercase text-sm">{sample.player.type}</span>
+              {/* Top stripe with badge + free tag */}
+              <div className="relative flex items-center justify-between px-5 py-3 border-b border-white/10 bg-deepnavy/60">
+                <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-volt rounded-full animate-pulse" /> Free Preview
+                </span>
+                <span className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-bold">{sample.player.videoType}</span>
+              </div>
+
+              <div className="relative px-5 md:px-7 py-6 md:py-7">
+                {/* Big jersey number + name */}
+                <div className="flex items-start gap-5">
+                  <div className="flex-shrink-0">
+                    <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-volt/70 mb-1">No.</div>
+                    <div className="font-barlow font-black text-volt leading-none" style={{ fontSize: "5.5rem", textShadow: "0 4px 24px rgba(204,255,0,0.3)" }}>
+                      {sample.player.number}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0 pt-2">
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40 mb-1">Player</div>
+                    <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.9] text-white">
+                      {sample.player.name}
+                    </h3>
+                    <div className="mt-2 inline-flex items-center gap-2 bg-volt/10 border border-volt/30 px-2.5 py-1">
+                      <span className="font-barlow font-black uppercase text-volt text-sm leading-none">{sample.player.positionShort}</span>
+                      <span className="text-white/60 text-[11px]">·</span>
+                      <span className="text-white/80 text-xs">{sample.player.position}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-4 gap-px bg-white/10 border border-white/10">
+                {/* Meta row */}
+                <div className="mt-6 grid grid-cols-3 gap-px bg-white/5 border border-white/10">
+                  <div className="bg-deepnavy/60 p-3">
+                    <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Age</div>
+                    <div className="font-barlow font-black text-white text-2xl leading-none mt-1">{sample.player.age}</div>
+                  </div>
+                  <div className="bg-deepnavy/60 p-3">
+                    <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Foot</div>
+                    <div className="font-barlow font-black text-white text-lg leading-none mt-1.5">{sample.player.foot}</div>
+                  </div>
+                  <div className="bg-deepnavy/60 p-3">
+                    <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Team</div>
+                    <div className="font-barlow font-black text-white text-sm leading-none mt-1.5 truncate">{sample.player.club}</div>
+                  </div>
+                </div>
+
+                {/* Style tag */}
+                <div className="mt-4 flex items-center gap-2 text-xs text-white/70">
+                  <Star className="w-3.5 h-3.5 text-volt flex-shrink-0" fill="currentColor" />
+                  <span className="font-bold">{sample.player.type}</span>
+                </div>
+
+                {/* Score row */}
+                <div className="mt-5 grid grid-cols-4 gap-px bg-white/10 border border-volt/20">
                   {[
                     { k: "TECH", v: sample.scores.technical },
                     { k: "TACT", v: sample.scores.tactical },
                     { k: "PHYS", v: sample.scores.physical },
                     { k: "MENT", v: sample.scores.mentality },
                   ].map((s, i) => (
-                    <div key={i} className="bg-deepnavy p-2 text-center">
+                    <div key={i} className="bg-deepnavy/80 py-3 text-center">
                       <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">{s.k}</div>
-                      <div className="font-barlow font-black text-2xl text-volt mt-0.5">{s.v}</div>
+                      <div className="font-barlow font-black text-3xl text-volt mt-0.5 leading-none">{s.v}</div>
                     </div>
                   ))}
                 </div>
@@ -420,15 +474,18 @@ export default function Landing() {
 
             {/* Brief summary card */}
             <div className="bg-surface p-6 md:p-8 lg:col-span-3">
-              <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Brief Summary · Free</span>
-              <p className="mt-3 text-white/85 text-base leading-relaxed">{sample.summary}</p>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">What the AI saw</span>
+                <span className="text-white/30 text-[10px] uppercase tracking-widest font-bold">Free preview</span>
+              </div>
+              <p className="text-white/90 text-base md:text-[17px] leading-[1.65]">{sample.summary}</p>
 
-              <div className="mt-6 grid sm:grid-cols-2 gap-6">
+              <div className="mt-7 grid sm:grid-cols-2 gap-6 pt-6 border-t border-white/10">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Top strengths</div>
-                  <ul className="space-y-2">
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">What he does well</div>
+                  <ul className="space-y-2.5">
                     {sample.strengths.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-white/90">
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/90 leading-snug">
                         <CheckCircle2 className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
                         <span>{s}</span>
                       </li>
@@ -436,7 +493,7 @@ export default function Landing() {
                   </ul>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Area for improvement</div>
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">What to work on</div>
                   <p className="text-sm text-white/85 leading-relaxed">{sample.improvement}</p>
                 </div>
               </div>
@@ -488,33 +545,33 @@ export default function Landing() {
               {/* Scout view */}
               <div className="bg-surface p-6 md:p-8 lg:col-span-2">
                 <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Scout View</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">How a scout might assess this player</h3>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">How a scout would see this player</h3>
                 <div className="mt-5 grid sm:grid-cols-2 gap-6">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">Key strengths</div>
+                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">What he'd love</div>
                     <ul className="space-y-2 text-sm text-white/85">
-                      <li className="flex gap-2"><span className="text-volt mt-1">▶</span>Elite scanning frequency for his age</li>
-                      <li className="flex gap-2"><span className="text-volt mt-1">▶</span>Vertical line-breaking left foot</li>
-                      <li className="flex gap-2"><span className="text-volt mt-1">▶</span>Composure under counter-press</li>
+                      {sample.scoutStrengths.map((s, i) => (
+                        <li key={i} className="flex gap-2"><span className="text-volt mt-1">▶</span>{s}</li>
+                      ))}
                     </ul>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-yellow-400 mb-2">Areas of concern</div>
+                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-yellow-400 mb-2">What he'd worry about</div>
                     <ul className="space-y-2 text-sm text-white/85">
-                      <li className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>Repeated high-intensity sprints</li>
-                      <li className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>Weak-foot deliveries</li>
-                      <li className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>Defensive transitions</li>
+                      {sample.scoutConcerns.map((s, i) => (
+                        <li key={i} className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>{s}</li>
+                      ))}
                     </ul>
                   </div>
                 </div>
                 <div className="mt-6 pt-6 border-t border-white/10 grid sm:grid-cols-2 gap-4">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Next competitive level</div>
-                    <div className="text-sm text-white/90">Regional academy U15 development squad</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Next level to aim for</div>
+                    <div className="text-sm text-white/90">{sample.nextLevel}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Positional suitability</div>
-                    <div className="text-sm text-white/90">Press-resistant #10, false-9 in possession-based systems</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Best position</div>
+                    <div className="text-sm text-white/90">{sample.bestPosition}</div>
                   </div>
                 </div>
               </div>
@@ -572,7 +629,7 @@ export default function Landing() {
                   Unlock the<br />full report
                 </h3>
                 <p className="mt-4 text-sm text-white/65 leading-relaxed">
-                  Radar map · all 4 score categories · scout view · 5 personalised drills · 30 & 90-day plan · timestamped feedback · premium PDF.
+                  Full performance map · all 4 score categories · scout view · 5 personal drills · 30 & 90-day plan · timestamped video comments · premium PDF.
                 </p>
 
                 <div className="mt-6 flex items-baseline justify-center gap-2">
