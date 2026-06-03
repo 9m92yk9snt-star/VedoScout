@@ -124,6 +124,10 @@ class CheckoutInit(BaseModel):
     origin_url: str
 
 
+class PrepayUploadInit(BaseModel):
+    origin_url: str
+
+
 class AgentReviewSubmit(BaseModel):
     review_text: str = Field(min_length=10)
     agent_name: Optional[str] = "Elite Scout Team"
@@ -710,6 +714,24 @@ async def upload_video_and_create_preview(
     description: str = Form(...),
     user=Depends(get_current_user),
 ):
+    # ============== UPLOAD GATE ==============
+    # Free users get ONE free preview lifetime. After that, every upload requires
+    # a 399 DKK pre-payment (auto-unlocks the full premium report on completion).
+    is_admin = user.get("role") == "admin"
+    free_used = bool(user.get("free_preview_used"))
+    prepaid = int(user.get("prepaid_uploads", 0) or 0)
+    upload_will_be_paid = False
+    if not is_admin:
+        if free_used and prepaid <= 0:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "PREPAY_REQUIRED",
+                    "message": "Your free preview is used. Pay 399 DKK to upload your next video — full premium report unlocks instantly.",
+                },
+            )
+        upload_will_be_paid = free_used and prepaid > 0
+
     # Validate file type
     allowed_mimes = {"video/mp4", "video/quicktime", "video/x-m4v", "video/webm"}
     if file.content_type not in allowed_mimes:
@@ -844,12 +866,29 @@ async def upload_video_and_create_preview(
         "content_gate": gate,
         "preview": preview,
         "full_report": None,
-        "is_paid": False,
+        "is_paid": bool(upload_will_be_paid),
         "manually_unlocked": False,
         "created_at": now_iso(),
-        "paid_at": None,
+        "paid_at": now_iso() if upload_will_be_paid else None,
     }
     await db.reports.insert_one(report_doc)
+
+    # ============== CONSUME ELIGIBILITY ==============
+    if not is_admin:
+        if upload_will_be_paid:
+            # Pre-paid upload — consume one credit; full report will be auto-generated below
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$inc": {"prepaid_uploads": -1}, "$set": {"last_upload_at": now_iso()}},
+            )
+            # Schedule full premium report generation (same path as paid checkout flow)
+            background.add_task(generate_full_report_task, report_id)
+        elif not free_used:
+            # First free preview consumed
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"free_preview_used": True, "last_upload_at": now_iso()}},
+            )
 
     return {
         "id": report_id,
@@ -1009,6 +1048,48 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
         {"$set": {"full_report": full, "full_generated_at": now_iso()}},
     )
     return {"status": "generated", "report_id": report_id}
+
+
+async def generate_full_report_task(report_id: str) -> None:
+    """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads)."""
+    try:
+        doc = await db.reports.find_one({"id": report_id})
+        if not doc or doc.get("full_report"):
+            return
+        file_path = UPLOAD_DIR / doc["video_filename"]
+        if not file_path.exists():
+            logger.warning(f"generate_full_report_task: video missing for {report_id}")
+            return
+
+        marker_path = None
+        if doc.get("marker_filename"):
+            mp = UPLOAD_DIR / doc["marker_filename"]
+            if mp.exists():
+                marker_path = str(mp)
+
+        details_str = json.dumps(doc["player_details"], ensure_ascii=False)
+        gate = doc.get("content_gate") or {}
+        full_prompt = (
+            FULL_REPORT_PROMPT
+            .replace("{player_details}", details_str)
+            .replace("{content_type}", str(gate.get("content_type", "other")))
+            .replace("{quality}", str(gate.get("quality", "good")))
+            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+            .replace("{games_detected}", str(gate.get("games_detected", 1)))
+        )
+        full = await call_gemini_with_video(
+            session_id=f"full-{report_id}",
+            prompt=full_prompt,
+            video_path=str(file_path),
+            marker_path=marker_path,
+        )
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report": full, "full_generated_at": now_iso()}},
+        )
+    except Exception:
+        logger.exception(f"generate_full_report_task failed for {report_id}")
 
 
 # ============== AGENT REVIEW (user side) ==============
@@ -1344,6 +1425,68 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
 
 # ============== PAYMENTS (STRIPE) ==============
 
+@api_router.get("/me/upload-eligibility")
+async def get_upload_eligibility(user=Depends(get_current_user)):
+    """Tells the frontend whether the user can upload for free, must pre-pay, or is admin."""
+    if user.get("role") == "admin":
+        return {"eligible": True, "reason": "admin", "free_preview_used": True, "prepaid_uploads": 999}
+    free_used = bool(user.get("free_preview_used"))
+    prepaid = int(user.get("prepaid_uploads", 0) or 0)
+    if not free_used:
+        return {"eligible": True, "reason": "free_preview", "free_preview_used": False, "prepaid_uploads": prepaid}
+    if prepaid > 0:
+        return {"eligible": True, "reason": "prepaid", "free_preview_used": True, "prepaid_uploads": prepaid}
+    return {"eligible": False, "reason": "prepay_required", "free_preview_used": True, "prepaid_uploads": 0}
+
+
+@api_router.post("/payments/prepay-upload")
+async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Request, user=Depends(get_current_user)):
+    """Stripe checkout for a single upload credit (399 DKK). On success, +1 prepaid_uploads."""
+    price_dkk = await get_current_price()
+
+    host_url = str(request.base_url)
+    webhook_url = f"{host_url}api/webhook/stripe"
+    stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+
+    origin = payload.origin_url.rstrip("/")
+    success_url = f"{origin}/upload?prepay_session={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/upload?prepay_canceled=1"
+
+    metadata = {
+        "kind": "prepay_upload",
+        "user_id": user["id"],
+        "user_email": user["email"],
+    }
+
+    session_req = CheckoutSessionRequest(
+        amount=float(price_dkk),
+        currency="dkk",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata,
+    )
+    session = await stripe_checkout.create_checkout_session(session_req)
+
+    txn = {
+        "id": str(uuid.uuid4()),
+        "session_id": session.session_id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "report_id": None,
+        "kind": "prepay_upload",
+        "amount": float(price_dkk),
+        "currency": "dkk",
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.payment_transactions.insert_one(txn)
+
+    return {"url": session.url, "session_id": session.session_id}
+
+
 @api_router.post("/payments/checkout")
 async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(get_current_user)):
     report = await db.reports.find_one({"id": payload.report_id})
@@ -1428,20 +1571,34 @@ async def payment_status(session_id: str, request: Request, user=Depends(get_cur
         }},
     )
 
-    # On success, mark report paid (idempotent)
+    # On success, mark report paid or credit prepay (idempotent)
     if new_payment_status == "paid":
-        report = await db.reports.find_one({"id": txn["report_id"]})
-        if report and not report.get("is_paid"):
-            await db.reports.update_one(
-                {"id": txn["report_id"]},
-                {"$set": {"is_paid": True, "paid_at": now_iso()}},
-            )
+        kind = (txn.get("kind") or txn.get("metadata", {}).get("kind") or "report")
+        if kind == "prepay_upload":
+            # Idempotent credit grant: only grant if not previously credited
+            if not txn.get("credited"):
+                await db.users.update_one(
+                    {"id": txn["user_id"]},
+                    {"$inc": {"prepaid_uploads": 1}},
+                )
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {"credited": True}},
+                )
+        else:
+            report = await db.reports.find_one({"id": txn.get("report_id")})
+            if report and not report.get("is_paid"):
+                await db.reports.update_one(
+                    {"id": txn["report_id"]},
+                    {"$set": {"is_paid": True, "paid_at": now_iso()}},
+                )
 
     return {
         "payment_status": new_payment_status,
         "status": new_status,
         "amount_total": status_resp.amount_total,
         "currency": status_resp.currency,
+        "kind": (txn.get("kind") or txn.get("metadata", {}).get("kind") or "report"),
     }
 
 
@@ -1463,18 +1620,33 @@ async def stripe_webhook(request: Request):
     if event.event_type == "checkout.session.completed" and event.payment_status == "paid":
         session_id = event.session_id
         metadata = event.metadata or {}
-        report_id = metadata.get("report_id")
-        if report_id:
-            txn = await db.payment_transactions.find_one({"session_id": session_id})
-            if txn and txn.get("payment_status") != "paid":
+        kind = metadata.get("kind") or "report"
+        txn = await db.payment_transactions.find_one({"session_id": session_id})
+
+        if kind == "prepay_upload":
+            if txn and not txn.get("credited"):
                 await db.payment_transactions.update_one(
                     {"session_id": session_id},
-                    {"$set": {"payment_status": "paid", "status": "complete", "updated_at": now_iso()}},
+                    {"$set": {"payment_status": "paid", "status": "complete", "credited": True, "updated_at": now_iso()}},
                 )
-                await db.reports.update_one(
-                    {"id": report_id},
-                    {"$set": {"is_paid": True, "paid_at": now_iso()}},
-                )
+                user_id = metadata.get("user_id") or txn.get("user_id")
+                if user_id:
+                    await db.users.update_one(
+                        {"id": user_id},
+                        {"$inc": {"prepaid_uploads": 1}},
+                    )
+        else:
+            report_id = metadata.get("report_id") or (txn and txn.get("report_id"))
+            if report_id:
+                if txn and txn.get("payment_status") != "paid":
+                    await db.payment_transactions.update_one(
+                        {"session_id": session_id},
+                        {"$set": {"payment_status": "paid", "status": "complete", "updated_at": now_iso()}},
+                    )
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"is_paid": True, "paid_at": now_iso()}},
+                    )
 
     return {"received": True}
 

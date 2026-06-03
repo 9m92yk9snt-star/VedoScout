@@ -503,9 +503,10 @@ export default function ReportPage() {
             </div>
           )}
 
-          {/* ===== Free Preview ===== */}
+          {/* ===== Free Preview ===== TWO sections only: Summary + Top Strengths + locked teaser */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mt-10">
             <div className="grid lg:grid-cols-3 gap-px bg-white/10 border border-white/10">
+              {/* SECTION 1 — Summary + Top strengths */}
               <div className="bg-surface p-6 md:p-8 lg:col-span-2">
                 <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Brief Summary</span>
                 <p
@@ -515,33 +516,68 @@ export default function ReportPage() {
                   {preview?.brief_summary}
                 </p>
 
-                <div className="mt-8 grid sm:grid-cols-2 gap-6">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Top strengths</div>
-                    <ul className="space-y-2">
-                      {(preview?.top_strengths || []).map((s, i) => (
-                        <li key={i} data-testid={`preview-strength-${i}`} className="flex items-start gap-2 text-sm text-white">
-                          <span className="text-volt mt-1">▶</span> {s}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Area for improvement</div>
-                    <p data-testid="preview-improvement" className="text-sm text-white/85 leading-relaxed">
-                      {preview?.area_for_improvement}
-                    </p>
-                  </div>
+                <div className="mt-8">
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Top strengths</div>
+                  <ul className="space-y-2">
+                    {(preview?.top_strengths || []).slice(0, 3).map((s, i) => (
+                      <li key={i} data-testid={`preview-strength-${i}`} className="flex items-start gap-2 text-sm text-white">
+                        <span className="text-volt mt-1">▶</span> {s}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
+
+                {/* Confidence note (new format only) */}
+                {preview?.confidence && (
+                  <div className="mt-6 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-white/60 border border-white/15 px-2.5 py-1">
+                    <ShieldCheck className="w-3 h-3 text-volt" />
+                    Preview confidence · {preview.confidence}
+                  </div>
+                )}
               </div>
 
-              <div className="bg-surface p-6 md:p-8">
-                <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">{preview?.sample_section?.title || "Sample Section"}</span>
-                <p className="mt-3 text-white/75 text-sm leading-relaxed">{preview?.sample_section?.content}</p>
-                <div className="mt-6 border-t border-white/10 pt-6">
-                  <p className="text-xs text-white/40 uppercase tracking-[0.2em] font-bold">More premium sections below</p>
+              {/* SECTION 2 — LOCKED TEASER: Unlock 9 more sections */}
+              {!unlocked ? (
+                <div
+                  data-testid="preview-locked-teaser"
+                  className="relative bg-gradient-to-br from-volt/10 via-deepnavy/30 to-deepnavy/30 p-6 md:p-8 border-l border-volt/30 overflow-hidden"
+                >
+                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-volt/15 blur-3xl rounded-full pointer-events-none" />
+                  <div className="relative">
+                    <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/10 px-2.5 py-1.5">
+                      <Lock className="w-3 h-3" /> Locked
+                    </div>
+                    <div className="mt-5 font-barlow font-black uppercase text-3xl md:text-4xl text-white leading-[0.95] tracking-tight">
+                      Unlock <span className="text-volt">9 more</span><br />sections
+                    </div>
+                    <p className="mt-4 text-sm text-white/65 leading-relaxed">
+                      Technical · Tactical · Physical · Mentality · Scout view · Training plan · Potential · Premium PDF · Scout chat.
+                    </p>
+                    <ul className="mt-5 space-y-1.5 text-[12px] text-white/55">
+                      {["Confidence + evidence per category", "Personalised 90-day plan", "Premium downloadable PDF"].map((t, i) => (
+                        <li key={i} className="flex items-start gap-2"><span className="text-volt mt-0.5">·</span><span>{t}</span></li>
+                      ))}
+                    </ul>
+                    <button
+                      onClick={handleUnlock}
+                      disabled={unlocking}
+                      data-testid="preview-locked-cta"
+                      className="mt-6 inline-flex items-center justify-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 transition-colors disabled:opacity-60"
+                    >
+                      {unlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
+                      Unlock for {price} DKK
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-surface p-6 md:p-8 border-l border-white/10">
+                  <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Premium unlocked</span>
+                  <p className="mt-3 text-white/75 text-sm leading-relaxed">All 11 sections, evidence + confidence, scout review chat, and the premium PDF are now available below.</p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-volt border border-volt/40 bg-volt/10 px-2.5 py-1.5">
+                    <Check className="w-3 h-3" /> Full report active
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
 

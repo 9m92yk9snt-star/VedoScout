@@ -1,11 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
-import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2 } from "lucide-react";
+import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap } from "lucide-react";
 
 export default function UploadPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [eligibility, setEligibility] = useState(null);   // { eligible, reason, free_preview_used, prepaid_uploads }
+  const [eligibilityLoading, setEligibilityLoading] = useState(true);
+  const [prepaying, setPrepaying] = useState(false);
+
   const [file, setFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
   const [markerBlob, setMarkerBlob] = useState(null);
@@ -36,6 +41,68 @@ export default function UploadPage() {
   const navigate = useNavigate();
 
   const setField = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
+
+  // Fetch upload eligibility on mount + after returning from Stripe checkout
+  const refreshEligibility = async () => {
+    try {
+      const { data } = await api.get("/me/upload-eligibility");
+      setEligibility(data);
+    } catch (err) {
+      // If unauthorized, just leave eligibility null
+      console.error("Eligibility check failed", err);
+    } finally {
+      setEligibilityLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshEligibility();
+    // eslint-disable-next-line
+  }, []);
+
+  // Handle return from Stripe prepay checkout (?prepay_session=... or ?prepay_canceled=1)
+  useEffect(() => {
+    const sessionId = searchParams.get("prepay_session");
+    const canceled = searchParams.get("prepay_canceled");
+    if (sessionId) {
+      (async () => {
+        try {
+          const { data } = await api.get(`/payments/status/${sessionId}`);
+          if (data.payment_status === "paid") {
+            toast.success("Upload credit added — you can upload your next video.");
+            await refreshEligibility();
+          } else {
+            toast.info("Payment still pending. Refresh in a few seconds.");
+          }
+        } catch (e) {
+          toast.error("Couldn't verify your payment. Refresh the page or contact support.");
+        }
+        // Clean up the query params
+        const next = new URLSearchParams(searchParams);
+        next.delete("prepay_session");
+        setSearchParams(next, { replace: true });
+      })();
+    } else if (canceled) {
+      toast.info("Payment cancelled.");
+      const next = new URLSearchParams(searchParams);
+      next.delete("prepay_canceled");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line
+  }, [searchParams.get("prepay_session"), searchParams.get("prepay_canceled")]);
+
+  const handlePrepayUpload = async () => {
+    setPrepaying(true);
+    try {
+      const { data } = await api.post("/payments/prepay-upload", {
+        origin_url: window.location.origin,
+      });
+      window.location.href = data.url;
+    } catch (err) {
+      setPrepaying(false);
+      toast.error(err?.response?.data?.detail || "Couldn't start checkout. Try again.");
+    }
+  };
 
   // Reset zoom/pan whenever marking starts or video changes
   useEffect(() => {
@@ -298,10 +365,23 @@ export default function UploadPage() {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 600000,
       });
-      toast.success("Free preview generated. Review your insights.");
+      toast.success(
+        eligibility?.reason === "prepaid"
+          ? "Upload received — generating your premium report."
+          : "Free preview generated. Review your insights."
+      );
       navigate(`/report/${data.id}`);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Upload failed. Please try again.");
+      // 402 with structured detail = pre-pay required
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 402 && (detail?.code === "PREPAY_REQUIRED" || typeof detail === "object")) {
+        toast.info(detail?.message || "Pay 399 DKK to upload your next video.");
+        await refreshEligibility();
+      } else {
+        toast.error(
+          (typeof detail === "string" ? detail : detail?.message) || "Upload failed. Please try again."
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -321,9 +401,84 @@ export default function UploadPage() {
             <p className="mt-3 text-white/60 max-w-2xl text-sm md:text-base">
               Upload the clip, scrub to the best moment, and click on the player. Our scouts then review only that exact player.
             </p>
+
+            {/* Eligibility status pill */}
+            {!eligibilityLoading && eligibility && (
+              <div className="mt-5">
+                {eligibility.reason === "free_preview" && (
+                  <span data-testid="eligibility-free" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/5 px-3 py-1.5">
+                    <Zap className="w-3.5 h-3.5" /> 1 free preview available
+                  </span>
+                )}
+                {eligibility.reason === "prepaid" && (
+                  <span data-testid="eligibility-prepaid" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/5 px-3 py-1.5">
+                    <Check className="w-3.5 h-3.5" /> 1 prepaid upload · full premium report
+                  </span>
+                )}
+                {eligibility.reason === "admin" && (
+                  <span data-testid="eligibility-admin" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-white/70 border border-white/20 px-3 py-1.5">
+                    Admin · unlimited uploads
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-px" data-testid="upload-form">
+          {/* ===== PAYWALL — ineligible state ===== */}
+          {!eligibilityLoading && eligibility && !eligibility.eligible && eligibility.reason === "prepay_required" && (
+            <div data-testid="upload-paywall" className="mb-10 relative overflow-hidden border-2 border-volt bg-gradient-to-br from-volt/10 via-deepnavy/40 to-deepnavy/40 p-8 md:p-12" style={{ boxShadow: "0 0 80px rgba(204,255,0,0.12)" }}>
+              <div className="grid md:grid-cols-3 gap-8 items-center">
+                <div className="md:col-span-2">
+                  <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] font-bold text-volt border border-volt/40 bg-volt/10 px-3 py-1.5 mb-5">
+                    <Lock className="w-3.5 h-3.5" />
+                    Free preview used
+                  </div>
+                  <h2 className="font-barlow font-black uppercase text-3xl md:text-5xl tracking-tighter leading-[0.95]">
+                    Ready for your next video?
+                  </h2>
+                  <p className="mt-4 text-white/75 leading-relaxed text-sm md:text-base max-w-xl">
+                    Pre-pay <span className="text-volt font-bold">399 DKK</span> to upload your next clip — your full premium report unlocks the moment analysis finishes. No second checkout. No subscriptions.
+                  </p>
+                  <ul className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-white/80">
+                    {[
+                      "Full 11-section premium report",
+                      "Evidence + confidence per category",
+                      "Premium PDF you can share",
+                      "Scout review chat unlocked",
+                    ].map((s, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-volt mt-0.5 shrink-0" />
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={handlePrepayUpload}
+                    disabled={prepaying}
+                    data-testid="upload-prepay-btn"
+                    className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-7 py-4 transition-colors disabled:opacity-60"
+                  >
+                    {prepaying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
+                    Pre-pay 399 DKK & upload
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                  <p className="mt-3 text-[11px] text-white/40 uppercase tracking-[0.2em] font-bold">
+                    Secure Stripe checkout · one-time payment · no subscriptions
+                  </p>
+                </div>
+                <div className="md:col-span-1 text-center md:text-right">
+                  <div className="inline-block bg-deepnavy/60 border border-volt/30 p-6">
+                    <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt mb-2">Per upload</div>
+                    <div className="font-barlow font-black text-6xl text-white leading-none">399</div>
+                    <div className="mt-1 text-xs uppercase tracking-widest font-bold text-white/55">DKK · one-time</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className={`space-y-px ${eligibility && !eligibility.eligible ? "opacity-40 pointer-events-none" : ""}`} data-testid="upload-form">
             {/* ===== STEP 1: FILE DROP ===== */}
             <div className="grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10">
               <div className="bg-surface p-6 md:p-8 lg:col-span-2">
