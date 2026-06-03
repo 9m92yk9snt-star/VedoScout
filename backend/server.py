@@ -65,7 +65,8 @@ JWT_ALG = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXP_MIN = int(os.environ.get("JWT_EXPIRES_MINUTES", "1440"))
 ADMIN_EMAIL = os.environ["ADMIN_EMAIL"]
 ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
-DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_DKK", "399"))
+DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_USD", "1"))
+PRICE_CURRENCY = os.environ.get("DEFAULT_REPORT_CURRENCY", "usd").lower()
 
 # ---- App ----
 app = FastAPI(title="Elite Football AI Scout API")
@@ -116,7 +117,9 @@ class PlayerDetails(BaseModel):
 
 
 class PriceUpdate(BaseModel):
-    price_dkk: float
+    price: Optional[float] = None
+    # backward-compat — admin UI may send price_dkk; we treat both as the canonical price
+    price_dkk: Optional[float] = None
 
 
 class CheckoutInit(BaseModel):
@@ -687,9 +690,8 @@ async def me(user=Depends(get_current_user)):
 @api_router.get("/settings/price")
 async def public_price():
     doc = await db.settings.find_one({"key": "report_price"}, {"_id": 0})
-    if doc:
-        return {"price_dkk": doc.get("value", DEFAULT_PRICE), "currency": "dkk"}
-    return {"price_dkk": DEFAULT_PRICE, "currency": "dkk"}
+    value = doc.get("value", DEFAULT_PRICE) if doc else DEFAULT_PRICE
+    return {"price": float(value), "currency": PRICE_CURRENCY, "price_dkk": float(value)}
 
 
 async def get_current_price() -> float:
@@ -1467,7 +1469,7 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
 
     session_req = CheckoutSessionRequest(
         amount=float(price_dkk),
-        currency="dkk",
+        currency=PRICE_CURRENCY,
         success_url=success_url,
         cancel_url=cancel_url,
         metadata=metadata,
@@ -1483,7 +1485,7 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
         "kind": "prepay_upload",
         "brand": "ScoutMePlay",
         "amount": float(price_dkk),
-        "currency": "dkk",
+        "currency": PRICE_CURRENCY,
         "metadata": metadata,
         "payment_status": "initiated",
         "status": "open",
@@ -1531,7 +1533,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
 
     session_req = CheckoutSessionRequest(
         amount=float(price_dkk),
-        currency="dkk",
+        currency=PRICE_CURRENCY,
         success_url=success_url,
         cancel_url=cancel_url,
         metadata=metadata,
@@ -1547,7 +1549,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
         "report_id": payload.report_id,
         "brand": "ScoutMePlay",
         "amount": float(price_dkk),
-        "currency": "dkk",
+        "currency": PRICE_CURRENCY,
         "metadata": metadata,
         "payment_status": "initiated",
         "status": "open",
@@ -1712,14 +1714,17 @@ async def admin_payments(_=Depends(get_current_admin)):
 
 @api_router.put("/admin/price")
 async def admin_update_price(payload: PriceUpdate, _=Depends(get_current_admin)):
-    if payload.price_dkk <= 0:
+    new_price = payload.price if payload.price is not None else payload.price_dkk
+    if new_price is None or new_price <= 0:
         raise HTTPException(status_code=400, detail="Price must be > 0")
+    if new_price > 999:
+        raise HTTPException(status_code=400, detail="Price must be <= 999")
     await db.settings.update_one(
         {"key": "report_price"},
-        {"$set": {"key": "report_price", "value": float(payload.price_dkk), "updated_at": now_iso()}},
+        {"$set": {"key": "report_price", "value": float(new_price), "updated_at": now_iso()}},
         upsert=True,
     )
-    return {"price_dkk": payload.price_dkk}
+    return {"price": float(new_price), "currency": PRICE_CURRENCY, "price_dkk": float(new_price)}
 
 
 @api_router.post("/admin/reports/{report_id}/unlock")

@@ -15,8 +15,8 @@ const STAGES = ["Preparing secure checkout", "Connecting to Stripe", "Encrypting
 export default function CheckoutTransitionModal({
   open,
   state = "preparing",
-  amount = 399,
-  currency = "DKK",
+  amount = 1,
+  currency = "USD",
   product = "ScoutMePlay – Football Video Analysis",
   errorMessage,
   onClose,
