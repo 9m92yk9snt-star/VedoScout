@@ -51,7 +51,7 @@ export default function Navigation({ transparent = false }) {
         <Link to="/" data-testid="nav-logo" className="flex items-center gap-2.5 sm:gap-3 group min-w-0 shrink">
           <LogoMark className="w-12 h-14 sm:w-14 sm:h-16 shrink-0 group-hover:scale-105 transition-transform" />
           <div className="flex flex-col leading-none min-w-0">
-            <span className="font-barlow font-black uppercase text-white tracking-tight text-base sm:text-xl whitespace-nowrap">
+            <span className="font-barlow font-black uppercase text-white text-base sm:text-xl tracking-[0.16em] sm:tracking-[0.18em] whitespace-nowrap">
               SCOUTMEPLAY
             </span>
             <span className="text-[7px] sm:text-[10px] text-volt font-bold uppercase tracking-[0.12em] sm:tracking-[0.22em] mt-1.5 sm:mt-2 whitespace-nowrap">

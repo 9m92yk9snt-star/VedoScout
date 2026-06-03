@@ -506,30 +506,12 @@ export default function Landing() {
             className="mt-16 md:mt-20"
           >
             <div className="flex items-center justify-center gap-3 md:gap-4">
-              {/* Inline soccer-boot SVG */}
-              <svg viewBox="0 0 44 32" className="w-9 h-7 md:w-11 md:h-8 shrink-0" aria-hidden="true">
-                {/* Upper body of boot */}
-                <path
-                  d="M3 22 Q3 12 11 9 L26 6 Q38 6 40 14 Q41 18 40 22 L3 22 Z"
-                  fill="#ccff00"
-                />
-                {/* Sole */}
-                <path
-                  d="M3 22 L40 22 L38 26 L5 26 Z"
-                  fill="#ccff00"
-                />
-                {/* Heel cup highlight */}
-                <path d="M3 22 Q3 16 7 14 L7 22 Z" fill="#a8d000" />
-                {/* Lace lines */}
-                <line x1="18" y1="10.5" x2="32" y2="10.5" stroke="#0d111a" strokeWidth="1.2" strokeLinecap="round" />
-                <line x1="18" y1="14" x2="32" y2="14" stroke="#0d111a" strokeWidth="1.2" strokeLinecap="round" />
-                <line x1="18" y1="17.5" x2="32" y2="17.5" stroke="#0d111a" strokeWidth="1.2" strokeLinecap="round" />
-                {/* Studs */}
-                <circle cx="9" cy="29" r="1.3" fill="#ccff00" />
-                <circle cx="18" cy="29" r="1.3" fill="#ccff00" />
-                <circle cx="27" cy="29" r="1.3" fill="#ccff00" />
-                <circle cx="35" cy="29" r="1.3" fill="#ccff00" />
-              </svg>
+              {/* Premium Eye icon — matches "eyes of professionals" */}
+              <div className="relative flex items-center justify-center w-11 h-11 md:w-14 md:h-14 shrink-0">
+                <span aria-hidden className="absolute inset-0 bg-volt/20 blur-xl rounded-full" />
+                <span aria-hidden className="absolute inset-1.5 border border-volt/40 rounded-full" />
+                <Eye className="relative w-6 h-6 md:w-7 md:h-7 text-volt" strokeWidth={1.6} fill="rgba(204,255,0,0.08)" />
+              </div>
               <p className="font-serif-italic italic text-xl md:text-2xl text-white/95 leading-snug text-center">
                 See your game through the eyes of{" "}
                 <span className="text-volt">professionals.</span>
