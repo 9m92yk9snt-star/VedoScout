@@ -206,8 +206,8 @@ export default function Landing() {
                 data-testid="hero-title"
                 className="mt-6 font-barlow font-black uppercase text-5xl sm:text-6xl md:text-7xl leading-[0.92] tracking-tighter"
               >
-                Your dream
-                <span className="block text-gradient-volt mt-1">deserves to be seen.</span>
+                Where talent
+                <span className="block text-gradient-volt mt-1">gets noticed.</span>
               </motion.h1>
 
               <motion.p
@@ -711,7 +711,7 @@ export default function Landing() {
             </div>
             <span className="font-barlow font-black uppercase tracking-tight">ScoutMePlay</span>
           </div>
-          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Your dream deserves to be seen · Football scouting service</p>
+          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Where talent gets noticed · Football scouting service</p>
           <p className="mt-2 text-[10px] text-white/30 normal-case tracking-normal max-w-md md:text-right">
             ScoutMePlay combines advanced scouting technology with human review to deliver honest player feedback.
           </p>
