@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
+import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 
 /* Visual treatment for confidence badges (high / medium / low). */
 const CONFIDENCE_STYLES = {
@@ -121,8 +122,8 @@ function LockedOverlay({ price, onUnlock, loading }) {
         Full scout analysis across technical, tactical, physical & mental dimensions. Scout view, training plan & a premium PDF.
       </p>
       <div className="mt-6 flex items-baseline gap-2">
-        <span className="font-barlow font-black text-6xl md:text-7xl text-volt">{price}</span>
-        <span className="text-white/60 uppercase tracking-widest font-bold">DKK</span>
+        <span className="font-barlow font-black text-6xl md:text-7xl text-volt">${price}</span>
+        <span className="text-white/60 uppercase tracking-widest font-bold">USD</span>
       </div>
       <p className="text-xs text-white/40 uppercase tracking-widest font-bold">One-time payment · No subscription</p>
       <button
@@ -156,10 +157,11 @@ export default function ReportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [report, setReport] = useState(null);
-  const [price, setPrice] = useState(399);
+  const [price, setPrice] = useState(1);
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
   const [checkoutModal, setCheckoutModal] = useState({ open: false, state: "preparing", errorMessage: null });
+  const [embeddedOpen, setEmbeddedOpen] = useState(false);
   const [generatingFull, setGeneratingFull] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const pollingRef = useRef(null);
@@ -171,7 +173,7 @@ export default function ReportPage() {
         api.get("/settings/price"),
       ]);
       setReport(r.data);
-      setPrice(p.data.price_dkk);
+      setPrice(p.data.price);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to load report");
       navigate("/dashboard");
@@ -243,6 +245,18 @@ export default function ReportPage() {
 
   const handleUnlock = async () => {
     setUnlocking(true);
+    // Prefer embedded checkout when configured
+    try {
+      const { data: cfg } = await api.get("/config/stripe");
+      if (cfg.embedded_available) {
+        setUnlocking(false);
+        setEmbeddedOpen(true);
+        return;
+      }
+    } catch (_) {
+      // ignore — fall through to redirect mode
+    }
+
     setCheckoutModal({ open: true, state: "preparing", errorMessage: null });
     try {
       const { data } = await api.post("/payments/checkout", {
@@ -260,6 +274,30 @@ export default function ReportPage() {
         errorMessage: err?.response?.data?.detail || "Failed to start checkout",
       });
       setUnlocking(false);
+    }
+  };
+
+  // Embedded checkout: backend session creator
+  const embeddedUnlockInit = async () => {
+    const { data } = await api.post("/payments/embedded/unlock", {
+      report_id: id,
+      origin_url: window.location.origin,
+    });
+    return data;
+  };
+
+  const handleEmbeddedSuccess = async () => {
+    await fetchReport();
+    // Trigger full report generation
+    setGeneratingFull(true);
+    try {
+      await api.post(`/reports/${id}/generate-full`);
+      await fetchReport();
+      toast.success("Full premium report unlocked");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Couldn't auto-generate full report. Click 'Regenerate' below.");
+    } finally {
+      setGeneratingFull(false);
     }
   };
 
@@ -346,9 +384,18 @@ export default function ReportPage() {
         state={checkoutModal.state}
         errorMessage={checkoutModal.errorMessage}
         amount={price}
-        currency="DKK"
+        currency="USD"
         product="ScoutMePlay – Football Video Analysis"
         onClose={() => setCheckoutModal({ open: false, state: "preparing", errorMessage: null })}
+      />
+      <EmbeddedCheckoutModal
+        open={embeddedOpen}
+        sessionInit={embeddedUnlockInit}
+        amount={price}
+        currency="USD"
+        product="ScoutMePlay – Premium Report Unlock"
+        onSuccess={handleEmbeddedSuccess}
+        onClose={() => setEmbeddedOpen(false)}
       />
 
       <div className="pt-28 px-6">
@@ -588,7 +635,7 @@ export default function ReportPage() {
                       className="mt-6 inline-flex items-center justify-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 transition-colors disabled:opacity-60"
                     >
                       {unlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
-                      Unlock for {price} DKK
+                      Unlock for ${price} USD
                     </button>
                   </div>
                 </div>

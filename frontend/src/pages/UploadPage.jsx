@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
+import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import api from "@/lib/api";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap } from "lucide-react";
 
@@ -11,8 +12,12 @@ export default function UploadPage() {
   const [eligibility, setEligibility] = useState(null);   // { eligible, reason, free_preview_used, prepaid_uploads }
   const [eligibilityLoading, setEligibilityLoading] = useState(true);
   const [prepaying, setPrepaying] = useState(false);
+  const [price, setPrice] = useState(1);
 
-  // Stripe transition modal state
+  // Embedded checkout state (preferred when Stripe keys are configured)
+  const [embeddedOpen, setEmbeddedOpen] = useState(false);
+
+  // Stripe transition modal state (legacy redirect fallback)
   const [checkoutModal, setCheckoutModal] = useState({ open: false, state: "preparing", errorMessage: null });
 
   const [file, setFile] = useState(null);
@@ -61,6 +66,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     refreshEligibility();
+    api.get("/settings/price").then(({ data }) => setPrice(data.price)).catch(() => {});
     // eslint-disable-next-line
   }, []);
 
@@ -98,12 +104,24 @@ export default function UploadPage() {
 
   const handlePrepayUpload = async () => {
     setPrepaying(true);
+    try {
+      // Prefer the embedded checkout when configured
+      const { data: cfg } = await api.get("/config/stripe");
+      if (cfg.embedded_available) {
+        setPrepaying(false);
+        setEmbeddedOpen(true);
+        return;
+      }
+    } catch (_) {
+      // ignore — fall through to redirect mode
+    }
+
+    // Legacy redirect-style flow
     setCheckoutModal({ open: true, state: "preparing", errorMessage: null });
     try {
       const { data } = await api.post("/payments/prepay-upload", {
         origin_url: window.location.origin,
       });
-      // Brief pause so the user perceives the modal, then redirect
       setCheckoutModal((m) => ({ ...m, state: "redirecting" }));
       setTimeout(() => {
         window.location.href = data.url;
@@ -116,6 +134,19 @@ export default function UploadPage() {
         errorMessage: err?.response?.data?.detail || "Couldn't start checkout. Try again.",
       });
     }
+  };
+
+  // Embedded checkout: backend session creator
+  const embeddedPrepayInit = async () => {
+    const { data } = await api.post("/payments/embedded/prepay-upload", {
+      origin_url: window.location.origin,
+    });
+    return data;
+  };
+
+  const handleEmbeddedSuccess = async () => {
+    await refreshEligibility();
+    toast.success("Upload credit added. You can upload your next video now.");
   };
 
   // Reset zoom/pan whenever marking starts or video changes
@@ -389,7 +420,7 @@ export default function UploadPage() {
       // 402 with structured detail = pre-pay required
       const detail = err?.response?.data?.detail;
       if (err?.response?.status === 402 && (detail?.code === "PREPAY_REQUIRED" || typeof detail === "object")) {
-        toast.info(detail?.message || "Pay 399 DKK to upload your next video.");
+        toast.info(detail?.message || `Pay $${price} to upload your next video.`);
         await refreshEligibility();
       } else {
         toast.error(
@@ -408,10 +439,19 @@ export default function UploadPage() {
         open={checkoutModal.open}
         state={checkoutModal.state}
         errorMessage={checkoutModal.errorMessage}
-        amount={399}
-        currency="DKK"
+        amount={price}
+        currency="USD"
         product="ScoutMePlay – Football Video Analysis"
         onClose={() => setCheckoutModal({ open: false, state: "preparing", errorMessage: null })}
+      />
+      <EmbeddedCheckoutModal
+        open={embeddedOpen}
+        sessionInit={embeddedPrepayInit}
+        amount={price}
+        currency="USD"
+        product="ScoutMePlay – Football Video Analysis"
+        onSuccess={handleEmbeddedSuccess}
+        onClose={() => setEmbeddedOpen(false)}
       />
 
       <div className="pt-28 pb-16 px-6">
@@ -460,7 +500,7 @@ export default function UploadPage() {
                     Ready for your next video?
                   </h2>
                   <p className="mt-4 text-white/75 leading-relaxed text-sm md:text-base max-w-xl">
-                    Pre-pay <span className="text-volt font-bold">399 DKK</span> to upload your next clip — your full premium report unlocks the moment analysis finishes. No second checkout. No subscriptions.
+                    Pre-pay <span className="text-volt font-bold">${price} USD</span> to upload your next clip — your full premium report unlocks the moment analysis finishes. No second checkout. No subscriptions.
                   </p>
                   <ul className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-white/80">
                     {[
@@ -483,7 +523,7 @@ export default function UploadPage() {
                     className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-7 py-4 transition-colors disabled:opacity-60"
                   >
                     {prepaying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-                    Pre-pay 399 DKK & upload
+                    Pre-pay ${price} USD & upload
                     <ArrowRight className="w-5 h-5" />
                   </button>
                   <p className="mt-3 text-[11px] text-white/40 uppercase tracking-[0.2em] font-bold">
@@ -493,8 +533,8 @@ export default function UploadPage() {
                 <div className="md:col-span-1 text-center md:text-right">
                   <div className="inline-block bg-deepnavy/60 border border-volt/30 p-6">
                     <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt mb-2">Per upload</div>
-                    <div className="font-barlow font-black text-6xl text-white leading-none">399</div>
-                    <div className="mt-1 text-xs uppercase tracking-widest font-bold text-white/55">DKK · one-time</div>
+                    <div className="font-barlow font-black text-6xl text-white leading-none">${price}</div>
+                    <div className="mt-1 text-xs uppercase tracking-widest font-bold text-white/55">USD · one-time</div>
                   </div>
                 </div>
               </div>

@@ -30,6 +30,9 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutSessionRequest,
 )
 
+# Raw Stripe SDK — required for `ui_mode="embedded"` checkout (not supported by emergentintegrations wrapper).
+import stripe as stripe_sdk
+
 # PDF generation
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -60,6 +63,10 @@ db = client[os.environ["DB_NAME"]]
 # ---- Constants ----
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
 STRIPE_API_KEY = os.environ["STRIPE_API_KEY"]
+# Embedded checkout uses the raw Stripe SDK and requires a real Stripe secret key.
+# If STRIPE_SECRET_KEY is unset we fall back to STRIPE_API_KEY (so non-embedded flows keep working).
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY") or STRIPE_API_KEY
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 JWT_SECRET = os.environ["JWT_SECRET_KEY"]
 JWT_ALG = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXP_MIN = int(os.environ.get("JWT_EXPIRES_MINUTES", "1440"))
@@ -691,6 +698,7 @@ async def me(user=Depends(get_current_user)):
 async def public_price():
     doc = await db.settings.find_one({"key": "report_price"}, {"_id": 0})
     value = doc.get("value", DEFAULT_PRICE) if doc else DEFAULT_PRICE
+    # `price_dkk` is kept only as a legacy alias for older frontend builds
     return {"price": float(value), "currency": PRICE_CURRENCY, "price_dkk": float(value)}
 
 
@@ -718,18 +726,19 @@ async def upload_video_and_create_preview(
 ):
     # ============== UPLOAD GATE ==============
     # Free users get ONE free preview lifetime. After that, every upload requires
-    # a 399 DKK pre-payment (auto-unlocks the full premium report on completion).
+    # a pre-payment (auto-unlocks the full premium report on completion).
     is_admin = user.get("role") == "admin"
     free_used = bool(user.get("free_preview_used"))
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
     upload_will_be_paid = False
     if not is_admin:
         if free_used and prepaid <= 0:
+            current_price = await get_current_price()
             raise HTTPException(
                 status_code=402,
                 detail={
                     "code": "PREPAY_REQUIRED",
-                    "message": "Your free preview is used. Pay 399 DKK to upload your next video — full premium report unlocks instantly.",
+                    "message": f"Your free preview is used. Pay ${current_price:g} to upload your next video — full premium report unlocks instantly.",
                 },
             )
         upload_will_be_paid = free_used and prepaid > 0
@@ -1443,8 +1452,8 @@ async def get_upload_eligibility(user=Depends(get_current_user)):
 
 @api_router.post("/payments/prepay-upload")
 async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Request, user=Depends(get_current_user)):
-    """Stripe checkout for a single upload credit (399 DKK). On success, +1 prepaid_uploads."""
-    price_dkk = await get_current_price()
+    """Stripe checkout for a single upload credit. On success, +1 prepaid_uploads."""
+    price = await get_current_price()
 
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
@@ -1468,7 +1477,7 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
     }
 
     session_req = CheckoutSessionRequest(
-        amount=float(price_dkk),
+        amount=float(price),
         currency=PRICE_CURRENCY,
         success_url=success_url,
         cancel_url=cancel_url,
@@ -1484,7 +1493,7 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
         "report_id": None,
         "kind": "prepay_upload",
         "brand": "ScoutMePlay",
-        "amount": float(price_dkk),
+        "amount": float(price),
         "currency": PRICE_CURRENCY,
         "metadata": metadata,
         "payment_status": "initiated",
@@ -1507,7 +1516,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
     if report.get("is_paid"):
         raise HTTPException(status_code=400, detail="Report already paid")
 
-    price_dkk = await get_current_price()
+    price = await get_current_price()
 
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
@@ -1532,7 +1541,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
     }
 
     session_req = CheckoutSessionRequest(
-        amount=float(price_dkk),
+        amount=float(price),
         currency=PRICE_CURRENCY,
         success_url=success_url,
         cancel_url=cancel_url,
@@ -1548,7 +1557,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
         "user_email": user["email"],
         "report_id": payload.report_id,
         "brand": "ScoutMePlay",
-        "amount": float(price_dkk),
+        "amount": float(price),
         "currency": PRICE_CURRENCY,
         "metadata": metadata,
         "payment_status": "initiated",
@@ -1670,6 +1679,241 @@ async def stripe_webhook(request: Request):
     return {"received": True}
 
 
+# ============== EMBEDDED CHECKOUT (true in-page Stripe checkout) ==============
+# These endpoints use the raw stripe SDK because emergentintegrations does not yet expose
+# `ui_mode="embedded"`. They run side-by-side with the redirect-style endpoints above and
+# only activate when valid `STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY` are configured.
+
+_SCOUTMEPLAY_METADATA = {
+    "brand": "ScoutMePlay",
+    "company": "Mentalkids",
+    "website": "ScoutMePlay",
+    "source": "scoutmeplay_website",
+    "niche": "football_scouting_video_analysis",
+    "product": "ScoutMePlay – Football Video Analysis",
+}
+
+
+def _embedded_ready() -> bool:
+    """Return True only when both pk and sk are real Stripe keys (not the Emergent stub)."""
+    pk_ok = STRIPE_PUBLISHABLE_KEY.startswith("pk_")
+    sk_ok = STRIPE_SECRET_KEY.startswith("sk_") and STRIPE_SECRET_KEY != "sk_test_emergent"
+    return pk_ok and sk_ok
+
+
+@api_router.get("/config/stripe")
+async def stripe_config():
+    """Public endpoint — gives the frontend the publishable key and embedded availability flag."""
+    return {
+        "publishable_key": STRIPE_PUBLISHABLE_KEY,
+        "embedded_available": _embedded_ready(),
+    }
+
+
+def _build_embedded_metadata(extra: Dict[str, str]) -> Dict[str, str]:
+    return {**_SCOUTMEPLAY_METADATA, **extra}
+
+
+@api_router.post("/payments/embedded/prepay-upload")
+async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_current_user)):
+    if not _embedded_ready():
+        raise HTTPException(status_code=503, detail="Embedded checkout not configured. Add Stripe pk_/sk_ keys.")
+    price = await get_current_price()
+    amount_cents = int(round(float(price) * 100))
+
+    origin = payload.origin_url.rstrip("/")
+    return_url = f"{origin}/upload?embedded_session={{CHECKOUT_SESSION_ID}}"
+
+    metadata = _build_embedded_metadata({
+        "kind": "prepay_upload",
+        "user_id": user["id"],
+        "user_email": user["email"],
+    })
+
+    try:
+        stripe_sdk.api_key = STRIPE_SECRET_KEY
+        session = stripe_sdk.checkout.Session.create(
+            ui_mode="embedded",
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": PRICE_CURRENCY,
+                    "product_data": {
+                        "name": "ScoutMePlay – Football Video Analysis",
+                        "description": "Upload credit · full premium report included",
+                    },
+                    "unit_amount": amount_cents,
+                },
+                "quantity": 1,
+            }],
+            return_url=return_url,
+            metadata=metadata,
+            payment_intent_data={"metadata": metadata},
+        )
+    except Exception as e:
+        logger.exception("Stripe embedded session create failed")
+        raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
+
+    txn = {
+        "id": str(uuid.uuid4()),
+        "session_id": session.id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "report_id": None,
+        "kind": "prepay_upload",
+        "ui_mode": "embedded",
+        "brand": "ScoutMePlay",
+        "amount": float(price),
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.payment_transactions.insert_one(txn)
+
+    return {"client_secret": session.client_secret, "session_id": session.id}
+
+
+@api_router.post("/payments/embedded/unlock")
+async def embedded_unlock(payload: CheckoutInit, user=Depends(get_current_user)):
+    if not _embedded_ready():
+        raise HTTPException(status_code=503, detail="Embedded checkout not configured. Add Stripe pk_/sk_ keys.")
+    report = await db.reports.find_one({"id": payload.report_id})
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if report["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if report.get("is_paid"):
+        raise HTTPException(status_code=400, detail="Report already paid")
+
+    price = await get_current_price()
+    amount_cents = int(round(float(price) * 100))
+
+    origin = payload.origin_url.rstrip("/")
+    return_url = f"{origin}/report/{payload.report_id}?embedded_session={{CHECKOUT_SESSION_ID}}"
+
+    metadata = _build_embedded_metadata({
+        "kind": "report_unlock",
+        "report_id": payload.report_id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+    })
+
+    try:
+        stripe_sdk.api_key = STRIPE_SECRET_KEY
+        session = stripe_sdk.checkout.Session.create(
+            ui_mode="embedded",
+            mode="payment",
+            line_items=[{
+                "price_data": {
+                    "currency": PRICE_CURRENCY,
+                    "product_data": {
+                        "name": "ScoutMePlay – Premium Report Unlock",
+                        "description": "Unlock the full 11-section premium scouting report",
+                    },
+                    "unit_amount": amount_cents,
+                },
+                "quantity": 1,
+            }],
+            return_url=return_url,
+            metadata=metadata,
+            payment_intent_data={"metadata": metadata},
+        )
+    except Exception as e:
+        logger.exception("Stripe embedded session create failed")
+        raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
+
+    txn = {
+        "id": str(uuid.uuid4()),
+        "session_id": session.id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "report_id": payload.report_id,
+        "kind": "report_unlock",
+        "ui_mode": "embedded",
+        "brand": "ScoutMePlay",
+        "amount": float(price),
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.payment_transactions.insert_one(txn)
+
+    return {"client_secret": session.client_secret, "session_id": session.id}
+
+
+@api_router.get("/payments/embedded/status/{session_id}")
+async def embedded_status(session_id: str, user=Depends(get_current_user)):
+    """Status check for embedded sessions — uses raw Stripe SDK + applies same side-effects
+    as the redirect-style status endpoint (grant credit / mark report paid, idempotent)."""
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    if txn["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    if txn.get("payment_status") == "paid":
+        return {"payment_status": "paid", "status": txn.get("status", "complete"), "kind": txn.get("kind")}
+
+    if not _embedded_ready():
+        raise HTTPException(status_code=503, detail="Embedded checkout not configured.")
+
+    try:
+        stripe_sdk.api_key = STRIPE_SECRET_KEY
+        session = stripe_sdk.checkout.Session.retrieve(session_id)
+    except Exception as e:
+        logger.exception("Stripe embedded status retrieve failed")
+        raise HTTPException(status_code=500, detail=f"Stripe error: {e}")
+
+    new_payment_status = session.payment_status or "unpaid"
+    new_status = session.status or "open"
+
+    await db.payment_transactions.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "payment_status": new_payment_status,
+            "status": new_status,
+            "updated_at": now_iso(),
+        }},
+    )
+
+    # Idempotent side-effects on success
+    if new_payment_status == "paid":
+        kind = txn.get("kind") or "report_unlock"
+        if kind == "prepay_upload":
+            if not txn.get("credited"):
+                await db.users.update_one(
+                    {"id": txn["user_id"]},
+                    {"$inc": {"prepaid_uploads": 1}},
+                )
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {"credited": True}},
+                )
+        elif kind == "report_unlock":
+            report = await db.reports.find_one({"id": txn.get("report_id")})
+            if report and not report.get("is_paid"):
+                await db.reports.update_one(
+                    {"id": txn["report_id"]},
+                    {"$set": {"is_paid": True, "paid_at": now_iso()}},
+                )
+
+    return {
+        "payment_status": new_payment_status,
+        "status": new_status,
+        "amount_total": session.amount_total,
+        "currency": session.currency,
+        "kind": txn.get("kind") or "report_unlock",
+    }
+
+
+
+
 # ============== ADMIN ROUTES ==============
 
 @api_router.get("/admin/stats")
@@ -1679,15 +1923,22 @@ async def admin_stats(_=Depends(get_current_admin)):
     total_paid = await db.reports.count_documents({"$or": [{"is_paid": True}, {"manually_unlocked": True}]})
 
     cursor = db.payment_transactions.find({"payment_status": "paid"}, {"_id": 0, "amount": 1, "currency": 1})
+    revenue_usd = 0.0
     revenue_dkk = 0.0
     async for tx in cursor:
-        if tx.get("currency", "").lower() == "dkk":
+        cur = tx.get("currency", "").lower()
+        if cur == "usd":
+            revenue_usd += float(tx.get("amount", 0))
+        elif cur == "dkk":
             revenue_dkk += float(tx.get("amount", 0))
     return {
         "total_users": total_users,
         "total_uploads": total_uploads,
         "total_paid_reports": total_paid,
+        "revenue_usd": revenue_usd,
+        # backward-compat fields (admin UI may still read `revenue_dkk`)
         "revenue_dkk": revenue_dkk,
+        "currency": PRICE_CURRENCY.upper(),
     }
 
 

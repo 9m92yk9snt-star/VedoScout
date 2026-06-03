@@ -153,7 +153,7 @@ export default function CheckoutTransitionModal({
                 <div className="text-right">
                   <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45">Amount</div>
                   <div className="font-barlow font-black text-white text-xl mt-0.5 leading-none">
-                    {amount}<span className="text-volt text-sm ml-1">{currency}</span>
+                    {currency === "USD" ? "$" : ""}{amount}<span className="text-volt text-sm ml-1">{currency}</span>
                   </div>
                 </div>
               </div>

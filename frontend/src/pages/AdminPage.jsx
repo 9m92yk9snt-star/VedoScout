@@ -22,7 +22,7 @@ export default function AdminPage() {
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [price, setPrice] = useState(399);
+  const [price, setPrice] = useState(1);
   const [priceInput, setPriceInput] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -41,8 +41,8 @@ export default function AdminPage() {
       setReports(r.data);
       setUsers(u.data);
       setPayments(p.data);
-      setPrice(pr.data.price_dkk);
-      setPriceInput(String(pr.data.price_dkk));
+      setPrice(pr.data.price);
+      setPriceInput(String(pr.data.price));
     } catch (err) {
       toast.error("Failed to load admin data");
     } finally {
@@ -60,9 +60,9 @@ export default function AdminPage() {
     }
     setSavingPrice(true);
     try {
-      await api.put("/admin/price", { price_dkk: v });
+      await api.put("/admin/price", { price: v });
       setPrice(v);
-      toast.success(`Price updated to ${v} DKK`);
+      toast.success(`Price updated to $${v} USD`);
     } catch (err) {
       toast.error("Failed to update price");
     } finally {
@@ -131,7 +131,7 @@ export default function AdminPage() {
                     { icon: Users, label: "Total users", val: stats.total_users, suffix: "" },
                     { icon: FileVideo, label: "Total uploads", val: stats.total_uploads, suffix: "" },
                     { icon: FileCheck2, label: "Paid reports", val: stats.total_paid_reports, suffix: "" },
-                    { icon: BadgeDollarSign, label: "Revenue", val: stats.revenue_dkk.toFixed(2), suffix: " DKK" },
+                    { icon: BadgeDollarSign, label: "Revenue", val: (stats.revenue_usd ?? stats.revenue_dkk ?? 0).toFixed(2), suffix: " USD" },
                   ].map((s, i) => (
                     <div key={i} data-testid={`admin-stat-${i}`} className="bg-surface p-6">
                       <s.icon className="w-7 h-7 text-volt mb-4" strokeWidth={1.5} />
@@ -271,7 +271,7 @@ export default function AdminPage() {
                   <p className="mt-2 text-white/60 text-sm">Modify the one-time premium report price.</p>
 
                   <div className="mt-6">
-                    <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Current price (DKK)</label>
+                    <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Current price (USD)</label>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -292,7 +292,7 @@ export default function AdminPage() {
                         Save
                       </button>
                     </div>
-                    <p className="mt-3 text-xs text-white/40">Currently active: <span className="text-volt font-bold">{price} DKK</span></p>
+                    <p className="mt-3 text-xs text-white/40">Currently active: <span className="text-volt font-bold">${price} USD</span></p>
                   </div>
                 </div>
               )}

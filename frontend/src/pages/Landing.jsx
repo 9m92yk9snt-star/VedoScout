@@ -333,12 +333,12 @@ function ScoreBar({ label, value, locked = false, benchmark = 65 }) {
 }
 
 export default function Landing() {
-  const [price, setPrice] = useState(399);
+  const [price, setPrice] = useState(1);
   const { user } = useAuth();
   const { scrollYProgress } = useScroll();
 
   useEffect(() => {
-    api.get("/settings/price").then(({ data }) => setPrice(data.price_dkk)).catch(() => {});
+    api.get("/settings/price").then(({ data }) => setPrice(data.price)).catch(() => {});
   }, []);
 
   const startHref = user ? "/upload" : "/signup";
@@ -436,7 +436,7 @@ export default function Landing() {
                 className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-white/50"
               >
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
-                <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> {price} DKK · one-time</span>
+                <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> ${price} USD · one-time</span>
                 <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
               </motion.div>
             </div>
@@ -552,7 +552,7 @@ export default function Landing() {
               {[
                 { n: "01", t: "Sign up", d: "Free account. No card required to start." },
                 { n: "02", t: "Upload video & details", d: "Highlight, match or training clip." },
-                { n: "03", t: "Get instant free preview", d: `Unlock full report for ${price} DKK.` },
+                { n: "03", t: "Get instant free preview", d: `Unlock full report for $${price} USD.` },
               ].map((s, i) => (
                 <li key={i} className="flex gap-4 md:gap-5 items-start">
                   <span className="font-barlow font-black text-3xl md:text-4xl text-volt/40 leading-none w-10 md:w-12 flex-shrink-0">{s.n}</span>
@@ -780,7 +780,7 @@ export default function Landing() {
               </h2>
               <p className="mt-4 text-white/65 max-w-2xl">
                 Below is a real example. The first box is the free preview — like the one you'll see right after you
-                upload. Everything else is what our scouts unlock for <span className="text-volt font-bold">{price} DKK</span>.
+                upload. Everything else is what our scouts unlock for <span className="text-volt font-bold">${price} USD</span>.
               </p>
             </div>
           </div>
@@ -1029,8 +1029,8 @@ export default function Landing() {
                 </p>
 
                 <div className="mt-6 flex items-baseline justify-center gap-2">
-                  <span className="font-barlow font-black text-5xl md:text-6xl text-volt leading-none">{price}</span>
-                  <span className="text-white/60 uppercase tracking-widest font-bold text-sm">DKK</span>
+                  <span className="font-barlow font-black text-5xl md:text-6xl text-volt leading-none">${price}</span>
+                  <span className="text-white/60 uppercase tracking-widest font-bold text-sm">USD</span>
                 </div>
                 <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mt-1">one-time · no subscription</p>
 
