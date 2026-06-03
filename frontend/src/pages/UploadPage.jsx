@@ -10,6 +10,7 @@ export default function UploadPage() {
   const [videoUrl, setVideoUrl] = useState(null);
   const [markerBlob, setMarkerBlob] = useState(null);
   const [markerPreviewUrl, setMarkerPreviewUrl] = useState(null);
+  const [markerTimestamp, setMarkerTimestamp] = useState(0);
   const [isMarking, setIsMarking] = useState(false);
 
   const [form, setForm] = useState({
@@ -51,7 +52,19 @@ export default function UploadPage() {
     setVideoUrl(URL.createObjectURL(f));
     setMarkerBlob(null);
     setMarkerPreviewUrl(null);
+    setMarkerTimestamp(0);
     setIsMarking(false);
+  };
+
+  // Force iOS Safari (and other browsers) to render the first frame instead of a black box
+  const handleVideoLoadedMetadata = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    try {
+      if (video.currentTime < 0.1) video.currentTime = 0.1;
+    } catch (_) {
+      /* ignore — seek can fail on some codecs */
+    }
   };
 
   const startMarking = () => {
@@ -168,6 +181,7 @@ export default function UploadPage() {
     if (markerPreviewUrl) URL.revokeObjectURL(markerPreviewUrl);
     setMarkerBlob(null);
     setMarkerPreviewUrl(null);
+    setMarkerTimestamp(0);
     setIsMarking(true);
   };
 
@@ -190,6 +204,7 @@ export default function UploadPage() {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("marker_image", markerBlob, "marker.jpg");
+    fd.append("marker_timestamp", String(markerTimestamp || 0));
     Object.entries(form).forEach(([k, v]) => {
       if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v));
     });
