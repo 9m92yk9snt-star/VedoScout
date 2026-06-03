@@ -246,9 +246,9 @@ export default function Landing() {
             <div className="lg:col-span-7">
               <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
                 <div className="inline-flex items-center gap-2 border border-volt/30 bg-volt/10 px-4 py-2">
-                  <Zap className="w-3.5 h-3.5 text-volt" />
-                  <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">
-                    ScoutMePlay · Football scouting service
+                  <Zap className="w-3.5 h-3.5 text-volt shrink-0" />
+                  <span className="text-volt text-[10px] sm:text-xs uppercase tracking-[0.22em] sm:tracking-[0.25em] font-bold whitespace-nowrap">
+                    Professional Scouting Service
                   </span>
                 </div>
               </motion.div>
