@@ -241,51 +241,6 @@ export default function Landing() {
         <div className="hero-letterbox-top" />
         <div className="hero-letterbox-bottom" />
 
-        {/* Floating data badges (drift around the hero) */}
-        <motion.div
-          className="data-badge hidden md:flex"
-          style={{ top: "22%", left: "44%" }}
-          animate={{ y: [0, -10, 0] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <Eye className="w-3 h-3 text-volt" strokeWidth={2.5} />
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Scanning</span>
-          <span className="font-barlow font-black text-volt text-base leading-none">9</span>
-        </motion.div>
-
-        <motion.div
-          className="data-badge hidden md:flex"
-          style={{ top: "62%", left: "38%" }}
-          animate={{ y: [0, -8, 0] }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
-        >
-          <Target className="w-3 h-3 text-volt" strokeWidth={2.5} />
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Passing</span>
-          <span className="font-barlow font-black text-volt text-base leading-none">9</span>
-        </motion.div>
-
-        <motion.div
-          className="data-badge hidden lg:flex"
-          style={{ top: "78%", right: "8%" }}
-          animate={{ y: [0, -12, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-        >
-          <Activity className="w-3 h-3 text-volt" strokeWidth={2.5} />
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Off-ball</span>
-          <span className="font-barlow font-black text-volt text-base leading-none">8</span>
-        </motion.div>
-
-        <motion.div
-          className="data-badge hidden lg:flex"
-          style={{ top: "14%", right: "32%" }}
-          animate={{ y: [0, -8, 0] }}
-          transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
-        >
-          <Trophy className="w-3 h-3 text-volt" strokeWidth={2.5} />
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Overall</span>
-          <span className="font-barlow font-black text-volt text-base leading-none">8</span>
-        </motion.div>
-
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-center">
             <div className="lg:col-span-7">
