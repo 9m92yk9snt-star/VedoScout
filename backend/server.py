@@ -1701,6 +1701,17 @@ def _embedded_ready() -> bool:
     return pk_ok and sk_ok
 
 
+def _arm_real_stripe():
+    """Reset the global `stripe` SDK to point at real Stripe.
+
+    emergentintegrations.StripeCheckout silently mutates `stripe.api_base` to its proxy
+    whenever the legacy endpoints run. Since both modules share the same `stripe` module
+    object, every embedded SDK call MUST re-arm api_base + api_key before use.
+    """
+    stripe_sdk.api_key = STRIPE_SECRET_KEY
+    stripe_sdk.api_base = "https://api.stripe.com"
+
+
 @api_router.get("/config/stripe")
 async def stripe_config():
     """Public endpoint — gives the frontend the publishable key and embedded availability flag."""
@@ -1731,10 +1742,11 @@ async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_cur
     })
 
     try:
-        stripe_sdk.api_key = STRIPE_SECRET_KEY
+        _arm_real_stripe()
         session = stripe_sdk.checkout.Session.create(
             ui_mode="embedded",
             mode="payment",
+            redirect_on_completion="if_required",
             line_items=[{
                 "price_data": {
                     "currency": PRICE_CURRENCY,
@@ -1802,10 +1814,11 @@ async def embedded_unlock(payload: CheckoutInit, user=Depends(get_current_user))
     })
 
     try:
-        stripe_sdk.api_key = STRIPE_SECRET_KEY
+        _arm_real_stripe()
         session = stripe_sdk.checkout.Session.create(
             ui_mode="embedded",
             mode="payment",
+            redirect_on_completion="if_required",
             line_items=[{
                 "price_data": {
                     "currency": PRICE_CURRENCY,
@@ -1864,7 +1877,7 @@ async def embedded_status(session_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=503, detail="Embedded checkout not configured.")
 
     try:
-        stripe_sdk.api_key = STRIPE_SECRET_KEY
+        _arm_real_stripe()
         session = stripe_sdk.checkout.Session.retrieve(session_id)
     except Exception as e:
         logger.exception("Stripe embedded status retrieve failed")
