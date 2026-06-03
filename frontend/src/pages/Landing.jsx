@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useScroll, useInView, animate, useMotionValue } from "framer-motion";
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from "recharts";
@@ -143,19 +143,54 @@ const radarData = [
   { axis: "Overall", v: sample.scores.overall },
 ];
 
-function ScoreBar({ label, value, locked = false }) {
+function AnimatedNumber({ value, duration = 1.6 }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-15%" });
+  const motionValue = useMotionValue(0);
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    const controls = animate(motionValue, value, {
+      duration,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return controls.stop;
+  }, [inView, value, motionValue, duration]);
+
+  return <span ref={ref}>{display}</span>;
+}
+
+function ScoreBar({ label, value, locked = false, benchmark = 65 }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-20%" });
   return (
-    <div className={locked ? "opacity-70" : ""}>
+    <div ref={ref} className={locked ? "opacity-70" : ""}>
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/70">{label}</span>
         <span className="font-barlow font-black text-volt text-base">
-          {locked ? "—" : value}<span className="text-white/30 text-xs">/10</span>
+          {locked ? "—" : <AnimatedNumber value={value} />}<span className="text-white/30 text-xs">/10</span>
         </span>
       </div>
-      <div className="h-1 bg-white/10 overflow-hidden">
+      <div className="h-1 bg-white/10 overflow-hidden relative">
         <div
-          className="h-full bg-volt"
-          style={{ width: locked ? "0%" : `${value * 10}%` }}
+          className="absolute top-0 left-0 h-full bg-volt"
+          style={{
+            width: inView && !locked ? `${value * 10}%` : "0%",
+            transition: "width 1.6s cubic-bezier(0.16, 1, 0.3, 1)",
+            boxShadow: "0 0 8px rgba(204, 255, 0, 0.5)",
+          }}
+        />
+        {/* peer benchmark line */}
+        <div
+          className="absolute top-0 h-full"
+          style={{
+            left: `${benchmark}%`,
+            width: "1px",
+            borderLeft: "1px dashed rgba(255,255,255,0.3)",
+            height: "100%",
+          }}
         />
       </div>
     </div>
@@ -165,6 +200,7 @@ function ScoreBar({ label, value, locked = false }) {
 export default function Landing() {
   const [price, setPrice] = useState(399);
   const { user } = useAuth();
+  const { scrollYProgress } = useScroll();
 
   useEffect(() => {
     api.get("/settings/price").then(({ data }) => setPrice(data.price_dkk)).catch(() => {});
@@ -175,6 +211,8 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-deepnavy text-white relative overflow-hidden">
+      {/* Scroll progress bar */}
+      <motion.div className="scroll-progress-bar" style={{ scaleX: scrollYProgress }} />
       <Navigation transparent />
 
       {/* ============ HERO ============ */}
@@ -187,7 +225,66 @@ export default function Landing() {
           />
           <div className="absolute inset-0 bg-gradient-to-br from-deepnavy/85 via-deepnavy/60 to-deepnavy" />
           <div className="absolute inset-0 scoreline-grid opacity-30" />
+          {/* Atmospheric sweep */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div
+              className="absolute -inset-x-1/4 top-0 h-full opacity-30 animate-sweep-slow"
+              style={{ background: "linear-gradient(90deg, transparent 0%, rgba(204,255,0,0.06) 50%, transparent 100%)" }}
+            />
+          </div>
+          {/* Volt halos */}
+          <div className="volt-halo" style={{ width: 480, height: 480, top: "20%", right: "-10%" }} />
+          <div className="volt-halo" style={{ width: 320, height: 320, bottom: "-10%", left: "30%", opacity: 0.5 }} />
         </div>
+
+        {/* Letterbox top + bottom */}
+        <div className="hero-letterbox-top" />
+        <div className="hero-letterbox-bottom" />
+
+        {/* Floating data badges (drift around the hero) */}
+        <motion.div
+          className="data-badge hidden md:flex"
+          style={{ top: "22%", left: "44%" }}
+          animate={{ y: [0, -10, 0] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Eye className="w-3 h-3 text-volt" strokeWidth={2.5} />
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Scanning</span>
+          <span className="font-barlow font-black text-volt text-base leading-none">9</span>
+        </motion.div>
+
+        <motion.div
+          className="data-badge hidden md:flex"
+          style={{ top: "62%", left: "38%" }}
+          animate={{ y: [0, -8, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
+        >
+          <Target className="w-3 h-3 text-volt" strokeWidth={2.5} />
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Passing</span>
+          <span className="font-barlow font-black text-volt text-base leading-none">9</span>
+        </motion.div>
+
+        <motion.div
+          className="data-badge hidden lg:flex"
+          style={{ top: "78%", right: "8%" }}
+          animate={{ y: [0, -12, 0] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        >
+          <Activity className="w-3 h-3 text-volt" strokeWidth={2.5} />
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Off-ball</span>
+          <span className="font-barlow font-black text-volt text-base leading-none">8</span>
+        </motion.div>
+
+        <motion.div
+          className="data-badge hidden lg:flex"
+          style={{ top: "14%", right: "32%" }}
+          animate={{ y: [0, -8, 0] }}
+          transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+        >
+          <Trophy className="w-3 h-3 text-volt" strokeWidth={2.5} />
+          <span className="text-[10px] uppercase tracking-widest font-bold text-white/70">Overall</span>
+          <span className="font-barlow font-black text-volt text-base leading-none">8</span>
+        </motion.div>
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10">
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-center">
@@ -206,7 +303,7 @@ export default function Landing() {
                 data-testid="hero-title"
                 className="mt-6 font-barlow font-black uppercase text-5xl sm:text-6xl md:text-7xl leading-[0.92] tracking-tighter"
               >
-                Where talent
+                Where <span className="font-serif-italic normal-case font-normal lowercase tracking-normal">talent</span>
                 <span className="block text-gradient-volt mt-1">gets noticed.</span>
               </motion.h1>
 
@@ -267,9 +364,9 @@ export default function Landing() {
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3, duration: 0.6, ease: "easeOut" }}
-              className="lg:col-span-5"
+              className="lg:col-span-5 relative z-10"
             >
-              <div className="border border-white/10 bg-surface/80 backdrop-blur-xl p-6 md:p-8">
+              <div className="card-premium border border-white/10 bg-surface/85 backdrop-blur-xl p-6 md:p-8">
                 <div className="flex items-center justify-between mb-6">
                   <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">3 steps</span>
                   <span className="text-white/40 text-xs uppercase tracking-widest font-bold">~ 2 min</span>
@@ -319,7 +416,7 @@ export default function Landing() {
       </section>
 
       {/* ============ WHAT YOU RECEIVE — rich feature cards ============ */}
-      <section id="what-you-get" data-testid="what-you-get" className="relative py-24 md:py-32 border-t border-white/10">
+      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-24 md:py-32 border-t border-white/10">
         <div className="absolute inset-0 z-0 opacity-15">
           <img
             src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
@@ -329,8 +426,9 @@ export default function Landing() {
           <div className="absolute inset-0 bg-deepnavy/90" />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
-          <div className="mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div className="max-w-3xl">
+          <div className="mb-16 relative flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <span aria-hidden className="section-num-bg">01</span>
+            <div className="max-w-3xl relative">
               <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Inside your report</span>
               <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
                 Eleven sections.<br />Like a real scout wrote it just for you.
@@ -347,7 +445,7 @@ export default function Landing() {
               <div
                 key={i}
                 data-testid={`feature-card-${i}`}
-                className="bg-deepnavy p-6 md:p-7 hover:bg-surface hover:-translate-y-1 transition-all group cursor-default flex flex-col"
+                className="card-premium p-6 md:p-7 group cursor-default flex flex-col"
               >
                 <div className="flex items-start justify-between mb-5">
                   <f.icon className="w-7 h-7 text-volt" strokeWidth={1.5} />
@@ -367,7 +465,7 @@ export default function Landing() {
       {/* ============ SAMPLE REPORT — RICH, COMPELLING, WOW ============ */}
       <section
         data-testid="example-report"
-        className="relative py-24 md:py-32 border-t border-white/10 overflow-hidden"
+        className="section-accent-top relative py-24 md:py-32 border-t border-white/10 overflow-hidden"
       >
         {/* Soft background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -376,8 +474,9 @@ export default function Landing() {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
-          <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div className="max-w-3xl">
+          <div className="mb-12 relative flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <span aria-hidden className="section-num-bg">02</span>
+            <div className="max-w-3xl relative">
               <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">A real example</span>
               <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
                 This is what you get.
@@ -656,7 +755,7 @@ export default function Landing() {
       </section>
 
       {/* ============ TRUST ============ */}
-      <section id="trust" data-testid="trust-section" className="relative py-20 border-t border-white/10">
+      <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-white/10">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
           <div className="border border-white/10 bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
             <ShieldCheck className="w-12 h-12 text-volt flex-shrink-0" strokeWidth={1.5} />
@@ -673,7 +772,7 @@ export default function Landing() {
       </section>
 
       {/* ============ FINAL CTA ============ */}
-      <section data-testid="final-cta" className="relative py-24 md:py-32 border-t border-white/10 overflow-hidden">
+      <section data-testid="final-cta" className="section-accent-top relative py-24 md:py-32 border-t border-white/10 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg"
