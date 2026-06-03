@@ -22,11 +22,11 @@ export default function Navigation({ transparent = false }) {
       <div className="max-w-7xl mx-auto px-6 md:px-10 py-4 flex items-center justify-between">
         <Link to="/" data-testid="nav-logo" className="flex items-center gap-3 group">
           <div className="w-8 h-8 bg-volt flex items-center justify-center">
-            <span className="text-deepnavy font-barlow font-black text-lg leading-none">E</span>
+            <span className="text-deepnavy font-barlow font-black text-lg leading-none">S</span>
           </div>
           <div className="flex flex-col leading-none">
-            <span className="font-barlow font-black uppercase text-white tracking-tight text-lg">Elite Scout</span>
-            <span className="text-[10px] text-volt font-bold uppercase tracking-[0.25em]">AI Player Analysis</span>
+            <span className="font-barlow font-black uppercase text-white tracking-tight text-lg">ScoutMePlay</span>
+            <span className="text-[10px] text-volt font-bold uppercase tracking-[0.25em]">Your dream · seen by AI</span>
           </div>
         </Link>
 

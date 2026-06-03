@@ -196,7 +196,7 @@ export default function Landing() {
                 <div className="inline-flex items-center gap-2 border border-volt/30 bg-volt/10 px-4 py-2">
                   <Zap className="w-3.5 h-3.5 text-volt" />
                   <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">
-                    AI-Powered Football Scouting
+                    ScoutMePlay · AI football scout
                   </span>
                 </div>
               </motion.div>
@@ -206,16 +206,16 @@ export default function Landing() {
                 data-testid="hero-title"
                 className="mt-6 font-barlow font-black uppercase text-5xl sm:text-6xl md:text-7xl leading-[0.92] tracking-tighter"
               >
-                Upload your football video.
-                <span className="block text-gradient-volt mt-1">Get a professional player analysis.</span>
+                Your dream
+                <span className="block text-gradient-volt mt-1">deserves to be seen.</span>
               </motion.h1>
 
               <motion.p
                 initial="hidden" animate="visible" variants={fadeUp} custom={2}
                 className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed"
               >
-                Instant AI feedback on strengths, weaknesses & a personalized development plan.
-                Free preview · one-time payment unlocks the full premium report + PDF.
+                Upload your football video. Our AI watches every touch like a real scout and tells you what makes you
+                stand out — your strengths, what to work on, and a clear plan to get better.
               </motion.p>
 
               <motion.div
@@ -331,14 +331,14 @@ export default function Landing() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
           <div className="mb-16 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div className="max-w-3xl">
-              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Inside the Premium Report</span>
+              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Inside your report</span>
               <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
-                Eleven sections.<br />Built like a real scout report.
+                Eleven sections.<br />Like a real scout wrote it just for you.
               </h2>
             </div>
             <p className="text-white/60 max-w-md text-sm md:text-base">
-              Each card below is a real section of your unlocked report. Scores, narratives, drills — written
-              specifically about the player in your video.
+              Every box below is a real part of your report. Scores, notes, drills — all written by our AI about the
+              player in YOUR video.
             </p>
           </div>
 
@@ -378,13 +378,13 @@ export default function Landing() {
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
           <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div className="max-w-3xl">
-              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Live Sample Report</span>
+              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">A real example</span>
               <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
                 This is what you get.
               </h2>
               <p className="mt-4 text-white/65 max-w-2xl">
-                A real example below. The first card is unlocked (your free preview). Everything else is what
-                you unlock when you pay <span className="text-volt font-bold">{price} DKK</span>.
+                Below is a real example. The first box is the free preview — like the one you'll see right after you
+                upload. Everything else is what our AI unlocks for <span className="text-volt font-bold">{price} DKK</span>.
               </p>
             </div>
           </div>
@@ -661,11 +661,11 @@ export default function Landing() {
           <div className="border border-white/10 bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
             <ShieldCheck className="w-12 h-12 text-volt flex-shrink-0" strokeWidth={1.5} />
             <div>
-              <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl">Independent development feedback</h3>
+              <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl">Honest AI feedback. Built for growth.</h3>
               <p className="mt-3 text-sm text-white/70 leading-relaxed max-w-3xl">
-                This platform provides independent football development feedback. It does <strong className="text-white">not</strong> guarantee trials,
-                contracts or academy selection. All scores are presented as developmental guidance, not definitive
-                scouting evaluations.
+                ScoutMePlay gives you honest, AI-powered football feedback to help young players get better.
+                It does <strong className="text-white">not</strong> promise trials, contracts, or academy spots.
+                Your scores are here to guide your training — not to decide your future.
               </p>
             </div>
           </div>
@@ -684,11 +684,11 @@ export default function Landing() {
         </div>
         <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-10 text-center">
           <h2 className="font-barlow font-black uppercase text-5xl md:text-7xl tracking-tighter leading-[0.95]">
-            Ready when you are.
-            <span className="block text-volt mt-2">Start your free preview.</span>
+            Your move.
+            <span className="block text-volt mt-2">Show the world what you've got.</span>
           </h2>
           <p className="mt-6 text-white/60 max-w-2xl mx-auto">
-            Upload a video, enter player details, and receive an instant AI preview. No card required to start.
+            Upload a video, mark yourself, and our AI gives you an instant free preview. No card needed to start.
           </p>
           <div className="mt-10">
             <Link
@@ -707,11 +707,11 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 md:px-10 flex flex-col md:flex-row justify-between gap-4 items-center">
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 bg-volt flex items-center justify-center">
-              <span className="text-deepnavy font-barlow font-black text-sm leading-none">E</span>
+              <span className="text-deepnavy font-barlow font-black text-sm leading-none">S</span>
             </div>
-            <span className="font-barlow font-black uppercase tracking-tight">Elite Scout</span>
+            <span className="font-barlow font-black uppercase tracking-tight">ScoutMePlay</span>
           </div>
-          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Independent AI player feedback. Built for development.</p>
+          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Your dream deserves to be seen · AI football scout</p>
         </div>
       </footer>
     </div>
