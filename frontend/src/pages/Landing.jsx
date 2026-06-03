@@ -262,13 +262,43 @@ export default function Landing() {
                 <span className="block text-gradient-volt mt-1">gets noticed.</span>
               </motion.h1>
 
-              <motion.p
+              <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={2}
-                className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed"
+                className="mt-7 max-w-xl space-y-5"
+                data-testid="hero-description"
               >
-                Upload your football video. Our scouts watch every touch and tell you what makes you stand out — your
-                strengths, what to work on, and a clear plan to get better.
-              </motion.p>
+                {/* Lead — primary hook */}
+                <p className="text-base md:text-lg text-white/85 leading-relaxed">
+                  Upload your football video and get{" "}
+                  <span className="text-white font-semibold">professional feedback</span>{" "}
+                  from experienced scouts and agents connected to clubs around the world.
+                </p>
+
+                {/* Two value lines with volt accent rail */}
+                <div className="border-l-2 border-volt/50 pl-5 space-y-3.5">
+                  <p className="text-sm md:text-base text-white/65 leading-relaxed">
+                    Receive a{" "}
+                    <span className="text-white">detailed visual report</span>{" "}
+                    covering your strengths, weaknesses, playing style, and development areas.
+                  </p>
+                  <p className="text-sm md:text-base text-white/65 leading-relaxed">
+                    Exceptional talents may receive{" "}
+                    <span className="text-white">scout attention, trial recommendations</span>,
+                    and guidance on the next step in their football journey.
+                  </p>
+                </div>
+
+                {/* Emotional closer — italic serif, matches headline accent */}
+                <p className="font-serif-italic text-xl md:text-2xl text-white/95 italic leading-snug pt-1">
+                  See your game through the eyes of professionals.
+                </p>
+
+                {/* Final punchline — brand-voiced */}
+                <p className="font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base pt-1">
+                  <span className="text-volt">Know your potential.</span>{" "}
+                  <span className="text-white">Unlock your future.</span>
+                </p>
+              </motion.div>
 
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={3}
