@@ -35,7 +35,10 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - ✅ NEW: Embedded Stripe checkout endpoints `/api/payments/embedded/prepay-upload`, `/api/payments/embedded/unlock`, `/api/payments/embedded/status/{sid}`
 - ✅ NEW: `EmbeddedCheckoutModal.jsx` mounts Stripe's `<EmbeddedCheckout>` inside a branded ScoutMePlay modal — true in-page payment
 - ✅ NEW: UploadPage + ReportPage auto-prefer embedded checkout when Stripe keys are configured; otherwise gracefully fall back to redirect modal
-- ✅ Backend tested 19/19 green (USD conversion + new endpoints)
+- ✅ **Real Stripe TEST keys configured** in `/app/backend/.env` — embedded checkout fully functional (verified via testing agent: 14 real js.stripe.com iframes mounted inside our branded modal showing "MENTALKIDS · SCOUTMEPLAY SECURE CHECKOUT · US$1.00")
+- ✅ **Bug fix (CRITICAL)**: Added `_arm_real_stripe()` helper that resets `stripe_sdk.api_base='https://api.stripe.com'` before every embedded SDK call. Required because `emergentintegrations` silently mutates the global `stripe.api_base` to its proxy URL, which would otherwise poison subsequent embedded calls in the same worker
+- ✅ **Bug fix (HIGH)**: Embedded sessions now use `redirect_on_completion='if_required'` so Stripe's `onComplete` callback fires in-page (instead of redirecting). 3DS auth flows still redirect when needed
+- ✅ Backend tested 7/8 green (1 intentional skip) — both previously-failing bug-repro tests now PASS
 
 ## Implemented Previously (Phase 1 — Feb 2026)
 - ✅ Landing page (Hero, How It Works, What You Receive, Sample Preview, Trust, CTA)
@@ -58,21 +61,23 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - ✅ Max video length 5min (OOM guard)
 
 ## Pending — User input required (P0)
-- 🔴 **Real Stripe TEST keys** — user has switched Stripe dashboard to test mode but hasn't sent `pk_test_...` and `sk_test_...` yet. Until then, embedded checkout endpoints gracefully return 503 and frontend automatically falls back to the redirect modal.
+- ✅ **Stripe TEST keys configured** — `pk_test_51SlanqPyHKLMizP3...` and `sk_test_51SlanqPyHKLMizP3...` are now active in `/app/backend/.env`. Embedded checkout is live and verified.
 
 ## Backlog
 ### P1
+- Add real-Stripe webhook handler at `/api/webhook/stripe-embedded` using `stripe.Webhook.construct_event` + `STRIPE_WEBHOOK_SECRET` — covers the edge case where the user closes the tab right after paying (currently frontend polling handles 99% of cases)
 - Sample PDF download on landing (teaser PDF + web sample page)
 - Resend email notifications (preview ready, scout review delivered, chat replies, payment receipts)
-- Stripe webhook handler should also process embedded-checkout `checkout.session.completed` events (currently only polling refreshes the txn status — works, but webhook would be more robust)
+- (Optional polish) In Stripe Dashboard → Settings → Link, toggle off "Allow Link to save payment details" — this lets new emails complete checkout without a phone-number verification step
 
 ### P2
 - Progress tracking over time (compare new videos with old reports)
 - Referral system ("Refer a teammate, both get 30% off")
 - Multi-language support
+- Migrate to `stripe.StripeClient(api_key=...)` per-instance API (eliminates the need for `_arm_real_stripe()` defensive helper)
 
 ### P3
-- Refactor server.py into routers (`payments_embedded.py`, `payments_legacy.py`, `admin.py`, `reports.py`)
+- Refactor server.py (~2070 lines) into routers (`payments_embedded.py`, `payments_legacy.py`, `admin.py`, `reports.py`)
 - Object-storage migration (S3) for video uploads
 - Auth-gated /api/uploads static mount
 
