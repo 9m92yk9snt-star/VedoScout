@@ -22,7 +22,7 @@ const fadeUp = {
 const featureCards = [
   {
     icon: Brain,
-    title: "AI Player Report",
+    title: "Player Report",
     text: "A full written breakdown of how you play, your strengths, and what makes you unique on the pitch.",
     preview: "\"Lukas plays like a smart playmaker. He sees passes before others, and his left foot is dangerous.\"",
   },
@@ -196,7 +196,7 @@ export default function Landing() {
                 <div className="inline-flex items-center gap-2 border border-volt/30 bg-volt/10 px-4 py-2">
                   <Zap className="w-3.5 h-3.5 text-volt" />
                   <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">
-                    ScoutMePlay · AI football scout
+                    ScoutMePlay · Football scouting service
                   </span>
                 </div>
               </motion.div>
@@ -214,8 +214,8 @@ export default function Landing() {
                 initial="hidden" animate="visible" variants={fadeUp} custom={2}
                 className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed"
               >
-                Upload your football video. Our AI watches every touch like a real scout and tells you what makes you
-                stand out — your strengths, what to work on, and a clear plan to get better.
+                Upload your football video. Our scouts watch every touch and tell you what makes you stand out — your
+                strengths, what to work on, and a clear plan to get better.
               </motion.p>
 
               <motion.div
@@ -302,7 +302,7 @@ export default function Landing() {
 
                 <div className="mt-5 pt-5 border-t border-white/10 grid grid-cols-3 gap-2">
                   {[
-                    { i: Brain, l: "AI Report" },
+                    { i: Brain, l: "Report" },
                     { i: Target, l: "Scout View" },
                     { i: FileText, l: "PDF" },
                   ].map(({ i: Icon, l }, idx) => (
@@ -337,8 +337,8 @@ export default function Landing() {
               </h2>
             </div>
             <p className="text-white/60 max-w-md text-sm md:text-base">
-              Every box below is a real part of your report. Scores, notes, drills — all written by our AI about the
-              player in YOUR video.
+              Every box below is a real part of your report. Scores, notes, drills — all written about the player in
+              YOUR video.
             </p>
           </div>
 
@@ -384,7 +384,7 @@ export default function Landing() {
               </h2>
               <p className="mt-4 text-white/65 max-w-2xl">
                 Below is a real example. The first box is the free preview — like the one you'll see right after you
-                upload. Everything else is what our AI unlocks for <span className="text-volt font-bold">{price} DKK</span>.
+                upload. Everything else is what our scouts unlock for <span className="text-volt font-bold">{price} DKK</span>.
               </p>
             </div>
           </div>
@@ -475,7 +475,7 @@ export default function Landing() {
             {/* Brief summary card */}
             <div className="bg-surface p-6 md:p-8 lg:col-span-3">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">What the AI saw</span>
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">What our scouts saw</span>
                 <span className="text-white/30 text-[10px] uppercase tracking-widest font-bold">Free preview</span>
               </div>
               <p className="text-white/90 text-base md:text-[17px] leading-[1.65]">{sample.summary}</p>
@@ -661,9 +661,9 @@ export default function Landing() {
           <div className="border border-white/10 bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
             <ShieldCheck className="w-12 h-12 text-volt flex-shrink-0" strokeWidth={1.5} />
             <div>
-              <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl">Honest AI feedback. Built for growth.</h3>
+              <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl">Honest scouting feedback. Built for growth.</h3>
               <p className="mt-3 text-sm text-white/70 leading-relaxed max-w-3xl">
-                ScoutMePlay gives you honest, AI-powered football feedback to help young players get better.
+                ScoutMePlay gives you honest, professional football feedback to help young players get better.
                 It does <strong className="text-white">not</strong> promise trials, contracts, or academy spots.
                 Your scores are here to guide your training — not to decide your future.
               </p>
@@ -688,7 +688,7 @@ export default function Landing() {
             <span className="block text-volt mt-2">Show the world what you've got.</span>
           </h2>
           <p className="mt-6 text-white/60 max-w-2xl mx-auto">
-            Upload a video, mark yourself, and our AI gives you an instant free preview. No card needed to start.
+            Upload a video, mark yourself, and you'll get an instant free preview from our scouts. No card needed to start.
           </p>
           <div className="mt-10">
             <Link
@@ -711,7 +711,10 @@ export default function Landing() {
             </div>
             <span className="font-barlow font-black uppercase tracking-tight">ScoutMePlay</span>
           </div>
-          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Your dream deserves to be seen · AI football scout</p>
+          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Your dream deserves to be seen · Football scouting service</p>
+          <p className="mt-2 text-[10px] text-white/30 normal-case tracking-normal max-w-md md:text-right">
+            ScoutMePlay combines advanced scouting technology with human review to deliver honest player feedback.
+          </p>
         </div>
       </footer>
     </div>

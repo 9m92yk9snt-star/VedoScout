@@ -26,7 +26,7 @@ export default function Navigation({ transparent = false }) {
           </div>
           <div className="flex flex-col leading-none">
             <span className="font-barlow font-black uppercase text-white tracking-tight text-lg">ScoutMePlay</span>
-            <span className="text-[10px] text-volt font-bold uppercase tracking-[0.25em]">Your dream · seen by AI</span>
+            <span className="text-[10px] text-volt font-bold uppercase tracking-[0.25em]">Your dream · seen properly</span>
           </div>
         </Link>
 

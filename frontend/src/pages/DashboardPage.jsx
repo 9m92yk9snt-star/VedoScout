@@ -48,7 +48,7 @@ export default function DashboardPage() {
               <div className="border border-white/10 bg-surface p-12 text-center">
                 <Film className="w-12 h-12 text-volt mx-auto mb-4" strokeWidth={1.5} />
                 <h2 className="font-barlow font-black uppercase text-2xl">No uploads yet</h2>
-                <p className="mt-2 text-white/60 text-sm">Upload your first football video and receive an AI-powered free preview.</p>
+                <p className="mt-2 text-white/60 text-sm">Upload your first football video and receive an instant free scout preview.</p>
                 <Link
                   to="/upload"
                   data-testid="dashboard-empty-upload-btn"

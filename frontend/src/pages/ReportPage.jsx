@@ -49,7 +49,7 @@ function LockedOverlay({ price, onUnlock, loading }) {
         Unlock full premium report
       </h3>
       <p className="mt-4 text-white/70 text-sm md:text-base max-w-xl">
-        Full AI analysis across technical, tactical, physical & mental dimensions. Scout view, training plan & a premium PDF.
+        Full scout analysis across technical, tactical, physical & mental dimensions. Scout view, training plan & a premium PDF.
       </p>
       <div className="mt-6 flex items-baseline gap-2">
         <span className="font-barlow font-black text-6xl md:text-7xl text-volt">{price}</span>
@@ -331,7 +331,7 @@ export default function ReportPage() {
                       className="w-full aspect-video object-cover border border-white/5"
                     />
                     <p className="mt-2 text-[11px] text-white/55">
-                      AI analysed only the player you circled above.
+                      We analysed only the player you circled above.
                     </p>
                   </div>
                 )}

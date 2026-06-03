@@ -101,7 +101,7 @@ export default function ScoutReview({ reportId }) {
             Your scout review is in progress
           </h3>
           <p className="mt-3 text-white/70 text-sm md:text-base max-w-2xl leading-relaxed">
-            On top of your AI report, a real scout from our team is now reviewing your video personally. You'll receive their
+            On top of your player report, a real scout from our team is now reviewing your video personally. You'll receive their
             written feedback here within <span className="text-volt font-bold">5 days</span>, and you'll be able to chat
             with them directly to ask follow-up questions.
           </p>

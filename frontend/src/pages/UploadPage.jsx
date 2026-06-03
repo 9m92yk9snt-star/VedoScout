@@ -220,7 +220,7 @@ export default function UploadPage() {
               Upload your video & mark your player
             </h1>
             <p className="mt-3 text-white/60 max-w-2xl text-sm md:text-base">
-              Upload the clip, scrub to the best moment, and click on the player. Our AI then analyses only that exact player.
+              Upload the clip, scrub to the best moment, and click on the player. Our scouts then review only that exact player.
             </p>
           </div>
 
@@ -373,7 +373,7 @@ export default function UploadPage() {
                           className="w-full aspect-video object-contain bg-black border border-white/5"
                         />
                         <p className="mt-2 text-[11px] text-white/50 text-center">
-                          The AI will analyse <span className="text-volt font-bold">only the player circled above</span>.
+                          We'll review <span className="text-volt font-bold">only the player circled above</span>.
                         </p>
                       </div>
                     )}
@@ -516,7 +516,7 @@ export default function UploadPage() {
                 )}
               </button>
               <p className="text-xs text-white/40 text-center">
-                The AI will analyse <span className="text-volt font-bold">only the player you marked</span>. Other players in the video are ignored.
+                The scouts will review <span className="text-volt font-bold">only the player you marked</span>. Other players in the video are ignored.
               </p>
             </div>
           </form>
