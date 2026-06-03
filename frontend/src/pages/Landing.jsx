@@ -11,6 +11,7 @@ import {
   ArrowRight, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
   Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
+  Lightbulb, Crown, Calendar, Dumbbell,
 } from "lucide-react";
 
 const fadeUp = {
@@ -19,56 +20,190 @@ const fadeUp = {
 };
 
 /* ===== Feature cards — natural football language ===== */
-const featureCards = [
+const reportCards = [
   {
     icon: Brain,
     title: "Player Report",
-    text: "A full written breakdown of how you play, your strengths, and what makes you unique on the pitch.",
-    preview: "\"Lukas plays like a smart playmaker. He sees passes before others, and his left foot is dangerous.\"",
+    text: "A complete breakdown of your game, strengths, and what makes you unique.",
+    viz: { type: "scorePill", label: "Scout Score", value: "8.2/10" },
   },
   {
     icon: Footprints,
     title: "Technical",
-    text: "First touch · ball control · dribbling · passing · shooting · weak foot · 1v1 battles.",
-    preview: "Score from 1–10 for every skill, with a tip on how to improve each one.",
+    text: "First touch, passing, dribbling, shooting and everything you do with the ball.",
+    viz: { type: "progressBar", percent: 81, value: "8.1" },
   },
   {
     icon: Target,
     title: "Tactical",
-    text: "Where you stand · how you move without the ball · how you read the game.",
-    preview: "We tell you when your positioning is great and when you need to think faster.",
+    text: "Positioning, game intelligence, movement and decision-making off the ball.",
+    viz: { type: "heatmap" },
   },
   {
     icon: Activity,
     title: "Physical",
-    text: "Speed · acceleration · balance · agility · stamina · body control.",
-    preview: "How your body holds up across a full match — and what fitness work will help most.",
+    text: "Speed, strength, endurance, agility and overall athletic performance.",
+    viz: { type: "barChart", bars: [40, 55, 70, 78, 60, 50, 72, 55, 35, 78, 65, 70], value: "7.8" },
   },
   {
-    icon: Heart,
+    icon: Lightbulb,
     title: "Mentality",
-    text: "Confidence · work rate · bravery in duels · focus · how you react to mistakes.",
-    preview: "We look at how you compete when the score is against your team.",
+    text: "Confidence, focus, work rate and how you handle pressure & challenges.",
+    viz: { type: "scorePill", label: "Mental Score", value: "8.5/10" },
   },
   {
     icon: Eye,
     title: "Scout View",
-    text: "How a real scout would look at you — what they'd love, what they'd worry about, and what level fits you next.",
-    preview: "Strengths · areas to work on · best position · next competitive level to target.",
+    text: "What a real scout would love, worry about, and the level that fits you next.",
+    viz: { type: "stars", value: 4 },
   },
   {
     icon: Trophy,
     title: "Training Plan",
-    text: "5 specific exercises just for you · a weekly focus · a 30-day plan · a 90-day plan.",
-    preview: "Real drills you can do at training or at home — not generic gym work.",
+    text: "5 specific exercises + weekly focus + 30-day plan + 90-day plan.",
+    viz: { type: "miniIcons", icons: [Calendar, Dumbbell, Target] },
+  },
+  {
+    icon: TrendingUp,
+    title: "Potential & Projection",
+    text: "Your current level, potential ceiling, and realistic pathway to the next level.",
+    viz: { type: "lineChart" },
+  },
+  {
+    icon: ShieldCheck,
+    title: "Comparison",
+    text: "How you compare to players at your level and what sets you apart.",
+    viz: { type: "topPercent", percent: 82, label: "TOP 18%" },
   },
   {
     icon: FileText,
     title: "Premium PDF",
-    text: "A clean, professional PDF you can share with your coach, your parents, or academies.",
-    preview: "Designed to look like a real scout dossier — print-ready.",
+    text: "A clean, professional report you can share with your coach, parents, or academies.",
+    viz: { type: "pill", label: "PDF Included", PillIcon: FileText },
+  },
+  {
+    icon: Lock,
+    title: "Private & Secure",
+    text: "Your data is safe. We never share your report with anyone.",
+    viz: { type: "pill", label: "100% Private", PillIcon: Lock },
   },
 ];
+
+/* ===== Card visualization renderer ===== */
+function CardViz({ viz }) {
+  if (!viz) return null;
+  switch (viz.type) {
+    case "scorePill":
+      return (
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-white/70 border border-white/25 rounded-full px-3 py-1.5 whitespace-nowrap">
+            {viz.label}
+          </span>
+          <span className="font-barlow font-black text-2xl md:text-3xl text-volt leading-none">
+            {viz.value}
+          </span>
+        </div>
+      );
+    case "progressBar":
+      return (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-2 bg-white/10 overflow-hidden">
+            <div className="h-full bg-volt" style={{ width: `${viz.percent}%` }} />
+          </div>
+          <span className="font-barlow font-black text-volt text-lg leading-none">{viz.value}</span>
+        </div>
+      );
+    case "heatmap":
+      return (
+        <svg viewBox="0 0 80 48" className="w-full h-16" aria-hidden>
+          <rect width="80" height="48" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
+          <line x1="40" y1="0" x2="40" y2="48" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
+          <circle cx="40" cy="24" r="6" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
+          <rect x="0" y="14" width="6" height="20" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
+          <rect x="74" y="14" width="6" height="20" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="0.5" />
+          {/* Hot spots */}
+          <circle cx="52" cy="24" r="9" fill="#ff5252" opacity="0.55" />
+          <circle cx="44" cy="20" r="6" fill="#ff9a3c" opacity="0.7" />
+          <circle cx="58" cy="30" r="5" fill="#ccff00" opacity="0.85" />
+          <circle cx="64" cy="22" r="3" fill="#ccff00" opacity="0.7" />
+        </svg>
+      );
+    case "barChart":
+      return (
+        <div className="flex items-end gap-1.5 h-10">
+          {viz.bars.map((h, i) => (
+            <div
+              key={i}
+              className={`flex-1 ${h > 60 ? "bg-volt" : "bg-white/20"}`}
+              style={{ height: `${h}%` }}
+            />
+          ))}
+          <span className="font-barlow font-black text-volt text-lg leading-none ml-2 self-center">{viz.value}</span>
+        </div>
+      );
+    case "stars":
+      return (
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Star
+              key={i}
+              className={`w-5 h-5 ${i <= viz.value ? "text-volt fill-volt" : "text-white/15"}`}
+              strokeWidth={1.5}
+            />
+          ))}
+        </div>
+      );
+    case "miniIcons":
+      return (
+        <div className="flex items-center gap-4">
+          {viz.icons.map((Ic, i) => (
+            <Ic key={i} className="w-5 h-5 text-volt" strokeWidth={1.5} />
+          ))}
+        </div>
+      );
+    case "lineChart":
+      return (
+        <svg viewBox="0 0 80 30" className="w-full h-12" aria-hidden>
+          {/* baseline */}
+          <line x1="0" y1="27" x2="80" y2="27" stroke="rgba(255,255,255,0.1)" strokeWidth="0.4" />
+          <polyline
+            points="2,24 12,22 22,18 32,20 42,15 52,11 62,8 72,4"
+            fill="none"
+            stroke="#ccff00"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {[[2, 24], [12, 22], [22, 18], [32, 20], [42, 15], [52, 11], [62, 8], [72, 4]].map(([x, y], i) => (
+            <circle key={i} cx={x} cy={y} r="1.2" fill="#ccff00" />
+          ))}
+          <text x="55" y="3" fontSize="3.4" fill="#ccff00" fontWeight="bold" letterSpacing="0.2">
+            90-DAY
+          </text>
+        </svg>
+      );
+    case "topPercent":
+      return (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-2 bg-white/10 overflow-hidden">
+            <div className="h-full bg-volt" style={{ width: `${viz.percent}%` }} />
+          </div>
+          <span className="font-barlow font-black text-volt text-sm leading-none whitespace-nowrap">{viz.label}</span>
+        </div>
+      );
+    case "pill": {
+      const { PillIcon } = viz;
+      return (
+        <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-white/85 border border-white/25 rounded-full px-3.5 py-1.5">
+          {viz.label}
+          {PillIcon && <PillIcon className="w-3.5 h-3.5 text-volt" />}
+        </span>
+      );
+    }
+    default:
+      return null;
+  }
+}
 
 /* ===== Sample report data — natural football language ===== */
 const sample = {
@@ -481,45 +616,160 @@ export default function Landing() {
       </section>
 
       {/* ============ WHAT YOU RECEIVE — rich feature cards ============ */}
-      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-24 md:py-32 border-t border-white/10">
+      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-24 md:py-32 border-t border-white/10 overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-15">
           <img
             src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
             alt="Pitch"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-deepnavy/90" />
+          <div className="absolute inset-0 bg-deepnavy/92" />
         </div>
+        {/* Subtle volt glow accents */}
+        <div aria-hidden className="absolute -top-40 right-0 w-[420px] h-[420px] bg-volt/10 rounded-full blur-3xl pointer-events-none" />
+
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
-          <div className="mb-16 relative flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <span aria-hidden className="section-num-bg">01</span>
-            <div className="max-w-3xl relative">
-              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Inside your report</span>
-              <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
-                Eleven sections.<br />Like a real scout wrote it just for you.
-              </h2>
+          {/* Header */}
+          <div className="mb-12 md:mb-16">
+            <div className="flex items-center gap-4 mb-6">
+              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold whitespace-nowrap">Inside your report</span>
+              <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/60 via-volt/20 to-transparent max-w-[260px]" />
             </div>
-            <p className="text-white/60 max-w-md text-sm md:text-base">
-              Every box below is a real part of your report. Scores, notes, drills — all written about the player in
-              YOUR video.
-            </p>
+
+            <div className="grid lg:grid-cols-12 gap-8 items-end">
+              <div className="lg:col-span-8">
+                <h2
+                  data-testid="report-section-title"
+                  className="font-barlow font-black uppercase text-4xl sm:text-5xl md:text-6xl lg:text-7xl tracking-tighter leading-[0.95]"
+                >
+                  What does a real scout see{" "}
+                  <br className="hidden md:block" />
+                  that{" "}
+                  <span className="font-serif-italic normal-case font-normal lowercase tracking-normal text-volt">you</span>{" "}
+                  don't?
+                </h2>
+                <p className="mt-6 text-white/70 text-base md:text-lg max-w-xl leading-relaxed">
+                  Professional analysis. Honest insights. Built to help you grow.
+                </p>
+              </div>
+
+              {/* Decorative jersey badge — visually echoes the reference */}
+              <div className="hidden lg:flex lg:col-span-4 justify-end">
+                <div className="relative w-full max-w-[260px] aspect-[3/4]">
+                  <div className="absolute inset-0 border border-volt/30 bg-deepnavy/60 backdrop-blur-sm">
+                    {/* corner brackets */}
+                    <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-volt" />
+                    <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-volt" />
+                    <span className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-volt" />
+                    <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-volt" />
+
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                      <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt/80 mb-2">Your name</span>
+                      <span
+                        className="font-barlow font-black text-volt leading-none"
+                        style={{ fontSize: "7rem", textShadow: "0 6px 30px rgba(204,255,0,0.35)" }}
+                      >
+                        10
+                      </span>
+                      <span className="mt-3 text-[10px] uppercase tracking-[0.2em] font-bold text-white/50">
+                        Built for the next level
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10">
-            {featureCards.map((f, i) => (
-              <div
+          {/* ===== Cards grid 3 cols ===== */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+            {reportCards.map((card, i) => (
+              <motion.div
                 key={i}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.5, delay: (i % 3) * 0.08, ease: "easeOut" }}
                 data-testid={`feature-card-${i}`}
-                className="card-premium p-6 md:p-7 group cursor-default flex flex-col"
+                className="relative bg-surface/80 backdrop-blur-sm border border-white/10 hover:border-volt/40 p-6 md:p-7 flex flex-col group transition-colors"
               >
-                <div className="flex items-start justify-between mb-5">
-                  <f.icon className="w-7 h-7 text-volt" strokeWidth={1.5} />
-                  <span className="font-barlow font-black text-xs text-white/20 tracking-widest">0{i + 1}</span>
+                {/* Number — top right */}
+                <span className="absolute top-5 right-6 font-barlow font-black text-xs text-white/25 tracking-widest">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+
+                {/* Icon */}
+                <card.icon className="w-8 h-8 md:w-9 md:h-9 text-volt mb-6 group-hover:scale-105 transition-transform" strokeWidth={1.5} />
+
+                {/* Title */}
+                <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-white mb-3 leading-tight tracking-tight">
+                  {card.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-sm text-white/65 leading-relaxed mb-6 flex-1">
+                  {card.text}
+                </p>
+
+                {/* Visualization at bottom */}
+                <div className="mt-auto pt-5 border-t border-white/5">
+                  <CardViz viz={card.viz} />
                 </div>
-                <h3 className="font-barlow font-black uppercase text-lg text-white mb-2 leading-tight">{f.title}</h3>
-                <p className="text-xs text-white/55 leading-relaxed mb-4 flex-1">{f.text}</p>
-                <div className="mt-auto pt-4 border-t border-white/5">
-                  <p className="text-[11px] italic text-volt/80 leading-snug">"{f.preview}"</p>
+              </motion.div>
+            ))}
+
+            {/* ===== Special highlight card — 12 ===== */}
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.6, delay: 0.18, ease: "easeOut" }}
+              data-testid="feature-card-highlight"
+              className="relative bg-gradient-to-br from-volt/10 via-deepnavy/40 to-deepnavy/40 border-2 border-volt p-6 md:p-7 flex flex-col"
+              style={{ boxShadow: "0 0 60px rgba(204,255,0,0.12)" }}
+            >
+              <span className="absolute top-5 right-6 font-barlow font-black text-xs text-volt/40 tracking-widest">12</span>
+
+              <Crown className="w-9 h-9 md:w-10 md:h-10 text-volt mb-6" strokeWidth={1.5} fill="#ccff00" fillOpacity="0.18" />
+
+              <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-white mb-2 leading-tight tracking-tight">
+                100% Personal.<br />
+                100% Game Changing.
+              </h3>
+
+              <p className="text-sm text-white/80 leading-relaxed mt-3">
+                This is more than a report.{" "}
+                <span className="text-volt font-serif-italic italic">It's your advantage.</span>
+              </p>
+
+              <div className="mt-auto pt-5 border-t border-volt/20">
+                <Link
+                  to={startHref}
+                  data-testid="report-section-cta"
+                  className="inline-flex items-center gap-2 font-barlow font-black uppercase text-xs tracking-[0.22em] text-volt hover:text-white transition-colors"
+                >
+                  Unlock your report
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* ===== Bottom trust bar ===== */}
+          <div
+            data-testid="report-trust-bar"
+            className="mt-12 md:mt-16 border border-white/10 bg-surface/40 backdrop-blur-sm divide-y md:divide-y-0 md:divide-x divide-white/10 grid md:grid-cols-3"
+          >
+            {[
+              { Icon: Clock, t: "5–10 Minutes", s: "To complete" },
+              { Icon: Zap, t: "Instant access", s: "To your free preview" },
+              { Icon: ShieldCheck, t: "Real scouts", s: "Real reports" },
+            ].map(({ Icon, t, s }, i) => (
+              <div key={i} className="flex items-center gap-3 px-6 py-5">
+                <Icon className="w-5 h-5 text-volt shrink-0" strokeWidth={1.8} />
+                <div className="flex flex-col leading-tight">
+                  <span className="font-barlow font-black uppercase text-white text-sm tracking-wider">{t}</span>
+                  <span className="text-white/55 text-[11px] uppercase tracking-[0.18em] font-bold mt-0.5">{s}</span>
                 </div>
               </div>
             ))}

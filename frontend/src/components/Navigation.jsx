@@ -47,14 +47,14 @@ export default function Navigation({ transparent = false }) {
         transparent ? "bg-deepnavy/40 backdrop-blur-xl" : "bg-deepnavy/90 backdrop-blur-xl"
       } border-b border-white/10`}
     >
-      <div className="max-w-7xl mx-auto px-6 md:px-10 py-3.5 flex items-center justify-between gap-4">
-        <Link to="/" data-testid="nav-logo" className="flex items-center gap-3 group shrink-0">
-          <LogoMark className="w-9 h-11 sm:w-10 sm:h-12 group-hover:scale-105 transition-transform" />
-          <div className="flex flex-col leading-none">
-            <span className="font-barlow font-black uppercase text-white tracking-tight text-lg sm:text-xl whitespace-nowrap">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-10 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-3">
+        <Link to="/" data-testid="nav-logo" className="flex items-center gap-2.5 sm:gap-3 group min-w-0 shrink">
+          <LogoMark className="w-12 h-14 sm:w-14 sm:h-16 shrink-0 group-hover:scale-105 transition-transform" />
+          <div className="flex flex-col leading-none min-w-0">
+            <span className="font-barlow font-black uppercase text-white tracking-tight text-base sm:text-xl whitespace-nowrap">
               SCOUTMEPLAY
             </span>
-            <span className="text-[8.5px] sm:text-[10px] text-volt font-bold uppercase tracking-[0.2em] sm:tracking-[0.22em] mt-1 whitespace-nowrap">
+            <span className="text-[7px] sm:text-[10px] text-volt font-bold uppercase tracking-[0.12em] sm:tracking-[0.22em] mt-1.5 sm:mt-2 whitespace-nowrap">
               One video away from your dream
             </span>
           </div>
@@ -62,7 +62,7 @@ export default function Navigation({ transparent = false }) {
 
         <nav className="hidden md:flex items-center gap-8" aria-hidden="true" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {user ? (
             <>
               <Link
@@ -105,7 +105,7 @@ export default function Navigation({ transparent = false }) {
               <Link
                 to="/login"
                 data-testid="nav-login-btn"
-                className="text-sm text-white/80 hover:text-white uppercase tracking-widest font-semibold transition-colors whitespace-nowrap"
+                className="text-xs sm:text-sm text-white/80 hover:text-white uppercase tracking-widest font-semibold transition-colors whitespace-nowrap"
               >
                 Log in
               </Link>
@@ -113,7 +113,7 @@ export default function Navigation({ transparent = false }) {
               <Link
                 to="/signup"
                 data-testid="nav-signup-btn"
-                className="bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-5 py-2.5 transition-colors whitespace-nowrap shrink-0"
+                className="bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-[11px] sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5 transition-colors whitespace-nowrap shrink-0"
               >
                 Get started
               </Link>
