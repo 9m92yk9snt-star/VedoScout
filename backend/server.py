@@ -182,130 +182,221 @@ async def get_current_admin(user=Depends(get_current_user)):
 
 # ============== GEMINI ANALYSIS ==============
 
-PREVIEW_PROMPT = """You are an experienced football coach giving honest, friendly feedback to a young player or their parent. You speak in NATURAL, EVERYDAY FOOTBALL LANGUAGE — the way a real coach talks to a 14-year-old and their family. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking", "half-turn", "high-intensity transitions", "block", "vertical progression". Instead say things like "stays calm under pressure", "always looks around before the ball arrives", "his left foot is dangerous", "gets tired late in the game", "smart playmaker", "reads the game well".
+CONTENT_GATE_PROMPT = """You are a strict video content validator for a professional football scouting service. A short video clip and a reference frame (player marked with a bright green circle and "THIS PLAYER" label) are provided. Look at them and decide whether this submission can be analysed.
 
-⚠️ CRITICAL PLAYER IDENTIFICATION ⚠️
-A REFERENCE FRAME image has been provided alongside the video. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER" in the reference image. This is a frame taken directly from the video and the user has explicitly pointed at the player they want analysed.
-
-YOU MUST:
-1. First locate this exact player in the reference image (look at the bright green circle and "THIS PLAYER" label).
-2. Identify visual cues — jersey colour, number, hair, position on the pitch, body type.
-3. Track THIS PLAYER across the entire video. Ignore all other players.
-4. If at any moment you cannot identify the player with confidence, say so honestly in the summary rather than guess.
-5. Cross-check with the user's text description below, but the CIRCLED PLAYER IN THE REFERENCE FRAME is the ground truth.
-
-The player's text description: {player_details}
-
-Now produce a JSON object EXACTLY in this format (no extra fields, no commentary outside JSON):
+Return ONLY a JSON object in EXACTLY this shape — no extra fields, no commentary outside JSON:
 
 {
-  "player_type": "<short, friendly label e.g. 'Smart playmaker with a strong left foot' or 'Direct winger with pace'>",
-  "brief_summary": "<2-3 sentences in plain football language describing how THE CIRCLED PLAYER plays and what makes him stand out>",
-  "top_strengths": ["<strength 1 in plain words>", "<strength 2>", "<strength 3>"],
-  "area_for_improvement": "<one specific thing for THIS PLAYER to work on, in simple words>",
+  "is_football": true | false,
+  "content_type": "full_match" | "small_sided" | "training" | "drill" | "fitness" | "freestyle" | "mixed" | "other",
+  "quality": "good" | "poor" | "unwatchable",
+  "player_visible": "clear" | "partial" | "unclear" | "not_visible",
+  "games_detected": <integer count of distinct games or sessions visible>,
+  "camera_distance": "close" | "medium" | "far" | "too_far",
+  "issues": ["<short concrete issue>", "..."],
+  "rejection_reason": "<one sentence explaining why this video cannot be analysed, or null if acceptable>"
+}
+
+STRICT rules:
+- A football match, small-sided game, training session, drills, fitness work, or freestyle with a football ALL count as football → is_football: true.
+- A basketball game, dance video, dog video, indoor non-football footage, a still photo or random clips → is_football: false.
+- If the video is so dark, shaky, or low-resolution that no football action can be identified → quality: "unwatchable".
+- If the marked player is genuinely never visible across the clip → player_visible: "not_visible".
+- Set rejection_reason ONLY when one of these is true:
+    • is_football is false, OR
+    • quality is "unwatchable", OR
+    • player_visible is "not_visible".
+  Otherwise rejection_reason MUST be null.
+- Be FAIR but firm. If you can see football activity and the player is shown at least briefly, accept it.
+
+Return only the JSON."""
+
+
+PREVIEW_PROMPT = """You are an experienced football coach giving a SHORT, evidence-based FREE PREVIEW based on a 15-second clip and a reference frame.
+
+🎯 GROUND RULE — EVIDENCE OR SILENCE
+Every observation must come from what you actually SAW in the clip. If you can't see it, say so — never invent.
+
+🎯 LANGUAGE
+Plain, natural football coach language. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking", "half-turn", "high-intensity transitions", "vertical progression". Use phrases like "stays calm under pressure", "always looks around before the ball arrives", "his left foot is dangerous", "gets tired late in the game".
+
+🎯 PLAYER IDENTIFICATION
+A reference frame is attached. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER". Track ONLY that player. Note their jersey colour, number, body type, hair, distinguishing features. Ignore everyone else.
+
+🎯 CONTENT CONTEXT (from pre-analysis)
+CONTENT_TYPE: {content_type}
+PLAYER_VISIBILITY: {player_visible}
+CAMERA_DISTANCE: {camera_distance}
+
+🎯 PLAYER DETAILS
+{player_details}
+
+Produce a JSON object EXACTLY in this format:
+
+{
+  "player_type": "<short, friendly label e.g. 'Smart playmaker with a strong left foot' — based on observation>",
+  "brief_summary": "<2-3 sentences about how THE CIRCLED PLAYER plays based ONLY on what you saw>",
+  "top_strengths": ["<observed strength 1>", "<observed strength 2>", "<observed strength 3>"],
+  "area_for_improvement": "<one specific area, only if visible in the clip — otherwise 'Need more footage to spot an improvement area'>",
+  "evidence_note": "<one short sentence about what kind of moments you observed (e.g., 'Saw 5 clear touches and 2 passes in the clip')>",
+  "confidence": "high" | "medium" | "low",
+  "confidence_reason": "<one sentence — e.g. 'Player visible for most of the clip with multiple touches' or 'Only 2 brief on-ball moments visible'>",
   "sample_section": {
     "title": "Sample: Technical Snapshot",
-    "content": "<3-4 sentence preview teaser of the deeper technical breakdown — still in natural football language>"
+    "content": "<3-4 sentence teaser of the deeper technical breakdown — still in natural football language, still evidence-based>"
   }
 }
 
-Important: This is independent developmental feedback. Do NOT imply trials, contracts, or academy selection. Return ONLY valid JSON."""
+CRITICAL:
+- Independent developmental feedback — do NOT imply trials, contracts, selection
+- Evidence-only — never invent or guess
+- Return ONLY valid JSON, no markdown, no commentary
+"""
 
 
-FULL_REPORT_PROMPT = """You are an experienced football coach writing a PREMIUM development report for a young player and their family. Write in NATURAL, EVERYDAY FOOTBALL LANGUAGE — the way a real coach talks. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking passes", "half-turn", "high-intensity transitions", "vertical progression", "false-9 in possession systems". Instead use plain language: "stays calm when defenders close him down", "always looks around before getting the ball", "his left foot can find any pass", "gets tired late in matches", "ready to step up to a stronger team", "best as a creative #10 behind the striker".
+FULL_REPORT_PROMPT = """You are an experienced football scout writing a PREMIUM, EVIDENCE-BASED development report for a young player.
 
-⚠️ CRITICAL PLAYER IDENTIFICATION ⚠️
-A REFERENCE FRAME image has been provided alongside the video. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER" in the reference image. This frame was taken from the video and the user has explicitly pointed at the player they want analysed.
+🎯 GROUND RULE — EVIDENCE OR SILENCE
+Every score and every claim must come from something you actually OBSERVED in the video. If you cannot see it, set "cannot_evaluate": true with a reason. NEVER guess.
 
-YOU MUST:
-1. Locate this exact player in the reference frame (bright green circle, "THIS PLAYER" label).
-2. Note their jersey colour, number, body type, hair, and any distinguishing features.
-3. Track ONLY THIS PLAYER across the entire video. Completely ignore other players.
-4. Every score, every note, every comment must be about THIS PLAYER only.
-5. If you lose sight of the player in some moments, only score what you actually observed of him.
+🎯 LANGUAGE
+Plain, natural football coach language. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking passes", "half-turn", "high-intensity transitions", "vertical progression", "false-9 in possession systems". Use plain phrases: "stays calm when defenders close him down", "always looks around before getting the ball", "his left foot can find any pass", "gets tired late in matches", "ready to step up to a stronger team".
 
-Each rating field must be an integer 1-10. Narrative fields should be specific, encouraging, and substantive (2-4 sentences each unless otherwise noted). Speak directly about the player ("he", "she", or use the name) — not abstractly.
+🎯 PLAYER IDENTIFICATION
+A reference frame is attached showing the player CIRCLED in bright green with the label "THIS PLAYER". Track ONLY that player across the video. Note their jersey colour, number, body type, hair, and distinguishing features. If you lose sight of them in some moments, only score what you actually saw.
 
-Player text details: {player_details}
+🎯 CONTENT AWARENESS (from pre-analysis)
+CONTENT_TYPE: {content_type}
+QUALITY: {quality}
+PLAYER_VISIBILITY: {player_visible}
+CAMERA_DISTANCE: {camera_distance}
+GAMES_DETECTED: {games_detected}
+
+ADAPT YOUR ANALYSIS to the content_type:
+- "full_match" / "small_sided" / "mixed": evaluate ALL categories (technical, tactical, physical, mentality).
+- "training": evaluate technical thoroughly. Evaluate tactical only if opposition/spacing context exists. If a sub-skill has no observable evidence, mark it cannot_evaluate.
+- "drill": evaluate technical thoroughly. Tactical, mentality (duel courage, response to mistakes) → almost always cannot_evaluate unless clearly shown.
+- "fitness": evaluate physical thoroughly. Technical/tactical/mentality → cannot_evaluate unless they appear.
+- "freestyle": evaluate technical (ball mastery) only. All other categories cannot_evaluate.
+
+🎯 EVIDENCE STRUCTURE
+For EVERY scored sub-skill (e.g. first_touch, passing, scanning), return this exact object shape:
+
+{
+  "score": <integer 1-10, OR null if cannot_evaluate>,
+  "notes": "<2-4 sentences of plain-language observation, OR 'Not observable from this footage' if cannot_evaluate>",
+  "confidence": "high" | "medium" | "low",
+  "confidence_reason": "<ONE sentence — e.g. '7 clear touches observed across the clip' or 'only 2 brief moments visible at distance'>",
+  "observations_used": <integer count of distinct moments used>,
+  "evidence": [{"timestamp": "MM:SS or 'General'", "what": "<concrete moment description>"}],
+  "cannot_evaluate": false | true,
+  "evaluable_reason": "<ONLY when cannot_evaluate=true: ONE sentence explaining why this skill cannot be assessed from this video, e.g. 'No shooting situations were visible in the footage.'>"
+}
+
+When cannot_evaluate=true: score MUST be null, notes brief, evidence may be empty, confidence "low".
+
+🎯 PLAYER DETAILS
+{player_details}
 
 Produce a JSON object EXACTLY in this format:
 
 {
   "player_type": "<short friendly label>",
-  "executive_summary": "<4-6 sentences describing THE CIRCLED PLAYER's style and what makes him stand out, in plain football language>",
+  "executive_summary": "<4-6 sentences describing THE CIRCLED PLAYER's style and what makes him stand out — strictly based on what you observed>",
+  "content_analysis": {
+    "content_type_observed": "<the type you actually saw, plain words>",
+    "minutes_observed": <approximate minutes of observable play of THIS PLAYER>,
+    "key_situations": ["<short list of distinct situations seen, e.g. 'attacking transition', 'first-touch under pressure', 'recovery sprint'>"]
+  },
   "technical": {
-    "first_touch": {"score": 1-10, "notes": "<specific observation of THIS PLAYER in plain words>"},
-    "ball_control": {"score": 1-10, "notes": "..."},
-    "dribbling": {"score": 1-10, "notes": "..."},
-    "passing": {"score": 1-10, "notes": "..."},
-    "shooting": {"score": 1-10, "notes": "..."},
-    "weak_foot": {"score": 1-10, "notes": "..."},
-    "one_v_one": {"score": 1-10, "notes": "..."}
+    "first_touch": { ... evidence object as above ... },
+    "ball_control": { ... },
+    "dribbling": { ... },
+    "passing": { ... },
+    "shooting": { ... },
+    "weak_foot": { ... },
+    "one_v_one": { ... }
   },
   "tactical": {
-    "positioning": {"score": 1-10, "notes": "..."},
-    "off_ball_movement": {"score": 1-10, "notes": "..."},
-    "scanning": {"score": 1-10, "notes": "..."},
-    "decision_making": {"score": 1-10, "notes": "..."},
-    "timing_of_runs": {"score": 1-10, "notes": "..."},
-    "game_understanding": {"score": 1-10, "notes": "..."}
+    "positioning": { ... },
+    "off_ball_movement": { ... },
+    "scanning": { ... },
+    "decision_making": { ... },
+    "timing_of_runs": { ... },
+    "game_understanding": { ... }
   },
   "physical": {
-    "acceleration": {"score": 1-10, "notes": "..."},
-    "speed": {"score": 1-10, "notes": "..."},
-    "balance": {"score": 1-10, "notes": "..."},
-    "agility": {"score": 1-10, "notes": "..."},
-    "intensity": {"score": 1-10, "notes": "..."},
-    "body_control": {"score": 1-10, "notes": "..."}
+    "acceleration": { ... },
+    "speed": { ... },
+    "balance": { ... },
+    "agility": { ... },
+    "intensity": { ... },
+    "body_control": { ... }
   },
   "mentality": {
-    "confidence": {"score": 1-10, "notes": "..."},
-    "work_rate": {"score": 1-10, "notes": "..."},
-    "courage_in_duels": {"score": 1-10, "notes": "..."},
-    "response_to_mistakes": {"score": 1-10, "notes": "..."},
-    "competitive_mindset": {"score": 1-10, "notes": "..."},
-    "focus": {"score": 1-10, "notes": "..."}
+    "confidence": { ... },
+    "work_rate": { ... },
+    "courage_in_duels": { ... },
+    "response_to_mistakes": { ... },
+    "competitive_mindset": { ... },
+    "focus": { ... }
   },
   "scout_view": {
-    "key_strengths": ["<3-5 bullets in plain football language>"],
-    "areas_of_concern": ["<2-4 bullets in plain language>"],
+    "key_strengths": ["<3-5 plain-language bullets, each grounded in observed evidence>"],
+    "areas_of_concern": ["<2-4 bullets>"],
     "development_priorities": ["<3-4 bullets — what to focus on next>"],
-    "appropriate_next_level": "<e.g. 'Ready to step up to a stronger U15 team' — plain language, no jargon>",
-    "positional_suitability": "<which positions suit him best, in plain words e.g. 'Best as a creative #10 behind a striker'>"
+    "appropriate_next_level": "<plain words>",
+    "positional_suitability": "<plain words>",
+    "what_we_could_not_assess": ["<list of categories or sub-skills that need different footage to evaluate, plain words>"]
   },
   "potential_assessment": {
-    "current_level": "<plain words describing where he is right now>",
-    "development_potential": "<honest, encouraging assessment of how much he can grow>",
-    "recommended_next_step": "<concrete next step in plain words>",
-    "three_month_focus": "<main focus for the next 90 days, simple words>"
+    "current_level": "<plain words>",
+    "development_potential": "<honest, encouraging>",
+    "recommended_next_step": "<concrete>",
+    "three_month_focus": "<main focus for next 90 days>"
   },
   "training_plan": {
     "exercises": [
-      {"name": "<exercise>", "description": "<2 sentence drill description in everyday language>", "duration": "<e.g. '15 min'>"},
+      {"name": "<exercise>", "description": "<2 sentence drill description>", "duration": "<e.g. '15 min'>"},
       {"name": "...", "description": "...", "duration": "..."},
       {"name": "...", "description": "...", "duration": "..."},
       {"name": "...", "description": "...", "duration": "..."},
       {"name": "...", "description": "...", "duration": "..."}
     ],
-    "weekly_focus": "<a paragraph on what to focus on each training session this week — plain words>",
-    "thirty_day_plan": "<paragraph on 30-day development plan in plain language>",
-    "ninety_day_plan": "<paragraph on 90-day development plan in plain language>"
+    "weekly_focus": "<paragraph>",
+    "thirty_day_plan": "<paragraph>",
+    "ninety_day_plan": "<paragraph>"
   },
-  "video_comments": [
-    {"timestamp": "<MM:SS or 'General'>", "comment": "<specific observation of THIS PLAYER in plain football words>"},
-    {"timestamp": "...", "comment": "..."}
-  ],
+  "video_comments": [{"timestamp": "MM:SS", "comment": "<specific moment observation in plain words>"}],
   "scores": {
-    "technical": 1-10,
-    "tactical": 1-10,
-    "physical": 1-10,
-    "mentality": 1-10,
-    "overall_development": 1-10
+    "technical": <integer 1-10>,
+    "tactical": <integer 1-10>,
+    "physical": <integer 1-10>,
+    "mentality": <integer 1-10>,
+    "overall_development": <integer 1-10>
   },
-  "final_summary": "<3-5 sentence encouraging closing summary about THIS PLAYER, plain football language>"
+  "scores_confidence": {
+    "technical": "high" | "medium" | "low",
+    "tactical": "high" | "medium" | "low",
+    "physical": "high" | "medium" | "low",
+    "mentality": "high" | "medium" | "low",
+    "overall_development": "high" | "medium" | "low"
+  },
+  "final_summary": "<3-5 sentence encouraging closing summary about THIS PLAYER, plain football language>",
+  "evidence_quality_note": "<one paragraph explaining the overall evidence quality of this video — what was strong, what was missing, what kind of follow-up footage would strengthen the report>"
 }
 
-CRITICAL: This is independent developmental analysis. Do NOT imply trials, contracts, or selection. Use language like 'developmental guidance' rather than 'scouting evaluation'. Use 'next level to aim for' rather than 'should be signed'. Write the way a real football coach talks — warm, specific, and clear. Return ONLY valid JSON, no markdown, no commentary."""
+RULES FOR TOP-LEVEL "scores":
+- These are AGGREGATES. Average the observable sub-skills in each category.
+- If MOST sub-skills in a category are cannot_evaluate, score the category honestly low (3-5) and set scores_confidence to "low".
+- If the entire category is cannot_evaluate, still give a defensible integer (e.g. 5) but set scores_confidence to "low" and reflect this in evidence_quality_note.
+
+CRITICAL:
+- Independent developmental analysis — do NOT imply trials, contracts, selection
+- Evidence-only — never invent, never guess
+- Honest cannot_evaluate is better than fake confidence
+- Return ONLY valid JSON, no markdown, no commentary
+"""
 
 
 def extract_json(text: str) -> dict:
@@ -352,6 +443,61 @@ async def call_gemini_with_video(session_id: str, prompt: str, video_path: str, 
     except Exception as e:
         logger.error(f"Failed to parse Gemini response: {e}\n{response_text[:500]}")
         raise HTTPException(status_code=500, detail="AI analysis returned invalid format. Please try again.")
+
+
+async def run_content_gate(report_id: str, clip_path: Path, marker_path: Optional[Path]) -> dict:
+    """Quick AI gate that validates a clip before deep analysis.
+    Returns a structured dict; never raises (falls back to permissive on error)."""
+    try:
+        gate = await call_gemini_with_video(
+            session_id=f"gate-{report_id}",
+            prompt=CONTENT_GATE_PROMPT,
+            video_path=str(clip_path),
+            marker_path=str(marker_path) if marker_path and marker_path.exists() else None,
+        )
+        # Basic sanity defaults
+        gate.setdefault("is_football", True)
+        gate.setdefault("quality", "good")
+        gate.setdefault("player_visible", "clear")
+        gate.setdefault("content_type", "other")
+        gate.setdefault("games_detected", 1)
+        gate.setdefault("camera_distance", "medium")
+        gate.setdefault("issues", [])
+        gate.setdefault("rejection_reason", None)
+        return gate
+    except Exception as e:
+        logger.warning(f"Content gate failed, falling back to permissive: {e}")
+        return {
+            "is_football": True,
+            "content_type": "other",
+            "quality": "good",
+            "player_visible": "clear",
+            "games_detected": 1,
+            "camera_distance": "medium",
+            "issues": [],
+            "rejection_reason": None,
+            "gate_error": True,
+        }
+
+
+def gate_rejection_message(gate: dict) -> Optional[str]:
+    """Return a user-facing rejection message if the gate result requires rejection. Otherwise None."""
+    if not gate.get("is_football", True):
+        return (
+            gate.get("rejection_reason")
+            or "This video doesn't look like football. Please upload a clip of a match, training, drill, or freestyle work with a football."
+        )
+    if gate.get("quality") == "unwatchable":
+        return (
+            gate.get("rejection_reason")
+            or "The video quality is too low to analyse reliably. Please upload a clearer recording (better lighting, less shake, closer to the action)."
+        )
+    if gate.get("player_visible") == "not_visible":
+        return (
+            gate.get("rejection_reason")
+            or "We couldn't spot the marked player in this footage. Mark a different moment where the player is clearly on screen, or upload a clip that includes them."
+        )
+    return None
 
 
 def transcode_to_web_mp4(src_path: Path) -> Path:
@@ -625,11 +771,38 @@ async def upload_video_and_create_preview(
     # Build a short preview clip (15s window around the marker) for the FREE preview
     preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
 
-    # Generate FREE preview synchronously (Gemini receives marker image + short clip)
+    # ============== CONTENT GATE ==============
+    # Validate the clip is actually football and the player is visible. Rejects
+    # non-football videos, unwatchable footage, or clips where the marked player
+    # never appears. This protects users from spending tokens / paying for noise.
+    gate = await run_content_gate(report_id, preview_clip_path, marker_path)
+    rejection = gate_rejection_message(gate)
+    if rejection:
+        for p in {file_path, web_path, marker_path, preview_clip_path}:
+            try:
+                p.unlink()
+            except Exception:
+                pass
+        if poster_path:
+            try:
+                poster_path.unlink()
+            except Exception:
+                pass
+        raise HTTPException(status_code=400, detail=rejection)
+
+    # Generate FREE preview synchronously (Gemini receives marker image + short clip).
+    # The prompt is content-aware: it adapts to the gate's content_type and visibility findings.
     try:
+        preview_prompt = (
+            PREVIEW_PROMPT
+            .replace("{player_details}", details_str)
+            .replace("{content_type}", str(gate.get("content_type", "other")))
+            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+        )
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
-            prompt=PREVIEW_PROMPT.replace("{player_details}", details_str),
+            prompt=preview_prompt,
             video_path=str(preview_clip_path),
             marker_path=str(marker_path),
         )
@@ -668,6 +841,7 @@ async def upload_video_and_create_preview(
         "marker_timestamp": float(marker_timestamp),
         "video_duration_sec": duration_sec,
         "video_size_bytes": file_size,
+        "content_gate": gate,
         "preview": preview,
         "full_report": None,
         "is_paid": False,
@@ -754,6 +928,7 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
         "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
         "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
         "preview": doc.get("preview"),
+        "content_gate": doc.get("content_gate"),
         "is_paid": doc.get("is_paid", False),
         "manually_unlocked": doc.get("manually_unlocked", False),
         "demo": doc.get("demo", False),
@@ -805,10 +980,21 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
             marker_path = str(mp)
 
     details_str = json.dumps(doc["player_details"], ensure_ascii=False)
+    # Pull the gate info captured at upload time so the full report adapts to content type.
+    gate = doc.get("content_gate") or {}
     try:
+        full_prompt = (
+            FULL_REPORT_PROMPT
+            .replace("{player_details}", details_str)
+            .replace("{content_type}", str(gate.get("content_type", "other")))
+            .replace("{quality}", str(gate.get("quality", "good")))
+            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+            .replace("{games_detected}", str(gate.get("games_detected", 1)))
+        )
         full = await call_gemini_with_video(
             session_id=f"full-{report_id}",
-            prompt=FULL_REPORT_PROMPT.replace("{player_details}", details_str),
+            prompt=full_prompt,
             video_path=str(file_path),
             marker_path=marker_path,
         )

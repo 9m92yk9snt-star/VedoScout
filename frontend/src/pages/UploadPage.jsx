@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
-import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle } from "lucide-react";
+import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2 } from "lucide-react";
 
 export default function UploadPage() {
   const [file, setFile] = useState(null);
@@ -12,6 +12,12 @@ export default function UploadPage() {
   const [markerPreviewUrl, setMarkerPreviewUrl] = useState(null);
   const [markerTimestamp, setMarkerTimestamp] = useState(0);
   const [isMarking, setIsMarking] = useState(false);
+
+  // P1: zoom + pan state for the marking overlay
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const gestureRef = useRef(null);
+  const movedRef = useRef(false);
 
   const [form, setForm] = useState({
     player_name: "",
@@ -30,6 +36,79 @@ export default function UploadPage() {
   const navigate = useNavigate();
 
   const setField = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
+
+  // Reset zoom/pan whenever marking starts or video changes
+  useEffect(() => {
+    if (!isMarking) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [isMarking, videoUrl]);
+
+  // Zoom controls (clamped 1× – 4×)
+  const clampZoom = (z) => Math.max(1, Math.min(4, z));
+  const zoomIn = () => setZoom((z) => clampZoom(z + 0.5));
+  const zoomOut = () =>
+    setZoom((z) => {
+      const nz = clampZoom(z - 0.5);
+      if (nz <= 1.01) setPan({ x: 0, y: 0 });
+      return nz;
+    });
+  const resetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Pinch + pan gesture handlers (only active while marking)
+  const onWrapperTouchStart = (e) => {
+    if (!isMarking) return;
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      gestureRef.current = {
+        type: "pinch",
+        startDist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY),
+        startZoom: zoom,
+      };
+      movedRef.current = true;
+    } else if (e.touches.length === 1 && zoom > 1.01) {
+      gestureRef.current = {
+        type: "pan",
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        startPan: pan,
+      };
+      movedRef.current = false;
+    } else {
+      gestureRef.current = null;
+      movedRef.current = false;
+    }
+  };
+
+  const onWrapperTouchMove = (e) => {
+    if (!isMarking || !gestureRef.current) return;
+    if (gestureRef.current.type === "pinch" && e.touches.length === 2) {
+      e.preventDefault();
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const d = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const ratio = d / gestureRef.current.startDist;
+      const nz = clampZoom(gestureRef.current.startZoom * ratio);
+      setZoom(nz);
+      if (nz <= 1.01) setPan({ x: 0, y: 0 });
+      movedRef.current = true;
+    } else if (gestureRef.current.type === "pan" && e.touches.length === 1) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - gestureRef.current.startX;
+      const dy = e.touches[0].clientY - gestureRef.current.startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) movedRef.current = true;
+      setPan({ x: gestureRef.current.startPan.x + dx, y: gestureRef.current.startPan.y + dy });
+    }
+  };
+
+  const onWrapperTouchEnd = () => {
+    gestureRef.current = null;
+  };
 
   // Clean up object URLs
   useEffect(() => {
@@ -81,6 +160,11 @@ export default function UploadPage() {
   const cancelMarking = () => setIsMarking(false);
 
   const handleOverlayClick = (e) => {
+    // Ignore clicks that are actually the end of a pan/pinch gesture
+    if (movedRef.current) {
+      movedRef.current = false;
+      return;
+    }
     const video = videoRef.current;
     const overlay = overlayRef.current;
     if (!video || !overlay) return;
@@ -311,40 +395,124 @@ export default function UploadPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* Video + overlay */}
-                    <div className="relative bg-black border border-white/10">
-                      <video
-                        ref={videoRef}
-                        src={videoUrl}
-                        controls={!isMarking}
-                        playsInline
-                        preload="metadata"
-                        onLoadedMetadata={handleVideoLoadedMetadata}
-                        data-testid="upload-video-preview"
-                        className="w-full aspect-video bg-black"
-                      />
+                    {/* Video + overlay (zoomable when marking) */}
+                    <div
+                      className="relative bg-black border border-white/10 overflow-hidden select-none"
+                      onTouchStart={onWrapperTouchStart}
+                      onTouchMove={onWrapperTouchMove}
+                      onTouchEnd={onWrapperTouchEnd}
+                      onTouchCancel={onWrapperTouchEnd}
+                      style={{ touchAction: isMarking ? "none" : "auto" }}
+                    >
+                      {/* Transformed inner — video + clickable overlay scale together */}
+                      <div
+                        style={{
+                          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                          transformOrigin: "0 0",
+                          transition: gestureRef.current ? "none" : "transform 0.15s ease-out",
+                          willChange: "transform",
+                        }}
+                      >
+                        <video
+                          ref={videoRef}
+                          src={videoUrl}
+                          controls={!isMarking}
+                          playsInline
+                          preload="metadata"
+                          onLoadedMetadata={handleVideoLoadedMetadata}
+                          data-testid="upload-video-preview"
+                          className="w-full aspect-video bg-black"
+                          style={{ pointerEvents: isMarking ? "none" : "auto" }}
+                        />
+                        {isMarking && (
+                          <div
+                            ref={overlayRef}
+                            onClick={handleOverlayClick}
+                            className="absolute inset-0 cursor-crosshair"
+                            style={{ backgroundColor: "rgba(5, 10, 15, 0.18)" }}
+                            data-testid="upload-mark-overlay"
+                          />
+                        )}
+                      </div>
+
+                      {/* Static UI — NOT scaled */}
                       {isMarking && (
-                        <div
-                          ref={overlayRef}
-                          onClick={handleOverlayClick}
-                          className="absolute inset-0 cursor-crosshair"
-                          style={{ backgroundColor: "rgba(5, 10, 15, 0.25)" }}
-                          data-testid="upload-mark-overlay"
-                        >
-                          <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                            <span className="bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1 animate-pulse">
+                        <>
+                          <div className="pointer-events-none absolute top-3 left-3 right-3 flex items-center justify-between z-10">
+                            <span className="pointer-events-auto bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1 animate-pulse">
                               Tap on your player
                             </span>
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); cancelMarking(); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                cancelMarking();
+                              }}
                               data-testid="upload-mark-cancel"
-                              className="bg-deepnavy/80 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2 py-1 border border-white/20"
+                              className="pointer-events-auto bg-deepnavy/80 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 border border-white/20"
                             >
                               Cancel
                             </button>
                           </div>
-                        </div>
+
+                          {/* Zoom controls */}
+                          <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-center gap-1.5">
+                            <div className="pointer-events-auto flex items-center bg-deepnavy/85 backdrop-blur-sm border border-white/20">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  zoomOut();
+                                }}
+                                disabled={zoom <= 1.01}
+                                data-testid="upload-zoom-out"
+                                className="w-9 h-9 flex items-center justify-center text-white hover:text-volt disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-r border-white/20"
+                                aria-label="Zoom out"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </button>
+                              <span className="px-2 min-w-[42px] text-center text-[11px] font-barlow font-black text-volt tracking-wider tabular-nums">
+                                {Math.round(zoom * 100)}%
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  zoomIn();
+                                }}
+                                disabled={zoom >= 3.99}
+                                data-testid="upload-zoom-in"
+                                className="w-9 h-9 flex items-center justify-center text-white hover:text-volt disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-white/20"
+                                aria-label="Zoom in"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {zoom > 1.01 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  resetZoom();
+                                }}
+                                data-testid="upload-zoom-reset"
+                                className="pointer-events-auto w-9 h-9 flex items-center justify-center text-white hover:text-volt bg-deepnavy/85 backdrop-blur-sm border border-white/20 transition-colors"
+                                aria-label="Reset zoom"
+                              >
+                                <Maximize2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Hint when zoomed */}
+                          {zoom > 1.01 && (
+                            <div className="pointer-events-none absolute bottom-3 left-3 z-10">
+                              <span className="bg-deepnavy/85 backdrop-blur-sm text-white/80 text-[9px] uppercase tracking-widest font-bold px-2 py-1 border border-white/15">
+                                Drag to pan · Tap player when ready
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -352,7 +520,10 @@ export default function UploadPage() {
                       <div className="bg-deepnavy/60 border border-volt/30 p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
                         <div className="flex items-start gap-2.5 text-sm text-white/80">
                           <AlertCircle className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
-                          <span>Scrub to a moment where your player is clearly visible, then tap "Mark this player".</span>
+                          <span>
+                            Scrub to a clear moment, then tap "Mark this player".{" "}
+                            <span className="text-volt/80">Pinch to zoom for precision on mobile.</span>
+                          </span>
                         </div>
                         <button
                           type="button"

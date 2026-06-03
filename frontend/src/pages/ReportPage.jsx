@@ -9,9 +9,29 @@ import Navigation from "@/components/Navigation";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star,
+  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
+
+/* Visual treatment for confidence badges (high / medium / low). */
+const CONFIDENCE_STYLES = {
+  high: { color: "text-volt", border: "border-volt/40", bg: "bg-volt/10", label: "High confidence" },
+  medium: { color: "text-yellow-300", border: "border-yellow-300/40", bg: "bg-yellow-300/10", label: "Medium confidence" },
+  low: { color: "text-orange-300", border: "border-orange-300/40", bg: "bg-orange-300/10", label: "Low confidence" },
+};
+function ConfidenceBadge({ level, reason }) {
+  const c = CONFIDENCE_STYLES[level];
+  if (!c) return null;
+  return (
+    <span
+      title={reason || c.label}
+      className={`inline-flex items-center gap-1 text-[9px] uppercase tracking-[0.18em] font-bold border ${c.border} ${c.bg} ${c.color} px-1.5 py-0.5`}
+    >
+      <ShieldCheck className="w-3 h-3" strokeWidth={2} />
+      {c.label.replace(" confidence", "")}
+    </span>
+  );
+}
 
 function scoreColor(s) {
   if (typeof s !== "number") return "text-white";
@@ -26,15 +46,63 @@ function SectionGrid({ title, section }) {
     <div className="bg-surface border border-white/10 p-6 md:p-8">
       <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">{title}</h3>
       <div className="mt-6 grid sm:grid-cols-2 gap-px bg-white/5">
-        {Object.entries(section).map(([key, val]) => (
-          <div key={key} className="bg-surface p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs uppercase tracking-[0.18em] font-bold text-white/60">{key.replace(/_/g, " ")}</span>
-              <span className={`font-barlow font-black text-2xl ${scoreColor(val?.score)}`}>{val?.score ?? "-"}<span className="text-white/30 text-base">/10</span></span>
+        {Object.entries(section).map(([key, val]) => {
+          const cannotEval = val?.cannot_evaluate === true;
+          const confidence = val?.confidence;
+          const evidence = Array.isArray(val?.evidence) ? val.evidence : [];
+          return (
+            <div key={key} className="bg-surface p-4">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="text-xs uppercase tracking-[0.18em] font-bold text-white/60">{key.replace(/_/g, " ")}</span>
+                {cannotEval ? (
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-orange-300 border border-orange-300/40 bg-orange-300/10 px-2 py-0.5 whitespace-nowrap">
+                    Need more footage
+                  </span>
+                ) : (
+                  <span className={`font-barlow font-black text-2xl ${scoreColor(val?.score)}`}>
+                    {val?.score ?? "-"}
+                    <span className="text-white/30 text-base">/10</span>
+                  </span>
+                )}
+              </div>
+
+              {cannotEval ? (
+                <p className="text-xs text-orange-200/70 leading-relaxed italic">
+                  {val?.evaluable_reason || val?.notes || "Not observable from this footage."}
+                </p>
+              ) : (
+                <p className="text-sm text-white/75 leading-relaxed">{val?.notes}</p>
+              )}
+
+              {/* Confidence + evidence (only on new-format reports) */}
+              {confidence && !cannotEval && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <ConfidenceBadge level={confidence} reason={val?.confidence_reason} />
+                  {typeof val?.observations_used === "number" && val.observations_used > 0 && (
+                    <span className="text-[9px] uppercase tracking-widest font-bold text-white/40">
+                      · {val.observations_used} obs
+                    </span>
+                  )}
+                </div>
+              )}
+              {evidence.length > 0 && (
+                <details className="mt-2 group">
+                  <summary className="cursor-pointer text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-volt transition-colors list-none">
+                    Show evidence ({evidence.length})
+                  </summary>
+                  <ul className="mt-2 space-y-1.5">
+                    {evidence.map((e, idx) => (
+                      <li key={idx} className="text-[11px] text-white/65 flex gap-2">
+                        <span className="font-barlow font-black text-volt min-w-[42px] tabular-nums">{e.timestamp || "·"}</span>
+                        <span className="leading-snug">{e.what || e.note}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
-            <p className="text-sm text-white/75 leading-relaxed">{val?.notes}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -225,7 +293,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -235,6 +303,26 @@ export default function ReportPage() {
     { axis: "Mentality", score: full_report.scores?.mentality },
     { axis: "Overall", score: full_report.scores?.overall_development },
   ] : null;
+
+  // Pretty content-type label for the awareness banner
+  const contentTypeLabel = (() => {
+    const t = content_gate?.content_type;
+    if (!t) return null;
+    const map = {
+      full_match: "Full Match",
+      small_sided: "Small-Sided Game",
+      training: "Training Session",
+      drill: "Technical Drills",
+      fitness: "Fitness Work",
+      freestyle: "Freestyle / Ball Mastery",
+      mixed: "Mixed Content",
+      other: "General Football",
+    };
+    return map[t] || t;
+  })();
+  const scoresConfidence = full_report?.scores_confidence;
+  const evidenceQualityNote = full_report?.evidence_quality_note;
+  const couldNotAssess = full_report?.scout_view?.what_we_could_not_assess;
 
   return (
     <div className="min-h-screen bg-deepnavy text-white pb-20">
@@ -340,17 +428,26 @@ export default function ReportPage() {
               {unlocked && full_report && (
                 <div className="mt-8 grid grid-cols-5 gap-px bg-white/10 border border-white/10">
                   {[
-                    { label: "Technical", v: full_report.scores?.technical },
-                    { label: "Tactical", v: full_report.scores?.tactical },
-                    { label: "Physical", v: full_report.scores?.physical },
-                    { label: "Mentality", v: full_report.scores?.mentality },
-                    { label: "Overall", v: full_report.scores?.overall_development },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-surface p-3 text-center">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">{s.label}</div>
-                      <div className={`font-barlow font-black text-3xl mt-1 ${scoreColor(s.v)}`}>{s.v ?? "-"}</div>
-                    </div>
-                  ))}
+                    { key: "technical", label: "Technical", v: full_report.scores?.technical },
+                    { key: "tactical", label: "Tactical", v: full_report.scores?.tactical },
+                    { key: "physical", label: "Physical", v: full_report.scores?.physical },
+                    { key: "mentality", label: "Mentality", v: full_report.scores?.mentality },
+                    { key: "overall_development", label: "Overall", v: full_report.scores?.overall_development },
+                  ].map((s, i) => {
+                    const conf = scoresConfidence?.[s.key];
+                    const c = conf ? CONFIDENCE_STYLES[conf] : null;
+                    return (
+                      <div key={i} className="bg-surface p-3 text-center">
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">{s.label}</div>
+                        <div className={`font-barlow font-black text-3xl mt-1 ${scoreColor(s.v)}`}>{s.v ?? "-"}</div>
+                        {c && (
+                          <div className={`mt-1.5 text-[8px] uppercase tracking-widest font-bold ${c.color}`} title={`Confidence: ${conf}`}>
+                            {conf}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -367,6 +464,44 @@ export default function ReportPage() {
               )}
             </div>
           </div>
+
+          {/* ===== Content-awareness banner ===== */}
+          {content_gate && contentTypeLabel && (
+            <div
+              data-testid="content-awareness-banner"
+              className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 border border-volt/20 bg-volt/5 px-5 py-4"
+            >
+              <div className="flex items-center gap-3 shrink-0">
+                <Eye className="w-5 h-5 text-volt" strokeWidth={1.7} />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Detected content</span>
+                  <span className="font-barlow font-black uppercase text-white text-lg">{contentTypeLabel}</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                {content_gate.quality && (
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/75 border border-white/20 px-2 py-1">
+                    Quality · {content_gate.quality}
+                  </span>
+                )}
+                {content_gate.player_visible && (
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/75 border border-white/20 px-2 py-1">
+                    Player · {String(content_gate.player_visible).replace(/_/g, " ")}
+                  </span>
+                )}
+                {typeof content_gate.games_detected === "number" && content_gate.games_detected > 1 && (
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-yellow-300 border border-yellow-300/30 bg-yellow-300/5 px-2 py-1">
+                    {content_gate.games_detected} games
+                  </span>
+                )}
+                {content_gate.camera_distance && (
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/55 border border-white/15 px-2 py-1">
+                    Camera · {content_gate.camera_distance}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* ===== Free Preview ===== */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mt-10">
@@ -533,6 +668,43 @@ export default function ReportPage() {
                       <p className="mt-6 text-xs text-white/40 italic">
                         This is an independent development analysis and does not guarantee selection or advancement opportunities.
                       </p>
+
+                      {/* What we couldn't assess — only on new evidence-based reports */}
+                      {Array.isArray(couldNotAssess) && couldNotAssess.length > 0 && (
+                        <div className="mt-6 border border-orange-300/30 bg-orange-300/5 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="w-4 h-4 text-orange-300" />
+                            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-orange-300">
+                              What we couldn't assess from this video
+                            </span>
+                          </div>
+                          <ul className="space-y-1.5">
+                            {couldNotAssess.map((item, i) => (
+                              <li key={i} className="text-sm text-orange-200/85 flex gap-2">
+                                <span className="text-orange-300/60 mt-1">·</span>
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-3 text-[11px] text-orange-200/55 italic">
+                            Upload different footage (match play, drills, etc.) to assess these areas.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Evidence Quality Note — explains overall video evidence */}
+                  {evidenceQualityNote && (
+                    <div
+                      data-testid="evidence-quality-note"
+                      className="bg-surface border border-volt/20 p-6 md:p-8"
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <Info className="w-4 h-4 text-volt" strokeWidth={2} />
+                        <h3 className="font-barlow font-black uppercase text-lg md:text-xl text-white">Evidence Quality</h3>
+                      </div>
+                      <p className="text-sm text-white/75 leading-relaxed">{evidenceQualityNote}</p>
                     </div>
                   )}
 
