@@ -1456,6 +1456,13 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
         "kind": "prepay_upload",
         "user_id": user["id"],
         "user_email": user["email"],
+        # Brand attribution — keeps ScoutMePlay separate from 1MillionBolde in the shared Stripe account
+        "brand": "ScoutMePlay",
+        "company": "Mentalkids",
+        "website": "ScoutMePlay",
+        "source": "scoutmeplay_website",
+        "niche": "football_scouting_video_analysis",
+        "product": "ScoutMePlay – Football Video Analysis",
     }
 
     session_req = CheckoutSessionRequest(
@@ -1474,6 +1481,7 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
         "user_email": user["email"],
         "report_id": None,
         "kind": "prepay_upload",
+        "brand": "ScoutMePlay",
         "amount": float(price_dkk),
         "currency": "dkk",
         "metadata": metadata,
@@ -1511,6 +1519,14 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
         "report_id": payload.report_id,
         "user_id": user["id"],
         "user_email": user["email"],
+        "kind": "report_unlock",
+        # Brand attribution — keeps ScoutMePlay separate from 1MillionBolde in the shared Stripe account
+        "brand": "ScoutMePlay",
+        "company": "Mentalkids",
+        "website": "ScoutMePlay",
+        "source": "scoutmeplay_website",
+        "niche": "football_scouting_video_analysis",
+        "product": "ScoutMePlay – Football Video Analysis",
     }
 
     session_req = CheckoutSessionRequest(
@@ -1529,6 +1545,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
         "user_id": user["id"],
         "user_email": user["email"],
         "report_id": payload.report_id,
+        "brand": "ScoutMePlay",
         "amount": float(price_dkk),
         "currency": "dkk",
         "metadata": metadata,

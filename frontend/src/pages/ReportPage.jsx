@@ -12,6 +12,7 @@ import {
   Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
+import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 
 /* Visual treatment for confidence badges (high / medium / low). */
 const CONFIDENCE_STYLES = {
@@ -158,6 +159,7 @@ export default function ReportPage() {
   const [price, setPrice] = useState(399);
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
+  const [checkoutModal, setCheckoutModal] = useState({ open: false, state: "preparing", errorMessage: null });
   const [generatingFull, setGeneratingFull] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const pollingRef = useRef(null);
@@ -193,13 +195,16 @@ export default function ReportPage() {
     }
     if (!sessionId) return;
 
+    // Show "preparing" modal while we poll for confirmation
+    setCheckoutModal({ open: true, state: "preparing", errorMessage: null });
+
     let attempts = 0;
     const maxAttempts = 10;
     const poll = async () => {
       try {
         const { data } = await api.get(`/payments/status/${sessionId}`);
         if (data.payment_status === "paid") {
-          toast.success("Payment confirmed. Generating your premium report...");
+          setCheckoutModal({ open: true, state: "success", errorMessage: null });
           const np = new URLSearchParams(searchParams);
           np.delete("session_id");
           setSearchParams(np, { replace: true });
@@ -218,16 +223,17 @@ export default function ReportPage() {
           return;
         }
         if (data.status === "expired") {
-          toast.error("Payment session expired");
+          setCheckoutModal({ open: true, state: "error", errorMessage: "Payment session expired" });
           return;
         }
         if (attempts++ < maxAttempts) {
           pollingRef.current = setTimeout(poll, 2000);
         } else {
+          setCheckoutModal({ open: false, state: "preparing", errorMessage: null });
           toast.info("Still processing. Please refresh shortly.");
         }
       } catch (err) {
-        toast.error("Error checking payment status");
+        setCheckoutModal({ open: true, state: "error", errorMessage: "Error checking payment status" });
       }
     };
     poll();
@@ -237,14 +243,22 @@ export default function ReportPage() {
 
   const handleUnlock = async () => {
     setUnlocking(true);
+    setCheckoutModal({ open: true, state: "preparing", errorMessage: null });
     try {
       const { data } = await api.post("/payments/checkout", {
         report_id: id,
         origin_url: window.location.origin,
       });
-      window.location.href = data.url;
+      setCheckoutModal((m) => ({ ...m, state: "redirecting" }));
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 700);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed to start checkout");
+      setCheckoutModal({
+        open: true,
+        state: "error",
+        errorMessage: err?.response?.data?.detail || "Failed to start checkout",
+      });
       setUnlocking(false);
     }
   };
@@ -327,6 +341,15 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen bg-deepnavy text-white pb-20">
       <Navigation />
+      <CheckoutTransitionModal
+        open={checkoutModal.open}
+        state={checkoutModal.state}
+        errorMessage={checkoutModal.errorMessage}
+        amount={price}
+        currency="DKK"
+        product="ScoutMePlay – Football Video Analysis"
+        onClose={() => setCheckoutModal({ open: false, state: "preparing", errorMessage: null })}
+      />
 
       <div className="pt-28 px-6">
         <div className="max-w-7xl mx-auto">

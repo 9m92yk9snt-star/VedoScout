@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
+import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import api from "@/lib/api";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap } from "lucide-react";
 
@@ -10,6 +11,9 @@ export default function UploadPage() {
   const [eligibility, setEligibility] = useState(null);   // { eligible, reason, free_preview_used, prepaid_uploads }
   const [eligibilityLoading, setEligibilityLoading] = useState(true);
   const [prepaying, setPrepaying] = useState(false);
+
+  // Stripe transition modal state
+  const [checkoutModal, setCheckoutModal] = useState({ open: false, state: "preparing", errorMessage: null });
 
   const [file, setFile] = useState(null);
   const [videoUrl, setVideoUrl] = useState(null);
@@ -69,7 +73,8 @@ export default function UploadPage() {
         try {
           const { data } = await api.get(`/payments/status/${sessionId}`);
           if (data.payment_status === "paid") {
-            toast.success("Upload credit added — you can upload your next video.");
+            // Show the celebration via the same transition modal
+            setCheckoutModal({ open: true, state: "success", errorMessage: null });
             await refreshEligibility();
           } else {
             toast.info("Payment still pending. Refresh in a few seconds.");
@@ -93,14 +98,23 @@ export default function UploadPage() {
 
   const handlePrepayUpload = async () => {
     setPrepaying(true);
+    setCheckoutModal({ open: true, state: "preparing", errorMessage: null });
     try {
       const { data } = await api.post("/payments/prepay-upload", {
         origin_url: window.location.origin,
       });
-      window.location.href = data.url;
+      // Brief pause so the user perceives the modal, then redirect
+      setCheckoutModal((m) => ({ ...m, state: "redirecting" }));
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 700);
     } catch (err) {
       setPrepaying(false);
-      toast.error(err?.response?.data?.detail || "Couldn't start checkout. Try again.");
+      setCheckoutModal({
+        open: true,
+        state: "error",
+        errorMessage: err?.response?.data?.detail || "Couldn't start checkout. Try again.",
+      });
     }
   };
 
@@ -390,6 +404,15 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-deepnavy text-white">
       <Navigation />
+      <CheckoutTransitionModal
+        open={checkoutModal.open}
+        state={checkoutModal.state}
+        errorMessage={checkoutModal.errorMessage}
+        amount={399}
+        currency="DKK"
+        product="ScoutMePlay – Football Video Analysis"
+        onClose={() => setCheckoutModal({ open: false, state: "preparing", errorMessage: null })}
+      />
 
       <div className="pt-28 pb-16 px-6">
         <div className="max-w-5xl mx-auto">
