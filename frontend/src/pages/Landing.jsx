@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   ArrowRight, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
   Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
-  TrendingUp, Clock, Award,
+  TrendingUp, Clock, Award, ClipboardList, Globe, Users,
 } from "lucide-react";
 
 const fadeUp = {
@@ -242,13 +242,13 @@ export default function Landing() {
         <div className="hero-letterbox-bottom" />
 
         <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-10">
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            <div className="lg:col-span-7">
+          <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+            <div className="lg:col-span-6">
               <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
                 <div className="inline-flex items-center gap-2 border border-volt/30 bg-volt/10 px-4 py-2">
-                  <Zap className="w-3.5 h-3.5 text-volt shrink-0" />
+                  <Target className="w-3.5 h-3.5 text-volt shrink-0" />
                   <span className="text-volt text-[10px] sm:text-xs uppercase tracking-[0.22em] sm:tracking-[0.25em] font-bold whitespace-nowrap">
-                    Professional Scouting Service
+                    ScoutMePlay · Football Scouting Service
                   </span>
                 </div>
               </motion.div>
@@ -262,43 +262,15 @@ export default function Landing() {
                 <span className="block text-gradient-volt mt-1">gets noticed.</span>
               </motion.h1>
 
-              <motion.div
+              <motion.p
                 initial="hidden" animate="visible" variants={fadeUp} custom={2}
-                className="mt-7 max-w-xl space-y-5"
                 data-testid="hero-description"
+                className="mt-7 max-w-xl text-base md:text-lg text-white/80 leading-relaxed"
               >
-                {/* Lead — primary hook */}
-                <p className="text-base md:text-lg text-white/85 leading-relaxed">
-                  Upload your football video and get{" "}
-                  <span className="text-white font-semibold">professional feedback</span>{" "}
-                  from experienced scouts and agents connected to clubs around the world.
-                </p>
-
-                {/* Two value lines with volt accent rail */}
-                <div className="border-l-2 border-volt/50 pl-5 space-y-3.5">
-                  <p className="text-sm md:text-base text-white/65 leading-relaxed">
-                    Receive a{" "}
-                    <span className="text-white">detailed visual report</span>{" "}
-                    covering your strengths, weaknesses, playing style, and development areas.
-                  </p>
-                  <p className="text-sm md:text-base text-white/65 leading-relaxed">
-                    Exceptional talents may receive{" "}
-                    <span className="text-white">scout attention, trial recommendations</span>,
-                    and guidance on the next step in their football journey.
-                  </p>
-                </div>
-
-                {/* Emotional closer — italic serif, matches headline accent */}
-                <p className="font-serif-italic text-xl md:text-2xl text-white/95 italic leading-snug pt-1">
-                  See your game through the eyes of professionals.
-                </p>
-
-                {/* Final punchline — brand-voiced */}
-                <p className="font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base pt-1">
-                  <span className="text-volt">Know your potential.</span>{" "}
-                  <span className="text-white">Unlock your future.</span>
-                </p>
-              </motion.div>
+                Upload your football video and get{" "}
+                <span className="text-white font-semibold">professional feedback</span>{" "}
+                from experienced scouts and agents connected to clubs around the world.
+              </motion.p>
 
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={3}
@@ -332,71 +304,179 @@ export default function Landing() {
                 <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> {price} DKK · one-time</span>
                 <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
               </motion.div>
-
-              <motion.a
-                href="#what-you-get"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
-                className="mt-10 inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-white/40 hover:text-volt transition-colors"
-              >
-                See an example report below
-                <span className="w-8 h-px bg-current" />
-              </motion.a>
             </div>
 
+            {/* ===== RIGHT: Icon-bulleted feature stack ===== */}
             <motion.div
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3, duration: 0.6, ease: "easeOut" }}
-              className="lg:col-span-5 relative z-10"
+              className="lg:col-span-6 lg:pt-4 relative z-10"
+              data-testid="hero-feature-bullets"
             >
-              <div className="card-premium border border-white/10 bg-surface/85 backdrop-blur-xl p-6 md:p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">3 steps</span>
-                  <span className="text-white/40 text-xs uppercase tracking-widest font-bold">~ 2 min</span>
-                </div>
+              <div className="relative pl-8 sm:pl-10 space-y-9 md:space-y-11">
+                {/* Vertical guide line (volt) */}
+                <div aria-hidden className="absolute left-0 top-2 bottom-2 w-px bg-gradient-to-b from-volt/10 via-volt/40 to-volt/10" />
 
-                <ol className="space-y-5">
-                  {[
-                    { n: "01", t: "Sign up", d: "Free account. No card required to start." },
-                    { n: "02", t: "Upload video & details", d: "Highlight, match or training clip." },
-                    { n: "03", t: "Get instant free preview", d: `Unlock full report for ${price} DKK.` },
-                  ].map((s, i) => (
-                    <li key={i} className="flex gap-4 items-start">
-                      <span className="font-barlow font-black text-3xl text-volt/40 leading-none w-10 flex-shrink-0">{s.n}</span>
-                      <div>
-                        <div className="font-barlow font-black uppercase text-white text-lg leading-tight">{s.t}</div>
-                        <div className="text-xs text-white/60 mt-0.5">{s.d}</div>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-
-                <Link
-                  to={startHref}
-                  data-testid="card-cta"
-                  className="mt-8 w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm py-3 flex items-center justify-center gap-2 transition-colors"
-                >
-                  Start free preview
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-
-                <div className="mt-5 pt-5 border-t border-white/10 grid grid-cols-3 gap-2">
-                  {[
-                    { i: Brain, l: "Report" },
-                    { i: Target, l: "Scout View" },
-                    { i: FileText, l: "PDF" },
-                  ].map(({ i: Icon, l }, idx) => (
-                    <div key={idx} className="flex flex-col items-center gap-1.5 text-center">
-                      <Icon className="w-4 h-4 text-volt" strokeWidth={1.5} />
-                      <span className="text-[10px] uppercase tracking-widest font-bold text-white/60">{l}</span>
+                {[
+                  {
+                    Icon: ClipboardList,
+                    body: (
+                      <>
+                        Receive a{" "}
+                        <span className="text-volt font-semibold">detailed visual report</span>{" "}
+                        covering your strengths, weaknesses, playing style, and development areas.
+                      </>
+                    ),
+                  },
+                  {
+                    Icon: Globe,
+                    body: (
+                      <>
+                        Exceptional talents may receive{" "}
+                        <span className="text-volt font-semibold">scout attention</span>, trial recommendations, and guidance on the next step in their football journey.
+                      </>
+                    ),
+                  },
+                  {
+                    Icon: Users,
+                    body: (
+                      <>
+                        Our network of scouts and agents can provide{" "}
+                        <span className="text-volt font-semibold">guidance</span>, answer questions, and help you explore future opportunities.
+                      </>
+                    ),
+                  },
+                ].map(({ Icon, body }, i) => (
+                  <div key={i} className="relative flex items-start gap-5">
+                    {/* Icon disk */}
+                    <div className="absolute -left-8 sm:-left-10 top-0 w-12 h-12 sm:w-14 sm:h-14 -translate-x-1/2 flex items-center justify-center bg-deepnavy border border-volt/40 shrink-0">
+                      <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-volt" strokeWidth={1.5} />
                     </div>
-                  ))}
-                </div>
+                    <p className="text-sm md:text-base text-white/75 leading-relaxed pt-2.5 sm:pt-3.5">
+                      {body}
+                    </p>
+                  </div>
+                ))}
               </div>
             </motion.div>
           </div>
+
+          {/* ===== Bottom: Boot tagline + horizontal-lined punchline ===== */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.4 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="mt-16 md:mt-20"
+          >
+            <div className="flex items-center justify-center gap-3 md:gap-4">
+              {/* Inline soccer-boot SVG */}
+              <svg viewBox="0 0 44 32" className="w-9 h-7 md:w-11 md:h-8 shrink-0" aria-hidden="true">
+                {/* Upper body of boot */}
+                <path
+                  d="M3 22 Q3 12 11 9 L26 6 Q38 6 40 14 Q41 18 40 22 L3 22 Z"
+                  fill="#ccff00"
+                />
+                {/* Sole */}
+                <path
+                  d="M3 22 L40 22 L38 26 L5 26 Z"
+                  fill="#ccff00"
+                />
+                {/* Heel cup highlight */}
+                <path d="M3 22 Q3 16 7 14 L7 22 Z" fill="#a8d000" />
+                {/* Lace lines */}
+                <line x1="18" y1="10.5" x2="32" y2="10.5" stroke="#0d111a" strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="18" y1="14" x2="32" y2="14" stroke="#0d111a" strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="18" y1="17.5" x2="32" y2="17.5" stroke="#0d111a" strokeWidth="1.2" strokeLinecap="round" />
+                {/* Studs */}
+                <circle cx="9" cy="29" r="1.3" fill="#ccff00" />
+                <circle cx="18" cy="29" r="1.3" fill="#ccff00" />
+                <circle cx="27" cy="29" r="1.3" fill="#ccff00" />
+                <circle cx="35" cy="29" r="1.3" fill="#ccff00" />
+              </svg>
+              <p className="font-serif-italic italic text-xl md:text-2xl text-white/95 leading-snug text-center">
+                See your game through the eyes of{" "}
+                <span className="text-volt">professionals.</span>
+              </p>
+            </div>
+
+            <div className="mt-7 md:mt-9 flex items-center gap-4 md:gap-6 max-w-3xl mx-auto">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-volt/40 to-volt/40" />
+              <p className="font-barlow font-black uppercase tracking-[0.22em] text-xs md:text-sm whitespace-nowrap">
+                <span className="text-volt">Know your potential.</span>{" "}
+                <span className="text-white">Unlock your future.</span>
+              </p>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent via-volt/40 to-volt/40" />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ============ HOW IT WORKS — 3 steps card (clean section after hero) ============ */}
+      <section
+        data-testid="how-it-works"
+        className="relative py-16 md:py-20 border-t border-white/10 bg-deepnavy"
+      >
+        <div className="max-w-3xl mx-auto px-6 md:px-10">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="card-premium border border-white/10 bg-surface/85 backdrop-blur-xl p-6 md:p-10"
+          >
+            <div className="flex items-center justify-between mb-7">
+              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">How it works · 3 steps</span>
+              <span className="text-white/40 text-xs uppercase tracking-widest font-bold">~ 2 min</span>
+            </div>
+
+            <ol className="space-y-5 md:space-y-6">
+              {[
+                { n: "01", t: "Sign up", d: "Free account. No card required to start." },
+                { n: "02", t: "Upload video & details", d: "Highlight, match or training clip." },
+                { n: "03", t: "Get instant free preview", d: `Unlock full report for ${price} DKK.` },
+              ].map((s, i) => (
+                <li key={i} className="flex gap-4 md:gap-5 items-start">
+                  <span className="font-barlow font-black text-3xl md:text-4xl text-volt/40 leading-none w-10 md:w-12 flex-shrink-0">{s.n}</span>
+                  <div>
+                    <div className="font-barlow font-black uppercase text-white text-lg md:text-xl leading-tight">{s.t}</div>
+                    <div className="text-xs md:text-sm text-white/60 mt-1">{s.d}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            <Link
+              to={startHref}
+              data-testid="card-cta"
+              className="mt-8 md:mt-10 w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+            >
+              Start free preview
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+
+            <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-3 gap-2">
+              {[
+                { i: Brain, l: "Report" },
+                { i: Target, l: "Scout View" },
+                { i: FileText, l: "PDF" },
+              ].map(({ i: Icon, l }, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-1.5 text-center">
+                  <Icon className="w-4 h-4 text-volt" strokeWidth={1.5} />
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/60">{l}</span>
+                </div>
+              ))}
+            </div>
+
+            <a
+              href="#what-you-get"
+              className="mt-7 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-white/40 hover:text-volt transition-colors"
+            >
+              See an example report below
+              <span className="w-8 h-px bg-current" />
+            </a>
+          </motion.div>
         </div>
       </section>
 
