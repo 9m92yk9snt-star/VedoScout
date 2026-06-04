@@ -56,42 +56,68 @@ PREVIEW = {
     },
 }
 
+_BENCH_U13_14 = {
+    "elite_academy": "8.5-10",
+    "pro_academy":   "7-8.5",
+    "strong_club":   "5.5-7",
+    "standard_club": "4-5.5",
+}
+
+def _skill(score, notes, tier, why, verdict, *, cannot_eval=False):
+    """Build an evidence-shaped sub-skill object aligned with the new AI prompt."""
+    if cannot_eval:
+        return {
+            "score": None, "notes": notes, "confidence": "low",
+            "confidence_reason": "Not visible in this clip", "observations_used": 0,
+            "evidence": [], "cannot_evaluate": True, "evaluable_reason": notes,
+        }
+    return {
+        "score": score, "notes": notes, "confidence": "high",
+        "confidence_reason": "Multiple clear moments observed", "observations_used": 8,
+        "evidence": [], "cannot_evaluate": False,
+        "why_this_score": why,
+        "tier_for_age": tier,
+        "benchmarks": _BENCH_U13_14,
+        "verdict": verdict,
+    }
+
+
 # Pre-built full premium report
 FULL_REPORT = {
     "player_type": "Smart playmaker · strong left foot",
     "executive_summary": "Lukas is a smart, calm playmaker with a left foot that opens up defences. He reads the game very well for his age and is brave on the ball under pressure. He plays simple when needed and risky when it pays off. The biggest area to grow is his fitness — he fades in the second half. Build the legs and the rest is already at a high level.",
     "technical": {
-        "first_touch": {"score": 8, "notes": "Clean first touch that sets him up to play forward almost every time. Rare to see him let the ball bounce away."},
-        "ball_control": {"score": 8, "notes": "Keeps the ball close in tight space. Comfortable on both surfaces of his left foot."},
-        "dribbling": {"score": 7, "notes": "Beats defenders with a feint and change of direction rather than pure pace. Effective in 1v1s."},
-        "passing": {"score": 9, "notes": "His standout skill. Vision to find passes others miss, and the technique to deliver them."},
-        "shooting": {"score": 7, "notes": "Strikes the ball cleanly with his left foot. Could be braver shooting from outside the box."},
-        "weak_foot": {"score": 5, "notes": "Right foot is rarely used. Needs daily work — even short passes and simple drills will make a big difference."},
-        "one_v_one": {"score": 7, "notes": "Calm in 1v1 situations. Picks the right moment to go past or release the ball."},
+        "first_touch": _skill(8, "Clean first touch that sets him up to play forward almost every time. Rare to see him let the ball bounce away.", "pro_academy", "Scored 8 because his first touch consistently breaks pressure and sets up his next action — only loses control once or twice across the clip.", "Currently sitting at pro academy for a 14-year-old attacking midfielder. To reach elite, work on first touch when facing two defenders at once."),
+        "ball_control": _skill(8, "Keeps the ball close in tight space. Comfortable on both surfaces of his left foot.", "pro_academy", "Scored 8 because he protects the ball through small spaces with consistent close control, only the weakest hand is his right foot.", "Currently at pro academy. To reach elite, add right-foot variations under pressure."),
+        "dribbling": _skill(7, "Beats defenders with a feint and change of direction rather than pure pace. Effective in 1v1s.", "pro_academy", "Scored 7 because he wins 1v1s through deception rather than explosiveness — limited variety against quicker defenders.", "Currently at pro academy. To reach elite, add an explosive burst after the feint."),
+        "passing": _skill(9, "His standout skill. Vision to find passes others miss, and the technique to deliver them.", "elite_academy", "Scored 9 because he picks line-breaking passes that other 14-year-olds simply don't see, and his weight is consistently right.", "Currently sitting at elite academy. To stay here, keep developing risk/reward judgement."),
+        "shooting": _skill(7, "Strikes the ball cleanly with his left foot. Could be braver shooting from outside the box.", "pro_academy", "Scored 7 because his strike is clean but he chooses to pass when shooting is the better option.", "Currently at pro academy. To reach elite, add 2-3 shots per match from the edge of the box."),
+        "weak_foot": _skill(5, "Right foot is rarely used. Needs daily work — even short passes and simple drills will make a big difference.", "standard_club", "Scored 5 because his right foot is almost never used in build-up, even for short passes that would naturally call for it.", "Currently sitting at standard club for weak foot. To reach strong club, log 10 minutes of right-foot wall-work daily."),
+        "one_v_one": _skill(7, "Calm in 1v1 situations. Picks the right moment to go past or release the ball.", "pro_academy", "Scored 7 because his decision making in 1v1 is mature — but he lacks the explosive change of pace elite wingers have.", "Currently at pro academy. To reach elite, add a sharper acceleration out of the feint."),
     },
     "tactical": {
-        "positioning": {"score": 9, "notes": "Always finds the right pocket of space between defenders. Smart at finding angles for his teammates."},
-        "off_ball_movement": {"score": 8, "notes": "Moves to receive constantly. Could improve runs in behind the defence to add another threat."},
-        "scanning": {"score": 9, "notes": "Looks over both shoulders before the ball arrives almost every time. Top level habit for his age."},
-        "decision_making": {"score": 9, "notes": "Picks the killer pass when it's there. Recycles smartly when it isn't. Mature beyond his years."},
-        "timing_of_runs": {"score": 8, "notes": "Times runs into the box well. Could vary the timing more to be unpredictable."},
-        "game_understanding": {"score": 9, "notes": "Reads the game very well. Anticipates where the next ball will go."},
+        "positioning": _skill(9, "Always finds the right pocket of space between defenders. Smart at finding angles for his teammates.", "elite_academy", "Scored 9 because he consistently appears in the half-spaces where his team needs an out-ball — rare for his age.", "Currently at elite academy. To stay here, keep this spatial awareness as the game gets quicker."),
+        "off_ball_movement": _skill(8, "Moves to receive constantly. Could improve runs in behind the defence to add another threat.", "pro_academy", "Scored 8 because he never stands still, but most of his movement is to receive, not to penetrate behind.", "Currently at pro academy. To reach elite, mix in 2-3 runs in behind per half."),
+        "scanning": _skill(9, "Looks over both shoulders before the ball arrives almost every time. Top level habit for his age.", "elite_academy", "Scored 9 because his scanning rate (2-3 looks per possession) is well above the pro academy norm for his age.", "Currently at elite academy. To stay here, keep this scanning habit when the game gets faster."),
+        "decision_making": _skill(9, "Picks the killer pass when it's there. Recycles smartly when it isn't. Mature beyond his years.", "elite_academy", "Scored 9 because he balances risk and security like a much older player — rarely forces a pass that isn't on.", "Currently at elite academy."),
+        "timing_of_runs": _skill(8, "Times runs into the box well. Could vary the timing more to be unpredictable.", "pro_academy", "Scored 8 because his timing is mostly right but predictable — quicker defenders will read him.", "Currently at pro academy. To reach elite, add delayed runs and double movements."),
+        "game_understanding": _skill(9, "Reads the game very well. Anticipates where the next ball will go.", "elite_academy", "Scored 9 because he reacts before the ball is played — clear sign of high football IQ.", "Currently at elite academy."),
     },
     "physical": {
-        "acceleration": {"score": 7, "notes": "Quick first few steps when he needs them. Not explosive but enough to create separation."},
-        "speed": {"score": 6, "notes": "Average top speed. Not a player who beats defenders by running past them."},
-        "balance": {"score": 8, "notes": "Stays on his feet through contact. Good lower body strength for his age."},
-        "agility": {"score": 8, "notes": "Changes direction sharply. Light on his feet in tight areas."},
-        "intensity": {"score": 6, "notes": "Drops off in the second half. Fitness is the area that limits him most right now."},
-        "body_control": {"score": 8, "notes": "Uses his body well to shield the ball and protect possession under pressure."},
+        "acceleration": _skill(7, "Quick first few steps when he needs them. Not explosive but enough to create separation.", "pro_academy", "Scored 7 because his first 3 steps are sharp enough to escape pressure, but not enough to beat defenders for pace.", "Currently at pro academy. To reach elite, add explosive sprint training (resistance bands, 5m starts)."),
+        "speed": _skill(6, "Average top speed. Not a player who beats defenders by running past them.", "strong_club", "Scored 6 because he relies on smart movement rather than top-end speed — limits him in transition.", "Currently at strong club for speed. To reach pro academy, focus on top-end sprint mechanics."),
+        "balance": _skill(8, "Stays on his feet through contact. Good lower body strength for his age.", "pro_academy", "Scored 8 because he absorbs contact and recovers his balance quickly — strong core control.", "Currently at pro academy."),
+        "agility": _skill(8, "Changes direction sharply. Light on his feet in tight areas.", "pro_academy", "Scored 8 because his change of direction is sharp and economical, especially in the final third.", "Currently at pro academy."),
+        "intensity": _skill(6, "Drops off in the second half. Fitness is the area that limits him most right now.", "strong_club", "Scored 6 because his press intensity falls off visibly after 60 minutes — the legs limit the whole game.", "Currently at strong club for intensity. To reach pro academy, build aerobic base and 90-min match fitness."),
+        "body_control": _skill(8, "Uses his body well to shield the ball and protect possession under pressure.", "pro_academy", "Scored 8 because he uses body angles to shield possession even against bigger defenders.", "Currently at pro academy."),
     },
     "mentality": {
-        "confidence": {"score": 9, "notes": "Wants the ball in every situation, even when his team is under pressure. Never hides."},
-        "work_rate": {"score": 7, "notes": "Works hard but tires late. Fitness will lift this score quickly."},
-        "courage_in_duels": {"score": 8, "notes": "Steps into challenges rather than avoiding them. Brave for his size."},
-        "response_to_mistakes": {"score": 9, "notes": "Reacts to losing the ball by sprinting to win it back. Doesn't sulk after errors."},
-        "competitive_mindset": {"score": 9, "notes": "Clearly hates losing. Lifts his teammates when the score is against them."},
-        "focus": {"score": 8, "notes": "Stays in the game mentally throughout. Rare to see him switch off."},
+        "confidence": _skill(9, "Wants the ball in every situation, even when his team is under pressure. Never hides.", "elite_academy", "Scored 9 because he demands the ball in every phase, even when the team is losing — clear leadership trait.", "Currently at elite academy."),
+        "work_rate": _skill(7, "Works hard but tires late. Fitness will lift this score quickly.", "pro_academy", "Scored 7 because his work rate is excellent for 60 minutes but drops off — purely a fitness ceiling.", "Currently at pro academy. To reach elite, build the engine to sustain work rate for 90 minutes."),
+        "courage_in_duels": _skill(8, "Steps into challenges rather than avoiding them. Brave for his size.", "pro_academy", "Scored 8 because he steps INTO 50-50s rather than away — rare bravery for his physical size.", "Currently at pro academy."),
+        "response_to_mistakes": _skill(9, "Reacts to losing the ball by sprinting to win it back. Doesn't sulk after errors.", "elite_academy", "Scored 9 because his reaction to losing possession is immediate counter-press — elite professional habit.", "Currently at elite academy."),
+        "competitive_mindset": _skill(9, "Clearly hates losing. Lifts his teammates when the score is against them.", "elite_academy", "Scored 9 because he visibly drives standards in his team — already a competitive leader.", "Currently at elite academy."),
+        "focus": _skill(8, "Stays in the game mentally throughout. Rare to see him switch off.", "pro_academy", "Scored 8 because he stays mentally engaged even when uninvolved for long periods.", "Currently at pro academy."),
     },
     "scout_view": {
         "key_strengths": [
@@ -113,6 +139,7 @@ FULL_REPORT = {
         ],
         "appropriate_next_level": "Ready to step up to a stronger U15 team or an academy trial",
         "positional_suitability": "Best as a creative #10 right behind the striker. Could also play as an 8 in a 4-3-3 if he gets fitter.",
+        "what_we_could_not_assess": [],
     },
     "potential_assessment": {
         "current_level": "Already one of the better players in his age group at club level",
@@ -147,7 +174,23 @@ FULL_REPORT = {
         "mentality": 9,
         "overall_development": 8,
     },
+    "scores_confidence": {
+        "technical": "high",
+        "tactical": "high",
+        "physical": "medium",
+        "mentality": "high",
+        "overall_development": "high",
+    },
+    "overall_benchmark": {
+        "tier": "pro_academy",
+        "tier_label": "Pro Academy Standard",
+        "percentile": "Currently in the top 10-15% of U14 attacking midfielders observed — particularly strong on passing range, scanning and competitive mindset.",
+        "realistic_next_step": "Trial at a regional pro academy or a strong talent centre. Step up to U15 training with older players to push physical development.",
+        "what_separates_from_next_tier": "Match fitness for 90 minutes plus a reliable right foot — these two together would put him into the elite academy bracket within 12-18 months.",
+        "age_bracket_used": "U13-U14",
+    },
     "final_summary": "Lukas is one of the more impressive players we've reviewed in his age group. The technique and game intelligence are already at a high level — what he sees and chooses to do with the ball is mature. Fitness is the next big step, alongside daily right-foot work. Keep doing what he's doing, add those two areas, and the path forward is wide open.",
+    "evidence_quality_note": "Footage was clear and showed Lukas across 60+ touches in a competitive match environment. Set-piece situations and goalkeeping moments were not assessable from this clip.",
 }
 
 

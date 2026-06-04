@@ -1556,6 +1556,265 @@ def _section_rows(section: dict) -> list:
     return rows
 
 
+# ---- Benchmark / tier visualisation primitives ----
+
+_TIER_ORDER = ["standard_club", "strong_club", "pro_academy", "elite_academy"]
+_TIER_LABEL = {
+    "standard_club": "Standard Club",
+    "strong_club":   "Strong Club",
+    "pro_academy":   "Pro Academy",
+    "elite_academy": "Elite Academy",
+}
+_TIER_DOT = {
+    "standard_club": HexColor("#78716C"),  # stone
+    "strong_club":   HexColor("#D97706"),  # amber
+    "pro_academy":   _PDF_FOREST_POP,
+    "elite_academy": HexColor("#10B981"),  # emerald
+}
+
+
+def _tier_chip(tier_key: str, styles) -> str:
+    """Inline HTML <font> tag fragment for a tier label, coloured by tier."""
+    label = _TIER_LABEL.get(tier_key, "—")
+    col = _TIER_DOT.get(tier_key, _PDF_MUTED).hexval()[2:]  # strip 0x
+    return f"<font color='#{col}'><b>{label.upper()}</b></font>"
+
+
+def _benchmark_strip(tier_key: str, benchmarks: dict, styles):
+    """Premium 4-column 'tier ladder' showing where the player sits.
+    Returns a small Table flowable."""
+    if not benchmarks or not isinstance(benchmarks, dict):
+        return None
+    cells = []
+    for k in _TIER_ORDER:
+        active = (k == tier_key)
+        label = _TIER_LABEL.get(k, "—")
+        rng = benchmarks.get(k) or "—"
+        col_hex = "#" + _TIER_DOT.get(k, _PDF_MUTED).hexval()[2:]
+        # Active cell: forest border + filled cream; inactive: muted
+        if active:
+            inner = (
+                f"<font color='{col_hex}' size='6.5'><b>{label.upper()}</b></font><br/>"
+                f"<font color='#0A0F0D' size='10'><b>{rng}</b></font><br/>"
+                f"<font color='#1F4F2F' size='6.5'><b>YOU ARE HERE</b></font>"
+            )
+        else:
+            inner = (
+                f"<font color='#9CA3AF' size='6.5'><b>{label.upper()}</b></font><br/>"
+                f"<font color='#6B7280' size='9'>{rng}</font>"
+            )
+        cells.append(Paragraph(inner, styles["BodyW"]))
+    t = Table([cells], colWidths=[3.7 * cm] * 4)
+    style = [
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("BOX",           (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+    ]
+    # Highlight active cell with forest left border + cream background
+    for i, k in enumerate(_TIER_ORDER):
+        if k == tier_key:
+            style.append(("BACKGROUND", (i, 0), (i, 0), _PDF_CREAM_S))
+            style.append(("LINEBEFORE", (i, 0), (i, 0), 2.5, _PDF_FOREST))
+    t.setStyle(TableStyle(style))
+    return t
+
+
+def _skill_card(key: str, value: dict, styles):
+    """Premium card for ONE scored sub-skill — exact parity with the web report.
+
+    Shows:
+      - Skill name + score + tier (top row)
+      - Notes
+      - Why this score (forest eyebrow + body)
+      - Benchmark strip (4-tier ladder, player's tier highlighted)
+      - Verdict (italic forest-accent line)
+
+    Returns a single Table flowable (one card)."""
+    label = key.replace("_", " ").title()
+    cannot_eval = bool(value.get("cannot_evaluate"))
+    score = value.get("score")
+    notes = value.get("notes", "")
+    tier = value.get("tier_for_age")
+    why = value.get("why_this_score")
+    benchmarks = value.get("benchmarks")
+    verdict = value.get("verdict")
+
+    # ----- Top row: name + score pill + tier chip -----
+    if cannot_eval:
+        score_para = Paragraph(
+            "<font color='#D97706' size='8'><b>NEED MORE FOOTAGE</b></font>",
+            styles["BodyW"],
+        )
+    else:
+        score_para = Paragraph(
+            f"<font color='#1F4F2F' size='22'><b>{score if score is not None else '—'}</b></font>"
+            f"<font color='#9CA3AF' size='10'> / 10</font>",
+            styles["BodyW"],
+        )
+    tier_html = f"<br/>{_tier_chip(tier, styles)}" if tier and not cannot_eval else ""
+    name_para = Paragraph(
+        f"<font color='#0A0F0D' size='13'><b>{label}</b></font>{tier_html}",
+        styles["BodyW"],
+    )
+
+    inner_rows = [[name_para, score_para]]
+    # Notes
+    notes_text = value.get("evaluable_reason") if cannot_eval else notes
+    if notes_text:
+        inner_rows.append([Paragraph(notes_text, styles["BodyW"]), ""])
+
+    # Why this score
+    if why and not cannot_eval:
+        inner_rows.append([
+            Paragraph(
+                f"<font color='#1F4F2F' size='7.5'><b>WHY THIS SCORE</b></font><br/>"
+                f"<font color='#0A0F0D' size='9.5'>{why}</font>",
+                styles["BodyW"],
+            ),
+            ""
+        ])
+
+    # Benchmark strip
+    strip = _benchmark_strip(tier, benchmarks, styles) if benchmarks and tier and not cannot_eval else None
+    if strip is not None:
+        inner_rows.append([strip, ""])
+
+    # Verdict
+    if verdict and not cannot_eval:
+        inner_rows.append([
+            Paragraph(
+                f"<font color='#1F4F2F' size='9'><b>›</b></font>&nbsp;&nbsp;"
+                f"<i><font color='#4B5563' size='9'>{verdict}</font></i>",
+                styles["BodyW"],
+            ),
+            ""
+        ])
+
+    card = Table(inner_rows, colWidths=[12.5 * cm, 3.0 * cm])
+    # Each row spans full width except the first one (name + score split)
+    span_style = []
+    for i in range(1, len(inner_rows)):
+        span_style.append(("SPAN", (0, i), (1, i)))
+
+    card.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (0, 0),   "TOP"),
+        ("VALIGN",        (1, 0), (1, 0),   "TOP"),
+        ("ALIGN",         (1, 0), (1, 0),   "RIGHT"),
+        ("LINEBEFORE",    (0, 0), (0, -1),  2.0, _PDF_FOREST),
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+        *span_style,
+    ]))
+    return card
+
+
+def _skill_section_block(section: dict, styles):
+    """Returns a list of Flowables: one premium card per sub-skill in the section."""
+    if not isinstance(section, dict):
+        return []
+    flow = []
+    for key, value in section.items():
+        if not isinstance(value, dict):
+            continue
+        flow.append(_skill_card(key, value, styles))
+        flow.append(Spacer(1, 0.18 * cm))
+    return flow
+
+
+def _overall_benchmark_page(ob: dict, overall_score, styles):
+    """The signature 'How you compare' page — forest hero panel + tier landscape."""
+    if not isinstance(ob, dict) or not ob.get("tier"):
+        return []
+
+    flow = []
+    tier_key = ob.get("tier")
+    tier_label = ob.get("tier_label") or _TIER_LABEL.get(tier_key, "—")
+    pct = ob.get("percentile") or ""
+    nxt = ob.get("realistic_next_step") or ""
+    sep = ob.get("what_separates_from_next_tier") or ""
+    bracket = (ob.get("age_bracket_used") or "").replace("_", " ")
+
+    # Hero card: dark forest panel with the big score + tier
+    hero_left = Paragraph(
+        f"<font color='#FFFFFF' size='7.5'><b>HOW YOU COMPARE</b></font><br/>"
+        f"<font color='#FFFFFF' size='40'><b>{overall_score if overall_score is not None else '—'}</b></font>"
+        f"<font color='#FFFFFF99' size='14'> /10</font><br/>"
+        f"<font color='#FFFFFF' size='9'><b>{tier_label.upper()}</b></font>"
+        + (f"<br/><font color='#FFFFFF80' size='7'><b>CALIBRATED FOR {bracket.upper()}</b></font>" if bracket else ""),
+        styles["BodyW"],
+    )
+
+    hero_right_html = ""
+    if pct:
+        hero_right_html += f"<font color='#FFFFFF' size='11'>{pct}</font><br/><br/>"
+    if nxt:
+        hero_right_html += (
+            f"<font color='#FFFFFF99' size='7'><b>REALISTIC NEXT STEP</b></font><br/>"
+            f"<font color='#FFFFFF' size='9.5'>{nxt}</font><br/><br/>"
+        )
+    if sep:
+        hero_right_html += (
+            f"<font color='#FFFFFF99' size='7'><b>TO REACH THE NEXT TIER</b></font><br/>"
+            f"<font color='#FFFFFF' size='9.5'>{sep}</font>"
+        )
+    hero_right = Paragraph(hero_right_html or "—", styles["BodyW"])
+
+    hero = Table([[hero_left, hero_right]], colWidths=[5.4 * cm, 10.1 * cm])
+    hero.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_FOREST),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 18),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 18),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LINEAFTER",     (0, 0), (0, 0),   0.4, HexColor("#FFFFFF22")),
+    ]))
+    flow.append(hero)
+    flow.append(Spacer(1, 0.45 * cm))
+
+    # Tier landscape (4 cells)
+    cells = []
+    for k in _TIER_ORDER:
+        active = (k == tier_key)
+        col_hex = "#" + _TIER_DOT.get(k, _PDF_MUTED).hexval()[2:]
+        lbl = _TIER_LABEL.get(k, "—")
+        if active:
+            inner = (
+                f"<font color='{col_hex}' size='7'><b>{lbl.upper()}</b></font><br/>"
+                f"<font color='#1F4F2F' size='8'><b>← YOU ARE HERE</b></font>"
+            )
+        else:
+            inner = f"<font color='#9CA3AF' size='7'><b>{lbl.upper()}</b></font>"
+        cells.append(Paragraph(inner, styles["BodyW"]))
+    landscape = Table([cells], colWidths=[3.7 * cm] * 4)
+    landscape_style = [
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("BOX",           (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+    ]
+    for i, k in enumerate(_TIER_ORDER):
+        if k == tier_key:
+            landscape_style.append(("BACKGROUND", (i, 0), (i, 0), _PDF_CREAM_S))
+            landscape_style.append(("LINEBELOW", (i, 0), (i, 0), 2.5, _PDF_FOREST))
+    landscape.setStyle(TableStyle(landscape_style))
+    flow.append(Paragraph("TIER LANDSCAPE", styles["Label"]))
+    flow.append(landscape)
+
+    return flow
+
+
 def build_pdf(report_doc: dict, output_path: str):
     """Builds a premium cream/forest PDF. Document is organised as:
         Page 1  — Cover (forest panel + player name + score box)
@@ -1680,36 +1939,51 @@ def build_pdf(report_doc: dict, output_path: str):
     ]
     story.append(_score_table(score_rows, styles))
 
+    # ===== HOW YOU COMPARE — Overall benchmark (signature page) =====
+    ob = full.get("overall_benchmark") or {}
+    if ob.get("tier"):
+        story.append(PageBreak())
+        story += _section_header("How you compare", styles, idx=3)
+        story += _overall_benchmark_page(ob, sc.get("overall_development"), styles)
+
     story.append(PageBreak())
 
-    # ===== TECHNICAL & TACTICAL =====
+    # ===== TECHNICAL & TACTICAL — premium per-skill cards with benchmarks =====
+    section_idx = 4 if ob.get("tier") else 3
     if "technical" in full:
-        story += _section_header("Technical analysis", styles, idx=3)
-        story.append(_score_table(_section_rows(full["technical"]), styles))
-        story.append(Spacer(1, 0.7 * cm))
+        story += _section_header("Technical analysis", styles, idx=section_idx)
+        story += _skill_section_block(full["technical"], styles)
+        story.append(Spacer(1, 0.4 * cm))
+        section_idx += 1
 
     if "tactical" in full:
-        story += _section_header("Tactical analysis", styles, idx=4)
-        story.append(_score_table(_section_rows(full["tactical"]), styles))
+        story.append(PageBreak())
+        story += _section_header("Tactical analysis", styles, idx=section_idx)
+        story += _skill_section_block(full["tactical"], styles)
+        section_idx += 1
 
     story.append(PageBreak())
 
     # ===== PHYSICAL & MENTALITY =====
     if "physical" in full:
-        story += _section_header("Physical analysis", styles, idx=5)
-        story.append(_score_table(_section_rows(full["physical"]), styles))
-        story.append(Spacer(1, 0.7 * cm))
+        story += _section_header("Physical analysis", styles, idx=section_idx)
+        story += _skill_section_block(full["physical"], styles)
+        story.append(Spacer(1, 0.4 * cm))
+        section_idx += 1
 
     if "mentality" in full:
-        story += _section_header("Mentality analysis", styles, idx=6)
-        story.append(_score_table(_section_rows(full["mentality"]), styles))
+        story.append(PageBreak())
+        story += _section_header("Mentality analysis", styles, idx=section_idx)
+        story += _skill_section_block(full["mentality"], styles)
+        section_idx += 1
 
     story.append(PageBreak())
 
     # ===== SCOUT VIEW =====
     if "scout_view" in full:
         sv = full["scout_view"] or {}
-        story += _section_header("Scout view — how a scout might assess this player", styles, idx=7)
+        story += _section_header("Scout view — how a scout might assess this player", styles, idx=section_idx)
+        section_idx += 1
 
         story.append(Paragraph("KEY STRENGTHS", styles["Label"]))
         story += _list_bullets(sv.get("key_strengths"), styles)
@@ -1737,7 +2011,8 @@ def build_pdf(report_doc: dict, output_path: str):
     if "potential_assessment" in full:
         pa = full["potential_assessment"] or {}
         story.append(PageBreak())
-        story += _section_header("Potential assessment", styles, idx=8)
+        story += _section_header("Potential assessment", styles, idx=section_idx)
+        section_idx += 1
         story.append(_kv_card([
             ("Current level",            pa.get("current_level", "")),
             ("Development potential",    pa.get("development_potential", "")),
@@ -1749,7 +2024,8 @@ def build_pdf(report_doc: dict, output_path: str):
     if "training_plan" in full:
         tp = full["training_plan"] or {}
         story.append(PageBreak())
-        story += _section_header("Personal training plan", styles, idx=9)
+        story += _section_header("Personal training plan", styles, idx=section_idx)
+        section_idx += 1
 
         story.append(Paragraph("FIVE FOCUSED EXERCISES", styles["Label"]))
         exercises = tp.get("exercises", []) or []
@@ -1790,7 +2066,8 @@ def build_pdf(report_doc: dict, output_path: str):
     # ===== VIDEO COMMENTS =====
     if full.get("video_comments"):
         story.append(PageBreak())
-        story += _section_header("Video moments", styles, idx=10)
+        story += _section_header("Video moments", styles, idx=section_idx)
+        section_idx += 1
         vc_rows = []
         for c in full["video_comments"]:
             vc_rows.append([
@@ -1811,7 +2088,7 @@ def build_pdf(report_doc: dict, output_path: str):
 
     # ===== FINAL SUMMARY =====
     story.append(PageBreak())
-    story += _section_header("Final summary", styles, idx=11)
+    story += _section_header("Final summary", styles, idx=section_idx)
     story.append(Paragraph(full.get("final_summary", "Not provided."), styles["BodyW"]))
     story.append(Spacer(1, 0.6 * cm))
 

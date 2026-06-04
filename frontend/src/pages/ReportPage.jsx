@@ -211,7 +211,8 @@ function SectionGrid({ title, section }) {
 
 /* Hero banner shown above the full report — places overall_development in
    the calibrated age+position tier landscape so the customer instantly
-   understands what the overall score MEANS. */
+   understands what the overall score MEANS. Styled as a forest hero panel
+   (ink-on-forest) to stand out as the report's signature insight. */
 function OverallBenchmarkBanner({ ob, overallScore }) {
   if (!ob) return null;
   const tier = ob.tier;
@@ -220,53 +221,66 @@ function OverallBenchmarkBanner({ ob, overallScore }) {
   return (
     <div
       data-testid="overall-benchmark-banner"
-      className="bg-ink border-2 border-volt p-6 md:p-8 my-8"
+      className="relative overflow-hidden bg-forest p-6 md:p-10"
     >
-      <div className="flex flex-col md:flex-row gap-6 md:items-start">
+      {/* Decorative diagonal accent stripe */}
+      <div className="absolute top-0 right-0 h-full w-1 bg-forest-pop" />
+      <div className="absolute -top-16 -right-16 w-56 h-56 bg-forest-pop/40 blur-3xl rounded-full pointer-events-none" />
+
+      <div className="relative flex flex-col md:flex-row gap-8 md:items-start">
         {/* Big score + tier */}
         <div className="md:w-1/3 shrink-0">
-          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Overall benchmark</div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-barlow font-black text-6xl md:text-7xl text-white leading-none">
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-cream-base/80">How you compare</div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="font-barlow font-black text-7xl md:text-8xl text-white leading-[0.85]">
               {overallScore ?? "-"}
             </span>
-            <span className="text-white/40 font-barlow font-black text-2xl">/10</span>
+            <span className="text-white/45 font-barlow font-black text-2xl">/10</span>
           </div>
-          <div className="mt-3">
-            <TierBadge tier={tier} />
+          <div className="mt-4">
+            <span
+              data-testid={`overall-tier-${tier}`}
+              className="inline-flex items-center gap-2 uppercase font-bold text-[11px] tracking-[0.22em] bg-cream-card text-forest border border-cream-card px-3 py-1.5"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} />
+              {t.label}
+            </span>
           </div>
           {ob.age_bracket_used && (
-            <div className="mt-2 text-[10px] uppercase tracking-widest font-bold text-white/45">
+            <div className="mt-3 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-base/65">
               calibrated for {ob.age_bracket_used.replace(/_/g, " ").toLowerCase()}
             </div>
           )}
         </div>
 
         {/* Narrative + next step */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-5">
           {ob.percentile && (
-            <p className="text-base md:text-lg text-white leading-snug font-medium">
+            <p
+              data-testid="overall-percentile"
+              className="text-lg md:text-xl text-white leading-snug font-medium"
+            >
               {ob.percentile}
             </p>
           )}
           {ob.realistic_next_step && (
             <div>
-              <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-volt mb-1">Realistic next step</div>
-              <p className="text-sm text-white/80 leading-relaxed">{ob.realistic_next_step}</p>
+              <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/80 mb-1.5">Realistic next step</div>
+              <p data-testid="overall-next-step" className="text-sm md:text-base text-cream-base/90 leading-relaxed">{ob.realistic_next_step}</p>
             </div>
           )}
           {ob.what_separates_from_next_tier && (
             <div>
-              <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-volt mb-1">To reach the next tier</div>
-              <p className="text-sm text-white/80 leading-relaxed">{ob.what_separates_from_next_tier}</p>
+              <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/80 mb-1.5">To reach the next tier</div>
+              <p data-testid="overall-next-tier-gap" className="text-sm md:text-base text-cream-base/90 leading-relaxed">{ob.what_separates_from_next_tier}</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Tier landscape - horizontal scale */}
-      <div className="mt-6 pt-5 border-t border-white/15">
-        <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-white/55 mb-2">Tier landscape</div>
+      {/* Tier landscape — horizontal scale showing player position */}
+      <div className="relative mt-8 pt-6 border-t border-cream-base/15">
+        <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/65 mb-3">Tier landscape</div>
         <div className="grid grid-cols-4 gap-0.5">
           {["standard_club", "strong_club", "pro_academy", "elite_academy"].map((k) => {
             const m = TIER_META[k];
@@ -274,16 +288,17 @@ function OverallBenchmarkBanner({ ob, overallScore }) {
             return (
               <div
                 key={k}
-                className={`px-2.5 py-2.5 border ${active ? `${m.border}` : "border-white/15"} ${active ? "bg-white/10" : "bg-white/[0.02]"}`}
+                data-testid={`tier-landscape-${k}`}
+                className={`px-3 py-3 ${active ? "bg-cream-card" : "bg-cream-base/5 border border-cream-base/10"}`}
               >
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-                  <span className={`text-[9px] uppercase tracking-[0.18em] font-bold ${active ? "text-white" : "text-white/45"}`}>
+                  <span className={`text-[9px] uppercase tracking-[0.18em] font-bold ${active ? "text-forest" : "text-cream-base/55"}`}>
                     {m.label}
                   </span>
                 </div>
                 {active && (
-                  <div className="mt-1 text-[10px] text-white/60 italic">You are here</div>
+                  <div className="mt-1.5 text-[10px] uppercase tracking-[0.22em] font-bold text-forest-pop">You are here</div>
                 )}
               </div>
             );
@@ -896,6 +911,12 @@ export default function ReportPage() {
               {/* Unlocked content */}
               {(unlocked && full_report) && (
                 <>
+                  {/* Overall benchmark hero — places the player on the age+position tier landscape */}
+                  <OverallBenchmarkBanner
+                    ob={full_report.overall_benchmark}
+                    overallScore={full_report.scores?.overall_development}
+                  />
+
                   {/* Radar chart */}
                   {radarData && (
                     <div className="bg-surface border border-gray-border p-6 md:p-8">
