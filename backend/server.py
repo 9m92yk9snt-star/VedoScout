@@ -67,6 +67,7 @@ STRIPE_API_KEY = os.environ["STRIPE_API_KEY"]
 # If STRIPE_SECRET_KEY is unset we fall back to STRIPE_API_KEY (so non-embedded flows keep working).
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY") or STRIPE_API_KEY
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 JWT_SECRET = os.environ["JWT_SECRET_KEY"]
 JWT_ALG = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXP_MIN = int(os.environ.get("JWT_EXPIRES_MINUTES", "1440"))
@@ -1923,6 +1924,83 @@ async def embedded_status(session_id: str, user=Depends(get_current_user)):
         "currency": session.currency,
         "kind": txn.get("kind") or "report_unlock",
     }
+
+
+@api_router.post("/webhook/stripe-embedded")
+async def stripe_webhook_embedded(request: Request):
+    """Real-Stripe webhook for embedded checkout. Configure this URL in your Stripe Dashboard:
+    https://<your-domain>/api/webhook/stripe-embedded
+    Listens for `checkout.session.completed` and credits prepaid_uploads or marks report as paid.
+    """
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook secret not configured.")
+
+    body = await request.body()
+    signature = request.headers.get("Stripe-Signature", "")
+
+    _arm_real_stripe()
+    try:
+        event = stripe_sdk.Webhook.construct_event(
+            payload=body, sig_header=signature, secret=STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe_sdk.error.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        session_id = session["id"]
+        if session.get("payment_status") != "paid":
+            return {"received": True}
+
+        txn = await db.payment_transactions.find_one({"session_id": session_id})
+        if not txn:
+            # Webhook beat the frontend — insert a minimal txn so we can credit
+            logger.warning(f"Webhook for unknown session {session_id} — crediting from metadata")
+
+        metadata = session.get("metadata") or {}
+        kind = metadata.get("kind") or (txn or {}).get("kind") or "report_unlock"
+
+        if kind == "prepay_upload":
+            user_id = metadata.get("user_id") or (txn or {}).get("user_id")
+            already_credited = txn and txn.get("credited")
+            if user_id and not already_credited:
+                await db.users.update_one(
+                    {"id": user_id},
+                    {"$inc": {"prepaid_uploads": 1}},
+                )
+            if txn:
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {
+                        "payment_status": "paid",
+                        "status": "complete",
+                        "credited": True,
+                        "updated_at": now_iso(),
+                    }},
+                )
+        elif kind == "report_unlock":
+            report_id = metadata.get("report_id") or (txn or {}).get("report_id")
+            if report_id:
+                report = await db.reports.find_one({"id": report_id})
+                if report and not report.get("is_paid"):
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"is_paid": True, "paid_at": now_iso()}},
+                    )
+                if txn:
+                    await db.payment_transactions.update_one(
+                        {"session_id": session_id},
+                        {"$set": {
+                            "payment_status": "paid",
+                            "status": "complete",
+                            "updated_at": now_iso(),
+                        }},
+                    )
+
+    return {"received": True}
+
 
 
 

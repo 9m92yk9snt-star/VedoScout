@@ -32,13 +32,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - ✅ Backend `/api/admin/stats` returns `revenue_usd` + legacy `revenue_dkk`
 - ✅ Backend `/api/payments/*` flows persist `currency=usd` and `amount` in USD dollars
 - ✅ DB migration ran — existing report_price setting reset to 1.0 USD
-- ✅ NEW: Embedded Stripe checkout endpoints `/api/payments/embedded/prepay-upload`, `/api/payments/embedded/unlock`, `/api/payments/embedded/status/{sid}`
-- ✅ NEW: `EmbeddedCheckoutModal.jsx` mounts Stripe's `<EmbeddedCheckout>` inside a branded ScoutMePlay modal — true in-page payment
-- ✅ NEW: UploadPage + ReportPage auto-prefer embedded checkout when Stripe keys are configured; otherwise gracefully fall back to redirect modal
-- ✅ **Real Stripe TEST keys configured** in `/app/backend/.env` — embedded checkout fully functional (verified via testing agent: 14 real js.stripe.com iframes mounted inside our branded modal showing "MENTALKIDS · SCOUTMEPLAY SECURE CHECKOUT · US$1.00")
-- ✅ **Bug fix (CRITICAL)**: Added `_arm_real_stripe()` helper that resets `stripe_sdk.api_base='https://api.stripe.com'` before every embedded SDK call. Required because `emergentintegrations` silently mutates the global `stripe.api_base` to its proxy URL, which would otherwise poison subsequent embedded calls in the same worker
-- ✅ **Bug fix (HIGH)**: Embedded sessions now use `redirect_on_completion='if_required'` so Stripe's `onComplete` callback fires in-page (instead of redirecting). 3DS auth flows still redirect when needed
-- ✅ Backend tested 7/8 green (1 intentional skip) — both previously-failing bug-repro tests now PASS
+- ✅ Embedded Stripe checkout endpoints `/api/payments/embedded/prepay-upload`, `/api/payments/embedded/unlock`, `/api/payments/embedded/status/{sid}`
+- ✅ `EmbeddedCheckoutModal.jsx` mounts Stripe's `<EmbeddedCheckout>` inside a branded ScoutMePlay modal — true in-page payment
+- ✅ UploadPage + ReportPage auto-prefer embedded checkout when Stripe keys are configured; otherwise gracefully fall back to redirect modal
+- ✅ **Bug fix (CRITICAL)**: `_arm_real_stripe()` helper resets `stripe_sdk.api_base='https://api.stripe.com'` before every embedded SDK call (counters `emergentintegrations` global mutation)
+- ✅ **Bug fix (HIGH)**: Embedded sessions use `redirect_on_completion='if_required'` so `onComplete` callback fires in-page
+- ✅ **🔴 LIVE MODE ACTIVATED** — `pk_live_51SlanqPyHKLMizP3...` + `sk_live_51SlanqPyHKLMizP3...` in `/app/backend/.env`. Account: `MENTALSKIDS 1M BOLDE` (DK, charges_enabled, payouts_enabled). Verified end-to-end: real `cs_live_...` session created via our API and confirmed `livemode: true`.
+- ✅ **Real Stripe webhook handler** at `/api/webhook/stripe-embedded` uses `stripe.Webhook.construct_event` with `STRIPE_WEBHOOK_SECRET`. Credits `prepaid_uploads` and marks reports paid even if the user closes their tab right after paying.
 
 ## Implemented Previously (Phase 1 — Feb 2026)
 - ✅ Landing page (Hero, How It Works, What You Receive, Sample Preview, Trust, CTA)
