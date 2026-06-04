@@ -16,6 +16,68 @@ import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
 
+/* Tier visual treatment — 4 levels mapped to colour + label */
+const TIER_META = {
+  elite_academy:  { rank: 4, label: "Elite Academy",     dot: "bg-emerald-500", text: "text-emerald-700", border: "border-emerald-500" },
+  pro_academy:    { rank: 3, label: "Pro Academy",       dot: "bg-volt",        text: "text-volt",        border: "border-volt" },
+  strong_club:    { rank: 2, label: "Strong Club",       dot: "bg-amber-500",   text: "text-amber-700",   border: "border-amber-500" },
+  standard_club:  { rank: 1, label: "Standard Club",     dot: "bg-stone-500",   text: "text-stone-600",   border: "border-stone-400" },
+};
+
+function TierBadge({ tier, size = "md" }) {
+  const t = TIER_META[tier];
+  if (!t) return null;
+  const cls = size === "sm"
+    ? "text-[9px] tracking-[0.18em] px-1.5 py-0.5"
+    : "text-[10px] tracking-[0.22em] px-2 py-1";
+  return (
+    <span
+      data-testid={`tier-badge-${tier}`}
+      className={`inline-flex items-center gap-1.5 uppercase font-bold border ${t.border} ${t.text} bg-cream-card ${cls}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} />
+      {t.label}
+    </span>
+  );
+}
+
+/* Visual benchmark bar — 4 segments, the one matching `tier` is highlighted.
+   Each segment shows the score range expected for that tier at the player's age+position. */
+function BenchmarkBar({ tier, benchmarks }) {
+  if (!benchmarks || typeof benchmarks !== "object") return null;
+  const order = ["standard_club", "strong_club", "pro_academy", "elite_academy"];
+  return (
+    <div className="mt-3" data-testid="benchmark-bar">
+      <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45 mb-1.5">
+        Age + position benchmark
+      </div>
+      <div className="grid grid-cols-4 gap-0.5">
+        {order.map((k) => {
+          const t = TIER_META[k];
+          const active = k === tier;
+          return (
+            <div
+              key={k}
+              data-testid={`benchmark-seg-${k}`}
+              className={`px-2 py-2 border ${active ? `${t.border} bg-cream-soft/40` : "border-gray-border bg-cream-card"} ${active ? "" : "opacity-65"}`}
+            >
+              <div className="flex items-center gap-1">
+                <span className={`w-1 h-1 rounded-full ${t.dot}`} />
+                <span className={`text-[8.5px] uppercase tracking-[0.16em] font-bold ${active ? t.text : "text-ink/45"}`}>
+                  {t.label}
+                </span>
+              </div>
+              <div className={`mt-0.5 font-barlow font-black ${active ? `${t.text} text-base` : "text-ink/55 text-sm"}`}>
+                {benchmarks[k] || "—"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* Visual treatment for confidence badges (high / medium / low). */
 const CONFIDENCE_STYLES = {
   high: { color: "text-volt", border: "border-volt/40", bg: "bg-volt/10", label: "High confidence" },
@@ -48,21 +110,36 @@ function SectionGrid({ title, section }) {
   return (
     <div className="bg-surface border border-gray-border p-6 md:p-8">
       <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">{title}</h3>
-      <div className="mt-6 grid sm:grid-cols-2 gap-px bg-cream-soft/20">
+      <div className="mt-6 grid sm:grid-cols-2 gap-4">
         {Object.entries(section).map(([key, val]) => {
           const cannotEval = val?.cannot_evaluate === true;
           const confidence = val?.confidence;
           const evidence = Array.isArray(val?.evidence) ? val.evidence : [];
+          const tier = val?.tier_for_age;
+          const benchmarks = val?.benchmarks;
+          const whyScore = val?.why_this_score;
+          const verdict = val?.verdict;
           return (
-            <div key={key} className="bg-surface p-4">
+            <div
+              key={key}
+              data-testid={`attr-card-${key}`}
+              className="bg-cream-card border border-gray-border p-5"
+            >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-xs uppercase tracking-[0.18em] font-bold text-ink/65">{key.replace(/_/g, " ")}</span>
+                <div className="min-w-0">
+                  <span className="text-xs uppercase tracking-[0.18em] font-bold text-ink/65">{key.replace(/_/g, " ")}</span>
+                  {tier && !cannotEval && (
+                    <div className="mt-1.5">
+                      <TierBadge tier={tier} size="sm" />
+                    </div>
+                  )}
+                </div>
                 {cannotEval ? (
                   <span className="text-[10px] uppercase tracking-widest font-bold text-orange-300 border border-orange-300/40 bg-orange-300/10 px-2 py-0.5 whitespace-nowrap">
                     Need more footage
                   </span>
                 ) : (
-                  <span className={`font-barlow font-black text-2xl ${scoreColor(val?.score)}`}>
+                  <span className={`font-barlow font-black text-3xl shrink-0 ${scoreColor(val?.score)}`}>
                     {val?.score ?? "-"}
                     <span className="text-ink/40 text-base">/10</span>
                   </span>
@@ -70,14 +147,35 @@ function SectionGrid({ title, section }) {
               </div>
 
               {cannotEval ? (
-                <p className="text-xs text-orange-200/70 leading-relaxed italic">
+                <p className="text-xs text-ink/55 leading-relaxed italic">
                   {val?.evaluable_reason || val?.notes || "Not observable from this footage."}
                 </p>
               ) : (
-                <p className="text-sm text-ink/75 leading-relaxed">{val?.notes}</p>
+                <>
+                  <p className="text-sm text-ink/75 leading-relaxed">{val?.notes}</p>
+
+                  {whyScore && (
+                    <div className="mt-3 pt-3 border-t border-gray-border">
+                      <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt mb-1">Why this score</div>
+                      <p className="text-[13px] text-ink/80 leading-relaxed">{whyScore}</p>
+                    </div>
+                  )}
+
+                  {benchmarks && tier && (
+                    <BenchmarkBar tier={tier} benchmarks={benchmarks} />
+                  )}
+
+                  {verdict && (
+                    <div className="mt-3 pt-3 border-t border-gray-border">
+                      <p className="text-[12px] text-ink/70 leading-relaxed italic">
+                        <span className="text-volt font-bold not-italic">›</span> {verdict}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Confidence + evidence (only on new-format reports) */}
+              {/* Confidence + evidence */}
               {confidence && !cannotEval && (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <ConfidenceBadge level={confidence} reason={val?.confidence_reason} />
@@ -106,6 +204,91 @@ function SectionGrid({ title, section }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/* Hero banner shown above the full report — places overall_development in
+   the calibrated age+position tier landscape so the customer instantly
+   understands what the overall score MEANS. */
+function OverallBenchmarkBanner({ ob, overallScore }) {
+  if (!ob) return null;
+  const tier = ob.tier;
+  const t = TIER_META[tier];
+  if (!t) return null;
+  return (
+    <div
+      data-testid="overall-benchmark-banner"
+      className="bg-ink border-2 border-volt p-6 md:p-8 my-8"
+    >
+      <div className="flex flex-col md:flex-row gap-6 md:items-start">
+        {/* Big score + tier */}
+        <div className="md:w-1/3 shrink-0">
+          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Overall benchmark</div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-barlow font-black text-6xl md:text-7xl text-white leading-none">
+              {overallScore ?? "-"}
+            </span>
+            <span className="text-white/40 font-barlow font-black text-2xl">/10</span>
+          </div>
+          <div className="mt-3">
+            <TierBadge tier={tier} />
+          </div>
+          {ob.age_bracket_used && (
+            <div className="mt-2 text-[10px] uppercase tracking-widest font-bold text-white/45">
+              calibrated for {ob.age_bracket_used.replace(/_/g, " ").toLowerCase()}
+            </div>
+          )}
+        </div>
+
+        {/* Narrative + next step */}
+        <div className="flex-1 space-y-4">
+          {ob.percentile && (
+            <p className="text-base md:text-lg text-white leading-snug font-medium">
+              {ob.percentile}
+            </p>
+          )}
+          {ob.realistic_next_step && (
+            <div>
+              <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-volt mb-1">Realistic next step</div>
+              <p className="text-sm text-white/80 leading-relaxed">{ob.realistic_next_step}</p>
+            </div>
+          )}
+          {ob.what_separates_from_next_tier && (
+            <div>
+              <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-volt mb-1">To reach the next tier</div>
+              <p className="text-sm text-white/80 leading-relaxed">{ob.what_separates_from_next_tier}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tier landscape - horizontal scale */}
+      <div className="mt-6 pt-5 border-t border-white/15">
+        <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-white/55 mb-2">Tier landscape</div>
+        <div className="grid grid-cols-4 gap-0.5">
+          {["standard_club", "strong_club", "pro_academy", "elite_academy"].map((k) => {
+            const m = TIER_META[k];
+            const active = k === tier;
+            return (
+              <div
+                key={k}
+                className={`px-2.5 py-2.5 border ${active ? `${m.border}` : "border-white/15"} ${active ? "bg-white/10" : "bg-white/[0.02]"}`}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
+                  <span className={`text-[9px] uppercase tracking-[0.18em] font-bold ${active ? "text-white" : "text-white/45"}`}>
+                    {m.label}
+                  </span>
+                </div>
+                {active && (
+                  <div className="mt-1 text-[10px] text-white/60 italic">You are here</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

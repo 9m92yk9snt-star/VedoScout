@@ -314,10 +314,41 @@ For EVERY scored sub-skill (e.g. first_touch, passing, scanning), return this ex
   "observations_used": <integer count of distinct moments used>,
   "evidence": [{"timestamp": "MM:SS or 'General'", "what": "<concrete moment description>"}],
   "cannot_evaluate": false | true,
-  "evaluable_reason": "<ONLY when cannot_evaluate=true: ONE sentence explaining why this skill cannot be assessed from this video, e.g. 'No shooting situations were visible in the footage.'>"
+  "evaluable_reason": "<ONLY when cannot_evaluate=true: ONE sentence explaining why this skill cannot be assessed from this video, e.g. 'No shooting situations were visible in the footage.'>",
+  "why_this_score": "<2-3 sentences explaining WHY you chose this specific score. Refer to concrete observed moments and reasoning. NEVER 'I gave this score because.' — be specific: 'Scored X because he consistently does Y but struggles when Z.'>",
+  "tier_for_age": "elite_academy" | "pro_academy" | "strong_club" | "standard_club",
+  "benchmarks": {
+    "elite_academy": "<typical score range for top 5% peers — e.g. Ajax/La Masia/Bayern academy at this age+position, e.g. '9-10'>",
+    "pro_academy": "<typical score range for top 15% — most professional U-academies at this age+position, e.g. '7.5-8.5'>",
+    "strong_club": "<top regional/elite-amateur club at this age+position, e.g. '6-7'>",
+    "standard_club": "<average local club / school football at this age+position, e.g. '4-5.5'>"
+  },
+  "verdict": "<ONE sentence in this format: 'Currently sitting at <tier> for a <age>-year-old <position>. To reach <next tier>, focus on <one specific actionable thing>.'>"
 }
 
-When cannot_evaluate=true: score MUST be null, notes brief, evidence may be empty, confidence "low".
+When cannot_evaluate=true: score MUST be null, notes brief, evidence may be empty, confidence "low", tier_for_age can be omitted, benchmarks can be omitted, verdict can be omitted or short.
+
+🎯 BENCHMARK CALIBRATION (this is what makes the report feel real)
+Calibrate every "benchmarks" object to the PLAYER'S AGE AND POSITION. A 12-year-old does NOT face the same standards as a 17-year-old. A goalkeeper is not measured against a striker. Use the age-bracket rubric below:
+
+AGE BRACKETS (use the bracket that contains the player's age):
+- U11–U12 (5v5/9v9): elite=8-9, pro=6.5-8, strong=5-6.5, standard=3-5
+- U13–U14 (11v11 introduction): elite=8.5-10, pro=7-8.5, strong=5.5-7, standard=4-5.5
+- U15–U16 (academy selection age): elite=9-10, pro=7.5-9, strong=6-7.5, standard=4-6
+- U17–U18 (pro contract age): elite=9-10, pro=8-9, strong=6.5-8, standard=5-6.5
+- U19–U21 (reserve/loan age): elite=9-10, pro=8-9.5, strong=7-8, standard=5.5-7
+- Senior 22+: elite=9-10, pro=8-9.5, strong=7-8.5, standard=6-7.5
+
+POSITION ADJUSTMENTS — emphasize the right attributes for the position:
+- Goalkeeper: emphasize positioning, decision_making, focus, body_control, courage_in_duels; de-emphasize dribbling, shooting, weak_foot
+- Centre-back: positioning, courage_in_duels, decision_making, heading; de-emphasize dribbling, shooting
+- Full-back/Wing-back: speed, acceleration, intensity, off_ball_movement, passing
+- Defensive midfielder: scanning, decision_making, passing, positioning, work_rate
+- Central/Attacking midfielder: passing, first_touch, scanning, decision_making, weak_foot
+- Winger: dribbling, acceleration, one_v_one, weak_foot, timing_of_runs
+- Striker/Forward: first_touch, shooting, one_v_one, off_ball_movement, courage_in_duels
+
+When you write benchmarks, write them as RANGES (e.g. "7.5-8.5") not single numbers. Calibrate the range to the AGE+POSITION combination. Choose the tier_for_age by checking which range the player's actual score falls into.
 
 🎯 PLAYER DETAILS
 {player_details}
@@ -406,6 +437,14 @@ Produce a JSON object EXACTLY in this format:
     "mentality": "high" | "medium" | "low",
     "overall_development": "high" | "medium" | "low"
   },
+  "overall_benchmark": {
+    "tier": "elite_academy" | "pro_academy" | "strong_club" | "standard_club",
+    "tier_label": "<human label, e.g. 'Pro Academy Standard'>",
+    "percentile": "<short plain-language phrase comparing to peers of same age+position, e.g. 'Currently in the top 15-25% of U14 central midfielders'>",
+    "realistic_next_step": "<concrete next step calibrated to the player's tier, e.g. 'Trial at a regional pro academy or strong talent center'>",
+    "what_separates_from_next_tier": "<ONE specific thing that, if improved, would move the player into the next tier above. Plain football language.>",
+    "age_bracket_used": "U11-U12" | "U13-U14" | "U15-U16" | "U17-U18" | "U19-U21" | "Senior_22+"
+  },
   "final_summary": "<3-5 sentence encouraging closing summary about THIS PLAYER, plain football language>",
   "evidence_quality_note": "<one paragraph explaining the overall evidence quality of this video — what was strong, what was missing, what kind of follow-up footage would strengthen the report>"
 }
@@ -414,6 +453,11 @@ RULES FOR TOP-LEVEL "scores":
 - These are AGGREGATES. Average the observable sub-skills in each category.
 - If MOST sub-skills in a category are cannot_evaluate, score the category honestly low (3-5) and set scores_confidence to "low".
 - If the entire category is cannot_evaluate, still give a defensible integer (e.g. 5) but set scores_confidence to "low" and reflect this in evidence_quality_note.
+
+RULES FOR "overall_benchmark":
+- The tier_label MUST match the AGE BRACKET RUBRIC above. Compare the overall_development score against the rubric for the player's age bracket.
+- "percentile" should reference the EXACT age bracket and position used in the rubric, e.g. "Top 15-20% of U15 wingers".
+- "realistic_next_step" must be calibrated to the player's CURRENT tier, not aspirational. If they're standard_club, the next step is strong_club — NOT pro academy. If they're already pro_academy, next step is elite_academy.
 
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
