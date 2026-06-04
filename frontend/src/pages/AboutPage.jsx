@@ -1,10 +1,23 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ChevronLeft, ShieldCheck, Brain, Video, Trophy, Mail } from "lucide-react";
+import { toast } from "sonner";
+import { ChevronLeft, ShieldCheck, Brain, Video, Trophy, Mail, Send, Loader2, CheckCircle2 } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import api from "@/lib/api";
 
 export default function AboutPage() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) {
+      const el = document.querySelector(hash);
+      if (el) {
+        // small delay so DOM is fully rendered
+        setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      }
+    }
+  }, [hash]);
+
   return (
     <div className="min-h-screen bg-deepnavy text-white">
       <Navigation />
@@ -98,22 +111,25 @@ export default function AboutPage() {
           </p>
         </section>
 
-        <section className="mt-14 border-t border-white/10 pt-10">
+        <section id="contact" className="mt-14 border-t border-white/10 pt-10">
           <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Contact</div>
           <h2 className="mt-3 font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl">
             Talk to us
           </h2>
-          <p className="mt-3 text-white/70">
-            Press, partnerships, support, refunds, club inquiries — write to us at:
+          <p className="mt-3 text-white/70 max-w-xl">
+            Press, partnerships, support, refunds, club inquiries — write to us below.
+            We read every message and reply within 24 hours.
           </p>
-          <a
-            href="mailto:scoutmeplay@gmail.com"
-            data-testid="about-contact-email"
-            className="mt-4 inline-flex items-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
-          >
-            <Mail className="w-4 h-4" />
-            scoutmeplay@gmail.com
-          </a>
+
+          <ContactForm />
+
+          <p className="mt-4 text-xs text-white/40">
+            Prefer email? Reach us directly at{" "}
+            <a href="mailto:scoutmeplay@gmail.com" className="text-volt underline">
+              scoutmeplay@gmail.com
+            </a>
+            .
+          </p>
         </section>
       </div>
 
@@ -123,5 +139,143 @@ export default function AboutPage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// ============== Contact Form ==============
+
+function ContactForm() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [honeypot, setHoneypot] = useState("");   // hidden field — bots fill this
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || message.trim().length < 10) {
+      toast.error("Please fill in your name, email and a message of at least 10 characters.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post("/contact", {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        message: message.trim(),
+        company: honeypot || undefined,
+      });
+      setSent(true);
+      setName(""); setEmail(""); setMessage("");
+      toast.success("Message received. We'll get back to you within 24 hours.");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Couldn't send. Please try again or email us directly.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <div className="mt-6 border-2 border-volt/30 bg-volt/5 p-6 max-w-xl">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 bg-volt/15 border border-volt flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-volt" />
+          </div>
+          <div>
+            <div className="font-barlow font-black uppercase text-base text-white">Message sent</div>
+            <p className="text-sm text-white/70 mt-1.5 leading-relaxed">
+              Thanks for reaching out. We read every message and reply within 24 hours.
+            </p>
+            <button
+              onClick={() => setSent(false)}
+              data-testid="contact-send-another"
+              className="mt-4 text-xs uppercase tracking-[0.22em] font-bold text-volt hover:text-white transition-colors"
+            >
+              Send another →
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} data-testid="contact-form" className="mt-6 max-w-xl space-y-4">
+      {/* Honeypot — visually hidden, ignored by users, often filled by bots */}
+      <div className="absolute -left-[9999px]" aria-hidden="true">
+        <label>
+          Company (leave blank)
+          <input
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+          />
+        </label>
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+          Your name
+        </label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Maria Hansen"
+          required
+          minLength={2}
+          maxLength={80}
+          data-testid="contact-name-input"
+          className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+          Your email
+        </label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          required
+          data-testid="contact-email-input"
+          className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+        />
+      </div>
+
+      <div>
+        <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+          Message
+        </label>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Tell us what's on your mind — questions, partnerships, refund requests, anything."
+          required
+          minLength={10}
+          maxLength={4000}
+          rows={6}
+          data-testid="contact-message-input"
+          className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-y"
+        />
+        <div className="mt-1 text-[10px] text-white/35 text-right">{message.length} / 4000</div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={submitting}
+        data-testid="contact-submit"
+        className="inline-flex items-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-7 py-3 transition-colors disabled:opacity-50"
+      >
+        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+        Send message
+      </button>
+    </form>
   );
 }

@@ -11,7 +11,7 @@ import {
   ArrowRight, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
   Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
-  Lightbulb, Crown, Calendar, Dumbbell, Mail,
+  Lightbulb, Crown, Calendar, Dumbbell, Mail, Send,
 } from "lucide-react";
 
 const fadeUp = {
@@ -1150,6 +1150,16 @@ export default function Landing() {
             <div>
               <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Contact</div>
               <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <Link
+                    to="/about#contact"
+                    data-testid="footer-link-contact-form"
+                    className="inline-flex items-center gap-1.5 text-white/65 hover:text-volt transition-colors"
+                  >
+                    <Send className="w-3.5 h-3.5 shrink-0" />
+                    Send us a message
+                  </Link>
+                </li>
                 <li>
                   <a
                     href="mailto:scoutmeplay@gmail.com"

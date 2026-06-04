@@ -2152,6 +2152,76 @@ async def admin_delete_user(user_id: str, admin=Depends(get_current_admin)):
     }
 
 
+# ============== CONTACT MESSAGES ==============
+
+class ContactSubmit(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    email: EmailStr
+    message: str = Field(min_length=10, max_length=4000)
+    company: Optional[str] = None  # honeypot field — bots fill this; humans don't
+
+
+@api_router.post("/contact", status_code=201)
+async def contact_submit(payload: ContactSubmit, request: Request):
+    """Public contact form. Stored in `contact_messages` and visible in admin → Messages tab."""
+    # Honeypot: silently accept then discard if a bot filled the hidden field
+    if payload.company:
+        return {"status": "received"}
+
+    # Simple rate-limit: max 5 messages per IP per hour
+    client_ip = request.client.host if request.client else "unknown"
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent = await db.contact_messages.count_documents({
+        "client_ip": client_ip,
+        "created_at": {"$gte": cutoff},
+    })
+    if recent >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many messages. Please try again in an hour.",
+        )
+
+    msg = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name.strip(),
+        "email": payload.email.lower().strip(),
+        "message": payload.message.strip(),
+        "client_ip": client_ip,
+        "user_agent": request.headers.get("User-Agent", "")[:300],
+        "status": "new",  # new | read | archived
+        "created_at": now_iso(),
+    }
+    await db.contact_messages.insert_one(msg)
+    return {"status": "received", "id": msg["id"]}
+
+
+@api_router.get("/admin/contact-messages")
+async def admin_list_contact(_=Depends(get_current_admin)):
+    cursor = db.contact_messages.find({}, {"_id": 0}).sort("created_at", -1).limit(500)
+    return await cursor.to_list(500)
+
+
+@api_router.put("/admin/contact-messages/{msg_id}/status")
+async def admin_update_contact_status(msg_id: str, payload: Dict[str, str], _=Depends(get_current_admin)):
+    new_status = (payload.get("status") or "").lower()
+    if new_status not in ("new", "read", "archived"):
+        raise HTTPException(status_code=400, detail="Invalid status")
+    res = await db.contact_messages.update_one({"id": msg_id}, {"$set": {"status": new_status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"status": new_status}
+
+
+@api_router.delete("/admin/contact-messages/{msg_id}")
+async def admin_delete_contact(msg_id: str, _=Depends(get_current_admin)):
+    res = await db.contact_messages.delete_one({"id": msg_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"status": "deleted"}
+
+
+
+
 @api_router.get("/admin/reports")
 async def admin_reports(_=Depends(get_current_admin)):
     docs = await db.reports.find({}, {"_id": 0, "full_report": 0}).sort("created_at", -1).to_list(500)

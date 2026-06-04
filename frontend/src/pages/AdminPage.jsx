@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
-  ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff,
+  ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 
@@ -14,6 +14,7 @@ const ALL_TABS = [
   { id: "scouts", label: "Scout Queue", role: "both" },
   { id: "reports", label: "Reports", role: "admin" },
   { id: "users", label: "Users", role: "admin" },
+  { id: "messages", label: "Messages", role: "admin" },
   { id: "payments", label: "Payments", role: "admin" },
   { id: "settings", label: "Settings", role: "admin" },
 ];
@@ -41,6 +42,7 @@ export default function AdminPage() {
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [price, setPrice] = useState(1);
   const [priceInput, setPriceInput] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
@@ -60,12 +62,13 @@ export default function AdminPage() {
         setPrice(pr.data.price);
         setPriceInput(String(pr.data.price));
       } else {
-        const [s, r, u, p, pr] = await Promise.all([
+        const [s, r, u, p, pr, m] = await Promise.all([
           api.get("/admin/stats"),
           api.get("/admin/reports"),
           api.get("/admin/users"),
           api.get("/admin/payments"),
           api.get("/settings/price"),
+          api.get("/admin/contact-messages"),
         ]);
         setStats(s.data);
         setReports(r.data);
@@ -73,6 +76,7 @@ export default function AdminPage() {
         setPayments(p.data);
         setPrice(pr.data.price);
         setPriceInput(String(pr.data.price));
+        setMessages(m.data);
       }
     } catch (err) {
       toast.error("Failed to load admin data");
@@ -142,6 +146,27 @@ export default function AdminPage() {
     }
   };
 
+  // ====== Contact messages ======
+  const updateMessageStatus = async (msgId, status) => {
+    try {
+      await api.put(`/admin/contact-messages/${msgId}/status`, { status });
+      setMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, status } : m)));
+    } catch (err) {
+      toast.error("Couldn't update message status");
+    }
+  };
+
+  const deleteMessage = async (msgId) => {
+    if (!window.confirm("Delete this message permanently?")) return;
+    try {
+      await api.delete(`/admin/contact-messages/${msgId}`);
+      setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      toast.success("Message deleted");
+    } catch (err) {
+      toast.error("Delete failed");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-deepnavy text-white">
       <Navigation />
@@ -163,18 +188,29 @@ export default function AdminPage() {
 
           {/* Tabs */}
           <div className="mt-8 border-b border-white/10 flex gap-1 overflow-x-auto">
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
-                data-testid={`admin-tab-${t.id}`}
-                className={`px-5 py-3 uppercase tracking-widest text-xs font-bold transition-colors whitespace-nowrap ${
-                  activeTab === t.id ? "text-volt border-b-2 border-volt" : "text-white/50 hover:text-white"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+            {tabs.map((t) => {
+              const newCount = t.id === "messages" ? messages.filter((m) => m.status === "new").length : 0;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  data-testid={`admin-tab-${t.id}`}
+                  className={`relative px-5 py-3 uppercase tracking-widest text-xs font-bold transition-colors whitespace-nowrap ${
+                    activeTab === t.id ? "text-volt border-b-2 border-volt" : "text-white/50 hover:text-white"
+                  }`}
+                >
+                  {t.label}
+                  {newCount > 0 && (
+                    <span
+                      data-testid="admin-tab-messages-badge"
+                      className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 bg-volt text-deepnavy text-[10px] font-black"
+                    >
+                      {newCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {loading ? (
@@ -357,6 +393,99 @@ export default function AdminPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {activeTab === "messages" && (
+                <div className="space-y-4">
+                  {messages.length === 0 ? (
+                    <div className="border border-white/10 bg-surface p-12 text-center">
+                      <Inbox className="w-10 h-10 text-white/30 mx-auto mb-3" />
+                      <p className="font-barlow font-black uppercase tracking-tight text-lg text-white/70">No messages yet</p>
+                      <p className="text-sm text-white/40 mt-1">Contact form submissions will appear here.</p>
+                    </div>
+                  ) : (
+                    messages.map((m) => {
+                      const isNew = m.status === "new";
+                      const isArchived = m.status === "archived";
+                      return (
+                        <div
+                          key={m.id}
+                          data-testid={`admin-message-${m.id}`}
+                          className={`border bg-surface ${isNew ? "border-volt/40" : "border-white/10"} ${isArchived ? "opacity-60" : ""}`}
+                        >
+                          <div className="px-5 py-4 flex flex-wrap items-start justify-between gap-3 border-b border-white/8">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2.5">
+                                {isNew ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black">
+                                    <Mail className="w-3 h-3" /> New
+                                  </span>
+                                ) : isArchived ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/8 text-white/50 text-[10px] uppercase tracking-widest font-bold">
+                                    Archived
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/8 text-white/70 text-[10px] uppercase tracking-widest font-bold">
+                                    <MailOpen className="w-3 h-3" /> Read
+                                  </span>
+                                )}
+                                <span className="font-barlow font-black uppercase text-base text-white">{m.name}</span>
+                              </div>
+                              <a
+                                href={`mailto:${m.email}?subject=Re: Your message to ScoutMePlay`}
+                                className="mt-1 inline-block text-xs text-volt hover:underline break-all"
+                              >
+                                {m.email}
+                              </a>
+                              <p className="mt-1 text-[10px] uppercase tracking-[0.22em] font-bold text-white/35">
+                                {new Date(m.created_at).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {isNew && (
+                                <button
+                                  onClick={() => updateMessageStatus(m.id, "read")}
+                                  data-testid={`admin-msg-mark-read-${m.id}`}
+                                  className="text-xs uppercase tracking-widest font-bold text-white/55 hover:text-volt px-2 py-1 transition-colors"
+                                >
+                                  Mark read
+                                </button>
+                              )}
+                              {!isArchived ? (
+                                <button
+                                  onClick={() => updateMessageStatus(m.id, "archived")}
+                                  data-testid={`admin-msg-archive-${m.id}`}
+                                  className="text-xs uppercase tracking-widest font-bold text-white/55 hover:text-volt px-2 py-1 transition-colors"
+                                >
+                                  Archive
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => updateMessageStatus(m.id, "read")}
+                                  data-testid={`admin-msg-unarchive-${m.id}`}
+                                  className="text-xs uppercase tracking-widest font-bold text-white/55 hover:text-volt px-2 py-1 transition-colors"
+                                >
+                                  Unarchive
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteMessage(m.id)}
+                                data-testid={`admin-msg-delete-${m.id}`}
+                                title="Delete"
+                                className="text-red-400 hover:bg-red-400 hover:text-deepnavy p-2 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="px-5 py-4 text-sm text-white/80 whitespace-pre-wrap leading-relaxed">
+                            {m.message}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
 
