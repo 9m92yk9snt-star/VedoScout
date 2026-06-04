@@ -9,7 +9,7 @@ import Navigation from "@/components/Navigation";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info,
+  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
