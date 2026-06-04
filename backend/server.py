@@ -14,6 +14,7 @@ from typing import Optional, List, Dict, Any
 import bcrypt
 import jwt as pyjwt
 from dotenv import load_dotenv
+import httpx
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, status, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -68,6 +69,7 @@ STRIPE_API_KEY = os.environ["STRIPE_API_KEY"]
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY") or STRIPE_API_KEY
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+CONTACT_NOTIFY_EMAIL = os.environ.get("CONTACT_NOTIFY_EMAIL", "scoutmeplay@gmail.com")
 JWT_SECRET = os.environ["JWT_SECRET_KEY"]
 JWT_ALG = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXP_MIN = int(os.environ.get("JWT_EXPIRES_MINUTES", "1440"))
@@ -2162,8 +2164,10 @@ class ContactSubmit(BaseModel):
 
 
 @api_router.post("/contact", status_code=201)
-async def contact_submit(payload: ContactSubmit, request: Request):
-    """Public contact form. Stored in `contact_messages` and visible in admin → Messages tab."""
+async def contact_submit(payload: ContactSubmit, request: Request, background: BackgroundTasks):
+    """Public contact form. Stored in `contact_messages` and visible in admin → Messages tab.
+    Also forwards to CONTACT_NOTIFY_EMAIL via FormSubmit.co (free, no signup) in the background.
+    """
     # Honeypot: silently accept then discard if a bot filled the hidden field
     if payload.company:
         return {"status": "received"}
@@ -2192,7 +2196,45 @@ async def contact_submit(payload: ContactSubmit, request: Request):
         "created_at": now_iso(),
     }
     await db.contact_messages.insert_one(msg)
+
+    # Fire-and-forget email forward (non-blocking, never fails the request)
+    background.add_task(_forward_contact_to_email, msg)
+
     return {"status": "received", "id": msg["id"]}
+
+
+async def _forward_contact_to_email(msg: Dict[str, Any]):
+    """Forward contact form submission to CONTACT_NOTIFY_EMAIL via FormSubmit.co.
+    FormSubmit is a free email-relay service that requires no signup or API key.
+    The very first email sent to a new address will instead be an activation email — the
+    admin must click the link once to whitelist the address. After that, all future
+    emails arrive in their inbox within seconds.
+    """
+    if not CONTACT_NOTIFY_EMAIL:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"https://formsubmit.co/ajax/{CONTACT_NOTIFY_EMAIL}",
+                json={
+                    "name": msg["name"],
+                    "email": msg["email"],
+                    "message": msg["message"],
+                    "_subject": f"ScoutMePlay contact: {msg['name']}",
+                    "_replyto": msg["email"],
+                    "_template": "table",
+                    "_captcha": "false",
+                },
+                headers={"Accept": "application/json"},
+            )
+            if resp.status_code >= 400:
+                logger.warning(
+                    f"FormSubmit forward failed ({resp.status_code}) for msg {msg['id']}: {resp.text[:200]}"
+                )
+            else:
+                logger.info(f"Contact message {msg['id']} forwarded to {CONTACT_NOTIFY_EMAIL}")
+    except Exception as e:
+        logger.warning(f"FormSubmit forward error for msg {msg['id']}: {e}")
 
 
 @api_router.get("/admin/contact-messages")

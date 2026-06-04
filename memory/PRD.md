@@ -49,6 +49,11 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
   - Scouts can log in and access `/admin` — but only see the **Scout Queue tab** (other tabs are role-gated server- and client-side).
   - `/api/admin/agent-queue`, `agent-review` deliver, and `agent-messages` endpoints now use `get_current_admin_or_scout` so scouts can deliver reviews and chat with players.
   - Admin UI: "Add Scout" button + modal (name / email / password) on the Users tab.
+- ✅ **Footer redesign** — Brand / About / Contact / Legal columns. Contact link sends to `/about#contact`. Email link to `scoutmeplay@gmail.com`. Privacy link to `/privacy`.
+- ✅ **About page** (`/about`) — Brand story, "What we do" 4-card grid, full contact form (Name / Email / Message), Mentalkids company info.
+- ✅ **Privacy Policy page** (`/privacy`) — Full GDPR-compliant Danish/EU privacy policy in 11 sections (data, retention, third parties incl. Stripe & Gemini, user rights, Datatilsynet complaints).
+- ✅ **Contact form** — `POST /api/contact` (public, rate-limited 5/hour, honeypot anti-spam). Stored in MongoDB AND forwarded to `scoutmeplay@gmail.com` via **FormSubmit.co** (free email relay, no signup/API key needed — admin clicks ONE activation link in the first arrival email, then all future submissions arrive instantly).
+- ✅ **Admin Messages tab** — Unread badge on the tab, per-message status (new/read/archived), mailto reply buttons, delete actions.
 
 ## Implemented Previously (Phase 1 — Feb 2026)
 - ✅ Landing page (Hero, How It Works, What You Receive, Sample Preview, Trust, CTA)
