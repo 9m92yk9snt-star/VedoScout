@@ -1,23 +1,42 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
+  ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 
-const tabs = [
-  { id: "stats", label: "Overview" },
-  { id: "scouts", label: "Scout Queue" },
-  { id: "reports", label: "Reports" },
-  { id: "users", label: "Users" },
-  { id: "payments", label: "Payments" },
-  { id: "settings", label: "Settings" },
+const ALL_TABS = [
+  { id: "stats", label: "Overview", role: "admin" },
+  { id: "scouts", label: "Scout Queue", role: "both" },
+  { id: "reports", label: "Reports", role: "admin" },
+  { id: "users", label: "Users", role: "admin" },
+  { id: "payments", label: "Payments", role: "admin" },
+  { id: "settings", label: "Settings", role: "admin" },
 ];
 
+const SEGMENT_META = {
+  all:     { label: "All users",  color: "text-white" },
+  free:    { label: "Free",       color: "text-white/70" },
+  premium: { label: "Premium",    color: "text-volt" },
+  scout:   { label: "Scouts",     color: "text-blue-400" },
+  admin:   { label: "Admins",     color: "text-pink-400" },
+};
+
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState("stats");
+  const { user: currentUser } = useAuth();
+  const isScoutRole = currentUser?.role === "scout";
+  const isAdminRole = currentUser?.role === "admin";
+
+  const tabs = useMemo(
+    () => ALL_TABS.filter((t) => t.role === "both" || (isAdminRole ? t.role === "admin" : false)),
+    [isAdminRole],
+  );
+
+  const [activeTab, setActiveTab] = useState(isScoutRole ? "scouts" : "stats");
   const [stats, setStats] = useState(null);
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
@@ -27,22 +46,34 @@ export default function AdminPage() {
   const [savingPrice, setSavingPrice] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Users tab — segment filter + scout creation modal
+  const [userSegment, setUserSegment] = useState("all");   // all | free | premium | scout | admin
+  const [showCreateScout, setShowCreateScout] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState(null);
+
   const load = async () => {
     setLoading(true);
     try {
-      const [s, r, u, p, pr] = await Promise.all([
-        api.get("/admin/stats"),
-        api.get("/admin/reports"),
-        api.get("/admin/users"),
-        api.get("/admin/payments"),
-        api.get("/settings/price"),
-      ]);
-      setStats(s.data);
-      setReports(r.data);
-      setUsers(u.data);
-      setPayments(p.data);
-      setPrice(pr.data.price);
-      setPriceInput(String(pr.data.price));
+      if (isScoutRole) {
+        // scouts only need pricing pulled (everything else they can't see)
+        const [pr] = await Promise.all([api.get("/settings/price")]);
+        setPrice(pr.data.price);
+        setPriceInput(String(pr.data.price));
+      } else {
+        const [s, r, u, p, pr] = await Promise.all([
+          api.get("/admin/stats"),
+          api.get("/admin/reports"),
+          api.get("/admin/users"),
+          api.get("/admin/payments"),
+          api.get("/settings/price"),
+        ]);
+        setStats(s.data);
+        setReports(r.data);
+        setUsers(u.data);
+        setPayments(p.data);
+        setPrice(pr.data.price);
+        setPriceInput(String(pr.data.price));
+      }
     } catch (err) {
       toast.error("Failed to load admin data");
     } finally {
@@ -50,6 +81,7 @@ export default function AdminPage() {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const handlePriceSave = async () => {
@@ -91,16 +123,42 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteUser = async (u) => {
+    if (u.role === "admin") {
+      toast.error("Admin accounts cannot be deleted");
+      return;
+    }
+    const label = u.segment === "scout" ? "scout" : u.segment === "premium" ? "premium user" : "user";
+    if (!window.confirm(`Delete ${label} "${u.email}"? This permanently removes their account, reports, and uploads.`)) return;
+    setDeletingUserId(u.id);
+    try {
+      const { data } = await api.delete(`/admin/users/${u.id}`);
+      toast.success(`Deleted ${u.email}${data.reports_deleted ? ` + ${data.reports_deleted} report(s)` : ""}`);
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Delete failed");
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-deepnavy text-white">
       <Navigation />
       <div className="pt-28 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
           <div>
-            <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Control Room</span>
+            <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">
+              {isScoutRole ? "Scout console" : "Control Room"}
+            </span>
             <h1 data-testid="admin-title" className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.95]">
-              Admin dashboard
+              {isScoutRole ? "Scout dashboard" : "Admin dashboard"}
             </h1>
+            {isScoutRole && (
+              <p className="mt-3 text-sm text-white/55 max-w-xl">
+                Welcome back. Review unlocked reports below — deliver your written assessment and reply to player questions in the chat thread.
+              </p>
+            )}
           </div>
 
           {/* Tabs */}
@@ -205,29 +263,100 @@ export default function AdminPage() {
               )}
 
               {activeTab === "users" && (
-                <div className="border border-white/10 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-volt text-deepnavy uppercase text-xs tracking-widest font-bold">
-                      <tr>
-                        <th className="p-3 text-left">Name</th>
-                        <th className="p-3 text-left">Email</th>
-                        <th className="p-3 text-left">Role</th>
-                        <th className="p-3 text-left">Joined</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((u) => (
-                        <tr key={u.id} className="bg-surface border-t border-white/5">
-                          <td className="p-3 text-white">{u.full_name}</td>
-                          <td className="p-3 text-white/70 text-xs">{u.email}</td>
-                          <td className="p-3">
-                            <span className={`uppercase text-xs font-bold tracking-widest ${u.role === "admin" ? "text-volt" : "text-white/50"}`}>{u.role}</span>
-                          </td>
-                          <td className="p-3 text-white/60 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
+                <div className="space-y-4">
+                  {/* Filter pills + Add Scout button */}
+                  <div className="flex flex-wrap items-center gap-3 justify-between">
+                    <div className="flex flex-wrap gap-2" data-testid="admin-users-filter">
+                      {["all", "free", "premium", "scout", "admin"].map((seg) => {
+                        const count = seg === "all" ? users.length : users.filter((u) => u.segment === seg).length;
+                        const active = userSegment === seg;
+                        const m = SEGMENT_META[seg];
+                        return (
+                          <button
+                            key={seg}
+                            onClick={() => setUserSegment(seg)}
+                            data-testid={`admin-users-segment-${seg}`}
+                            className={`px-4 py-2 uppercase tracking-widest text-[10px] font-bold border transition-colors ${
+                              active
+                                ? "bg-volt text-deepnavy border-volt"
+                                : "bg-surface text-white/60 border-white/10 hover:border-white/30 hover:text-white"
+                            }`}
+                          >
+                            {m.label} <span className={`ml-1.5 ${active ? "text-deepnavy/70" : "text-white/40"}`}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setShowCreateScout(true)}
+                      data-testid="admin-add-scout-btn"
+                      className="inline-flex items-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Add scout
+                    </button>
+                  </div>
+
+                  <div className="border border-white/10 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-volt text-deepnavy uppercase text-xs tracking-widest font-bold">
+                        <tr>
+                          <th className="p-3 text-left">Name</th>
+                          <th className="p-3 text-left">Email</th>
+                          <th className="p-3 text-left">Segment</th>
+                          <th className="p-3 text-left">Reports</th>
+                          <th className="p-3 text-left">Joined</th>
+                          <th className="p-3 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {users
+                          .filter((u) => userSegment === "all" || u.segment === userSegment)
+                          .map((u) => {
+                            const isSelf = u.id === currentUser?.id;
+                            const canDelete = u.role !== "admin" && !isSelf;
+                            const segIcon = u.segment === "premium" ? <Crown className="w-3 h-3" /> :
+                                            u.segment === "scout"   ? <UserCheck className="w-3 h-3" /> :
+                                            u.segment === "admin"   ? <ShieldCheck className="w-3 h-3" /> :
+                                                                       null;
+                            return (
+                              <tr key={u.id} data-testid={`admin-user-row-${u.id}`} className="bg-surface border-t border-white/5">
+                                <td className="p-3 text-white">{u.full_name}</td>
+                                <td className="p-3 text-white/70 text-xs">{u.email}</td>
+                                <td className="p-3">
+                                  <span className={`inline-flex items-center gap-1 uppercase text-xs font-bold tracking-widest ${SEGMENT_META[u.segment]?.color || "text-white/50"}`}>
+                                    {segIcon}
+                                    {u.segment}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-white/70 text-xs">{u.report_count ?? 0}</td>
+                                <td className="p-3 text-white/60 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
+                                <td className="p-3 text-right">
+                                  {canDelete ? (
+                                    <button
+                                      onClick={() => handleDeleteUser(u)}
+                                      disabled={deletingUserId === u.id}
+                                      data-testid={`admin-delete-user-${u.id}`}
+                                      title="Delete user"
+                                      className="text-red-400 hover:bg-red-400 hover:text-deepnavy p-2 transition-colors disabled:opacity-40"
+                                    >
+                                      {deletingUserId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                    </button>
+                                  ) : (
+                                    <span className="text-white/30 text-[10px] uppercase tracking-widest">
+                                      {isSelf ? "you" : "protected"}
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        {users.filter((u) => userSegment === "all" || u.segment === userSegment).length === 0 && (
+                          <tr><td colSpan="6" className="p-8 text-center text-white/40 bg-surface">No users in this segment.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
@@ -299,6 +428,167 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <CreateScoutModal
+        open={showCreateScout}
+        onClose={() => setShowCreateScout(false)}
+        onCreated={() => {
+          setShowCreateScout(false);
+          setUserSegment("scout");
+          load();
+        }}
+      />
+    </div>
+  );
+}
+
+// ============== Create Scout Modal ==============
+
+function CreateScoutModal({ open, onClose, onCreated }) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setFullName("");
+      setEmail("");
+      setPassword("");
+      setShowPwd(false);
+      setSubmitting(false);
+    }
+  }, [open]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!fullName.trim() || !email.trim() || password.length < 6) {
+      toast.error("Name, email and password (min 6 chars) are required.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post("/admin/scouts", {
+        email: email.trim().toLowerCase(),
+        password,
+        full_name: fullName.trim(),
+      });
+      toast.success(`Scout ${email} created — they can now log in and answer reports.`);
+      onCreated && onCreated();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Couldn't create scout.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      data-testid="create-scout-modal"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-deepnavy/85 backdrop-blur-md px-4 py-6"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md border-2 border-volt/30 bg-surface/95 backdrop-blur-2xl"
+        style={{ boxShadow: "0 0 80px rgba(204,255,0,0.18)" }}
+      >
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/8">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-volt/10 border border-volt/40 flex items-center justify-center">
+              <UserCheck className="w-4 h-4 text-volt" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Scout / Agent</div>
+              <div className="font-barlow font-black uppercase text-white text-base leading-tight mt-0.5">
+                Add new scout
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            data-testid="create-scout-close"
+            className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-volt transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="px-6 py-5 space-y-4">
+          <p className="text-xs text-white/55 leading-relaxed">
+            Scouts log in and respond to unlocked reports. They can deliver the initial review and chat with the player —
+            they cannot see other admin tabs, payments, or users.
+          </p>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+              Full name
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="e.g. Marco Vasquez"
+              data-testid="create-scout-name"
+              className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="scout@scoutmeplay.com"
+              data-testid="create-scout-email"
+              className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+              Temporary password
+            </label>
+            <div className="relative">
+              <input
+                type={showPwd ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                data-testid="create-scout-password"
+                className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 pr-10 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                tabIndex={-1}
+              >
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-white/40">Share this with the scout securely. They can change it later via the profile settings (future feature).</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            data-testid="create-scout-submit"
+            className="w-full inline-flex items-center justify-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-5 py-3 transition-colors disabled:opacity-50"
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+            Create scout
+          </button>
+        </form>
       </div>
     </div>
   );

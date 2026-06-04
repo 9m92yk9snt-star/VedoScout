@@ -195,6 +195,13 @@ async def get_current_admin(user=Depends(get_current_user)):
     return user
 
 
+async def get_current_admin_or_scout(user=Depends(get_current_user)):
+    """Used by agent-review endpoints — both admins and scouts can review reports."""
+    if user.get("role") not in ("admin", "scout"):
+        raise HTTPException(status_code=403, detail="Admin or scout access required")
+    return user
+
+
 # ============== GEMINI ANALYSIS ==============
 
 CONTENT_GATE_PROMPT = """You are a strict video content validator for a professional football scouting service. A short video clip and a reference frame (player marked with a bright green circle and "THIS PLAYER" label) are provided. Look at them and decide whether this submission can be analysed.
@@ -1143,7 +1150,7 @@ async def user_send_agent_message(report_id: str, payload: AgentMessageSubmit, u
 # ============== AGENT REVIEW (admin / scout side) ==============
 
 @api_router.get("/admin/agent-queue")
-async def admin_agent_queue(_=Depends(get_current_admin)):
+async def admin_agent_queue(_=Depends(get_current_admin_or_scout)):
     """All unlocked reports with their agent review state — oldest pending first."""
     cursor = db.reports.find(
         {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
@@ -1172,7 +1179,7 @@ async def admin_agent_queue(_=Depends(get_current_admin)):
 
 
 @api_router.put("/admin/reports/{report_id}/agent-review")
-async def admin_deliver_review(report_id: str, payload: AgentReviewSubmit, admin=Depends(get_current_admin)):
+async def admin_deliver_review(report_id: str, payload: AgentReviewSubmit, admin=Depends(get_current_admin_or_scout)):
     doc = await db.reports.find_one({"id": report_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -1189,7 +1196,7 @@ async def admin_deliver_review(report_id: str, payload: AgentReviewSubmit, admin
 
 
 @api_router.post("/admin/reports/{report_id}/agent-messages")
-async def admin_send_agent_message(report_id: str, payload: AgentMessageSubmit, admin=Depends(get_current_admin)):
+async def admin_send_agent_message(report_id: str, payload: AgentMessageSubmit, admin=Depends(get_current_admin_or_scout)):
     doc = await db.reports.find_one({"id": report_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -2035,8 +2042,114 @@ async def admin_stats(_=Depends(get_current_admin)):
 
 @api_router.get("/admin/users")
 async def admin_users(_=Depends(get_current_admin)):
+    """Returns all users enriched with computed `segment` field:
+    - admin     : role == admin
+    - scout     : role == scout
+    - premium   : role == user AND (prepaid_uploads > 0 OR has at least 1 paid report)
+    - free      : role == user AND none of the above
+    """
     docs = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
-    return docs
+    # collect emails with paid reports in a single pass
+    paid_emails = set()
+    async for r in db.reports.find(
+        {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
+        {"_id": 0, "user_email": 1},
+    ):
+        if r.get("user_email"):
+            paid_emails.add(r["user_email"].lower())
+    # paid-report counts per user_id for richer display
+    report_counts: Dict[str, int] = {}
+    async for r in db.reports.find({}, {"_id": 0, "user_id": 1}):
+        if r.get("user_id"):
+            report_counts[r["user_id"]] = report_counts.get(r["user_id"], 0) + 1
+    out = []
+    for u in docs:
+        role = u.get("role") or "user"
+        if role == "admin":
+            seg = "admin"
+        elif role == "scout":
+            seg = "scout"
+        elif int(u.get("prepaid_uploads", 0) or 0) > 0 or (u.get("email", "").lower() in paid_emails):
+            seg = "premium"
+        else:
+            seg = "free"
+        u["segment"] = seg
+        u["report_count"] = report_counts.get(u.get("id"), 0)
+        out.append(u)
+    return out
+
+
+# ============== ADMIN — USER MANAGEMENT ==============
+
+class ScoutCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    full_name: str = Field(min_length=2, max_length=100)
+
+
+@api_router.post("/admin/scouts", status_code=201)
+async def admin_create_scout(payload: ScoutCreate, admin=Depends(get_current_admin)):
+    """Create a new scout (agent) account that can respond to reports."""
+    email = payload.email.lower().strip()
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+    scout = {
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "full_name": payload.full_name.strip(),
+        "role": "scout",
+        "created_at": now_iso(),
+        "created_by_admin": admin["id"],
+    }
+    await db.users.insert_one(scout)
+    return {
+        "id": scout["id"],
+        "email": scout["email"],
+        "full_name": scout["full_name"],
+        "role": "scout",
+        "created_at": scout["created_at"],
+    }
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, admin=Depends(get_current_admin)):
+    """Delete any user (free, premium, scout). Admin accounts cannot be deleted.
+    Cascades: removes the user's reports + uploaded video/marker files + PDFs.
+    Payment transactions are kept (audit trail) but the user_id reference remains.
+    """
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="Admin accounts cannot be deleted")
+    if target["id"] == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    # Cascade-delete the user's reports + files
+    reports_deleted = 0
+    async for r in db.reports.find({"user_id": user_id}, {"_id": 0, "id": 1, "video_filename": 1, "poster_filename": 1, "marker_filename": 1}):
+        for fname_key in ("video_filename", "poster_filename", "marker_filename"):
+            fname = r.get(fname_key)
+            if fname:
+                try:
+                    (UPLOAD_DIR / fname).unlink(missing_ok=True)
+                except Exception:
+                    pass
+        try:
+            (PDF_DIR / f"{r['id']}.pdf").unlink(missing_ok=True)
+        except Exception:
+            pass
+        reports_deleted += 1
+    await db.reports.delete_many({"user_id": user_id})
+    await db.users.delete_one({"id": user_id})
+    return {
+        "status": "deleted",
+        "email": target.get("email"),
+        "role": target.get("role"),
+        "reports_deleted": reports_deleted,
+    }
 
 
 @api_router.get("/admin/reports")

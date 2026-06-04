@@ -15,7 +15,7 @@ import DashboardPage from "@/pages/DashboardPage";
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== "admin") return <Navigate to="/dashboard" replace />;
+  if (adminOnly && user.role !== "admin" && user.role !== "scout") return <Navigate to="/dashboard" replace />;
   return children;
 }
 

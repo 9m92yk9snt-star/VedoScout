@@ -40,6 +40,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - ✅ **🔴 LIVE MODE ACTIVATED** — `pk_live_51SlanqPyHKLMizP3...` + `sk_live_51SlanqPyHKLMizP3...` in `/app/backend/.env`. Account: `MENTALSKIDS 1M BOLDE` (DK, charges_enabled, payouts_enabled). Verified end-to-end: real `cs_live_...` session created via our API and confirmed `livemode: true`.
 - ✅ **Real Stripe webhook handler** at `/api/webhook/stripe-embedded` uses `stripe.Webhook.construct_event` with `STRIPE_WEBHOOK_SECRET`. Credits `prepaid_uploads` and marks reports paid even if the user closes their tab right after paying.
 - ✅ **Apple Pay + Google Pay + Link + PayPal enabled** for `scout-ai-pro-1.preview.emergentagent.com`. Domain registered via `stripe.PaymentMethodDomain.create()`. Verification file served from `/app/frontend/public/.well-known/apple-developer-merchantid-domain-association`. Wallets auto-surface in embedded checkout for compatible browsers (iOS/macOS Safari with Apple Wallet → Apple Pay button; Chrome+Android with Google Wallet → Google Pay button).
+- ✅ **Admin user management**:
+  - `/api/admin/users` now returns enriched users with `segment` (free / premium / scout / admin) and `report_count` fields.
+  - `DELETE /api/admin/users/{user_id}` — cascade-deletes user + their reports + uploaded files. Admin accounts and self-deletion are blocked.
+  - Admin UI: Users tab redesigned with **segment filter pills** (All / Free / Premium / Scouts / Admins with live counts), per-user **delete buttons**, segment icons, and report counts.
+- ✅ **Scouts (agents) system**:
+  - New role `scout`. `POST /api/admin/scouts` creates a scout account (admin only).
+  - Scouts can log in and access `/admin` — but only see the **Scout Queue tab** (other tabs are role-gated server- and client-side).
+  - `/api/admin/agent-queue`, `agent-review` deliver, and `agent-messages` endpoints now use `get_current_admin_or_scout` so scouts can deliver reviews and chat with players.
+  - Admin UI: "Add Scout" button + modal (name / email / password) on the Users tab.
 
 ## Implemented Previously (Phase 1 — Feb 2026)
 - ✅ Landing page (Hero, How It Works, What You Receive, Sample Preview, Trust, CTA)
@@ -90,12 +99,18 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - `POST /api/payments/prepay-upload` — legacy redirect
 - `POST /api/payments/checkout` — legacy redirect (unlock report)
 - `GET /api/payments/status/{session_id}` — legacy
-- `POST /api/payments/embedded/prepay-upload` — NEW embedded (returns `client_secret`)
-- `POST /api/payments/embedded/unlock` — NEW embedded (returns `client_secret`)
-- `GET /api/payments/embedded/status/{session_id}` — NEW
-- `GET /api/config/stripe` — NEW public config (publishable_key + embedded_available)
-- `POST /api/webhook/stripe`
-- `PUT /api/admin/price`, `GET /api/admin/stats`, etc.
+- `POST /api/payments/embedded/prepay-upload` — embedded (returns `client_secret`)
+- `POST /api/payments/embedded/unlock` — embedded (returns `client_secret`)
+- `GET /api/payments/embedded/status/{session_id}` — embedded
+- `GET /api/config/stripe` — public config (publishable_key + embedded_available)
+- `POST /api/webhook/stripe`, `POST /api/webhook/stripe-embedded`
+- `PUT /api/admin/price`, `GET /api/admin/stats`
+- `GET /api/admin/users` — enriched with `segment` and `report_count`
+- `DELETE /api/admin/users/{user_id}` — cascade-deletes user + reports + files
+- `POST /api/admin/scouts` — create a scout/agent account
+- `GET /api/admin/agent-queue` (admin **or** scout) — unlocked reports awaiting review
+- `PUT /api/admin/reports/{id}/agent-review` (admin **or** scout) — deliver written review
+- `POST /api/admin/reports/{id}/agent-messages` (admin **or** scout) — chat with player
 
 ## DB Collections
 - `users` — `{id, email, hashed_password, role, free_preview_used, prepaid_uploads}`
