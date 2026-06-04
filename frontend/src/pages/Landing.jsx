@@ -13,6 +13,7 @@ import {
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
   Lightbulb, Crown, Calendar, Dumbbell, Mail, Send,
 } from "lucide-react";
+import PaymentBadges from "@/components/PaymentBadges";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -433,7 +434,14 @@ export default function Landing() {
 
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={4}
-                className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-ink/55"
+                className="mt-5 flex items-center"
+              >
+                <PaymentBadges variant="compact" />
+              </motion.div>
+
+              <motion.div
+                initial="hidden" animate="visible" variants={fadeUp} custom={5}
+                className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-ink/55"
               >
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
                 <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> ${price} USD · one-time</span>
@@ -1045,6 +1053,9 @@ export default function Landing() {
                 <p className="mt-3 text-[10px] text-ink/50 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
                 </p>
+                <div className="mt-4 pt-4 border-t border-gray-border flex justify-center">
+                  <PaymentBadges variant="compact" />
+                </div>
               </motion.div>
             </div>
           </div>
@@ -1095,6 +1106,9 @@ export default function Landing() {
               {startLabel}
               <ArrowRight className="w-5 h-5" />
             </Link>
+            <div className="mt-5 flex justify-center">
+              <PaymentBadges variant="compact" />
+            </div>
           </div>
         </div>
       </section>

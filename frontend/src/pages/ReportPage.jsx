@@ -14,6 +14,7 @@ import {
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
+import PaymentBadges from "@/components/PaymentBadges";
 
 /* Visual treatment for confidence badges (high / medium / low). */
 const CONFIDENCE_STYLES = {
@@ -637,6 +638,9 @@ export default function ReportPage() {
                       {unlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
                       Unlock for ${price} USD
                     </button>
+                    <div className="mt-3">
+                      <PaymentBadges variant="compact" />
+                    </div>
                   </div>
                 </div>
               ) : (

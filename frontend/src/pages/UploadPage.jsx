@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
+import PaymentBadges from "@/components/PaymentBadges";
 import api from "@/lib/api";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap } from "lucide-react";
 
@@ -529,6 +530,9 @@ export default function UploadPage() {
                   <p className="mt-3 text-[11px] text-ink/50 uppercase tracking-[0.2em] font-bold">
                     Secure Stripe checkout · one-time payment · no subscriptions
                   </p>
+                  <div className="mt-3">
+                    <PaymentBadges variant="compact" />
+                  </div>
                 </div>
                 <div className="md:col-span-1 text-center md:text-right">
                   <div className="inline-block bg-cream-card/90 border border-volt/30 p-6">
