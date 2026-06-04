@@ -1215,55 +1215,288 @@ async def admin_send_agent_message(report_id: str, payload: AgentMessageSubmit, 
 
 # ============== PDF GENERATION ==============
 
+"""
+============== PREMIUM PDF GENERATOR ==============
+
+Cream paper · forest accents · ink text · Helvetica-Bold for headlines.
+Designed to feel like a high-end coaching-academy printed report — not a screenshot.
+"""
+
+# Brand palette (mirrors the website tokens)
+_PDF_CREAM   = HexColor("#F4EFE6")  # page background
+_PDF_CREAM_S = HexColor("#EAE3D2")  # alternating row
+_PDF_CARD    = HexColor("#FFFFFF")
+_PDF_FOREST  = HexColor("#1F4F2F")
+_PDF_FOREST_POP = HexColor("#2D6B3D")
+_PDF_INK     = HexColor("#0A0F0D")
+_PDF_MUTED   = HexColor("#4B5563")
+_PDF_BORDER  = HexColor("#E5E7EB")
+
+
 def _pdf_styles():
     styles = getSampleStyleSheet()
-    accent = HexColor("#CCFF00")
-    muted = HexColor("#94A3B8")
-    white_c = HexColor("#FFFFFF")
-    styles.add(ParagraphStyle(name="HeroTitle", fontName="Helvetica-Bold", fontSize=28, leading=32, textColor=white_c, spaceAfter=6))
-    styles.add(ParagraphStyle(name="HeroSub", fontName="Helvetica", fontSize=11, leading=14, textColor=muted, spaceAfter=18))
-    styles.add(ParagraphStyle(name="SectionTitle", fontName="Helvetica-Bold", fontSize=16, leading=20, textColor=accent, spaceBefore=14, spaceAfter=8))
-    styles.add(ParagraphStyle(name="SubTitle", fontName="Helvetica-Bold", fontSize=12, leading=16, textColor=white_c, spaceBefore=8, spaceAfter=4))
-    styles.add(ParagraphStyle(name="BodyW", fontName="Helvetica", fontSize=10, leading=14, textColor=white_c, spaceAfter=6))
-    styles.add(ParagraphStyle(name="MutedW", fontName="Helvetica", fontSize=9, leading=12, textColor=muted, spaceAfter=4))
-    styles.add(ParagraphStyle(name="Label", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=muted, spaceAfter=2))
+    styles.add(ParagraphStyle(
+        name="Eyebrow", fontName="Helvetica-Bold", fontSize=8, leading=11,
+        textColor=_PDF_FOREST, letterSpacing=2, spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="HeroTitle", fontName="Helvetica-Bold", fontSize=40, leading=42,
+        textColor=_PDF_INK, spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="HeroSub", fontName="Helvetica", fontSize=10.5, leading=14,
+        textColor=_PDF_MUTED, spaceAfter=14,
+    ))
+    styles.add(ParagraphStyle(
+        name="SectionTitle", fontName="Helvetica-Bold", fontSize=18, leading=22,
+        textColor=_PDF_INK, spaceBefore=18, spaceAfter=10,
+    ))
+    styles.add(ParagraphStyle(
+        name="SectionEyebrow", fontName="Helvetica-Bold", fontSize=8, leading=10,
+        textColor=_PDF_FOREST, letterSpacing=2.4, spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="SubTitle", fontName="Helvetica-Bold", fontSize=11.5, leading=15,
+        textColor=_PDF_INK, spaceBefore=10, spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="BodyW", fontName="Helvetica", fontSize=10, leading=14.5,
+        textColor=_PDF_INK, spaceAfter=6,
+    ))
+    styles.add(ParagraphStyle(
+        name="BodyMuted", fontName="Helvetica", fontSize=9.5, leading=14,
+        textColor=_PDF_MUTED, spaceAfter=6,
+    ))
+    styles.add(ParagraphStyle(
+        name="MutedW", fontName="Helvetica-Oblique", fontSize=8.5, leading=11.5,
+        textColor=_PDF_MUTED, spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="Label", fontName="Helvetica-Bold", fontSize=8, leading=10,
+        textColor=_PDF_FOREST, spaceAfter=3,
+    ))
+    styles.add(ParagraphStyle(
+        name="QuoteLead", fontName="Helvetica-Bold", fontSize=14, leading=20,
+        textColor=_PDF_INK, spaceBefore=10, spaceAfter=8,
+    ))
+    styles.add(ParagraphStyle(
+        name="CoverFootnote", fontName="Helvetica", fontSize=8, leading=11,
+        textColor=_PDF_MUTED, alignment=TA_LEFT, spaceAfter=2,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForestBullet", fontName="Helvetica", fontSize=10, leading=14.5,
+        textColor=_PDF_INK, leftIndent=12, bulletIndent=0, spaceAfter=4,
+    ))
     return styles
 
 
 def _draw_background(canv, doc):
+    """Cream page + forest accent rail on the left + page numbers + brand footer."""
     canv.saveState()
-    canv.setFillColor(HexColor("#050A0F"))
-    canv.rect(0, 0, doc.pagesize[0], doc.pagesize[1], fill=1, stroke=0)
-    canv.setFillColor(HexColor("#CCFF00"))
+    w, h = doc.pagesize
+
+    # Cream page background
+    canv.setFillColor(_PDF_CREAM)
+    canv.rect(0, 0, w, h, fill=1, stroke=0)
+
+    # Subtle forest vertical rail on the left (the "spine")
+    canv.setFillColor(_PDF_FOREST)
+    canv.rect(0, 0, 0.18 * cm, h, fill=1, stroke=0)
+
+    # Top-right brand mark
+    canv.setFillColor(_PDF_INK)
     canv.setFont("Helvetica-Bold", 8)
-    canv.drawString(2 * cm, 1 * cm, "ELITE SCOUT // PROFESSIONAL PLAYER ANALYSIS")
-    canv.setFillColor(HexColor("#94A3B8"))
-    canv.drawRightString(doc.pagesize[0] - 2 * cm, 1 * cm, f"Page {doc.page}")
+    canv.drawRightString(w - 1.6 * cm, h - 1.0 * cm, "SCOUTMEPLAY")
+    canv.setFillColor(_PDF_FOREST)
+    canv.drawRightString(w - 0.65 * cm, h - 1.0 * cm, "·")
+
+    # Footer line + brand + page number
+    canv.setStrokeColor(_PDF_BORDER)
+    canv.setLineWidth(0.4)
+    canv.line(1.6 * cm, 1.55 * cm, w - 1.6 * cm, 1.55 * cm)
+
+    canv.setFillColor(_PDF_FOREST)
+    canv.setFont("Helvetica-Bold", 7.5)
+    canv.drawString(1.6 * cm, 1.05 * cm, "SCOUTMEPLAY · MENTALKIDS")
+    canv.setFillColor(_PDF_MUTED)
+    canv.setFont("Helvetica", 7.5)
+    canv.drawString(5.4 * cm, 1.05 * cm, "Professional player development report")
+    canv.drawRightString(w - 1.6 * cm, 1.05 * cm, f"Page {doc.page}")
+
     canv.restoreState()
 
 
+def _draw_cover_background(canv, doc):
+    """Cover page background: cream + large forest panel on the left,
+    big ScoutMePlay wordmark at the top.
+    """
+    canv.saveState()
+    w, h = doc.pagesize
+
+    # Cream base
+    canv.setFillColor(_PDF_CREAM)
+    canv.rect(0, 0, w, h, fill=1, stroke=0)
+
+    # Forest left panel (1/3 width)
+    panel_w = w * 0.34
+    canv.setFillColor(_PDF_FOREST)
+    canv.rect(0, 0, panel_w, h, fill=1, stroke=0)
+
+    # Subtle diagonal accent stripe on the forest panel
+    canv.setFillColor(_PDF_FOREST_POP)
+    canv.rect(panel_w - 0.45 * cm, 0, 0.45 * cm, h, fill=1, stroke=0)
+
+    # Top-of-page brand wordmark on the forest panel (rotated 90deg, runs vertically)
+    canv.setFillColor(HexColor("#FFFFFF"))
+    canv.setFont("Helvetica-Bold", 11)
+    canv.saveState()
+    canv.translate(1.6 * cm, h - 2.2 * cm)
+    canv.rotate(-90)
+    canv.drawString(0, 0, "SCOUTMEPLAY")
+    canv.restoreState()
+    # tagline beneath wordmark (also rotated)
+    canv.setFillColor(HexColor("#FFFFFFAA"))
+    canv.setFont("Helvetica", 7)
+    canv.saveState()
+    canv.translate(2.3 * cm, h - 2.2 * cm)
+    canv.rotate(-90)
+    canv.drawString(0, 0, "PROFESSIONAL · INDEPENDENT · EVIDENCE-BASED")
+    canv.restoreState()
+
+    # Bottom-left footer on the green panel
+    canv.setFillColor(HexColor("#FFFFFFAA"))
+    canv.setFont("Helvetica", 7)
+    canv.drawString(1.6 * cm, 1.0 * cm, "MENTALKIDS / Denmark")
+    canv.setFont("Helvetica-Bold", 7)
+    canv.drawString(1.6 * cm, 0.55 * cm, "SCOUTMEPLAY.COM")
+
+    canv.restoreState()
+
+
+# ---- Reusable visual primitives ----
+
+def _section_header(title: str, styles, idx: int = None):
+    """Forest eyebrow + big ink title + thin forest underline.
+    Returned as a Table so the underline visually 'hangs' under the title."""
+    eyebrow_text = f"SECTION {idx:02d}" if idx else "ANALYSIS"
+    eyebrow = Paragraph(eyebrow_text, styles["SectionEyebrow"])
+    head = Paragraph(title, styles["SectionTitle"])
+
+    # underline accent (thin green line)
+    line = Table([[""]], colWidths=[2.4 * cm], rowHeights=[0.07 * cm])
+    line.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), _PDF_FOREST),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    return [eyebrow, head, line, Spacer(1, 0.35 * cm)]
+
+
+def _score_pill(score) -> str:
+    """Inline score formatting for table cells."""
+    try:
+        s = float(score)
+        return f"<font color='#1F4F2F'><b>{s:g}</b></font><font color='#9CA3AF'> / 10</font>"
+    except Exception:
+        return "<font color='#9CA3AF'>—</font>"
+
+
 def _score_table(rows, styles):
-    data = [["Attribute", "Score", "Notes"]]
+    """Premium attribute table with alternating cream rows + forest accents."""
+    data = [["ATTRIBUTE", "SCORE", "NOTES"]]
     for label, score, notes in rows:
         data.append([
-            Paragraph(label, styles["BodyW"]),
-            Paragraph(f"<b>{score}/10</b>", styles["BodyW"]),
-            Paragraph(notes, styles["BodyW"]),
+            Paragraph(f"<b>{label}</b>", styles["BodyW"]),
+            Paragraph(_score_pill(score), styles["BodyW"]),
+            Paragraph(notes or "—", styles["BodyMuted"]),
         ])
-    t = Table(data, colWidths=[4.5 * cm, 2 * cm, 9 * cm])
+    t = Table(data, colWidths=[4.5 * cm, 2.5 * cm, 9 * cm], repeatRows=1)
+    style = [
+        # Header row
+        ("BACKGROUND", (0, 0), (-1, 0), _PDF_FOREST),
+        ("TEXTCOLOR",  (0, 0), (-1, 0), HexColor("#FFFFFF")),
+        ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",   (0, 0), (-1, 0), 8),
+        ("ALIGN",      (0, 0), (-1, 0), "LEFT"),
+        ("ALIGN",      (1, 0), (1, 0),  "CENTER"),
+        # Body
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.25, _PDF_BORDER),
+    ]
+    # Alternate row backgrounds
+    for i in range(1, len(data)):
+        bg = _PDF_CARD if i % 2 == 1 else _PDF_CREAM_S
+        style.append(("BACKGROUND", (0, i), (-1, i), bg))
+    # Score column right-accent
+    style.append(("ALIGN", (1, 1), (1, -1), "CENTER"))
+    t.setStyle(TableStyle(style))
+    return t
+
+
+def _list_bullets(items, styles):
+    """Forest-bulleted list."""
+    flow = []
+    for s in items or []:
+        flow.append(Paragraph(
+            f"<font color='#1F4F2F'><b>▸</b></font>&nbsp;&nbsp;{s}",
+            styles["BodyW"],
+        ))
+    if not flow:
+        flow.append(Paragraph("<font color='#9CA3AF'>No items recorded.</font>", styles["BodyMuted"]))
+    return flow
+
+
+def _kv_card(items, styles):
+    """A 'card' table with bold label + body paragraph rows.
+    `items` is list of (label, value) tuples."""
+    data = []
+    for label, value in items:
+        data.append([
+            Paragraph(f"<b>{label}</b>", styles["Label"]),
+            Paragraph(value or "—", styles["BodyW"]),
+        ])
+    if not data:
+        return Spacer(1, 0)
+    t = Table(data, colWidths=[4.2 * cm, 11.3 * cm])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#CCFF00")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#050A0F")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 9),
-        ("BACKGROUND", (0, 1), (-1, -1), HexColor("#0F1623")),
-        ("TEXTCOLOR", (0, 1), (-1, -1), HexColor("#FFFFFF")),
-        ("GRID", (0, 0), (-1, -1), 0.25, HexColor("#1f2937")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+        ("LINEBEFORE",    (0, 0), (0, -1),  2.0, _PDF_FOREST),
+    ]))
+    return t
+
+
+def _cover_summary_box(overall: str, player_type: str, body: str, styles):
+    """Big quoted highlight on the cover page."""
+    rows = [
+        [Paragraph("OVERALL DEVELOPMENT", styles["Label"]),
+         Paragraph("PLAYER TYPE", styles["Label"])],
+        [Paragraph(f"<font color='#1F4F2F' size='28'><b>{overall}</b></font>"
+                   f"<font color='#9CA3AF' size='14'> /10</font>", styles["BodyW"]),
+         Paragraph(f"<font size='13'><b>{player_type or 'Independent'}</b></font>", styles["BodyW"])],
+    ]
+    t = Table(rows, colWidths=[5.6 * cm, 5.6 * cm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (0, 0),   12),
+        ("TOPPADDING",    (0, 1), (-1, 1),  4),
+        ("BOTTOMPADDING", (0, 1), (-1, 1),  14),
+        ("BOTTOMPADDING", (0, 0), (-1, 0),  0),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
     ]))
     return t
 
@@ -1280,6 +1513,16 @@ def _section_rows(section: dict) -> list:
 
 
 def build_pdf(report_doc: dict, output_path: str):
+    """Builds a premium cream/forest PDF. Document is organised as:
+        Page 1  — Cover (forest panel + player name + score box)
+        Page 2  — Executive Summary + Score Overview
+        Page 3+ — Technical / Tactical / Physical / Mentality (one full section per spread)
+        Page    — Scout View
+        Page    — Potential Assessment
+        Page    — Personal Training Plan (5 drills + weekly + 30/90 day)
+        Page    — Video Comments (if any)
+        Page    — Final Summary + closing
+    """
     full = report_doc["full_report"]
     details = report_doc["player_details"]
     styles = _pdf_styles()
@@ -1287,139 +1530,281 @@ def build_pdf(report_doc: dict, output_path: str):
     doc = SimpleDocTemplate(
         output_path,
         pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
+        leftMargin=1.6 * cm,
+        rightMargin=1.6 * cm,
+        topMargin=1.9 * cm,
+        bottomMargin=2.2 * cm,
+        title=f"ScoutMePlay Report — {details.get('player_name','Player')}",
+        author="ScoutMePlay · Mentalkids",
+        subject="Football Player Development Report",
     )
 
-    story = []
+    # Page templates: the FIRST page uses the cover background (forest panel on left),
+    # SUBSEQUENT pages use the regular cream background with the slim forest rail.
+    from reportlab.platypus.doctemplate import PageTemplate
+    from reportlab.platypus.frames import Frame
 
-    # Cover
-    story.append(Paragraph("ELITE SCOUT", styles["Label"]))
-    story.append(Paragraph(f"{details['player_name'].upper()}", styles["HeroTitle"]))
+    cover_frame = Frame(
+        x1=doc.pagesize[0] * 0.34 + 1.0 * cm,
+        y1=2.0 * cm,
+        width=doc.pagesize[0] * 0.66 - 2.6 * cm,
+        height=doc.pagesize[1] - 4.0 * cm,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0,
+        id="cover",
+    )
+    inner_frame = Frame(
+        x1=1.6 * cm + 0.3 * cm,
+        y1=2.0 * cm,
+        width=doc.pagesize[0] - 3.2 * cm - 0.3 * cm,
+        height=doc.pagesize[1] - 4.0 * cm,
+        leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0,
+        id="inner",
+    )
+    doc.addPageTemplates([
+        PageTemplate(id="Cover", frames=[cover_frame], onPage=_draw_cover_background),
+        PageTemplate(id="Inner", frames=[inner_frame], onPage=_draw_background),
+    ])
+
+    story = []
+    player_name = (details.get("player_name") or "Player").upper()
+    position = (details.get("position") or "").title()
+    age = details.get("age", "—")
+    foot = (details.get("preferred_foot") or "").title() or "—"
+    club = details.get("current_club") or "Independent"
+
+    # ===== COVER =====
+    story.append(Spacer(1, 4 * cm))
+    story.append(Paragraph("SCOUTMEPLAY · PREMIUM PLAYER REPORT", styles["Eyebrow"]))
+    story.append(Spacer(1, 0.15 * cm))
+    story.append(Paragraph(player_name, styles["HeroTitle"]))
+    story.append(Spacer(1, 0.1 * cm))
     story.append(Paragraph(
-        f"{details['position'].title()} · Age {details['age']} · {details['preferred_foot'].title()} foot · {details.get('current_club') or 'Independent'}",
-        styles["HeroSub"],
+        f"<b>{position or '—'}</b> &nbsp;·&nbsp; Age {age} &nbsp;·&nbsp; {foot} foot",
+        styles["BodyW"],
+    ))
+    story.append(Paragraph(club, styles["BodyMuted"]))
+    story.append(Spacer(1, 1.2 * cm))
+
+    overall = full.get("scores", {}).get("overall_development", "—")
+    ptype = full.get("player_type", "Independent")
+    story.append(_cover_summary_box(str(overall), ptype, "", styles))
+    story.append(Spacer(1, 0.8 * cm))
+
+    # Executive paragraph teaser on the cover — show only the FIRST clean sentence
+    # so it never appears truncated. The full summary is on page 2.
+    exec_summary = full.get("executive_summary", "")
+    if exec_summary:
+        snippet = exec_summary.strip()
+        # Take just the first sentence (clean break, never mid-word)
+        for sep in (". ", "! ", "? "):
+            if sep in snippet:
+                snippet = snippet.split(sep, 1)[0] + sep.strip()
+                break
+        if len(snippet) > 220:
+            snippet = snippet[:217].rsplit(" ", 1)[0] + "…"
+        story.append(Paragraph("EXECUTIVE SUMMARY", styles["Eyebrow"]))
+        story.append(Paragraph(snippet, styles["QuoteLead"]))
+
+    story.append(Spacer(1, 1.0 * cm))
+    story.append(Paragraph(
+        f"Issued by SCOUTMEPLAY · Mentalkids &nbsp;·&nbsp; {datetime.now(timezone.utc).strftime('%d %B %Y')}",
+        styles["CoverFootnote"],
+    ))
+    story.append(Paragraph(
+        "Independent player development analysis. Not a recruitment guarantee.",
+        styles["MutedW"],
     ))
 
-    overall = full.get("scores", {}).get("overall_development", "-")
-    story.append(Paragraph(f"<b>Overall Development Score:</b> {overall}/10", styles["BodyW"]))
-    story.append(Paragraph(f"<b>Player Type:</b> {full.get('player_type', '-')}", styles["BodyW"]))
-    story.append(Spacer(1, 0.4 * cm))
-
-    # Executive Summary
-    story.append(Paragraph("EXECUTIVE SUMMARY", styles["SectionTitle"]))
-    story.append(Paragraph(full.get("executive_summary", ""), styles["BodyW"]))
-
-    # Overall scores
-    story.append(Paragraph("SCORE OVERVIEW", styles["SectionTitle"]))
-    sc = full.get("scores", {})
-    score_rows = [
-        ("Technical", sc.get("technical", "-"), "Composite technical ability"),
-        ("Tactical", sc.get("tactical", "-"), "Composite tactical intelligence"),
-        ("Physical", sc.get("physical", "-"), "Composite physical attributes"),
-        ("Mentality", sc.get("mentality", "-"), "Composite mental attributes"),
-        ("Overall Development", sc.get("overall_development", "-"), "Overall development indicator"),
-    ]
-    story.append(_score_table(score_rows, styles))
+    # Switch to inner template starting from page 2
+    from reportlab.platypus import NextPageTemplate
+    story.append(NextPageTemplate("Inner"))
     story.append(PageBreak())
 
-    # Technical
-    if "technical" in full:
-        story.append(Paragraph("TECHNICAL ANALYSIS", styles["SectionTitle"]))
-        story.append(_score_table(_section_rows(full["technical"]), styles))
+    # ===== PAGE 2 — EXECUTIVE SUMMARY + SCORE OVERVIEW =====
+    story += _section_header("Executive summary", styles, idx=1)
+    story.append(Paragraph(exec_summary or "Not provided.", styles["BodyW"]))
+    story.append(Spacer(1, 0.8 * cm))
 
-    # Tactical
+    story += _section_header("Score overview", styles, idx=2)
+    sc = full.get("scores", {}) or {}
+    score_rows = [
+        ("Technical",            sc.get("technical"),           "Composite technical ability"),
+        ("Tactical",             sc.get("tactical"),            "Composite tactical intelligence"),
+        ("Physical",             sc.get("physical"),            "Composite physical attributes"),
+        ("Mentality",            sc.get("mentality"),           "Composite mental attributes"),
+        ("Overall development",  sc.get("overall_development"), "Holistic developmental indicator"),
+    ]
+    story.append(_score_table(score_rows, styles))
+
+    story.append(PageBreak())
+
+    # ===== TECHNICAL & TACTICAL =====
+    if "technical" in full:
+        story += _section_header("Technical analysis", styles, idx=3)
+        story.append(_score_table(_section_rows(full["technical"]), styles))
+        story.append(Spacer(1, 0.7 * cm))
+
     if "tactical" in full:
-        story.append(Paragraph("TACTICAL ANALYSIS", styles["SectionTitle"]))
+        story += _section_header("Tactical analysis", styles, idx=4)
         story.append(_score_table(_section_rows(full["tactical"]), styles))
 
     story.append(PageBreak())
 
-    # Physical
+    # ===== PHYSICAL & MENTALITY =====
     if "physical" in full:
-        story.append(Paragraph("PHYSICAL ANALYSIS", styles["SectionTitle"]))
+        story += _section_header("Physical analysis", styles, idx=5)
         story.append(_score_table(_section_rows(full["physical"]), styles))
+        story.append(Spacer(1, 0.7 * cm))
 
-    # Mentality
     if "mentality" in full:
-        story.append(Paragraph("MENTALITY ANALYSIS", styles["SectionTitle"]))
+        story += _section_header("Mentality analysis", styles, idx=6)
         story.append(_score_table(_section_rows(full["mentality"]), styles))
 
     story.append(PageBreak())
 
-    # Scout View
+    # ===== SCOUT VIEW =====
     if "scout_view" in full:
-        sv = full["scout_view"]
-        story.append(Paragraph("SCOUT VIEW · HOW A SCOUT MIGHT ASSESS THIS PLAYER", styles["SectionTitle"]))
-        story.append(Paragraph("Key Strengths", styles["SubTitle"]))
-        for s in sv.get("key_strengths", []):
-            story.append(Paragraph(f"• {s}", styles["BodyW"]))
-        story.append(Paragraph("Areas of Concern", styles["SubTitle"]))
-        for s in sv.get("areas_of_concern", []):
-            story.append(Paragraph(f"• {s}", styles["BodyW"]))
-        story.append(Paragraph("Development Priorities", styles["SubTitle"]))
-        for s in sv.get("development_priorities", []):
-            story.append(Paragraph(f"• {s}", styles["BodyW"]))
-        story.append(Paragraph("Appropriate Next Competitive Level", styles["SubTitle"]))
-        story.append(Paragraph(sv.get("appropriate_next_level", ""), styles["BodyW"]))
-        story.append(Paragraph("Positional Suitability", styles["SubTitle"]))
-        story.append(Paragraph(sv.get("positional_suitability", ""), styles["BodyW"]))
-        story.append(Spacer(1, 0.2 * cm))
+        sv = full["scout_view"] or {}
+        story += _section_header("Scout view — how a scout might assess this player", styles, idx=7)
+
+        story.append(Paragraph("KEY STRENGTHS", styles["Label"]))
+        story += _list_bullets(sv.get("key_strengths"), styles)
+        story.append(Spacer(1, 0.35 * cm))
+
+        story.append(Paragraph("AREAS OF CONCERN", styles["Label"]))
+        story += _list_bullets(sv.get("areas_of_concern"), styles)
+        story.append(Spacer(1, 0.35 * cm))
+
+        story.append(Paragraph("DEVELOPMENT PRIORITIES", styles["Label"]))
+        story += _list_bullets(sv.get("development_priorities"), styles)
+        story.append(Spacer(1, 0.4 * cm))
+
+        story.append(_kv_card([
+            ("Next competitive level", sv.get("appropriate_next_level", "")),
+            ("Positional suitability",   sv.get("positional_suitability", "")),
+        ], styles))
+        story.append(Spacer(1, 0.3 * cm))
         story.append(Paragraph(
             "<i>This is an independent development analysis and does not guarantee selection or advancement opportunities.</i>",
             styles["MutedW"],
         ))
 
-    # Potential
+    # ===== POTENTIAL =====
     if "potential_assessment" in full:
-        pa = full["potential_assessment"]
-        story.append(Paragraph("POTENTIAL ASSESSMENT", styles["SectionTitle"]))
-        story.append(Paragraph(f"<b>Current Level:</b> {pa.get('current_level', '')}", styles["BodyW"]))
-        story.append(Paragraph(f"<b>Development Potential:</b> {pa.get('development_potential', '')}", styles["BodyW"]))
-        story.append(Paragraph(f"<b>Recommended Next Step:</b> {pa.get('recommended_next_step', '')}", styles["BodyW"]))
-        story.append(Paragraph(f"<b>3-Month Focus:</b> {pa.get('three_month_focus', '')}", styles["BodyW"]))
+        pa = full["potential_assessment"] or {}
+        story.append(PageBreak())
+        story += _section_header("Potential assessment", styles, idx=8)
+        story.append(_kv_card([
+            ("Current level",            pa.get("current_level", "")),
+            ("Development potential",    pa.get("development_potential", "")),
+            ("Recommended next step",    pa.get("recommended_next_step", "")),
+            ("3-month focus",            pa.get("three_month_focus", "")),
+        ], styles))
 
-    story.append(PageBreak())
-
-    # Training Plan
+    # ===== TRAINING PLAN =====
     if "training_plan" in full:
-        tp = full["training_plan"]
-        story.append(Paragraph("PERSONAL TRAINING PLAN", styles["SectionTitle"]))
-        story.append(Paragraph("Five Specific Exercises", styles["SubTitle"]))
-        for ex in tp.get("exercises", []):
-            story.append(Paragraph(
-                f"<b>{ex.get('name', '')}</b> · {ex.get('duration', '')}<br/>{ex.get('description', '')}",
-                styles["BodyW"],
-            ))
-        story.append(Paragraph("Weekly Focus", styles["SubTitle"]))
-        story.append(Paragraph(tp.get("weekly_focus", ""), styles["BodyW"]))
-        story.append(Paragraph("30-Day Development Plan", styles["SubTitle"]))
-        story.append(Paragraph(tp.get("thirty_day_plan", ""), styles["BodyW"]))
-        story.append(Paragraph("90-Day Development Plan", styles["SubTitle"]))
-        story.append(Paragraph(tp.get("ninety_day_plan", ""), styles["BodyW"]))
+        tp = full["training_plan"] or {}
+        story.append(PageBreak())
+        story += _section_header("Personal training plan", styles, idx=9)
 
-    # Video Comments
-    if "video_comments" in full and full["video_comments"]:
-        story.append(Paragraph("VIDEO COMMENTS", styles["SectionTitle"]))
+        story.append(Paragraph("FIVE FOCUSED EXERCISES", styles["Label"]))
+        exercises = tp.get("exercises", []) or []
+        if exercises:
+            ex_rows = []
+            for i, ex in enumerate(exercises, 1):
+                ex_rows.append([
+                    Paragraph(f"<font color='#1F4F2F'><b>{i:02d}</b></font>", styles["BodyW"]),
+                    Paragraph(
+                        f"<b>{ex.get('name', '—')}</b> &nbsp;·&nbsp; "
+                        f"<font color='#6B7280'>{ex.get('duration', '')}</font><br/>"
+                        f"{ex.get('description', '')}",
+                        styles["BodyW"],
+                    ),
+                ])
+            et = Table(ex_rows, colWidths=[1.0 * cm, 14.5 * cm])
+            et.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+                ("TOPPADDING",    (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+                ("LINEBEFORE",    (0, 0), (0, -1), 2.0, _PDF_FOREST),
+            ]))
+            story.append(et)
+        else:
+            story.append(Paragraph("<font color='#9CA3AF'>No exercises recorded.</font>", styles["BodyMuted"]))
+
+        story.append(Spacer(1, 0.6 * cm))
+        story.append(_kv_card([
+            ("Weekly focus",       tp.get("weekly_focus", "")),
+            ("30-day plan",        tp.get("thirty_day_plan", "")),
+            ("90-day plan",        tp.get("ninety_day_plan", "")),
+        ], styles))
+
+    # ===== VIDEO COMMENTS =====
+    if full.get("video_comments"):
+        story.append(PageBreak())
+        story += _section_header("Video moments", styles, idx=10)
+        vc_rows = []
         for c in full["video_comments"]:
-            story.append(Paragraph(
-                f"<b>{c.get('timestamp', '')}</b> · {c.get('comment', '')}",
-                styles["BodyW"],
-            ))
+            vc_rows.append([
+                Paragraph(f"<font color='#1F4F2F'><b>{c.get('timestamp', '')}</b></font>", styles["BodyW"]),
+                Paragraph(c.get("comment", ""), styles["BodyW"]),
+            ])
+        vct = Table(vc_rows, colWidths=[2.5 * cm, 13.0 * cm])
+        vct.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+            ("TOPPADDING",    (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+        ]))
+        story.append(vct)
 
-    # Final Summary
+    # ===== FINAL SUMMARY =====
     story.append(PageBreak())
-    story.append(Paragraph("FINAL SUMMARY", styles["SectionTitle"]))
-    story.append(Paragraph(full.get("final_summary", ""), styles["BodyW"]))
-    story.append(Spacer(1, 0.5 * cm))
+    story += _section_header("Final summary", styles, idx=11)
+    story.append(Paragraph(full.get("final_summary", "Not provided."), styles["BodyW"]))
+    story.append(Spacer(1, 0.6 * cm))
+
+    # Sign-off card
+    signoff = Table([[
+        Paragraph(
+            "<b>Issued by</b><br/>"
+            "SCOUTMEPLAY · MENTALKIDS<br/>"
+            "Denmark · scoutmeplay@gmail.com",
+            styles["BodyMuted"],
+        ),
+        Paragraph(
+            f"<b>Report ID</b><br/>"
+            f"{report_doc.get('id', '—')}<br/>"
+            f"Generated {datetime.now(timezone.utc).strftime('%d %B %Y')}",
+            styles["BodyMuted"],
+        ),
+    ]], colWidths=[7.7 * cm, 7.8 * cm])
+    signoff.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+        ("TOPPADDING",    (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LINEBEFORE",    (0, 0), (0, -1),  2.0, _PDF_FOREST),
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+    ]))
+    story.append(signoff)
+    story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph(
-        "<i>Scores presented as developmental guidance, not definitive scouting evaluations. Independent feedback only.</i>",
+        "<i>Scores are presented as developmental guidance based on the submitted video, not definitive scouting evaluations. "
+        "ScoutMePlay provides independent feedback only. We do not represent players or contact clubs on your behalf.</i>",
         styles["MutedW"],
     ))
 
-    doc.build(story, onFirstPage=_draw_background, onLaterPages=_draw_background)
+    doc.build(story)
 
 
 @api_router.get("/reports/{report_id}/pdf")

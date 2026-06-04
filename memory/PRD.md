@@ -59,9 +59,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
   - **New Tailwind tokens**: `cream-base` (#F4EFE6 — page background), `cream-soft` (#EAE3D2 — section separators), `cream-card` (#FFFFFF — feature cards), `forest` (#1F4F2F — primary CTA), `forest-pop` (#2D6B3D — hover/accent), `ink` (#0A0F0D — text/headers/navbar), `gray-body` (#4B5563), `gray-border` (#E5E7EB).
   - **Navigation rebuilt**: Black `bg-ink` top bar with green logo, "SCOUT**ME**PLAY" wordmark (ME in forest), tagline "See your game through scout eyes", rounded forest-pill CTA buttons.
   - **Logo refactored** to use `currentColor` so it inherits any parent color (now always forest green on the black navbar).
-  - **Global recolor**: ~600 lines repainted across Landing, Login, Signup, Dashboard, Upload, Report, Admin, About, Privacy, ScoutQueue, ScoutReview, EmbeddedCheckoutModal, CheckoutTransitionModal — all `text-white*` → `text-ink*`, `border-white*` → `border-ink*`/`gray-border`, modal wrappers from `bg-surface` → `bg-cream-card`.
-  - **Forest-green CTA buttons everywhere**: White text on forest background with hover to forest-pop; matches the "UNLOCK FOR $X" button in the mockup.
-  - **Functionality preserved 100%** — payments, Stripe wallets, AI, admin/scouts, uploads, reports, embedded checkout, contact form/email forwarding — all untouched.
+  - **Global recolor**: ~600 lines repainted across Landing, Login, Signup, Dashboard, Upload, Report, Admin, About, Privacy, ScoutQueue, ScoutReview, EmbeddedCheckoutModal, CheckoutTransitionModal.
+  - **Forest-green CTA buttons everywhere**: White text on forest background with hover to forest-pop.
+- ✅ **Premium Scouting PDF redesigned**:
+  - Cream paper · forest left rail · large ink player name on cover · forest panel with vertical "SCOUTMEPLAY" wordmark · brand footer on every page.
+  - 11-page structure: Cover · Executive Summary + Score Overview · Technical + Tactical · Physical + Mentality · Scout View · Potential Assessment · Personal Training Plan (5 exercises with numbered cards + weekly/30/90-day) · Video Moments · Final Summary + Sign-off card.
+  - Reusable PDF primitives: `_section_header(title, idx)` (eyebrow + title + forest underline), `_score_table` (forest header row, alternating cream/white rows, formatted score pills like "8 / 10"), `_kv_card` (white card with thick forest left-border), `_list_bullets` (forest ▸ markers), `_cover_summary_box` (overall score + player type).
+  - All cached PDFs cleared so existing customers re-download the new version automatically.
+  - Visually verified end-to-end via PyMuPDF rasterization + AI analysis — cover + content pages confirmed clean, no truncation, no overlaps.
+  - **Functionality preserved 100%** — payments, Stripe wallets, AI engine, admin/scouts, uploads, contact form/email forwarding — all untouched.
 
 ## Implemented Previously (Phase 1 — Feb 2026)
 - ✅ Landing page (Hero, How It Works, What You Receive, Sample Preview, Trust, CTA)
