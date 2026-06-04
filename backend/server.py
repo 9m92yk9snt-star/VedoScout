@@ -2209,10 +2209,15 @@ async def _forward_contact_to_email(msg: Dict[str, Any]):
     The very first email sent to a new address will instead be an activation email — the
     admin must click the link once to whitelist the address. After that, all future
     emails arrive in their inbox within seconds.
+
+    NOTE: FormSubmit's AJAX endpoint silently rejects requests without Origin/Referer headers
+    (responds 200 with `{"success":"false"}`). We must always send those.
     """
     if not CONTACT_NOTIFY_EMAIL:
         return
     try:
+        # The Origin/Referer must look like a real browser submission for FormSubmit to accept it
+        origin = "https://scout-ai-pro-1.preview.emergentagent.com"
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 f"https://formsubmit.co/ajax/{CONTACT_NOTIFY_EMAIL}",
@@ -2225,11 +2230,27 @@ async def _forward_contact_to_email(msg: Dict[str, Any]):
                     "_template": "table",
                     "_captcha": "false",
                 },
-                headers={"Accept": "application/json"},
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "Origin": origin,
+                    "Referer": f"{origin}/about",
+                    "User-Agent": "ScoutMePlay/1.0 (+https://scoutmeplay.com)",
+                },
             )
+            body = {}
+            try:
+                body = resp.json()
+            except Exception:
+                pass
             if resp.status_code >= 400:
                 logger.warning(
                     f"FormSubmit forward failed ({resp.status_code}) for msg {msg['id']}: {resp.text[:200]}"
+                )
+            elif str(body.get("success")).lower() == "false":
+                # FormSubmit returns 200 even on logical failure — check the JSON
+                logger.warning(
+                    f"FormSubmit rejected msg {msg['id']}: {body.get('message')}"
                 )
             else:
                 logger.info(f"Contact message {msg['id']} forwarded to {CONTACT_NOTIFY_EMAIL}")
