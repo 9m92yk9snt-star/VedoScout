@@ -433,7 +433,7 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-deepnavy text-white">
+    <div className="min-h-screen bg-deepnavy text-ink">
       <Navigation />
       <CheckoutTransitionModal
         open={checkoutModal.open}
@@ -461,7 +461,7 @@ export default function UploadPage() {
             <h1 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.95]" data-testid="upload-title">
               Upload your video & mark your player
             </h1>
-            <p className="mt-3 text-white/60 max-w-2xl text-sm md:text-base">
+            <p className="mt-3 text-ink/65 max-w-2xl text-sm md:text-base">
               Upload the clip, scrub to the best moment, and click on the player. Our scouts then review only that exact player.
             </p>
 
@@ -479,7 +479,7 @@ export default function UploadPage() {
                   </span>
                 )}
                 {eligibility.reason === "admin" && (
-                  <span data-testid="eligibility-admin" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-white/70 border border-white/20 px-3 py-1.5">
+                  <span data-testid="eligibility-admin" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-ink/70 border border-gray-border px-3 py-1.5">
                     Admin · unlimited uploads
                   </span>
                 )}
@@ -499,10 +499,10 @@ export default function UploadPage() {
                   <h2 className="font-barlow font-black uppercase text-3xl md:text-5xl tracking-tighter leading-[0.95]">
                     Ready for your next video?
                   </h2>
-                  <p className="mt-4 text-white/75 leading-relaxed text-sm md:text-base max-w-xl">
+                  <p className="mt-4 text-ink/75 leading-relaxed text-sm md:text-base max-w-xl">
                     Pre-pay <span className="text-volt font-bold">${price} USD</span> to upload your next clip — your full premium report unlocks the moment analysis finishes. No second checkout. No subscriptions.
                   </p>
-                  <ul className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-white/80">
+                  <ul className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-ink/80">
                     {[
                       "Full 11-section premium report",
                       "Evidence + confidence per category",
@@ -520,21 +520,21 @@ export default function UploadPage() {
                     onClick={handlePrepayUpload}
                     disabled={prepaying}
                     data-testid="upload-prepay-btn"
-                    className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-7 py-4 transition-colors disabled:opacity-60"
+                    className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-7 py-4 transition-colors disabled:opacity-60"
                   >
                     {prepaying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
                     Pre-pay ${price} USD & upload
                     <ArrowRight className="w-5 h-5" />
                   </button>
-                  <p className="mt-3 text-[11px] text-white/40 uppercase tracking-[0.2em] font-bold">
+                  <p className="mt-3 text-[11px] text-ink/50 uppercase tracking-[0.2em] font-bold">
                     Secure Stripe checkout · one-time payment · no subscriptions
                   </p>
                 </div>
                 <div className="md:col-span-1 text-center md:text-right">
-                  <div className="inline-block bg-deepnavy/60 border border-volt/30 p-6">
+                  <div className="inline-block bg-cream-card/90 border border-volt/30 p-6">
                     <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt mb-2">Per upload</div>
-                    <div className="font-barlow font-black text-6xl text-white leading-none">${price}</div>
-                    <div className="mt-1 text-xs uppercase tracking-widest font-bold text-white/55">USD · one-time</div>
+                    <div className="font-barlow font-black text-6xl text-ink leading-none">${price}</div>
+                    <div className="mt-1 text-xs uppercase tracking-widest font-bold text-ink/60">USD · one-time</div>
                   </div>
                 </div>
               </div>
@@ -543,10 +543,10 @@ export default function UploadPage() {
 
           <form onSubmit={handleSubmit} className={`space-y-px ${eligibility && !eligibility.eligible ? "opacity-40 pointer-events-none" : ""}`} data-testid="upload-form">
             {/* ===== STEP 1: FILE DROP ===== */}
-            <div className="grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10">
+            <div className="grid lg:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
               <div className="bg-surface p-6 md:p-8 lg:col-span-2">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/50">Step 1 · Video file</span>
+                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 1 · Video file</span>
                   {file && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Selected</span>}
                 </div>
                 <label
@@ -556,7 +556,7 @@ export default function UploadPage() {
                     handleFile(e.dataTransfer.files?.[0]);
                   }}
                   data-testid="upload-dropzone"
-                  className="block cursor-pointer border-2 border-dashed border-white/20 hover:border-volt bg-deepnavy/40 p-6 md:p-8 text-center transition-colors"
+                  className="block cursor-pointer border-2 border-dashed border-gray-border hover:border-volt bg-cream-soft p-6 md:p-8 text-center transition-colors"
                 >
                   <input
                     ref={fileRef}
@@ -569,8 +569,8 @@ export default function UploadPage() {
                   {file ? (
                     <div className="flex flex-col items-center gap-3">
                       <Film className="w-9 h-9 text-volt" strokeWidth={1.5} />
-                      <p className="font-barlow font-bold uppercase text-white text-base break-all">{file.name}</p>
-                      <p className="text-xs text-white/50">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                      <p className="font-barlow font-bold uppercase text-ink text-base break-all">{file.name}</p>
+                      <p className="text-xs text-ink/55">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -580,7 +580,7 @@ export default function UploadPage() {
                           setMarkerBlob(null);
                           setMarkerPreviewUrl(null);
                         }}
-                        className="text-xs text-white/60 hover:text-volt uppercase tracking-widest font-semibold mt-2"
+                        className="text-xs text-ink/65 hover:text-volt uppercase tracking-widest font-semibold mt-2"
                       >
                         Replace file
                       </button>
@@ -588,10 +588,10 @@ export default function UploadPage() {
                   ) : (
                     <div className="flex flex-col items-center gap-3">
                       <UploadCloud className="w-11 h-11 text-volt" strokeWidth={1.25} />
-                      <p className="font-barlow font-black uppercase text-white text-lg">Drop video here</p>
-                      <p className="text-xs text-white/50">MP4, MOV or WebM · max 5 minutes</p>
+                      <p className="font-barlow font-black uppercase text-ink text-lg">Drop video here</p>
+                      <p className="text-xs text-ink/55">MP4, MOV or WebM · max 5 minutes</p>
                       <span className="mt-1 text-xs text-volt uppercase tracking-widest font-bold">or click to browse</span>
-                      <p className="mt-3 text-[11px] text-white/45 leading-relaxed max-w-[260px] text-center">
+                      <p className="mt-3 text-[11px] text-ink/50 leading-relaxed max-w-[260px] text-center">
                         Tip: pick your child's best moments — scouts decide in the first 3 minutes. Quality beats quantity.
                       </p>
                     </div>
@@ -602,20 +602,20 @@ export default function UploadPage() {
               {/* ===== STEP 2: VIDEO + MARK PLAYER ===== */}
               <div className="bg-surface p-6 md:p-8 lg:col-span-3">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/50">Step 2 · Mark your player</span>
+                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 2 · Mark your player</span>
                   {markerBlob && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Marked</span>}
                 </div>
 
                 {!file ? (
-                  <div className="aspect-video bg-deepnavy/40 border border-white/10 flex flex-col items-center justify-center text-center p-6">
-                    <Crosshair className="w-10 h-10 text-white/20 mb-3" strokeWidth={1.25} />
-                    <p className="text-sm text-white/40 uppercase tracking-widest font-bold">Upload a video first</p>
+                  <div className="aspect-video bg-cream-soft border border-gray-border flex flex-col items-center justify-center text-center p-6">
+                    <Crosshair className="w-10 h-10 text-ink/30 mb-3" strokeWidth={1.25} />
+                    <p className="text-sm text-ink/50 uppercase tracking-widest font-bold">Upload a video first</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {/* Video + overlay (zoomable when marking) */}
                     <div
-                      className="relative bg-black border border-white/10 overflow-hidden select-none"
+                      className="relative bg-black border border-gray-border overflow-hidden select-none"
                       onTouchStart={onWrapperTouchStart}
                       onTouchMove={onWrapperTouchMove}
                       onTouchEnd={onWrapperTouchEnd}
@@ -657,7 +657,7 @@ export default function UploadPage() {
                       {isMarking && (
                         <>
                           <div className="pointer-events-none absolute top-3 left-3 right-3 flex items-center justify-between z-10">
-                            <span className="pointer-events-auto bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1 animate-pulse">
+                            <span className="pointer-events-auto bg-volt text-white text-[10px] uppercase tracking-widest font-black px-2 py-1 animate-pulse">
                               Tap on your player
                             </span>
                             <button
@@ -667,7 +667,7 @@ export default function UploadPage() {
                                 cancelMarking();
                               }}
                               data-testid="upload-mark-cancel"
-                              className="pointer-events-auto bg-deepnavy/80 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 border border-white/20"
+                              className="pointer-events-auto bg-cream-card backdrop-blur text-ink text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 border border-gray-border"
                             >
                               Cancel
                             </button>
@@ -675,7 +675,7 @@ export default function UploadPage() {
 
                           {/* Zoom controls */}
                           <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-center gap-1.5">
-                            <div className="pointer-events-auto flex items-center bg-deepnavy/85 backdrop-blur-sm border border-white/20">
+                            <div className="pointer-events-auto flex items-center bg-cream-card backdrop-blur-sm border border-gray-border">
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -684,7 +684,7 @@ export default function UploadPage() {
                                 }}
                                 disabled={zoom <= 1.01}
                                 data-testid="upload-zoom-out"
-                                className="w-9 h-9 flex items-center justify-center text-white hover:text-volt disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-r border-white/20"
+                                className="w-9 h-9 flex items-center justify-center text-ink hover:text-volt disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-r border-gray-border"
                                 aria-label="Zoom out"
                               >
                                 <Minus className="w-4 h-4" />
@@ -700,7 +700,7 @@ export default function UploadPage() {
                                 }}
                                 disabled={zoom >= 3.99}
                                 data-testid="upload-zoom-in"
-                                className="w-9 h-9 flex items-center justify-center text-white hover:text-volt disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-white/20"
+                                className="w-9 h-9 flex items-center justify-center text-ink hover:text-volt disabled:opacity-30 disabled:cursor-not-allowed transition-colors border-l border-gray-border"
                                 aria-label="Zoom in"
                               >
                                 <Plus className="w-4 h-4" />
@@ -714,7 +714,7 @@ export default function UploadPage() {
                                   resetZoom();
                                 }}
                                 data-testid="upload-zoom-reset"
-                                className="pointer-events-auto w-9 h-9 flex items-center justify-center text-white hover:text-volt bg-deepnavy/85 backdrop-blur-sm border border-white/20 transition-colors"
+                                className="pointer-events-auto w-9 h-9 flex items-center justify-center text-ink hover:text-volt bg-cream-card backdrop-blur-sm border border-gray-border transition-colors"
                                 aria-label="Reset zoom"
                               >
                                 <Maximize2 className="w-4 h-4" />
@@ -725,7 +725,7 @@ export default function UploadPage() {
                           {/* Hint when zoomed */}
                           {zoom > 1.01 && (
                             <div className="pointer-events-none absolute bottom-3 left-3 z-10">
-                              <span className="bg-deepnavy/85 backdrop-blur-sm text-white/80 text-[9px] uppercase tracking-widest font-bold px-2 py-1 border border-white/15">
+                              <span className="bg-cream-card backdrop-blur-sm text-ink/80 text-[9px] uppercase tracking-widest font-bold px-2 py-1 border border-gray-border">
                                 Drag to pan · Tap player when ready
                               </span>
                             </div>
@@ -735,8 +735,8 @@ export default function UploadPage() {
                     </div>
 
                     {!isMarking && !markerBlob && (
-                      <div className="bg-deepnavy/60 border border-volt/30 p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                        <div className="flex items-start gap-2.5 text-sm text-white/80">
+                      <div className="bg-cream-card/90 border border-volt/30 p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                        <div className="flex items-start gap-2.5 text-sm text-ink/80">
                           <AlertCircle className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
                           <span>
                             Scrub to a clear moment, then tap "Mark this player".{" "}
@@ -747,7 +747,7 @@ export default function UploadPage() {
                           type="button"
                           onClick={startMarking}
                           data-testid="upload-mark-start"
-                          className="flex-shrink-0 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 transition-colors flex items-center gap-2"
+                          className="flex-shrink-0 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 transition-colors flex items-center gap-2"
                         >
                           <Crosshair className="w-3.5 h-3.5" />
                           Mark this player
@@ -756,7 +756,7 @@ export default function UploadPage() {
                     )}
 
                     {markerBlob && markerPreviewUrl && (
-                      <div className="bg-deepnavy/60 border border-volt/30 p-3">
+                      <div className="bg-cream-card/90 border border-volt/30 p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1.5">
                             <Check className="w-3 h-3" /> Player marked
@@ -765,7 +765,7 @@ export default function UploadPage() {
                             type="button"
                             onClick={reMark}
                             data-testid="upload-mark-redo"
-                            className="text-white/60 hover:text-volt text-[10px] uppercase tracking-widest font-bold flex items-center gap-1 transition-colors"
+                            className="text-ink/65 hover:text-volt text-[10px] uppercase tracking-widest font-bold flex items-center gap-1 transition-colors"
                           >
                             <RefreshCw className="w-3 h-3" /> Re-mark
                           </button>
@@ -774,9 +774,9 @@ export default function UploadPage() {
                           src={markerPreviewUrl}
                           alt="Marked player"
                           data-testid="upload-mark-preview"
-                          className="w-full aspect-video object-contain bg-black border border-white/5"
+                          className="w-full aspect-video object-contain bg-black border border-gray-border"
                         />
-                        <p className="mt-2 text-[11px] text-white/50 text-center">
+                        <p className="mt-2 text-[11px] text-ink/55 text-center">
                           We'll review <span className="text-volt font-bold">only the player circled above</span>.
                         </p>
                       </div>
@@ -787,24 +787,24 @@ export default function UploadPage() {
             </div>
 
             {/* ===== STEP 3: PLAYER DETAILS ===== */}
-            <div className="bg-surface border border-white/10 p-6 md:p-8 space-y-5">
-              <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/50">Step 3 · Player details</span>
+            <div className="bg-surface border border-gray-border p-6 md:p-8 space-y-5">
+              <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 3 · Player details</span>
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Player name *</label>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Player name *</label>
                   <input
                     required
                     type="text"
                     value={form.player_name}
                     onChange={(e) => setField("player_name", e.target.value)}
                     data-testid="upload-player-name"
-                    className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                     placeholder="e.g. Lukas Andersen"
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Age *</label>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Age *</label>
                   <input
                     required
                     type="number"
@@ -813,7 +813,7 @@ export default function UploadPage() {
                     value={form.age}
                     onChange={(e) => setField("age", e.target.value)}
                     data-testid="upload-player-age"
-                    className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                     placeholder="14"
                   />
                 </div>
@@ -821,13 +821,13 @@ export default function UploadPage() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Position *</label>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Position *</label>
                   <select
                     required
                     value={form.position}
                     onChange={(e) => setField("position", e.target.value)}
                     data-testid="upload-player-position"
-                    className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                   >
                     <option value="">Select position</option>
                     <option value="Goalkeeper">Goalkeeper</option>
@@ -842,13 +842,13 @@ export default function UploadPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Preferred foot *</label>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Preferred foot *</label>
                   <select
                     required
                     value={form.preferred_foot}
                     onChange={(e) => setField("preferred_foot", e.target.value)}
                     data-testid="upload-player-foot"
-                    className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                   >
                     <option value="right">Right</option>
                     <option value="left">Left</option>
@@ -859,23 +859,23 @@ export default function UploadPage() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Current club / team</label>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Current club / team</label>
                   <input
                     type="text"
                     value={form.current_club}
                     onChange={(e) => setField("current_club", e.target.value)}
                     data-testid="upload-player-club"
-                    className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                     placeholder="Optional"
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Video type *</label>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Video type *</label>
                   <select
                     value={form.video_type}
                     onChange={(e) => setField("video_type", e.target.value)}
                     data-testid="upload-video-type"
-                    className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                   >
                     <option value="highlight">Highlight reel</option>
                     <option value="match">Match clip</option>
@@ -885,14 +885,14 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Which player are you in the video? *</label>
+                <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Which player are you in the video? *</label>
                 <textarea
                   required
                   value={form.description}
                   onChange={(e) => setField("description", e.target.value)}
                   data-testid="upload-player-description"
                   rows={3}
-                  className="w-full bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
+                  className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
                   placeholder="e.g. I am number 10 in the white shirt — the one you just marked above."
                 />
               </div>
@@ -901,7 +901,7 @@ export default function UploadPage() {
                 type="submit"
                 disabled={submitting || !file || !markerBlob}
                 data-testid="upload-submit-btn"
-                className="w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 mt-2"
+                className="w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 mt-2"
               >
                 {submitting ? (
                   <>
@@ -919,7 +919,7 @@ export default function UploadPage() {
                   </>
                 )}
               </button>
-              <p className="text-xs text-white/40 text-center">
+              <p className="text-xs text-ink/50 text-center">
                 The scouts will review <span className="text-volt font-bold">only the player you marked</span>. Other players in the video are ignored.
               </p>
             </div>

@@ -143,12 +143,12 @@ export default function EmbeddedCheckoutModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
           data-testid="embedded-checkout-modal"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-deepnavy/95 backdrop-blur-xl px-4 py-6 overflow-y-auto"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/85 backdrop-blur-xl px-4 py-6 overflow-y-auto"
         >
-          {/* Volt halos */}
+          {/* Soft halos */}
           <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-volt/12 rounded-full blur-3xl" />
-            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-volt/6 rounded-full blur-3xl" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-forest/15 rounded-full blur-3xl" />
+            <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-forest/10 rounded-full blur-3xl" />
           </div>
 
           <motion.div
@@ -156,20 +156,20 @@ export default function EmbeddedCheckoutModal({
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ scale: 0.96, y: 8, opacity: 0 }}
             transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
-            className="relative w-full max-w-lg border-2 border-volt/30 bg-surface/95 backdrop-blur-2xl my-auto"
-            style={{ boxShadow: "0 0 80px rgba(204,255,0,0.18)" }}
+            className="relative w-full max-w-lg border-2 border-forest/40 bg-cream-card my-auto"
+            style={{ boxShadow: "0 0 80px rgba(31,79,47,0.18)" }}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 md:px-8 pt-6 md:pt-7 pb-4 border-b border-white/8">
+            <div className="flex items-center justify-between px-6 md:px-8 pt-6 md:pt-7 pb-4 border-b border-gray-border">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 bg-volt/10 border border-volt/40 flex items-center justify-center">
+                <div className="w-9 h-9 bg-forest/8 border border-forest/40 flex items-center justify-center">
                   <ShieldCheck className="w-4 h-4 text-volt" />
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">
                     Mentalkids · ScoutMePlay
                   </div>
-                  <div className="font-barlow font-black uppercase text-white text-sm leading-tight mt-0.5">
+                  <div className="font-barlow font-black uppercase text-ink text-sm leading-tight mt-0.5">
                     Secure checkout
                   </div>
                 </div>
@@ -179,7 +179,7 @@ export default function EmbeddedCheckoutModal({
                   onClick={onClose}
                   aria-label="Close"
                   data-testid="embedded-modal-close"
-                  className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-volt transition-colors"
+                  className="w-8 h-8 flex items-center justify-center text-ink/55 hover:text-volt transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -201,28 +201,28 @@ export default function EmbeddedCheckoutModal({
                   </div>
                   <h2
                     data-testid="embedded-modal-headline"
-                    className="font-barlow font-black uppercase tracking-tighter text-xl md:text-2xl text-white"
+                    className="font-barlow font-black uppercase tracking-tighter text-xl md:text-2xl text-ink"
                   >
                     Preparing your checkout
                   </h2>
-                  <p className="mt-2 text-sm text-white/65 inline-flex items-center gap-1.5">
+                  <p className="mt-2 text-sm text-ink/70 inline-flex items-center gap-1.5">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-volt" />
                     Encrypting your session…
                   </p>
-                  <div className="mt-7 mx-6 border-t border-white/10 pt-4 flex items-center justify-between text-left">
+                  <div className="mt-7 mx-6 border-t border-gray-border pt-4 flex items-center justify-between text-left">
                     <div>
-                      <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45">
+                      <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
                         Product
                       </div>
-                      <div className="font-barlow font-black uppercase text-white text-xs mt-0.5">
+                      <div className="font-barlow font-black uppercase text-ink text-xs mt-0.5">
                         {product}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45">
+                      <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
                         Amount
                       </div>
-                      <div className="font-barlow font-black text-white text-lg leading-none mt-0.5">
+                      <div className="font-barlow font-black text-ink text-lg leading-none mt-0.5">
                         ${amount}
                         <span className="text-volt text-xs ml-1">{currency}</span>
                       </div>
@@ -234,7 +234,7 @@ export default function EmbeddedCheckoutModal({
               {state === "ready" && clientSecret && stripePromise && (
                 <div
                   data-testid="embedded-checkout-iframe-wrapper"
-                  className="bg-white"
+                  className="bg-cream-card"
                   // Stripe's embedded checkout fills available width; we give it a comfortable height
                   style={{ minHeight: 520 }}
                 >
@@ -258,11 +258,11 @@ export default function EmbeddedCheckoutModal({
                   </motion.div>
                   <h2
                     data-testid="embedded-success-headline"
-                    className="font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl text-white"
+                    className="font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl text-ink"
                   >
                     Payment confirmed
                   </h2>
-                  <p className="mt-2 text-sm text-white/65">
+                  <p className="mt-2 text-sm text-ink/70">
                     Your premium report is unlocking now…
                   </p>
                 </div>
@@ -274,12 +274,12 @@ export default function EmbeddedCheckoutModal({
                     <div className="absolute inset-0 border-2 border-orange-400/40 rounded-full" />
                     <AlertCircle className="relative w-8 h-8 text-orange-400" strokeWidth={1.6} />
                   </div>
-                  <h2 className="font-barlow font-black uppercase tracking-tighter text-xl md:text-2xl text-white">
+                  <h2 className="font-barlow font-black uppercase tracking-tighter text-xl md:text-2xl text-ink">
                     Couldn't open checkout
                   </h2>
                   <p
                     data-testid="embedded-error-message"
-                    className="mt-3 text-sm text-white/65 max-w-sm mx-auto"
+                    className="mt-3 text-sm text-ink/70 max-w-sm mx-auto"
                   >
                     {errorMessage || "Please try again, or contact support."}
                   </p>
@@ -287,7 +287,7 @@ export default function EmbeddedCheckoutModal({
                     <button
                       onClick={onClose}
                       data-testid="embedded-error-close"
-                      className="mt-6 inline-flex items-center justify-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-6 py-3 transition-colors"
+                      className="mt-6 inline-flex items-center justify-center gap-2 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-6 py-3 transition-colors"
                     >
                       Close
                     </button>
@@ -297,7 +297,7 @@ export default function EmbeddedCheckoutModal({
             </div>
 
             {/* Trust footer */}
-            <div className="px-6 md:px-8 py-4 border-t border-white/8 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+            <div className="px-6 md:px-8 py-4 border-t border-gray-border flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
               <ShieldCheck className="w-3 h-3 text-volt" />
               Secure 256-bit · PCI compliant · Stripe
             </div>

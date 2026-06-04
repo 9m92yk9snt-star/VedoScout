@@ -36,7 +36,7 @@ function ConfidenceBadge({ level, reason }) {
 }
 
 function scoreColor(s) {
-  if (typeof s !== "number") return "text-white";
+  if (typeof s !== "number") return "text-ink";
   if (s >= 8) return "text-volt";
   if (s >= 6) return "text-yellow-400";
   return "text-red-400";
@@ -45,9 +45,9 @@ function scoreColor(s) {
 function SectionGrid({ title, section }) {
   if (!section) return null;
   return (
-    <div className="bg-surface border border-white/10 p-6 md:p-8">
-      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">{title}</h3>
-      <div className="mt-6 grid sm:grid-cols-2 gap-px bg-white/5">
+    <div className="bg-surface border border-gray-border p-6 md:p-8">
+      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">{title}</h3>
+      <div className="mt-6 grid sm:grid-cols-2 gap-px bg-cream-soft/20">
         {Object.entries(section).map(([key, val]) => {
           const cannotEval = val?.cannot_evaluate === true;
           const confidence = val?.confidence;
@@ -55,7 +55,7 @@ function SectionGrid({ title, section }) {
           return (
             <div key={key} className="bg-surface p-4">
               <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="text-xs uppercase tracking-[0.18em] font-bold text-white/60">{key.replace(/_/g, " ")}</span>
+                <span className="text-xs uppercase tracking-[0.18em] font-bold text-ink/65">{key.replace(/_/g, " ")}</span>
                 {cannotEval ? (
                   <span className="text-[10px] uppercase tracking-widest font-bold text-orange-300 border border-orange-300/40 bg-orange-300/10 px-2 py-0.5 whitespace-nowrap">
                     Need more footage
@@ -63,7 +63,7 @@ function SectionGrid({ title, section }) {
                 ) : (
                   <span className={`font-barlow font-black text-2xl ${scoreColor(val?.score)}`}>
                     {val?.score ?? "-"}
-                    <span className="text-white/30 text-base">/10</span>
+                    <span className="text-ink/40 text-base">/10</span>
                   </span>
                 )}
               </div>
@@ -73,7 +73,7 @@ function SectionGrid({ title, section }) {
                   {val?.evaluable_reason || val?.notes || "Not observable from this footage."}
                 </p>
               ) : (
-                <p className="text-sm text-white/75 leading-relaxed">{val?.notes}</p>
+                <p className="text-sm text-ink/75 leading-relaxed">{val?.notes}</p>
               )}
 
               {/* Confidence + evidence (only on new-format reports) */}
@@ -81,7 +81,7 @@ function SectionGrid({ title, section }) {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <ConfidenceBadge level={confidence} reason={val?.confidence_reason} />
                   {typeof val?.observations_used === "number" && val.observations_used > 0 && (
-                    <span className="text-[9px] uppercase tracking-widest font-bold text-white/40">
+                    <span className="text-[9px] uppercase tracking-widest font-bold text-ink/50">
                       · {val.observations_used} obs
                     </span>
                   )}
@@ -89,12 +89,12 @@ function SectionGrid({ title, section }) {
               )}
               {evidence.length > 0 && (
                 <details className="mt-2 group">
-                  <summary className="cursor-pointer text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-volt transition-colors list-none">
+                  <summary className="cursor-pointer text-[10px] uppercase tracking-widest font-bold text-ink/50 hover:text-volt transition-colors list-none">
                     Show evidence ({evidence.length})
                   </summary>
                   <ul className="mt-2 space-y-1.5">
                     {evidence.map((e, idx) => (
-                      <li key={idx} className="text-[11px] text-white/65 flex gap-2">
+                      <li key={idx} className="text-[11px] text-ink/70 flex gap-2">
                         <span className="font-barlow font-black text-volt min-w-[42px] tabular-nums">{e.timestamp || "·"}</span>
                         <span className="leading-snug">{e.what || e.note}</span>
                       </li>
@@ -112,25 +112,25 @@ function SectionGrid({ title, section }) {
 
 function LockedOverlay({ price, onUnlock, loading }) {
   return (
-    <div className="absolute inset-0 z-20 backdrop-blur-xl bg-deepnavy/85 border border-white/10 flex flex-col items-center justify-center text-center p-6 md:p-12">
+    <div className="absolute inset-0 z-20 backdrop-blur-xl bg-cream-card border border-gray-border flex flex-col items-center justify-center text-center p-6 md:p-12">
       <Lock className="w-10 h-10 text-volt mb-5" strokeWidth={1.5} />
       <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold">Premium</span>
-      <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-5xl text-white tracking-tighter">
+      <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-5xl text-ink tracking-tighter">
         Unlock full premium report
       </h3>
-      <p className="mt-4 text-white/70 text-sm md:text-base max-w-xl">
+      <p className="mt-4 text-ink/70 text-sm md:text-base max-w-xl">
         Full scout analysis across technical, tactical, physical & mental dimensions. Scout view, training plan & a premium PDF.
       </p>
       <div className="mt-6 flex items-baseline gap-2">
         <span className="font-barlow font-black text-6xl md:text-7xl text-volt">${price}</span>
-        <span className="text-white/60 uppercase tracking-widest font-bold">USD</span>
+        <span className="text-ink/65 uppercase tracking-widest font-bold">USD</span>
       </div>
-      <p className="text-xs text-white/40 uppercase tracking-widest font-bold">One-time payment · No subscription</p>
+      <p className="text-xs text-ink/50 uppercase tracking-widest font-bold">One-time payment · No subscription</p>
       <button
         onClick={onUnlock}
         disabled={loading}
         data-testid="unlock-report-btn"
-        className="mt-8 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-10 py-4 transition-colors disabled:opacity-50 flex items-center gap-3"
+        className="mt-8 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-10 py-4 transition-colors disabled:opacity-50 flex items-center gap-3"
       >
         {loading ? (
           <>
@@ -144,7 +144,7 @@ function LockedOverlay({ price, onUnlock, loading }) {
           </>
         )}
       </button>
-      <p className="mt-4 text-xs text-white/40 flex items-center gap-2">
+      <p className="mt-4 text-xs text-ink/50 flex items-center gap-2">
         <ShieldCheck className="w-3.5 h-3.5" /> Secure payment via Stripe
       </p>
     </div>
@@ -334,11 +334,11 @@ export default function ReportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-deepnavy text-white">
+      <div className="min-h-screen bg-deepnavy text-ink">
         <Navigation />
         <div className="pt-40 text-center">
           <Loader2 className="w-8 h-8 animate-spin text-volt mx-auto" />
-          <p className="mt-4 text-white/60 uppercase tracking-widest text-sm font-bold">Loading report...</p>
+          <p className="mt-4 text-ink/65 uppercase tracking-widest text-sm font-bold">Loading report...</p>
         </div>
       </div>
     );
@@ -377,7 +377,7 @@ export default function ReportPage() {
   const couldNotAssess = full_report?.scout_view?.what_we_could_not_assess;
 
   return (
-    <div className="min-h-screen bg-deepnavy text-white pb-20">
+    <div className="min-h-screen bg-deepnavy text-ink pb-20">
       <Navigation />
       <CheckoutTransitionModal
         open={checkoutModal.open}
@@ -403,18 +403,18 @@ export default function ReportPage() {
           <button
             onClick={() => navigate("/dashboard")}
             data-testid="back-to-dashboard"
-            className="flex items-center gap-2 text-white/60 hover:text-volt uppercase tracking-widest text-xs font-bold transition-colors"
+            className="flex items-center gap-2 text-ink/65 hover:text-volt uppercase tracking-widest text-xs font-bold transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             Dashboard
           </button>
 
           {/* ===== Header ===== */}
-          <div className="mt-6 grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10">
+          <div className="mt-6 grid lg:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
             <div className="bg-surface p-6 md:p-8 lg:col-span-2">
               {report.demo ? (
                 <div className="relative w-full bg-deepnavy border border-volt/20 aspect-video flex flex-col items-center justify-center text-center p-6">
-                  <div className="absolute top-3 right-3 bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1">Demo</div>
+                  <div className="absolute top-3 right-3 bg-volt text-white text-[10px] uppercase tracking-widest font-black px-2 py-1">Demo</div>
                   <div
                     className="absolute inset-0 opacity-30"
                     style={{
@@ -426,7 +426,7 @@ export default function ReportPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-deepnavy via-deepnavy/70 to-transparent" />
                   <div className="relative">
                     <div className="font-barlow font-black uppercase text-3xl text-volt">Sample report</div>
-                    <p className="mt-2 text-sm text-white/70 max-w-sm">
+                    <p className="mt-2 text-sm text-ink/70 max-w-sm">
                       This is a demo report so you can explore the premium experience. Upload your own video to get a real analysis.
                     </p>
                   </div>
@@ -442,18 +442,18 @@ export default function ReportPage() {
                   className="w-full bg-black aspect-video"
                 />
               )}
-              <div className="mt-4 grid grid-cols-3 gap-px bg-white/5">
+              <div className="mt-4 grid grid-cols-3 gap-px bg-cream-soft/20">
                 <div className="bg-surface p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">Type</div>
-                  <div className="text-sm text-white font-bold mt-1 capitalize">{player_details.video_type}</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">Type</div>
+                  <div className="text-sm text-ink font-bold mt-1 capitalize">{player_details.video_type}</div>
                 </div>
                 <div className="bg-surface p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">Foot</div>
-                  <div className="text-sm text-white font-bold mt-1 capitalize">{player_details.preferred_foot}</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">Foot</div>
+                  <div className="text-sm text-ink font-bold mt-1 capitalize">{player_details.preferred_foot}</div>
                 </div>
                 <div className="bg-surface p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">Age</div>
-                  <div className="text-sm text-white font-bold mt-1">{player_details.age}</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">Age</div>
+                  <div className="text-sm text-ink font-bold mt-1">{player_details.age}</div>
                 </div>
               </div>
             </div>
@@ -467,7 +467,7 @@ export default function ReportPage() {
                 >
                   {player_details.player_name}
                 </h1>
-                <p className="mt-3 text-white/60 text-sm md:text-base">
+                <p className="mt-3 text-ink/65 text-sm md:text-base">
                   {player_details.position} · {player_details.current_club || "Independent"}
                 </p>
                 <div className="mt-6 inline-flex items-center gap-2 bg-deepnavy border border-volt/30 px-4 py-2">
@@ -478,7 +478,7 @@ export default function ReportPage() {
                 </div>
 
                 {marker_url && (
-                  <div className="mt-5 border border-white/10 bg-deepnavy/60 p-3 max-w-md" data-testid="marker-card">
+                  <div className="mt-5 border border-gray-border bg-cream-card/90 p-3 max-w-md" data-testid="marker-card">
                     <div className="flex items-center gap-2 mb-2">
                       <Star className="w-3 h-3 text-volt" fill="currentColor" />
                       <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Verified player</span>
@@ -486,9 +486,9 @@ export default function ReportPage() {
                     <img
                       src={`${ASSET_BASE}${marker_url}`}
                       alt="Marked player"
-                      className="w-full aspect-video object-cover border border-white/5"
+                      className="w-full aspect-video object-cover border border-gray-border"
                     />
-                    <p className="mt-2 text-[11px] text-white/55">
+                    <p className="mt-2 text-[11px] text-ink/60">
                       We analysed only the player you circled above.
                     </p>
                   </div>
@@ -496,7 +496,7 @@ export default function ReportPage() {
               </div>
 
               {unlocked && full_report && (
-                <div className="mt-8 grid grid-cols-5 gap-px bg-white/10 border border-white/10">
+                <div className="mt-8 grid grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
                   {[
                     { key: "technical", label: "Technical", v: full_report.scores?.technical },
                     { key: "tactical", label: "Tactical", v: full_report.scores?.tactical },
@@ -508,7 +508,7 @@ export default function ReportPage() {
                     const c = conf ? CONFIDENCE_STYLES[conf] : null;
                     return (
                       <div key={i} className="bg-surface p-3 text-center">
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-white/40 font-bold">{s.label}</div>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">{s.label}</div>
                         <div className={`font-barlow font-black text-3xl mt-1 ${scoreColor(s.v)}`}>{s.v ?? "-"}</div>
                         {c && (
                           <div className={`mt-1.5 text-[8px] uppercase tracking-widest font-bold ${c.color}`} title={`Confidence: ${conf}`}>
@@ -526,7 +526,7 @@ export default function ReportPage() {
                   onClick={handleDownloadPdf}
                   disabled={downloadingPdf}
                   data-testid="download-pdf-btn"
-                  className="mt-6 self-start bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="mt-6 self-start bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                   Download premium PDF
@@ -545,17 +545,17 @@ export default function ReportPage() {
                 <Eye className="w-5 h-5 text-volt" strokeWidth={1.7} />
                 <div className="flex flex-col leading-tight">
                   <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Detected content</span>
-                  <span className="font-barlow font-black uppercase text-white text-lg">{contentTypeLabel}</span>
+                  <span className="font-barlow font-black uppercase text-ink text-lg">{contentTypeLabel}</span>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                 {content_gate.quality && (
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/75 border border-white/20 px-2 py-1">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-ink/75 border border-gray-border px-2 py-1">
                     Quality · {content_gate.quality}
                   </span>
                 )}
                 {content_gate.player_visible && (
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/75 border border-white/20 px-2 py-1">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-ink/75 border border-gray-border px-2 py-1">
                     Player · {String(content_gate.player_visible).replace(/_/g, " ")}
                   </span>
                 )}
@@ -565,7 +565,7 @@ export default function ReportPage() {
                   </span>
                 )}
                 {content_gate.camera_distance && (
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/55 border border-white/15 px-2 py-1">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-ink/60 border border-gray-border px-2 py-1">
                     Camera · {content_gate.camera_distance}
                   </span>
                 )}
@@ -575,22 +575,22 @@ export default function ReportPage() {
 
           {/* ===== Free Preview ===== TWO sections only: Summary + Top Strengths + locked teaser */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mt-10">
-            <div className="grid lg:grid-cols-3 gap-px bg-white/10 border border-white/10">
+            <div className="grid lg:grid-cols-3 gap-px bg-cream-soft/40 border border-gray-border">
               {/* SECTION 1 — Summary + Top strengths */}
               <div className="bg-surface p-6 md:p-8 lg:col-span-2">
                 <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Brief Summary</span>
                 <p
                   data-testid="report-preview-summary"
-                  className="mt-3 text-white/85 text-base md:text-lg leading-relaxed"
+                  className="mt-3 text-ink/85 text-base md:text-lg leading-relaxed"
                 >
                   {preview?.brief_summary}
                 </p>
 
                 <div className="mt-8">
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">Top strengths</div>
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">Top strengths</div>
                   <ul className="space-y-2">
                     {(preview?.top_strengths || []).slice(0, 3).map((s, i) => (
-                      <li key={i} data-testid={`preview-strength-${i}`} className="flex items-start gap-2 text-sm text-white">
+                      <li key={i} data-testid={`preview-strength-${i}`} className="flex items-start gap-2 text-sm text-ink">
                         <span className="text-volt mt-1">▶</span> {s}
                       </li>
                     ))}
@@ -599,7 +599,7 @@ export default function ReportPage() {
 
                 {/* Confidence note (new format only) */}
                 {preview?.confidence && (
-                  <div className="mt-6 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-white/60 border border-white/15 px-2.5 py-1">
+                  <div className="mt-6 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/65 border border-gray-border px-2.5 py-1">
                     <ShieldCheck className="w-3 h-3 text-volt" />
                     Preview confidence · {preview.confidence}
                   </div>
@@ -617,13 +617,13 @@ export default function ReportPage() {
                     <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/10 px-2.5 py-1.5">
                       <Lock className="w-3 h-3" /> Locked
                     </div>
-                    <div className="mt-5 font-barlow font-black uppercase text-3xl md:text-4xl text-white leading-[0.95] tracking-tight">
+                    <div className="mt-5 font-barlow font-black uppercase text-3xl md:text-4xl text-ink leading-[0.95] tracking-tight">
                       Unlock <span className="text-volt">9 more</span><br />sections
                     </div>
-                    <p className="mt-4 text-sm text-white/65 leading-relaxed">
+                    <p className="mt-4 text-sm text-ink/70 leading-relaxed">
                       Technical · Tactical · Physical · Mentality · Scout view · Training plan · Potential · Premium PDF · Scout chat.
                     </p>
-                    <ul className="mt-5 space-y-1.5 text-[12px] text-white/55">
+                    <ul className="mt-5 space-y-1.5 text-[12px] text-ink/60">
                       {["Confidence + evidence per category", "Personalised 90-day plan", "Premium downloadable PDF"].map((t, i) => (
                         <li key={i} className="flex items-start gap-2"><span className="text-volt mt-0.5">·</span><span>{t}</span></li>
                       ))}
@@ -632,7 +632,7 @@ export default function ReportPage() {
                       onClick={handleUnlock}
                       disabled={unlocking}
                       data-testid="preview-locked-cta"
-                      className="mt-6 inline-flex items-center justify-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 transition-colors disabled:opacity-60"
+                      className="mt-6 inline-flex items-center justify-center gap-2 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 transition-colors disabled:opacity-60"
                     >
                       {unlocking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Unlock className="w-4 h-4" />}
                       Unlock for ${price} USD
@@ -640,9 +640,9 @@ export default function ReportPage() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-surface p-6 md:p-8 border-l border-white/10">
+                <div className="bg-surface p-6 md:p-8 border-l border-gray-border">
                   <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Premium unlocked</span>
-                  <p className="mt-3 text-white/75 text-sm leading-relaxed">All 11 sections, evidence + confidence, scout review chat, and the premium PDF are now available below.</p>
+                  <p className="mt-3 text-ink/75 text-sm leading-relaxed">All 11 sections, evidence + confidence, scout review chat, and the premium PDF are now available below.</p>
                   <div className="mt-6 inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-volt border border-volt/40 bg-volt/10 px-2.5 py-1.5">
                     <Check className="w-3 h-3" /> Full report active
                   </div>
@@ -664,44 +664,44 @@ export default function ReportPage() {
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
               {/* Executive Summary */}
               {(unlocked && full_report) && (
-                <div className="bg-surface border border-white/10 p-6 md:p-8">
-                  <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Executive Summary</h3>
-                  <p className="mt-4 text-white/85 leading-relaxed">{full_report.executive_summary}</p>
+                <div className="bg-surface border border-gray-border p-6 md:p-8">
+                  <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Executive Summary</h3>
+                  <p className="mt-4 text-ink/85 leading-relaxed">{full_report.executive_summary}</p>
                 </div>
               )}
 
               {/* Placeholder content if locked */}
               {!unlocked && (
                 <>
-                  <div className="bg-surface border border-white/10 p-6 md:p-8">
-                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Technical Analysis</h3>
+                  <div className="bg-surface border border-gray-border p-6 md:p-8">
+                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Technical Analysis</h3>
                     <div className="mt-6 grid sm:grid-cols-2 gap-4">
                       {["First touch","Ball control","Dribbling","Passing","Shooting","Weak foot","1v1 actions"].map((k,i)=>(
-                        <div key={i} className="flex items-center justify-between bg-deepnavy p-3 border border-white/5">
-                          <span className="text-white/80 text-sm">{k}</span>
+                        <div key={i} className="flex items-center justify-between bg-deepnavy p-3 border border-gray-border">
+                          <span className="text-ink/80 text-sm">{k}</span>
                           <span className="text-volt font-barlow font-black text-xl">8/10</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="bg-surface border border-white/10 p-6 md:p-8">
-                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Tactical Analysis</h3>
+                  <div className="bg-surface border border-gray-border p-6 md:p-8">
+                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Tactical Analysis</h3>
                     <div className="mt-6 grid sm:grid-cols-2 gap-4">
                       {["Positioning","Off-ball movement","Scanning","Decision making","Timing of runs","Game understanding"].map((k,i)=>(
-                        <div key={i} className="flex items-center justify-between bg-deepnavy p-3 border border-white/5">
-                          <span className="text-white/80 text-sm">{k}</span>
+                        <div key={i} className="flex items-center justify-between bg-deepnavy p-3 border border-gray-border">
+                          <span className="text-ink/80 text-sm">{k}</span>
                           <span className="text-volt font-barlow font-black text-xl">7/10</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="bg-surface border border-white/10 p-6 md:p-8">
-                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Physical & Mentality</h3>
-                    <p className="mt-3 text-white/60 text-sm">Acceleration · Balance · Agility · Work rate · Focus · Competitive mindset.</p>
+                  <div className="bg-surface border border-gray-border p-6 md:p-8">
+                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Physical & Mentality</h3>
+                    <p className="mt-3 text-ink/65 text-sm">Acceleration · Balance · Agility · Work rate · Focus · Competitive mindset.</p>
                   </div>
-                  <div className="bg-surface border border-white/10 p-6 md:p-8">
-                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Scout View · Training Plan · Video Comments</h3>
-                    <p className="mt-3 text-white/60 text-sm">Full breakdown across scout perspective, personalized training plan and timestamped video comments.</p>
+                  <div className="bg-surface border border-gray-border p-6 md:p-8">
+                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Scout View · Training Plan · Video Comments</h3>
+                    <p className="mt-3 text-ink/65 text-sm">Full breakdown across scout perspective, personalized training plan and timestamped video comments.</p>
                   </div>
                 </>
               )}
@@ -711,8 +711,8 @@ export default function ReportPage() {
                 <>
                   {/* Radar chart */}
                   {radarData && (
-                    <div className="bg-surface border border-white/10 p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Performance Radar</h3>
+                    <div className="bg-surface border border-gray-border p-6 md:p-8">
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Performance Radar</h3>
                       <div className="mt-6 h-80">
                         <ResponsiveContainer width="100%" height="100%">
                           <RadarChart data={radarData}>
@@ -733,12 +733,12 @@ export default function ReportPage() {
 
                   {/* Scout View */}
                   {full_report.scout_view && (
-                    <div className="bg-surface border border-white/10 p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">How a Scout Might Assess This Player</h3>
-                      <div className="mt-6 grid lg:grid-cols-3 gap-px bg-white/5">
+                    <div className="bg-surface border border-gray-border p-6 md:p-8">
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">How a Scout Might Assess This Player</h3>
+                      <div className="mt-6 grid lg:grid-cols-3 gap-px bg-cream-soft/20">
                         <div className="bg-surface p-4">
                           <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-3">Key strengths</div>
-                          <ul className="space-y-2 text-sm text-white/85">
+                          <ul className="space-y-2 text-sm text-ink/85">
                             {(full_report.scout_view.key_strengths || []).map((s,i)=>(
                               <li key={i} className="flex gap-2"><span className="text-volt mt-1">▶</span><span>{s}</span></li>
                             ))}
@@ -746,32 +746,32 @@ export default function ReportPage() {
                         </div>
                         <div className="bg-surface p-4">
                           <div className="text-xs uppercase tracking-[0.2em] font-bold text-yellow-400 mb-3">Areas of concern</div>
-                          <ul className="space-y-2 text-sm text-white/85">
+                          <ul className="space-y-2 text-sm text-ink/85">
                             {(full_report.scout_view.areas_of_concern || []).map((s,i)=>(
                               <li key={i} className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span><span>{s}</span></li>
                             ))}
                           </ul>
                         </div>
                         <div className="bg-surface p-4">
-                          <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/60 mb-3">Development priorities</div>
-                          <ul className="space-y-2 text-sm text-white/85">
+                          <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/65 mb-3">Development priorities</div>
+                          <ul className="space-y-2 text-sm text-ink/85">
                             {(full_report.scout_view.development_priorities || []).map((s,i)=>(
-                              <li key={i} className="flex gap-2"><span className="text-white/60 mt-1">▶</span><span>{s}</span></li>
+                              <li key={i} className="flex gap-2"><span className="text-ink/65 mt-1">▶</span><span>{s}</span></li>
                             ))}
                           </ul>
                         </div>
                       </div>
-                      <div className="mt-6 grid md:grid-cols-2 gap-px bg-white/5">
+                      <div className="mt-6 grid md:grid-cols-2 gap-px bg-cream-soft/20">
                         <div className="bg-surface p-4">
-                          <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-2">Appropriate next competitive level</div>
-                          <p className="text-sm text-white/85">{full_report.scout_view.appropriate_next_level}</p>
+                          <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-2">Appropriate next competitive level</div>
+                          <p className="text-sm text-ink/85">{full_report.scout_view.appropriate_next_level}</p>
                         </div>
                         <div className="bg-surface p-4">
-                          <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-2">Positional suitability</div>
-                          <p className="text-sm text-white/85">{full_report.scout_view.positional_suitability}</p>
+                          <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-2">Positional suitability</div>
+                          <p className="text-sm text-ink/85">{full_report.scout_view.positional_suitability}</p>
                         </div>
                       </div>
-                      <p className="mt-6 text-xs text-white/40 italic">
+                      <p className="mt-6 text-xs text-ink/50 italic">
                         This is an independent development analysis and does not guarantee selection or advancement opportunities.
                       </p>
 
@@ -808,17 +808,17 @@ export default function ReportPage() {
                     >
                       <div className="flex items-center gap-2 mb-3">
                         <Info className="w-4 h-4 text-volt" strokeWidth={2} />
-                        <h3 className="font-barlow font-black uppercase text-lg md:text-xl text-white">Evidence Quality</h3>
+                        <h3 className="font-barlow font-black uppercase text-lg md:text-xl text-ink">Evidence Quality</h3>
                       </div>
-                      <p className="text-sm text-white/75 leading-relaxed">{evidenceQualityNote}</p>
+                      <p className="text-sm text-ink/75 leading-relaxed">{evidenceQualityNote}</p>
                     </div>
                   )}
 
                   {/* Potential */}
                   {full_report.potential_assessment && (
-                    <div className="bg-surface border border-white/10 p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Potential Assessment</h3>
-                      <div className="mt-6 grid md:grid-cols-2 gap-px bg-white/5">
+                    <div className="bg-surface border border-gray-border p-6 md:p-8">
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Potential Assessment</h3>
+                      <div className="mt-6 grid md:grid-cols-2 gap-px bg-cream-soft/20">
                         {[
                           ["Current level", full_report.potential_assessment.current_level],
                           ["Development potential", full_report.potential_assessment.development_potential],
@@ -827,7 +827,7 @@ export default function ReportPage() {
                         ].map(([k, v], i) => (
                           <div key={i} className="bg-surface p-4">
                             <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">{k}</div>
-                            <p className="text-sm text-white/85">{v}</p>
+                            <p className="text-sm text-ink/85">{v}</p>
                           </div>
                         ))}
                       </div>
@@ -836,31 +836,31 @@ export default function ReportPage() {
 
                   {/* Training Plan */}
                   {full_report.training_plan && (
-                    <div className="bg-surface border border-white/10 p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Personal Training Plan</h3>
-                      <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-white/5">
+                    <div className="bg-surface border border-gray-border p-6 md:p-8">
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Personal Training Plan</h3>
+                      <div className="mt-6 grid md:grid-cols-2 lg:grid-cols-3 gap-px bg-cream-soft/20">
                         {(full_report.training_plan.exercises || []).map((ex, i) => (
                           <div key={i} className="bg-surface p-4">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="font-barlow font-black uppercase text-white text-base">{ex.name}</span>
+                              <span className="font-barlow font-black uppercase text-ink text-base">{ex.name}</span>
                               <span className="text-xs text-volt font-bold">{ex.duration}</span>
                             </div>
-                            <p className="text-sm text-white/75 leading-relaxed">{ex.description}</p>
+                            <p className="text-sm text-ink/75 leading-relaxed">{ex.description}</p>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-6 grid md:grid-cols-3 gap-px bg-white/5">
+                      <div className="mt-6 grid md:grid-cols-3 gap-px bg-cream-soft/20">
                         <div className="bg-surface p-4">
                           <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">Weekly focus</div>
-                          <p className="text-sm text-white/85">{full_report.training_plan.weekly_focus}</p>
+                          <p className="text-sm text-ink/85">{full_report.training_plan.weekly_focus}</p>
                         </div>
                         <div className="bg-surface p-4">
                           <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">30-day plan</div>
-                          <p className="text-sm text-white/85">{full_report.training_plan.thirty_day_plan}</p>
+                          <p className="text-sm text-ink/85">{full_report.training_plan.thirty_day_plan}</p>
                         </div>
                         <div className="bg-surface p-4">
                           <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">90-day plan</div>
-                          <p className="text-sm text-white/85">{full_report.training_plan.ninety_day_plan}</p>
+                          <p className="text-sm text-ink/85">{full_report.training_plan.ninety_day_plan}</p>
                         </div>
                       </div>
                     </div>
@@ -868,13 +868,13 @@ export default function ReportPage() {
 
                   {/* Video Comments */}
                   {full_report.video_comments && full_report.video_comments.length > 0 && (
-                    <div className="bg-surface border border-white/10 p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Video Comments</h3>
+                    <div className="bg-surface border border-gray-border p-6 md:p-8">
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Video Comments</h3>
                       <div className="mt-6 space-y-2">
                         {full_report.video_comments.map((c, i) => (
-                          <div key={i} className="flex items-start gap-4 bg-deepnavy p-3 border border-white/5">
+                          <div key={i} className="flex items-start gap-4 bg-deepnavy p-3 border border-gray-border">
                             <span className="font-barlow font-black text-volt min-w-[64px]">{c.timestamp}</span>
-                            <p className="text-sm text-white/85">{c.comment}</p>
+                            <p className="text-sm text-ink/85">{c.comment}</p>
                           </div>
                         ))}
                       </div>
@@ -883,10 +883,10 @@ export default function ReportPage() {
 
                   {/* Final summary */}
                   {full_report.final_summary && (
-                    <div className="bg-surface border border-white/10 p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-white">Final Summary</h3>
-                      <p className="mt-4 text-white/85 leading-relaxed">{full_report.final_summary}</p>
-                      <p className="mt-6 text-xs text-white/40 italic">
+                    <div className="bg-surface border border-gray-border p-6 md:p-8">
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Final Summary</h3>
+                      <p className="mt-4 text-ink/85 leading-relaxed">{full_report.final_summary}</p>
+                      <p className="mt-6 text-xs text-ink/50 italic">
                         Scores presented as developmental guidance, not definitive scouting evaluations.
                       </p>
                     </div>
@@ -903,12 +903,12 @@ export default function ReportPage() {
               {unlocked && !full_report && !generatingFull && (
                 <div className="bg-surface border border-volt/30 p-8 text-center">
                   <Unlock className="w-10 h-10 text-volt mx-auto mb-4" strokeWidth={1.5} />
-                  <h3 className="font-barlow font-black uppercase text-2xl text-white">Report unlocked</h3>
-                  <p className="mt-2 text-white/60 text-sm">Generate your premium analysis now.</p>
+                  <h3 className="font-barlow font-black uppercase text-2xl text-ink">Report unlocked</h3>
+                  <p className="mt-2 text-ink/65 text-sm">Generate your premium analysis now.</p>
                   <button
                     onClick={handleGenerateFull}
                     data-testid="generate-full-report-btn"
-                    className="mt-6 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
+                    className="mt-6 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
                   >
                     Generate full report
                   </button>
@@ -917,7 +917,7 @@ export default function ReportPage() {
               {generatingFull && (
                 <div className="bg-surface border border-volt/30 p-8 text-center">
                   <Loader2 className="w-8 h-8 animate-spin text-volt mx-auto" />
-                  <p className="mt-4 text-white/70 uppercase tracking-widest font-bold text-sm">Generating full premium report... a few minutes</p>
+                  <p className="mt-4 text-ink/70 uppercase tracking-widest font-bold text-sm">Generating full premium report... a few minutes</p>
                 </div>
               )}
             </div>

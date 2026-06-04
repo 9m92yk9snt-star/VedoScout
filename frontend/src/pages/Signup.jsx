@@ -32,48 +32,48 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-deepnavy text-white">
+    <div className="min-h-screen bg-deepnavy text-ink">
       <Navigation />
       <div className="pt-32 pb-20 px-6">
         <div className="max-w-md mx-auto">
           <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Get started</span>
           <h1 className="mt-3 font-barlow font-black uppercase text-5xl tracking-tighter leading-[0.95]">Create account</h1>
-          <p className="mt-3 text-white/60 text-sm">Free preview included. No card required to start.</p>
+          <p className="mt-3 text-ink/65 text-sm">Free preview included. No card required to start.</p>
 
           <form onSubmit={handleSubmit} className="mt-10 space-y-5" data-testid="signup-form">
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Full name</label>
+              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Full name</label>
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 data-testid="signup-name"
-                className="w-full bg-surface border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
+                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
                 placeholder="Jane Doe"
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Email</label>
+              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 data-testid="signup-email"
-                className="w-full bg-surface border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
+                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
                 placeholder="you@email.com"
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Password</label>
+              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="signup-password"
-                className="w-full bg-surface border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
+                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
                 placeholder="At least 6 characters"
               />
             </div>
@@ -81,16 +81,16 @@ export default function Signup() {
               type="submit"
               disabled={submitting}
               data-testid="signup-submit"
-              className="w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {submitting ? "Creating..." : "Create account"}
               {!submitting && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 
-          <p className="mt-8 text-sm text-white/50 text-center">
+          <p className="mt-8 text-sm text-ink/55 text-center">
             Have an account?{" "}
-            <Link to="/login" data-testid="signup-to-login" className="text-volt hover:text-white transition-colors uppercase tracking-widest font-semibold">
+            <Link to="/login" data-testid="signup-to-login" className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold">
               Log in
             </Link>
           </p>

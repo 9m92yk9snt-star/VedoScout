@@ -20,8 +20,8 @@ const ALL_TABS = [
 ];
 
 const SEGMENT_META = {
-  all:     { label: "All users",  color: "text-white" },
-  free:    { label: "Free",       color: "text-white/70" },
+  all:     { label: "All users",  color: "text-ink" },
+  free:    { label: "Free",       color: "text-ink/70" },
   premium: { label: "Premium",    color: "text-volt" },
   scout:   { label: "Scouts",     color: "text-blue-400" },
   admin:   { label: "Admins",     color: "text-pink-400" },
@@ -168,7 +168,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-deepnavy text-white">
+    <div className="min-h-screen bg-deepnavy text-ink">
       <Navigation />
       <div className="pt-28 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
@@ -180,14 +180,14 @@ export default function AdminPage() {
               {isScoutRole ? "Scout dashboard" : "Admin dashboard"}
             </h1>
             {isScoutRole && (
-              <p className="mt-3 text-sm text-white/55 max-w-xl">
+              <p className="mt-3 text-sm text-ink/60 max-w-xl">
                 Welcome back. Review unlocked reports below — deliver your written assessment and reply to player questions in the chat thread.
               </p>
             )}
           </div>
 
           {/* Tabs */}
-          <div className="mt-8 border-b border-white/10 flex gap-1 overflow-x-auto">
+          <div className="mt-8 border-b border-gray-border flex gap-1 overflow-x-auto">
             {tabs.map((t) => {
               const newCount = t.id === "messages" ? messages.filter((m) => m.status === "new").length : 0;
               return (
@@ -196,14 +196,14 @@ export default function AdminPage() {
                   onClick={() => setActiveTab(t.id)}
                   data-testid={`admin-tab-${t.id}`}
                   className={`relative px-5 py-3 uppercase tracking-widest text-xs font-bold transition-colors whitespace-nowrap ${
-                    activeTab === t.id ? "text-volt border-b-2 border-volt" : "text-white/50 hover:text-white"
+                    activeTab === t.id ? "text-volt border-b-2 border-volt" : "text-ink/55 hover:text-ink"
                   }`}
                 >
                   {t.label}
                   {newCount > 0 && (
                     <span
                       data-testid="admin-tab-messages-badge"
-                      className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 bg-volt text-deepnavy text-[10px] font-black"
+                      className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 bg-volt text-white text-[10px] font-black"
                     >
                       {newCount}
                     </span>
@@ -220,7 +220,7 @@ export default function AdminPage() {
           ) : (
             <div className="mt-8">
               {activeTab === "stats" && stats && (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-cream-soft/40 border border-gray-border">
                   {[
                     { icon: Users, label: "Total users", val: stats.total_users, suffix: "" },
                     { icon: FileVideo, label: "Total uploads", val: stats.total_uploads, suffix: "" },
@@ -229,8 +229,8 @@ export default function AdminPage() {
                   ].map((s, i) => (
                     <div key={i} data-testid={`admin-stat-${i}`} className="bg-surface p-6">
                       <s.icon className="w-7 h-7 text-volt mb-4" strokeWidth={1.5} />
-                      <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40">{s.label}</div>
-                      <div className="mt-2 font-barlow font-black text-4xl text-white">{s.val}{s.suffix}</div>
+                      <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50">{s.label}</div>
+                      <div className="mt-2 font-barlow font-black text-4xl text-ink">{s.val}{s.suffix}</div>
                     </div>
                   ))}
                 </div>
@@ -239,9 +239,9 @@ export default function AdminPage() {
               {activeTab === "scouts" && <ScoutQueue />}
 
               {activeTab === "reports" && (
-                <div className="border border-white/10 overflow-x-auto">
+                <div className="border border-gray-border overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-volt text-deepnavy uppercase text-xs tracking-widest font-bold">
+                    <thead className="bg-volt text-white uppercase text-xs tracking-widest font-bold">
                       <tr>
                         <th className="p-3 text-left">Player</th>
                         <th className="p-3 text-left">User</th>
@@ -252,18 +252,18 @@ export default function AdminPage() {
                     </thead>
                     <tbody>
                       {reports.map((r) => (
-                        <tr key={r.id} data-testid={`admin-report-row-${r.id}`} className="bg-surface border-t border-white/5">
+                        <tr key={r.id} data-testid={`admin-report-row-${r.id}`} className="bg-surface border-t border-gray-border">
                           <td className="p-3">
-                            <div className="font-bold text-white">{r.player_details?.player_name}</div>
-                            <div className="text-xs text-white/50">{r.player_details?.position} · age {r.player_details?.age}</div>
+                            <div className="font-bold text-ink">{r.player_details?.player_name}</div>
+                            <div className="text-xs text-ink/55">{r.player_details?.position} · age {r.player_details?.age}</div>
                           </td>
-                          <td className="p-3 text-white/70 text-xs">{r.user_email}</td>
-                          <td className="p-3 text-white/60 text-xs">{new Date(r.created_at).toLocaleString()}</td>
+                          <td className="p-3 text-ink/70 text-xs">{r.user_email}</td>
+                          <td className="p-3 text-ink/65 text-xs">{new Date(r.created_at).toLocaleString()}</td>
                           <td className="p-3">
                             {r.is_paid || r.manually_unlocked ? (
                               <span className="text-volt uppercase text-xs font-bold tracking-widest">Premium</span>
                             ) : (
-                              <span className="text-white/50 uppercase text-xs font-bold tracking-widest">Preview</span>
+                              <span className="text-ink/55 uppercase text-xs font-bold tracking-widest">Preview</span>
                             )}
                           </td>
                           <td className="p-3 text-right">
@@ -273,7 +273,7 @@ export default function AdminPage() {
                                   onClick={() => handleUnlock(r.id)}
                                   data-testid={`admin-unlock-${r.id}`}
                                   title="Manually unlock"
-                                  className="text-volt hover:bg-volt hover:text-deepnavy p-2 transition-colors"
+                                  className="text-volt hover:bg-volt hover:text-white p-2 transition-colors"
                                 >
                                   <Unlock className="w-4 h-4" />
                                 </button>
@@ -282,7 +282,7 @@ export default function AdminPage() {
                                 onClick={() => handleDelete(r.id)}
                                 data-testid={`admin-delete-${r.id}`}
                                 title="Delete report"
-                                className="text-red-400 hover:bg-red-400 hover:text-deepnavy p-2 transition-colors"
+                                className="text-red-400 hover:bg-red-400 hover:text-ink p-2 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -291,7 +291,7 @@ export default function AdminPage() {
                         </tr>
                       ))}
                       {reports.length === 0 && (
-                        <tr><td colSpan="5" className="p-8 text-center text-white/40 bg-surface">No reports yet</td></tr>
+                        <tr><td colSpan="5" className="p-8 text-center text-ink/50 bg-surface">No reports yet</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -314,11 +314,11 @@ export default function AdminPage() {
                             data-testid={`admin-users-segment-${seg}`}
                             className={`px-4 py-2 uppercase tracking-widest text-[10px] font-bold border transition-colors ${
                               active
-                                ? "bg-volt text-deepnavy border-volt"
-                                : "bg-surface text-white/60 border-white/10 hover:border-white/30 hover:text-white"
+                                ? "bg-volt text-white border-volt"
+                                : "bg-surface text-white/65 border-gray-border hover:border-ink/12 hover:text-white"
                             }`}
                           >
-                            {m.label} <span className={`ml-1.5 ${active ? "text-deepnavy/70" : "text-white/40"}`}>{count}</span>
+                            {m.label} <span className={`ml-1.5 ${active ? "text-ink/70" : "text-ink/50"}`}>{count}</span>
                           </button>
                         );
                       })}
@@ -326,16 +326,16 @@ export default function AdminPage() {
                     <button
                       onClick={() => setShowCreateScout(true)}
                       data-testid="admin-add-scout-btn"
-                      className="inline-flex items-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors"
+                      className="inline-flex items-center gap-2 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors"
                     >
                       <UserPlus className="w-4 h-4" />
                       Add scout
                     </button>
                   </div>
 
-                  <div className="border border-white/10 overflow-x-auto">
+                  <div className="border border-gray-border overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-volt text-deepnavy uppercase text-xs tracking-widest font-bold">
+                      <thead className="bg-volt text-white uppercase text-xs tracking-widest font-bold">
                         <tr>
                           <th className="p-3 text-left">Name</th>
                           <th className="p-3 text-left">Email</th>
@@ -356,17 +356,17 @@ export default function AdminPage() {
                                             u.segment === "admin"   ? <ShieldCheck className="w-3 h-3" /> :
                                                                        null;
                             return (
-                              <tr key={u.id} data-testid={`admin-user-row-${u.id}`} className="bg-surface border-t border-white/5">
-                                <td className="p-3 text-white">{u.full_name}</td>
-                                <td className="p-3 text-white/70 text-xs">{u.email}</td>
+                              <tr key={u.id} data-testid={`admin-user-row-${u.id}`} className="bg-surface border-t border-gray-border">
+                                <td className="p-3 text-ink">{u.full_name}</td>
+                                <td className="p-3 text-ink/70 text-xs">{u.email}</td>
                                 <td className="p-3">
-                                  <span className={`inline-flex items-center gap-1 uppercase text-xs font-bold tracking-widest ${SEGMENT_META[u.segment]?.color || "text-white/50"}`}>
+                                  <span className={`inline-flex items-center gap-1 uppercase text-xs font-bold tracking-widest ${SEGMENT_META[u.segment]?.color || "text-ink/55"}`}>
                                     {segIcon}
                                     {u.segment}
                                   </span>
                                 </td>
-                                <td className="p-3 text-white/70 text-xs">{u.report_count ?? 0}</td>
-                                <td className="p-3 text-white/60 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
+                                <td className="p-3 text-ink/70 text-xs">{u.report_count ?? 0}</td>
+                                <td className="p-3 text-ink/65 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
                                 <td className="p-3 text-right">
                                   {canDelete ? (
                                     <button
@@ -374,12 +374,12 @@ export default function AdminPage() {
                                       disabled={deletingUserId === u.id}
                                       data-testid={`admin-delete-user-${u.id}`}
                                       title="Delete user"
-                                      className="text-red-400 hover:bg-red-400 hover:text-deepnavy p-2 transition-colors disabled:opacity-40"
+                                      className="text-red-400 hover:bg-red-400 hover:text-ink p-2 transition-colors disabled:opacity-40"
                                     >
                                       {deletingUserId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                     </button>
                                   ) : (
-                                    <span className="text-white/30 text-[10px] uppercase tracking-widest">
+                                    <span className="text-ink/40 text-[10px] uppercase tracking-widest">
                                       {isSelf ? "you" : "protected"}
                                     </span>
                                   )}
@@ -388,7 +388,7 @@ export default function AdminPage() {
                             );
                           })}
                         {users.filter((u) => userSegment === "all" || u.segment === userSegment).length === 0 && (
-                          <tr><td colSpan="6" className="p-8 text-center text-white/40 bg-surface">No users in this segment.</td></tr>
+                          <tr><td colSpan="6" className="p-8 text-center text-ink/50 bg-surface">No users in this segment.</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -399,10 +399,10 @@ export default function AdminPage() {
               {activeTab === "messages" && (
                 <div className="space-y-4">
                   {messages.length === 0 ? (
-                    <div className="border border-white/10 bg-surface p-12 text-center">
-                      <Inbox className="w-10 h-10 text-white/30 mx-auto mb-3" />
-                      <p className="font-barlow font-black uppercase tracking-tight text-lg text-white/70">No messages yet</p>
-                      <p className="text-sm text-white/40 mt-1">Contact form submissions will appear here.</p>
+                    <div className="border border-gray-border bg-surface p-12 text-center">
+                      <Inbox className="w-10 h-10 text-ink/40 mx-auto mb-3" />
+                      <p className="font-barlow font-black uppercase tracking-tight text-lg text-ink/70">No messages yet</p>
+                      <p className="text-sm text-ink/50 mt-1">Contact form submissions will appear here.</p>
                     </div>
                   ) : (
                     messages.map((m) => {
@@ -412,25 +412,25 @@ export default function AdminPage() {
                         <div
                           key={m.id}
                           data-testid={`admin-message-${m.id}`}
-                          className={`border bg-surface ${isNew ? "border-volt/40" : "border-white/10"} ${isArchived ? "opacity-60" : ""}`}
+                          className={`border bg-surface ${isNew ? "border-volt/40" : "border-gray-border"} ${isArchived ? "opacity-60" : ""}`}
                         >
-                          <div className="px-5 py-4 flex flex-wrap items-start justify-between gap-3 border-b border-white/8">
+                          <div className="px-5 py-4 flex flex-wrap items-start justify-between gap-3 border-b border-gray-border">
                             <div className="min-w-0">
                               <div className="flex items-center gap-2.5">
                                 {isNew ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-volt text-white text-[10px] uppercase tracking-widest font-black">
                                     <Mail className="w-3 h-3" /> New
                                   </span>
                                 ) : isArchived ? (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/8 text-white/50 text-[10px] uppercase tracking-widest font-bold">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cream-soft/30 text-ink/55 text-[10px] uppercase tracking-widest font-bold">
                                     Archived
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/8 text-white/70 text-[10px] uppercase tracking-widest font-bold">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-cream-soft/30 text-ink/70 text-[10px] uppercase tracking-widest font-bold">
                                     <MailOpen className="w-3 h-3" /> Read
                                   </span>
                                 )}
-                                <span className="font-barlow font-black uppercase text-base text-white">{m.name}</span>
+                                <span className="font-barlow font-black uppercase text-base text-ink">{m.name}</span>
                               </div>
                               <a
                                 href={`mailto:${m.email}?subject=Re: Your message to ScoutMePlay`}
@@ -438,7 +438,7 @@ export default function AdminPage() {
                               >
                                 {m.email}
                               </a>
-                              <p className="mt-1 text-[10px] uppercase tracking-[0.22em] font-bold text-white/35">
+                              <p className="mt-1 text-[10px] uppercase tracking-[0.22em] font-bold text-ink/45">
                                 {new Date(m.created_at).toLocaleString()}
                               </p>
                             </div>
@@ -447,7 +447,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => updateMessageStatus(m.id, "read")}
                                   data-testid={`admin-msg-mark-read-${m.id}`}
-                                  className="text-xs uppercase tracking-widest font-bold text-white/55 hover:text-volt px-2 py-1 transition-colors"
+                                  className="text-xs uppercase tracking-widest font-bold text-ink/60 hover:text-volt px-2 py-1 transition-colors"
                                 >
                                   Mark read
                                 </button>
@@ -456,7 +456,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => updateMessageStatus(m.id, "archived")}
                                   data-testid={`admin-msg-archive-${m.id}`}
-                                  className="text-xs uppercase tracking-widest font-bold text-white/55 hover:text-volt px-2 py-1 transition-colors"
+                                  className="text-xs uppercase tracking-widest font-bold text-ink/60 hover:text-volt px-2 py-1 transition-colors"
                                 >
                                   Archive
                                 </button>
@@ -464,7 +464,7 @@ export default function AdminPage() {
                                 <button
                                   onClick={() => updateMessageStatus(m.id, "read")}
                                   data-testid={`admin-msg-unarchive-${m.id}`}
-                                  className="text-xs uppercase tracking-widest font-bold text-white/55 hover:text-volt px-2 py-1 transition-colors"
+                                  className="text-xs uppercase tracking-widest font-bold text-ink/60 hover:text-volt px-2 py-1 transition-colors"
                                 >
                                   Unarchive
                                 </button>
@@ -473,13 +473,13 @@ export default function AdminPage() {
                                 onClick={() => deleteMessage(m.id)}
                                 data-testid={`admin-msg-delete-${m.id}`}
                                 title="Delete"
-                                className="text-red-400 hover:bg-red-400 hover:text-deepnavy p-2 transition-colors"
+                                className="text-red-400 hover:bg-red-400 hover:text-ink p-2 transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
-                          <div className="px-5 py-4 text-sm text-white/80 whitespace-pre-wrap leading-relaxed">
+                          <div className="px-5 py-4 text-sm text-ink/80 whitespace-pre-wrap leading-relaxed">
                             {m.message}
                           </div>
                         </div>
@@ -490,9 +490,9 @@ export default function AdminPage() {
               )}
 
               {activeTab === "payments" && (
-                <div className="border border-white/10 overflow-x-auto">
+                <div className="border border-gray-border overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-volt text-deepnavy uppercase text-xs tracking-widest font-bold">
+                    <thead className="bg-volt text-white uppercase text-xs tracking-widest font-bold">
                       <tr>
                         <th className="p-3 text-left">Date</th>
                         <th className="p-3 text-left">User</th>
@@ -503,20 +503,20 @@ export default function AdminPage() {
                     </thead>
                     <tbody>
                       {payments.map((p) => (
-                        <tr key={p.id} className="bg-surface border-t border-white/5">
-                          <td className="p-3 text-white/60 text-xs">{new Date(p.created_at).toLocaleString()}</td>
-                          <td className="p-3 text-white/70 text-xs">{p.user_email}</td>
-                          <td className="p-3 text-white font-bold">{p.amount} {(p.currency || "").toUpperCase()}</td>
+                        <tr key={p.id} className="bg-surface border-t border-gray-border">
+                          <td className="p-3 text-ink/65 text-xs">{new Date(p.created_at).toLocaleString()}</td>
+                          <td className="p-3 text-ink/70 text-xs">{p.user_email}</td>
+                          <td className="p-3 text-ink font-bold">{p.amount} {(p.currency || "").toUpperCase()}</td>
                           <td className="p-3">
-                            <span className={`uppercase text-xs font-bold tracking-widest ${p.payment_status === "paid" ? "text-volt" : "text-white/50"}`}>
+                            <span className={`uppercase text-xs font-bold tracking-widest ${p.payment_status === "paid" ? "text-volt" : "text-ink/55"}`}>
                               {p.payment_status}
                             </span>
                           </td>
-                          <td className="p-3 text-white/40 text-[10px] font-mono break-all">{p.session_id}</td>
+                          <td className="p-3 text-ink/50 text-[10px] font-mono break-all">{p.session_id}</td>
                         </tr>
                       ))}
                       {payments.length === 0 && (
-                        <tr><td colSpan="5" className="p-8 text-center text-white/40 bg-surface">No payments yet</td></tr>
+                        <tr><td colSpan="5" className="p-8 text-center text-ink/50 bg-surface">No payments yet</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -524,12 +524,12 @@ export default function AdminPage() {
               )}
 
               {activeTab === "settings" && (
-                <div className="bg-surface border border-white/10 p-6 md:p-8 max-w-xl">
-                  <h2 className="font-barlow font-black uppercase text-2xl text-white">Pricing</h2>
-                  <p className="mt-2 text-white/60 text-sm">Modify the one-time premium report price.</p>
+                <div className="bg-surface border border-gray-border p-6 md:p-8 max-w-xl">
+                  <h2 className="font-barlow font-black uppercase text-2xl text-ink">Pricing</h2>
+                  <p className="mt-2 text-ink/65 text-sm">Modify the one-time premium report price.</p>
 
                   <div className="mt-6">
-                    <label className="text-xs uppercase tracking-[0.2em] font-bold text-white/50 block mb-2">Current price (USD)</label>
+                    <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Current price (USD)</label>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -538,19 +538,19 @@ export default function AdminPage() {
                         value={priceInput}
                         onChange={(e) => setPriceInput(e.target.value)}
                         data-testid="admin-price-input"
-                        className="flex-1 bg-deepnavy border border-white/10 px-3 py-3 text-white focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                        className="flex-1 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                       />
                       <button
                         onClick={handlePriceSave}
                         disabled={savingPrice}
                         data-testid="admin-price-save"
-                        className="bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-6 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 transition-colors disabled:opacity-50 flex items-center gap-2"
                       >
                         {savingPrice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         Save
                       </button>
                     </div>
-                    <p className="mt-3 text-xs text-white/40">Currently active: <span className="text-volt font-bold">${price} USD</span></p>
+                    <p className="mt-3 text-xs text-ink/50">Currently active: <span className="text-volt font-bold">${price} USD</span></p>
                   </div>
                 </div>
               )}
@@ -618,7 +618,7 @@ function CreateScoutModal({ open, onClose, onCreated }) {
   return (
     <div
       data-testid="create-scout-modal"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-deepnavy/85 backdrop-blur-md px-4 py-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-cream-card backdrop-blur-md px-4 py-6"
       onClick={onClose}
     >
       <div
@@ -626,14 +626,14 @@ function CreateScoutModal({ open, onClose, onCreated }) {
         className="relative w-full max-w-md border-2 border-volt/30 bg-surface/95 backdrop-blur-2xl"
         style={{ boxShadow: "0 0 80px rgba(204,255,0,0.18)" }}
       >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-white/8">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-border">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 bg-volt/10 border border-volt/40 flex items-center justify-center">
               <UserCheck className="w-4 h-4 text-volt" />
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Scout / Agent</div>
-              <div className="font-barlow font-black uppercase text-white text-base leading-tight mt-0.5">
+              <div className="font-barlow font-black uppercase text-ink text-base leading-tight mt-0.5">
                 Add new scout
               </div>
             </div>
@@ -642,20 +642,20 @@ function CreateScoutModal({ open, onClose, onCreated }) {
             onClick={onClose}
             aria-label="Close"
             data-testid="create-scout-close"
-            className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-volt transition-colors"
+            className="w-8 h-8 flex items-center justify-center text-ink/55 hover:text-volt transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={submit} className="px-6 py-5 space-y-4">
-          <p className="text-xs text-white/55 leading-relaxed">
+          <p className="text-xs text-ink/60 leading-relaxed">
             Scouts log in and respond to unlocked reports. They can deliver the initial review and chat with the player —
             they cannot see other admin tabs, payments, or users.
           </p>
 
           <div>
-            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 block mb-1.5">
               Full name
             </label>
             <input
@@ -664,13 +664,13 @@ function CreateScoutModal({ open, onClose, onCreated }) {
               onChange={(e) => setFullName(e.target.value)}
               placeholder="e.g. Marco Vasquez"
               data-testid="create-scout-name"
-              className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+              className="w-full bg-deepnavy border border-gray-border px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 block mb-1.5">
               Email
             </label>
             <input
@@ -679,12 +679,12 @@ function CreateScoutModal({ open, onClose, onCreated }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="scout@scoutmeplay.com"
               data-testid="create-scout-email"
-              className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+              className="w-full bg-deepnavy border border-gray-border px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
             />
           </div>
 
           <div>
-            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/50 block mb-1.5">
+            <label className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 block mb-1.5">
               Temporary password
             </label>
             <div className="relative">
@@ -694,25 +694,25 @@ function CreateScoutModal({ open, onClose, onCreated }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Min 6 characters"
                 data-testid="create-scout-password"
-                className="w-full bg-deepnavy border border-white/10 px-3 py-2.5 pr-10 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                className="w-full bg-deepnavy border border-gray-border px-3 py-2.5 pr-10 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
               />
               <button
                 type="button"
                 onClick={() => setShowPwd((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-ink/50 hover:text-ink"
                 tabIndex={-1}
               >
                 {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="mt-1 text-[10px] text-white/40">Share this with the scout securely. They can change it later via the profile settings (future feature).</p>
+            <p className="mt-1 text-[10px] text-ink/50">Share this with the scout securely. They can change it later via the profile settings (future feature).</p>
           </div>
 
           <button
             type="submit"
             disabled={submitting}
             data-testid="create-scout-submit"
-            className="w-full inline-flex items-center justify-center gap-2 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm px-5 py-3 transition-colors disabled:opacity-50"
+            className="w-full inline-flex items-center justify-center gap-2 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-5 py-3 transition-colors disabled:opacity-50"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
             Create scout

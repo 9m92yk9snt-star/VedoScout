@@ -17,10 +17,23 @@ module.exports = {
         sm: 'calc(var(--radius) - 4px)'
       },
       colors: {
-        volt: '#CCFF00',
-        'volt-hover': '#B3E600',
-        deepnavy: '#050A0F',
-        surface: '#0F1623',
+        // Legacy tokens (kept for backward-compat) — will be phased out
+        volt: '#2D6B3D',
+        'volt-hover': '#1F4F2F',
+        // New premium cream/forest aesthetic (mockup-driven)
+        'cream-base': '#F4EFE6',
+        'cream-soft': '#EAE3D2',
+        'cream-card': '#FFFFFF',
+        forest: '#1F4F2F',
+        'forest-pop': '#2D6B3D',
+        ink: '#0A0F0D',
+        'gray-body': '#4B5563',
+        'gray-border': '#E5E7EB',
+        // Legacy aliases (deepnavy + surface now point to the new cream/dark equivalents
+        // so existing `bg-deepnavy` rendering as the page-background turns cream automatically.
+        // Navbar and footer should EXPLICITLY use `bg-ink`.)
+        deepnavy: '#F4EFE6',
+        surface: '#FFFFFF',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
@@ -72,8 +85,8 @@ module.exports = {
           to: { height: '0' }
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(204, 255, 0, 0.5)' },
-          '50%': { boxShadow: '0 0 0 12px rgba(204, 255, 0, 0)' }
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(31, 79, 47, 0.5)' },
+          '50%': { boxShadow: '0 0 0 12px rgba(31, 79, 47, 0)' }
         }
       },
       animation: {

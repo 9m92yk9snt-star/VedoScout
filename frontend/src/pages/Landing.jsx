@@ -96,7 +96,7 @@ function CardViz({ viz }) {
     case "scorePill":
       return (
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-white/70 border border-white/25 rounded-full px-3 py-1.5 whitespace-nowrap">
+          <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-ink/70 border border-ink/10 rounded-full px-3 py-1.5 whitespace-nowrap">
             {viz.label}
           </span>
           <span className="font-barlow font-black text-2xl md:text-3xl text-volt leading-none">
@@ -107,7 +107,7 @@ function CardViz({ viz }) {
     case "progressBar":
       return (
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 bg-white/10 overflow-hidden">
+          <div className="flex-1 h-2 bg-cream-soft/40 overflow-hidden">
             <div className="h-full bg-volt" style={{ width: `${viz.percent}%` }} />
           </div>
           <span className="font-barlow font-black text-volt text-lg leading-none">{viz.value}</span>
@@ -134,7 +134,7 @@ function CardViz({ viz }) {
           {viz.bars.map((h, i) => (
             <div
               key={i}
-              className={`flex-1 ${h > 60 ? "bg-volt" : "bg-white/20"}`}
+              className={`flex-1 ${h > 60 ? "bg-volt" : "bg-cream-soft/60"}`}
               style={{ height: `${h}%` }}
             />
           ))}
@@ -147,7 +147,7 @@ function CardViz({ viz }) {
           {[1, 2, 3, 4, 5].map((i) => (
             <Star
               key={i}
-              className={`w-5 h-5 ${i <= viz.value ? "text-volt fill-volt" : "text-white/15"}`}
+              className={`w-5 h-5 ${i <= viz.value ? "text-volt fill-volt" : "text-ink/25"}`}
               strokeWidth={1.5}
             />
           ))}
@@ -185,7 +185,7 @@ function CardViz({ viz }) {
     case "topPercent":
       return (
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-2 bg-white/10 overflow-hidden">
+          <div className="flex-1 h-2 bg-cream-soft/40 overflow-hidden">
             <div className="h-full bg-volt" style={{ width: `${viz.percent}%` }} />
           </div>
           <span className="font-barlow font-black text-volt text-sm leading-none whitespace-nowrap">{viz.label}</span>
@@ -194,7 +194,7 @@ function CardViz({ viz }) {
     case "pill": {
       const { PillIcon } = viz;
       return (
-        <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-white/85 border border-white/25 rounded-full px-3.5 py-1.5">
+        <span className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/85 border border-ink/10 rounded-full px-3.5 py-1.5">
           {viz.label}
           {PillIcon && <PillIcon className="w-3.5 h-3.5 text-volt" />}
         </span>
@@ -303,12 +303,12 @@ function ScoreBar({ label, value, locked = false, benchmark = 65 }) {
   return (
     <div ref={ref} className={locked ? "opacity-70" : ""}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-white/70">{label}</span>
+        <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-ink/70">{label}</span>
         <span className="font-barlow font-black text-volt text-base">
-          {locked ? "—" : <AnimatedNumber value={value} />}<span className="text-white/30 text-xs">/10</span>
+          {locked ? "—" : <AnimatedNumber value={value} />}<span className="text-ink/40 text-xs">/10</span>
         </span>
       </div>
-      <div className="h-1 bg-white/10 overflow-hidden relative">
+      <div className="h-1 bg-cream-soft/40 overflow-hidden relative">
         <div
           className="absolute top-0 left-0 h-full bg-volt"
           style={{
@@ -345,7 +345,7 @@ export default function Landing() {
   const startLabel = user ? "Upload your video" : "Get started";
 
   return (
-    <div className="min-h-screen bg-deepnavy text-white relative overflow-hidden">
+    <div className="min-h-screen bg-deepnavy text-ink relative overflow-hidden">
       {/* Scroll progress bar */}
       <motion.div className="scroll-progress-bar" style={{ scaleX: scrollYProgress }} />
       <Navigation transparent />
@@ -400,10 +400,10 @@ export default function Landing() {
               <motion.p
                 initial="hidden" animate="visible" variants={fadeUp} custom={2}
                 data-testid="hero-description"
-                className="mt-7 max-w-xl text-base md:text-lg text-white/80 leading-relaxed"
+                className="mt-7 max-w-xl text-base md:text-lg text-ink/80 leading-relaxed"
               >
                 Upload your football video and get{" "}
-                <span className="text-white font-semibold">professional feedback</span>{" "}
+                <span className="text-ink font-semibold">professional feedback</span>{" "}
                 from experienced scouts and agents connected to clubs around the world.
               </motion.p>
 
@@ -414,7 +414,7 @@ export default function Landing() {
                 <Link
                   to={startHref}
                   data-testid="hero-cta-upload"
-                  className="group flex-1 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-6 py-4 flex items-center justify-center gap-3 transition-colors animate-pulse-glow"
+                  className="group flex-1 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-6 py-4 flex items-center justify-center gap-3 transition-colors animate-pulse-glow"
                 >
                   <Upload className="w-5 h-5" />
                   {startLabel}
@@ -424,7 +424,7 @@ export default function Landing() {
                   <Link
                     to="/login"
                     data-testid="hero-cta-login"
-                    className="flex-1 border border-white/20 hover:border-volt hover:text-volt text-white font-barlow font-black uppercase tracking-widest text-base px-6 py-4 flex items-center justify-center gap-2 transition-colors"
+                    className="flex-1 border border-gray-border hover:border-volt hover:text-volt text-ink font-barlow font-black uppercase tracking-widest text-base px-6 py-4 flex items-center justify-center gap-2 transition-colors"
                   >
                     Sign in
                   </Link>
@@ -433,7 +433,7 @@ export default function Landing() {
 
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={4}
-                className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-white/50"
+                className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-ink/55"
               >
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
                 <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> ${price} USD · one-time</span>
@@ -488,7 +488,7 @@ export default function Landing() {
                     <div className="absolute -left-8 sm:-left-10 top-0 w-12 h-12 sm:w-14 sm:h-14 -translate-x-1/2 flex items-center justify-center bg-deepnavy border border-volt/40 shrink-0">
                       <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-volt" strokeWidth={1.5} />
                     </div>
-                    <p className="text-sm md:text-base text-white/75 leading-relaxed pt-2.5 sm:pt-3.5">
+                    <p className="text-sm md:text-base text-ink/75 leading-relaxed pt-2.5 sm:pt-3.5">
                       {body}
                     </p>
                   </div>
@@ -512,7 +512,7 @@ export default function Landing() {
                 <span aria-hidden className="absolute inset-1.5 border border-volt/40 rounded-full" />
                 <Eye className="relative w-6 h-6 md:w-7 md:h-7 text-volt" strokeWidth={1.6} fill="rgba(204,255,0,0.08)" />
               </div>
-              <p className="font-serif-italic italic text-xl md:text-2xl text-white/95 leading-snug text-center">
+              <p className="font-serif-italic italic text-xl md:text-2xl text-ink leading-snug text-center">
                 See your game through the eyes of{" "}
                 <span className="text-volt">professionals.</span>
               </p>
@@ -522,7 +522,7 @@ export default function Landing() {
               <div className="flex-1 h-px bg-gradient-to-r from-transparent via-volt/40 to-volt/40" />
               <p className="font-barlow font-black uppercase tracking-[0.22em] text-xs md:text-sm whitespace-nowrap">
                 <span className="text-volt">Know your potential.</span>{" "}
-                <span className="text-white">Unlock your future.</span>
+                <span className="text-ink">Unlock your future.</span>
               </p>
               <div className="flex-1 h-px bg-gradient-to-l from-transparent via-volt/40 to-volt/40" />
             </div>
@@ -533,7 +533,7 @@ export default function Landing() {
       {/* ============ HOW IT WORKS — 3 steps card (clean section after hero) ============ */}
       <section
         data-testid="how-it-works"
-        className="relative py-16 md:py-20 border-t border-white/10 bg-deepnavy"
+        className="relative py-16 md:py-20 border-t border-gray-border bg-deepnavy"
       >
         <div className="max-w-3xl mx-auto px-6 md:px-10">
           <motion.div
@@ -541,11 +541,11 @@ export default function Landing() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="card-premium border border-white/10 bg-surface/85 backdrop-blur-xl p-6 md:p-10"
+            className="card-premium border border-gray-border bg-surface/85 backdrop-blur-xl p-6 md:p-10"
           >
             <div className="flex items-center justify-between mb-7">
               <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">How it works · 3 steps</span>
-              <span className="text-white/40 text-xs uppercase tracking-widest font-bold">~ 2 min</span>
+              <span className="text-ink/50 text-xs uppercase tracking-widest font-bold">~ 2 min</span>
             </div>
 
             <ol className="space-y-5 md:space-y-6">
@@ -557,8 +557,8 @@ export default function Landing() {
                 <li key={i} className="flex gap-4 md:gap-5 items-start">
                   <span className="font-barlow font-black text-3xl md:text-4xl text-volt/40 leading-none w-10 md:w-12 flex-shrink-0">{s.n}</span>
                   <div>
-                    <div className="font-barlow font-black uppercase text-white text-lg md:text-xl leading-tight">{s.t}</div>
-                    <div className="text-xs md:text-sm text-white/60 mt-1">{s.d}</div>
+                    <div className="font-barlow font-black uppercase text-ink text-lg md:text-xl leading-tight">{s.t}</div>
+                    <div className="text-xs md:text-sm text-ink/65 mt-1">{s.d}</div>
                   </div>
                 </li>
               ))}
@@ -567,13 +567,13 @@ export default function Landing() {
             <Link
               to={startHref}
               data-testid="card-cta"
-              className="mt-8 md:mt-10 w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+              className="mt-8 md:mt-10 w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
             >
               Start free preview
               <ArrowRight className="w-4 h-4" />
             </Link>
 
-            <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-3 gap-2">
+            <div className="mt-6 pt-6 border-t border-gray-border grid grid-cols-3 gap-2">
               {[
                 { i: Brain, l: "Report" },
                 { i: Target, l: "Scout View" },
@@ -581,14 +581,14 @@ export default function Landing() {
               ].map(({ i: Icon, l }, idx) => (
                 <div key={idx} className="flex flex-col items-center gap-1.5 text-center">
                   <Icon className="w-4 h-4 text-volt" strokeWidth={1.5} />
-                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/60">{l}</span>
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-ink/65">{l}</span>
                 </div>
               ))}
             </div>
 
             <a
               href="#what-you-get"
-              className="mt-7 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-white/40 hover:text-volt transition-colors"
+              className="mt-7 flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.25em] font-bold text-ink/50 hover:text-volt transition-colors"
             >
               See an example report below
               <span className="w-8 h-px bg-current" />
@@ -598,14 +598,14 @@ export default function Landing() {
       </section>
 
       {/* ============ WHAT YOU RECEIVE — rich feature cards ============ */}
-      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-24 md:py-32 border-t border-white/10 overflow-hidden">
+      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-24 md:py-32 border-t border-gray-border overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-15">
           <img
             src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
             alt="Pitch"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-deepnavy/92" />
+          <div className="absolute inset-0 bg-cream-card" />
         </div>
         {/* Subtle volt glow accents */}
         <div aria-hidden className="absolute -top-40 right-0 w-[420px] h-[420px] bg-volt/10 rounded-full blur-3xl pointer-events-none" />
@@ -630,7 +630,7 @@ export default function Landing() {
                   <span className="font-serif-italic normal-case font-normal lowercase tracking-normal text-volt">you</span>{" "}
                   don't?
                 </h2>
-                <p className="mt-6 text-white/70 text-base md:text-lg max-w-xl leading-relaxed">
+                <p className="mt-6 text-ink/70 text-base md:text-lg max-w-xl leading-relaxed">
                   Professional analysis. Honest insights. Built to help you grow.
                 </p>
               </div>
@@ -638,7 +638,7 @@ export default function Landing() {
               {/* Decorative jersey badge — visually echoes the reference */}
               <div className="hidden lg:flex lg:col-span-4 justify-end">
                 <div className="relative w-full max-w-[260px] aspect-[3/4]">
-                  <div className="absolute inset-0 border border-volt/30 bg-deepnavy/60 backdrop-blur-sm">
+                  <div className="absolute inset-0 border border-volt/30 bg-cream-card/90 backdrop-blur-sm">
                     {/* corner brackets */}
                     <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-volt" />
                     <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-volt" />
@@ -653,7 +653,7 @@ export default function Landing() {
                       >
                         10
                       </span>
-                      <span className="mt-3 text-[10px] uppercase tracking-[0.2em] font-bold text-white/50">
+                      <span className="mt-3 text-[10px] uppercase tracking-[0.2em] font-bold text-ink/55">
                         Built for the next level
                       </span>
                     </div>
@@ -673,10 +673,10 @@ export default function Landing() {
                 viewport={{ once: true, amount: 0.2 }}
                 transition={{ duration: 0.5, delay: (i % 3) * 0.08, ease: "easeOut" }}
                 data-testid={`feature-card-${i}`}
-                className="relative bg-surface/80 backdrop-blur-sm border border-white/10 hover:border-volt/40 p-6 md:p-7 flex flex-col group transition-colors"
+                className="relative bg-surface/80 backdrop-blur-sm border border-gray-border hover:border-volt/40 p-6 md:p-7 flex flex-col group transition-colors"
               >
                 {/* Number — top right */}
-                <span className="absolute top-5 right-6 font-barlow font-black text-xs text-white/25 tracking-widest">
+                <span className="absolute top-5 right-6 font-barlow font-black text-xs text-ink/35 tracking-widest">
                   {String(i + 1).padStart(2, "0")}
                 </span>
 
@@ -684,17 +684,17 @@ export default function Landing() {
                 <card.icon className="w-8 h-8 md:w-9 md:h-9 text-volt mb-6 group-hover:scale-105 transition-transform" strokeWidth={1.5} />
 
                 {/* Title */}
-                <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-white mb-3 leading-tight tracking-tight">
+                <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink mb-3 leading-tight tracking-tight">
                   {card.title}
                 </h3>
 
                 {/* Description */}
-                <p className="text-sm text-white/65 leading-relaxed mb-6 flex-1">
+                <p className="text-sm text-ink/70 leading-relaxed mb-6 flex-1">
                   {card.text}
                 </p>
 
                 {/* Visualization at bottom */}
-                <div className="mt-auto pt-5 border-t border-white/5">
+                <div className="mt-auto pt-5 border-t border-gray-border">
                   <CardViz viz={card.viz} />
                 </div>
               </motion.div>
@@ -714,12 +714,12 @@ export default function Landing() {
 
               <Crown className="w-9 h-9 md:w-10 md:h-10 text-volt mb-6" strokeWidth={1.5} fill="#ccff00" fillOpacity="0.18" />
 
-              <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-white mb-2 leading-tight tracking-tight">
+              <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink mb-2 leading-tight tracking-tight">
                 100% Personal.<br />
                 100% Game Changing.
               </h3>
 
-              <p className="text-sm text-white/80 leading-relaxed mt-3">
+              <p className="text-sm text-ink/80 leading-relaxed mt-3">
                 This is more than a report.{" "}
                 <span className="text-volt font-serif-italic italic">It's your advantage.</span>
               </p>
@@ -728,7 +728,7 @@ export default function Landing() {
                 <Link
                   to={startHref}
                   data-testid="report-section-cta"
-                  className="inline-flex items-center gap-2 font-barlow font-black uppercase text-xs tracking-[0.22em] text-volt hover:text-white transition-colors"
+                  className="inline-flex items-center gap-2 font-barlow font-black uppercase text-xs tracking-[0.22em] text-volt hover:text-ink transition-colors"
                 >
                   Unlock your report
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -740,7 +740,7 @@ export default function Landing() {
           {/* ===== Bottom trust bar ===== */}
           <div
             data-testid="report-trust-bar"
-            className="mt-12 md:mt-16 border border-white/10 bg-surface/40 backdrop-blur-sm divide-y md:divide-y-0 md:divide-x divide-white/10 grid md:grid-cols-3"
+            className="mt-12 md:mt-16 border border-gray-border bg-surface/40 backdrop-blur-sm divide-y md:divide-y-0 md:divide-x divide-white/10 grid md:grid-cols-3"
           >
             {[
               { Icon: Clock, t: "5–10 Minutes", s: "To complete" },
@@ -750,8 +750,8 @@ export default function Landing() {
               <div key={i} className="flex items-center gap-3 px-6 py-5">
                 <Icon className="w-5 h-5 text-volt shrink-0" strokeWidth={1.8} />
                 <div className="flex flex-col leading-tight">
-                  <span className="font-barlow font-black uppercase text-white text-sm tracking-wider">{t}</span>
-                  <span className="text-white/55 text-[11px] uppercase tracking-[0.18em] font-bold mt-0.5">{s}</span>
+                  <span className="font-barlow font-black uppercase text-ink text-sm tracking-wider">{t}</span>
+                  <span className="text-ink/60 text-[11px] uppercase tracking-[0.18em] font-bold mt-0.5">{s}</span>
                 </div>
               </div>
             ))}
@@ -762,7 +762,7 @@ export default function Landing() {
       {/* ============ SAMPLE REPORT — RICH, COMPELLING, WOW ============ */}
       <section
         data-testid="example-report"
-        className="section-accent-top relative py-24 md:py-32 border-t border-white/10 overflow-hidden"
+        className="section-accent-top relative py-24 md:py-32 border-t border-gray-border overflow-hidden"
       >
         {/* Soft background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -778,7 +778,7 @@ export default function Landing() {
               <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
                 This is what you get.
               </h2>
-              <p className="mt-4 text-white/65 max-w-2xl">
+              <p className="mt-4 text-ink/70 max-w-2xl">
                 Below is a real example. The first box is the free preview — like the one you'll see right after you
                 upload. Everything else is what our scouts unlock for <span className="text-volt font-bold">${price} USD</span>.
               </p>
@@ -786,7 +786,7 @@ export default function Landing() {
           </div>
 
           {/* === SAMPLE REPORT HEADER — pro football card === */}
-          <div className="grid lg:grid-cols-5 gap-px bg-white/10 border border-white/10 mb-px">
+          <div className="grid lg:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border mb-px">
             {/* Player card — premium football style */}
             <div className="bg-surface lg:col-span-2 relative overflow-hidden">
               {/* Pitch background */}
@@ -800,11 +800,11 @@ export default function Landing() {
               </div>
 
               {/* Top stripe with badge + free tag */}
-              <div className="relative flex items-center justify-between px-5 py-3 border-b border-white/10 bg-deepnavy/60">
+              <div className="relative flex items-center justify-between px-5 py-3 border-b border-gray-border bg-cream-card/90">
                 <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-volt rounded-full animate-pulse" /> Free Preview
                 </span>
-                <span className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-bold">{sample.player.videoType}</span>
+                <span className="text-ink/50 text-[10px] uppercase tracking-[0.2em] font-bold">{sample.player.videoType}</span>
               </div>
 
               <div className="relative px-5 md:px-7 py-6 md:py-7">
@@ -817,50 +817,50 @@ export default function Landing() {
                     </div>
                   </div>
                   <div className="flex-1 min-w-0 pt-2">
-                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40 mb-1">Player</div>
-                    <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.9] text-white">
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50 mb-1">Player</div>
+                    <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.9] text-ink">
                       {sample.player.name}
                     </h3>
                     <div className="mt-2 inline-flex items-center gap-2 bg-volt/10 border border-volt/30 px-2.5 py-1">
                       <span className="font-barlow font-black uppercase text-volt text-sm leading-none">{sample.player.positionShort}</span>
-                      <span className="text-white/60 text-[11px]">·</span>
-                      <span className="text-white/80 text-xs">{sample.player.position}</span>
+                      <span className="text-ink/65 text-[11px]">·</span>
+                      <span className="text-ink/80 text-xs">{sample.player.position}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Meta row */}
-                <div className="mt-6 grid grid-cols-3 gap-px bg-white/5 border border-white/10">
-                  <div className="bg-deepnavy/60 p-3">
-                    <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Age</div>
-                    <div className="font-barlow font-black text-white text-2xl leading-none mt-1">{sample.player.age}</div>
+                <div className="mt-6 grid grid-cols-3 gap-px bg-cream-soft/20 border border-gray-border">
+                  <div className="bg-cream-card/90 p-3">
+                    <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Age</div>
+                    <div className="font-barlow font-black text-ink text-2xl leading-none mt-1">{sample.player.age}</div>
                   </div>
-                  <div className="bg-deepnavy/60 p-3">
-                    <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Foot</div>
-                    <div className="font-barlow font-black text-white text-lg leading-none mt-1.5">{sample.player.foot}</div>
+                  <div className="bg-cream-card/90 p-3">
+                    <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Foot</div>
+                    <div className="font-barlow font-black text-ink text-lg leading-none mt-1.5">{sample.player.foot}</div>
                   </div>
-                  <div className="bg-deepnavy/60 p-3">
-                    <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">Team</div>
-                    <div className="font-barlow font-black text-white text-sm leading-none mt-1.5 truncate">{sample.player.club}</div>
+                  <div className="bg-cream-card/90 p-3">
+                    <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Team</div>
+                    <div className="font-barlow font-black text-ink text-sm leading-none mt-1.5 truncate">{sample.player.club}</div>
                   </div>
                 </div>
 
                 {/* Style tag */}
-                <div className="mt-4 flex items-center gap-2 text-xs text-white/70">
+                <div className="mt-4 flex items-center gap-2 text-xs text-ink/70">
                   <Star className="w-3.5 h-3.5 text-volt flex-shrink-0" fill="currentColor" />
                   <span className="font-bold">{sample.player.type}</span>
                 </div>
 
                 {/* Score row */}
-                <div className="mt-5 grid grid-cols-4 gap-px bg-white/10 border border-volt/20">
+                <div className="mt-5 grid grid-cols-4 gap-px bg-cream-soft/40 border border-volt/20">
                   {[
                     { k: "TECH", v: sample.scores.technical },
                     { k: "TACT", v: sample.scores.tactical },
                     { k: "PHYS", v: sample.scores.physical },
                     { k: "MENT", v: sample.scores.mentality },
                   ].map((s, i) => (
-                    <div key={i} className="bg-deepnavy/80 py-3 text-center">
-                      <div className="text-[9px] uppercase tracking-widest text-white/40 font-bold">{s.k}</div>
+                    <div key={i} className="bg-cream-card py-3 text-center">
+                      <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">{s.k}</div>
                       <div className="font-barlow font-black text-3xl text-volt mt-0.5 leading-none">{s.v}</div>
                     </div>
                   ))}
@@ -872,16 +872,16 @@ export default function Landing() {
             <div className="bg-surface p-6 md:p-8 lg:col-span-3">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">What our scouts saw</span>
-                <span className="text-white/30 text-[10px] uppercase tracking-widest font-bold">Free preview</span>
+                <span className="text-ink/40 text-[10px] uppercase tracking-widest font-bold">Free preview</span>
               </div>
-              <p className="text-white/90 text-base md:text-[17px] leading-[1.65]">{sample.summary}</p>
+              <p className="text-ink text-base md:text-[17px] leading-[1.65]">{sample.summary}</p>
 
-              <div className="mt-7 grid sm:grid-cols-2 gap-6 pt-6 border-t border-white/10">
+              <div className="mt-7 grid sm:grid-cols-2 gap-6 pt-6 border-t border-gray-border">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">What he does well</div>
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">What he does well</div>
                   <ul className="space-y-2.5">
                     {sample.strengths.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-white/90 leading-snug">
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-ink leading-snug">
                         <CheckCircle2 className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
                         <span>{s}</span>
                       </li>
@@ -889,8 +889,8 @@ export default function Landing() {
                   </ul>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-white/40 mb-3">What to work on</div>
-                  <p className="text-sm text-white/85 leading-relaxed">{sample.improvement}</p>
+                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">What to work on</div>
+                  <p className="text-sm text-ink/85 leading-relaxed">{sample.improvement}</p>
                 </div>
               </div>
             </div>
@@ -899,7 +899,7 @@ export default function Landing() {
           {/* === PREMIUM SECTIONS — blurred but visually rich === */}
           <div className="relative">
             {/* The actual content (blurred) */}
-            <div className="blur-locked grid lg:grid-cols-3 gap-px bg-white/10 border border-white/10">
+            <div className="blur-locked grid lg:grid-cols-3 gap-px bg-cream-soft/40 border border-gray-border">
               {/* Radar chart card */}
               <div className="bg-surface p-6 md:p-8">
                 <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Performance Radar</span>
@@ -945,7 +945,7 @@ export default function Landing() {
                 <div className="mt-5 grid sm:grid-cols-2 gap-6">
                   <div>
                     <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">What he'd love</div>
-                    <ul className="space-y-2 text-sm text-white/85">
+                    <ul className="space-y-2 text-sm text-ink/85">
                       {sample.scoutStrengths.map((s, i) => (
                         <li key={i} className="flex gap-2"><span className="text-volt mt-1">▶</span>{s}</li>
                       ))}
@@ -953,21 +953,21 @@ export default function Landing() {
                   </div>
                   <div>
                     <div className="text-xs uppercase tracking-[0.2em] font-bold text-yellow-400 mb-2">What he'd worry about</div>
-                    <ul className="space-y-2 text-sm text-white/85">
+                    <ul className="space-y-2 text-sm text-ink/85">
                       {sample.scoutConcerns.map((s, i) => (
                         <li key={i} className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>{s}</li>
                       ))}
                     </ul>
                   </div>
                 </div>
-                <div className="mt-6 pt-6 border-t border-white/10 grid sm:grid-cols-2 gap-4">
+                <div className="mt-6 pt-6 border-t border-gray-border grid sm:grid-cols-2 gap-4">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Next level to aim for</div>
-                    <div className="text-sm text-white/90">{sample.nextLevel}</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50 mb-1">Next level to aim for</div>
+                    <div className="text-sm text-ink">{sample.nextLevel}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-white/40 mb-1">Best position</div>
-                    <div className="text-sm text-white/90">{sample.bestPosition}</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50 mb-1">Best position</div>
+                    <div className="text-sm text-ink">{sample.bestPosition}</div>
                   </div>
                 </div>
               </div>
@@ -978,12 +978,12 @@ export default function Landing() {
                 <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Drill of the week</h3>
                 <div className="mt-5 border border-volt/30 bg-deepnavy p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-barlow font-black uppercase text-white text-base">{sample.exercise.name}</span>
+                    <span className="font-barlow font-black uppercase text-ink text-base">{sample.exercise.name}</span>
                     <span className="flex items-center gap-1 text-xs text-volt font-bold"><Clock className="w-3 h-3" />{sample.exercise.duration}</span>
                   </div>
-                  <p className="text-xs text-white/70 leading-relaxed">{sample.exercise.desc}</p>
+                  <p className="text-xs text-ink/70 leading-relaxed">{sample.exercise.desc}</p>
                 </div>
-                <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-white/40">
+                <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-ink/50">
                   <span className="flex items-center gap-1"><Award className="w-3 h-3 text-volt" />4 more drills</span>
                   <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-volt" />30 & 90-day plan</span>
                 </div>
@@ -995,12 +995,12 @@ export default function Landing() {
                 <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Timestamped feedback</h3>
                 <div className="mt-5 space-y-2">
                   {sample.timeline.map((c, i) => (
-                    <div key={i} className="flex items-start gap-4 bg-deepnavy/60 border border-white/5 px-4 py-3">
+                    <div key={i} className="flex items-start gap-4 bg-cream-card/90 border border-gray-border px-4 py-3">
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <Play className="w-3 h-3 text-volt" fill="currentColor" />
                         <span className="font-barlow font-black text-volt text-base min-w-[44px]">{c.t}</span>
                       </div>
-                      <p className="text-sm text-white/85">{c.c}</p>
+                      <p className="text-sm text-ink/85">{c.c}</p>
                     </div>
                   ))}
                 </div>
@@ -1014,7 +1014,7 @@ export default function Landing() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true, margin: "-100px" }}
                 transition={{ duration: 0.5 }}
-                className="pointer-events-auto border border-volt/30 bg-deepnavy/95 backdrop-blur-2xl p-8 md:p-10 max-w-md mx-6 text-center shadow-2xl"
+                className="pointer-events-auto border border-volt/30 bg-cream-card backdrop-blur-2xl p-8 md:p-10 max-w-md mx-6 text-center shadow-2xl"
                 style={{ boxShadow: "0 20px 80px rgba(204,255,0,0.15)" }}
               >
                 <div className="inline-flex items-center justify-center w-14 h-14 bg-volt/10 border border-volt/30 mb-5">
@@ -1024,25 +1024,25 @@ export default function Landing() {
                 <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
                   Unlock the<br />full report
                 </h3>
-                <p className="mt-4 text-sm text-white/65 leading-relaxed">
+                <p className="mt-4 text-sm text-ink/70 leading-relaxed">
                   Full performance map · all 4 score categories · scout view · 5 personal drills · 30 & 90-day plan · timestamped video comments · premium PDF.
                 </p>
 
                 <div className="mt-6 flex items-baseline justify-center gap-2">
                   <span className="font-barlow font-black text-5xl md:text-6xl text-volt leading-none">${price}</span>
-                  <span className="text-white/60 uppercase tracking-widest font-bold text-sm">USD</span>
+                  <span className="text-ink/65 uppercase tracking-widest font-bold text-sm">USD</span>
                 </div>
-                <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold mt-1">one-time · no subscription</p>
+                <p className="text-[10px] text-ink/50 uppercase tracking-widest font-bold mt-1">one-time · no subscription</p>
 
                 <Link
                   to={startHref}
                   data-testid="sample-unlock-cta"
-                  className="mt-6 w-full bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+                  className="mt-6 w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
                 >
                   {startLabel}
                   <ArrowRight className="w-4 h-4" />
                 </Link>
-                <p className="mt-3 text-[10px] text-white/40 flex items-center justify-center gap-1.5">
+                <p className="mt-3 text-[10px] text-ink/50 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
                 </p>
               </motion.div>
@@ -1052,15 +1052,15 @@ export default function Landing() {
       </section>
 
       {/* ============ TRUST ============ */}
-      <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-white/10">
+      <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-gray-border">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
-          <div className="border border-white/10 bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
+          <div className="border border-gray-border bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
             <ShieldCheck className="w-12 h-12 text-volt flex-shrink-0" strokeWidth={1.5} />
             <div>
               <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl">Honest scouting feedback. Built for growth.</h3>
-              <p className="mt-3 text-sm text-white/70 leading-relaxed max-w-3xl">
+              <p className="mt-3 text-sm text-ink/70 leading-relaxed max-w-3xl">
                 ScoutMePlay gives you honest, professional football feedback to help young players get better.
-                It does <strong className="text-white">not</strong> promise trials, contracts, or academy spots.
+                It does <strong className="text-ink">not</strong> promise trials, contracts, or academy spots.
                 Your scores are here to guide your training — not to decide your future.
               </p>
             </div>
@@ -1069,7 +1069,7 @@ export default function Landing() {
       </section>
 
       {/* ============ FINAL CTA ============ */}
-      <section data-testid="final-cta" className="section-accent-top relative py-24 md:py-32 border-t border-white/10 overflow-hidden">
+      <section data-testid="final-cta" className="section-accent-top relative py-24 md:py-32 border-t border-gray-border overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg"
@@ -1083,14 +1083,14 @@ export default function Landing() {
             Your move.
             <span className="block text-volt mt-2">Show the world what you've got.</span>
           </h2>
-          <p className="mt-6 text-white/60 max-w-2xl mx-auto">
+          <p className="mt-6 text-ink/65 max-w-2xl mx-auto">
             Upload a video, mark yourself, and you'll get an instant free preview from our scouts. No card needed to start.
           </p>
           <div className="mt-10">
             <Link
               to={startHref}
               data-testid="final-cta-btn"
-              className="inline-flex items-center gap-3 bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-base px-10 py-5 transition-colors"
+              className="inline-flex items-center gap-3 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-10 py-5 transition-colors"
             >
               {startLabel}
               <ArrowRight className="w-5 h-5" />
@@ -1099,21 +1099,21 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 mt-10">
+      <footer className="border-t border-gray-border mt-10">
         <div className="max-w-7xl mx-auto px-6 md:px-10 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-10">
             {/* Brand */}
             <div className="col-span-2">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-volt flex items-center justify-center">
-                  <span className="text-deepnavy font-barlow font-black text-base leading-none">S</span>
+                  <span className="text-ink font-barlow font-black text-base leading-none">S</span>
                 </div>
                 <div>
                   <div className="font-barlow font-black uppercase tracking-tight text-base leading-none">ScoutMePlay</div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40 mt-1">by Mentalkids</div>
+                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50 mt-1">by Mentalkids</div>
                 </div>
               </div>
-              <p className="mt-4 text-sm text-white/55 leading-relaxed max-w-xs">
+              <p className="mt-4 text-sm text-ink/60 leading-relaxed max-w-xs">
                 ScoutMePlay combines advanced scouting technology with human review to deliver
                 honest player feedback. Where talent gets noticed.
               </p>
@@ -1127,7 +1127,7 @@ export default function Landing() {
                   <Link
                     to="/about"
                     data-testid="footer-link-about"
-                    className="text-white/65 hover:text-volt transition-colors"
+                    className="text-ink/70 hover:text-volt transition-colors"
                   >
                     About ScoutMePlay
                   </Link>
@@ -1135,13 +1135,13 @@ export default function Landing() {
                 <li>
                   <Link
                     to="/about#what-we-do"
-                    className="text-white/65 hover:text-volt transition-colors"
+                    className="text-ink/70 hover:text-volt transition-colors"
                   >
                     How it works
                   </Link>
                 </li>
                 <li>
-                  <span className="text-white/45 cursor-default">Mentalkids · Denmark</span>
+                  <span className="text-ink/50 cursor-default">Mentalkids · Denmark</span>
                 </li>
               </ul>
             </div>
@@ -1154,7 +1154,7 @@ export default function Landing() {
                   <Link
                     to="/about#contact"
                     data-testid="footer-link-contact-form"
-                    className="inline-flex items-center gap-1.5 text-white/65 hover:text-volt transition-colors"
+                    className="inline-flex items-center gap-1.5 text-ink/70 hover:text-volt transition-colors"
                   >
                     <Send className="w-3.5 h-3.5 shrink-0" />
                     Send us a message
@@ -1164,7 +1164,7 @@ export default function Landing() {
                   <a
                     href="mailto:scoutmeplay@gmail.com"
                     data-testid="footer-link-email"
-                    className="inline-flex items-center gap-1.5 text-white/65 hover:text-volt transition-colors break-all"
+                    className="inline-flex items-center gap-1.5 text-ink/70 hover:text-volt transition-colors break-all"
                   >
                     <Mail className="w-3.5 h-3.5 shrink-0" />
                     scoutmeplay@gmail.com
@@ -1178,7 +1178,7 @@ export default function Landing() {
                   <Link
                     to="/privacy"
                     data-testid="footer-link-privacy"
-                    className="text-white/65 hover:text-volt transition-colors"
+                    className="text-ink/70 hover:text-volt transition-colors"
                   >
                     Privacy Policy
                   </Link>
@@ -1187,11 +1187,11 @@ export default function Landing() {
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between gap-3 items-center">
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+          <div className="mt-10 pt-6 border-t border-gray-border flex flex-col md:flex-row justify-between gap-3 items-center">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
               © {new Date().getFullYear()} Mentalkids · ScoutMePlay
             </p>
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
               Where talent gets noticed · Football scouting service
             </p>
           </div>

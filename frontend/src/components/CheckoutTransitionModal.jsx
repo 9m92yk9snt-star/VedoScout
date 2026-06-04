@@ -51,7 +51,7 @@ export default function CheckoutTransitionModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
           data-testid="checkout-transition-modal"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-deepnavy/95 backdrop-blur-xl px-6"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-cream-card backdrop-blur-xl px-6"
           onClick={state === "error" && onClose ? onClose : undefined}
         >
           {/* Volt halo */}
@@ -75,7 +75,7 @@ export default function CheckoutTransitionModal({
                 onClick={onClose}
                 aria-label="Close"
                 data-testid="checkout-modal-close"
-                className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-white/50 hover:text-white"
+                className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-ink/55 hover:text-ink"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -122,7 +122,7 @@ export default function CheckoutTransitionModal({
             {/* HEADLINE */}
             <h2
               data-testid="checkout-modal-headline"
-              className="font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl text-white leading-tight"
+              className="font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl text-ink leading-tight"
             >
               {state === "preparing" && "Preparing your checkout"}
               {state === "redirecting" && "Connecting to Stripe…"}
@@ -131,7 +131,7 @@ export default function CheckoutTransitionModal({
             </h2>
 
             {/* DESCRIPTION */}
-            <p className="mt-3 text-sm text-white/65 leading-relaxed">
+            <p className="mt-3 text-sm text-ink/70 leading-relaxed">
               {state === "preparing" && (
                 <span className="inline-flex items-center gap-1.5">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-volt" />
@@ -145,14 +145,14 @@ export default function CheckoutTransitionModal({
 
             {/* PRICE STRIP — visible only during preparing/redirecting to anchor expectations */}
             {(state === "preparing" || state === "redirecting") && (
-              <div className="mt-7 border-t border-white/10 pt-5 flex items-center justify-between text-left">
+              <div className="mt-7 border-t border-gray-border pt-5 flex items-center justify-between text-left">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45">Product</div>
-                  <div className="font-barlow font-black uppercase text-white text-sm mt-0.5 leading-tight">{product}</div>
+                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">Product</div>
+                  <div className="font-barlow font-black uppercase text-ink text-sm mt-0.5 leading-tight">{product}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45">Amount</div>
-                  <div className="font-barlow font-black text-white text-xl mt-0.5 leading-none">
+                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">Amount</div>
+                  <div className="font-barlow font-black text-ink text-xl mt-0.5 leading-none">
                     {currency === "USD" ? "$" : ""}{amount}<span className="text-volt text-sm ml-1">{currency}</span>
                   </div>
                 </div>
@@ -161,7 +161,7 @@ export default function CheckoutTransitionModal({
 
             {/* PROGRESS BAR — preparing only */}
             {state === "preparing" && (
-              <div className="mt-6 h-1 bg-white/10 overflow-hidden">
+              <div className="mt-6 h-1 bg-cream-soft/40 overflow-hidden">
                 <motion.div
                   className="h-full bg-volt"
                   initial={{ width: "5%" }}
@@ -172,7 +172,7 @@ export default function CheckoutTransitionModal({
             )}
 
             {/* Trust line */}
-            <div className="mt-6 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+            <div className="mt-6 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
               <ShieldCheck className="w-3 h-3 text-volt" />
               Secure 256-bit · PCI compliant · Stripe
             </div>

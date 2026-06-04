@@ -39,7 +39,7 @@
         @apply border-border;
     }
     html, body {
-        @apply bg-deepnavy text-white;
+        @apply bg-cream-base text-ink;
         font-family: 'DM Sans', system-ui, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
@@ -49,8 +49,8 @@
         letter-spacing: -0.02em;
     }
     ::selection {
-        background-color: #CCFF00;
-        color: #050A0F;
+        background-color: #1F4F2F;
+        color: #FFFFFF;
     }
 }
 
@@ -67,13 +67,13 @@
         letter-spacing: -0.01em;
     }
     .text-volt {
-        color: #CCFF00;
+        color: #1F4F2F;
     }
     .bg-volt {
-        background-color: #CCFF00;
+        background-color: #1F4F2F;
     }
     .border-volt {
-        border-color: #CCFF00;
+        border-color: #1F4F2F;
     }
     .grain {
         position: relative;
@@ -94,12 +94,12 @@
     }
     .scoreline-grid {
         background-image:
-            linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            linear-gradient(rgba(31, 79, 47, 0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(31, 79, 47, 0.06) 1px, transparent 1px);
         background-size: 56px 56px;
     }
     .text-gradient-volt {
-        background: linear-gradient(135deg, #FFFFFF 0%, #CCFF00 100%);
+        background: linear-gradient(135deg, #0A0F0D 0%, #1F4F2F 100%);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
@@ -108,7 +108,8 @@
     /* ===== PREMIUM CARD UPGRADE ===== */
     .card-premium {
         position: relative;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 60%), #0F1623;
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
         transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
                     box-shadow 0.5s cubic-bezier(0.16, 1, 0.3, 1),
                     border-color 0.3s ease;
@@ -117,17 +118,18 @@
         content: '';
         position: absolute;
         top: 0; left: 0; right: 0;
-        height: 1px;
-        background: linear-gradient(90deg, transparent 0%, rgba(204, 255, 0, 0.4) 50%, transparent 100%);
-        opacity: 0.7;
+        height: 2px;
+        background: linear-gradient(90deg, transparent 0%, rgba(31, 79, 47, 0.45) 50%, transparent 100%);
+        opacity: 0;
         transition: opacity 0.4s ease;
         pointer-events: none;
     }
     .card-premium:hover {
         transform: translateY(-4px);
         box-shadow:
-            0 16px 50px -10px rgba(204, 255, 0, 0.12),
-            inset 0 1px 0 rgba(204, 255, 0, 0.08);
+            0 16px 50px -10px rgba(31, 79, 47, 0.12),
+            0 4px 16px -6px rgba(10, 15, 13, 0.04);
+        border-color: #D6D0BF;
     }
     .card-premium:hover::before {
         opacity: 1;
@@ -137,18 +139,18 @@
     .hero-letterbox-top {
         position: absolute; top: 0; left: 0; right: 0;
         height: 96px; z-index: 4;
-        background: linear-gradient(180deg, #050A0F 0%, transparent 100%);
+        background: linear-gradient(180deg, #F4EFE6 0%, transparent 100%);
         pointer-events: none;
     }
     .hero-letterbox-bottom {
         position: absolute; bottom: 0; left: 0; right: 0;
         height: 120px; z-index: 4;
-        background: linear-gradient(0deg, #050A0F 0%, transparent 100%);
+        background: linear-gradient(0deg, #F4EFE6 0%, transparent 100%);
         pointer-events: none;
     }
     .volt-halo {
         position: absolute;
-        background: radial-gradient(circle, rgba(204, 255, 0, 0.18) 0%, transparent 60%);
+        background: radial-gradient(circle, rgba(31, 79, 47, 0.10) 0%, transparent 60%);
         pointer-events: none;
         filter: blur(20px);
     }
@@ -165,13 +167,13 @@
         transform: translateX(-50%);
         width: 120px;
         height: 1px;
-        background: linear-gradient(90deg, transparent 0%, #CCFF00 50%, transparent 100%);
+        background: linear-gradient(90deg, transparent 0%, #1F4F2F 50%, transparent 100%);
         opacity: 0.5;
     }
     .section-num-bg {
         font-family: 'Barlow Condensed', sans-serif;
         font-weight: 900;
-        color: rgba(204, 255, 0, 0.06);
+        color: rgba(31, 79, 47, 0.06);
         font-size: 14rem;
         line-height: 0.85;
         letter-spacing: -0.04em;
@@ -188,27 +190,27 @@
         position: fixed;
         top: 0; left: 0; right: 0;
         height: 2px;
-        background: #CCFF00;
+        background: #1F4F2F;
         transform-origin: 0%;
         z-index: 100;
-        box-shadow: 0 0 12px rgba(204, 255, 0, 0.6);
+        box-shadow: 0 0 12px rgba(31, 79, 47, 0.45);
     }
 
     /* ===== FLOATING DATA BADGES (hero) ===== */
     .data-badge {
         position: absolute;
         z-index: 6;
-        background: rgba(5, 10, 15, 0.78);
+        background: rgba(10, 15, 13, 0.85);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(204, 255, 0, 0.32);
+        border: 1px solid rgba(31, 79, 47, 0.45);
         padding: 0.55rem 0.85rem;
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
         box-shadow:
-            0 12px 32px -8px rgba(0, 0, 0, 0.5),
-            0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+            0 12px 32px -8px rgba(0, 0, 0, 0.35),
+            0 0 0 1px rgba(255, 255, 255, 0.02) inset;
     }
 
     /* ===== ANIMATIONS ===== */
@@ -235,11 +237,11 @@
         animation: sweep-slow 12s linear infinite;
     }
 
-    /* ===== SCROLLBAR (subtle volt accent) ===== */
+    /* ===== SCROLLBAR ===== */
     ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-track { background: #050A0F; }
-    ::-webkit-scrollbar-thumb { background: #1f2937; border: 2px solid #050A0F; }
-    ::-webkit-scrollbar-thumb:hover { background: #CCFF00; }
+    ::-webkit-scrollbar-track { background: #EAE3D2; }
+    ::-webkit-scrollbar-thumb { background: #D6CFBC; border: 2px solid #EAE3D2; }
+    ::-webkit-scrollbar-thumb:hover { background: #1F4F2F; }
 
     /* ===== INTERACTIVE HOVER REFINEMENTS ===== */
     a, button { -webkit-tap-highlight-color: transparent; }

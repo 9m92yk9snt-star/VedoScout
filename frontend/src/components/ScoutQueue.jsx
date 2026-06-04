@@ -95,8 +95,8 @@ export default function ScoutQueue() {
 
   if (items.length === 0) {
     return (
-      <div className="bg-surface border border-white/10 p-12 text-center">
-        <p className="text-white/50 uppercase tracking-widest text-sm font-bold">No paid reports yet — queue is empty.</p>
+      <div className="bg-surface border border-gray-border p-12 text-center">
+        <p className="text-ink/55 uppercase tracking-widest text-sm font-bold">No paid reports yet — queue is empty.</p>
       </div>
     );
   }
@@ -106,20 +106,20 @@ export default function ScoutQueue() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-px bg-white/10 border border-white/10">
+      <div className="grid grid-cols-2 gap-px bg-cream-soft/40 border border-gray-border">
         <div className="bg-deepnavy p-4">
           <div className="flex items-center gap-2 mb-1">
             <Clock className="w-3.5 h-3.5 text-volt" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Pending reviews</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Pending reviews</span>
           </div>
           <div className="font-barlow font-black text-3xl text-volt">{pendingCount}</div>
         </div>
         <div className="bg-deepnavy p-4">
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle2 className="w-3.5 h-3.5 text-volt" />
-            <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Delivered</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Delivered</span>
           </div>
-          <div className="font-barlow font-black text-3xl text-white">{deliveredCount}</div>
+          <div className="font-barlow font-black text-3xl text-ink">{deliveredCount}</div>
         </div>
       </div>
 
@@ -135,38 +135,38 @@ export default function ScoutQueue() {
             <div
               key={it.report_id}
               data-testid={`scout-queue-item-${it.report_id}`}
-              className={`border ${isPending ? "border-volt/30" : "border-white/10"} bg-surface`}
+              className={`border ${isPending ? "border-volt/30" : "border-gray-border"} bg-surface`}
             >
               {/* Card header */}
               <button
                 type="button"
                 onClick={() => setExpanded((e) => ({ ...e, [it.report_id]: !e[it.report_id] }))}
-                className="w-full flex items-center gap-4 p-4 hover:bg-deepnavy/40 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 hover:bg-cream-soft transition-colors text-left"
               >
                 {it.poster_url ? (
                   <img
                     src={`${ASSET_BASE}${it.poster_url}`}
                     alt=""
-                    className="w-16 h-10 object-cover border border-white/10 flex-shrink-0"
+                    className="w-16 h-10 object-cover border border-gray-border flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-16 h-10 bg-deepnavy border border-white/10 flex-shrink-0" />
+                  <div className="w-16 h-10 bg-deepnavy border border-gray-border flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="font-barlow font-black uppercase text-white text-lg leading-tight truncate">
+                  <div className="font-barlow font-black uppercase text-ink text-lg leading-tight truncate">
                     {it.player_name}
                   </div>
-                  <div className="text-[11px] text-white/50 truncate">
+                  <div className="text-[11px] text-ink/55 truncate">
                     {it.player_position} · {it.user_email}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {isPending ? (
-                    <span className="bg-volt text-deepnavy text-[10px] uppercase tracking-widest font-black px-2 py-1 flex items-center gap-1.5">
+                    <span className="bg-volt text-white text-[10px] uppercase tracking-widest font-black px-2 py-1 flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 bg-deepnavy rounded-full animate-pulse" /> Pending
                     </span>
                   ) : (
-                    <span className="border border-white/20 text-white/70 text-[10px] uppercase tracking-widest font-bold px-2 py-1">
+                    <span className="border border-gray-border text-ink/70 text-[10px] uppercase tracking-widest font-bold px-2 py-1">
                       Delivered
                     </span>
                   )}
@@ -176,13 +176,13 @@ export default function ScoutQueue() {
                       {r.messages.length}
                     </span>
                   )}
-                  {isOpen ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}
+                  {isOpen ? <ChevronUp className="w-4 h-4 text-ink/50" /> : <ChevronDown className="w-4 h-4 text-ink/50" />}
                 </div>
               </button>
 
               {/* Expanded content */}
               {isOpen && (
-                <div className="border-t border-white/10 p-5 space-y-5">
+                <div className="border-t border-gray-border p-5 space-y-5">
                   {/* Video & marker preview */}
                   <div className="grid md:grid-cols-2 gap-3">
                     {it.video_url && (
@@ -192,7 +192,7 @@ export default function ScoutQueue() {
                         controls
                         playsInline
                         preload="metadata"
-                        className="w-full aspect-video bg-black border border-white/10"
+                        className="w-full aspect-video bg-black border border-gray-border"
                       />
                     )}
                     {it.marker_url && (
@@ -203,7 +203,7 @@ export default function ScoutQueue() {
                         <img
                           src={`${ASSET_BASE}${it.marker_url}`}
                           alt="Marked player"
-                          className="w-full aspect-video object-contain bg-black border border-white/10"
+                          className="w-full aspect-video object-contain bg-black border border-gray-border"
                         />
                       </div>
                     )}
@@ -221,7 +221,7 @@ export default function ScoutQueue() {
                         onChange={(e) => setDraft(it.report_id, "agent_name", e.target.value)}
                         placeholder="Your name (default: Elite Scout Team)"
                         data-testid={`scout-queue-agent-name-${it.report_id}`}
-                        className="w-full bg-deepnavy border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                        className="w-full bg-deepnavy border border-gray-border px-3 py-2 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                       />
                       <textarea
                         value={draft.review_text || ""}
@@ -229,14 +229,14 @@ export default function ScoutQueue() {
                         rows={6}
                         placeholder="Write a personal, honest scout review for this player. Speak directly to them and their family."
                         data-testid={`scout-queue-review-text-${it.report_id}`}
-                        className="w-full bg-deepnavy border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
+                        className="w-full bg-deepnavy border border-gray-border px-3 py-2 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
                       />
                       <button
                         type="button"
                         onClick={() => deliverReview(it.report_id)}
                         disabled={send === "deliver"}
                         data-testid={`scout-queue-deliver-${it.report_id}`}
-                        className="bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 disabled:opacity-50 flex items-center gap-2 transition-colors"
+                        className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 disabled:opacity-50 flex items-center gap-2 transition-colors"
                       >
                         {send === "deliver" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                         Deliver review
@@ -251,8 +251,8 @@ export default function ScoutQueue() {
                         <div className="text-[10px] uppercase tracking-widest font-bold text-volt mb-2">
                           Your review (delivered {formatRelative(r.delivered_at)})
                         </div>
-                        <div className="bg-deepnavy/60 border-l-2 border-volt p-4">
-                          <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{r.review_text}</p>
+                        <div className="bg-cream-card/90 border-l-2 border-volt p-4">
+                          <p className="text-ink text-sm leading-relaxed whitespace-pre-line">{r.review_text}</p>
                         </div>
                       </div>
 
@@ -260,16 +260,16 @@ export default function ScoutQueue() {
                         <div className="text-[10px] uppercase tracking-widest font-bold text-volt mb-2">
                           Conversation ({r.messages?.length || 0})
                         </div>
-                        <div className="space-y-2 max-h-72 overflow-y-auto bg-deepnavy/40 p-3 border border-white/5">
+                        <div className="space-y-2 max-h-72 overflow-y-auto bg-cream-soft p-3 border border-gray-border">
                           {(!r.messages || r.messages.length === 0) && (
-                            <p className="text-xs text-white/40 text-center py-4">No messages yet.</p>
+                            <p className="text-xs text-ink/50 text-center py-4">No messages yet.</p>
                           )}
                           {r.messages?.map((m, i) => {
                             const isAgent = m.sender === "agent";
                             return (
                               <div key={i} className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[80%] px-3 py-2 text-xs ${isAgent ? "bg-volt text-deepnavy" : "bg-deepnavy border border-white/10 text-white/90"}`}>
-                                  <div className={`text-[9px] uppercase tracking-widest font-bold mb-0.5 ${isAgent ? "text-deepnavy/70" : "text-volt"}`}>
+                                <div className={`max-w-[80%] px-3 py-2 text-xs ${isAgent ? "bg-volt text-white" : "bg-deepnavy border border-gray-border text-white"}`}>
+                                  <div className={`text-[9px] uppercase tracking-widest font-bold mb-0.5 ${isAgent ? "text-ink/70" : "text-volt"}`}>
                                     {isAgent ? "You (scout)" : "User"} · {formatRelative(m.created_at)}
                                   </div>
                                   <div className="whitespace-pre-line">{m.text}</div>
@@ -286,14 +286,14 @@ export default function ScoutQueue() {
                             rows={2}
                             placeholder="Reply to the user..."
                             data-testid={`scout-queue-reply-${it.report_id}`}
-                            className="flex-1 bg-deepnavy border border-white/10 px-3 py-2 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
+                            className="flex-1 bg-deepnavy border border-gray-border px-3 py-2 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
                           />
                           <button
                             type="button"
                             onClick={() => sendMessage(it.report_id)}
                             disabled={send === "reply" || !(draft.reply || "").trim()}
                             data-testid={`scout-queue-send-${it.report_id}`}
-                            className="bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-4 disabled:opacity-40 flex items-center gap-2 transition-colors"
+                            className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 disabled:opacity-40 flex items-center gap-2 transition-colors"
                           >
                             {send === "reply" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                           </button>

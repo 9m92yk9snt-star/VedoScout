@@ -54,6 +54,14 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - ✅ **Privacy Policy page** (`/privacy`) — Full GDPR-compliant Danish/EU privacy policy in 11 sections (data, retention, third parties incl. Stripe & Gemini, user rights, Datatilsynet complaints).
 - ✅ **Contact form** — `POST /api/contact` (public, rate-limited 5/hour, honeypot anti-spam). Stored in MongoDB AND forwarded to `scoutmeplay@gmail.com` via **FormSubmit.co** (free email relay, no signup/API key needed — admin clicks ONE activation link in the first arrival email, then all future submissions arrive instantly).
 - ✅ **Admin Messages tab** — Unread badge on the tab, per-message status (new/read/archived), mailto reply buttons, delete actions.
+- ✅ **Premium Design System Overhaul (mockup-aligned)**:
+  - **Theme**: Switched from dark-mode (deep navy + electric volt) to a **premium cream/forest aesthetic** matching the user's reference mockup — feels like high-end athleticwear (Nike/Adidas vibe), not a tech startup.
+  - **New Tailwind tokens**: `cream-base` (#F4EFE6 — page background), `cream-soft` (#EAE3D2 — section separators), `cream-card` (#FFFFFF — feature cards), `forest` (#1F4F2F — primary CTA), `forest-pop` (#2D6B3D — hover/accent), `ink` (#0A0F0D — text/headers/navbar), `gray-body` (#4B5563), `gray-border` (#E5E7EB).
+  - **Navigation rebuilt**: Black `bg-ink` top bar with green logo, "SCOUT**ME**PLAY" wordmark (ME in forest), tagline "See your game through scout eyes", rounded forest-pill CTA buttons.
+  - **Logo refactored** to use `currentColor` so it inherits any parent color (now always forest green on the black navbar).
+  - **Global recolor**: ~600 lines repainted across Landing, Login, Signup, Dashboard, Upload, Report, Admin, About, Privacy, ScoutQueue, ScoutReview, EmbeddedCheckoutModal, CheckoutTransitionModal — all `text-white*` → `text-ink*`, `border-white*` → `border-ink*`/`gray-border`, modal wrappers from `bg-surface` → `bg-cream-card`.
+  - **Forest-green CTA buttons everywhere**: White text on forest background with hover to forest-pop; matches the "UNLOCK FOR $X" button in the mockup.
+  - **Functionality preserved 100%** — payments, Stripe wallets, AI, admin/scouts, uploads, reports, embedded checkout, contact form/email forwarding — all untouched.
 
 ## Implemented Previously (Phase 1 — Feb 2026)
 - ✅ Landing page (Hero, How It Works, What You Receive, Sample Preview, Trust, CTA)

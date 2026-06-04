@@ -74,9 +74,9 @@ export default function ScoutReview({ reportId }) {
 
   if (loading) {
     return (
-      <div className="bg-surface border border-white/10 p-6 md:p-8 flex items-center gap-3">
+      <div className="bg-surface border border-gray-border p-6 md:p-8 flex items-center gap-3">
         <Loader2 className="w-5 h-5 animate-spin text-volt" />
-        <span className="text-white/60 text-sm uppercase tracking-widest font-bold">Loading scout review...</span>
+        <span className="text-ink/65 text-sm uppercase tracking-widest font-bold">Loading scout review...</span>
       </div>
     );
   }
@@ -100,29 +100,29 @@ export default function ScoutReview({ reportId }) {
           <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
             Your scout review is in progress
           </h3>
-          <p className="mt-3 text-white/70 text-sm md:text-base max-w-2xl leading-relaxed">
+          <p className="mt-3 text-ink/70 text-sm md:text-base max-w-2xl leading-relaxed">
             On top of your player report, a real scout from our team is now reviewing your video personally. You'll receive their
             written feedback here within <span className="text-volt font-bold">5 days</span>, and you'll be able to chat
             with them directly to ask follow-up questions.
           </p>
 
-          <div className="mt-7 grid sm:grid-cols-3 gap-px bg-white/10 border border-white/10 max-w-2xl">
+          <div className="mt-7 grid sm:grid-cols-3 gap-px bg-cream-soft/40 border border-gray-border max-w-2xl">
             <div className="bg-deepnavy p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Clock className="w-3.5 h-3.5 text-volt" />
-                <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Status</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Status</span>
               </div>
               <div className="font-barlow font-black text-volt text-xl uppercase">In review</div>
             </div>
             <div className="bg-deepnavy p-4">
-              <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Submitted</div>
-              <div className="font-barlow font-black text-white text-xl">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Submitted</div>
+              <div className="font-barlow font-black text-ink text-xl">
                 {daysSince < 1 ? "Today" : `${Math.floor(daysSince)}d ago`}
               </div>
             </div>
             <div className="bg-deepnavy p-4">
-              <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Estimated arrival</div>
-              <div className="font-barlow font-black text-white text-xl">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-ink/50">Estimated arrival</div>
+              <div className="font-barlow font-black text-ink text-xl">
                 {daysLeft < 1 ? "Today / soon" : `≤ ${Math.ceil(daysLeft)} days`}
               </div>
             </div>
@@ -130,16 +130,16 @@ export default function ScoutReview({ reportId }) {
 
           {/* Progress bar */}
           <div className="mt-5 max-w-2xl">
-            <div className="h-1.5 bg-white/10 overflow-hidden">
+            <div className="h-1.5 bg-cream-soft/40 overflow-hidden">
               <div className="h-full bg-volt transition-all duration-500" style={{ width: `${progressPct}%` }} />
             </div>
-            <div className="flex justify-between mt-2 text-[10px] uppercase tracking-widest font-bold text-white/40">
+            <div className="flex justify-between mt-2 text-[10px] uppercase tracking-widest font-bold text-ink/50">
               <span>Day 0</span>
               <span>Day 5</span>
             </div>
           </div>
 
-          <div className="mt-7 flex items-start gap-3 text-xs text-white/60 max-w-2xl">
+          <div className="mt-7 flex items-start gap-3 text-xs text-ink/65 max-w-2xl">
             <ShieldCheck className="w-4 h-4 text-volt flex-shrink-0 mt-0.5" />
             <p>
               The scout watches the video personally and writes a human review tailored to your player. Once delivered,
@@ -153,21 +153,21 @@ export default function ScoutReview({ reportId }) {
 
   /* =================== DELIVERED STATE — review + chat =================== */
   return (
-    <div data-testid="scout-review-delivered" className="bg-surface border border-white/10">
+    <div data-testid="scout-review-delivered" className="bg-surface border border-gray-border">
       {/* Header strip */}
-      <div className="bg-deepnavy/60 border-b border-white/10 px-6 py-4 flex items-center justify-between">
+      <div className="bg-cream-card/90 border-b border-gray-border px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-volt flex items-center justify-center">
-            <UserIcon className="w-4 h-4 text-deepnavy" strokeWidth={2.5} />
+            <UserIcon className="w-4 h-4 text-ink" strokeWidth={2.5} />
           </div>
           <div>
-            <div className="font-barlow font-black uppercase text-white leading-tight">{review.agent_name || "Elite Scout Team"}</div>
+            <div className="font-barlow font-black uppercase text-ink leading-tight">{review.agent_name || "Elite Scout Team"}</div>
             <div className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-volt rounded-full animate-pulse" /> Your dedicated scout
             </div>
           </div>
         </div>
-        <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-bold text-white/40">
+        <span className="hidden sm:inline text-[10px] uppercase tracking-widest font-bold text-ink/50">
           Delivered {formatRelative(review.delivered_at)}
         </span>
       </div>
@@ -181,8 +181,8 @@ export default function ScoutReview({ reportId }) {
         <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
           What the scout said
         </h3>
-        <div className="mt-5 bg-deepnavy/60 border-l-2 border-volt p-5">
-          <p className="text-white/90 text-base md:text-[17px] leading-[1.7] whitespace-pre-line">
+        <div className="mt-5 bg-cream-card/90 border-l-2 border-volt p-5">
+          <p className="text-ink text-base md:text-[17px] leading-[1.7] whitespace-pre-line">
             {review.review_text}
           </p>
         </div>
@@ -192,15 +192,15 @@ export default function ScoutReview({ reportId }) {
           <div className="flex items-center gap-2 mb-4">
             <MessageSquare className="w-4 h-4 text-volt" />
             <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Conversation</span>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-white/40 ml-auto">
+            <span className="text-[10px] uppercase tracking-widest font-bold text-ink/50 ml-auto">
               {review.messages?.length || 0} message{(review.messages?.length || 0) === 1 ? "" : "s"}
             </span>
           </div>
 
           <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
             {(!review.messages || review.messages.length === 0) && (
-              <div className="bg-deepnavy/40 border border-white/5 p-4 text-center">
-                <p className="text-xs text-white/50 leading-relaxed">
+              <div className="bg-cream-soft border border-gray-border p-4 text-center">
+                <p className="text-xs text-ink/55 leading-relaxed">
                   Have a question for your scout? Send them a message below and they'll reply here.
                 </p>
               </div>
@@ -213,8 +213,8 @@ export default function ScoutReview({ reportId }) {
                     <div
                       className={`px-4 py-3 text-sm leading-relaxed ${
                         isUser
-                          ? "bg-volt text-deepnavy"
-                          : "bg-deepnavy border border-white/10 text-white/95"
+                          ? "bg-volt text-white"
+                          : "bg-deepnavy border border-gray-border text-white"
                       }`}
                     >
                       {!isUser && (
@@ -224,7 +224,7 @@ export default function ScoutReview({ reportId }) {
                       )}
                       <div className="whitespace-pre-line">{m.text}</div>
                     </div>
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-white/30 px-1">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-ink/40 px-1">
                       {formatRelative(m.created_at)}
                     </span>
                   </div>
@@ -242,19 +242,19 @@ export default function ScoutReview({ reportId }) {
               placeholder="Write to your scout..."
               rows={2}
               data-testid="scout-compose-text"
-              className="flex-1 bg-deepnavy border border-white/10 px-4 py-3 text-white text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
+              className="flex-1 bg-deepnavy border border-gray-border px-4 py-3 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
             />
             <button
               type="submit"
               disabled={sending || !draft.trim()}
               data-testid="scout-compose-send"
-              className="bg-volt hover:bg-white text-deepnavy font-barlow font-black uppercase tracking-widest text-xs px-5 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-5 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Send
             </button>
           </form>
-          <p className="mt-2 text-[10px] uppercase tracking-widest font-bold text-white/30">
+          <p className="mt-2 text-[10px] uppercase tracking-widest font-bold text-ink/40">
             Refresh to see new replies from your scout.
           </p>
         </div>
