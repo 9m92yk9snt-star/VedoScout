@@ -11,7 +11,7 @@ import {
   ArrowRight, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
   Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
-  Lightbulb, Crown, Calendar, Dumbbell,
+  Lightbulb, Crown, Calendar, Dumbbell, Mail,
 } from "lucide-react";
 
 const fadeUp = {
@@ -1099,18 +1099,92 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 py-10">
-        <div className="max-w-7xl mx-auto px-6 md:px-10 flex flex-col md:flex-row justify-between gap-4 items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 bg-volt flex items-center justify-center">
-              <span className="text-deepnavy font-barlow font-black text-sm leading-none">S</span>
+      <footer className="border-t border-white/10 mt-10">
+        <div className="max-w-7xl mx-auto px-6 md:px-10 py-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-10">
+            {/* Brand */}
+            <div className="col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-volt flex items-center justify-center">
+                  <span className="text-deepnavy font-barlow font-black text-base leading-none">S</span>
+                </div>
+                <div>
+                  <div className="font-barlow font-black uppercase tracking-tight text-base leading-none">ScoutMePlay</div>
+                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40 mt-1">by Mentalkids</div>
+                </div>
+              </div>
+              <p className="mt-4 text-sm text-white/55 leading-relaxed max-w-xs">
+                ScoutMePlay combines advanced scouting technology with human review to deliver
+                honest player feedback. Where talent gets noticed.
+              </p>
             </div>
-            <span className="font-barlow font-black uppercase tracking-tight">ScoutMePlay</span>
+
+            {/* About column */}
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">About</div>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <Link
+                    to="/about"
+                    data-testid="footer-link-about"
+                    className="text-white/65 hover:text-volt transition-colors"
+                  >
+                    About ScoutMePlay
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/about#what-we-do"
+                    className="text-white/65 hover:text-volt transition-colors"
+                  >
+                    How it works
+                  </Link>
+                </li>
+                <li>
+                  <span className="text-white/45 cursor-default">Mentalkids · Denmark</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Contact + Privacy column */}
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Contact</div>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <a
+                    href="mailto:scoutmeplay@gmail.com"
+                    data-testid="footer-link-email"
+                    className="inline-flex items-center gap-1.5 text-white/65 hover:text-volt transition-colors break-all"
+                  >
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    scoutmeplay@gmail.com
+                  </a>
+                </li>
+              </ul>
+
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt mt-6">Legal</div>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <Link
+                    to="/privacy"
+                    data-testid="footer-link-privacy"
+                    className="text-white/65 hover:text-volt transition-colors"
+                  >
+                    Privacy Policy
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
-          <p className="text-xs text-white/40 uppercase tracking-[0.2em]">Where talent gets noticed · Football scouting service</p>
-          <p className="mt-2 text-[10px] text-white/30 normal-case tracking-normal max-w-md md:text-right">
-            ScoutMePlay combines advanced scouting technology with human review to deliver honest player feedback.
-          </p>
+
+          <div className="mt-10 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between gap-3 items-center">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+              © {new Date().getFullYear()} Mentalkids · ScoutMePlay
+            </p>
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+              Where talent gets noticed · Football scouting service
+            </p>
+          </div>
         </div>
       </footer>
     </div>

@@ -11,6 +11,8 @@ import UploadPage from "@/pages/UploadPage";
 import ReportPage from "@/pages/ReportPage";
 import AdminPage from "@/pages/AdminPage";
 import DashboardPage from "@/pages/DashboardPage";
+import AboutPage from "@/pages/AboutPage";
+import PrivacyPage from "@/pages/PrivacyPage";
 
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -44,6 +46,8 @@ function App() {
             <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
             <Route path="/report/:id" element={<RequireAuth><ReportPage /></RequireAuth>} />
             <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
