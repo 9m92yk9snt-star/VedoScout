@@ -55,7 +55,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 7  # v7 = differentiated StatsBomb metrics (no duplicate rows)
+PDF_RENDER_VERSION = 8  # v8 = Age Intelligence Scoring System + stage gating
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -287,6 +287,22 @@ except Exception as _e:  # pragma: no cover
     logging.warning("Could not load statsbomb_percentiles.json: %s", _e)
     STATSBOMB_PCTS = {}
     STATSBOMB_META = {}
+
+# Age Intelligence Scoring System — 5 development stages from U6 to senior.
+# Drives age-appropriate scoring math + stage-gating of senior-pro panels.
+# See age_stages.json for the full schema.
+try:
+    with open(DATA_DIR / "age_stages.json", "r", encoding="utf-8") as _f:
+        _AGE_STAGES_DB = json.load(_f)
+    AGE_STAGES = _AGE_STAGES_DB.get("stages", [])
+    AGE_LEVEL_MAPPING = _AGE_STAGES_DB.get("level_mapping", {})
+    AGE_INTELLIGENCE_DISCLAIMER = _AGE_STAGES_DB.get("disclaimer", "")
+    logging.info("Loaded Age Intelligence stages: %d stages", len(AGE_STAGES))
+except Exception as _e:  # pragma: no cover
+    logging.warning("Could not load age_stages.json: %s", _e)
+    AGE_STAGES = []
+    AGE_LEVEL_MAPPING = {}
+    AGE_INTELLIGENCE_DISCLAIMER = ""
 
 
 # ---- 4-Layer Intelligence Stack helpers -----------------------------------
@@ -706,6 +722,313 @@ def compute_statsbomb_calibration(full_report: dict, player_details: dict) -> Op
         "rows":         rows,
         "summary":      bucket_counts,
     }
+
+
+
+
+# =============================================================================
+# AGE INTELLIGENCE SCORING SYSTEM
+# =============================================================================
+# Five development stages × deterministic 9-score system × stage-gating.
+# Everything below is PURE PYTHON math over the AI scores — no LLM involved.
+#
+# Why this exists:
+#   The Gemini prompt has a SOFT age instruction (the model is *told* to grade
+#   age-appropriately). But soft instructions are unreliable. This module
+#   enforces age-appropriateness in the post-processing math: a U7's
+#   "decision_making" is weighted differently than a U17's, period.
+
+# Default scoring weights for the 4 high-level scoring sections used to
+# produce the technical/tactical/physical/mentality summary scores.
+_SECTION_ATTRS = {
+    "technical":  ["first_touch", "ball_control", "dribbling", "passing", "shooting",
+                   "weak_foot", "one_v_one", "long_passing"],
+    "tactical":   ["positioning", "off_ball_movement", "scanning", "decision_making",
+                   "timing_of_runs", "game_understanding"],
+    "physical":   ["acceleration", "speed", "balance", "agility", "intensity",
+                   "body_control"],
+    "mentality":  ["confidence", "work_rate", "courage_in_duels", "response_to_mistakes",
+                   "competitive_mindset", "focus", "composure"],
+}
+
+
+def resolve_age_stage(age) -> Optional[dict]:
+    """Return the development-stage dict for the given age, or None if no
+    stages are loaded or the age is unparseable."""
+    if not AGE_STAGES:
+        return None
+    try:
+        a = int(str(age).strip())
+    except (TypeError, ValueError):
+        return None
+    for stage in AGE_STAGES:
+        if int(stage.get("age_min", 0)) <= a <= int(stage.get("age_max", 99)):
+            return stage
+    return None
+
+
+def next_age_stage(current_stage: Optional[dict]) -> Optional[dict]:
+    """Return the stage that comes AFTER the current one, or None if the
+    player is already at the final stage."""
+    if not current_stage or not AGE_STAGES:
+        return None
+    cur_idx = next((i for i, s in enumerate(AGE_STAGES) if s["id"] == current_stage["id"]), -1)
+    if cur_idx < 0 or cur_idx + 1 >= len(AGE_STAGES):
+        return None
+    return AGE_STAGES[cur_idx + 1]
+
+
+def _weighted_mean(scores: dict, attrs: list, downweight: Optional[list] = None) -> Optional[float]:
+    """Mean of `attrs` from `scores`, where attrs in `downweight` get half-weight."""
+    if not attrs:
+        return None
+    downweight_set = set(downweight or [])
+    weighted_sum = 0.0
+    total_weight = 0.0
+    for a in attrs:
+        v = scores.get(a)
+        if not isinstance(v, (int, float)):
+            continue
+        w = 0.5 if a in downweight_set else 1.0
+        weighted_sum += v * w
+        total_weight += w
+    if total_weight == 0:
+        return None
+    return round(weighted_sum / total_weight, 2)
+
+
+def _resolve_level(tier: Optional[str], stage_id: Optional[str], overall: Optional[float]) -> Optional[dict]:
+    """Map (tier, stage, overall_score) → one of 8 human-friendly levels:
+    Beginner / Grassroots / Club / Strong Club / Academy / Elite Academy /
+    Semi-Pro / Professional. Returns {label, definition} or None."""
+    if not tier or not stage_id or not AGE_LEVEL_MAPPING:
+        return None
+    rules = AGE_LEVEL_MAPPING.get("rules", [])
+    overall_f = float(overall) if isinstance(overall, (int, float)) else 0.0
+    for rule in rules:
+        if rule.get("when_tier") != tier:
+            continue
+        if stage_id not in (rule.get("in_stages") or []):
+            continue
+        if not (float(rule.get("min_overall", 0.0)) <= overall_f <= float(rule.get("max_overall", 10.0))):
+            continue
+        label = rule["level"]
+        return {
+            "label":      label,
+            "definition": (AGE_LEVEL_MAPPING.get("level_definitions") or {}).get(label, ""),
+            "tier":       tier,
+            "stage_id":   stage_id,
+        }
+    return None
+
+
+def compute_age_intelligence(full_report: dict, player_details: dict) -> Optional[dict]:
+    """The 9-score Age Intelligence block + stage gates + disclaimers.
+
+    Returns:
+      {
+        stage: {id, label, age_band, headline, what_we_evaluate[], what_we_dont_evaluate[]},
+        next_stage: {...} | None,
+        scores: {
+          current_age_score, position_specific_score, next_level_readiness_score,
+          pro_style_match_score, technical_score, tactical_score, physical_score,
+          mentality_body_language_score, development_priority_score
+        },
+        level: {label, definition, tier, stage_id} | None,
+        panels: {show_fifa_knn, show_statsbomb, show_trial_readiness, ...},
+        panel_replacement_messages: {fifa_knn, statsbomb, trial_readiness},
+        evaluation_basis: "U12-U14 / Game Understanding Stage",
+        what_we_evaluated:    [...],
+        what_we_could_not_evaluate: [...],
+        disclaimer: "<full disclaimer text>"
+      }
+
+    Returns None when we cannot resolve the stage or have no scores.
+    """
+    if not isinstance(full_report, dict) or not isinstance(player_details, dict):
+        return None
+    stage = resolve_age_stage(player_details.get("age"))
+    if not stage:
+        return None
+    scores = _flatten_scores(full_report)
+    if not scores:
+        return None
+
+    focus_attrs   = stage.get("focus_attributes") or []
+    downweight    = stage.get("downweight_attributes") or []
+
+    # 1. current_age_score — weighted mean over stage focus attrs (downweighted
+    #    ones contribute half). This is the canonical "score for the kid AT
+    #    THIS STAGE" — different from the AI's overall_development score.
+    current_age_score = _weighted_mean(scores, focus_attrs, downweight=downweight)
+
+    # 2. position_specific_score — re-weight using the position's priority
+    #    attribute weights from age_profiles.json, but ONLY count attrs that
+    #    appear in the stage's focus list (stage-aware).
+    position_specific_score = None
+    position = _normalise_position(player_details.get("position"))
+    if position and AGE_PROFILES_CATALOG.get(position):
+        priority_attrs = (AGE_PROFILES_CATALOG[position].get("priority_attributes") or [])
+        weighted_sum, total_weight = 0.0, 0.0
+        for spec in priority_attrs:
+            k, w = spec.get("key"), float(spec.get("weight", 1))
+            if k not in scores or not isinstance(scores[k], (int, float)):
+                continue
+            # If a position-priority attr is in the stage's downweight list,
+            # halve its weight so we don't over-score U7 tactics.
+            if k in (downweight or []):
+                w = w * 0.5
+            weighted_sum += scores[k] * w
+            total_weight += w
+        if total_weight > 0:
+            position_specific_score = round(weighted_sum / total_weight, 2)
+
+    # 3. next_level_readiness_score — average of the NEXT stage's focus
+    #    attributes mapped to the kid's current scores. Returns "how close
+    #    is this kid to the next stage's expectations" as a 0-10.
+    next_stage = next_age_stage(stage)
+    next_level_readiness_score = None
+    if next_stage:
+        next_level_readiness_score = _weighted_mean(scores, next_stage.get("focus_attributes") or [])
+
+    # 4. pro_style_match_score — re-emit FIFA k-NN top-match similarity as
+    #    a 0-10 (similarity_pct / 10). ONLY when the stage allows it; for
+    #    U6-U11 we surface None and the UI shows a friendly stage message.
+    pro_style_match_score = None
+    panels = stage.get("panels") or {}
+    if panels.get("show_fifa_knn"):
+        # We're not running k-NN here (match_archetype owns that). We surface
+        # whatever was computed there during _serialize_report by reading
+        # from the archetype block — left to the caller to thread in.
+        pro_style_match_score = None  # threaded from archetype.lenses.fifa.score by caller
+
+    # 5-8. Section means (technical/tactical/physical/mentality_body_language).
+    technical_score              = _weighted_mean(scores, _SECTION_ATTRS["technical"],  downweight=downweight)
+    tactical_score               = _weighted_mean(scores, _SECTION_ATTRS["tactical"],   downweight=downweight)
+    physical_score               = _weighted_mean(scores, _SECTION_ATTRS["physical"],   downweight=downweight)
+    mentality_body_language_score = _weighted_mean(scores, _SECTION_ATTRS["mentality"], downweight=downweight)
+
+    # 9. development_priority_score — how trainable the kid's WEAK areas are.
+    #    Take the 3 weakest stage-focus attrs and return 10 - their average
+    #    (so weaker = more headroom = higher priority to train).
+    development_priority_score = None
+    focus_scores_present = sorted(
+        [scores[a] for a in focus_attrs if isinstance(scores.get(a), (int, float))]
+    )
+    if len(focus_scores_present) >= 3:
+        weakest = focus_scores_present[:3]
+        development_priority_score = round(10.0 - (sum(weakest) / len(weakest)), 2)
+    elif focus_scores_present:
+        development_priority_score = round(10.0 - (sum(focus_scores_present) / len(focus_scores_present)), 2)
+
+    # Level mapping (the 8-level human-friendly scale)
+    overall_benchmark = (full_report.get("overall_benchmark") or {})
+    tier = (overall_benchmark.get("tier") or "").strip().lower() or None
+    overall_dev = (full_report.get("scores") or {}).get("overall_development")
+    level = _resolve_level(tier, stage["id"], overall_dev)
+
+    # What the AI ACTUALLY could vs could not evaluate (read from the AI's
+    # own per-skill `cannot_evaluate` flags + the stage's
+    # `what_we_dont_evaluate` framing). This is the truthful version of the
+    # AI's report — surfaced prominently on every page.
+    could_not_evaluate_from_ai = []
+    for section in ("technical", "tactical", "physical", "mentality"):
+        sec = full_report.get(section) or {}
+        if not isinstance(sec, dict):
+            continue
+        for k, v in sec.items():
+            if isinstance(v, dict) and v.get("cannot_evaluate"):
+                reason = v.get("evaluable_reason") or "Not observable from this footage."
+                could_not_evaluate_from_ai.append({
+                    "key":    k,
+                    "label":  k.replace("_", " ").title(),
+                    "reason": reason,
+                })
+
+    return {
+        "stage": {
+            "id":                    stage["id"],
+            "label":                 stage["label"],
+            "age_band":              stage["age_band"],
+            "headline":              stage.get("headline", ""),
+            "what_we_evaluate":      stage.get("what_we_evaluate", []),
+            "what_we_dont_evaluate": stage.get("what_we_dont_evaluate", []),
+        },
+        "next_stage": ({
+            "id":       next_stage["id"],
+            "label":    next_stage["label"],
+            "age_band": next_stage["age_band"],
+        } if next_stage else None),
+        "scores": {
+            "current_age_score":             current_age_score,
+            "position_specific_score":       position_specific_score,
+            "next_level_readiness_score":    next_level_readiness_score,
+            "pro_style_match_score":         pro_style_match_score,
+            "technical_score":               technical_score,
+            "tactical_score":                tactical_score,
+            "physical_score":                physical_score,
+            "mentality_body_language_score": mentality_body_language_score,
+            "development_priority_score":    development_priority_score,
+        },
+        "level":                       level,
+        "panels":                      panels,
+        "panel_replacement_messages":  stage.get("panel_replacement_messages") or {},
+        "evaluation_basis":            f"{stage['age_band']} / {stage['label']}",
+        "what_we_evaluated":           stage.get("what_we_evaluate", []),
+        "what_we_could_not_evaluate":  stage.get("what_we_dont_evaluate", []),
+        "what_ai_could_not_evaluate":  could_not_evaluate_from_ai,
+        "disclaimer":                  AGE_INTELLIGENCE_DISCLAIMER,
+    }
+
+
+def apply_stage_gating(serialized: dict, age_intel: Optional[dict]) -> None:
+    """Mutate `serialized` to hide senior-pro panels for younger stages.
+    Strict rule: U6-U11 must NOT show direct senior-pro comparisons; they
+    only see archetype style references framed as long-term development.
+
+    This implements scope (b) requirement #3.
+    """
+    if not isinstance(serialized, dict) or not age_intel:
+        return
+    panels = age_intel.get("panels") or {}
+
+    # 1. FIFA k-NN — strip the fifa lens + the top-5 neighbours panel
+    if not panels.get("show_fifa_knn") and isinstance(serialized.get("archetype"), dict):
+        arch = serialized["archetype"]
+        if isinstance(arch.get("lenses"), dict) and "fifa" in arch["lenses"]:
+            del arch["lenses"]["fifa"]
+        arch["fifa_neighbors"] = []
+        arch["fifa_db_meta"] = None
+        # Tag so the UI can show a friendly "reserved for U12+" message
+        arch["fifa_panel_gated_message"] = (age_intel.get("panel_replacement_messages") or {}).get("fifa_knn")
+
+    # 2. StatsBomb Pro Calibration — hide entirely for U6-U11
+    if not panels.get("show_statsbomb"):
+        serialized["statsbomb_calibration_gated_message"] = (
+            (age_intel.get("panel_replacement_messages") or {}).get("statsbomb")
+        )
+        serialized["statsbomb_calibration"] = None
+
+    # 3. Trial readiness — hide for U6-U11 (replaced with friendly message)
+    if not panels.get("show_trial_readiness"):
+        serialized["trial_readiness_gated_message"] = (
+            (age_intel.get("panel_replacement_messages") or {}).get("trial_readiness")
+        )
+        serialized["trial_readiness"] = None
+
+    # 4. Career brief — clear it from archetype for U6-U8 (we still keep the
+    # bio chunk so the kid sees how the pro started). For U9+ we keep it.
+    if (not panels.get("show_career_brief")) and isinstance(serialized.get("archetype"), dict):
+        serialized["archetype"]["career_brief"] = ""
+
+    # 5. Surface the "pro_style_match_score" from the (un-gated) archetype
+    # block so the AgeIntelligence scoreboard can render a real number when
+    # FIFA panels are allowed.
+    if panels.get("show_fifa_knn") and isinstance(serialized.get("archetype"), dict):
+        fifa_lens = (serialized["archetype"].get("lenses") or {}).get("fifa") or {}
+        sim_pct = fifa_lens.get("similarity_pct")
+        if isinstance(sim_pct, (int, float)):
+            age_intel["scores"]["pro_style_match_score"] = round(float(sim_pct) / 10.0, 2)
 
 
 
@@ -2507,6 +2830,17 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # === Age Intelligence Scoring System ============================
+        # Deterministic age-band scoring + stage-gating of senior-pro panels.
+        # This MUST run AFTER archetype/statsbomb so apply_stage_gating can
+        # strip them out for younger stages (U6-U11).
+        age_intel = compute_age_intelligence(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        if age_intel:
+            apply_stage_gating(out, age_intel)
+            out["age_intelligence"] = age_intel
         # Extract / placeholder frames for every video_comments timestamp and
         # rewrite the comments list with a `frame_url` per moment.
         enriched_comments = ensure_video_frames(doc)
@@ -3892,6 +4226,168 @@ def _statsbomb_calibration_pdf(calibration: dict, styles):
 
 
 
+
+def _age_intelligence_pdf(age_intel: dict, styles):
+    """Stage banner + 9-score scoreboard + disclaimer + what-we-evaluated."""
+    if not isinstance(age_intel, dict):
+        return []
+    stage = age_intel.get("stage") or {}
+    scores = age_intel.get("scores") or {}
+    level = age_intel.get("level") or {}
+
+    # 1) Stage banner (forest hero)
+    level_html = ""
+    if level and level.get("label"):
+        level_html = (
+            f"<font color='#FFFFFF' size='8'><b>LEVEL: {level['label'].upper()}</b></font><br/>"
+            f"<font color='#FFFFFFAA' size='8'>{level.get('definition','')}</font>"
+        )
+    stage_card = Table(
+        [[Paragraph(
+            f"<font color='#FFFFFFAA' size='7'><b>AGE-ANCHORED EVALUATION</b></font><br/>"
+            f"<font color='#FFFFFF' size='17'><b>{stage.get('age_band','')} &middot; {stage.get('label','')}</b></font><br/>"
+            f"<font color='#FFFFFFAA' size='9'><i>{stage.get('headline','')}</i></font>",
+            styles["BodyW"],
+        ),
+        Paragraph(level_html or "&nbsp;", styles["BodyW"])]],
+        colWidths=[11.0 * cm, 4.5 * cm],
+    )
+    stage_card.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_FOREST),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",         (1, 0), (1, 0),   "RIGHT"),
+    ]))
+
+    # 2) Disclaimer
+    disclaimer = age_intel.get("disclaimer") or ""
+    disc_card = Table(
+        [[Paragraph(
+            f"<font color='#1F4F2F' size='7'><b>HOW THIS EVALUATION WORKS</b></font><br/><br/>"
+            f"<font color='#0A0F0D' size='9'>{disclaimer}</font>",
+            styles["BodyW"],
+        )]],
+        colWidths=[15.5 * cm],
+    )
+    disc_card.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), "#F4EFE6"),
+        ("LINEBEFORE",    (0, 0), (0, -1),  3, _PDF_FOREST),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+    ]))
+
+    # 3) 9-score grid (3 columns × 3 rows)
+    SCORE_ORDER = [
+        ("current_age_score",             "Current Age Score"),
+        ("position_specific_score",       "Position-Specific"),
+        ("next_level_readiness_score",    "Next-Level Readiness"),
+        ("pro_style_match_score",         "Pro Style Match"),
+        ("technical_score",               "Technical"),
+        ("tactical_score",                "Tactical"),
+        ("physical_score",                "Physical"),
+        ("mentality_body_language_score", "Mentality / Body Lang."),
+        ("development_priority_score",    "Dev. Priority"),
+    ]
+
+    def _score_cell(label, val, highlight=False):
+        fg = "#FFFFFF" if highlight else "#0A0F0D"
+        eyebrow = "#FFFFFFAA" if highlight else "#1F4F2F"
+        if val is None:
+            val_html = f"<font color='{fg}' size='14'><b>&mdash;</b></font><br/><font color='{eyebrow}' size='7'>unlocks at U12</font>"
+        else:
+            val_html = f"<font color='{fg}' size='18'><b>{float(val):.1f}</b></font><font color='{eyebrow}' size='7'> /10</font>"
+        return Paragraph(
+            f"<font color='{eyebrow}' size='6.5'><b>{label.upper()}</b></font><br/>{val_html}",
+            styles["BodyW"],
+        )
+
+    rows = []
+    row = []
+    for i, (key, label) in enumerate(SCORE_ORDER):
+        cell = _score_cell(label, scores.get(key), highlight=(key == "current_age_score"))
+        row.append(cell)
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        while len(row) < 3:
+            row.append(Paragraph("&nbsp;", styles["BodyW"]))
+        rows.append(row)
+
+    grid = Table(rows, colWidths=[5.17 * cm] * 3)
+    grid_styles = [
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]
+    # Background colours per cell (forest for current_age, cream for the rest)
+    for r in range(len(rows)):
+        for c in range(3):
+            idx = r * 3 + c
+            if idx < len(SCORE_ORDER) and SCORE_ORDER[idx][0] == "current_age_score":
+                grid_styles.append(("BACKGROUND", (c, r), (c, r), _PDF_FOREST))
+            elif idx < len(SCORE_ORDER):
+                grid_styles.append(("BACKGROUND", (c, r), (c, r), _PDF_CARD))
+    grid.setStyle(TableStyle(grid_styles))
+
+    # 4) What we evaluated · what we did not
+    evaluated   = age_intel.get("what_we_evaluated", []) or []
+    not_for     = age_intel.get("what_we_could_not_evaluate", []) or []
+
+    left_html = (
+        "<font color='#1F4F2F' size='7'><b>EVALUATED FOR THIS STAGE</b></font><br/><br/>"
+        + "".join(
+            f"<font color='#0A0F0D' size='9'>&middot; {e}</font><br/>" for e in evaluated
+        )
+    )
+    right_html = (
+        "<font color='#9CA3AF' size='7'><b>DELIBERATELY NOT EVALUATED AT THIS STAGE</b></font><br/><br/>"
+        + ("".join(f"<font color='#0A0F0D' size='9'>&middot; {e}</font><br/>" for e in not_for)
+           if not_for
+           else "<font color='#9CA3AF' size='9'><i>At this stage we evaluate everything visible.</i></font>")
+    )
+    eval_block = Table(
+        [[Paragraph(left_html, styles["BodyW"]), Paragraph(right_html, styles["BodyW"])]],
+        colWidths=[7.75 * cm, 7.75 * cm],
+    )
+    eval_block.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (0, 0),  _PDF_CARD),
+        ("BACKGROUND",    (1, 0), (1, 0),  "#F4EFE6"),
+        ("LINEBEFORE",    (0, 0), (0, 0),  3, _PDF_FOREST),
+        ("LINEBEFORE",    (1, 0), (1, 0),  3, "#D6D3D1"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    return [
+        stage_card,
+        Spacer(1, 0.2 * cm),
+        disc_card,
+        Spacer(1, 0.3 * cm),
+        Paragraph(
+            "<font color='#1F4F2F' size='7'><b>AGE INTELLIGENCE SCOREBOARD</b></font><br/>"
+            "<font color='#0A0F0D' size='12'><b>9 scores &middot; age-anchored, deterministic</b></font>",
+            styles["BodyW"],
+        ),
+        Spacer(1, 0.15 * cm),
+        grid,
+        Spacer(1, 0.3 * cm),
+        eval_block,
+        Spacer(1, 0.3 * cm),
+    ]
+
+
+
 def build_pdf(report_doc: dict, output_path: str):
     """Builds a premium cream/forest PDF. Document is organised as:
         Page 1  — Cover (forest panel + player name + score box)
@@ -4023,7 +4519,13 @@ def build_pdf(report_doc: dict, output_path: str):
         story += _section_header("How you compare", styles, idx=3)
         story += _overall_benchmark_page(ob, sc.get("overall_development"), styles)
 
-    # ===== STYLISTIC ARCHETYPE — placed right after the overall benchmark =====
+    # ===== AGE INTELLIGENCE SCOREBOARD — stage banner, 9 scores, what we evaluated =====
+    age_intel = report_doc.get("age_intelligence")
+    if age_intel:
+        story.append(Spacer(1, 0.5 * cm))
+        story += _age_intelligence_pdf(age_intel, styles)
+
+    # ===== STYLISTIC ARCHETYPE — placed right after the age intelligence block =====
     archetype = report_doc.get("archetype")
     if archetype and archetype.get("name"):
         story.append(Spacer(1, 0.5 * cm))
@@ -4032,9 +4534,11 @@ def build_pdf(report_doc: dict, output_path: str):
         story.append(Spacer(1, 0.3 * cm))
         story += _lens_matches_pdf(archetype, styles)
         # FIFA Data Twin — top-5 closest senior pros by real k-NN
-        story.append(Spacer(1, 0.3 * cm))
-        story += _fifa_neighbors_pdf(archetype, styles)
-        # Pro Calibration — anchor scores against StatsBomb Euro 2024 percentiles
+        # (Stripped by apply_stage_gating for U6-U11, so this is a no-op there.)
+        if archetype.get("fifa_neighbors"):
+            story.append(Spacer(1, 0.3 * cm))
+            story += _fifa_neighbors_pdf(archetype, styles)
+        # Pro Calibration — gated to U12+ via apply_stage_gating()
         statsbomb_cal = report_doc.get("statsbomb_calibration")
         if statsbomb_cal:
             story.append(Spacer(1, 0.3 * cm))
@@ -4415,6 +4919,14 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # Age Intelligence — drives stage-gated rendering in the PDF too
+        age_intel = compute_age_intelligence(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        if age_intel:
+            apply_stage_gating(doc, age_intel)
+            doc["age_intelligence"] = age_intel
         # Extract / placeholder frames so the PDF can embed them too.
         enriched_comments = ensure_video_frames(doc)
         if enriched_comments and isinstance(doc.get("full_report"), dict):

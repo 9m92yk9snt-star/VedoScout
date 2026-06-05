@@ -1142,6 +1142,261 @@ function StatsBombCalibrationPanel({ calibration }) {
 
 /* Position-specific reference profile card — shows the player's actual
    scores against Pro Academy expectations for the position + age bracket.
+
+
+/* ============================================================================
+   AGE INTELLIGENCE SCORING SYSTEM — UI COMPONENTS
+   ============================================================================ */
+
+/* AgeStageBanner — top-of-report stage indicator + headline. */
+function AgeStageBanner({ age_intelligence }) {
+  if (!age_intelligence || !age_intelligence.stage) return null;
+  const { age_band, label, headline } = age_intelligence.stage;
+  const level = age_intelligence.level;
+  return (
+    <div data-testid="age-stage-banner" className="bg-forest text-cream-base p-5 md:p-6">
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/75 px-2.5 py-1 bg-cream-base/15">
+          Age-anchored evaluation
+        </div>
+        <div className="font-barlow font-black text-2xl md:text-3xl tracking-tight uppercase">
+          {age_band}
+        </div>
+        <div className="font-barlow font-black uppercase text-base md:text-lg text-cream-base/95">
+          · {label}
+        </div>
+        {level && level.label && (
+          <div data-testid="age-stage-level-pill" className="ml-auto inline-flex items-center gap-2 px-3 py-1.5 bg-cream-base text-forest">
+            <span className="text-[9px] uppercase tracking-[0.22em] font-bold">Level</span>
+            <span className="font-barlow font-black text-sm uppercase">{level.label}</span>
+          </div>
+        )}
+      </div>
+      {headline && (
+        <p className="mt-2 text-sm md:text-base text-cream-base/85 italic">{headline}</p>
+      )}
+    </div>
+  );
+}
+
+
+/* AgeAppropriateEvaluationDisclaimer — the credibility line. */
+function AgeAppropriateEvaluationDisclaimer({ age_intelligence }) {
+  if (!age_intelligence) return null;
+  const text = age_intelligence.disclaimer ||
+    "This player has been evaluated using age-appropriate and position-specific benchmarks. Professional player data is used as a style and long-term development reference, not as a direct comparison.";
+  return (
+    <div data-testid="age-appropriate-disclaimer" className="bg-cream-soft border-l-4 border-forest p-4 md:p-5">
+      <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-1.5">
+        How this evaluation works
+      </div>
+      <p className="text-sm md:text-base text-ink/85 leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+
+/* WhatWeEvaluatedBlock — shows the stage's evaluation focus AND what the AI
+   could/couldn't see in the actual video. */
+function WhatWeEvaluatedBlock({ age_intelligence }) {
+  if (!age_intelligence) return null;
+  const evaluated = age_intelligence.what_we_evaluated || [];
+  const not_for_stage = age_intelligence.what_we_could_not_evaluate || [];
+  const ai_blind_spots = age_intelligence.what_ai_could_not_evaluate || [];
+
+  if (evaluated.length === 0 && not_for_stage.length === 0 && ai_blind_spots.length === 0) return null;
+
+  return (
+    <div data-testid="what-we-evaluated-block" className="bg-surface border border-gray-border p-6 md:p-7">
+      <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+        What we evaluated · What we could not
+      </div>
+      <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight mb-5">
+        Scout-grade transparency
+      </h3>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div data-testid="what-we-evaluated-list" className="bg-cream-card border-l-4 border-forest p-5">
+          <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-forest mb-3">
+            Evaluated for this stage
+          </div>
+          <ul className="space-y-2">
+            {evaluated.map((item, i) => (
+              <li key={i} className="text-sm text-ink/85 flex gap-2">
+                <span className="text-forest font-bold shrink-0">·</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div data-testid="what-we-did-not-evaluate-list" className="bg-cream-card border-l-4 border-ink/30 p-5">
+          <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-3">
+            Deliberately not evaluated at this stage
+          </div>
+          {not_for_stage.length > 0 ? (
+            <ul className="space-y-2">
+              {not_for_stage.map((item, i) => (
+                <li key={i} className="text-sm text-ink/75 flex gap-2">
+                  <span className="text-ink/40 font-bold shrink-0">·</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink/60 italic">At this stage we evaluate everything visible. No category is deliberately deferred.</p>
+          )}
+        </div>
+      </div>
+
+      {ai_blind_spots.length > 0 && (
+        <div data-testid="ai-blind-spots" className="mt-4 p-4 bg-cream-soft">
+          <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">
+            Could not be assessed from this specific video
+          </div>
+          <ul className="space-y-1">
+            {ai_blind_spots.slice(0, 6).map((item, i) => (
+              <li key={i} className="text-xs text-ink/65">
+                <span className="font-bold text-ink/80">{item.label}:</span> {item.reason}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[10px] text-ink/45 italic">
+            Upload follow-up footage that includes these moments for a complete picture.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* AgeIntelligenceScoreboard — the 9-score grid. */
+function AgeIntelligenceScoreboard({ age_intelligence, position_hint }) {
+  if (!age_intelligence || !age_intelligence.scores) return null;
+  const s = age_intelligence.scores;
+  const stage = age_intelligence.stage || {};
+  const nextStage = age_intelligence.next_stage;
+
+  const SCORES = [
+    { key: "current_age_score",            label: "Current Age Score",          hint: `vs ${stage.age_band || "peers"} peers` },
+    { key: "position_specific_score",      label: "Position-Specific Score",    hint: position_hint || "for your position" },
+    { key: "next_level_readiness_score",   label: "Next-Level Readiness",       hint: nextStage ? `toward ${nextStage.age_band}` : "already at top stage" },
+    { key: "pro_style_match_score",        label: "Pro Style Match",            hint: "long-term style reference" },
+    { key: "technical_score",              label: "Technical",                  hint: "ball, dribbling, passing" },
+    { key: "tactical_score",               label: "Tactical",                   hint: "scanning, decision-making, positioning" },
+    { key: "physical_score",               label: "Physical",                   hint: "speed, balance, agility" },
+    { key: "mentality_body_language_score",label: "Mentality / Body Language",  hint: "confidence, courage, focus" },
+    { key: "development_priority_score",   label: "Development Priority",       hint: "how much room to grow" },
+  ];
+
+  return (
+    <div data-testid="age-intelligence-scoreboard" className="bg-surface border border-gray-border p-6 md:p-7">
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+            Age Intelligence Scoreboard
+          </div>
+          <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
+            9 scores · age-anchored to {stage.age_band}
+          </h3>
+          <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
+            Each score is computed deterministically against the {stage.label?.toLowerCase()} rubric.
+            None of these numbers are AI prose — they are math over the AI's observed sub-skills, weighted by stage focus.
+          </p>
+        </div>
+        <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45">
+          {stage.age_band} · {stage.label}
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {SCORES.map((cfg) => {
+          const v = s[cfg.key];
+          const isMissing = v === null || v === undefined;
+          const isHighlight = cfg.key === "current_age_score";
+          const barWidth = isMissing ? 0 : Math.min(100, Math.max(8, v * 10));
+          return (
+            <div
+              key={cfg.key}
+              data-testid={`scoreboard-${cfg.key}`}
+              className={`p-4 ${isHighlight ? "bg-forest text-cream-base" : "bg-cream-card"}`}
+            >
+              <div className={`text-[9px] uppercase tracking-[0.2em] font-bold mb-1 ${isHighlight ? "text-cream-base/75" : "text-forest"}`}>
+                {cfg.label}
+              </div>
+              {isMissing ? (
+                <div>
+                  <div className={`font-barlow font-black text-2xl leading-none ${isHighlight ? "text-white" : "text-ink/30"}`}>—</div>
+                  <div className={`text-[9px] uppercase tracking-[0.18em] font-bold mt-1 ${isHighlight ? "text-cream-base/55" : "text-ink/45"}`}>
+                    {(stage.id === "foundation" || stage.id === "technical") ? "Unlocks at U12" : "not applicable"}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`font-barlow font-black text-3xl tabular-nums leading-none ${isHighlight ? "text-white" : "text-forest"}`}>
+                      {Number(v).toFixed(1)}
+                    </span>
+                    <span className={`text-[9px] uppercase tracking-[0.2em] font-bold ${isHighlight ? "text-cream-base/55" : "text-ink/45"}`}>
+                      / 10
+                    </span>
+                  </div>
+                  <div className={`mt-2 h-1 ${isHighlight ? "bg-cream-base/15" : "bg-cream-soft"}`}>
+                    <div className={`h-full ${isHighlight ? "bg-cream-base" : "bg-forest"}`} style={{ width: `${barWidth}%` }} />
+                  </div>
+                  <div className={`text-[10px] mt-2 ${isHighlight ? "text-cream-base/65" : "text-ink/55"}`}>
+                    {cfg.hint}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {age_intelligence.level && (
+        <div className="mt-5 p-3 bg-cream-soft flex items-center gap-3 flex-wrap">
+          <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-forest">
+            Overall level
+          </div>
+          <div data-testid="age-intelligence-level" className="font-barlow font-black uppercase text-base text-ink">
+            {age_intelligence.level.label}
+          </div>
+          <div className="text-xs text-ink/60 flex-1">
+            {age_intelligence.level.definition}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* StageGatedPanel — friendly replacement when a senior-pro panel is hidden
+   because the player is too young (U6-U11). */
+function StageGatedPanel({ title, message, testId }) {
+  if (!message) return null;
+  return (
+    <div data-testid={testId} className="bg-cream-card border border-gray-border p-6 md:p-7 text-center">
+      <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+        {title}
+      </div>
+      <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-forest/10 text-forest mb-3">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </div>
+      <p className="text-sm text-ink/75 max-w-lg mx-auto leading-relaxed">
+        {message}
+      </p>
+    </div>
+  );
+}
+
+
+/* AgeProfileCard — European academy reference overlay.
    Pure server-side enrichment, no AI involved. */
 function AgeProfileCard({ ref: profile }) {
   if (!profile || !Array.isArray(profile.items) || profile.items.length === 0) return null;
@@ -1475,7 +1730,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration, age_intelligence, statsbomb_calibration_gated_message, trial_readiness_gated_message } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -1856,23 +2111,57 @@ export default function ReportPage() {
               {/* Unlocked content */}
               {(unlocked && full_report) && (
                 <>
+                  {/* Age Stage banner — top-of-report stage indicator */}
+                  <AgeStageBanner age_intelligence={age_intelligence} />
+
+                  {/* Age-appropriate evaluation disclaimer */}
+                  <AgeAppropriateEvaluationDisclaimer age_intelligence={age_intelligence} />
+
                   {/* Overall benchmark hero — places the player on the age+position tier landscape */}
                   <OverallBenchmarkBanner
                     ob={full_report.overall_benchmark}
                     overallScore={full_report.scores?.overall_development}
                   />
 
+                  {/* Age Intelligence Scoreboard — the 9 deterministic scores */}
+                  <AgeIntelligenceScoreboard
+                    age_intelligence={age_intelligence}
+                    position_hint={player_details?.position}
+                  />
+
+                  {/* What we evaluated · what we deliberately did not */}
+                  <WhatWeEvaluatedBlock age_intelligence={age_intelligence} />
+
                   {/* Stylistic archetype — public, style-only comparison */}
                   <ArchetypeCard archetype={archetype} />
 
-                  {/* 5-Lens twins strip (Style / Build / Role / Career-path / FIFA k-NN) */}
+                  {/* 5-Lens twins strip — ALWAYS renders. The FIFA lens is auto-removed
+                      from archetype.lenses for U6-U11 by the backend stage-gating, so it
+                      naturally falls back to a 4-lens display at those ages. */}
                   <ClosestMatchesStrip archetype={archetype} />
 
-                  {/* FIFA Data Twin — real k-NN top-5 against ~7,500 senior pros */}
-                  <FifaDataTwinPanel archetype={archetype} />
+                  {/* FIFA Data Twin — top-5 real k-NN. Backend strips fifa_neighbors for
+                      U6-U11 and attaches a friendly stage-gated message instead. */}
+                  {archetype?.fifa_neighbors && archetype.fifa_neighbors.length > 0 ? (
+                    <FifaDataTwinPanel archetype={archetype} />
+                  ) : (
+                    <StageGatedPanel
+                      title="FIFA Data Twin · senior-pro reference"
+                      message={archetype?.fifa_panel_gated_message}
+                      testId="fifa-data-twin-gated"
+                    />
+                  )}
 
-                  {/* StatsBomb Pro Calibration — Euro 2024 percentile anchoring */}
-                  <StatsBombCalibrationPanel calibration={statsbomb_calibration} />
+                  {/* StatsBomb Pro Calibration — gated for U6-U11. */}
+                  {statsbomb_calibration ? (
+                    <StatsBombCalibrationPanel calibration={statsbomb_calibration} />
+                  ) : (
+                    <StageGatedPanel
+                      title="Pro Calibration · StatsBomb Euro 2024"
+                      message={statsbomb_calibration_gated_message}
+                      testId="statsbomb-calibration-gated"
+                    />
+                  )}
 
                   {/* Player DNA — unique attribute fingerprint */}
                   <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
@@ -1979,8 +2268,17 @@ export default function ReportPage() {
                   {/* European Academy reference profile — position priorities vs Pro Academy expectations */}
                   <AgeProfileCard ref={age_profile_reference} />
 
-                  {/* Trial-readiness checklist — position-specific, scout-style */}
-                  <TrialReadinessCard tr={trial_readiness} />
+                  {/* Trial-readiness checklist — position-specific, scout-style.
+                      Gated to U12+; backend nulls it for U6-U11 with a friendly message. */}
+                  {trial_readiness ? (
+                    <TrialReadinessCard tr={trial_readiness} />
+                  ) : (
+                    <StageGatedPanel
+                      title="Trial readiness · scout checklist"
+                      message={trial_readiness_gated_message}
+                      testId="trial-readiness-gated"
+                    />
+                  )}
 
                   {/* Scout View */}
                   {full_report.scout_view && (

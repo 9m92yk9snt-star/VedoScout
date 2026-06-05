@@ -1,0 +1,229 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "purpose": "Single source of truth for ScoutMePlay's Age Intelligence Scoring System. Each stage carries (a) what we score, (b) what we deliberately do NOT score, and (c) which senior-pro panels are gated for that stage.",
+    "principle": "Children are evaluated using age-appropriate and position-specific benchmarks. Professional player data is used as a style and long-term development reference, not as a direct comparison."
+  },
+  "stages": [
+    {
+      "id": "foundation",
+      "label": "Foundation Stage",
+      "age_band": "U6-U8",
+      "age_min": 6,
+      "age_max": 8,
+      "headline": "Building the love of the game",
+      "what_we_evaluate": [
+        "Ball contact frequency",
+        "Coordination & balance",
+        "Courage on the ball",
+        "Enjoyment & effort",
+        "Basic dribbling",
+        "Confidence in possession"
+      ],
+      "what_we_dont_evaluate": [
+        "Tactical positioning (develops after U9)",
+        "Scanning & decision complexity (reserved for U12+)",
+        "Speed of play & tempo control (reserved for U13+)",
+        "90-minute intensity (reserved for U15+)"
+      ],
+      "focus_attributes": [
+        "ball_control", "first_touch", "dribbling",
+        "balance", "agility", "confidence", "courage_in_duels", "work_rate"
+      ],
+      "downweight_attributes": [
+        "positioning", "decision_making", "scanning", "off_ball_movement",
+        "timing_of_runs", "long_passing", "game_understanding"
+      ],
+      "panels": {
+        "show_fifa_knn":          false,
+        "show_statsbomb":         false,
+        "show_trial_readiness":   false,
+        "show_career_brief":      false,
+        "show_archetype_full":    false,
+        "show_archetype_light":   true
+      },
+      "panel_replacement_messages": {
+        "fifa_knn":         "Reserved for U12+. At this stage we focus on fundamentals, not pro comparisons.",
+        "statsbomb":        "Reserved for U12+. Comparing a 7-year-old to senior pros wouldn't be fair or useful.",
+        "trial_readiness":  "Too early for trial flags. The next milestone is U9 Technical Development."
+      }
+    },
+    {
+      "id": "technical",
+      "label": "Technical Development Stage",
+      "age_band": "U9-U11",
+      "age_min": 9,
+      "age_max": 11,
+      "headline": "Building the technical toolkit",
+      "what_we_evaluate": [
+        "First touch under pressure",
+        "Dribbling in tight spaces",
+        "Passing fundamentals",
+        "1v1 confidence",
+        "Creativity on the ball",
+        "Weak-foot exposure",
+        "Effort & re-press"
+      ],
+      "what_we_dont_evaluate": [
+        "Advanced tactical patterns (reserved for U12+)",
+        "Speed of play under elite pressure (reserved for U13+)",
+        "90-minute intensity & physical peaks (reserved for U15+)",
+        "Pro role discipline (reserved for U15+)"
+      ],
+      "focus_attributes": [
+        "first_touch", "ball_control", "dribbling", "passing", "one_v_one",
+        "weak_foot", "balance", "agility", "confidence", "work_rate"
+      ],
+      "downweight_attributes": [
+        "long_passing", "intensity", "game_understanding"
+      ],
+      "panels": {
+        "show_fifa_knn":          false,
+        "show_statsbomb":         false,
+        "show_trial_readiness":   false,
+        "show_career_brief":      true,
+        "show_archetype_full":    false,
+        "show_archetype_light":   true
+      },
+      "panel_replacement_messages": {
+        "fifa_knn":         "Senior-pro comparisons unlock at U12. At this stage your archetype is shown as a long-term style reference only.",
+        "statsbomb":        "Senior-pro percentile anchoring unlocks at U12. The focus at this age is building the technical toolkit.",
+        "trial_readiness":  "Trial-readiness checks unlock at U12, when scouts begin formal selection windows."
+      }
+    },
+    {
+      "id": "understanding",
+      "label": "Game Understanding Stage",
+      "age_band": "U12-U14",
+      "age_min": 12,
+      "age_max": 14,
+      "headline": "Linking technique to game intelligence",
+      "what_we_evaluate": [
+        "Scanning before receiving",
+        "Decision-making under pressure",
+        "Positioning by phase",
+        "Off-ball movement & runs",
+        "Passing choices & weight",
+        "Defensive awareness",
+        "Body language between actions"
+      ],
+      "what_we_dont_evaluate": [
+        "Pro-level role discipline (still emerging)",
+        "90-minute physical peaks (reserved for U15+)",
+        "Senior-team tactical execution (reserved for U17+)"
+      ],
+      "focus_attributes": [
+        "scanning", "decision_making", "positioning", "off_ball_movement",
+        "passing", "first_touch", "game_understanding", "timing_of_runs",
+        "ball_control", "composure"
+      ],
+      "downweight_attributes": [
+        "intensity"
+      ],
+      "panels": {
+        "show_fifa_knn":          true,
+        "show_statsbomb":         true,
+        "show_trial_readiness":   true,
+        "show_career_brief":      true,
+        "show_archetype_full":    true,
+        "show_archetype_light":   false
+      },
+      "panel_replacement_messages": {}
+    },
+    {
+      "id": "academy_ready",
+      "label": "Academy Readiness Stage",
+      "age_band": "U15-U17",
+      "age_min": 15,
+      "age_max": 17,
+      "headline": "Preparing for academy selection",
+      "what_we_evaluate": [
+        "Speed of play",
+        "Tactical discipline",
+        "90-minute intensity",
+        "Physical development",
+        "Role understanding",
+        "Consistency across the match",
+        "Response to mistakes & competitive mindset"
+      ],
+      "what_we_dont_evaluate": [
+        "Senior-team end-product expectations (reserved for U18+)"
+      ],
+      "focus_attributes": [
+        "decision_making", "positioning", "scanning", "passing",
+        "intensity", "work_rate", "acceleration", "speed",
+        "competitive_mindset", "response_to_mistakes", "game_understanding"
+      ],
+      "downweight_attributes": [],
+      "panels": {
+        "show_fifa_knn":          true,
+        "show_statsbomb":         true,
+        "show_trial_readiness":   true,
+        "show_career_brief":      true,
+        "show_archetype_full":    true,
+        "show_archetype_light":   false
+      },
+      "panel_replacement_messages": {}
+    },
+    {
+      "id": "senior",
+      "label": "Senior Performance Stage",
+      "age_band": "U18+",
+      "age_min": 18,
+      "age_max": 99,
+      "headline": "Senior performance & end product",
+      "what_we_evaluate": [
+        "Efficiency in possession",
+        "Match impact",
+        "Tactical execution",
+        "Physical intensity over 90 minutes",
+        "End product (goals, assists, chances created)",
+        "Consistency across phases",
+        "Leadership & body language"
+      ],
+      "what_we_dont_evaluate": [],
+      "focus_attributes": [
+        "decision_making", "passing", "intensity", "positioning",
+        "shooting", "off_ball_movement", "timing_of_runs", "scanning",
+        "composure", "work_rate", "game_understanding", "competitive_mindset"
+      ],
+      "downweight_attributes": [],
+      "panels": {
+        "show_fifa_knn":          true,
+        "show_statsbomb":         true,
+        "show_trial_readiness":   true,
+        "show_career_brief":      true,
+        "show_archetype_full":    true,
+        "show_archetype_light":   false
+      },
+      "panel_replacement_messages": {}
+    }
+  ],
+  "level_mapping": {
+    "_doc": "Maps the AI's 4-tier classification × stage × overall_score to the 8-level human-friendly label parents and scouts intuitively understand.",
+    "rules": [
+      {"when_tier": "standard_club",  "min_overall": 0.0, "max_overall": 5.4,  "in_stages": ["foundation","technical"], "level": "Beginner"},
+      {"when_tier": "standard_club",  "min_overall": 0.0, "max_overall": 10.0, "in_stages": ["understanding","academy_ready","senior"], "level": "Grassroots"},
+      {"when_tier": "standard_club",  "min_overall": 5.5, "max_overall": 10.0, "in_stages": ["foundation","technical"], "level": "Grassroots"},
+      {"when_tier": "strong_club",    "min_overall": 0.0, "max_overall": 6.4,  "in_stages": ["foundation","technical","understanding","academy_ready","senior"], "level": "Club"},
+      {"when_tier": "strong_club",    "min_overall": 6.5, "max_overall": 10.0, "in_stages": ["foundation","technical","understanding","academy_ready","senior"], "level": "Strong Club"},
+      {"when_tier": "pro_academy",    "min_overall": 0.0, "max_overall": 7.9,  "in_stages": ["foundation","technical","understanding","academy_ready"], "level": "Academy"},
+      {"when_tier": "pro_academy",    "min_overall": 8.0, "max_overall": 10.0, "in_stages": ["foundation","technical","understanding","academy_ready"], "level": "Elite Academy"},
+      {"when_tier": "pro_academy",    "min_overall": 0.0, "max_overall": 7.9,  "in_stages": ["senior"], "level": "Semi-Pro"},
+      {"when_tier": "pro_academy",    "min_overall": 8.0, "max_overall": 10.0, "in_stages": ["senior"], "level": "Professional"},
+      {"when_tier": "elite_academy",  "min_overall": 0.0, "max_overall": 10.0, "in_stages": ["foundation","technical","understanding","academy_ready"], "level": "Elite Academy"},
+      {"when_tier": "elite_academy",  "min_overall": 0.0, "max_overall": 10.0, "in_stages": ["senior"], "level": "Professional"}
+    ],
+    "level_definitions": {
+      "Beginner":      "Just starting out — early ball contact & coordination.",
+      "Grassroots":    "Local/school football. Building the foundations.",
+      "Club":          "Regular club football. Settling into a position.",
+      "Strong Club":   "Top regional/elite-amateur club at this age.",
+      "Academy":       "Typical professional youth academy standard.",
+      "Elite Academy": "Top 5% youth — La Masia / Ajax / Bayern / Hajduk class.",
+      "Semi-Pro":      "Adult semi-professional level — paid lower-league football.",
+      "Professional":  "Professional-grade senior performance."
+    }
+  },
+  "disclaimer": "This player has been evaluated using age-appropriate and position-specific benchmarks. Professional player data is used as a style and long-term development reference, not as a direct comparison."
+}
