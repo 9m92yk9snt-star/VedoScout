@@ -10,7 +10,7 @@ import shutil
 import re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 import bcrypt
 import jwt as pyjwt
@@ -55,7 +55,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 5  # v5 = fixed pro-name extraction in bio/career headers
+PDF_RENDER_VERSION = 6  # v6 = adds StatsBomb Pro Calibration section
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -269,6 +269,24 @@ except Exception as _e:  # pragma: no cover
     FIFA_PLAYERS = []
     FIFA_BY_POSITION = {}
     FIFA_META = {}
+
+# StatsBomb Euro 2024 per-position percentiles — pre-computed offline from
+# the public open-data repo. See scripts/build_statsbomb_percentiles.py.
+# Used by Step 2 to calibrate the "Pro Academy" tier against real senior-pro
+# performance distributions and to cite a verifiable source on the report.
+try:
+    with open(DATA_DIR / "statsbomb_percentiles.json", "r", encoding="utf-8") as _f:
+        _SB_DB = json.load(_f)
+    STATSBOMB_PCTS = _SB_DB.get("percentiles_by_position", {})
+    STATSBOMB_META = _SB_DB.get("_meta", {})
+    logging.info(
+        "Loaded StatsBomb percentile DB: %d positions, source=%s",
+        len(STATSBOMB_PCTS), STATSBOMB_META.get("source", "unknown"),
+    )
+except Exception as _e:  # pragma: no cover
+    logging.warning("Could not load statsbomb_percentiles.json: %s", _e)
+    STATSBOMB_PCTS = {}
+    STATSBOMB_META = {}
 
 
 # ---- 4-Layer Intelligence Stack helpers -----------------------------------
@@ -543,6 +561,151 @@ def find_fifa_neighbors(
     # Best similarity first; tie-break by FIFA overall (famous pros surface first)
     neighbors.sort(key=lambda n: (-n["similarity_pct"], -n["overall"]))
     return neighbors[:k]
+
+
+
+
+# ---- Step 2 — StatsBomb Euro 2024 calibration ------------------------------
+# Map each ScoutMePlay attribute to the StatsBomb per-90 metric that best
+# proxies it. The kid's 0-10 score on the LHS is then anchored to where it
+# would sit in the senior-pro distribution on the RHS (e.g. "your 8/10 in
+# passing matches the top 25% of Euro 2024 starters at this position").
+
+_SCORE_TO_STATSBOMB = {
+    "passing":              "pass_completion_pct",      # also "passes_per_90"
+    "long_passing":         "progressive_passes_per_90",
+    "scanning":             "key_passes_per_90",
+    "decision_making":      "progressive_passes_per_90",
+    "vision":               "key_passes_per_90",
+    "positioning":          "interceptions_per_90",
+    "off_ball_movement":    "shots_per_90",
+    "timing_of_runs":       "shots_per_90",
+    "shooting":             "xg_per_90",
+    "finishing":            "goals_per_90",
+    "dribbling":            "dribbles_completed_per_90",
+    "one_v_one":            "dribbles_completed_per_90",
+    "intensity":            "pressures_per_90",
+    "work_rate":            "pressures_per_90",
+    "courage_in_duels":     "duels_won_per_90",
+    "ball_recoveries":      "ball_recoveries_per_90",
+}
+
+# Human-friendly labels for the calibration UI / PDF
+_STATSBOMB_METRIC_LABELS = {
+    "pass_completion_pct":            "Pass completion %",
+    "passes_per_90":                  "Passes per 90",
+    "progressive_passes_per_90":      "Progressive passes per 90",
+    "passes_into_final_third_per_90": "Passes into final third per 90",
+    "key_passes_per_90":              "Key passes per 90",
+    "shots_per_90":                   "Shots per 90",
+    "goals_per_90":                   "Goals per 90",
+    "xg_per_90":                      "Expected goals (xG) per 90",
+    "dribbles_attempted_per_90":      "Dribbles attempted per 90",
+    "dribbles_completed_per_90":      "Dribbles completed per 90",
+    "duels_won_per_90":               "Duels won per 90",
+    "ball_recoveries_per_90":         "Ball recoveries per 90",
+    "interceptions_per_90":           "Interceptions per 90",
+    "pressures_per_90":               "Pressures per 90",
+    "dribble_completion_pct":         "Dribble completion %",
+    "duel_win_pct":                   "Duel-win %",
+}
+
+
+def _score_to_percentile_bucket(score: float) -> Tuple[str, str]:
+    """Map a 0-10 ScoutMePlay score to a Euro 2024 percentile bucket.
+
+    The calibration is intentionally generous on the upper end so we don't
+    accidentally tell every 8/10 they're "elite" — we anchor 7=median pro,
+    8=top-quartile pro, 9=top-decile pro.
+    """
+    if score >= 9.0:
+        return "p90", "Top 10% of Euro 2024 starters"
+    if score >= 8.0:
+        return "p75", "Top 25% of Euro 2024 starters"
+    if score >= 7.0:
+        return "p50", "Median Euro 2024 starter"
+    if score >= 6.0:
+        return "p25", "Bottom 25% of Euro 2024 starters"
+    return "below_p25", "Below Euro 2024 starter level"
+
+
+def compute_statsbomb_calibration(full_report: dict, player_details: dict) -> Optional[dict]:
+    """Build a per-attribute calibration showing where the player's scores
+    land against Euro 2024 senior-pro distributions for their position.
+
+    Output:
+      {
+        position: "...",
+        position_n: 14,
+        source: "...",
+        rows: [
+          {
+            attribute_key, attribute_label, score (0-10),
+            statsbomb_metric, statsbomb_metric_label,
+            bucket ("p25"|"p50"|"p75"|"p90"|"below_p25"),
+            bucket_label ("Top 25% of Euro 2024 starters"),
+            pro_p25, pro_p50, pro_p75, pro_p90  (raw per-90 values)
+          },
+          ...
+        ],
+        summary: { p90: 3, p75: 5, p50: 4, p25: 1, below_p25: 0 }
+      }
+
+    Returns None when the dataset has no rows for that position.
+    """
+    if not STATSBOMB_PCTS or not isinstance(full_report, dict):
+        return None
+    position = _normalise_position((player_details or {}).get("position"))
+    if not position:
+        return None
+    pcts = STATSBOMB_PCTS.get(position)
+    if not pcts:
+        return None
+    scores = _flatten_scores(full_report)
+    if not scores:
+        return None
+
+    rows = []
+    bucket_counts = {"p90": 0, "p75": 0, "p50": 0, "p25": 0, "below_p25": 0}
+    for attr_key, sb_metric in _SCORE_TO_STATSBOMB.items():
+        score = scores.get(attr_key)
+        if not isinstance(score, (int, float)):
+            continue
+        metric_pcts = pcts.get(sb_metric)
+        if not isinstance(metric_pcts, dict):
+            continue
+        bucket, label = _score_to_percentile_bucket(score)
+        bucket_counts[bucket] += 1
+        rows.append({
+            "attribute_key":          attr_key,
+            "attribute_label":        attr_key.replace("_", " ").title(),
+            "score":                  score,
+            "statsbomb_metric":       sb_metric,
+            "statsbomb_metric_label": _STATSBOMB_METRIC_LABELS.get(sb_metric, sb_metric),
+            "bucket":                 bucket,
+            "bucket_label":           label,
+            "pro_p25":                metric_pcts.get("p25"),
+            "pro_p50":                metric_pcts.get("p50"),
+            "pro_p75":                metric_pcts.get("p75"),
+            "pro_p90":                metric_pcts.get("p90"),
+        })
+
+    if not rows:
+        return None
+
+    return {
+        "position":     position,
+        "position_n":   pcts.get("_n_players"),
+        "min_minutes":  pcts.get("_min_minutes_filter"),
+        "source":       STATSBOMB_META.get("source", "StatsBomb Open Data"),
+        "source_url":   STATSBOMB_META.get("source_url", "https://github.com/statsbomb/open-data"),
+        "competition":  STATSBOMB_META.get("competition", "UEFA Euro 2024"),
+        "matches":      STATSBOMB_META.get("matches"),
+        "license":      STATSBOMB_META.get("license"),
+        "methodology":  STATSBOMB_META.get("methodology"),
+        "rows":         rows,
+        "summary":      bucket_counts,
+    }
 
 
 
@@ -2339,6 +2502,11 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # Step 2: Pro calibration — anchor user scores against StatsBomb Euro 2024 percentiles
+        out["statsbomb_calibration"] = compute_statsbomb_calibration(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
         # Extract / placeholder frames for every video_comments timestamp and
         # rewrite the comments list with a `frame_url` per moment.
         enriched_comments = ensure_video_frames(doc)
@@ -3634,6 +3802,95 @@ def _age_profile_page(profile: dict, styles):
     return flow
 
 
+def _statsbomb_calibration_pdf(calibration: dict, styles):
+    """Pro Calibration table for the PDF — anchors player scores against
+    Euro 2024 senior-pro per-90 percentiles. Cites StatsBomb open data."""
+    if not isinstance(calibration, dict):
+        return []
+    rows_in = calibration.get("rows") or []
+    if not rows_in:
+        return []
+
+    BUCKET_LABEL = {
+        "p90":      "Top 10%",
+        "p75":      "Top 25%",
+        "p50":      "Median pro",
+        "p25":      "Bottom 25%",
+        "below_p25": "Below pro",
+    }
+    BUCKET_COLOR = {
+        "p90":       _PDF_FOREST,
+        "p75":       "#1F4F2F",
+        "p50":       "#9CA3AF",
+        "p25":       "#9CA3AF",
+        "below_p25": "#9CA3AF",
+    }
+
+    header = Paragraph(
+        "<font color='#1F4F2F' size='7'><b>PRO CALIBRATION &middot; STATSBOMB EURO 2024</b></font><br/>"
+        "<font color='#0A0F0D' size='13'><b>Where your scores sit vs Euro 2024 senior pros</b></font><br/>"
+        f"<font color='#0A0F0D' size='8.5'>Each AI score is anchored against the actual per-90 distribution "
+        f"of <b>{calibration.get('position_n')} {calibration.get('position')} starters</b> at the European "
+        f"Championship 2024 &mdash; extracted from public StatsBomb event-level data across "
+        f"<b>{calibration.get('matches')} matches</b>.</font>",
+        styles["BodyW"],
+    )
+
+    rows = [[
+        Paragraph("<font color='#FFFFFF' size='7'><b>ATTRIBUTE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>STATSBOMB METRIC</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>SCORE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>vs EURO 2024 PROS</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>PRO REFERENCE</b></font>", styles["BodyW"]),
+    ]]
+    for r in rows_in:
+        bucket = r.get("bucket", "p25")
+        pro_ref = (
+            f"p90={r.get('pro_p90')}" if bucket == "p90" else
+            f"p75={r.get('pro_p75')}" if bucket == "p75" else
+            f"p50={r.get('pro_p50')}" if bucket == "p50" else
+            f"p25={r.get('pro_p25')}"
+        )
+        rows.append([
+            Paragraph(f"<font color='#0A0F0D' size='9'><b>{r.get('attribute_label', '')}</b></font>", styles["BodyW"]),
+            Paragraph(f"<font color='#0A0F0D' size='8'>{r.get('statsbomb_metric_label', '')}</font>", styles["BodyW"]),
+            Paragraph(
+                f"<font color='#1F4F2F' size='14'><b>{r.get('score')}</b></font>"
+                f"<font color='#9CA3AF' size='7'> /10</font>",
+                styles["BodyW"],
+            ),
+            Paragraph(
+                f"<font color='{BUCKET_COLOR.get(bucket, '#9CA3AF')}' size='9'>"
+                f"<b>{BUCKET_LABEL.get(bucket, bucket)}</b></font>",
+                styles["BodyW"],
+            ),
+            Paragraph(f"<font color='#9CA3AF' size='8'>{pro_ref}</font>", styles["BodyW"]),
+        ])
+
+    table = Table(rows, colWidths=[3.3 * cm, 4.5 * cm, 1.7 * cm, 3.4 * cm, 2.6 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND",     (0, 0), (-1, 0),  _PDF_FOREST),
+        ("BACKGROUND",     (0, 1), (-1, -1), _PDF_CARD),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [_PDF_CARD, "#F4EFE6"]),
+        ("LEFTPADDING",    (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING",   (0, 0), (-1, -1), 7),
+        ("TOPPADDING",     (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING",  (0, 0), (-1, -1), 7),
+        ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    footnote = Paragraph(
+        f"<i><font color='#9CA3AF' size='7.5'><b>Source:</b> {calibration.get('source')} "
+        f"&middot; {calibration.get('source_url')} &middot; "
+        f"License: {calibration.get('license', '')}. "
+        f"<b>Methodology:</b> {calibration.get('methodology', '')}</font></i>",
+        styles["BodyW"],
+    )
+
+    return [header, Spacer(1, 0.2 * cm), table, Spacer(1, 0.2 * cm), footnote, Spacer(1, 0.2 * cm)]
+
+
+
 
 def build_pdf(report_doc: dict, output_path: str):
     """Builds a premium cream/forest PDF. Document is organised as:
@@ -3777,6 +4034,11 @@ def build_pdf(report_doc: dict, output_path: str):
         # FIFA Data Twin — top-5 closest senior pros by real k-NN
         story.append(Spacer(1, 0.3 * cm))
         story += _fifa_neighbors_pdf(archetype, styles)
+        # Pro Calibration — anchor scores against StatsBomb Euro 2024 percentiles
+        statsbomb_cal = report_doc.get("statsbomb_calibration")
+        if statsbomb_cal:
+            story.append(Spacer(1, 0.3 * cm))
+            story += _statsbomb_calibration_pdf(statsbomb_cal, styles)
 
     story.append(PageBreak())
 
@@ -4145,6 +4407,11 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
             if doc.get("archetype_narrative_archetype_id") == doc["archetype"].get("id"):
                 doc["archetype"]["narrative"] = doc["archetype_narrative"]
         doc["age_profile_reference"] = compute_age_profile_reference(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        # Step 2 — StatsBomb calibration for the PDF mirror
+        doc["statsbomb_calibration"] = compute_statsbomb_calibration(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )

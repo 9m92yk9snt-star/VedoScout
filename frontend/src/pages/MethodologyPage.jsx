@@ -174,8 +174,133 @@ export default function MethodologyPage() {
           </ul>
         </section>
 
+        {/* Data sources & calibration */}
+        <section data-testid="methodology-data-sources" className="mb-12">
+          <h2 className="font-barlow font-black uppercase text-2xl text-ink mb-3">
+            Data sources &amp; calibration
+          </h2>
+          <p className="text-sm text-ink/70 leading-relaxed max-w-2xl mb-6">
+            Every comparison and tier in this report is anchored against publicly verifiable senior-pro data —
+            never against pure curated guesses. Three open datasets do the heavy lifting:
+          </p>
+
+          <div className="space-y-3">
+            {/* StatsBomb */}
+            <div data-testid="methodology-source-statsbomb" className="bg-surface border border-gray-border p-5">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-16 text-center">
+                  <div className="font-barlow font-black text-3xl text-forest leading-none">SB</div>
+                  <div className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/45 mt-1">
+                    Source 1
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-barlow font-black uppercase text-lg text-ink leading-tight">
+                    StatsBomb Open Data · UEFA Euro 2024
+                  </h3>
+                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-forest mt-0.5 mb-2">
+                    51 matches · 493 unique players · 179 with ≥270 minutes
+                  </div>
+                  <p className="text-sm text-ink/75 leading-relaxed">
+                    Used to calibrate the &quot;Pro Calibration&quot; panel on every report. For each player position,
+                    we pre-computed per-90 percentiles (p25 / p50 / p75 / p90) of: pass completion, progressive
+                    passes, key passes, xG, goals, dribbles completed, duels won, pressures, interceptions, ball
+                    recoveries. The player&apos;s AI scores are then anchored to these distributions — so &quot;8/10
+                    passing&quot; literally means &quot;top 25% of Euro 2024 starters at this position.&quot;
+                  </p>
+                  <p className="mt-2 text-xs text-ink/55">
+                    <a
+                      href="https://github.com/statsbomb/open-data"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-forest underline hover:text-forest-pop"
+                    >
+                      github.com/statsbomb/open-data
+                    </a>{" "}
+                    · License: CC BY-NC-SA 4.0 (StatsBomb Open Data terms) · Updated annually.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* FIFA */}
+            <div data-testid="methodology-source-fifa" className="bg-surface border border-gray-border p-5">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-16 text-center">
+                  <div className="font-barlow font-black text-3xl text-forest leading-none">FIFA</div>
+                  <div className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/45 mt-1">
+                    Source 2
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-barlow font-black uppercase text-lg text-ink leading-tight">
+                    EA Sports FIFA · 7,473 senior pros
+                  </h3>
+                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-forest mt-0.5 mb-2">
+                    22 attributes · 8 positions · normalised to a 0-10 scale
+                  </div>
+                  <p className="text-sm text-ink/75 leading-relaxed">
+                    Used by the &quot;FIFA Data Twin&quot; panel to run a real k-nearest-neighbour similarity
+                    search across senior pros. We pre-process the public Kaggle FIFA dataset into a slim
+                    runtime file, map every FIFA attribute (ball control, dribbling, short-passing, vision,
+                    composure, acceleration, balance, etc.) onto the same 0-10 scale we use for the player,
+                    then compute per-attribute Euclidean RMSE.
+                    <span className="block mt-1 font-semibold text-ink">
+                      The reported similarity is hard-capped at 92%
+                    </span>{" "}
+                    — a youth player&apos;s scoring vector should never report 99% match to a peak-career pro;
+                    capping it keeps the figure honest.
+                  </p>
+                  <p className="mt-2 text-xs text-ink/55">
+                    Source: Kaggle FIFA 22 complete dataset (Stefano Leone) · attribute ratings © EA Sports,
+                    used in a derived non-republished form for similarity matching only.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* FBref */}
+            <div data-testid="methodology-source-fbref" className="bg-surface border border-gray-border p-5">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-16 text-center">
+                  <div className="font-barlow font-black text-3xl text-forest leading-none">FBR</div>
+                  <div className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/45 mt-1">
+                    Source 3
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-barlow font-black uppercase text-lg text-ink leading-tight">
+                    FBref &amp; Transfermarkt · career snapshots
+                  </h3>
+                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-forest mt-0.5 mb-2">
+                    27 archetype career briefs · pre-computed offline
+                  </div>
+                  <p className="text-sm text-ink/75 leading-relaxed">
+                    Powers the &quot;Career snapshot&quot; block on every archetype card — career appearances,
+                    trophies, FBref per-90 stats (e.g. <em>&quot;Modric career pass completion ~88% across 13 La
+                    Liga seasons&quot;</em>). All numbers are researched offline and shipped in
+                    <code className="text-xs text-forest font-mono mx-1">archetypes.json</code>; we never
+                    scrape FBref at runtime to respect Sports Reference&apos;s terms of service.
+                  </p>
+                  <p className="mt-2 text-xs text-ink/55">
+                    Career data cross-referenced against FBref career-totals, Transfermarkt player profiles,
+                    and the player&apos;s Wikipedia infobox at build time. Annual refresh.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-5 text-xs text-ink/55 italic leading-relaxed max-w-2xl">
+            <span className="not-italic font-bold text-ink/65">Why pre-compute everything offline?</span>{" "}
+            Runtime web scraping is fragile, slow, and legally grey. Every dataset above is licensed for the
+            use described, processed into a slim runtime file at build time, then cited verbatim in the report
+            — so a scout or parent can independently verify any number we cite.
+          </p>
+        </section>
+
         <footer className="text-xs text-ink/50 italic">
-          Methodology version 1.0 — last updated Feb 2026.
+          Methodology version 1.1 — last updated Feb 2026 · Added StatsBomb Euro 2024 calibration + FIFA k-NN + FBref career snapshots.
         </footer>
       </main>
     </div>

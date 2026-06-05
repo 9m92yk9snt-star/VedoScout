@@ -1018,6 +1018,128 @@ function ClosestMatchesStrip({ archetype }) {
   return <LensMatchesStrip archetype={archetype} />;
 }
 
+/* StatsBomb Pro Calibration — anchors the player's scores against Euro 2024
+   senior-pro per-90 distributions. This is the panel that turns "8/10
+   passing" into "Top 25% of Euro 2024 starters" — verifiable, public-source. */
+function StatsBombCalibrationPanel({ calibration }) {
+  if (!calibration || !Array.isArray(calibration.rows) || calibration.rows.length === 0) return null;
+  const { position, position_n, source, source_url, competition, matches, rows, summary } = calibration;
+
+  const BUCKET_META = {
+    p90:      { label: "Top 10%",      cls: "bg-forest text-cream-base", barCls: "bg-forest",        widthPct: 95 },
+    p75:      { label: "Top 25%",      cls: "bg-forest/85 text-cream-base", barCls: "bg-forest/80",  widthPct: 78 },
+    p50:      { label: "Median pro",   cls: "bg-cream-soft text-forest", barCls: "bg-forest/55",     widthPct: 50 },
+    p25:      { label: "Bottom 25%",   cls: "bg-cream-soft text-ink/70", barCls: "bg-ink/30",        widthPct: 25 },
+    below_p25:{ label: "Below pro",    cls: "bg-cream-soft text-ink/60", barCls: "bg-ink/20",        widthPct: 12 },
+  };
+
+  return (
+    <div data-testid="statsbomb-calibration-panel" className="bg-surface border border-gray-border p-6 md:p-7">
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+            Pro calibration · StatsBomb Euro 2024
+          </div>
+          <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
+            Where your scores sit vs Euro 2024 senior pros
+          </h3>
+          <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
+            Each AI score is anchored against the actual per-90 distribution of{" "}
+            <span className="font-bold text-forest">{position_n} {position} starters</span>{" "}
+            at the European Championship 2024 — extracted from public StatsBomb event-level data across{" "}
+            <span className="font-bold text-forest">{matches} matches</span>.
+          </p>
+        </div>
+        <div className="hidden lg:flex flex-col items-end gap-1 text-[9px] uppercase tracking-[0.22em] font-bold">
+          {["p90","p75","p50","p25"].map((b) => (
+            <div key={b} className="flex items-center gap-2">
+              <span className="text-ink/50">{BUCKET_META[b].label}</span>
+              <span className={`px-2 py-0.5 ${BUCKET_META[b].cls}`}>{summary[b] ?? 0}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {rows.map((r, i) => {
+          const meta = BUCKET_META[r.bucket] || BUCKET_META.p25;
+          // Pro reference label: show the relevant p-band value the user surpassed
+          let proRef = "";
+          if (r.bucket === "p90") proRef = `pro p90: ${r.pro_p90}`;
+          else if (r.bucket === "p75") proRef = `pro p75: ${r.pro_p75}`;
+          else if (r.bucket === "p50") proRef = `pro p50: ${r.pro_p50}`;
+          else proRef = `pro p25: ${r.pro_p25}`;
+          return (
+            <div
+              key={r.attribute_key}
+              data-testid={`statsbomb-row-${r.attribute_key}`}
+              className="flex items-center gap-3 md:gap-4 p-3 md:p-4 bg-cream-card"
+            >
+              {/* Attribute label + StatsBomb metric */}
+              <div className="flex-1 min-w-0 max-w-[40%]">
+                <div className="font-barlow font-black uppercase text-sm text-ink truncate">
+                  {r.attribute_label}
+                </div>
+                <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50 truncate">
+                  {r.statsbomb_metric_label}
+                </div>
+              </div>
+
+              {/* Score */}
+              <div className="shrink-0 w-16 text-right">
+                <div className="font-barlow font-black text-2xl tabular-nums text-forest leading-none">
+                  {r.score}
+                </div>
+                <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-ink/45">
+                  / 10
+                </div>
+              </div>
+
+              {/* Bar */}
+              <div className="hidden md:block flex-1 relative h-3 bg-cream-soft">
+                {/* p25/p50/p75/p90 ticks */}
+                <div className="absolute top-0 left-[25%] w-px h-full bg-ink/15" />
+                <div className="absolute top-0 left-[50%] w-px h-full bg-ink/15" />
+                <div className="absolute top-0 left-[75%] w-px h-full bg-ink/15" />
+                <div className="absolute top-0 left-[90%] w-px h-full bg-ink/15" />
+                <div className={`absolute inset-y-0 left-0 ${meta.barCls}`} style={{ width: `${meta.widthPct}%` }} />
+              </div>
+
+              {/* Bucket pill + pro p-value */}
+              <div className="shrink-0 flex flex-col items-end gap-1">
+                <span className={`text-[9px] uppercase tracking-[0.18em] font-bold px-2.5 py-1 ${meta.cls}`}>
+                  {r.bucket_label}
+                </span>
+                <span className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/45">
+                  {proRef}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 p-3 bg-cream-soft text-xs text-ink/70 leading-relaxed">
+        <span className="font-bold text-forest uppercase tracking-wider text-[10px]">Methodology:</span>{" "}
+        {calibration.methodology}
+      </div>
+
+      <p className="mt-3 text-xs text-ink/50 italic">
+        <span className="not-italic font-bold text-ink/65">Source:</span>{" "}
+        <a href={source_url} target="_blank" rel="noopener noreferrer" className="underline hover:text-forest">
+          {source}
+        </a>
+        {calibration.license && (
+          <> · <span className="not-italic">License: {calibration.license}</span></>
+        )}
+        . The percentile bands describe where this player would sit if measured against {competition} starters at the same position.
+      </p>
+    </div>
+  );
+}
+
+
+
 /* Position-specific reference profile card — shows the player's actual
    scores against Pro Academy expectations for the position + age bracket.
    Pure server-side enrichment, no AI involved. */
@@ -1353,7 +1475,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -1748,6 +1870,9 @@ export default function ReportPage() {
 
                   {/* FIFA Data Twin — real k-NN top-5 against ~7,500 senior pros */}
                   <FifaDataTwinPanel archetype={archetype} />
+
+                  {/* StatsBomb Pro Calibration — Euro 2024 percentile anchoring */}
+                  <StatsBombCalibrationPanel calibration={statsbomb_calibration} />
 
                   {/* Player DNA — unique attribute fingerprint */}
                   <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />

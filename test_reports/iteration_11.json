@@ -1,0 +1,45 @@
+{
+  "summary": "Iter11 (StatsBomb Euro 2024 calibration) verified end-to-end. Dataset integrity (8 positions, monotonic percentiles, realistic CB/striker spot-checks), API contract (statsbomb_calibration block with rows/summary/source/license/methodology), Lukas-specific buckets (Passing 9→p90, DM 9→p90, Intensity 6→p25), summary counters {p90:4, p75:3, p50:4, p25:1}, PDF v6 contents (PRO CALIBRATION / STATSBOMB EURO 2024 / Top 25% / p75= / StatsBomb / methodology), and full UI render of [data-testid=statsbomb-calibration-panel] below FIFA Data Twin panel — all PASS. Methodology page shows 3 source cards (StatsBomb / FIFA / FBref) with required text, footer 'Methodology version 1.1'. Regression: all prior 4-Layer Stack + FIFA k-NN + career_brief tests still green (29/30 — the 1 failure is missing `pdftotext` binary in container, NOT an app bug; PDF was verified via pypdf in the new iter11 suite and the iter10 pdf test passed).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "iter9 test_pdf_regenerates_with_new_sections", "issue": "Test calls shell `pdftotext` which is not installed in the container — replace with pypdf to make environment-portable. Not a product bug; PDF content verified independently in test_iter11_live.py via pypdf and all required strings are present."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "StatsBomb calibration panel", "issues": ["Off Ball Movement and Timing Of Runs both display the same StatsBomb metric label 'Shots per 90' (same p75=2.565); Dribbling and One V One both display 'Dribbles completed per 90' (same p50=0.547). This is by design via the _SCORE_TO_STATSBOMB map but to the user it looks like a duplicate row. Consider mapping Timing Of Runs → a distinct metric (e.g. 'Touches in box per 90' or 'xA per 90') and One V One → 'Dribble completion %' so each ScoutMePlay attribute has a unique anchor."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_statsbomb_calibration.py",
+    "/app/backend/tests/test_iter11_live.py",
+    "/app/test_reports/pytest/iter11_statsbomb.xml",
+    "/app/test_reports/pytest/iter11_live.xml",
+    "/app/test_reports/pytest/iter11_regression.xml"
+  ],
+  "action_items": [
+    "(Optional polish) Differentiate the StatsBomb metric mapped to Timing Of Runs vs Off Ball Movement, and to One V One vs Dribbling, so every row anchors against a unique pro metric — keeps the 'real rapport' promise tighter.",
+    "(Optional) Swap shell `pdftotext` in test_iter9_independent.test_pdf_regenerates_with_new_sections for pypdf so the test runs in any container."
+  ],
+  "critical_code_review_comments": [
+    "Backend StatsBomb dataset is real Euro 2024 (51 matches, 8 positions, 270-min filter) — CB p75 pass_completion 92.5% and striker p75 xG/90 0.49 are league-realistic.",
+    "Calibration block correctly includes position_n, matches, source_url, license, methodology — auditable on the wire.",
+    "Bucket anchoring is monotonic on score (9→p90, 8→p75, 7→p50, 6→p25, <6→below_p25) and summary counts match row buckets exactly.",
+    "FIFA 92% hard cap holds (top neighbor 88.2%). Career brief still attached. Narrative cache still warm after first fetch.",
+    "PDF cache versioning (v6) works — regenerates after /app/backend/pdfs/*.pdf purge with all required strings.",
+    "Two ScoutMePlay attributes are pointed at the same StatsBomb metric in two places (see design_issues) — not a bug, but a polish opportunity."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter11_live.py (new — 5 live API + PDF tests)"
+  ],
+  "success_rate": {"backend": "100% (7/7 iter11 statsbomb + 5/5 iter11 live + 29/30 regression; 1 regression failure is a missing OS binary, not an app bug)", "frontend": "100% (panel renders, all data-testids present, correct buckets and pro reference numbers, methodology page complete)"},
+  "test_credentials": "premium@elitescout.com / Premium@2026 (verified working)",
+  "seed_data_creation": "None — used existing seeded Lukas A. premium report (rid 64f59196-a520-4ba4-a0f9-de96df8802ef).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter11 is green across backend + frontend + PDF. If E1 polishes the _SCORE_TO_STATSBOMB map to give Timing-Of-Runs / One-V-One their own metrics, just re-run /app/backend/tests/test_statsbomb_calibration.py + /app/backend/tests/test_iter11_live.py — both already validate bucket monotonicity and summary integrity, so any swap will be caught. PDF cache purge (`rm /app/backend/pdfs/*.pdf`) is needed before any PDF re-test.",
+  "rca of the issue": "No app bug found. Only a portability issue in test_iter9_independent.test_pdf_regenerates_with_new_sections: it shells out to `pdftotext` which isn't shipped in this container — replace with `pypdf.PdfReader` (already a dep) to make the regression environment-portable."
+}
