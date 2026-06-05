@@ -226,28 +226,193 @@ except Exception as _e:  # pragma: no cover
     AGE_PROFILES_CATALOG = {}
 
 
+# ---- 4-Layer Intelligence Stack helpers -----------------------------------
+# Layer 1 = static curated JSON catalog (archetypes.json)
+# Layer 2 = multi-dimensional ranker (this module — Style/Build/Role/Path lenses)
+# Layer 3 = Gemini narrative generator (text-only, see generate_archetype_narrative)
+# Layer 4 = UI personalization (frontend ArchetypeCard + 4 lens strip)
+
+# Age-bracket keys MUST match the keys in archetypes.json:academy_bio.
+_AGE_BRACKETS = [
+    (0, 10,  "8-10"),
+    (11, 12, "11-12"),
+    (13, 14, "13-14"),
+    (15, 17, "15-17"),
+    (18, 99, "18-21"),
+]
+
+
+def _age_bracket_key(age) -> Optional[str]:
+    """Map a player's age (int|str|None) to the bracket key used in academy_bio."""
+    try:
+        a = int(str(age).strip())
+    except (TypeError, ValueError):
+        return None
+    for lo, hi, key in _AGE_BRACKETS:
+        if lo <= a <= hi:
+            return key
+    return None
+
+
+# Build categories used in archetypes.json:profile.build
+_BUILD_KEYS = ["small_technical", "compact_balanced", "athletic_runner", "tall_powerful"]
+_BUILD_LABELS = {
+    "small_technical":  "Small · technical",
+    "compact_balanced": "Compact · balanced",
+    "athletic_runner":  "Athletic · runner",
+    "tall_powerful":    "Tall · powerful",
+}
+
+
+def _infer_build(scores: dict) -> str:
+    """Infer the player's physical build from observed physical/technical scores.
+    Pure deterministic fallback when the player_details form doesn't capture it.
+
+    Logic (each rule contributes one signal, highest signal wins):
+      - High `body_control`/`balance`/`first_touch` & low `intensity`/`courage_in_duels`
+          → small_technical (Pedri / Modric-type frame)
+      - High `acceleration`/`speed`/`work_rate`            → athletic_runner
+      - High `courage_in_duels`/`intensity`/`body_control` → tall_powerful
+      - Otherwise (everything balanced)                    → compact_balanced
+    """
+    if not isinstance(scores, dict) or not scores:
+        return "compact_balanced"
+
+    def avg(*keys):
+        vals = [scores[k] for k in keys if isinstance(scores.get(k), (int, float))]
+        return sum(vals) / len(vals) if vals else 5.0
+
+    technical = avg("first_touch", "ball_control", "balance", "body_control")
+    athletic  = avg("acceleration", "speed", "work_rate")
+    powerful  = avg("courage_in_duels", "intensity", "body_control")
+
+    # Compute deltas vs overall average
+    overall = (technical + athletic + powerful) / 3.0
+    candidates = [
+        ("small_technical",  technical - overall),
+        ("athletic_runner",  athletic  - overall),
+        ("tall_powerful",    powerful  - overall),
+    ]
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    top_key, top_delta = candidates[0]
+    # If no signal is meaningfully above the others, call it compact/balanced
+    if top_delta < 0.4:
+        return "compact_balanced"
+    return top_key
+
+
+# Per-position role inference. The role keys MUST match the role values used
+# in archetypes.json:profile.role. Each rule maps a dominant attribute pattern
+# to a role key.
+_ROLE_RULES = {
+    "attacking midfielder": [
+        ("press_resistant_8", ["first_touch", "ball_control", "scanning"]),
+        ("deep_creator",      ["passing", "scanning", "decision_making"]),
+        ("chaos_creator",     ["dribbling", "shooting", "one_v_one"]),
+        ("shadow_striker",    ["timing_of_runs", "shooting", "off_ball_movement"]),
+        ("wide_creator",      ["dribbling", "passing", "weak_foot"]),
+    ],
+    "central midfielder": [
+        ("deep_creator_8",     ["passing", "scanning", "decision_making"]),
+        ("press_resistant_8",  ["first_touch", "ball_control", "scanning"]),
+        ("creator_8",          ["passing", "shooting", "weak_foot"]),
+        ("box_arriving_8",     ["timing_of_runs", "intensity", "shooting"]),
+        ("box_to_box_8",       ["work_rate", "intensity", "courage_in_duels"]),
+    ],
+    "defensive midfielder": [
+        ("tempo_6",      ["passing", "scanning", "decision_making"]),
+        ("destroyer_6",  ["courage_in_duels", "intensity", "positioning"]),
+        ("carrier_8",    ["ball_control", "dribbling", "first_touch"]),
+        ("box_to_box_8", ["work_rate", "intensity", "timing_of_runs"]),
+    ],
+    "centre back": [
+        ("ball_playing_cb", ["passing", "first_touch", "ball_control"]),
+        ("athletic_cb",     ["speed", "acceleration", "courage_in_duels"]),
+        ("leader_cb",       ["positioning", "scanning", "confidence"]),
+        ("aggressive_cb",   ["intensity", "courage_in_duels", "speed"]),
+    ],
+    "full back": [
+        ("creative_fb",   ["passing", "scanning", "first_touch"]),
+        ("attacking_fb",  ["acceleration", "speed", "work_rate"]),
+        ("defensive_fb",  ["positioning", "one_v_one", "courage_in_duels"]),
+    ],
+    "winger": [
+        ("dribble_winger",   ["dribbling", "one_v_one", "agility"]),
+        ("direct_winger",    ["acceleration", "speed", "shooting"]),
+        ("inverted_winger",  ["shooting", "dribbling", "weak_foot"]),
+        ("creator_winger",   ["passing", "weak_foot", "first_touch"]),
+    ],
+    "striker": [
+        ("penalty_box_9", ["shooting", "off_ball_movement", "timing_of_runs"]),
+        ("runner_9",      ["acceleration", "speed", "timing_of_runs"]),
+        ("pressing_9",    ["work_rate", "intensity", "courage_in_duels"]),
+        ("complete_9",    ["first_touch", "passing", "shooting"]),
+    ],
+    "goalkeeper": [
+        ("sweeper",       ["passing", "scanning", "decision_making"]),
+        ("shot_stopper",  ["one_v_one", "agility", "confidence"]),
+    ],
+}
+
+
+def _infer_role(scores: dict, position: Optional[str]) -> Optional[str]:
+    """Pick the role from _ROLE_RULES whose 3 key attrs the player scores
+    highest on. Returns None when no scores or no rules exist for the position.
+    """
+    if not position or not isinstance(scores, dict) or not scores:
+        return None
+    rules = _ROLE_RULES.get(position)
+    if not rules:
+        return None
+    best, best_avg = None, -1.0
+    for role_key, attrs in rules:
+        vals = [scores[a] for a in attrs if isinstance(scores.get(a), (int, float))]
+        if not vals:
+            continue
+        avg_v = sum(vals) / len(vals)
+        if avg_v > best_avg:
+            best, best_avg = role_key, avg_v
+    return best
+
+
+# Mapping from overall_benchmark tier to archetype tier — used for the
+# "Career-path twin" lens (i.e. an Elite Academy kid maps best to an
+# `elite` archetype's journey, while a Strong-Club kid maps best to a
+# `breakthrough`/`established` story).
+_TIER_PATH_PREFERENCE = {
+    "elite_academy":  ["elite", "world_class", "established", "breakthrough"],
+    "pro_academy":    ["world_class", "elite", "established", "breakthrough"],
+    "strong_club":    ["established", "breakthrough", "world_class", "elite"],
+    "standard_club":  ["breakthrough", "established", "world_class", "elite"],
+}
+
+
 def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
-    """Pick the closest stylistic archetype + return top-3 candidates with
-    per-attribute evidence. Pure deterministic.
+    """4-Lens deterministic matcher.
 
-    Each archetype's `anchor` may be:
-      - a list of attr keys  (legacy — every attr weighted equally at 1)
-      - a list of {key, weight} dicts  (preferred — higher weight = more
-        signature for that pro)
+    For every candidate archetype in the player's position, compute four
+    independent scores:
+      - style_score  — weighted average across the archetype's `anchor` attrs
+      - build_score  — 10 if archetype.profile.build == inferred player build
+      - role_score   — 10 if archetype.profile.role  == inferred player role
+      - path_score   — based on alignment between archetype.tier and the
+                       player's overall_benchmark.tier
+      - foot_bonus   — +1 when archetype.profile.foot matches the player's
+                       preferred_foot (or "both")
 
-    Optionally an archetype may declare `signature_attrs` (e.g. ["scanning",
-    "decision_making"]) — the player MUST score >= 7 on every signature
-    attr for the archetype to be considered a real match. This filters out
-    superficial matches (e.g. a player with high passing but zero scanning
-    will not be called a "Modric-type").
-
-    Returns:
+    Then pick ONE best archetype per lens. Returns:
       {
-        ...archetype meta (id/name/club/league/tier/traits/summary)...,
-        match_strength: float,           # weighted average across anchor attrs
-        evidence: [{key, label, score, weight}, ...],  # top-3 contributing attrs
-        developing: bool,
-        alternatives: [ {id, name, club, league, tier, match_strength}, ... ]  # next 2-3
+        id, name, club, league, tier, traits, summary,    # primary (style winner)
+        match_strength, evidence, developing,
+        lenses: {
+          style: { ...archetype meta..., score, why },
+          build: { ...archetype meta..., score, why },
+          role:  { ...archetype meta..., score, why },
+          path:  { ...archetype meta..., score, why }
+        },
+        academy_bio_chunk: "<bio for the age bracket from the STYLE winner>",
+        age_bracket_used: "13-14",
+        alternatives: [ next 2 style candidates ]
       }
     """
     if not isinstance(full_report, dict):
@@ -262,10 +427,16 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
     if not scores:
         return None
 
+    # ---- Inferred player profile (build/role/foot/tier) -----------------
+    player_foot = str((player_details or {}).get("preferred_foot") or "").strip().lower()
+    player_build = _infer_build(scores)
+    player_role = _infer_role(scores, position)
+    player_tier = ((full_report.get("overall_benchmark") or {}).get("tier") or "").strip().lower()
+    path_order = _TIER_PATH_PREFERENCE.get(player_tier, ["world_class", "elite", "established", "breakthrough"])
+
     ranked = []
     for arch in candidates:
         anchor = arch.get("anchor") or []
-        # Normalise to list of (key, weight)
         weighted = []
         for entry in anchor:
             if isinstance(entry, dict):
@@ -276,22 +447,65 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
         if not weighted:
             continue
 
-        # Signature gate — every signature_attr must be >= the min (default 7)
+        # --- Lens 1: Style (weighted average across signature attrs) ----
+        total_w = sum(w for _, w in weighted)
+        style_score = sum(scores[k] * w for k, w in weighted) / total_w
+
+        # --- Signature gate (existing behaviour preserved) ---------------
         sigs = arch.get("signature_attrs") or []
         passes_signature = True
         for sig in sigs:
             if isinstance(sig, dict):
-                sig_key = sig.get("key")
-                sig_min = sig.get("min", 7)
+                sig_key, sig_min = sig.get("key"), sig.get("min", 7)
             else:
-                sig_key = sig
-                sig_min = 7
+                sig_key, sig_min = sig, 7
             if scores.get(sig_key, 0) < sig_min:
                 passes_signature = False
                 break
 
-        total_w = sum(w for _, w in weighted)
-        match = sum(scores[k] * w for k, w in weighted) / total_w
+        # --- Profile-based lenses ---------------------------------------
+        profile = arch.get("profile") or {}
+        arch_foot  = str(profile.get("foot")  or "").lower()
+        arch_build = str(profile.get("build") or "").lower()
+        arch_role  = str(profile.get("role")  or "").lower()
+
+        # Foot bonus: +1.0 if exact match, +0.5 if either side is "both"
+        if player_foot and arch_foot:
+            if player_foot == arch_foot:
+                foot_bonus = 1.0
+            elif player_foot == "both" or arch_foot == "both":
+                foot_bonus = 0.5
+            else:
+                foot_bonus = 0.0
+        else:
+            foot_bonus = 0.0
+
+        # Build lens: 10 if exact match, 6 if "compact_balanced" (neutral)
+        if arch_build and player_build:
+            if arch_build == player_build:
+                build_score = 10.0
+            elif "compact_balanced" in (arch_build, player_build):
+                build_score = 7.0  # neutral build always partially fits
+            else:
+                build_score = 4.0
+        else:
+            build_score = 5.0
+
+        # Role lens
+        if arch_role and player_role:
+            role_score = 10.0 if arch_role == player_role else 4.0
+        else:
+            role_score = 5.0
+
+        # Path lens — preference list maps tier → ordered archetype tiers
+        arch_tier = str(arch.get("tier") or "").lower()
+        if arch_tier in path_order:
+            # Position 0 = best fit (10), last = lowest fit (~6)
+            idx = path_order.index(arch_tier)
+            path_score = max(6.0, 10.0 - 1.2 * idx)
+        else:
+            path_score = 6.0
+
         # Evidence — top-3 attrs by (score * weight) contribution
         contribs = sorted(
             [{"key": k, "label": k.replace("_", " ").title(), "score": scores[k], "weight": w}
@@ -308,19 +522,82 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             "tier":           arch.get("tier"),
             "traits":         arch.get("traits") or [],
             "summary":        arch.get("summary") or "",
-            "match_strength": round(match, 2),
+            "profile":        profile,
+            "academy_bio":    arch.get("academy_bio") or {},
+            "match_strength": round(style_score, 2),
             "evidence":       contribs,
             "passes_signature": passes_signature,
+            "_style":  round(style_score + foot_bonus * 0.3, 3),
+            "_build":  round(build_score + foot_bonus, 3),
+            "_role":   round(role_score + foot_bonus, 3),
+            "_path":   round(path_score + foot_bonus * 0.3, 3),
         })
 
     if not ranked:
         return None
 
-    # Prefer signature-passing matches first, then by match strength
-    ranked.sort(key=lambda x: (x["passes_signature"], x["match_strength"]), reverse=True)
+    # ---- Style winner (primary archetype) -------------------------------
+    # Prefer signature-passing matches first, then by style score
+    by_style = sorted(ranked, key=lambda x: (x["passes_signature"], x["_style"]), reverse=True)
+    primary = by_style[0]
 
-    primary = ranked[0]
-    # If even the strongest match fails signature OR is below 6.0, show developing state
+    age_bracket = _age_bracket_key((player_details or {}).get("age"))
+    academy_bio_chunk = None
+    if primary.get("academy_bio") and age_bracket:
+        academy_bio_chunk = primary["academy_bio"].get(age_bracket)
+
+    # ---- Lens twins (independent picks across the 4 lenses) -------------
+    def _pick(metric_key, exclude_id=None):
+        pool = [c for c in ranked if c["id"] != exclude_id] if exclude_id else ranked
+        if not pool:
+            return None
+        winner = max(pool, key=lambda x: x[metric_key])
+        return {
+            "id":    winner["id"],
+            "name":  winner["name"],
+            "club":  winner["club"],
+            "league": winner["league"],
+            "tier":  winner["tier"],
+            "summary": winner["summary"],
+            "score": round(winner[metric_key], 2),
+            "profile": winner.get("profile") or {},
+        }
+
+    style_pick = _pick("_style")
+    build_pick = _pick("_build")
+    role_pick  = _pick("_role")
+    path_pick  = _pick("_path")
+
+    lenses = {
+        "style": {
+            "lens": "style",
+            "lens_label": "Style twin",
+            "why": "Plays in the same mould — same signature attributes drive both players.",
+            **(style_pick or {}),
+        },
+        "build": {
+            "lens": "build",
+            "lens_label": "Build twin",
+            "why": f"Same physical build — {_BUILD_LABELS.get(player_build, player_build)}"
+                   + (f", {player_foot}-footed" if player_foot else "")
+                   + ".",
+            **(build_pick or {}),
+        },
+        "role": {
+            "lens": "role",
+            "lens_label": "Role twin",
+            "why": f"Same on-pitch role — {(player_role or 'inferred from scores').replace('_', ' ')}.",
+            **(role_pick or {}),
+        },
+        "path": {
+            "lens": "path",
+            "lens_label": "Career-path twin",
+            "why": f"Likely development arc — currently sitting at {player_tier.replace('_', ' ') or 'this tier'}.",
+            **(path_pick or {}),
+        },
+    }
+
+    # ---- Developing fallback (unchanged behaviour) ----------------------
     if (not primary["passes_signature"]) or (primary["match_strength"] < 6.0):
         return {
             "id": None,
@@ -333,19 +610,113 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             "match_strength": primary["match_strength"],
             "developing": True,
             "evidence": primary.get("evidence", []),
+            "age_bracket_used": age_bracket,
+            "academy_bio_chunk": None,
+            "lenses": lenses,
             "alternatives": [
                 {k: r[k] for k in ("id", "name", "club", "league", "tier", "match_strength")}
-                for r in ranked[1:4]
+                for r in by_style[1:4]
             ],
+            "inferred_build": player_build,
+            "inferred_role":  player_role,
+            "preferred_foot": player_foot or None,
         }
 
-    primary["developing"] = False
-    primary["alternatives"] = [
+    # ---- Strip private metric keys before returning ---------------------
+    def _clean(d):
+        return {k: v for k, v in d.items() if not k.startswith("_") and k != "passes_signature"}
+
+    out = _clean(primary)
+    out["developing"]        = False
+    out["academy_bio_chunk"] = academy_bio_chunk
+    out["age_bracket_used"]  = age_bracket
+    out["lenses"]            = lenses
+    out["alternatives"]      = [
         {k: r[k] for k in ("id", "name", "club", "league", "tier", "match_strength")}
-        for r in ranked[1:4]
+        for r in by_style[1:4]
     ]
-    primary.pop("passes_signature", None)
-    return primary
+    out["inferred_build"] = player_build
+    out["inferred_role"]  = player_role
+    out["preferred_foot"] = player_foot or None
+    return out
+
+
+# ---- Layer 3 — Gemini-powered narrative ------------------------------------
+
+async def call_gemini_text(session_id: str, prompt: str, system_message: str = "") -> str:
+    """Fast text-only Gemini call. No file_contents. Returns raw text."""
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=session_id,
+        system_message=system_message or (
+            "You are a precise football writer. You ONLY use facts that are explicitly given to you. "
+            "You NEVER invent biographical facts. You write plain English, no jargon."
+        ),
+    ).with_model("gemini", "gemini-2.5-flash")
+    user_message = UserMessage(text=prompt, file_contents=[])
+    response = await chat.send_message(user_message)
+    return response if isinstance(response, str) else str(response)
+
+
+async def generate_archetype_narrative(player_details: dict, full_report: dict, archetype: dict) -> Optional[str]:
+    """Produce a 50-70 word narrative that weaves the player's top scores into
+    the chosen archetype's age-bracketed bio chunk. Strict guardrails — Gemini
+    cannot invent any historical facts: it only paraphrases the supplied bio.
+
+    Returns None when:
+      - archetype is None or developing
+      - we don't have an age_bracket bio chunk to anchor on
+      - the call fails (we never crash the report on a narrative failure)
+    """
+    if not isinstance(archetype, dict) or archetype.get("developing") or not archetype.get("id"):
+        return None
+    bio_chunk = archetype.get("academy_bio_chunk")
+    age_bracket = archetype.get("age_bracket_used")
+    if not bio_chunk or not age_bracket:
+        return None
+
+    player_name = (player_details or {}).get("player_name") or "the player"
+    age = (player_details or {}).get("age") or "—"
+    position = (player_details or {}).get("position") or ""
+
+    # Top 3 evidence attrs (already computed by match_archetype)
+    evidence = archetype.get("evidence") or []
+    top_attrs_str = ", ".join(
+        f"{e.get('label')} {e.get('score')}/10" for e in evidence[:3] if isinstance(e, dict)
+    ) or "balanced scores across signature attributes"
+
+    pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+
+    prompt = f"""Write a single short paragraph (50-70 words, plain English, no jargon) that compares this young footballer to the named professional AT THE SAME AGE.
+
+STRICT RULES — read carefully:
+1. Use ONLY the BIO_CHUNK provided. You may paraphrase but DO NOT invent any other historical fact about the pro (no goals scored, no transfers, no clubs not mentioned).
+2. NEVER compare the kid to the pro's peak career — only the pro at age {age_bracket}.
+3. Weave in 2 of the kid's top scores naturally.
+4. Open with the kid's name. Close with one sentence about what comes next.
+5. No bullet points. No JSON. Plain prose.
+
+KID:
+- Name: {player_name}
+- Age: {age}
+- Position: {position}
+- Top measured strengths: {top_attrs_str}
+
+PRO REFERENCE (style match): {pro_name}
+PRO AT AGE {age_bracket} (this is the ONLY biographical fact you may use):
+"{bio_chunk}"
+
+OUTPUT (just the paragraph, nothing else):"""
+
+    try:
+        text = await call_gemini_text(
+            session_id=f"archetype-narrative-{archetype.get('id')}-{age_bracket}",
+            prompt=prompt,
+        )
+        return (text or "").strip().strip('"').strip()
+    except Exception as e:
+        logger.warning(f"Archetype narrative generation failed: {e}")
+        return None
 
 
 def compute_age_profile_reference(full_report: dict, player_details: dict) -> Optional[dict]:
@@ -1637,7 +2008,7 @@ async def _ensure_agent_review(doc: dict) -> dict:
     return review
 
 
-def _serialize_report(doc: dict, include_full: bool) -> dict:
+async def _serialize_report(doc: dict, include_full: bool) -> dict:
     poster_filename = doc.get("poster_filename")
     marker_filename = doc.get("marker_filename")
     out = {
@@ -1663,10 +2034,42 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
-        out["archetype"] = match_archetype(
+        archetype = match_archetype(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # ----- Layer 3: attach the Gemini narrative (cached on the doc) -----
+        if archetype and not archetype.get("developing") and archetype.get("id"):
+            cached = doc.get("archetype_narrative")
+            cached_for = doc.get("archetype_narrative_archetype_id")
+            cached_bracket = doc.get("archetype_narrative_age_bracket")
+            current_id = archetype.get("id")
+            current_bracket = archetype.get("age_bracket_used")
+            if cached and cached_for == current_id and cached_bracket == current_bracket:
+                archetype["narrative"] = cached
+            else:
+                # Generate lazily — never block the response on a hard failure.
+                try:
+                    narrative = await generate_archetype_narrative(
+                        doc.get("player_details") or {},
+                        doc.get("full_report") or {},
+                        archetype,
+                    )
+                except Exception as _e:
+                    logger.warning(f"narrative generation crashed: {_e}")
+                    narrative = None
+                if narrative:
+                    archetype["narrative"] = narrative
+                    # Persist for instant reuse on next fetch
+                    await db.reports.update_one(
+                        {"id": doc["id"]},
+                        {"$set": {
+                            "archetype_narrative": narrative,
+                            "archetype_narrative_archetype_id": current_id,
+                            "archetype_narrative_age_bracket": current_bracket,
+                        }},
+                    )
+        out["archetype"] = archetype
         out["age_profile_reference"] = compute_age_profile_reference(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
@@ -1692,7 +2095,7 @@ async def get_report(report_id: str, user=Depends(get_current_user)):
     unlocked = doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"
     if unlocked:
         await _ensure_agent_review(doc)
-    return _serialize_report(doc, include_full=bool(unlocked))
+    return await _serialize_report(doc, include_full=bool(unlocked))
 
 
 @api_router.post("/reports/{report_id}/generate-full")
@@ -2594,7 +2997,8 @@ def _trial_item_cell(item: dict, styles):
 
 
 def _archetype_card_pdf(archetype: dict, styles):
-    """Forest hero card — stylistic archetype block for the PDF cover area."""
+    """Forest hero card — stylistic archetype block for the PDF cover area.
+    Renders the new Gemini narrative + age-bracketed bio chunk when present."""
     if not isinstance(archetype, dict) or not archetype.get("name"):
         return []
 
@@ -2637,15 +3041,119 @@ def _archetype_card_pdf(archetype: dict, styles):
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("ALIGN",         (1, 0), (1, 0),   "RIGHT"),
     ]))
-    return [
-        card,
-        Spacer(1, 0.2 * cm),
-        Paragraph(
-            "<i><font color='#9CA3AF' size='7.5'>Stylistic comparisons describe how this player plays today — "
-            "not their ceiling, and not the named professional's youth data.</font></i>",
-            styles["BodyW"],
-        ),
-    ]
+
+    flow = [card, Spacer(1, 0.2 * cm)]
+
+    # ----- Narrative card (Gemini-generated, age-anchored) ------------------
+    narrative = (archetype.get("narrative") or "").strip()
+    if narrative and not developing:
+        narrative_card = Table(
+            [[Paragraph(
+                f"<font color='#1F4F2F' size='7'><b>PERSONALIZED COMPARISON · AGE-ANCHORED</b></font><br/><br/>"
+                f"<font color='#0A0F0D' size='10'>{narrative}</font>",
+                styles["BodyW"],
+            )]],
+            colWidths=[15.5 * cm],
+        )
+        narrative_card.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+            ("LINEBEFORE",    (0, 0), (0, -1),  3, _PDF_FOREST),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ("TOPPADDING",    (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        flow += [narrative_card, Spacer(1, 0.2 * cm)]
+
+    # ----- Age-bracketed bio chunk (the verifiable fact) --------------------
+    bio_chunk = (archetype.get("academy_bio_chunk") or "").strip()
+    bracket = archetype.get("age_bracket_used")
+    if bio_chunk and bracket and not developing:
+        pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+        bio_card = Table(
+            [[Paragraph(
+                f"<font color='#1F4F2F' size='7'><b>WHAT {pro_name.upper()} WAS DOING AT AGE {bracket}</b></font><br/><br/>"
+                f"<font color='#0A0F0D' size='9.5'><i>{bio_chunk}</i></font>",
+                styles["BodyW"],
+            )]],
+            colWidths=[15.5 * cm],
+        )
+        bio_card.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), "#F4EFE6"),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ("TOPPADDING",    (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        flow += [bio_card, Spacer(1, 0.2 * cm)]
+
+    flow.append(Paragraph(
+        "<i><font color='#9CA3AF' size='7.5'>Stylistic comparisons describe how this player plays today — "
+        "not their ceiling, and not the named professional's youth data.</font></i>",
+        styles["BodyW"],
+    ))
+    return flow
+
+
+def _lens_matches_pdf(archetype: dict, styles):
+    """4-Lens strip — Style / Build / Role / Career-path twins for the PDF."""
+    if not isinstance(archetype, dict):
+        return []
+    lenses = archetype.get("lenses") or {}
+    if not lenses:
+        return []
+
+    header = Paragraph(
+        "<font color='#1F4F2F' size='7'><b>THE 4-LENS COMPARISON</b></font><br/>"
+        "<font color='#0A0F0D' size='13'><b>How this player resembles four different professionals</b></font><br/>"
+        "<font color='#0A0F0D' size='8.5'>Each lens picks the closest pro on a different dimension: how he plays, "
+        "his physical build, his on-pitch role, and the career path he's on.</font>",
+        styles["BodyW"],
+    )
+
+    rows = [[
+        Paragraph("<font color='#FFFFFF' size='7'><b>LENS</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>MATCHED PRO</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>WHY</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>SCORE</b></font>", styles["BodyW"]),
+    ]]
+    for key in ("style", "build", "role", "path"):
+        lens = lenses.get(key) or {}
+        if not lens.get("name"):
+            continue
+        rows.append([
+            Paragraph(f"<font color='#0A0F0D' size='9'><b>{(lens.get('lens_label') or key).upper()}</b></font>", styles["BodyW"]),
+            Paragraph(
+                f"<font color='#0A0F0D' size='9'><b>{lens.get('name', '')}</b></font><br/>"
+                f"<font color='#9CA3AF' size='7'>{lens.get('club', '') or ''}"
+                + (f" · {lens.get('league')}" if lens.get('league') else "")
+                + "</font>",
+                styles["BodyW"],
+            ),
+            Paragraph(f"<font color='#0A0F0D' size='8'>{lens.get('why', '')}</font>", styles["BodyW"]),
+            Paragraph(
+                f"<font color='#1F4F2F' size='14'><b>{lens.get('score', 0):.1f}</b></font>"
+                f"<font color='#9CA3AF' size='7'> /10</font>",
+                styles["BodyW"],
+            ),
+        ])
+
+    if len(rows) <= 1:
+        return []
+
+    table = Table(rows, colWidths=[2.8 * cm, 4.6 * cm, 6.4 * cm, 1.7 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0),  _PDF_FOREST),
+        ("BACKGROUND",    (0, 1), (-1, -1), _PDF_CARD),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -1), [_PDF_CARD, "#F4EFE6"]),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    return [header, Spacer(1, 0.2 * cm), table, Spacer(1, 0.2 * cm)]
 
 
 def _age_profile_page(profile: dict, styles):
@@ -2888,6 +3396,9 @@ def build_pdf(report_doc: dict, output_path: str):
     if archetype and archetype.get("name"):
         story.append(Spacer(1, 0.5 * cm))
         story += _archetype_card_pdf(archetype, styles)
+        # 4-Lens twins strip (Style / Build / Role / Career-path)
+        story.append(Spacer(1, 0.3 * cm))
+        story += _lens_matches_pdf(archetype, styles)
 
     story.append(PageBreak())
 
@@ -3250,6 +3761,10 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # Attach the cached narrative (if any) so the PDF mirrors the web report
+        if isinstance(doc.get("archetype"), dict) and doc.get("archetype_narrative"):
+            if doc.get("archetype_narrative_archetype_id") == doc["archetype"].get("id"):
+                doc["archetype"]["narrative"] = doc["archetype_narrative"]
         doc["age_profile_reference"] = compute_age_profile_reference(
             doc.get("full_report") or {},
             doc.get("player_details") or {},

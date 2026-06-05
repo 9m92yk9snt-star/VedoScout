@@ -578,6 +578,11 @@ function ArchetypeCard({ archetype }) {
     );
   }
   const tierMeta = TIER_PILL_META[archetype.tier] || null;
+  // Strip the "-type ..." suffix from the archetype name to get the pro's name
+  const proName = (archetype.name || "").replace(/-type.*$/i, "").trim();
+  const bracket = archetype.age_bracket_used;
+  const bioChunk = archetype.academy_bio_chunk;
+  const narrative = archetype.narrative;
   return (
     <div
       data-testid="archetype-card"
@@ -689,6 +694,40 @@ function ArchetypeCard({ archetype }) {
         </div>
       </div>
 
+      {/* Personalized Gemini narrative (Layer 3) — age-anchored comparison */}
+      {narrative && (
+        <div
+          data-testid="archetype-narrative"
+          className="relative mx-6 md:mx-8 mb-5 p-5 bg-cream-base text-ink border-l-4 border-cream-base/0"
+          style={{ borderLeftColor: "#FFFFFF" }}
+        >
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+            Personalized comparison · age-anchored
+          </div>
+          <p className="text-sm md:text-base leading-relaxed text-ink/85">
+            {narrative}
+          </p>
+        </div>
+      )}
+
+      {/* Age-bracketed bio chunk (Layer 1 — verbatim from catalog, no AI invention) */}
+      {bioChunk && bracket && proName && (
+        <div
+          data-testid="archetype-academy-bio"
+          className="relative mx-6 md:mx-8 mb-5 p-5 bg-cream-base/10 border border-cream-base/20"
+        >
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-cream-base/85 mb-2">
+            What {proName} was doing at age {bracket}
+          </div>
+          <p className="text-sm leading-relaxed text-cream-base/95 italic">
+            "{bioChunk}"
+          </p>
+          <p className="mt-3 text-[10px] uppercase tracking-[0.18em] font-bold text-cream-base/55">
+            Source · public biographical record (Wikipedia / Transfermarkt / club academy pages)
+          </p>
+        </div>
+      )}
+
       {/* Footer disclaimer */}
       <div className="relative px-6 md:px-8 pb-5 -mt-2">
         <p className="text-xs italic text-cream-base/55 max-w-3xl">
@@ -699,110 +738,80 @@ function ArchetypeCard({ archetype }) {
   );
 }
 
-/* Closest Matches strip — sits beneath the ArchetypeCard and shows the
-   next 2-3 archetype candidates by weighted match strength. Each row
-   has a monogram crest, club + league, tier pill, and a visual bar +
-   numeric match score. */
-function ClosestMatchesStrip({ archetype }) {
-  if (!archetype || !Array.isArray(archetype.alternatives) || archetype.alternatives.length === 0) return null;
-  // Build a unified list — primary at the top, then alternatives
-  const primary = {
-    name: archetype.name,
-    club: archetype.club,
-    league: archetype.league,
-    tier: archetype.tier,
-    match_strength: archetype.match_strength,
-    primary: true,
-  };
-  const list = [primary, ...archetype.alternatives.slice(0, 2)];
+/* 4-Lens Twins Strip — replaces the legacy ClosestMatchesStrip with a richer
+   layout that shows ONE matched pro per lens (Style / Build / Role / Career-path).
+   Each lens picks the closest archetype on a different dimension. */
+function LensMatchesStrip({ archetype }) {
+  if (!archetype || !archetype.lenses) return null;
+  const order = ["style", "build", "role", "path"];
+  const lenses = order
+    .map((k) => archetype.lenses[k])
+    .filter((l) => l && l.name);
+  if (lenses.length === 0) return null;
 
   return (
-    <div data-testid="closest-matches-strip" className="bg-surface border border-gray-border p-6 md:p-7">
+    <div data-testid="lens-matches-strip" className="bg-surface border border-gray-border p-6 md:p-7">
       <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Top 3 closest matches</div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">The 4-lens comparison</div>
           <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
-            Other archetypes this player resembles
+            How this player resembles four different pros
           </h3>
           <p className="mt-1.5 text-xs text-ink/60 max-w-xl">
-            Ranked by weighted similarity across the position's signature attributes.
+            Each lens picks the closest pro on a different dimension: how he plays, his physical build, his on-pitch role, and the career path he's on.
           </p>
         </div>
         <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45">
-          Higher score = closer stylistic fit
+          Style · Build · Role · Career-path
         </div>
       </div>
 
-      <div className="space-y-2">
-        {list.map((item, i) => {
-          const meta = TIER_PILL_META[item.tier] || null;
-          const isPrimary = !!item.primary;
-          const widthPct = Math.min(100, Math.max(10, (item.match_strength || 0) * 10));
+      <div className="grid sm:grid-cols-2 gap-3">
+        {lenses.map((lens) => {
+          const meta = TIER_PILL_META[lens.tier] || null;
+          const scoreWidth = Math.min(100, Math.max(20, (lens.score || 0) * 8));
           return (
             <div
-              key={i}
-              data-testid={`closest-match-row-${i}`}
-              className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 ${
-                isPrimary ? "bg-forest text-cream-base" : "bg-cream-card border-l-2 border-forest/30"
-              }`}
+              key={lens.lens}
+              data-testid={`lens-match-${lens.lens}`}
+              className="relative p-4 md:p-5 bg-cream-card border-l-4 border-forest"
             >
-              {/* Rank */}
-              <div className={`font-barlow font-black text-2xl shrink-0 w-8 text-center ${
-                isPrimary ? "text-cream-base" : "text-forest/70"
-              }`}>
-                {i + 1}
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className="w-12 h-12 shrink-0 bg-forest text-cream-base flex items-center justify-center font-barlow font-black text-base shadow"
+                  style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
+                >
+                  {_archetypeMonogram(lens.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-forest">
+                    {lens.lens_label}
+                  </div>
+                  <div className="font-barlow font-black uppercase text-base md:text-lg text-ink truncate leading-tight">
+                    {lens.name}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/55 truncate">
+                    {lens.club || "—"}
+                    {lens.league && <span className="opacity-60"> · {lens.league}</span>}
+                  </div>
+                </div>
+                {meta && (
+                  <div className="hidden sm:inline-flex text-[8px] uppercase tracking-[0.2em] font-bold px-2 py-1 bg-cream-soft text-forest shrink-0">
+                    {meta.label}
+                  </div>
+                )}
               </div>
-
-              {/* Crest */}
-              <div
-                className={`w-12 h-12 shrink-0 flex items-center justify-center font-barlow font-black text-base shadow ${
-                  isPrimary ? "bg-cream-base text-forest" : "bg-forest text-cream-base"
-                }`}
-                style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
-              >
-                {_archetypeMonogram(item.name)}
-              </div>
-
-              {/* Name + club/league */}
-              <div className="flex-1 min-w-0">
-                <div className={`font-barlow font-black uppercase text-sm md:text-base truncate ${
-                  isPrimary ? "text-white" : "text-ink"
-                }`}>
-                  {item.name}
+              <p className="text-xs md:text-sm text-ink/70 leading-snug mb-3">
+                {lens.why}
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 bg-cream-soft overflow-hidden">
+                  <div className="h-full bg-forest" style={{ width: `${scoreWidth}%` }} />
                 </div>
-                <div className={`text-[10px] uppercase tracking-[0.18em] font-bold truncate ${
-                  isPrimary ? "text-cream-base/75" : "text-ink/55"
-                }`}>
-                  {item.club || "—"}
-                  {item.league && <span className="opacity-60"> · {item.league}</span>}
+                <div className="font-barlow font-black tabular-nums text-xl text-forest leading-none">
+                  {(lens.score ?? 0).toFixed(1)}
                 </div>
-              </div>
-
-              {/* Tier pill */}
-              {meta && (
-                <div className={`hidden sm:inline-flex text-[9px] uppercase tracking-[0.2em] font-bold px-2.5 py-1.5 shrink-0 ${
-                  isPrimary ? "bg-cream-base/15 text-cream-base" : "bg-cream-soft text-forest"
-                }`}>
-                  {meta.label}
-                </div>
-              )}
-
-              {/* Match bar + score */}
-              <div className="flex items-center gap-2 shrink-0">
-                <div className={`hidden md:block w-24 h-2 ${isPrimary ? "bg-cream-base/15" : "bg-cream-soft"}`}>
-                  <div
-                    className={`h-full ${isPrimary ? "bg-cream-base" : "bg-forest"}`}
-                    style={{ width: `${widthPct}%` }}
-                  />
-                </div>
-                <div className={`font-barlow font-black text-2xl md:text-3xl tabular-nums leading-none ${
-                  isPrimary ? "text-white" : "text-forest"
-                }`}>
-                  {item.match_strength != null ? item.match_strength.toFixed(1) : "—"}
-                </div>
-                <div className={`text-[10px] font-bold ${isPrimary ? "text-cream-base/60" : "text-ink/45"}`}>
-                  /10
-                </div>
+                <div className="text-[10px] font-bold text-ink/45">/10</div>
               </div>
             </div>
           );
@@ -810,10 +819,17 @@ function ClosestMatchesStrip({ archetype }) {
       </div>
 
       <p className="mt-5 text-xs text-ink/50 italic">
-        Match score is a weighted average across each archetype's signature attributes — higher score = closer stylistic fit, not better player.
+        Match score reflects similarity on that lens only — not overall player quality. A high Build twin score means the same physical frame, not the same career ceiling.
       </p>
     </div>
   );
+}
+
+/* Legacy alias kept for backward compatibility — the four lenses replace the
+   old "top 3 closest matches" strip. ClosestMatchesStrip now simply renders
+   the new LensMatchesStrip. */
+function ClosestMatchesStrip({ archetype }) {
+  return <LensMatchesStrip archetype={archetype} />;
 }
 
 /* Position-specific reference profile card — shows the player's actual
