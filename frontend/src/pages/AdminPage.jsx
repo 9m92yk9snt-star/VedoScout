@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
@@ -268,6 +269,14 @@ export default function AdminPage() {
                           </td>
                           <td className="p-3 text-right">
                             <div className="flex gap-2 justify-end">
+                              <Link
+                                to={`/report/${r.id}`}
+                                data-testid={`admin-view-${r.id}`}
+                                title="Open report"
+                                className="text-volt hover:bg-volt hover:text-white p-2 transition-colors"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Link>
                               {!(r.is_paid || r.manually_unlocked) && (
                                 <button
                                   onClick={() => handleUnlock(r.id)}
