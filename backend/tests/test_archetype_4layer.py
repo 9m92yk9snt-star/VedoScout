@@ -101,6 +101,11 @@ def test_layer2_lukas_returns_lenses_block(lukas_report):
         assert lenses[k].get("name"), f"lens '{k}' has no archetype name"
         assert lenses[k].get("lens_label"), f"lens '{k}' has no label"
         assert isinstance(lenses[k].get("score"), (int, float))
+        # Iteration-9 fix: the lens score is advertised as `/10` on the UI,
+        # so the backend MUST clip it to [0, 10].
+        assert 0.0 <= lenses[k]["score"] <= 10.0, (
+            f"lens '{k}' score {lenses[k]['score']} violates 0-10 contract"
+        )
 
 
 def test_layer2_legacy_fields_still_present(lukas_report):

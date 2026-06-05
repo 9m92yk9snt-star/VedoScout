@@ -552,6 +552,10 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
         if not pool:
             return None
         winner = max(pool, key=lambda x: x[metric_key])
+        # Clip the displayed lens score to the [0, 10] contract advertised
+        # on the UI (the raw metric can exceed 10 due to the foot bonus).
+        raw = float(winner[metric_key])
+        display = round(min(10.0, max(0.0, raw)), 2)
         return {
             "id":    winner["id"],
             "name":  winner["name"],
@@ -559,7 +563,7 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             "league": winner["league"],
             "tier":  winner["tier"],
             "summary": winner["summary"],
-            "score": round(winner[metric_key], 2),
+            "score": display,
             "profile": winner.get("profile") or {},
         }
 
