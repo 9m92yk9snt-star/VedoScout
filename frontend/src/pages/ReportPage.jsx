@@ -9,7 +9,7 @@ import Navigation from "@/components/Navigation";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check,
+  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
@@ -406,6 +406,132 @@ function TrialReadinessCard({ tr }) {
     </div>
   );
 }
+
+/* DNA Fingerprint — horizontal bar visualisation of ALL ~24 sub-attributes
+   the AI evaluated. Each attribute is shown as a vertical bar scaled to its
+   score (1-10). Attributes are ordered by position priority weight when
+   available, so every player's DNA bar looks unique — a "fingerprint" you
+   can recognise at a glance. */
+
+const PILLAR_ATTRS = {
+  technical: ["first_touch", "ball_control", "dribbling", "passing", "shooting", "weak_foot", "one_v_one"],
+  tactical:  ["positioning", "off_ball_movement", "scanning", "decision_making", "timing_of_runs", "game_understanding"],
+  physical:  ["acceleration", "speed", "balance", "agility", "intensity", "body_control"],
+  mentality: ["confidence", "work_rate", "courage_in_duels", "response_to_mistakes", "competitive_mindset", "focus"],
+};
+const PILLAR_COLOR = {
+  technical: "bg-forest",
+  tactical:  "bg-forest-pop",
+  physical:  "bg-amber-700",
+  mentality: "bg-ink",
+};
+const PILLAR_LABEL = {
+  technical: "Technical",
+  tactical:  "Tactical",
+  physical:  "Physical",
+  mentality: "Mental",
+};
+
+function _attrPillar(key) {
+  for (const [pillar, keys] of Object.entries(PILLAR_ATTRS)) {
+    if (keys.includes(key)) return pillar;
+  }
+  return null;
+}
+
+function DnaFingerprint({ fullReport, ageProfile }) {
+  if (!fullReport) return null;
+
+  const bars = [];
+  for (const pillar of ["technical", "tactical", "physical", "mentality"]) {
+    const sec = fullReport[pillar] || {};
+    for (const [key, value] of Object.entries(sec)) {
+      if (value && typeof value === "object" && typeof value.score === "number") {
+        bars.push({ key, pillar, score: value.score, label: key.replace(/_/g, " ") });
+      }
+    }
+  }
+  if (bars.length === 0) return null;
+
+  const priorityWeights = {};
+  if (ageProfile && Array.isArray(ageProfile.items)) {
+    for (const it of ageProfile.items) {
+      priorityWeights[it.key] = it.weight || 3;
+    }
+  }
+  bars.sort((a, b) => {
+    const wa = priorityWeights[a.key] ?? 0;
+    const wb = priorityWeights[b.key] ?? 0;
+    if (wb !== wa) return wb - wa;
+    return b.score - a.score;
+  });
+
+  return (
+    <div data-testid="dna-fingerprint" className="bg-surface border border-gray-border p-6 md:p-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Player DNA</div>
+          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
+            Attribute fingerprint
+          </h3>
+          <p className="mt-2 text-sm text-ink/65 max-w-xl">
+            Every scored attribute as a single visual signature — ordered by what matters most for the position.
+            Two players will never have the same DNA bar.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {Object.entries(PILLAR_LABEL).map(([p, label]) => (
+            <div key={p} className="flex items-center gap-1.5">
+              <span className={`w-2.5 h-2.5 ${PILLAR_COLOR[p]}`} />
+              <span className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/65">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative h-44 flex items-end gap-px bg-cream-soft/30 p-1">
+        {bars.map((b) => {
+          const hPct = Math.max(8, (b.score / 10) * 100);
+          return (
+            <div
+              key={b.key}
+              data-testid={`dna-seg-${b.key}`}
+              className="relative flex-1 group"
+              style={{ height: "100%" }}
+              title={`${b.label} · ${b.score}/10`}
+            >
+              <div
+                className={`absolute bottom-0 left-0 right-0 ${PILLAR_COLOR[b.pillar]} transition-all`}
+                style={{ height: `${hPct}%` }}
+              />
+              <div className="absolute -top-5 left-0 right-0 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[9px] uppercase tracking-wide font-bold text-ink">{b.score}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex gap-px h-10 overflow-hidden">
+        {bars.map((b) => (
+          <div key={b.key} className="flex-1 overflow-hidden">
+            <div
+              className="origin-top-left text-[8px] uppercase tracking-wide font-bold text-ink/55 truncate whitespace-nowrap"
+              style={{ transform: "rotate(35deg) translateY(2px) translateX(-2px)" }}
+            >
+              {b.label}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-4 text-xs text-ink/50 italic">
+        Bars are ordered by position priority — the attributes that matter most for this player's role appear first.
+      </p>
+    </div>
+  );
+}
+
 
 
 /* Stylistic archetype card — small, premium, sits inline with the report.
@@ -975,15 +1101,30 @@ export default function ReportPage() {
               )}
 
               {unlocked && full_report && (
-                <button
-                  onClick={handleDownloadPdf}
-                  disabled={downloadingPdf}
-                  data-testid="download-pdf-btn"
-                  className="mt-6 self-start bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  Download premium PDF
-                </button>
+                <div className="mt-6 flex flex-wrap gap-3 items-center">
+                  <button
+                    onClick={handleDownloadPdf}
+                    disabled={downloadingPdf}
+                    data-testid="download-pdf-btn"
+                    className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    Download premium PDF
+                  </button>
+                  {report.share_card_url && (
+                    <a
+                      href={`${ASSET_BASE}${report.share_card_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={`scoutmeplay-${(player_details?.player_name || "player").replace(/\s+/g, "-").toLowerCase()}.png`}
+                      data-testid="download-share-card-btn"
+                      className="bg-cream-card hover:bg-cream-soft text-forest border-2 border-forest font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors flex items-center gap-2"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      Get share card
+                    </a>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1174,6 +1315,9 @@ export default function ReportPage() {
                   {/* Stylistic archetype — public, style-only comparison */}
                   <ArchetypeCard archetype={archetype} />
 
+                  {/* Player DNA — unique attribute fingerprint */}
+                  <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
+
                   {/* Radar chart */}
                   {radarData && (
                     <div className="bg-surface border border-gray-border p-6 md:p-8">
@@ -1337,15 +1481,40 @@ export default function ReportPage() {
                     </div>
                   )}
 
-                  {/* Video Comments */}
+                  {/* Video Moments — frame-stamped evidence */}
                   {full_report.video_comments && full_report.video_comments.length > 0 && (
-                    <div className="bg-surface border border-gray-border p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Video Comments</h3>
-                      <div className="mt-6 space-y-2">
+                    <div data-testid="video-moments-card" className="bg-surface border border-gray-border p-6 md:p-8">
+                      <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Frame-stamped evidence</div>
+                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">Video moments</h3>
+                      <p className="mt-2 text-sm text-ink/65 max-w-xl">
+                        Every observation is anchored to the exact frame it was seen at — so you can verify each note in the original clip.
+                      </p>
+                      <div className="mt-6 grid sm:grid-cols-2 gap-4">
                         {full_report.video_comments.map((c, i) => (
-                          <div key={i} className="flex items-start gap-4 bg-deepnavy p-3 border border-gray-border">
-                            <span className="font-barlow font-black text-volt min-w-[64px]">{c.timestamp}</span>
-                            <p className="text-sm text-ink/85">{c.comment}</p>
+                          <div
+                            key={i}
+                            data-testid={`video-moment-${i}`}
+                            className="bg-cream-card overflow-hidden border-l-2 border-forest"
+                          >
+                            <div className="relative aspect-video bg-cream-soft">
+                              {c.frame_url ? (
+                                <img
+                                  data-testid={`video-moment-frame-${i}`}
+                                  src={`${ASSET_BASE}${c.frame_url}`}
+                                  alt={`Moment at ${c.timestamp}`}
+                                  className="absolute inset-0 w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-ink/30 text-xs uppercase tracking-wider">no frame</span>
+                                </div>
+                              )}
+                              <div className="absolute bottom-2 left-2 bg-ink text-cream-base px-2 py-1 text-xs font-barlow font-black tracking-wide">
+                                {c.timestamp || "—"}
+                              </div>
+                            </div>
+                            <p className="p-4 text-sm text-ink/85 leading-relaxed">{c.comment}</p>
                           </div>
                         ))}
                       </div>

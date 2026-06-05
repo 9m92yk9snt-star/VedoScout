@@ -379,6 +379,262 @@ def _collect_skill_meta(full_report: dict) -> dict:
     return meta
 
 
+# ---- Video frame thumbnails (Session 3: feature F) ----
+
+def _ts_to_seconds(timestamp: str) -> Optional[int]:
+    """Parse 'MM:SS' or 'HH:MM:SS' (or plain '125') into integer seconds."""
+    if timestamp is None:
+        return None
+    s = str(timestamp).strip()
+    if not s:
+        return None
+    try:
+        parts = s.split(":")
+        if len(parts) == 1:
+            return int(parts[0])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except (ValueError, TypeError):
+        return None
+    return None
+
+
+def _make_placeholder_frame(timestamp: str, comment: str, out_path: Path) -> bool:
+    """Generate a branded forest-on-cream placeholder frame when ffmpeg
+    extraction is unavailable (e.g. seeded demo with no real video)."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        W, H = 640, 360
+        img = Image.new("RGB", (W, H), (244, 239, 230))
+        d = ImageDraw.Draw(img)
+        d.rectangle([(0, 0), (8, H)], fill=(31, 79, 47))
+        d.polygon([(W - 110, 0), (W, 0), (W, 110)], fill=(45, 107, 61))
+        cx, cy = W // 2, H // 2 - 30
+        d.rectangle([(cx - 70, cy - 30), (cx + 70, cy + 30)], outline=(31, 79, 47), width=3)
+        d.rectangle([(cx + 50, cy - 18), (cx + 80, cy + 18)], outline=(31, 79, 47), width=3)
+        d.ellipse([(cx - 25, cy - 18), (cx + 25, cy + 32)], outline=(31, 79, 47), width=3)
+        try:
+            font_lg = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+            font_sm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
+        except Exception:
+            font_lg = ImageFont.load_default()
+            font_sm = ImageFont.load_default()
+        ts_text = str(timestamp or "—")
+        bbox = d.textbbox((0, 0), ts_text, font=font_lg)
+        tw = bbox[2] - bbox[0]
+        d.text(((W - tw) // 2, H - 110), ts_text, fill=(31, 79, 47), font=font_lg)
+        sub = "Moment placeholder · upload a real clip to see the live frame"
+        bbox = d.textbbox((0, 0), sub, font=font_sm)
+        sw = bbox[2] - bbox[0]
+        d.text(((W - sw) // 2, H - 50), sub, fill=(107, 114, 128), font=font_sm)
+        img.save(out_path, "JPEG", quality=82)
+        return True
+    except Exception as e:
+        logging.warning("placeholder frame failed: %s", e)
+        return False
+
+
+def _extract_video_frame(video_path: Path, seconds: int, out_path: Path) -> bool:
+    """Use ffmpeg to grab a single frame at the given second."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-ss", str(max(0, int(seconds))),
+                "-i", str(video_path),
+                "-frames:v", "1", "-q:v", "3",
+                "-vf", "scale=640:-1",
+                str(out_path),
+            ],
+            capture_output=True, timeout=15,
+        )
+        return result.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0
+    except Exception as e:
+        logging.warning("ffmpeg frame extraction failed: %s", e)
+        return False
+
+
+def ensure_video_frames(report_doc: dict) -> list:
+    """For every video_comments entry, ensure a frame JPEG exists on disk and
+    attach a `frame_url` to the comment. Falls back to a branded placeholder
+    when the video file is missing or ffmpeg fails."""
+    full = report_doc.get("full_report") or {}
+    comments = full.get("video_comments") or []
+    if not comments:
+        return []
+
+    report_id = report_doc.get("id")
+    if not report_id:
+        return comments
+
+    frames_dir = UPLOAD_DIR / "frames" / str(report_id)
+    frames_dir.mkdir(parents=True, exist_ok=True)
+
+    video_filename = report_doc.get("video_filename")
+    video_path = UPLOAD_DIR / video_filename if video_filename else None
+    have_video = bool(video_path and video_path.exists())
+
+    enriched = []
+    for idx, c in enumerate(comments):
+        if not isinstance(c, dict):
+            enriched.append(c)
+            continue
+        ts = c.get("timestamp", "")
+        out_path = frames_dir / f"frame_{idx:02d}.jpg"
+        if not out_path.exists():
+            ok = False
+            if have_video:
+                seconds = _ts_to_seconds(ts)
+                if seconds is not None:
+                    ok = _extract_video_frame(video_path, seconds, out_path)
+            if not ok:
+                _make_placeholder_frame(ts, c.get("comment", ""), out_path)
+        out = dict(c)
+        out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
+        enriched.append(out)
+    return enriched
+
+
+# ---- Shareable IG-ready PNG card (Session 3: feature J - shareable) ----
+
+def generate_share_card(report_doc: dict, out_path: Path) -> bool:
+    """Render a 1080x1350 IG-ready PNG summarising the player's report."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except Exception as e:
+        logging.warning("share card: PIL import failed: %s", e)
+        return False
+
+    pd = report_doc.get("player_details") or {}
+    fr = report_doc.get("full_report") or {}
+    ob = fr.get("overall_benchmark") or {}
+    arch = report_doc.get("archetype") or {}
+    scores = fr.get("scores") or {}
+
+    player_name = pd.get("player_name") or "Player"
+    position = pd.get("position") or "—"
+    age = pd.get("age") or ""
+    overall = scores.get("overall_development")
+    tier_label = ob.get("tier_label") or "—"
+
+    flat = []
+    for sec in ("technical", "tactical", "physical", "mentality"):
+        s = fr.get(sec) or {}
+        if isinstance(s, dict):
+            for key, value in s.items():
+                if isinstance(value, dict) and isinstance(value.get("score"), (int, float)):
+                    flat.append((value["score"], key.replace("_", " ").title()))
+    flat.sort(reverse=True)
+    top_strengths = [name for _, name in flat[:3]]
+
+    W, H = 1080, 1350
+    CREAM = (244, 239, 230)
+    FOREST = (31, 79, 47)
+    FOREST_POP = (45, 107, 61)
+    INK = (10, 15, 13)
+    MUTED = (107, 114, 128)
+
+    img = Image.new("RGB", (W, H), CREAM)
+    d = ImageDraw.Draw(img)
+
+    try:
+        font_xl = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 180)
+        font_lg = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 64)
+        font_md = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 36)
+        font_sm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+        font_xs = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
+    except Exception:
+        font_xl = font_lg = font_md = font_sm = font_xs = ImageFont.load_default()
+
+    d.rectangle([(0, 0), (W, 280)], fill=FOREST)
+    d.polygon([(W - 220, 0), (W, 0), (W, 220)], fill=FOREST_POP)
+    d.text((48, 36), "SCOUTMEPLAY", fill=CREAM, font=font_xs)
+    d.text((48, 72), player_name.upper()[:24], fill=(255, 255, 255), font=font_lg)
+    sub = f"{position.upper()}"
+    if age:
+        sub += f"  ·  AGE {age}"
+    d.text((48, 156), sub[:46], fill=CREAM, font=font_sm)
+    if arch.get("match_strength") is not None and not arch.get("developing"):
+        ms_text = f"{arch['match_strength']:.1f}/10"
+        d.text((W - 250, 110), "MATCH", fill=CREAM, font=font_xs)
+        d.text((W - 250, 132), ms_text, fill=(255, 255, 255), font=font_md)
+
+    score_y = 360
+    score_text = f"{overall}" if overall is not None else "—"
+    bbox = d.textbbox((0, 0), score_text, font=font_xl)
+    sw = bbox[2] - bbox[0]
+    d.text(((W - sw) // 2, score_y), score_text, fill=FOREST, font=font_xl)
+    slash = "/10"
+    d.text(((W + sw) // 2 + 14, score_y + 116), slash, fill=MUTED, font=font_md)
+    d.text((W // 2 - 130, score_y + 200), "OVERALL DEVELOPMENT", fill=MUTED, font=font_xs)
+
+    tier_y = 660
+    tier_text = tier_label.upper()
+    bbox = d.textbbox((0, 0), tier_text, font=font_md)
+    tw = bbox[2] - bbox[0]
+    pad_x = 48
+    chip_x0 = (W - tw - pad_x * 2) // 2
+    d.rectangle([(chip_x0, tier_y), (chip_x0 + tw + pad_x * 2, tier_y + 76)], fill=FOREST)
+    d.text((chip_x0 + pad_x, tier_y + 18), tier_text, fill=(255, 255, 255), font=font_md)
+
+    if arch.get("name") and not arch.get("developing"):
+        arch_y = 800
+        d.text((60, arch_y), "STYLISTIC ARCHETYPE", fill=FOREST, font=font_xs)
+        d.text((60, arch_y + 28), arch["name"], fill=INK, font=font_md)
+
+    if top_strengths:
+        sy = 920
+        d.text((60, sy), "TOP STRENGTHS", fill=FOREST, font=font_xs)
+        for i, name in enumerate(top_strengths):
+            yy = sy + 42 + i * 50
+            d.ellipse([(64, yy + 10), (84, yy + 30)], fill=FOREST)
+            d.text((104, yy), name, fill=INK, font=font_md)
+
+    bars = []
+    for pillar, color in [("technical", FOREST), ("tactical", FOREST_POP), ("physical", (185, 110, 17)), ("mentality", INK)]:
+        s = fr.get(pillar) or {}
+        if isinstance(s, dict):
+            for key, value in s.items():
+                if isinstance(value, dict) and isinstance(value.get("score"), (int, float)):
+                    bars.append((value["score"], color))
+    bars.sort(key=lambda x: -x[0])
+    if bars:
+        dna_y = 1130
+        dna_h = 88
+        seg_w = (W - 120) / max(len(bars), 1)
+        d.text((60, dna_y - 30), "PLAYER DNA", fill=FOREST, font=font_xs)
+        for i, (score, color) in enumerate(bars):
+            x0 = 60 + i * seg_w
+            h = max(10, (score / 10.0) * dna_h)
+            d.rectangle([(x0, dna_y + (dna_h - h)), (x0 + seg_w - 2, dna_y + dna_h)], fill=color)
+
+    d.text((60, H - 60), "SCOUTMEPLAY.COM  ·  ALIGNED WITH UEFA YOUTH-DEVELOPMENT PILLARS", fill=MUTED, font=font_xs)
+
+    img.save(out_path, "PNG", optimize=True)
+    return True
+
+
+def ensure_share_card(report_doc: dict) -> Optional[str]:
+    """Generate (lazily) the IG-ready share card and return its public URL."""
+    report_id = report_doc.get("id")
+    if not report_id:
+        return None
+    cards_dir = UPLOAD_DIR / "cards"
+    cards_dir.mkdir(parents=True, exist_ok=True)
+    card_path = cards_dir / f"{report_id}.png"
+    if not card_path.exists():
+        if not generate_share_card(report_doc, card_path):
+            return None
+    return f"/api/uploads/cards/{card_path.name}"
+
+
+
+
+
+
+
 
 
 
@@ -1345,6 +1601,14 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # Extract / placeholder frames for every video_comments timestamp and
+        # rewrite the comments list with a `frame_url` per moment.
+        enriched_comments = ensure_video_frames(doc)
+        if enriched_comments and isinstance(out.get("full_report"), dict):
+            out["full_report"] = {**out["full_report"], "video_comments": enriched_comments}
+        # Generate share card lazily — use enriched archetype for the card.
+        share_doc = {**doc, "archetype": out.get("archetype")}
+        out["share_card_url"] = ensure_share_card(share_doc)
     return out
 
 
@@ -2688,26 +2952,49 @@ def build_pdf(report_doc: dict, output_path: str):
             ("90-day plan",        tp.get("ninety_day_plan", "")),
         ], styles))
 
-    # ===== VIDEO COMMENTS =====
+    # ===== VIDEO MOMENTS — frame-stamped evidence with thumbnails =====
     if full.get("video_comments"):
         story.append(PageBreak())
-        story += _section_header("Video moments", styles, idx=section_idx)
+        story += _section_header("Video moments — frame-stamped evidence", styles, idx=section_idx)
         section_idx += 1
+        story.append(Paragraph(
+            "<font color='#1F4F2F' size='7'><b>EVERY OBSERVATION IS ANCHORED TO THE EXACT FRAME IT WAS SEEN AT</b></font>",
+            styles["BodyW"],
+        ))
+        story.append(Spacer(1, 0.3 * cm))
         vc_rows = []
         for c in full["video_comments"]:
-            vc_rows.append([
-                Paragraph(f"<font color='#1F4F2F'><b>{c.get('timestamp', '')}</b></font>", styles["BodyW"]),
-                Paragraph(c.get("comment", ""), styles["BodyW"]),
-            ])
-        vct = Table(vc_rows, colWidths=[2.5 * cm, 13.0 * cm])
+            frame_cell = ""
+            frame_url = c.get("frame_url") or ""
+            if frame_url.startswith("/api/uploads/"):
+                frame_path = UPLOAD_DIR / frame_url[len("/api/uploads/"):]
+                if frame_path.exists():
+                    try:
+                        frame_cell = RLImage(str(frame_path), width=4.5 * cm, height=2.5 * cm, kind="proportional")
+                    except Exception:
+                        frame_cell = ""
+            if not frame_cell:
+                frame_cell = Paragraph(
+                    "<font color='#9CA3AF' size='8'><i>frame unavailable</i></font>",
+                    styles["BodyW"],
+                )
+            text_cell = Paragraph(
+                f"<font color='#1F4F2F' size='13'><b>{c.get('timestamp', '')}</b></font><br/>"
+                f"<font color='#0A0F0D' size='10'>{c.get('comment', '')}</font>",
+                styles["BodyW"],
+            )
+            vc_rows.append([frame_cell, text_cell])
+        vct = Table(vc_rows, colWidths=[5.0 * cm, 10.5 * cm])
         vct.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
             ("LEFTPADDING",   (0, 0), (-1, -1), 10),
             ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
-            ("TOPPADDING",    (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("VALIGN",        (1, 0), (1, -1), "TOP"),
             ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+            ("LINEBEFORE",    (0, 0), (0, -1),  2.0, _PDF_FOREST),
         ]))
         story.append(vct)
 
@@ -2897,6 +3184,10 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        # Extract / placeholder frames so the PDF can embed them too.
+        enriched_comments = ensure_video_frames(doc)
+        if enriched_comments and isinstance(doc.get("full_report"), dict):
+            doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
         build_pdf(doc, str(pdf_path))
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"]["player_name"])
