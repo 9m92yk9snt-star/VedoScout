@@ -227,13 +227,28 @@ except Exception as _e:  # pragma: no cover
 
 
 def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
-    """Pick the closest stylistic archetype for this player. Pure
-    deterministic: averages player scores across each archetype's
-    `anchor` attributes, returns the highest-scoring match. We never
-    publish childhood data for the named professionals — these are
-    style references only.
+    """Pick the closest stylistic archetype + return top-3 candidates with
+    per-attribute evidence. Pure deterministic.
 
-    Returns None if we cannot resolve the position or no match >= 6.0.
+    Each archetype's `anchor` may be:
+      - a list of attr keys  (legacy — every attr weighted equally at 1)
+      - a list of {key, weight} dicts  (preferred — higher weight = more
+        signature for that pro)
+
+    Optionally an archetype may declare `signature_attrs` (e.g. ["scanning",
+    "decision_making"]) — the player MUST score >= 7 on every signature
+    attr for the archetype to be considered a real match. This filters out
+    superficial matches (e.g. a player with high passing but zero scanning
+    will not be called a "Modric-type").
+
+    Returns:
+      {
+        ...archetype meta (id/name/club/league/tier/traits/summary)...,
+        match_strength: float,           # weighted average across anchor attrs
+        evidence: [{key, label, score, weight}, ...],  # top-3 contributing attrs
+        developing: bool,
+        alternatives: [ {id, name, club, league, tier, match_strength}, ... ]  # next 2-3
+      }
     """
     if not isinstance(full_report, dict):
         return None
@@ -247,25 +262,66 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
     if not scores:
         return None
 
-    best = None
+    ranked = []
     for arch in candidates:
-        anchor_scores = [scores[k] for k in arch.get("anchor", []) if k in scores]
-        if not anchor_scores:
+        anchor = arch.get("anchor") or []
+        # Normalise to list of (key, weight)
+        weighted = []
+        for entry in anchor:
+            if isinstance(entry, dict):
+                weighted.append((entry.get("key"), float(entry.get("weight", 1))))
+            else:
+                weighted.append((entry, 1.0))
+        weighted = [(k, w) for k, w in weighted if k in scores]
+        if not weighted:
             continue
-        match = sum(anchor_scores) / len(anchor_scores)
-        if (best is None) or match > best["match_strength"]:
-            best = {
-                "id": arch["id"],
-                "name": arch["name"],
-                "club": arch.get("club"),
-                "league": arch.get("league"),
-                "tier": arch.get("tier"),
-                "traits": arch.get("traits") or [],
-                "summary": arch.get("summary") or "",
-                "match_strength": round(match, 2),
-            }
 
-    if not best or best["match_strength"] < 6.0:
+        # Signature gate — every signature_attr must be >= the min (default 7)
+        sigs = arch.get("signature_attrs") or []
+        passes_signature = True
+        for sig in sigs:
+            if isinstance(sig, dict):
+                sig_key = sig.get("key")
+                sig_min = sig.get("min", 7)
+            else:
+                sig_key = sig
+                sig_min = 7
+            if scores.get(sig_key, 0) < sig_min:
+                passes_signature = False
+                break
+
+        total_w = sum(w for _, w in weighted)
+        match = sum(scores[k] * w for k, w in weighted) / total_w
+        # Evidence — top-3 attrs by (score * weight) contribution
+        contribs = sorted(
+            [{"key": k, "label": k.replace("_", " ").title(), "score": scores[k], "weight": w}
+             for k, w in weighted],
+            key=lambda x: x["score"] * x["weight"],
+            reverse=True,
+        )[:3]
+
+        ranked.append({
+            "id":             arch["id"],
+            "name":           arch["name"],
+            "club":           arch.get("club"),
+            "league":         arch.get("league"),
+            "tier":           arch.get("tier"),
+            "traits":         arch.get("traits") or [],
+            "summary":        arch.get("summary") or "",
+            "match_strength": round(match, 2),
+            "evidence":       contribs,
+            "passes_signature": passes_signature,
+        })
+
+    if not ranked:
+        return None
+
+    # Prefer signature-passing matches first, then by match strength
+    ranked.sort(key=lambda x: (x["passes_signature"], x["match_strength"]), reverse=True)
+
+    primary = ranked[0]
+    # If even the strongest match fails signature OR is below 6.0, show developing state
+    if (not primary["passes_signature"]) or (primary["match_strength"] < 6.0):
         return {
             "id": None,
             "name": "Developing — no clear archetype yet",
@@ -274,11 +330,22 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
                 "Scores are still developing across this position's signature attributes. "
                 "A clearer stylistic identity will emerge as the player's strengths sharpen."
             ),
-            "match_strength": best["match_strength"] if best else None,
+            "match_strength": primary["match_strength"],
             "developing": True,
+            "evidence": primary.get("evidence", []),
+            "alternatives": [
+                {k: r[k] for k in ("id", "name", "club", "league", "tier", "match_strength")}
+                for r in ranked[1:4]
+            ],
         }
-    best["developing"] = False
-    return best
+
+    primary["developing"] = False
+    primary["alternatives"] = [
+        {k: r[k] for k in ("id", "name", "club", "league", "tier", "match_strength")}
+        for r in ranked[1:4]
+    ]
+    primary.pop("passes_signature", None)
+    return primary
 
 
 def compute_age_profile_reference(full_report: dict, player_details: dict) -> Optional[dict]:

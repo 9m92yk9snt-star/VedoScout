@@ -658,6 +658,34 @@ function ArchetypeCard({ archetype }) {
               ))}
             </ul>
           )}
+
+          {/* Evidence — which player attrs drove this match */}
+          {Array.isArray(archetype.evidence) && archetype.evidence.length > 0 && (
+            <div data-testid="archetype-evidence" className="mt-6 pt-5 border-t border-cream-base/15">
+              <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-cream-base/65 mb-3">
+                Why this match
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {archetype.evidence.map((e, i) => (
+                  <div
+                    key={i}
+                    data-testid={`archetype-evidence-${e.key}`}
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-cream-base/10 border-l-2 border-cream-base"
+                  >
+                    <span className="font-barlow font-black text-2xl text-white leading-none">{e.score}</span>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] uppercase tracking-[0.18em] font-bold text-white leading-tight">
+                        {e.label}
+                      </span>
+                      <span className="text-[8px] uppercase tracking-[0.18em] font-bold text-cream-base/55">
+                        signature trait
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -667,6 +695,123 @@ function ArchetypeCard({ archetype }) {
           Stylistic comparisons describe how this player plays <strong>today</strong> — not their ceiling, and not the named professional's youth data.
         </p>
       </div>
+    </div>
+  );
+}
+
+/* Closest Matches strip — sits beneath the ArchetypeCard and shows the
+   next 2-3 archetype candidates by weighted match strength. Each row
+   has a monogram crest, club + league, tier pill, and a visual bar +
+   numeric match score. */
+function ClosestMatchesStrip({ archetype }) {
+  if (!archetype || !Array.isArray(archetype.alternatives) || archetype.alternatives.length === 0) return null;
+  // Build a unified list — primary at the top, then alternatives
+  const primary = {
+    name: archetype.name,
+    club: archetype.club,
+    league: archetype.league,
+    tier: archetype.tier,
+    match_strength: archetype.match_strength,
+    primary: true,
+  };
+  const list = [primary, ...archetype.alternatives.slice(0, 2)];
+
+  return (
+    <div data-testid="closest-matches-strip" className="bg-surface border border-gray-border p-6 md:p-7">
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Top 3 closest matches</div>
+          <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
+            Other archetypes this player resembles
+          </h3>
+          <p className="mt-1.5 text-xs text-ink/60 max-w-xl">
+            Ranked by weighted similarity across the position's signature attributes.
+          </p>
+        </div>
+        <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45">
+          Higher score = closer stylistic fit
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {list.map((item, i) => {
+          const meta = TIER_PILL_META[item.tier] || null;
+          const isPrimary = !!item.primary;
+          const widthPct = Math.min(100, Math.max(10, (item.match_strength || 0) * 10));
+          return (
+            <div
+              key={i}
+              data-testid={`closest-match-row-${i}`}
+              className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 ${
+                isPrimary ? "bg-forest text-cream-base" : "bg-cream-card border-l-2 border-forest/30"
+              }`}
+            >
+              {/* Rank */}
+              <div className={`font-barlow font-black text-2xl shrink-0 w-8 text-center ${
+                isPrimary ? "text-cream-base" : "text-forest/70"
+              }`}>
+                {i + 1}
+              </div>
+
+              {/* Crest */}
+              <div
+                className={`w-12 h-12 shrink-0 flex items-center justify-center font-barlow font-black text-base shadow ${
+                  isPrimary ? "bg-cream-base text-forest" : "bg-forest text-cream-base"
+                }`}
+                style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
+              >
+                {_archetypeMonogram(item.name)}
+              </div>
+
+              {/* Name + club/league */}
+              <div className="flex-1 min-w-0">
+                <div className={`font-barlow font-black uppercase text-sm md:text-base truncate ${
+                  isPrimary ? "text-white" : "text-ink"
+                }`}>
+                  {item.name}
+                </div>
+                <div className={`text-[10px] uppercase tracking-[0.18em] font-bold truncate ${
+                  isPrimary ? "text-cream-base/75" : "text-ink/55"
+                }`}>
+                  {item.club || "—"}
+                  {item.league && <span className="opacity-60"> · {item.league}</span>}
+                </div>
+              </div>
+
+              {/* Tier pill */}
+              {meta && (
+                <div className={`hidden sm:inline-flex text-[9px] uppercase tracking-[0.2em] font-bold px-2.5 py-1.5 shrink-0 ${
+                  isPrimary ? "bg-cream-base/15 text-cream-base" : "bg-cream-soft text-forest"
+                }`}>
+                  {meta.label}
+                </div>
+              )}
+
+              {/* Match bar + score */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className={`hidden md:block w-24 h-2 ${isPrimary ? "bg-cream-base/15" : "bg-cream-soft"}`}>
+                  <div
+                    className={`h-full ${isPrimary ? "bg-cream-base" : "bg-forest"}`}
+                    style={{ width: `${widthPct}%` }}
+                  />
+                </div>
+                <div className={`font-barlow font-black text-2xl md:text-3xl tabular-nums leading-none ${
+                  isPrimary ? "text-white" : "text-forest"
+                }`}>
+                  {item.match_strength != null ? item.match_strength.toFixed(1) : "—"}
+                </div>
+                <div className={`text-[10px] font-bold ${isPrimary ? "text-cream-base/60" : "text-ink/45"}`}>
+                  /10
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-5 text-xs text-ink/50 italic">
+        Match score is a weighted average across each archetype's signature attributes — higher score = closer stylistic fit, not better player.
+      </p>
     </div>
   );
 }
@@ -1395,6 +1540,9 @@ export default function ReportPage() {
 
                   {/* Stylistic archetype — public, style-only comparison */}
                   <ArchetypeCard archetype={archetype} />
+
+                  {/* Top 3 closest archetype matches */}
+                  <ClosestMatchesStrip archetype={archetype} />
 
                   {/* Player DNA — unique attribute fingerprint */}
                   <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
