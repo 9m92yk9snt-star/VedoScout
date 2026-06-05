@@ -66,7 +66,8 @@ export default function DashboardPage() {
                       to={`/report/${r.id}`}
                       key={r.id}
                       data-testid={`dashboard-report-${r.id}`}
-                      className="group bg-surface hover:bg-deepnavy transition-colors flex flex-col overflow-hidden"
+                      data-report-id={r.id}
+                      className="group bg-surface hover:bg-deepnavy transition-colors flex flex-col overflow-hidden open-report-link"
                     >
                       {/* Thumbnail */}
                       <div className="relative aspect-video bg-deepnavy overflow-hidden">

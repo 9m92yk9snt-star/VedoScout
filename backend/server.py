@@ -52,6 +52,27 @@ load_dotenv(ROOT_DIR / ".env")
 UPLOAD_DIR = ROOT_DIR / "uploads"
 PDF_DIR = ROOT_DIR / "pdfs"
 UPLOAD_DIR.mkdir(exist_ok=True)
+# Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
+# Each PDF is cached on disk keyed by report_id + this version, so a bump
+# invalidates every stale PDF without losing the current ones.
+PDF_RENDER_VERSION = 5  # v5 = fixed pro-name extraction in bio/career headers
+
+
+def _pdf_cache_path(report_id: str) -> Path:
+    return PDF_DIR / f"{report_id}.v{PDF_RENDER_VERSION}.pdf"
+
+
+def _purge_stale_pdfs(report_id: str) -> None:
+    """Delete older-version cached PDFs for a given report id so disk doesn't
+    leak. Safe no-op if none exist."""
+    for old in PDF_DIR.glob(f"{report_id}*.pdf"):
+        if old.name != _pdf_cache_path(report_id).name:
+            try:
+                old.unlink()
+            except Exception:
+                pass
+
+
 PDF_DIR.mkdir(exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -840,6 +861,19 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
 
 # ---- Layer 3 — Gemini-powered narrative ------------------------------------
 
+def _pro_name_from_archetype(archetype: dict) -> str:
+    """Extract just the pro's name from an archetype name like
+    'Modric-type composer' → 'Modric', 'Lamine Yamal-type wonderkid' → 'Lamine Yamal'.
+    Splits on the first '-type' suffix marker.
+    """
+    raw = (archetype or {}).get("name") or ""
+    # Common pattern: '<Name>-type <descriptor>' — keep everything BEFORE '-type'
+    if "-type" in raw:
+        return raw.split("-type", 1)[0].strip()
+    # Fallback: legacy entries that may already be just 'Name'
+    return raw.strip()
+
+
 async def call_gemini_text(session_id: str, prompt: str, system_message: str = "") -> str:
     """Fast text-only Gemini call. No file_contents. Returns raw text."""
     chat = LlmChat(
@@ -882,7 +916,7 @@ async def generate_archetype_narrative(player_details: dict, full_report: dict, 
         f"{e.get('label')} {e.get('score')}/10" for e in evidence[:3] if isinstance(e, dict)
     ) or "balanced scores across signature attributes"
 
-    pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+    pro_name = _pro_name_from_archetype(archetype)
     career_brief = (archetype.get("career_brief") or "").strip()
 
     # Pull the top FIFA neighbor (if any) so the narrative can cite the real
@@ -3300,7 +3334,7 @@ def _archetype_card_pdf(archetype: dict, styles):
     bio_chunk = (archetype.get("academy_bio_chunk") or "").strip()
     bracket = archetype.get("age_bracket_used")
     if bio_chunk and bracket and not developing:
-        pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+        pro_name = _pro_name_from_archetype(archetype)
         bio_card = Table(
             [[Paragraph(
                 f"<font color='#1F4F2F' size='7'><b>WHAT {pro_name.upper()} WAS DOING AT AGE {bracket}</b></font><br/><br/>"
@@ -3321,7 +3355,7 @@ def _archetype_card_pdf(archetype: dict, styles):
     # ----- Career brief — FBref / Transfermarkt verified career stats -------
     career_brief = (archetype.get("career_brief") or "").strip()
     if career_brief and not developing:
-        pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+        pro_name = _pro_name_from_archetype(archetype)
         career_card = Table(
             [[Paragraph(
                 f"<font color='#1F4F2F' size='7'><b>{pro_name.upper()} &middot; CAREER SNAPSHOT (FBREF &middot; TRANSFERMARKT)</b></font><br/><br/>"
@@ -4094,8 +4128,9 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
     if not doc.get("full_report"):
         raise HTTPException(status_code=400, detail="Full report not generated yet")
 
-    pdf_path = PDF_DIR / f"{report_id}.pdf"
+    pdf_path = _pdf_cache_path(report_id)
     if not pdf_path.exists():
+        _purge_stale_pdfs(report_id)
         # Compute deterministic enrichment so PDF == web report.
         doc["trial_readiness"] = compute_trial_readiness(
             doc.get("full_report") or {},
@@ -4820,7 +4855,9 @@ async def admin_delete_user(user_id: str, admin=Depends(get_current_admin)):
                 except Exception:
                     pass
         try:
-            (PDF_DIR / f"{r['id']}.pdf").unlink(missing_ok=True)
+            # Purge ALL PDF versions for this report (current + any stale)
+            for old in PDF_DIR.glob(f"{r['id']}*.pdf"):
+                old.unlink(missing_ok=True)
         except Exception:
             pass
         reports_deleted += 1
@@ -5017,7 +5054,9 @@ async def admin_delete_report(report_id: str, _=Depends(get_current_admin)):
     except Exception:
         pass
     try:
-        (PDF_DIR / f"{report_id}.pdf").unlink(missing_ok=True)
+        # Purge ALL PDF versions for this report (current + any stale)
+        for old in PDF_DIR.glob(f"{report_id}*.pdf"):
+            old.unlink(missing_ok=True)
     except Exception:
         pass
     await db.reports.delete_one({"id": report_id})
