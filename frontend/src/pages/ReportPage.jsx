@@ -304,10 +304,109 @@ function OverallBenchmarkBanner({ ob, overallScore }) {
             );
           })}
         </div>
+        <a
+          href="/methodology"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid="overall-methodology-link"
+          className="mt-4 inline-block text-[10px] uppercase tracking-[0.22em] font-bold text-cream-base/70 hover:text-cream-base underline-offset-4 hover:underline transition-colors"
+        >
+          How we score · methodology →
+        </a>
       </div>
     </div>
   );
 }
+
+/* Position-specific trial-readiness checklist — auto-evaluated against
+   strong-club / pro-academy score thresholds. Renders as the page
+   the player would actually hand a coach: yes/no items with reasons. */
+function TrialReadinessCard({ tr }) {
+  if (!tr || !Array.isArray(tr.items) || tr.items.length === 0) return null;
+
+  const headlineMeta = {
+    pro_academy:           { tone: "bg-forest text-cream-base",                eyebrow: "Today, this player is" },
+    strong_club:           { tone: "bg-forest-pop text-cream-base",            eyebrow: "Today, this player is" },
+    building_strong_club:  { tone: "bg-cream-card text-forest border-2 border-forest", eyebrow: "On track — building towards" },
+    foundation:            { tone: "bg-cream-card text-ink border-2 border-stone-400", eyebrow: "Foundation phase" },
+  }[tr.readiness_tier] || { tone: "bg-cream-card text-ink border", eyebrow: "Status" };
+
+  return (
+    <div data-testid="trial-readiness-card" className="bg-surface border border-gray-border p-6 md:p-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Trial readiness</div>
+          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
+            What this player is ready for, today
+          </h3>
+          <p className="mt-2 text-sm text-ink/65 max-w-xl">
+            Position-specific checklist — each item below is auto-evaluated against the strong-club and pro-academy
+            score thresholds for a {tr.position_key}.
+          </p>
+        </div>
+        <div data-testid="trial-readiness-headline" className={`px-5 py-4 ${headlineMeta.tone}`}>
+          <div className="text-[9px] uppercase tracking-[0.25em] font-bold opacity-80">{headlineMeta.eyebrow}</div>
+          <div className="text-lg md:text-xl font-barlow font-black uppercase leading-tight mt-0.5">
+            {tr.headline}
+          </div>
+          <div className="mt-2 flex items-center gap-3 text-[10px] uppercase tracking-[0.18em] font-bold opacity-90">
+            <span data-testid="tr-strong-score">Strong club {tr.strong_club_score}</span>
+            <span className="opacity-50">·</span>
+            <span data-testid="tr-pro-score">Pro academy {tr.pro_academy_score}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 grid sm:grid-cols-2 gap-px bg-cream-soft/20">
+        {tr.items.map((it) => {
+          const proMet  = it.pro_academy_met;
+          const strongMet = it.strong_club_met;
+          let mark, markCls, eyebrowLabel, eyebrowCls;
+          if (it.no_data) {
+            mark = "—"; markCls = "bg-stone-200 text-stone-500";
+            eyebrowLabel = "no data"; eyebrowCls = "text-stone-500";
+          } else if (proMet) {
+            mark = "✓"; markCls = "bg-forest text-cream-base";
+            eyebrowLabel = "pro academy ready"; eyebrowCls = "text-forest";
+          } else if (strongMet) {
+            mark = "✓"; markCls = "bg-forest-pop/15 text-forest";
+            eyebrowLabel = "strong club ready"; eyebrowCls = "text-forest-pop";
+          } else {
+            mark = "○"; markCls = "bg-cream-soft text-ink/45";
+            eyebrowLabel = "needs work"; eyebrowCls = "text-ink/45";
+          }
+          return (
+            <div
+              key={it.id}
+              data-testid={`tr-item-${it.id}`}
+              className="bg-surface p-4 flex items-start gap-3"
+            >
+              <div className={`w-8 h-8 shrink-0 flex items-center justify-center font-barlow font-black text-base ${markCls}`}>
+                {mark}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-ink leading-snug">{it.label}</div>
+                <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold">
+                  <span className={eyebrowCls}>{eyebrowLabel}</span>
+                  {!it.no_data && (
+                    <span className="text-ink/40">
+                      score {it.value} <span className="opacity-50">· need {it.strong_club_min}/{it.pro_academy_min}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-5 text-xs text-ink/50 italic">
+        Trial readiness is computed from the scores above. It's a scout-style guide, not a guarantee of selection.
+      </p>
+    </div>
+  );
+}
+
 
 function LockedOverlay({ price, onUnlock, loading }) {
   return (
@@ -544,7 +643,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -938,6 +1037,9 @@ export default function ReportPage() {
                   <SectionGrid title="Tactical Analysis" section={full_report.tactical} />
                   <SectionGrid title="Physical Analysis" section={full_report.physical} />
                   <SectionGrid title="Mentality Analysis" section={full_report.mentality} />
+
+                  {/* Trial-readiness checklist — position-specific, scout-style */}
+                  <TrialReadinessCard tr={trial_readiness} />
 
                   {/* Scout View */}
                   {full_report.scout_view && (

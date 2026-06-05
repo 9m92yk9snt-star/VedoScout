@@ -13,6 +13,7 @@ import AdminPage from "@/pages/AdminPage";
 import DashboardPage from "@/pages/DashboardPage";
 import AboutPage from "@/pages/AboutPage";
 import PrivacyPage from "@/pages/PrivacyPage";
+import MethodologyPage from "@/pages/MethodologyPage";
 
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -48,6 +49,7 @@ function App() {
             <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/methodology" element={<MethodologyPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

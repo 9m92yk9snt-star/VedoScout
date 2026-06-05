@@ -1197,6 +1197,15 @@ export default function Landing() {
                     Privacy Policy
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    to="/methodology"
+                    data-testid="footer-link-methodology"
+                    className="text-ink/70 hover:text-volt transition-colors"
+                  >
+                    Methodology
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>

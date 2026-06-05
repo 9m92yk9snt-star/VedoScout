@@ -91,6 +91,125 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ---- Trial readiness catalog (position-specific scout-style checklist) ----
+
+DATA_DIR = ROOT_DIR / "data"
+
+try:
+    with open(DATA_DIR / "trial_readiness.json", "r", encoding="utf-8") as _f:
+        TRIAL_READINESS_CATALOG = json.load(_f)
+except Exception as _e:  # pragma: no cover - file is shipped with the repo
+    logging.warning("Could not load trial_readiness.json: %s", _e)
+    TRIAL_READINESS_CATALOG = {}
+
+
+def _normalise_position(raw: Optional[str]) -> Optional[str]:
+    """Map a free-text position to one of the catalog position keys."""
+    if not raw:
+        return None
+    text = str(raw).strip().lower()
+    aliases = TRIAL_READINESS_CATALOG.get("_aliases", {})
+    for canonical, options in aliases.items():
+        for opt in options:
+            if opt in text:
+                return canonical
+    return None
+
+
+def _flatten_scores(full_report: dict) -> dict:
+    """Collapse the four section objects into a single {sub_attr: score} map."""
+    flat: dict = {}
+    if not isinstance(full_report, dict):
+        return flat
+    for section in ("technical", "tactical", "physical", "mentality"):
+        sec = full_report.get(section) or {}
+        if not isinstance(sec, dict):
+            continue
+        for key, value in sec.items():
+            if isinstance(value, dict) and isinstance(value.get("score"), (int, float)):
+                flat[key] = value["score"]
+    return flat
+
+
+def compute_trial_readiness(full_report: dict, player_details: dict) -> Optional[dict]:
+    """Server-side, deterministic. Reads scores + position → returns the
+    checklist envelope used by both web UI and PDF.
+
+    Returns None if we cannot map the position to the catalog (graceful fallback)."""
+    if not isinstance(full_report, dict):
+        return None
+    position = _normalise_position((player_details or {}).get("position"))
+    if not position:
+        return None
+    catalog = TRIAL_READINESS_CATALOG.get(position)
+    if not catalog:
+        return None
+    scores = _flatten_scores(full_report)
+    if not scores:
+        return None
+
+    items_out = []
+    for item in catalog.get("items", []):
+        attr_keys = item.get("attrs") or []
+        attr_scores = [scores[k] for k in attr_keys if k in scores]
+        if not attr_scores:
+            items_out.append({
+                "id": item["id"],
+                "label": item["label"],
+                "strong_club_met": False,
+                "pro_academy_met": False,
+                "no_data": True,
+                "value": None,
+                "strong_club_min": item.get("strong_club_min"),
+                "pro_academy_min": item.get("pro_academy_min"),
+            })
+            continue
+        logic = item.get("logic", "min")
+        value = min(attr_scores) if logic == "min" else (sum(attr_scores) / len(attr_scores))
+        items_out.append({
+            "id": item["id"],
+            "label": item["label"],
+            "value": round(value, 1),
+            "strong_club_min": item.get("strong_club_min"),
+            "pro_academy_min": item.get("pro_academy_min"),
+            "strong_club_met": value >= item.get("strong_club_min", 6),
+            "pro_academy_met": value >= item.get("pro_academy_min", 7),
+            "no_data": False,
+        })
+
+    if not items_out:
+        return None
+
+    countable = [i for i in items_out if not i["no_data"]]
+    strong_met = sum(1 for i in countable if i["strong_club_met"])
+    pro_met = sum(1 for i in countable if i["pro_academy_met"])
+    total = len(countable)
+
+    # Headline label — what the player IS ready for, today
+    if total > 0 and pro_met / total >= 0.75:
+        headline = "Ready for Pro Academy trial"
+        readiness_tier = "pro_academy"
+    elif total > 0 and strong_met / total >= 0.75:
+        headline = "Ready for Strong Club trial"
+        readiness_tier = "strong_club"
+    elif total > 0 and strong_met / total >= 0.5:
+        headline = "Building towards a Strong Club trial"
+        readiness_tier = "building_strong_club"
+    else:
+        headline = "Foundation phase — build the basics first"
+        readiness_tier = "foundation"
+
+    return {
+        "position_key": position,
+        "headline": headline,
+        "readiness_tier": readiness_tier,
+        "strong_club_score": f"{strong_met}/{total}",
+        "pro_academy_score": f"{pro_met}/{total}",
+        "items": items_out,
+    }
+
+
+
 class UserSignup(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
@@ -1042,6 +1161,10 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
     if include_full:
         out["full_report"] = doc.get("full_report")
         out["agent_review"] = doc.get("agent_review")
+        out["trial_readiness"] = compute_trial_readiness(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
     return out
 
 
@@ -1815,6 +1938,146 @@ def _overall_benchmark_page(ob: dict, overall_score, styles):
     return flow
 
 
+def _trial_readiness_page(tr: dict, styles):
+    """Premium scout-style checklist page. Renders the headline + a grid of items.
+
+    Each item shows: status icon, label, value, and the required thresholds."""
+    if not isinstance(tr, dict) or not tr.get("items"):
+        return []
+
+    flow = []
+
+    # Headline strip — forest or cream depending on readiness tier
+    tier_key = tr.get("readiness_tier")
+    if tier_key in ("pro_academy",):
+        bg = _PDF_FOREST
+        fg_hex = "#FFFFFF"
+        eyebrow_hex = "#FFFFFFAA"
+    elif tier_key in ("strong_club",):
+        bg = _PDF_FOREST_POP
+        fg_hex = "#FFFFFF"
+        eyebrow_hex = "#FFFFFFAA"
+    else:
+        bg = _PDF_CREAM_S
+        fg_hex = "#0A0F0D"
+        eyebrow_hex = "#1F4F2F"
+
+    headline_left = Paragraph(
+        f"<font color='{eyebrow_hex}' size='7'><b>TODAY, THIS PLAYER IS</b></font><br/>"
+        f"<font color='{fg_hex}' size='17'><b>{tr.get('headline', 'Trial readiness')}</b></font><br/><br/>"
+        f"<font color='{fg_hex}' size='9'><b>STRONG CLUB {tr.get('strong_club_score', '-')}</b>"
+        f"&nbsp;&nbsp;&nbsp;<b>PRO ACADEMY {tr.get('pro_academy_score', '-')}</b></font>",
+        styles["BodyW"],
+    )
+    headline_right = Paragraph(
+        f"<font color='{eyebrow_hex}' size='7'><b>POSITION</b></font><br/>"
+        f"<font color='{fg_hex}' size='11'><b>{(tr.get('position_key') or '').upper()}</b></font>",
+        styles["BodyW"],
+    )
+    headline = Table([[headline_left, headline_right]], colWidths=[11.5 * cm, 4.0 * cm])
+    headline.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), bg),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+    flow.append(headline)
+    flow.append(Spacer(1, 0.4 * cm))
+
+    # Checklist grid — 2 columns
+    items = tr.get("items", [])
+    rows = []
+    for i in range(0, len(items), 2):
+        row_cells = []
+        for j in range(2):
+            if i + j >= len(items):
+                row_cells.append("")
+                continue
+            it = items[i + j]
+            row_cells.append(_trial_item_cell(it, styles))
+        rows.append(row_cells)
+
+    grid = Table(rows, colWidths=[7.75 * cm, 7.75 * cm])
+    grid_style = [
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    grid.setStyle(TableStyle(grid_style))
+    flow.append(grid)
+
+    flow.append(Spacer(1, 0.4 * cm))
+    flow.append(Paragraph(
+        "<i><font color='#6B7280' size='8'>Trial readiness is computed from the scores in this report. "
+        "It is a scout-style guide, not a guarantee of selection.</font></i>",
+        styles["BodyW"],
+    ))
+    return flow
+
+
+def _trial_item_cell(item: dict, styles):
+    """A single checklist cell — icon + label + status line."""
+    if item.get("no_data"):
+        mark_hex = "#9CA3AF"
+        bg = HexColor("#E5E7EB")
+        status = "NO DATA"
+        status_hex = "#9CA3AF"
+        mark = "—"
+    elif item.get("pro_academy_met"):
+        mark_hex = "#FFFFFF"
+        bg = _PDF_FOREST
+        status = "PRO ACADEMY READY"
+        status_hex = "#1F4F2F"
+        mark = "✓"
+    elif item.get("strong_club_met"):
+        mark_hex = "#1F4F2F"
+        bg = _PDF_CREAM_S
+        status = "STRONG CLUB READY"
+        status_hex = "#2D6B3D"
+        mark = "✓"
+    else:
+        mark_hex = "#9CA3AF"
+        bg = _PDF_CARD
+        status = "NEEDS WORK"
+        status_hex = "#9CA3AF"
+        mark = "○"
+
+    icon = Paragraph(f"<font color='{mark_hex}' size='14'><b>{mark}</b></font>", styles["BodyW"])
+    val = item.get("value")
+    sc_min = item.get("strong_club_min")
+    pa_min = item.get("pro_academy_min")
+    score_line = ""
+    if not item.get("no_data") and val is not None:
+        score_line = (
+            f"<font color='#9CA3AF' size='7'>"
+            f"&nbsp;&nbsp;score {val} · need {sc_min}/{pa_min}"
+            f"</font>"
+        )
+    body = Paragraph(
+        f"<font color='#0A0F0D' size='9.5'><b>{item.get('label', '')}</b></font><br/>"
+        f"<font color='{status_hex}' size='7'><b>{status}</b></font>{score_line}",
+        styles["BodyW"],
+    )
+    cell = Table([[icon, body]], colWidths=[1.0 * cm, 6.6 * cm])
+    cell.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("BACKGROUND",    (0, 0), (0, 0),   bg),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",         (0, 0), (0, 0),   "CENTER"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    return cell
+
+
+
+
 def build_pdf(report_doc: dict, output_path: str):
     """Builds a premium cream/forest PDF. Document is organised as:
         Page 1  — Cover (forest panel + player name + score box)
@@ -1979,6 +2242,14 @@ def build_pdf(report_doc: dict, output_path: str):
 
     story.append(PageBreak())
 
+    # ===== TRIAL READINESS — position-specific scout-style checklist =====
+    tr = report_doc.get("trial_readiness") or {}
+    if tr and tr.get("items"):
+        story += _section_header("Trial readiness — what this player is ready for, today", styles, idx=section_idx)
+        section_idx += 1
+        story += _trial_readiness_page(tr, styles)
+        story.append(PageBreak())
+
     # ===== SCOUT VIEW =====
     if "scout_view" in full:
         sv = full["scout_view"] or {}
@@ -2125,7 +2396,123 @@ def build_pdf(report_doc: dict, output_path: str):
         styles["MutedW"],
     ))
 
+    # ===== METHODOLOGY APPENDIX (always last) =====
+    story.append(PageBreak())
+    story += _methodology_appendix(styles)
+
     doc.build(story)
+
+
+def _methodology_appendix(styles):
+    """Final page of every PDF — explains how the report is scored so any
+    coach receiving it can verify the framework. Strictly defensible language
+    (UEFA-aligned, never UEFA-certified)."""
+    flow = []
+    flow += _section_header("How ScoutMePlay scores — methodology", styles, idx=None)
+    flow.append(Paragraph(
+        "Every report is built around the same four player-development pillars used across European Category-1 "
+        "youth academies. This appendix explains how we evaluate, benchmark, and tier players — so any coach or "
+        "scout receiving this PDF can understand the numbers.",
+        styles["BodyW"],
+    ))
+    flow.append(Spacer(1, 0.25 * cm))
+    flow.append(Paragraph(
+        "<font color='#9CA3AF' size='7'><b>ALIGNED WITH UEFA YOUTH-DEVELOPMENT PILLARS · "
+        "NOT CERTIFIED OR ENDORSED BY UEFA</b></font>",
+        styles["BodyW"],
+    ))
+    flow.append(Spacer(1, 0.5 * cm))
+
+    # --- Pillars ---
+    flow.append(Paragraph("THE FOUR PILLARS", styles["Label"]))
+    pillars_rows = [
+        ("Technical",  "Skills with the ball — first touch, ball control, passing, dribbling, shooting, weak-foot use, 1v1."),
+        ("Tactical",   "Decisions without the ball — positioning, off-ball movement, scanning, decision-making, timing of runs, game understanding."),
+        ("Physical",   "Athletic foundation — acceleration, speed, balance, agility, intensity (90-minute), body control."),
+        ("Mental",     "Habits and character — confidence, work rate, courage in duels, response to mistakes, competitive mindset, focus."),
+    ]
+    flow.append(_two_col_card_table(pillars_rows, styles))
+    flow.append(Spacer(1, 0.45 * cm))
+
+    # --- Tier ladder ---
+    flow.append(Paragraph("THE FOUR-TIER LADDER", styles["Label"]))
+    flow.append(Paragraph(
+        "Each sub-skill is scored 1-10 and placed into one of four tiers, calibrated to the player's age and position.",
+        styles["BodyW"],
+    ))
+    flow.append(Spacer(1, 0.15 * cm))
+    tiers = [
+        ("Elite Academy",  "Top-end Category-1 academies (La Masia, Clairefontaine, Cobham-level). Top 1-3% of an age group."),
+        ("Pro Academy",    "Strong regional or national pro-club academies. Trial-ready for serious competitive pathways. Top 10-15%."),
+        ("Strong Club",    "Higher-level competitive club football, talent centres, district selections. Top 30%."),
+        ("Standard Club",  "Mainstream club football where most players develop. Baseline for organised youth football."),
+    ]
+    flow.append(_two_col_card_table(tiers, styles))
+    flow.append(Spacer(1, 0.45 * cm))
+
+    # --- Age brackets ---
+    flow.append(Paragraph("AGE BRACKETS", styles["Label"]))
+    flow.append(Paragraph(
+        "A 7/10 for first touch at U11 is not the same as a 7/10 at U17. Every score is calibrated against the typical "
+        "milestone for the age bracket and position.",
+        styles["BodyW"],
+    ))
+    flow.append(Spacer(1, 0.15 * cm))
+    ages = [
+        ("U11",  "Foundation — coordination, ball mastery, basic decision-making."),
+        ("U13",  "Build phase — scanning habits, positional discipline, both-footed development."),
+        ("U15",  "Performance phase — match impact, pressing intensity, tactical role clarity."),
+        ("U17",  "Specialisation — position-specific excellence, physical maturity, mental resilience."),
+        ("U19",  "Pre-professional — match management, leadership, consistency across 90 minutes."),
+        ("U21",  "Professional threshold — high-performance habits, durability, decision quality at speed."),
+    ]
+    flow.append(_two_col_card_table(ages, styles))
+    flow.append(Spacer(1, 0.45 * cm))
+
+    # --- What we don't claim ---
+    flow.append(Paragraph("WHAT WE DON'T CLAIM", styles["Label"]))
+    for item in [
+        "We are not UEFA-certified. We align with the same pillars used in UEFA elite-youth coaching education — that's it.",
+        "We don't publish childhood scores of professional players. Stylistic archetype comparisons describe style, not factual youth data.",
+        "We don't guarantee selection, signing, or progression to any club or academy.",
+        "Set-pieces from open play, off-camera defensive work, and goalkeeping moments are not assessable from outfield clips.",
+    ]:
+        flow.append(Paragraph(
+            f"<font color='#1F4F2F'><b>·</b></font>&nbsp;&nbsp;<font color='#0A0F0D' size='9.5'>{item}</font>",
+            styles["BodyW"],
+        ))
+        flow.append(Spacer(1, 0.1 * cm))
+
+    flow.append(Spacer(1, 0.4 * cm))
+    flow.append(Paragraph(
+        "<i><font color='#9CA3AF' size='8'>Methodology version 1.0 — last updated Feb 2026.</font></i>",
+        styles["BodyW"],
+    ))
+    return flow
+
+
+def _two_col_card_table(rows, styles):
+    """Helper for the methodology appendix — left column is a bold label,
+    right column is a body paragraph. Cards alternate background subtly."""
+    data = []
+    for label, body in rows:
+        data.append([
+            Paragraph(f"<font color='#1F4F2F' size='10'><b>{label.upper()}</b></font>", styles["BodyW"]),
+            Paragraph(f"<font color='#0A0F0D' size='9.5'>{body}</font>", styles["BodyW"]),
+        ])
+    t = Table(data, colWidths=[4.5 * cm, 11.0 * cm])
+    style = [
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+        ("LINEBELOW",     (0, 0), (-1, -1), 0.3, _PDF_BORDER),
+        ("LINEBEFORE",    (0, 0), (0, -1),  2.0, _PDF_FOREST),
+    ]
+    t.setStyle(TableStyle(style))
+    return t
 
 
 @api_router.get("/reports/{report_id}/pdf")
@@ -2143,6 +2530,11 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
 
     pdf_path = PDF_DIR / f"{report_id}.pdf"
     if not pdf_path.exists():
+        # Compute trial readiness deterministically so the PDF matches the web report.
+        doc["trial_readiness"] = compute_trial_readiness(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
         build_pdf(doc, str(pdf_path))
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"]["player_name"])
