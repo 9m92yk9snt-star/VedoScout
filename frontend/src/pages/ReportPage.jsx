@@ -408,6 +408,161 @@ function TrialReadinessCard({ tr }) {
 }
 
 
+/* Stylistic archetype card — small, premium, sits inline with the report.
+   The named pros are public stylistic references only. We never publish
+   their childhood scores. */
+function ArchetypeCard({ archetype }) {
+  if (!archetype) return null;
+  const developing = archetype.developing;
+  return (
+    <div
+      data-testid="archetype-card"
+      className={`p-6 md:p-7 ${developing ? "bg-cream-card border border-gray-border" : "bg-forest text-cream-base"}`}
+    >
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className={`text-[10px] uppercase tracking-[0.28em] font-bold mb-2 ${developing ? "text-forest" : "text-cream-base/75"}`}>
+            Stylistic archetype
+          </div>
+          <h3 className={`font-barlow font-black uppercase text-2xl md:text-3xl leading-tight ${developing ? "text-ink" : "text-white"}`}>
+            <span data-testid="archetype-name">{archetype.name}</span>
+          </h3>
+          <p className={`mt-3 text-sm md:text-base leading-relaxed max-w-2xl ${developing ? "text-ink/75" : "text-cream-base/90"}`}>
+            {archetype.summary}
+          </p>
+          {Array.isArray(archetype.traits) && archetype.traits.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {archetype.traits.map((t, i) => (
+                <li
+                  key={i}
+                  data-testid={`archetype-trait-${i}`}
+                  className={`text-[10px] uppercase tracking-[0.18em] font-bold px-3 py-1.5 ${
+                    developing
+                      ? "bg-cream-soft text-forest"
+                      : "bg-cream-base/15 text-cream-base"
+                  }`}
+                >
+                  {t}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {!developing && typeof archetype.match_strength === "number" && (
+          <div className="shrink-0 text-right">
+            <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-cream-base/65">Match strength</div>
+            <div className="mt-1 font-barlow font-black text-3xl text-white leading-none">{archetype.match_strength.toFixed(1)}</div>
+            <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-cream-base/65 mt-1">/10</div>
+          </div>
+        )}
+      </div>
+      <p className={`mt-5 text-xs italic ${developing ? "text-ink/50" : "text-cream-base/55"}`}>
+        Stylistic comparisons describe how this player plays today — not their ceiling, and not the named professional's youth data.
+      </p>
+    </div>
+  );
+}
+
+/* Position-specific reference profile card — shows the player's actual
+   scores against Pro Academy expectations for the position + age bracket.
+   Pure server-side enrichment, no AI involved. */
+function AgeProfileCard({ ref: profile }) {
+  if (!profile || !Array.isArray(profile.items) || profile.items.length === 0) return null;
+  const positionLabel = (profile.position_key || "").toUpperCase();
+  const ageLabel = (profile.age_bracket || "").toUpperCase();
+  return (
+    <div data-testid="age-profile-card" className="bg-surface border border-gray-border p-6 md:p-8">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">European academy reference profile</div>
+          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
+            How the player overlays
+          </h3>
+          <p className="mt-2 text-sm text-ink/65 max-w-xl">
+            The attributes that matter most for a {profile.position_key} — measured against the Pro Academy expectation
+            for {profile.age_bracket || "the player's age bracket"}.
+          </p>
+        </div>
+        <div className="px-4 py-3 bg-cream-card border-l-4 border-forest">
+          <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-forest">Position · Age</div>
+          <div className="mt-0.5 font-barlow font-black text-base text-ink leading-tight">
+            <span data-testid="age-profile-position">{positionLabel}</span>
+            {ageLabel && <span className="text-ink/40"> · </span>}
+            <span data-testid="age-profile-age">{ageLabel}</span>
+          </div>
+          <div
+            className="mt-2 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/70"
+            data-testid="age-profile-summary"
+            dangerouslySetInnerHTML={{ __html: profile.summary || "" }}
+          />
+        </div>
+      </div>
+
+      {/* Priority attributes table */}
+      <div className="mt-6 space-y-px bg-gray-border">
+        {profile.items.map((it) => {
+          const delta = it.delta;
+          let stateLabel, stateCls, deltaIcon;
+          if (delta === "at_or_above") {
+            stateLabel = "At or above"; stateCls = "text-forest"; deltaIcon = "▲";
+          } else if (delta === "below") {
+            stateLabel = "Below";        stateCls = "text-amber-700"; deltaIcon = "▼";
+          } else {
+            stateLabel = "—";             stateCls = "text-ink/45"; deltaIcon = "·";
+          }
+          // Weight visual — solid dots
+          const dots = [];
+          for (let i = 0; i < 5; i++) {
+            dots.push(
+              <span
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full ${i < (it.weight || 3) ? "bg-forest" : "bg-cream-soft"}`}
+              />
+            );
+          }
+          return (
+            <div
+              key={it.key}
+              data-testid={`age-profile-row-${it.key}`}
+              className="bg-surface p-4 grid grid-cols-12 gap-3 items-center"
+            >
+              <div className="col-span-12 md:col-span-4">
+                <div className="text-sm font-semibold text-ink leading-tight">{it.label}</div>
+                <div className="mt-0.5 text-xs text-ink/55 leading-snug">{it.why_matters}</div>
+              </div>
+              <div className="col-span-3 md:col-span-2 flex items-center gap-1">
+                {dots}
+              </div>
+              <div className="col-span-3 md:col-span-2 text-center">
+                <div className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/50">Pro range</div>
+                <div className="font-barlow font-black text-sm text-ink">{it.pro_academy_range}</div>
+              </div>
+              <div className="col-span-3 md:col-span-2 text-center">
+                <div className="text-[9px] uppercase tracking-[0.18em] font-bold text-ink/50">Player</div>
+                <div className="font-barlow font-black text-2xl text-forest leading-none">
+                  {it.player_score ?? "—"}
+                </div>
+              </div>
+              <div className="col-span-3 md:col-span-2 text-right">
+                <div className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-bold ${stateCls}`}>
+                  <span>{deltaIcon}</span>
+                  <span>{stateLabel}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-5 text-xs text-ink/50 italic">
+        Reference profile is curated from European youth-academy development frameworks. It compares the player's actual
+        scores against what scouts at Pro Academy level typically look for.
+      </p>
+    </div>
+  );
+}
+
+
 function LockedOverlay({ price, onUnlock, loading }) {
   return (
     <div className="absolute inset-0 z-20 backdrop-blur-xl bg-cream-card border border-gray-border flex flex-col items-center justify-center text-center p-6 md:p-12">
@@ -643,7 +798,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -1016,6 +1171,9 @@ export default function ReportPage() {
                     overallScore={full_report.scores?.overall_development}
                   />
 
+                  {/* Stylistic archetype — public, style-only comparison */}
+                  <ArchetypeCard archetype={archetype} />
+
                   {/* Radar chart */}
                   {radarData && (
                     <div className="bg-surface border border-gray-border p-6 md:p-8">
@@ -1037,6 +1195,9 @@ export default function ReportPage() {
                   <SectionGrid title="Tactical Analysis" section={full_report.tactical} />
                   <SectionGrid title="Physical Analysis" section={full_report.physical} />
                   <SectionGrid title="Mentality Analysis" section={full_report.mentality} />
+
+                  {/* European Academy reference profile — position priorities vs Pro Academy expectations */}
+                  <AgeProfileCard ref={age_profile_reference} />
 
                   {/* Trial-readiness checklist — position-specific, scout-style */}
                   <TrialReadinessCard tr={trial_readiness} />

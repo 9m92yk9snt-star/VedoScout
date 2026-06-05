@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 7: Validated session-2 'credibility upgrade' shipping (C1) Stylistic Archetype + (C2) European Academy Reference Profile. ALL 8 backend pytest cases pass (test_archetype_age_profile.py): catalog file integrity for both archetypes.json and age_profiles.json (8 positions × ≥4 archetypes, 8 positions × ≥5 priority attributes with {key, weight, why_matters}); /api/reports/{id} response includes top-level 'archetype' object {id, name, traits, summary, match_strength, developing} — Lukas A. correctly resolves to id='modric_type', name='Modric-type composer', match_strength=8.75 (≥8.0), developing=false; response also includes top-level 'age_profile_reference' with position_key='attacking midfielder', age_bracket='U13-U14', 7 items, above_count=7, below_count=0; each item carries the full required schema (key, label, weight 1-5, why_matters, pro_academy_range, player_score, player_tier, delta ∈ {at_or_above/below/no_data}); trial_readiness regression intact (position_key='attacking midfielder', 8 items); premium PDF size=45,723 bytes (>35KB), 24 pages (≥22), and full-page text extraction (whitespace-normalised) contains all of STYLISTIC ARCHETYPE, MODRIC-TYPE COMPOSER, MATCH STRENGTH, EUROPEAN ACADEMY REFERENCE PROFILE, ATTACKING MIDFIELDER, AT OR ABOVE, PRO RANGE plus priority attribute labels (Scanning/Passing/Decision Making) and methodology regression FOUR PILLARS + UEFA + TRIAL READINESS. Frontend: premium login → /report/64f59196 → archetype-card visible right after overall-benchmark-banner (DOM order verified), archetype-name='MODRIC-TYPE COMPOSER', 3 archetype-trait-* rendered, disclaimer 'Stylistic comparisons describe how this player plays today — not their ceiling, and not the named professional's youth data.' visible; age-profile-card visible, age-profile-position='ATTACKING MIDFIELDER', age-profile-age='U13-U14', age-profile-summary='7 at or above Pro Academy level', 7 age-profile-row-* rendered; regression: trial-readiness-card + overall-benchmark-banner + banner methodology link (/methodology) + PDF download button all render; /methodology page methodology-pillars/tiers/ages all visible. 17/18 frontend checks pass — single fail was a test-selector miss (skill-card-* testid doesn't exist in code; actual is 'benchmark-bar'), not a real regression. Zero pageerrors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_archetype_age_profile.py",
+    "/app/test_reports/pytest/iteration_7_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Deterministic enrichment is clean: match_archetype() averages player scores across archetype anchor attrs and picks the highest — modric_type wins on Lukas (scan=9, ball_control implied high, passing=9, decision_making=9 → ~8.75) which is exactly the expected behaviour. developing=false correctly triggered by match_strength >= 6.0 threshold per archetypes.json _meta.",
+    "compute_age_profile_reference() correctly resolves 'attacking midfielder' for Lukas (NOT central — alias-order safe just like trial_readiness), pulls the 7 priority attributes for U13-U14, and tags each item with at_or_above/below/no_data — clean separation of catalog data and per-player overlay.",
+    "PDF table layout uses a vertical-wrapped header ('PRO' on one line, 'RANGE' on the next). raw PyMuPDF text extraction returns 'PRO\\nRANGE' — fine for human reading, but exact-string assertions need whitespace normalisation. Test was updated to handle this; consider keeping header tokens on one line to avoid future agent confusion.",
+    "Defensible language verified end-to-end: archetype card disclaimer explicitly says 'not the named professional's youth data', methodology page repeats 'not certified or endorsed by UEFA', archetypes.json _meta states catalog is built from public stylistic comparisons only. Good legal hygiene maintained.",
+    "server.py continues to grow (now ~2400+ lines after _archetype_card_pdf + _age_profile_page). Carry-over recommendation from iter-5/6: time to split into routers/ (reports, payments, admin, pdf).",
+    "(low) ReportPage.jsx uses 'data-testid=benchmark-bar' for per-skill rows, not 'skill-card-*' — naming is fine but could be consistent ('skill-card-{key}') to be more semantic for future test agents."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_archetype_age_profile.py (NEW — 8 tests, all green)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 pytest pass)",
+    "frontend": "100% on all 17 review-requested checks (archetype card + 3 traits + disclaimer + placement after banner + age profile card + position/age/summary + 7 rows + trial-readiness regression + benchmark-banner regression + banner methodology link + PDF button + /methodology pillars/tiers/ages). The 18th check ('skill-card-*' selector) was a test-side selector mistake — actual testid is 'benchmark-bar'; section grids render correctly (visually verified, iter-6 also confirmed)."
+  },
+  "test_credentials": "premium@elitescout.com / Premium@2026 — login works, report id 64f59196-a520-4ba4-a0f9-de96df8802ef is Lukas A.",
+  "seed_data_creation": "No new seed data. Lukas A. premium report still has correct scores (scan=9, passing=9, decision_making=9, first_touch=8, off_ball_movement=8, dribbling=7, shooting=7) which produces deterministic modric_type 8.75 archetype + 7/7 above-Pro-Academy age profile.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Session-2 credibility upgrade ships clean. archetype + age_profile_reference are now permanent top-level fields on premium reports and PDFs include both the Stylistic Archetype card AND the European Academy Reference table. archetypes.json and age_profiles.json position-key insertion order is safe and matches trial_readiness.json convention (attacking/defensive midfielder BEFORE central midfielder so generic 'midfielder' alias doesn't swallow specific positions). Frontend route is /report/:id (SINGULAR, not /reports/) — important for next playwright runs. PDF column-header 'PRO RANGE' is rendered as 'PRO' \\n 'RANGE' due to narrow table column; assertions should normalise whitespace.",
+  "rca of the issue": "No new bugs. One test-side hiccup: initial PDF assertion failed because PyMuPDF extracted vertical-wrapped column header 'PRO\\nRANGE' instead of 'PRO RANGE'. Fixed in test by collapsing whitespace before substring search. One frontend test-selector miss (skill-card-* doesn't exist; actual is benchmark-bar) — does NOT indicate a real regression."
+}

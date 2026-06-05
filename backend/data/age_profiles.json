@@ -1,0 +1,100 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "Position-specific priority attributes — what scouts at a Pro Academy level look for at each age bracket. Each priority_attribute carries a weight (1-5, used to order the reference card by importance) and a 'why_matters' line explaining the scout's lens. The reference range ('pro_academy_range') is the typical score band a player needs to show in the AI's existing benchmarks to sit at Pro Academy level. We don't claim UEFA endorsement; this is a curated framework aligned with the same youth-development pillars used across European Category-1 academies.",
+    "age_brackets": ["U11-U12", "U13-U14", "U15-U16", "U17-U18", "U19-U21"],
+    "tier_ranges": {
+      "elite_academy": "8.5-10",
+      "pro_academy":   "7-8.5",
+      "strong_club":   "5.5-7",
+      "standard_club": "4-5.5"
+    }
+  },
+  "centre back": {
+    "priority_attributes": [
+      {"key": "positioning",       "weight": 5, "why_matters": "Top CBs win 80% of their work through position before duels happen."},
+      {"key": "decision_making",   "weight": 5, "why_matters": "When to step, when to drop, when to pass — separates pro from amateur CBs."},
+      {"key": "courage_in_duels",  "weight": 4, "why_matters": "Aggressive 1v1 defending in big moments defines the role."},
+      {"key": "scanning",          "weight": 4, "why_matters": "Reading runners off the ball and adjusting position early."},
+      {"key": "passing",           "weight": 4, "why_matters": "Modern CBs build out from the back — both feet under pressure."},
+      {"key": "body_control",      "weight": 3, "why_matters": "Aerial duels and shielding the ball through contact."},
+      {"key": "confidence",        "weight": 3, "why_matters": "Voice and presence to organise the back line."}
+    ]
+  },
+  "full back": {
+    "priority_attributes": [
+      {"key": "acceleration",      "weight": 5, "why_matters": "Modern FBs need explosive 5m starts to attack and recover."},
+      {"key": "one_v_one",         "weight": 5, "why_matters": "1v1 defending against wingers is the position's signature test."},
+      {"key": "intensity",         "weight": 4, "why_matters": "Up and down the flank for 90 minutes — endurance is non-negotiable."},
+      {"key": "passing",           "weight": 4, "why_matters": "Final-third delivery quality (cross, cut-back, switch) creates chances."},
+      {"key": "positioning",       "weight": 4, "why_matters": "Defensive shape — when to tuck in vs stay wide."},
+      {"key": "timing_of_runs",    "weight": 3, "why_matters": "Overlapping/underlapping at the right moment without leaving the line exposed."},
+      {"key": "work_rate",         "weight": 3, "why_matters": "Tireless tracking back after attacking — the role demands it."}
+    ]
+  },
+  "defensive midfielder": {
+    "priority_attributes": [
+      {"key": "positioning",         "weight": 5, "why_matters": "Screening the back four is positional first, athletic second."},
+      {"key": "scanning",            "weight": 5, "why_matters": "Reads the danger before it materialises — head on a swivel."},
+      {"key": "passing",             "weight": 4, "why_matters": "Controls tempo with accurate simple passes under pressure."},
+      {"key": "decision_making",     "weight": 4, "why_matters": "When to step into a duel vs hold position — pure game IQ."},
+      {"key": "courage_in_duels",    "weight": 4, "why_matters": "Wins midfield battles — sets the tone for the team."},
+      {"key": "intensity",           "weight": 3, "why_matters": "90-minute engine to cover the middle channel."}
+    ]
+  },
+  "central midfielder": {
+    "priority_attributes": [
+      {"key": "scanning",          "weight": 5, "why_matters": "Top CMs scan 2-3 times per possession — this is the #1 separator at academy level."},
+      {"key": "decision_making",   "weight": 5, "why_matters": "Risk vs security with the ball — the pro-level CM judges this perfectly."},
+      {"key": "passing",           "weight": 5, "why_matters": "Range and line-breaking quality is the heartbeat of the role."},
+      {"key": "first_touch",       "weight": 4, "why_matters": "Receiving in tight central spaces requires elite touch."},
+      {"key": "intensity",         "weight": 4, "why_matters": "Pro academy CMs sustain press-intensity across 90 minutes."},
+      {"key": "weak_foot",         "weight": 3, "why_matters": "Both-footed CMs can receive on either side — pros expect at least 5/10."},
+      {"key": "courage_in_duels",  "weight": 3, "why_matters": "Brave in central duels even against bigger physical opponents."}
+    ]
+  },
+  "attacking midfielder": {
+    "priority_attributes": [
+      {"key": "decision_making",   "weight": 5, "why_matters": "AMs make 50+ decisions per match in the most congested area of the pitch."},
+      {"key": "scanning",          "weight": 5, "why_matters": "Top AMs see the picture before receiving — pockets between lines are the key habit."},
+      {"key": "passing",           "weight": 5, "why_matters": "Final pass quality (weight, disguise, timing) separates AMs at every level."},
+      {"key": "first_touch",       "weight": 4, "why_matters": "Receiving in tight spaces under pressure — non-negotiable for the role."},
+      {"key": "off_ball_movement", "weight": 4, "why_matters": "Finding pockets and timing arrivals is half the AM's job."},
+      {"key": "dribbling",         "weight": 4, "why_matters": "Beating one defender unlocks the next phase of attack."},
+      {"key": "shooting",          "weight": 3, "why_matters": "End product from the edge of the box — quality strike is expected at Pro Academy level."}
+    ]
+  },
+  "winger": {
+    "priority_attributes": [
+      {"key": "acceleration",      "weight": 5, "why_matters": "Wingers win primarily through first-step explosiveness."},
+      {"key": "dribbling",         "weight": 5, "why_matters": "1v1 beats unlock the cross/shot — the defining skill of the role."},
+      {"key": "one_v_one",         "weight": 5, "why_matters": "Isolating and beating the full-back is the winger's central test."},
+      {"key": "speed",             "weight": 4, "why_matters": "Top-end speed to threaten in behind on diagonal balls."},
+      {"key": "passing",           "weight": 4, "why_matters": "Final ball quality (cross / cut-back / cutback) defines chance creation."},
+      {"key": "shooting",          "weight": 3, "why_matters": "Inverted wingers especially need to finish from the half-space."},
+      {"key": "weak_foot",         "weight": 3, "why_matters": "Switchable wingers (play either flank) need both feet."}
+    ]
+  },
+  "striker": {
+    "priority_attributes": [
+      {"key": "shooting",          "weight": 5, "why_matters": "Pro academy strikers finish chances — the most prized attribute at every level."},
+      {"key": "off_ball_movement", "weight": 5, "why_matters": "Creating separation in the box is half the goal-scoring battle."},
+      {"key": "timing_of_runs",    "weight": 5, "why_matters": "Late, perfectly-timed runs beat the offside line and find space."},
+      {"key": "first_touch",       "weight": 4, "why_matters": "Receiving under pressure with one touch to set up the shot."},
+      {"key": "body_control",      "weight": 4, "why_matters": "Holding the ball up with back to goal — every #9 needs this."},
+      {"key": "acceleration",      "weight": 3, "why_matters": "Beating the last line and creating goal-side separation."},
+      {"key": "courage_in_duels",  "weight": 3, "why_matters": "Brave in the box — strikers get fouled and have to play through it."}
+    ]
+  },
+  "goalkeeper": {
+    "priority_attributes": [
+      {"key": "one_v_one",         "weight": 5, "why_matters": "Saving 1v1s is the GK's signature high-leverage moment."},
+      {"key": "positioning",       "weight": 5, "why_matters": "Starting position determines half of all save outcomes."},
+      {"key": "agility",           "weight": 4, "why_matters": "Reactive saves require explosive change of direction."},
+      {"key": "decision_making",   "weight": 4, "why_matters": "When to claim, when to stay, when to come for the cross."},
+      {"key": "passing",           "weight": 4, "why_matters": "Modern GKs build attacks — short and long distribution accuracy."},
+      {"key": "confidence",        "weight": 3, "why_matters": "Voice and presence — the back four reads the keeper's energy."},
+      {"key": "scanning",          "weight": 3, "why_matters": "Reading the play to start position correctly before the ball arrives."}
+    ]
+  }
+}

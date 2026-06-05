@@ -209,6 +209,178 @@ def compute_trial_readiness(full_report: dict, player_details: dict) -> Optional
     }
 
 
+# ---- Archetype catalog + age-profile reference (server-side enrichment) ----
+
+try:
+    with open(DATA_DIR / "archetypes.json", "r", encoding="utf-8") as _f:
+        ARCHETYPES_CATALOG = json.load(_f)
+except Exception as _e:  # pragma: no cover
+    logging.warning("Could not load archetypes.json: %s", _e)
+    ARCHETYPES_CATALOG = {}
+
+try:
+    with open(DATA_DIR / "age_profiles.json", "r", encoding="utf-8") as _f:
+        AGE_PROFILES_CATALOG = json.load(_f)
+except Exception as _e:  # pragma: no cover
+    logging.warning("Could not load age_profiles.json: %s", _e)
+    AGE_PROFILES_CATALOG = {}
+
+
+def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
+    """Pick the closest stylistic archetype for this player. Pure
+    deterministic: averages player scores across each archetype's
+    `anchor` attributes, returns the highest-scoring match. We never
+    publish childhood data for the named professionals — these are
+    style references only.
+
+    Returns None if we cannot resolve the position or no match >= 6.0.
+    """
+    if not isinstance(full_report, dict):
+        return None
+    position = _normalise_position((player_details or {}).get("position"))
+    if not position:
+        return None
+    candidates = ARCHETYPES_CATALOG.get(position) or []
+    if not candidates:
+        return None
+    scores = _flatten_scores(full_report)
+    if not scores:
+        return None
+
+    best = None
+    for arch in candidates:
+        anchor_scores = [scores[k] for k in arch.get("anchor", []) if k in scores]
+        if not anchor_scores:
+            continue
+        match = sum(anchor_scores) / len(anchor_scores)
+        if (best is None) or match > best["match_strength"]:
+            best = {
+                "id": arch["id"],
+                "name": arch["name"],
+                "traits": arch.get("traits") or [],
+                "summary": arch.get("summary") or "",
+                "match_strength": round(match, 2),
+            }
+
+    if not best or best["match_strength"] < 6.0:
+        return {
+            "id": None,
+            "name": "Developing — no clear archetype yet",
+            "traits": [],
+            "summary": (
+                "Scores are still developing across this position's signature attributes. "
+                "A clearer stylistic identity will emerge as the player's strengths sharpen."
+            ),
+            "match_strength": best["match_strength"] if best else None,
+            "developing": True,
+        }
+    best["developing"] = False
+    return best
+
+
+def compute_age_profile_reference(full_report: dict, player_details: dict) -> Optional[dict]:
+    """Builds the 'European Academy reference profile' comparison block.
+
+    For the player's position we pull the position's priority attributes,
+    look up the player's actual score from the AI report, and compare
+    against the pro-academy benchmark range from the AI's own benchmarks
+    field. Returns deltas + a short summary so the user can SEE how the
+    player overlays on a top-academy reference profile.
+    """
+    if not isinstance(full_report, dict):
+        return None
+    position = _normalise_position((player_details or {}).get("position"))
+    if not position:
+        return None
+    profile = AGE_PROFILES_CATALOG.get(position)
+    if not profile or not isinstance(profile, dict):
+        return None
+    priority_attrs = profile.get("priority_attributes") or []
+    if not priority_attrs:
+        return None
+
+    scores = _flatten_scores(full_report)
+    # Pull each attribute's benchmark + tier from the AI's own per-skill block
+    skill_meta = _collect_skill_meta(full_report)
+
+    age_bracket = (full_report.get("overall_benchmark") or {}).get("age_bracket_used") or ""
+
+    items = []
+    above = 0
+    below = 0
+    on_par = 0
+    for spec in priority_attrs:
+        k = spec["key"]
+        score = scores.get(k)
+        meta = skill_meta.get(k) or {}
+        pro_range = ((meta.get("benchmarks") or {}).get("pro_academy")) or "7-8.5"
+        tier = meta.get("tier_for_age")
+        if score is None:
+            delta_label = "no_data"
+        elif tier in ("elite_academy", "pro_academy"):
+            delta_label = "at_or_above"
+            above += 1
+        elif tier in ("standard_club",) or (isinstance(score, (int, float)) and score < 5.5):
+            delta_label = "below"
+            below += 1
+        else:
+            delta_label = "below"
+            below += 1 if tier == "strong_club" else 0
+            if tier == "strong_club":
+                pass
+            else:
+                on_par += 1
+        items.append({
+            "key": k,
+            "label": k.replace("_", " ").title(),
+            "weight": spec.get("weight", 3),
+            "why_matters": spec.get("why_matters", ""),
+            "pro_academy_range": pro_range,
+            "player_score": score,
+            "player_tier": tier,
+            "delta": delta_label,
+        })
+
+    summary_parts = []
+    if above:
+        summary_parts.append(f"<b>{above}</b> at or above Pro Academy level")
+    if below:
+        summary_parts.append(f"<b>{below}</b> still developing")
+    summary = " · ".join(summary_parts) if summary_parts else "Profile is forming."
+
+    return {
+        "position_key": position,
+        "age_bracket": age_bracket,
+        "items": items,
+        "summary": summary,
+        "above_count": above,
+        "below_count": below,
+        "total_priority_attrs": len(items),
+    }
+
+
+def _collect_skill_meta(full_report: dict) -> dict:
+    """Flat lookup: sub_attr_key -> {benchmarks, tier_for_age, why_this_score, verdict}."""
+    meta: dict = {}
+    if not isinstance(full_report, dict):
+        return meta
+    for section in ("technical", "tactical", "physical", "mentality"):
+        sec = full_report.get(section) or {}
+        if not isinstance(sec, dict):
+            continue
+        for key, value in sec.items():
+            if isinstance(value, dict):
+                meta[key] = {
+                    "benchmarks": value.get("benchmarks"),
+                    "tier_for_age": value.get("tier_for_age"),
+                    "why_this_score": value.get("why_this_score"),
+                    "verdict": value.get("verdict"),
+                }
+    return meta
+
+
+
+
 
 class UserSignup(BaseModel):
     email: EmailStr
@@ -1165,6 +1337,14 @@ def _serialize_report(doc: dict, include_full: bool) -> dict:
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
+        out["archetype"] = match_archetype(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        out["age_profile_reference"] = compute_age_profile_reference(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
     return out
 
 
@@ -2078,6 +2258,166 @@ def _trial_item_cell(item: dict, styles):
 
 
 
+
+def _archetype_card_pdf(archetype: dict, styles):
+    """Forest hero card — stylistic archetype block for the PDF cover area."""
+    if not isinstance(archetype, dict) or not archetype.get("name"):
+        return []
+
+    developing = bool(archetype.get("developing"))
+    bg = _PDF_CARD if developing else _PDF_FOREST
+    fg_hex = "#0A0F0D" if developing else "#FFFFFF"
+    eyebrow_hex = "#1F4F2F" if developing else "#FFFFFFAA"
+
+    traits = archetype.get("traits") or []
+    traits_html = ""
+    if traits:
+        traits_html = "<br/><br/>" + "&nbsp;&nbsp;".join(
+            f"<font color='{eyebrow_hex}' size='7'><b>· {t.upper()}</b></font>" for t in traits[:5]
+        )
+
+    match_html = ""
+    if not developing and isinstance(archetype.get("match_strength"), (int, float)):
+        match_html = (
+            f"<font color='{eyebrow_hex}' size='7'><b>MATCH STRENGTH</b></font><br/>"
+            f"<font color='{fg_hex}' size='24'><b>{archetype['match_strength']:.1f}</b></font>"
+            f"<font color='{eyebrow_hex}' size='10'> / 10</font>"
+        )
+
+    left = Paragraph(
+        f"<font color='{eyebrow_hex}' size='7'><b>STYLISTIC ARCHETYPE</b></font><br/>"
+        f"<font color='{fg_hex}' size='17'><b>{archetype['name']}</b></font><br/><br/>"
+        f"<font color='{fg_hex}' size='9.5'>{archetype.get('summary', '')}</font>"
+        f"{traits_html}",
+        styles["BodyW"],
+    )
+    right = Paragraph(match_html or "&nbsp;", styles["BodyW"])
+
+    card = Table([[left, right]], colWidths=[11.5 * cm, 4.0 * cm])
+    card.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), bg),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",         (1, 0), (1, 0),   "RIGHT"),
+    ]))
+    return [
+        card,
+        Spacer(1, 0.2 * cm),
+        Paragraph(
+            "<i><font color='#9CA3AF' size='7.5'>Stylistic comparisons describe how this player plays today — "
+            "not their ceiling, and not the named professional's youth data.</font></i>",
+            styles["BodyW"],
+        ),
+    ]
+
+
+def _age_profile_page(profile: dict, styles):
+    """European Academy reference profile — position priorities table."""
+    if not isinstance(profile, dict) or not profile.get("items"):
+        return []
+
+    flow = []
+    pos = (profile.get("position_key") or "").upper()
+    age = (profile.get("age_bracket") or "").upper()
+    summary = (profile.get("summary") or "").replace("<b>", "").replace("</b>", "")
+
+    eyebrow = Paragraph(
+        f"<font color='#1F4F2F' size='7'><b>EUROPEAN ACADEMY REFERENCE PROFILE</b></font><br/>"
+        f"<font color='#0A0F0D' size='9.5'>The attributes that matter most for a {profile.get('position_key', '')}"
+        f" — measured against the Pro Academy expectation for {profile.get('age_bracket', 'the age bracket')}.</font>",
+        styles["BodyW"],
+    )
+    chip = Paragraph(
+        f"<font color='#1F4F2F' size='6.5'><b>POSITION · AGE</b></font><br/>"
+        f"<font color='#0A0F0D' size='10'><b>{pos}{' · ' + age if age else ''}</b></font><br/>"
+        f"<font color='#4B5563' size='7.5'><b>{summary.upper()}</b></font>",
+        styles["BodyW"],
+    )
+    intro = Table([[eyebrow, chip]], colWidths=[11.0 * cm, 4.5 * cm])
+    intro.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("BACKGROUND",    (1, 0), (1, 0),   _PDF_CARD),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",   (1, 0), (1, 0),   12),
+        ("RIGHTPADDING",  (1, 0), (1, 0),   12),
+        ("LINEBEFORE",    (1, 0), (1, 0),   2.0, _PDF_FOREST),
+    ]))
+    flow.append(intro)
+    flow.append(Spacer(1, 0.35 * cm))
+
+    head = [
+        Paragraph("<font color='#9CA3AF' size='6.5'><b>ATTRIBUTE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='6.5'><b>IMPORTANCE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='6.5'><b>PRO RANGE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='6.5'><b>PLAYER</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='6.5'><b>STATE</b></font>", styles["BodyW"]),
+    ]
+    rows = [head]
+    for it in profile["items"]:
+        delta = it.get("delta")
+        if delta == "at_or_above":
+            state_html = "<font color='#1F4F2F' size='8'><b>▲ AT OR ABOVE</b></font>"
+        elif delta == "below":
+            state_html = "<font color='#D97706' size='8'><b>▼ BELOW</b></font>"
+        else:
+            state_html = "<font color='#9CA3AF' size='8'><b>—</b></font>"
+
+        weight = it.get("weight", 3)
+        dots = ""
+        for i in range(5):
+            color = "#1F4F2F" if i < weight else "#E5E7EB"
+            dots += f"<font color='{color}'>●</font> "
+
+        attr_p = Paragraph(
+            f"<font color='#0A0F0D' size='10'><b>{it.get('label', '')}</b></font><br/>"
+            f"<font color='#6B7280' size='7.5'>{it.get('why_matters', '')}</font>",
+            styles["BodyW"],
+        )
+        rows.append([
+            attr_p,
+            Paragraph(f"<font size='9'>{dots}</font>", styles["BodyW"]),
+            Paragraph(f"<font color='#0A0F0D' size='10'><b>{it.get('pro_academy_range', '—')}</b></font>", styles["BodyW"]),
+            Paragraph(
+                f"<font color='#1F4F2F' size='18'><b>{it.get('player_score') if it.get('player_score') is not None else '—'}</b></font>",
+                styles["BodyW"],
+            ),
+            Paragraph(state_html, styles["BodyW"]),
+        ])
+
+    table = Table(rows, colWidths=[6.5 * cm, 2.4 * cm, 2.0 * cm, 1.6 * cm, 3.0 * cm])
+    style = [
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("ALIGN",         (3, 1), (3, -1),  "CENTER"),
+        ("ALIGN",         (2, 1), (2, -1),  "CENTER"),
+        ("ALIGN",         (4, 1), (4, -1),  "RIGHT"),
+        ("BACKGROUND",    (0, 0), (-1, 0),  HexColor("#F0EAE0")),
+        ("LINEBELOW",     (0, 0), (-1, 0),  0.4, _PDF_FOREST),
+    ]
+    for i in range(1, len(rows)):
+        style.append(("BACKGROUND", (0, i), (-1, i), _PDF_CARD))
+        style.append(("LINEBELOW",  (0, i), (-1, i), 0.3, _PDF_BORDER))
+        style.append(("LINEBEFORE", (0, i), (0, i),  2.0, _PDF_FOREST))
+    table.setStyle(TableStyle(style))
+    flow.append(table)
+    flow.append(Spacer(1, 0.3 * cm))
+    flow.append(Paragraph(
+        "<i><font color='#9CA3AF' size='8'>Reference profile is curated from European youth-academy development "
+        "frameworks. It compares the player's actual scores against what scouts at Pro Academy level typically "
+        "look for.</font></i>",
+        styles["BodyW"],
+    ))
+    return flow
+
+
+
 def build_pdf(report_doc: dict, output_path: str):
     """Builds a premium cream/forest PDF. Document is organised as:
         Page 1  — Cover (forest panel + player name + score box)
@@ -2209,6 +2549,12 @@ def build_pdf(report_doc: dict, output_path: str):
         story += _section_header("How you compare", styles, idx=3)
         story += _overall_benchmark_page(ob, sc.get("overall_development"), styles)
 
+    # ===== STYLISTIC ARCHETYPE — placed right after the overall benchmark =====
+    archetype = report_doc.get("archetype")
+    if archetype and archetype.get("name"):
+        story.append(Spacer(1, 0.5 * cm))
+        story += _archetype_card_pdf(archetype, styles)
+
     story.append(PageBreak())
 
     # ===== TECHNICAL & TACTICAL — premium per-skill cards with benchmarks =====
@@ -2241,6 +2587,14 @@ def build_pdf(report_doc: dict, output_path: str):
         section_idx += 1
 
     story.append(PageBreak())
+
+    # ===== EUROPEAN ACADEMY REFERENCE PROFILE — position priorities vs Pro Academy expectations =====
+    ap = report_doc.get("age_profile_reference") or {}
+    if ap and ap.get("items"):
+        story += _section_header("European Academy reference profile", styles, idx=section_idx)
+        section_idx += 1
+        story += _age_profile_page(ap, styles)
+        story.append(PageBreak())
 
     # ===== TRIAL READINESS — position-specific scout-style checklist =====
     tr = report_doc.get("trial_readiness") or {}
@@ -2530,8 +2884,16 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
 
     pdf_path = PDF_DIR / f"{report_id}.pdf"
     if not pdf_path.exists():
-        # Compute trial readiness deterministically so the PDF matches the web report.
+        # Compute deterministic enrichment so PDF == web report.
         doc["trial_readiness"] = compute_trial_readiness(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        doc["archetype"] = match_archetype(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        doc["age_profile_reference"] = compute_age_profile_reference(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
         )
