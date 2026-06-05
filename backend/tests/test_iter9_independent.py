@@ -117,11 +117,14 @@ def test_pdf_regenerates_with_new_sections(lukas, headers):
         f.write(r.content)
     assert len(r.content) > 5000, f"pdf too small: {len(r.content)} bytes"
 
-    # Extract text and look for the new sections
-    out = subprocess.run(
-        ["pdftotext", "-layout", pdf_path, "-"], capture_output=True, text=True
-    )
-    text = (out.stdout or "").upper()
+    # Extract text using pypdf (portable, no system dependency on `pdftotext`)
+    try:
+        import pypdf
+        pdf = pypdf.PdfReader(pdf_path)
+        text = "".join((p.extract_text() or "") for p in pdf.pages).upper()
+    except ImportError:
+        from pdfminer.high_level import extract_text
+        text = (extract_text(pdf_path) or "").upper()
     print(f"PDF text length: {len(text)}")
     # Must contain hallmark phrases from new template
     found = {

@@ -55,7 +55,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 6  # v6 = adds StatsBomb Pro Calibration section
+PDF_RENDER_VERSION = 7  # v7 = differentiated StatsBomb metrics (no duplicate rows)
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -572,20 +572,20 @@ def find_fifa_neighbors(
 # passing matches the top 25% of Euro 2024 starters at this position").
 
 _SCORE_TO_STATSBOMB = {
-    "passing":              "pass_completion_pct",      # also "passes_per_90"
+    "passing":              "pass_completion_pct",
     "long_passing":         "progressive_passes_per_90",
-    "scanning":             "key_passes_per_90",
+    "scanning":             "passes_into_final_third_per_90",
     "decision_making":      "progressive_passes_per_90",
     "vision":               "key_passes_per_90",
     "positioning":          "interceptions_per_90",
     "off_ball_movement":    "shots_per_90",
-    "timing_of_runs":       "shots_per_90",
+    "timing_of_runs":       "goals_per_90",
     "shooting":             "xg_per_90",
     "finishing":            "goals_per_90",
     "dribbling":            "dribbles_completed_per_90",
-    "one_v_one":            "dribbles_completed_per_90",
+    "one_v_one":            "dribble_completion_pct",
     "intensity":            "pressures_per_90",
-    "work_rate":            "pressures_per_90",
+    "work_rate":            "ball_recoveries_per_90",
     "courage_in_duels":     "duels_won_per_90",
     "ball_recoveries":      "ball_recoveries_per_90",
 }
