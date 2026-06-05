@@ -29,6 +29,7 @@ EIGHT_POSITIONS = [
     "central midfielder", "attacking midfielder", "winger", "striker",
 ]
 LENS_KEYS = ["style", "build", "role", "path"]
+FIFA_LENS_KEYS = ["style", "build", "role", "path", "fifa"]
 
 
 @pytest.fixture(scope="session")
@@ -190,3 +191,84 @@ def test_layer4_age_bracket_and_bio_chunk(lukas_report):
     assert catalog_entry, f"archetype {arch['id']} not found in catalog for position '{position}'"
     expected_bio = (catalog_entry.get("academy_bio") or {}).get(bracket)
     assert arch["academy_bio_chunk"] == expected_bio, "bio chunk does not match catalog"
+
+
+# ---------- Layer 5: FIFA Data Twin (k-NN) ----------
+
+def test_layer5_fifa_lens_returned_with_real_data(lukas_report):
+    """The 5th lens (FIFA Data Twin) MUST be attached to a real archetype."""
+    arch = lukas_report.get("archetype") or {}
+    if arch.get("developing"):
+        pytest.skip("developing archetype — FIFA lens not applicable")
+    lenses = arch.get("lenses") or {}
+    assert "fifa" in lenses, "FIFA k-NN lens missing from lenses block"
+    fifa = lenses["fifa"]
+    assert fifa.get("lens_label") == "FIFA data twin"
+    assert fifa.get("name"), "FIFA lens has no pro name"
+    assert fifa.get("club"), "FIFA lens has no club"
+    assert isinstance(fifa.get("similarity_pct"), (int, float))
+    # Hard cap test — similarity must NEVER exceed 92%
+    assert 0.0 <= fifa["similarity_pct"] <= 92.0, (
+        f"FIFA similarity {fifa['similarity_pct']} exceeds 92% credibility cap"
+    )
+    # Score is the 0-10 mirror, must be ≤ 9.2 (cap mirror)
+    assert 0.0 <= fifa.get("score", 0) <= 9.2
+    # nearest_attrs must be a list of 3 attribute names
+    assert isinstance(fifa.get("nearest_attrs"), list)
+    assert len(fifa["nearest_attrs"]) >= 1
+
+
+def test_layer5_fifa_top5_neighbors_shipped(lukas_report):
+    """The full top-5 neighbours block must be present for UI consumption."""
+    arch = lukas_report.get("archetype") or {}
+    if arch.get("developing"):
+        pytest.skip("developing — FIFA panel not applicable")
+    neighbors = arch.get("fifa_neighbors")
+    assert isinstance(neighbors, list)
+    assert 1 <= len(neighbors) <= 5
+    for n in neighbors:
+        assert n.get("name") and n.get("club"), f"incomplete neighbour: {n}"
+        assert 0.0 <= n.get("similarity_pct", -1) <= 92.0
+        assert isinstance(n.get("nearest_attrs"), list)
+    # neighbors must be sorted by similarity desc
+    sims = [n["similarity_pct"] for n in neighbors]
+    assert sims == sorted(sims, reverse=True), "neighbors not sorted by similarity"
+
+
+def test_layer5_fifa_meta_shipped(lukas_report):
+    """The FIFA DB meta block must include source + size for the UI footnote."""
+    arch = lukas_report.get("archetype") or {}
+    if arch.get("developing"):
+        pytest.skip("developing")
+    meta = arch.get("fifa_db_meta") or {}
+    assert meta.get("source"), "FIFA meta has no source"
+    assert isinstance(meta.get("size"), int) and meta["size"] >= 1000
+
+
+# ---------- Step 3: FBref-grade career_brief ----------
+
+def test_step3_career_brief_on_modric_archetype(lukas_report):
+    """Lukas's primary (Modric-type) must surface a career_brief string."""
+    arch = lukas_report.get("archetype") or {}
+    if arch.get("developing"):
+        pytest.skip("developing")
+    cb = arch.get("career_brief") or ""
+    assert isinstance(cb, str) and len(cb) > 30, (
+        f"career_brief missing or too short for primary archetype: {cb!r}"
+    )
+    # Spot-check: Modric brief should mention Croatia / Ballon d'Or
+    assert "Croatia" in cb or "Modric" in cb or "Ballon" in cb
+
+
+def test_step3_top_archetypes_have_career_brief():
+    """At least 20 archetypes across the catalog should now have a career_brief."""
+    with open(ARCHETYPES_PATH, "r") as f:
+        catalog = json.load(f)
+    enriched = 0
+    for pos, archs in catalog.items():
+        if pos.startswith("_") or not isinstance(archs, list):
+            continue
+        for a in archs:
+            if isinstance(a.get("career_brief"), str) and len(a["career_brief"]) > 30:
+                enriched += 1
+    assert enriched >= 20, f"only {enriched} archetypes have career_brief — expected ≥20"

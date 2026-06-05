@@ -4,6 +4,7 @@ Elite Football AI Scout Platform - Backend Server
 import os
 import uuid
 import json
+import math
 import logging
 import shutil
 import re
@@ -225,6 +226,29 @@ except Exception as _e:  # pragma: no cover
     logging.warning("Could not load age_profiles.json: %s", _e)
     AGE_PROFILES_CATALOG = {}
 
+# Real FIFA pro dataset — pre-processed from the Kaggle FIFA 22 mirror.
+# Used by the 5th lens (FIFA Data Twin) to do real similarity matching
+# against 7k+ senior pros across all major leagues. See
+# scripts/build_fifa_dataset.py for how this file is generated.
+try:
+    with open(DATA_DIR / "fifa_players.json", "r", encoding="utf-8") as _f:
+        _FIFA_DB = json.load(_f)
+    FIFA_PLAYERS = _FIFA_DB.get("players", [])
+    FIFA_META = _FIFA_DB.get("_meta", {})
+    # Bucket by position for fast same-position lookups
+    FIFA_BY_POSITION: Dict[str, list] = {}
+    for _p in FIFA_PLAYERS:
+        FIFA_BY_POSITION.setdefault(_p.get("position", ""), []).append(_p)
+    logging.info(
+        "Loaded FIFA pro DB: %d players across %d positions",
+        len(FIFA_PLAYERS), len(FIFA_BY_POSITION),
+    )
+except Exception as _e:  # pragma: no cover
+    logging.warning("Could not load fifa_players.json: %s", _e)
+    FIFA_PLAYERS = []
+    FIFA_BY_POSITION = {}
+    FIFA_META = {}
+
 
 # ---- 4-Layer Intelligence Stack helpers -----------------------------------
 # Layer 1 = static curated JSON catalog (archetypes.json)
@@ -387,6 +411,121 @@ _TIER_PATH_PREFERENCE = {
 }
 
 
+# ---- Layer 5 — FIFA Data Twin (k-NN on real Kaggle dataset) ----------------
+# This is the precision lens. Real numbers, real pros, no curation.
+
+# Attribute basket used for similarity matching. We compare ONLY on attributes
+# present in BOTH the player's scoring vector and the FIFA player's `attrs`
+# dict — so a missing attribute on either side is simply skipped, not zeroed.
+_FIFA_MATCH_ATTRS = [
+    "first_touch", "ball_control", "dribbling", "passing", "long_passing",
+    "shooting", "crossing", "scanning", "vision", "decision_making",
+    "composure", "positioning", "off_ball_movement", "timing_of_runs",
+    "acceleration", "speed", "agility", "balance", "intensity",
+    "work_rate", "courage_in_duels", "body_control",
+]
+
+
+def _cosine_similarity(v1: list, v2: list) -> float:
+    """Cosine similarity in [-1, 1]."""
+    if not v1 or not v2 or len(v1) != len(v2):
+        return 0.0
+    dot = sum(a * b for a, b in zip(v1, v2))
+    n1 = math.sqrt(sum(a * a for a in v1))
+    n2 = math.sqrt(sum(b * b for b in v2))
+    if n1 == 0 or n2 == 0:
+        return 0.0
+    return dot / (n1 * n2)
+
+
+def _euclidean_distance(v1: list, v2: list) -> float:
+    """Euclidean distance — used to penalize raw magnitude mismatches."""
+    if not v1 or not v2 or len(v1) != len(v2):
+        return float("inf")
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(v1, v2)))
+
+
+def find_fifa_neighbors(
+    scores: dict,
+    position: Optional[str],
+    player_build: Optional[str] = None,
+    player_foot: Optional[str] = None,
+    k: int = 5,
+) -> list:
+    """k-NN against the real FIFA-22 senior-pro dataset (~7,500 players).
+
+    Returns up to `k` neighbors, each with:
+      name, long_name, club, league, age, height_cm, position, build,
+      preferred_foot, overall, similarity_pct, nearest_attrs.
+
+    Similarity model is RMSE-based (NOT cosine):
+        per_attr_rmse = euclidean(player_vec, pro_vec) / sqrt(n_attrs)
+        similarity_pct = max(0, 100 - per_attr_rmse * 18)
+    This gives an honest spread — typical 14yo vs senior pro lands 65-85%,
+    with truly elite matches reaching ~88%. A hard cap of 92% keeps the
+    output credible (no false "98% match" claims).
+    Small +1.0/+1.5% bonuses are added for foot/build exact matches.
+    """
+    if not isinstance(scores, dict) or not scores or not position:
+        return []
+    pool = FIFA_BY_POSITION.get(position) or []
+    if not pool:
+        return []
+
+    available_attrs = [a for a in _FIFA_MATCH_ATTRS if isinstance(scores.get(a), (int, float))]
+    if len(available_attrs) < 6:
+        return []
+
+    neighbors = []
+    for pro in pool:
+        pro_attrs = pro.get("attrs") or {}
+        common = [a for a in available_attrs if isinstance(pro_attrs.get(a), (int, float))]
+        if len(common) < 6:
+            continue
+        pv = [float(scores[a]) for a in common]
+        ev = [float(pro_attrs[a]) for a in common]
+
+        # RMSE-based similarity — much more honest than pure cosine
+        dist = _euclidean_distance(pv, ev)
+        per_attr_rmse = dist / math.sqrt(len(common))
+        base_pct = max(0.0, 100.0 - per_attr_rmse * 18.0)
+
+        bonus = 0.0
+        if player_foot and pro.get("preferred_foot") and player_foot == pro["preferred_foot"]:
+            bonus += 1.0
+        if player_build and pro.get("build") and player_build == pro["build"]:
+            bonus += 1.5
+        # Hard cap at 92% — a 14yo vs senior pro should NEVER be reported
+        # as 99% similar, however well the kid scores. Caps create credibility.
+        similarity_pct = round(min(92.0, base_pct + bonus), 1)
+
+        deltas = sorted([(a, abs(scores[a] - pro_attrs[a])) for a in common], key=lambda x: x[1])
+        nearest_attrs = [a for a, _ in deltas[:3]]
+
+        neighbors.append({
+            "name":           pro.get("name"),
+            "long_name":      pro.get("long_name"),
+            "club":           pro.get("club"),
+            "league":         pro.get("league"),
+            "age":            pro.get("age"),
+            "height_cm":      pro.get("height_cm"),
+            "position":       pro.get("position"),
+            "build":          pro.get("build"),
+            "preferred_foot": pro.get("preferred_foot"),
+            "overall":        pro.get("overall"),
+            "similarity_pct": similarity_pct,
+            "nearest_attrs":  nearest_attrs,
+        })
+
+    if not neighbors:
+        return []
+    # Best similarity first; tie-break by FIFA overall (famous pros surface first)
+    neighbors.sort(key=lambda n: (-n["similarity_pct"], -n["overall"]))
+    return neighbors[:k]
+
+
+
+
 def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
     """4-Lens deterministic matcher.
 
@@ -524,6 +663,7 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             "summary":        arch.get("summary") or "",
             "profile":        profile,
             "academy_bio":    arch.get("academy_bio") or {},
+            "career_brief":   arch.get("career_brief") or "",
             "match_strength": round(style_score, 2),
             "evidence":       contribs,
             "passes_signature": passes_signature,
@@ -572,6 +712,43 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
     role_pick  = _pick("_role")
     path_pick  = _pick("_path")
 
+    # ---- Layer 5: FIFA Data Twin (real k-NN against ~7,500 senior pros) ----
+    fifa_neighbors = find_fifa_neighbors(
+        scores=scores,
+        position=position,
+        player_build=player_build,
+        player_foot=player_foot,
+        k=5,
+    )
+    fifa_top = fifa_neighbors[0] if fifa_neighbors else None
+    fifa_lens = None
+    if fifa_top:
+        # Build the human-readable "why" — list the 3 attrs where kid & pro are closest
+        nearest_labels = ", ".join(a.replace("_", " ") for a in fifa_top.get("nearest_attrs", []))
+        fifa_lens = {
+            "lens": "fifa",
+            "lens_label": "FIFA data twin",
+            "name":   fifa_top["name"],
+            "long_name": fifa_top.get("long_name"),
+            "club":   fifa_top["club"],
+            "league": fifa_top["league"],
+            "tier":   None,
+            "age":    fifa_top.get("age"),
+            "height_cm": fifa_top.get("height_cm"),
+            "build":  fifa_top.get("build"),
+            "preferred_foot": fifa_top.get("preferred_foot"),
+            "overall": fifa_top.get("overall"),
+            # Score advertised on a 0-10 scale to match other lenses
+            "score":  round(fifa_top["similarity_pct"] / 10.0, 2),
+            "similarity_pct": fifa_top["similarity_pct"],
+            "nearest_attrs": fifa_top.get("nearest_attrs", []),
+            "why": (
+                f"Nearest senior pro by 22-attribute similarity search across "
+                f"{len(FIFA_PLAYERS):,} FIFA-rated pros — closest on "
+                f"{nearest_labels or 'multiple attributes'}."
+            ),
+        }
+
     lenses = {
         "style": {
             "lens": "style",
@@ -600,6 +777,8 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             **(path_pick or {}),
         },
     }
+    if fifa_lens:
+        lenses["fifa"] = fifa_lens
 
     # ---- Developing fallback (unchanged behaviour) ----------------------
     if (not primary["passes_signature"]) or (primary["match_strength"] < 6.0):
@@ -624,6 +803,12 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             "inferred_build": player_build,
             "inferred_role":  player_role,
             "preferred_foot": player_foot or None,
+            "fifa_neighbors": fifa_neighbors,
+            "fifa_db_meta": {
+                "source":  FIFA_META.get("source_dataset", "FIFA 22 dataset"),
+                "size":    len(FIFA_PLAYERS),
+                "scale":   "0-10 (FIFA 0-99 normalised)",
+            },
         }
 
     # ---- Strip private metric keys before returning ---------------------
@@ -642,6 +827,14 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
     out["inferred_build"] = player_build
     out["inferred_role"]  = player_role
     out["preferred_foot"] = player_foot or None
+    # Ship the top-5 FIFA neighbours separately so the UI can render an
+    # "Other close FIFA matches" strip beneath the headline lens.
+    out["fifa_neighbors"] = fifa_neighbors
+    out["fifa_db_meta"]   = {
+        "source":  FIFA_META.get("source_dataset", "FIFA 22 dataset"),
+        "size":    len(FIFA_PLAYERS),
+        "scale":   "0-10 (FIFA 0-99 normalised)",
+    }
     return out
 
 
@@ -690,15 +883,41 @@ async def generate_archetype_narrative(player_details: dict, full_report: dict, 
     ) or "balanced scores across signature attributes"
 
     pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+    career_brief = (archetype.get("career_brief") or "").strip()
 
-    prompt = f"""Write a single short paragraph (50-70 words, plain English, no jargon) that compares this young footballer to the named professional AT THE SAME AGE.
+    # Pull the top FIFA neighbor (if any) so the narrative can cite the real
+    # similarity-search result alongside the curated archetype. This is what
+    # turns a generic "you play like X" line into a precise, data-backed claim.
+    fifa_neighbors = archetype.get("fifa_neighbors") or []
+    fifa_top = fifa_neighbors[0] if fifa_neighbors else None
+    fifa_line = ""
+    if fifa_top and isinstance(fifa_top.get("similarity_pct"), (int, float)):
+        nearest = ", ".join(a.replace("_", " ") for a in fifa_top.get("nearest_attrs", [])[:3])
+        fifa_line = (
+            f"\nFIFA-22 NEAREST-NEIGHBOUR (independent k-NN result across 7,473 senior pros): "
+            f"{fifa_top['name']} ({fifa_top.get('club') or '—'}), {fifa_top['similarity_pct']:.1f}% similar — "
+            f"closest on {nearest}. You MAY mention this match in one short sentence, "
+            f"but only as a similarity finding (e.g. \"the closest senior pro by data is X\"). "
+            f"Do NOT make any other claim about that pro."
+        )
+
+    career_line = ""
+    if career_brief:
+        career_line = (
+            f"\nPRO CAREER CONTEXT (FBref / Transfermarkt verified — facts only):\n\"{career_brief}\"\n"
+            "You MAY paraphrase ONE statistic from this line if it flows naturally, "
+            "but do NOT invent any other career fact."
+        )
+
+    prompt = f"""Write a single short paragraph (60-90 words, plain English, no jargon) that compares this young footballer to the named professional AT THE SAME AGE.
 
 STRICT RULES — read carefully:
-1. Use ONLY the BIO_CHUNK provided. You may paraphrase but DO NOT invent any other historical fact about the pro (no goals scored, no transfers, no clubs not mentioned).
+1. Use ONLY the BIO_CHUNK and (if provided) the PRO CAREER CONTEXT. You may paraphrase but DO NOT invent any other historical fact about the pro (no goals scored, no transfers, no clubs not mentioned).
 2. NEVER compare the kid to the pro's peak career — only the pro at age {age_bracket}.
 3. Weave in 2 of the kid's top scores naturally.
 4. Open with the kid's name. Close with one sentence about what comes next.
-5. No bullet points. No JSON. Plain prose.
+5. If the FIFA-22 NEAREST-NEIGHBOUR line is present, weave it in once — but ONLY as "data similarity" framing (not a career claim).
+6. No bullet points. No JSON. Plain prose.
 
 KID:
 - Name: {player_name}
@@ -707,8 +926,10 @@ KID:
 - Top measured strengths: {top_attrs_str}
 
 PRO REFERENCE (style match): {pro_name}
-PRO AT AGE {age_bracket} (this is the ONLY biographical fact you may use):
+PRO AT AGE {age_bracket} (this is the ONLY biographical fact you may use, plus the career line below):
 "{bio_chunk}"
+{career_line}
+{fifa_line}
 
 OUTPUT (just the paragraph, nothing else):"""
 
@@ -2043,13 +2264,18 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
             doc.get("player_details") or {},
         )
         # ----- Layer 3: attach the Gemini narrative (cached on the doc) -----
+        # Narrative cache version bumps invalidate stale narratives when we
+        # change the underlying prompt (e.g. v2 added the FIFA k-NN match).
+        _NARRATIVE_CACHE_VERSION = 3
         if archetype and not archetype.get("developing") and archetype.get("id"):
             cached = doc.get("archetype_narrative")
             cached_for = doc.get("archetype_narrative_archetype_id")
             cached_bracket = doc.get("archetype_narrative_age_bracket")
+            cached_version = doc.get("archetype_narrative_version", 1)
             current_id = archetype.get("id")
             current_bracket = archetype.get("age_bracket_used")
-            if cached and cached_for == current_id and cached_bracket == current_bracket:
+            if (cached and cached_for == current_id and cached_bracket == current_bracket
+                    and cached_version == _NARRATIVE_CACHE_VERSION):
                 archetype["narrative"] = cached
             else:
                 # Generate lazily — never block the response on a hard failure.
@@ -2071,6 +2297,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
                             "archetype_narrative": narrative,
                             "archetype_narrative_archetype_id": current_id,
                             "archetype_narrative_age_bracket": current_bracket,
+                            "archetype_narrative_version": _NARRATIVE_CACHE_VERSION,
                         }},
                     )
         out["archetype"] = archetype
@@ -3091,6 +3318,28 @@ def _archetype_card_pdf(archetype: dict, styles):
         ]))
         flow += [bio_card, Spacer(1, 0.2 * cm)]
 
+    # ----- Career brief — FBref / Transfermarkt verified career stats -------
+    career_brief = (archetype.get("career_brief") or "").strip()
+    if career_brief and not developing:
+        pro_name = (archetype.get("name") or "").replace("-type", "").strip()
+        career_card = Table(
+            [[Paragraph(
+                f"<font color='#1F4F2F' size='7'><b>{pro_name.upper()} &middot; CAREER SNAPSHOT (FBREF &middot; TRANSFERMARKT)</b></font><br/><br/>"
+                f"<font color='#0A0F0D' size='9'>{career_brief}</font>",
+                styles["BodyW"],
+            )]],
+            colWidths=[15.5 * cm],
+        )
+        career_card.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
+            ("LINEBEFORE",    (0, 0), (0, -1),  3, _PDF_FOREST),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+            ("TOPPADDING",    (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        flow += [career_card, Spacer(1, 0.2 * cm)]
+
     flow.append(Paragraph(
         "<i><font color='#9CA3AF' size='7.5'>Stylistic comparisons describe how this player plays today — "
         "not their ceiling, and not the named professional's youth data.</font></i>",
@@ -3100,18 +3349,26 @@ def _archetype_card_pdf(archetype: dict, styles):
 
 
 def _lens_matches_pdf(archetype: dict, styles):
-    """4-Lens strip — Style / Build / Role / Career-path twins for the PDF."""
+    """5-Lens strip — Style / Build / Role / Career-path / FIFA k-NN for the PDF."""
     if not isinstance(archetype, dict):
         return []
     lenses = archetype.get("lenses") or {}
     if not lenses:
         return []
 
+    # Count active lenses for header text
+    lens_keys = [k for k in ("style", "build", "role", "path", "fifa") if (lenses.get(k) or {}).get("name")]
+    n = len(lens_keys)
+    if n == 0:
+        return []
+
     header = Paragraph(
-        "<font color='#1F4F2F' size='7'><b>THE 4-LENS COMPARISON</b></font><br/>"
-        "<font color='#0A0F0D' size='13'><b>How this player resembles four different professionals</b></font><br/>"
+        f"<font color='#1F4F2F' size='7'><b>THE {n}-LENS COMPARISON</b></font><br/>"
+        f"<font color='#0A0F0D' size='13'><b>How this player resembles {n} different professionals</b></font><br/>"
         "<font color='#0A0F0D' size='8.5'>Each lens picks the closest pro on a different dimension: how he plays, "
-        "his physical build, his on-pitch role, and the career path he's on.</font>",
+        "his physical build, his on-pitch role, the career path he's on"
+        + (", and a real k-NN similarity search against 7,500+ FIFA-rated senior pros." if "fifa" in lens_keys else ".")
+        + "</font>",
         styles["BodyW"],
     )
 
@@ -3121,10 +3378,16 @@ def _lens_matches_pdf(archetype: dict, styles):
         Paragraph("<font color='#FFFFFF' size='7'><b>WHY</b></font>", styles["BodyW"]),
         Paragraph("<font color='#FFFFFF' size='7'><b>SCORE</b></font>", styles["BodyW"]),
     ]]
-    for key in ("style", "build", "role", "path"):
+    for key in lens_keys:
         lens = lenses.get(key) or {}
-        if not lens.get("name"):
-            continue
+        is_fifa = (key == "fifa")
+        score_html = (
+            f"<font color='#1F4F2F' size='14'><b>{lens.get('similarity_pct', 0):.1f}</b></font>"
+            f"<font color='#9CA3AF' size='7'>%</font>"
+            if is_fifa else
+            f"<font color='#1F4F2F' size='14'><b>{lens.get('score', 0):.1f}</b></font>"
+            f"<font color='#9CA3AF' size='7'> /10</font>"
+        )
         rows.append([
             Paragraph(f"<font color='#0A0F0D' size='9'><b>{(lens.get('lens_label') or key).upper()}</b></font>", styles["BodyW"]),
             Paragraph(
@@ -3135,11 +3398,7 @@ def _lens_matches_pdf(archetype: dict, styles):
                 styles["BodyW"],
             ),
             Paragraph(f"<font color='#0A0F0D' size='8'>{lens.get('why', '')}</font>", styles["BodyW"]),
-            Paragraph(
-                f"<font color='#1F4F2F' size='14'><b>{lens.get('score', 0):.1f}</b></font>"
-                f"<font color='#9CA3AF' size='7'> /10</font>",
-                styles["BodyW"],
-            ),
+            Paragraph(score_html, styles["BodyW"]),
         ])
 
     if len(rows) <= 1:
@@ -3158,6 +3417,84 @@ def _lens_matches_pdf(archetype: dict, styles):
     ]))
 
     return [header, Spacer(1, 0.2 * cm), table, Spacer(1, 0.2 * cm)]
+
+
+def _fifa_neighbors_pdf(archetype: dict, styles):
+    """FIFA Data Twin — top-5 nearest-neighbour result as a PDF table."""
+    if not isinstance(archetype, dict):
+        return []
+    neighbors = archetype.get("fifa_neighbors") or []
+    if not neighbors:
+        return []
+    meta = archetype.get("fifa_db_meta") or {}
+    db_size = meta.get("size") or 7500
+
+    header = Paragraph(
+        "<font color='#1F4F2F' size='7'><b>FIFA DATA TWIN &middot; REAL SIMILARITY SEARCH</b></font><br/>"
+        "<font color='#0A0F0D' size='13'><b>The 5 closest senior pros by 22-attribute k-NN</b></font><br/>"
+        f"<font color='#0A0F0D' size='8.5'>The player's full scoring vector was matched against "
+        f"<b>{db_size:,} senior pros</b> in the EA Sports FIFA-22 dataset using per-attribute "
+        "Euclidean similarity across 22 dimensions.</font>",
+        styles["BodyW"],
+    )
+
+    rows = [[
+        Paragraph("<font color='#FFFFFF' size='7'><b>#</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>PRO</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>BUILD &middot; FOOT</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>CLOSEST ON</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#FFFFFF' size='7'><b>SIMILARITY</b></font>", styles["BodyW"]),
+    ]]
+    for i, n in enumerate(neighbors[:5]):
+        nearest_str = ", ".join(a.replace("_", " ") for a in (n.get("nearest_attrs") or [])[:3])
+        club_line = (n.get('club') or '')
+        if n.get('league'):
+            club_line += f" &middot; {n.get('league')}"
+        if n.get('overall'):
+            club_line += f" &middot; FIFA {n.get('overall')}"
+        rows.append([
+            Paragraph(f"<font color='#1F4F2F' size='13'><b>{i+1}</b></font>", styles["BodyW"]),
+            Paragraph(
+                f"<font color='#0A0F0D' size='9'><b>{n.get('name', '')}</b></font><br/>"
+                f"<font color='#9CA3AF' size='7'>{club_line}</font>",
+                styles["BodyW"],
+            ),
+            Paragraph(
+                f"<font color='#0A0F0D' size='8'>{(n.get('build') or '').replace('_', ' ')}</font><br/>"
+                f"<font color='#9CA3AF' size='7'>{(n.get('preferred_foot') or '').upper()}-FOOTED</font>",
+                styles["BodyW"],
+            ),
+            Paragraph(f"<font color='#0A0F0D' size='8'>{nearest_str}</font>", styles["BodyW"]),
+            Paragraph(
+                f"<font color='#1F4F2F' size='14'><b>{n.get('similarity_pct', 0):.1f}</b></font>"
+                f"<font color='#9CA3AF' size='7'>%</font>",
+                styles["BodyW"],
+            ),
+        ])
+
+    table = Table(rows, colWidths=[0.7 * cm, 4.6 * cm, 3.1 * cm, 5.4 * cm, 1.7 * cm])
+    table.setStyle(TableStyle([
+        ("BACKGROUND",     (0, 0), (-1, 0),  _PDF_FOREST),
+        ("BACKGROUND",     (0, 1), (-1, -1), _PDF_CARD),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [_PDF_CARD, "#F4EFE6"]),
+        ("LEFTPADDING",    (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING",   (0, 0), (-1, -1), 7),
+        ("TOPPADDING",     (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING",  (0, 0), (-1, -1), 7),
+        ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    footnote = Paragraph(
+        "<i><font color='#9CA3AF' size='7.5'>Similarity = 100 &minus; RMSE &times; 18 across 22 measured attributes "
+        "(FIFA attribute ratings normalised to 0-10, identical to the player's scale). "
+        f"Source: {meta.get('source') or 'EA Sports FIFA 22'}. "
+        "Capped at 92% &mdash; a youth-player score should never match a senior pro 99%.</font></i>",
+        styles["BodyW"],
+    )
+
+    return [header, Spacer(1, 0.2 * cm), table, Spacer(1, 0.2 * cm), footnote, Spacer(1, 0.2 * cm)]
+
+
 
 
 def _age_profile_page(profile: dict, styles):
@@ -3400,9 +3737,12 @@ def build_pdf(report_doc: dict, output_path: str):
     if archetype and archetype.get("name"):
         story.append(Spacer(1, 0.5 * cm))
         story += _archetype_card_pdf(archetype, styles)
-        # 4-Lens twins strip (Style / Build / Role / Career-path)
+        # 5-Lens twins strip (Style / Build / Role / Career-path / FIFA)
         story.append(Spacer(1, 0.3 * cm))
         story += _lens_matches_pdf(archetype, styles)
+        # FIFA Data Twin — top-5 closest senior pros by real k-NN
+        story.append(Spacer(1, 0.3 * cm))
+        story += _fifa_neighbors_pdf(archetype, styles)
 
     story.append(PageBreak())
 

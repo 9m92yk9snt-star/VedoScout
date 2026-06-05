@@ -3,19 +3,18 @@
     "version": 4,
     "description": "Stylistic archetypes per position with verified academy bios sourced from public biographical data (Wikipedia, Transfermarkt, FBref, club academy pages, long-form journalism). Each archetype includes signature_attrs (must-have score gates), anchor (weighted attrs for the style lens), profile (foot/build/role/path — used by the build, role and path lenses), and academy_bio (age-bracketed biographical facts used for age-aware comparisons). NEVER publishes numeric youth scores for any named professional — only sourced biographical facts.",
     "tier_labels": {
-      "elite":        "Generational",
-      "world_class":  "World-class",
-      "established":  "Established pro",
+      "elite": "Generational",
+      "world_class": "World-class",
+      "established": "Established pro",
       "breakthrough": "Late-blooming breakthrough"
     },
     "lens_labels": {
       "style": "Style match",
       "build": "Build twin",
-      "role":  "Role twin",
-      "path":  "Career-path twin"
+      "role": "Role twin",
+      "path": "Career-path twin"
     }
   },
-
   "attacking midfielder": [
     {
       "id": "modric_type",
@@ -23,18 +22,53 @@
       "club": "Real Madrid",
       "league": "La Liga",
       "tier": "elite",
-      "signature_attrs": ["scanning", "ball_control", "decision_making"],
-      "anchor": [{"key":"scanning","weight":5},{"key":"ball_control","weight":5},{"key":"passing","weight":4},{"key":"decision_making","weight":5},{"key":"game_understanding","weight":4}],
-      "traits": ["scans constantly", "press-resistant", "Croatian magic"],
+      "signature_attrs": [
+        "scanning",
+        "ball_control",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "game_understanding",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "scans constantly",
+        "press-resistant",
+        "Croatian magic"
+      ],
       "summary": "Composed playmaker who controls tempo with scanning and elite ball-handling.",
-      "profile": {"foot": "right", "build": "small_technical", "role": "deep_creator", "path": "elite_european_academy"},
+      "profile": {
+        "foot": "right",
+        "build": "small_technical",
+        "role": "deep_creator",
+        "path": "elite_european_academy"
+      },
       "academy_bio": {
-        "8-10":  "Started in NK Zadar's youth section around age 6, growing up in Croatia during the war. Always the smallest in his age group but already known locally for not losing the ball.",
+        "8-10": "Started in NK Zadar's youth section around age 6, growing up in Croatia during the war. Always the smallest in his age group but already known locally for not losing the ball.",
         "11-12": "Around U12 was tried at Hajduk Split (Croatia's biggest academy) — rejected for being 'too thin and small to make it'. Returned to NK Zadar and kept playing weekly.",
         "13-14": "U13-U14 at NK Zadar — small playmaker, dropped deep to receive because he wasn't tall enough to win duels higher up. Caught Dinamo Zagreb scouts' attention at youth tournaments.",
         "15-17": "Signed by Dinamo Zagreb academy at 16. Senior first-team debut at 17 — composure under pressure was already first-team quality before the legs caught up.",
         "18-21": "Loaned to Zrinjski Mostar (Bosnian league) at 18 to toughen up physically. Returned to Dinamo at 19 as a regular. Tottenham at 22, Real Madrid at 26."
-      }
+      },
+      "career_brief": "Career: 750+ club appearances · 180+ Croatia caps · 6× UEFA Champions League winner · Ballon d'Or 2018 · UEFA Player of the Year 2017-18 · 4 La Liga titles with Real Madrid · FBref career pass completion ~88% across 13 La Liga seasons."
     },
     {
       "id": "odegaard_composer",
@@ -42,18 +76,53 @@
       "club": "Arsenal",
       "league": "Premier League",
       "tier": "elite",
-      "signature_attrs": ["scanning", "passing", "decision_making"],
-      "anchor": [{"key":"scanning","weight":5},{"key":"passing","weight":5},{"key":"decision_making","weight":5},{"key":"first_touch","weight":4},{"key":"off_ball_movement","weight":3}],
-      "traits": ["composed playmaker", "captain energy", "elite weight"],
+      "signature_attrs": [
+        "scanning",
+        "passing",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "off_ball_movement",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "composed playmaker",
+        "captain energy",
+        "elite weight"
+      ],
       "summary": "Arsenal's brain — composes the side with elite scanning and weight.",
-      "profile": {"foot": "right", "build": "compact_balanced", "role": "deep_creator", "path": "scandinavian_academy"},
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "deep_creator",
+        "path": "scandinavian_academy"
+      },
       "academy_bio": {
-        "8-10":  "Joined Strømsgodset (Drammen, Norway) youth around age 7. Father Hans Erik was a Norwegian pro, so football was the family rhythm from very young.",
+        "8-10": "Joined Strømsgodset (Drammen, Norway) youth around age 7. Father Hans Erik was a Norwegian pro, so football was the family rhythm from very young.",
         "11-12": "U12 at Strømsgodset — already known in Norwegian junior football for picking out a pass other kids couldn't see. Skipped most U13 youth football to train with older boys.",
         "13-14": "U13-U14 at Strømsgodset — training regularly with U16 and U18 squads. Norwegian FA flagged him as the most talented academy product in a generation.",
         "15-17": "Senior Strømsgodset debut at 15 — became the youngest player in Tippeligaen history. Sold to Real Madrid at 16 for ~€3m. Spent 16-21 on loan tours (Heerenveen, Vitesse, Real Sociedad, Arsenal).",
         "18-21": "Loan years at Heerenveen, Vitesse and Real Sociedad shaped the modern Ödegaard — added composure under physical pressure. Permanent Arsenal move at 22, captain by 23."
-      }
+      },
+      "career_brief": "Career: Real Sociedad loan was the turning point — 7 goals & 9 assists in his breakthrough La Liga season. Arsenal captain at 23. Premier League most assists 2022-23 (10). Norway captain since age 20. Norwegian Player of the Year 5× consecutively (2019-23)."
     },
     {
       "id": "pedri_type",
@@ -61,18 +130,53 @@
       "club": "Barcelona",
       "league": "La Liga",
       "tier": "elite",
-      "signature_attrs": ["first_touch", "ball_control", "dribbling"],
-      "anchor": [{"key":"first_touch","weight":5},{"key":"ball_control","weight":5},{"key":"dribbling","weight":4},{"key":"decision_making","weight":4},{"key":"scanning","weight":3}],
-      "traits": ["receives in tight space", "wriggles out", "always plays forward"],
+      "signature_attrs": [
+        "first_touch",
+        "ball_control",
+        "dribbling"
+      ],
+      "anchor": [
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "scanning",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "receives in tight space",
+        "wriggles out",
+        "always plays forward"
+      ],
       "summary": "Press-resistant micro-genius — escapes pressure to find the next pass.",
-      "profile": {"foot": "right", "build": "small_technical", "role": "press_resistant_8", "path": "south_american_pipeline"},
+      "profile": {
+        "foot": "right",
+        "build": "small_technical",
+        "role": "press_resistant_8",
+        "path": "south_american_pipeline"
+      },
       "academy_bio": {
-        "8-10":  "Started in Tegueste (small village in Tenerife, Canary Islands) around age 6 at the local club Juventud Laguna — playing barefoot in family yards before that.",
+        "8-10": "Started in Tegueste (small village in Tenerife, Canary Islands) around age 6 at the local club Juventud Laguna — playing barefoot in family yards before that.",
         "11-12": "Joined CD Tegueste U12 — already a head shorter than his teammates but rarely lost the ball in tight space.",
         "13-14": "Joined UD Las Palmas (Canary Islands pro club) academy at 14. Coaches said he was the only kid who 'played with his head up since the day he arrived'.",
         "15-17": "Las Palmas first team at 16 (Segunda División). Sold to Barcelona at 17 for ~€5m. Many big clubs (including Real Madrid) had watched him at 14-15 but didn't sign him because of his frame.",
         "18-21": "Barcelona first-team debut at 17. Started for Spain at the Euros at 18. Euro 2020 Young Player of the Tournament. Has battled hamstring issues from playing too many minutes too young."
-      }
+      },
+      "career_brief": "Career: La Masia at 17. Barcelona first-team debut at 17. Euro 2020 Young Player of the Tournament. Kopa Trophy 2021 (best U21 player in the world). 180+ Barcelona appearances by 22. Euro 2024 winner with Spain. FBref career pass completion ~91%."
     },
     {
       "id": "kdb_creator_10",
@@ -80,18 +184,53 @@
       "club": "Manchester City",
       "league": "Premier League",
       "tier": "elite",
-      "signature_attrs": ["passing", "shooting", "decision_making"],
-      "anchor": [{"key":"passing","weight":5},{"key":"shooting","weight":5},{"key":"decision_making","weight":5},{"key":"first_touch","weight":3},{"key":"weak_foot","weight":3}],
-      "traits": ["elite assist machine", "shoots from anywhere", "vision"],
+      "signature_attrs": [
+        "passing",
+        "shooting",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 3
+        },
+        {
+          "key": "weak_foot",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "elite assist machine",
+        "shoots from anywhere",
+        "vision"
+      ],
       "summary": "Chance-creating machine — playing as a #10 his vision becomes lethal.",
-      "profile": {"foot": "right", "build": "athletic_runner", "role": "deep_creator", "path": "city_football_group"},
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "deep_creator",
+        "path": "city_football_group"
+      },
       "academy_bio": {
-        "8-10":  "Joined KVV Drongen youth (small Belgian club) at age 6. Moved to Gent at 9-10 — known locally for hitting passes other kids his age couldn't even attempt.",
+        "8-10": "Joined KVV Drongen youth (small Belgian club) at age 6. Moved to Gent at 9-10 — known locally for hitting passes other kids his age couldn't even attempt.",
         "11-12": "Joined Genk academy at 11 — Genk being the top Belgian academy at the time alongside Anderlecht.",
         "13-14": "U13-U14 at Genk — was already striking the ball with the technique of a senior. Lived in academy housing during the week.",
         "15-17": "Genk youth → first-team debut at 17 (Belgian Pro League). Sold to Chelsea at 21 — never broke through, sent on loan to Werder Bremen.",
         "18-21": "Werder Bremen loan transformed him. Sold to Wolfsburg at 22, Bundesliga player of the season at 23. Manchester City at 24."
-      }
+      },
+      "career_brief": "Career: 400+ Manchester City appearances · 6× Premier League champion · 2× PFA Player of the Year (2019-20, 2021-22) · FBref top-5 all-time PL assist leader · UEFA Champions League winner 2022-23. Career assists per 90 in the PL: 0.38 (one of the highest ever recorded for an outfield player)."
     },
     {
       "id": "bruno_chaos",
@@ -99,18 +238,53 @@
       "club": "Manchester United",
       "league": "Premier League",
       "tier": "world_class",
-      "signature_attrs": ["shooting", "competitive_mindset", "passing"],
-      "anchor": [{"key":"shooting","weight":5},{"key":"competitive_mindset","weight":5},{"key":"passing","weight":4},{"key":"decision_making","weight":3},{"key":"work_rate","weight":3}],
-      "traits": ["high-risk high-reward", "leads the team", "Portuguese vibe"],
+      "signature_attrs": [
+        "shooting",
+        "competitive_mindset",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 3
+        },
+        {
+          "key": "work_rate",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "high-risk high-reward",
+        "leads the team",
+        "Portuguese vibe"
+      ],
       "summary": "High-risk high-reward chaos creator — every action could be the killer ball.",
-      "profile": {"foot": "right", "build": "athletic_runner", "role": "chaos_creator", "path": "italian_serie_pipeline"},
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "chaos_creator",
+        "path": "italian_serie_pipeline"
+      },
       "academy_bio": {
-        "8-10":  "Joined Boavista (Porto, Portugal) youth at age 8. Played up two age groups consistently because he was bigger physically.",
+        "8-10": "Joined Boavista (Porto, Portugal) youth at age 8. Played up two age groups consistently because he was bigger physically.",
         "11-12": "U12 at Boavista — already showing the volume-shooting habit. Would attempt long-range shots multiple times a game even at U12.",
         "13-14": "U13-U14 at Boavista's academy — relentless work rate flagged by coaches. Wasn't flashy technically but always influenced games.",
         "15-17": "Moved to Italy at 17 (Novara, Serie B) on a youth contract — unusually direct route, bypassing the Portuguese senior academy.",
         "18-21": "Udinese at 18 (Serie A). Sampdoria at 22. Back to Portugal (Sporting CP) at 22 — became Portugal's player of the year before joining Manchester United at 25."
-      }
+      },
+      "career_brief": "Career: 400+ Manchester United appearances since 2020 · United captain since 2023 · Portugal captain. Most goal involvements in the PL across his first three seasons (after Salah, KdB). Has averaged 12+ PL assists per season at United (FBref)."
     },
     {
       "id": "bellingham_engine",
@@ -118,18 +292,53 @@
       "club": "Real Madrid",
       "league": "La Liga",
       "tier": "elite",
-      "signature_attrs": ["intensity", "competitive_mindset", "shooting"],
-      "anchor": [{"key":"intensity","weight":5},{"key":"competitive_mindset","weight":5},{"key":"shooting","weight":4},{"key":"courage_in_duels","weight":4},{"key":"timing_of_runs","weight":4}],
-      "traits": ["arrives in both boxes", "Galactico mentality", "scores goals"],
+      "signature_attrs": [
+        "intensity",
+        "competitive_mindset",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 4
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 4
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "arrives in both boxes",
+        "Galactico mentality",
+        "scores goals"
+      ],
       "summary": "Generational midfielder — arrives in the box, defends, leads, scores.",
-      "profile": {"foot": "right", "build": "tall_powerful", "role": "shadow_striker", "path": "english_academy"},
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "shadow_striker",
+        "path": "english_academy"
+      },
       "academy_bio": {
-        "8-10":  "Joined Birmingham City academy at 7 — local boy, his dad and brother both played for nearby teams.",
+        "8-10": "Joined Birmingham City academy at 7 — local boy, his dad and brother both played for nearby teams.",
         "11-12": "U12 at Birmingham — already a head taller than peers and physically dominant. Captained his age group from U11 onwards.",
         "13-14": "U13-U14 at Birmingham — training regularly with the U18s. Birmingham retired his shirt number when he left — first English club to do so for an academy product.",
         "15-17": "Birmingham senior debut at 16 (Championship). Captained Birmingham at 17. Sold to Borussia Dortmund at 17 for £25m — record fee for an English 17-year-old.",
         "18-21": "Bundesliga player of the year-equivalent at 18. Real Madrid at 19 for £100m+. Champions League and La Liga winner at 20."
-      }
+      },
+      "career_brief": "Career: Birmingham → Dortmund → Real Madrid (2023, ~€103m). La Liga top scorer joint-runner-up in his debut Madrid season. England No. 10. La Liga 2023-24 champion + UCL 2023-24 champion in his first Madrid season. Kopa Trophy 2023. La Liga goals per 90 in season 1: ~0.65."
     },
     {
       "id": "foden_inverted",
@@ -137,18 +346,53 @@
       "club": "Manchester City",
       "league": "Premier League",
       "tier": "elite",
-      "signature_attrs": ["dribbling", "shooting", "ball_control"],
-      "anchor": [{"key":"dribbling","weight":5},{"key":"shooting","weight":5},{"key":"ball_control","weight":4},{"key":"one_v_one","weight":4},{"key":"first_touch","weight":3}],
-      "traits": ["plays multiple positions", "elite finish", "carries the ball"],
+      "signature_attrs": [
+        "dribbling",
+        "shooting",
+        "ball_control"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 4
+        },
+        {
+          "key": "one_v_one",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "plays multiple positions",
+        "elite finish",
+        "carries the ball"
+      ],
       "summary": "Plays multiple roles around the #10 with elite ball-carrying and finish.",
-      "profile": {"foot": "left", "build": "small_technical", "role": "chaos_creator", "path": "english_academy"},
+      "profile": {
+        "foot": "left",
+        "build": "small_technical",
+        "role": "chaos_creator",
+        "path": "english_academy"
+      },
       "academy_bio": {
-        "8-10":  "Joined Manchester City academy at age 8. Local Stockport boy who would walk to Etihad Campus from a young age.",
+        "8-10": "Joined Manchester City academy at age 8. Local Stockport boy who would walk to Etihad Campus from a young age.",
         "11-12": "U12 at Man City — already drawing comparisons to David Silva in the academy. Coaches said his close control at 11 was 'unlike anyone we'd ever had'.",
         "13-14": "U13-U14 at City — winning every academy player of the year award. Trained with first team occasionally even at 14.",
         "15-17": "U18 captain at 16. Senior debut at 17 in the EFL Cup. England U17 World Cup-winning captain at 17 — best player at the tournament.",
         "18-21": "First Premier League start at 18. Champions League appearances at 19. By 21, established starter at Manchester City."
-      }
+      },
+      "career_brief": "Career: 250+ Manchester City appearances · 6× Premier League champion · FWA Footballer of the Year 2023-24 · PFA Young Player of the Year 2022-23 & 2023-24 (first ever back-to-back). Career goal+assist per 90 in the PL: ~0.70."
     },
     {
       "id": "musiala_dribbler",
@@ -156,13 +400,47 @@
       "club": "Bayern Munich / Germany",
       "league": "Bundesliga",
       "tier": "elite",
-      "signature_attrs": ["dribbling", "ball_control", "one_v_one"],
-      "anchor": [{"key":"dribbling","weight":5},{"key":"ball_control","weight":5},{"key":"one_v_one","weight":5},{"key":"balance","weight":4},{"key":"agility","weight":4}],
-      "traits": ["beats his man cold", "elite close control", "Bavarian Bambi"],
+      "signature_attrs": [
+        "dribbling",
+        "ball_control",
+        "one_v_one"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "agility",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "beats his man cold",
+        "elite close control",
+        "Bavarian Bambi"
+      ],
       "summary": "Carries the ball through any defence with feet too quick to follow.",
-      "profile": {"foot": "right", "build": "small_technical", "role": "chaos_creator", "path": "elite_european_academy"},
+      "profile": {
+        "foot": "right",
+        "build": "small_technical",
+        "role": "chaos_creator",
+        "path": "elite_european_academy"
+      },
       "academy_bio": {
-        "8-10":  "Born in Germany, moved to England at 7. Joined Southampton youth at 8 — chosen over local Hampshire kids because of his close control.",
+        "8-10": "Born in Germany, moved to England at 7. Joined Southampton youth at 8 — chosen over local Hampshire kids because of his close control.",
         "11-12": "Chelsea academy from 11. Lived in the Cobham academy housing — already standing out in the elite English youth setup.",
         "13-14": "U13-U14 at Chelsea — frequently played up two age groups. Eligible for England, Germany and Nigeria — England capped him first.",
         "15-17": "Surprise move to Bayern Munich at 16 — Chelsea couldn't guarantee a first-team pathway. Bayern senior debut at 17. Switched international allegiance to Germany at 18.",
@@ -175,18 +453,53 @@
       "club": "Barcelona / Spain",
       "league": "La Liga",
       "tier": "world_class",
-      "signature_attrs": ["dribbling", "passing", "decision_making"],
-      "anchor": [{"key":"dribbling","weight":5},{"key":"passing","weight":5},{"key":"decision_making","weight":5},{"key":"first_touch","weight":3},{"key":"acceleration","weight":3}],
-      "traits": ["generational talent", "carries", "creates"],
+      "signature_attrs": [
+        "dribbling",
+        "passing",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 3
+        },
+        {
+          "key": "acceleration",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "generational talent",
+        "carries",
+        "creates"
+      ],
       "summary": "Generational wonderkid — beats players and creates in equal measure.",
-      "profile": {"foot": "left", "build": "compact_balanced", "role": "wide_creator", "path": "elite_european_academy"},
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "wide_creator",
+        "path": "elite_european_academy"
+      },
       "academy_bio": {
-        "8-10":  "Joined Barcelona's La Masia at age 7 — local Catalan kid (Mataró), spotted in a school competition.",
+        "8-10": "Joined Barcelona's La Masia at age 7 — local Catalan kid (Mataró), spotted in a school competition.",
         "11-12": "U12 at La Masia — Xavi (then U10/U12 coach) reportedly told staff 'this one is different' when Yamal was 11.",
         "13-14": "U13-U14 La Masia — training with the older youth teams. La Liga staff already monitoring him for the senior squad pathway.",
         "15-17": "Barcelona B at 14. First-team debut at 15 years, 290 days — youngest in Barcelona history. Played at Euro 2024 at 16, becoming youngest goalscorer in tournament history.",
         "18-21": "Established starter for Barcelona at 16-17. Already in Ballon d'Or conversations at 17 — comparisons with the all-time greats are running ahead of his actual career."
-      }
+      },
+      "career_brief": "Career: Barcelona La Masia academy since age 7. La Liga debut at 15 (youngest in Barcelona history). Euro 2024 Young Player of the Tournament — youngest ever scorer at a Euros final. 16 years old when he debuted for Spain. Already 20+ Spain caps before turning 18."
     },
     {
       "id": "olise_creator",
@@ -194,13 +507,47 @@
       "club": "Bayern Munich",
       "league": "Bundesliga",
       "tier": "world_class",
-      "signature_attrs": ["passing", "dribbling", "first_touch"],
-      "anchor": [{"key":"passing","weight":5},{"key":"dribbling","weight":4},{"key":"first_touch","weight":4},{"key":"weak_foot","weight":3},{"key":"decision_making","weight":3}],
-      "traits": ["elite delivery", "left-foot magic", "creator"],
+      "signature_attrs": [
+        "passing",
+        "dribbling",
+        "first_touch"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 3
+        },
+        {
+          "key": "decision_making",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "elite delivery",
+        "left-foot magic",
+        "creator"
+      ],
       "summary": "Left-foot magician — creates from wide #10 zones with elegant delivery.",
-      "profile": {"foot": "left", "build": "compact_balanced", "role": "wide_creator", "path": "released_then_returned"},
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "wide_creator",
+        "path": "released_then_returned"
+      },
       "academy_bio": {
-        "8-10":  "Joined Chelsea academy at 8 — born in London to a French-Nigerian-Algerian family, multilingual upbringing.",
+        "8-10": "Joined Chelsea academy at 8 — born in London to a French-Nigerian-Algerian family, multilingual upbringing.",
         "11-12": "U12 at Chelsea — already showing the left-foot delivery range that would define him later.",
         "13-14": "Released by Chelsea at U14 — deemed not athletic enough for the elite English pathway. Picked up by Reading academy.",
         "15-17": "Reading U18s. Senior debut at 16-17 in the Championship. Played in unfashionable lower-tier English football for several seasons.",
@@ -213,13 +560,47 @@
       "club": "Manchester United",
       "league": "Premier League",
       "tier": "established",
-      "signature_attrs": ["first_touch", "ball_control", "decision_making"],
-      "anchor": [{"key":"first_touch","weight":5},{"key":"ball_control","weight":5},{"key":"scanning","weight":4},{"key":"decision_making","weight":5},{"key":"focus","weight":3}],
-      "traits": ["academy prodigy", "press-resistant", "calm beyond his years"],
+      "signature_attrs": [
+        "first_touch",
+        "ball_control",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "focus",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "academy prodigy",
+        "press-resistant",
+        "calm beyond his years"
+      ],
       "summary": "Young academy prodigy with the composure of a senior midfielder.",
-      "profile": {"foot": "right", "build": "compact_balanced", "role": "press_resistant_8", "path": "english_academy"},
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "press_resistant_8",
+        "path": "english_academy"
+      },
       "academy_bio": {
-        "8-10":  "Joined Manchester United academy at 9 — local Stockport boy (same area as Phil Foden).",
+        "8-10": "Joined Manchester United academy at 9 — local Stockport boy (same area as Phil Foden).",
         "11-12": "U12 at United — already drawing comparisons within the academy for ball-retention under pressure.",
         "13-14": "U13-U14 at United — training regularly with the U18s.",
         "15-17": "United U18 captain at 17. Senior debut at 18 — Erik ten Hag fast-tracked him into the first team. FA Cup goal in the final at 18.",
@@ -232,13 +613,47 @@
       "club": "Al-Ahli / former Leicester / Man City",
       "league": "Saudi Pro League / Premier League",
       "tier": "breakthrough",
-      "signature_attrs": ["dribbling", "shooting", "ball_control"],
-      "anchor": [{"key":"dribbling","weight":5},{"key":"shooting","weight":4},{"key":"ball_control","weight":4},{"key":"first_touch","weight":4},{"key":"one_v_one","weight":4}],
-      "traits": ["beat the system", "lower-tier roots", "Premier League title winner"],
+      "signature_attrs": [
+        "dribbling",
+        "shooting",
+        "ball_control"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 4
+        },
+        {
+          "key": "ball_control",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "one_v_one",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "beat the system",
+        "lower-tier roots",
+        "Premier League title winner"
+      ],
       "summary": "Late-blooming breakthrough — proves that not every elite career starts in elite academies.",
-      "profile": {"foot": "left", "build": "small_technical", "role": "wide_creator", "path": "semi_pro_breakthrough"},
+      "profile": {
+        "foot": "left",
+        "build": "small_technical",
+        "role": "wide_creator",
+        "path": "semi_pro_breakthrough"
+      },
       "academy_bio": {
-        "8-10":  "Born in Paris suburbs (Sarcelles) — played street football through his pre-teen years. Never in a top French academy at this age.",
+        "8-10": "Born in Paris suburbs (Sarcelles) — played street football through his pre-teen years. Never in a top French academy at this age.",
         "11-12": "Played for AAS Sarcelles (regional amateur club) — completely off the elite academy radar.",
         "13-14": "Still at AAS Sarcelles U14-U16 — slim build, no big-club interest. Family situation meant football was a hobby, not a project.",
         "15-17": "Late move to Quimper (Ligue 2 reserves) at ~18. Played in lower-tier French football — Le Havre B-side at 21. Still no Premier League radar.",
@@ -251,13 +666,47 @@
       "club": "Bayer Leverkusen",
       "league": "Bundesliga",
       "tier": "world_class",
-      "signature_attrs": ["dribbling", "decision_making", "passing"],
-      "anchor": [{"key":"dribbling","weight":5},{"key":"decision_making","weight":5},{"key":"passing","weight":4},{"key":"first_touch","weight":4},{"key":"ball_control","weight":4}],
-      "traits": ["German wonderkid", "creates chances", "carries the ball"],
+      "signature_attrs": [
+        "dribbling",
+        "decision_making",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "ball_control",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "German wonderkid",
+        "creates chances",
+        "carries the ball"
+      ],
       "summary": "Creative engine — beats his man and finds the killer ball in the same motion.",
-      "profile": {"foot": "right", "build": "compact_balanced", "role": "chaos_creator", "path": "elite_european_academy"},
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "chaos_creator",
+        "path": "elite_european_academy"
+      },
       "academy_bio": {
-        "8-10":  "Joined Köln youth at 7 — Pulheim local boy, near the Köln training ground.",
+        "8-10": "Joined Köln youth at 7 — Pulheim local boy, near the Köln training ground.",
         "11-12": "U12 at Köln — known as one of the most technically advanced kids in the German youth pyramid.",
         "13-14": "U13-U14 at Köln academy — by U14 was widely regarded as the best youth prospect in Germany.",
         "15-17": "Surprise move to Bayer Leverkusen at 16 (Köln couldn't guarantee fast-track). Senior debut at 17. Bundesliga regular by 17-18.",
@@ -265,88 +714,2934 @@
       }
     }
   ],
-
   "goalkeeper": [
-    {"id": "neuer_sweeper",        "name": "Manuel Neuer-type sweeper",  "club": "Bayern Munich",        "league": "Bundesliga",     "tier": "elite",       "signature_attrs": ["positioning", "scanning", "passing"], "anchor": [{"key":"positioning","weight":5},{"key":"scanning","weight":5},{"key":"decision_making","weight":4},{"key":"passing","weight":4},{"key":"weak_foot","weight":3}], "traits": ["highest line in the league", "plays out of the back", "reads danger early"],     "summary": "Plays the highest line in the league — sweeps behind the defence and starts attacks at his feet.", "profile": {"foot":"right","build":"tall_powerful","role":"sweeper","path":"elite_european_academy"}},
-    {"id": "alisson_modern",       "name": "Alisson-type modern keeper", "club": "Liverpool",            "league": "Premier League", "tier": "elite",       "signature_attrs": ["one_v_one", "agility", "decision_making"], "anchor": [{"key":"agility","weight":5},{"key":"decision_making","weight":5},{"key":"one_v_one","weight":5},{"key":"confidence","weight":4},{"key":"passing","weight":3}], "traits": ["calm in 1v1", "elite distribution", "owns the box"],                            "summary": "Composure-first keeper who turns saves into counter-attacks within two passes.", "profile": {"foot":"right","build":"athletic_runner","role":"sweeper","path":"south_american_pipeline"}},
-    {"id": "courtois_commanding",  "name": "Courtois-type shot-stopper", "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["one_v_one", "balance", "confidence"], "anchor": [{"key":"one_v_one","weight":5},{"key":"balance","weight":4},{"key":"confidence","weight":5},{"key":"focus","weight":4},{"key":"body_control","weight":4}], "traits": ["dominant frame", "huge reach", "big-game keeper"],                              "summary": "Old-school commanding keeper whose size and timing make every save look routine.", "profile": {"foot":"right","build":"tall_powerful","role":"shot_stopper","path":"elite_european_academy"}},
-    {"id": "stegen_passer",        "name": "Ter Stegen-type passer",     "club": "Barcelona",            "league": "La Liga",        "tier": "world_class", "signature_attrs": ["passing", "first_touch", "weak_foot"], "anchor": [{"key":"passing","weight":5},{"key":"weak_foot","weight":5},{"key":"first_touch","weight":5},{"key":"decision_making","weight":4},{"key":"confidence","weight":3}], "traits": ["both-footed range", "midfielder-grade passing", "calm under press"],            "summary": "Treats build-up like a midfielder — both-footed range opens up the press.", "profile": {"foot":"both","build":"athletic_runner","role":"sweeper","path":"elite_european_academy"}},
-    {"id": "maignan_athletic",     "name": "Mike Maignan-type athlete",  "club": "AC Milan",             "league": "Serie A",        "tier": "world_class", "signature_attrs": ["agility", "acceleration", "courage_in_duels"], "anchor": [{"key":"agility","weight":5},{"key":"acceleration","weight":5},{"key":"balance","weight":4},{"key":"courage_in_duels","weight":4},{"key":"body_control","weight":4}], "traits": ["explosive recoveries", "brave at the feet", "covers ground"],                  "summary": "Athletic shot-stopper who turns recoveries into impossible saves with raw pace.", "profile": {"foot":"right","build":"athletic_runner","role":"shot_stopper","path":"elite_european_academy"}},
-    {"id": "donnarumma_reactive",  "name": "Donnarumma-type reflex",     "club": "PSG / Italy",          "league": "Ligue 1",        "tier": "world_class", "signature_attrs": ["agility", "one_v_one", "balance"], "anchor": [{"key":"agility","weight":5},{"key":"one_v_one","weight":5},{"key":"balance","weight":4},{"key":"focus","weight":4},{"key":"confidence","weight":3}], "traits": ["frame + reach", "late reactions when needed", "young-keeper legend"],          "summary": "Tall, springy keeper whose reflexes win the moments others can't even reach.", "profile": {"foot":"right","build":"tall_powerful","role":"shot_stopper","path":"elite_european_academy"}},
-    {"id": "raya_distributor",     "name": "David Raya-type distributor","club": "Arsenal",              "league": "Premier League", "tier": "established", "signature_attrs": ["passing", "decision_making"], "anchor": [{"key":"passing","weight":5},{"key":"decision_making","weight":5},{"key":"scanning","weight":4},{"key":"weak_foot","weight":4},{"key":"confidence","weight":3}], "traits": ["claims crosses", "switches play", "modern build-up"],                          "summary": "Conducts the back four with both feet and intelligent claiming on crosses.", "profile": {"foot":"both","build":"compact_balanced","role":"sweeper","path":"english_academy"}},
-    {"id": "oblak_positional",     "name": "Jan Oblak-type positional",  "club": "Atlético Madrid",      "league": "La Liga",        "tier": "elite",       "signature_attrs": ["positioning", "scanning", "focus"], "anchor": [{"key":"positioning","weight":5},{"key":"scanning","weight":5},{"key":"game_understanding","weight":5},{"key":"focus","weight":4},{"key":"decision_making","weight":4}], "traits": ["never out of position", "minimal flair, maximum efficiency", "shut-out king"], "summary": "Saves through angles, not athleticism — the cleanest positional keeper in Europe.", "profile": {"foot":"right","build":"tall_powerful","role":"shot_stopper","path":"slovenian_balkan_pipeline"}},
-    {"id": "ederson_playmaker",    "name": "Ederson-type playmaker",     "club": "Manchester City",      "league": "Premier League", "tier": "elite",       "signature_attrs": ["passing", "weak_foot", "first_touch"], "anchor": [{"key":"passing","weight":5},{"key":"weak_foot","weight":5},{"key":"first_touch","weight":5},{"key":"confidence","weight":4},{"key":"decision_making","weight":3}], "traits": ["pinpoint long passing", "ice-cold composure", "extra outfield player"],       "summary": "Plays like an extra deep-lying playmaker — pinpoint long range from his own box.", "profile": {"foot":"both","build":"athletic_runner","role":"sweeper","path":"south_american_pipeline"}}
+    {
+      "id": "neuer_sweeper",
+      "name": "Manuel Neuer-type sweeper",
+      "club": "Bayern Munich",
+      "league": "Bundesliga",
+      "tier": "elite",
+      "signature_attrs": [
+        "positioning",
+        "scanning",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "highest line in the league",
+        "plays out of the back",
+        "reads danger early"
+      ],
+      "summary": "Plays the highest line in the league — sweeps behind the defence and starts attacks at his feet.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "sweeper",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "alisson_modern",
+      "name": "Alisson-type modern keeper",
+      "club": "Liverpool",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "one_v_one",
+        "agility",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "agility",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "confidence",
+          "weight": 4
+        },
+        {
+          "key": "passing",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "calm in 1v1",
+        "elite distribution",
+        "owns the box"
+      ],
+      "summary": "Composure-first keeper who turns saves into counter-attacks within two passes.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "sweeper",
+        "path": "south_american_pipeline"
+      },
+      "career_brief": "Career: 300+ Liverpool appearances since 2018. UEFA Champions League winner 2018-19. PL champion 2019-20. Yashin Trophy 2019. PL Golden Glove 2018-19. Brazil's #1 keeper for the last 8+ years. FBref career save percentage in the PL: ~76%."
+    },
+    {
+      "id": "courtois_commanding",
+      "name": "Courtois-type shot-stopper",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "one_v_one",
+        "balance",
+        "confidence"
+      ],
+      "anchor": [
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "confidence",
+          "weight": 5
+        },
+        {
+          "key": "focus",
+          "weight": 4
+        },
+        {
+          "key": "body_control",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "dominant frame",
+        "huge reach",
+        "big-game keeper"
+      ],
+      "summary": "Old-school commanding keeper whose size and timing make every save look routine.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "shot_stopper",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: Real Madrid since 2018. UCL winner 2021-22 (named final's man of the match — 9 saves vs Liverpool). Yashin Trophy 2022. Belgium's all-time most-capped keeper. La Liga clean-sheet leader multiple seasons."
+    },
+    {
+      "id": "stegen_passer",
+      "name": "Ter Stegen-type passer",
+      "club": "Barcelona",
+      "league": "La Liga",
+      "tier": "world_class",
+      "signature_attrs": [
+        "passing",
+        "first_touch",
+        "weak_foot"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "weak_foot",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "confidence",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "both-footed range",
+        "midfielder-grade passing",
+        "calm under press"
+      ],
+      "summary": "Treats build-up like a midfielder — both-footed range opens up the press.",
+      "profile": {
+        "foot": "both",
+        "build": "athletic_runner",
+        "role": "sweeper",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "maignan_athletic",
+      "name": "Mike Maignan-type athlete",
+      "club": "AC Milan",
+      "league": "Serie A",
+      "tier": "world_class",
+      "signature_attrs": [
+        "agility",
+        "acceleration",
+        "courage_in_duels"
+      ],
+      "anchor": [
+        {
+          "key": "agility",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 4
+        },
+        {
+          "key": "body_control",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "explosive recoveries",
+        "brave at the feet",
+        "covers ground"
+      ],
+      "summary": "Athletic shot-stopper who turns recoveries into impossible saves with raw pace.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "shot_stopper",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "donnarumma_reactive",
+      "name": "Donnarumma-type reflex",
+      "club": "PSG / Italy",
+      "league": "Ligue 1",
+      "tier": "world_class",
+      "signature_attrs": [
+        "agility",
+        "one_v_one",
+        "balance"
+      ],
+      "anchor": [
+        {
+          "key": "agility",
+          "weight": 5
+        },
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "focus",
+          "weight": 4
+        },
+        {
+          "key": "confidence",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "frame + reach",
+        "late reactions when needed",
+        "young-keeper legend"
+      ],
+      "summary": "Tall, springy keeper whose reflexes win the moments others can't even reach.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "shot_stopper",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "raya_distributor",
+      "name": "David Raya-type distributor",
+      "club": "Arsenal",
+      "league": "Premier League",
+      "tier": "established",
+      "signature_attrs": [
+        "passing",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 4
+        },
+        {
+          "key": "confidence",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "claims crosses",
+        "switches play",
+        "modern build-up"
+      ],
+      "summary": "Conducts the back four with both feet and intelligent claiming on crosses.",
+      "profile": {
+        "foot": "both",
+        "build": "compact_balanced",
+        "role": "sweeper",
+        "path": "english_academy"
+      }
+    },
+    {
+      "id": "oblak_positional",
+      "name": "Jan Oblak-type positional",
+      "club": "Atlético Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "positioning",
+        "scanning",
+        "focus"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "game_understanding",
+          "weight": 5
+        },
+        {
+          "key": "focus",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "never out of position",
+        "minimal flair, maximum efficiency",
+        "shut-out king"
+      ],
+      "summary": "Saves through angles, not athleticism — the cleanest positional keeper in Europe.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "shot_stopper",
+        "path": "slovenian_balkan_pipeline"
+      }
+    },
+    {
+      "id": "ederson_playmaker",
+      "name": "Ederson-type playmaker",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "weak_foot",
+        "first_touch"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "weak_foot",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "confidence",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "pinpoint long passing",
+        "ice-cold composure",
+        "extra outfield player"
+      ],
+      "summary": "Plays like an extra deep-lying playmaker — pinpoint long range from his own box.",
+      "profile": {
+        "foot": "both",
+        "build": "athletic_runner",
+        "role": "sweeper",
+        "path": "south_american_pipeline"
+      }
+    }
   ],
-
   "centre back": [
-    {"id": "vandijk_leader",       "name": "Van Dijk-type leader",       "club": "Liverpool",            "league": "Premier League", "tier": "elite",       "signature_attrs": ["positioning", "scanning", "confidence"], "anchor": [{"key":"positioning","weight":5},{"key":"scanning","weight":5},{"key":"confidence","weight":5},{"key":"courage_in_duels","weight":4},{"key":"competitive_mindset","weight":4}], "traits": ["organises the line", "wins every aerial", "rarely beaten 1v1"],                "summary": "Defends with brain and presence first — the modern complete leader CB.", "profile":{"foot":"right","build":"tall_powerful","role":"leader_cb","path":"semi_pro_breakthrough"}},
-    {"id": "rudiger_athletic",     "name": "Rüdiger-type enforcer",      "club": "Real Madrid",          "league": "La Liga",        "tier": "world_class", "signature_attrs": ["courage_in_duels", "intensity", "speed"], "anchor": [{"key":"courage_in_duels","weight":5},{"key":"intensity","weight":5},{"key":"speed","weight":5},{"key":"acceleration","weight":4},{"key":"body_control","weight":3}], "traits": ["front-foot defending", "wins 50-50s", "athletic recovery pace"],               "summary": "Plays on the front foot — closes ground in two steps and wins every duel he enters.", "profile":{"foot":"right","build":"athletic_runner","role":"aggressive_cb","path":"elite_european_academy"}},
-    {"id": "bastoni_ball_player",  "name": "Bastoni-type ball-player",   "club": "Inter Milan",          "league": "Serie A",        "tier": "world_class", "signature_attrs": ["passing", "first_touch", "ball_control"], "anchor": [{"key":"passing","weight":5},{"key":"first_touch","weight":5},{"key":"ball_control","weight":5},{"key":"decision_making","weight":4},{"key":"weak_foot","weight":3}], "traits": ["press-resistant", "carries possession", "left-foot range"],                    "summary": "A Serie A modern CB who builds attacks like a deep-lying midfielder.", "profile":{"foot":"left","build":"compact_balanced","role":"ball_playing_cb","path":"italian_serie_pipeline"}},
-    {"id": "saliba_complete",      "name": "Saliba-type complete CB",    "club": "Arsenal",              "league": "Premier League", "tier": "world_class", "signature_attrs": ["positioning", "speed", "passing"], "anchor": [{"key":"positioning","weight":5},{"key":"speed","weight":5},{"key":"passing","weight":4},{"key":"scanning","weight":4},{"key":"first_touch","weight":4}], "traits": ["pace + composure", "reads danger early", "elegant on the ball"],               "summary": "The blueprint for the modern CB — pace, positioning and elite ball-playing.", "profile":{"foot":"right","build":"tall_powerful","role":"ball_playing_cb","path":"elite_european_academy"}},
-    {"id": "kim_aggressive",       "name": "Kim Min-jae-type aggressor", "club": "Bayern Munich",        "league": "Bundesliga",     "tier": "world_class", "signature_attrs": ["intensity", "courage_in_duels", "speed"], "anchor": [{"key":"intensity","weight":5},{"key":"speed","weight":5},{"key":"courage_in_duels","weight":5},{"key":"body_control","weight":4},{"key":"work_rate","weight":4}], "traits": ["front-foot duels", "huge engine", "aerial machine"],                          "summary": "Asian CB who proves the modern game needs aerobic CBs — duels, sprints, repeats.", "profile":{"foot":"right","build":"tall_powerful","role":"aggressive_cb","path":"asian_academy"}},
-    {"id": "araujo_athletic",      "name": "Araújo-type athletic CB",    "club": "Barcelona",            "league": "La Liga",        "tier": "world_class", "signature_attrs": ["speed", "acceleration", "balance"], "anchor": [{"key":"speed","weight":5},{"key":"acceleration","weight":5},{"key":"body_control","weight":4},{"key":"balance","weight":4},{"key":"courage_in_duels","weight":4}], "traits": ["explosive recovery", "wins foot-races", "covers the channels"],                "summary": "Defends a high line confidently because his recovery pace covers most threats.", "profile":{"foot":"right","build":"athletic_runner","role":"athletic_cb","path":"south_american_pipeline"}},
-    {"id": "stones_inverted",      "name": "Stones-type inverted CB",    "club": "Manchester City",      "league": "Premier League", "tier": "elite",       "signature_attrs": ["passing", "first_touch", "decision_making"], "anchor": [{"key":"passing","weight":5},{"key":"first_touch","weight":5},{"key":"ball_control","weight":4},{"key":"decision_making","weight":5},{"key":"scanning","weight":4}], "traits": ["inverts to midfield", "press-resistant", "elegant range"],                     "summary": "Inverts into midfield mid-possession — redefines what CB technicality means.", "profile":{"foot":"right","build":"compact_balanced","role":"ball_playing_cb","path":"english_academy"}},
-    {"id": "marquinhos_reader",    "name": "Marquinhos-type reader",     "club": "PSG",                  "league": "Ligue 1",        "tier": "elite",       "signature_attrs": ["positioning", "scanning", "game_understanding"], "anchor": [{"key":"positioning","weight":5},{"key":"scanning","weight":5},{"key":"game_understanding","weight":5},{"key":"focus","weight":4},{"key":"confidence","weight":4}], "traits": ["anticipates the pass", "rarely out of position", "captain's energy"],         "summary": "Defends with the brain — reads the game two moves ahead, leads the line vocally.", "profile":{"foot":"right","build":"compact_balanced","role":"leader_cb","path":"south_american_pipeline"}},
-    {"id": "konate_powerful",      "name": "Konaté-type powerful CB",    "club": "Liverpool",            "league": "Premier League", "tier": "established", "signature_attrs": ["speed", "courage_in_duels", "body_control"], "anchor": [{"key":"speed","weight":5},{"key":"courage_in_duels","weight":5},{"key":"body_control","weight":4},{"key":"balance","weight":4},{"key":"acceleration","weight":4}], "traits": ["powerful frame", "explosive recoveries", "wins everything physical"],          "summary": "Physical specimen who combines pace and power — wins every duel, recovers any ball.", "profile":{"foot":"right","build":"tall_powerful","role":"athletic_cb","path":"elite_european_academy"}}
+    {
+      "id": "vandijk_leader",
+      "name": "Van Dijk-type leader",
+      "club": "Liverpool",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "positioning",
+        "scanning",
+        "confidence"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "confidence",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "organises the line",
+        "wins every aerial",
+        "rarely beaten 1v1"
+      ],
+      "summary": "Defends with brain and presence first — the modern complete leader CB.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "leader_cb",
+        "path": "semi_pro_breakthrough"
+      },
+      "career_brief": "Career: Celtic → Southampton → Liverpool (~€84m, world-record CB fee at the time). PFA Player of the Year 2018-19 (only defender since 2005 to win it). UCL winner 2018-19, PL champion 2019-20. Netherlands captain. FBref career duels won per 90: ~6.5 in the PL."
+    },
+    {
+      "id": "rudiger_athletic",
+      "name": "Rüdiger-type enforcer",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "world_class",
+      "signature_attrs": [
+        "courage_in_duels",
+        "intensity",
+        "speed"
+      ],
+      "anchor": [
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        },
+        {
+          "key": "body_control",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "front-foot defending",
+        "wins 50-50s",
+        "athletic recovery pace"
+      ],
+      "summary": "Plays on the front foot — closes ground in two steps and wins every duel he enters.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "aggressive_cb",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "bastoni_ball_player",
+      "name": "Bastoni-type ball-player",
+      "club": "Inter Milan",
+      "league": "Serie A",
+      "tier": "world_class",
+      "signature_attrs": [
+        "passing",
+        "first_touch",
+        "ball_control"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "press-resistant",
+        "carries possession",
+        "left-foot range"
+      ],
+      "summary": "A Serie A modern CB who builds attacks like a deep-lying midfielder.",
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "ball_playing_cb",
+        "path": "italian_serie_pipeline"
+      }
+    },
+    {
+      "id": "saliba_complete",
+      "name": "Saliba-type complete CB",
+      "club": "Arsenal",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "positioning",
+        "speed",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "pace + composure",
+        "reads danger early",
+        "elegant on the ball"
+      ],
+      "summary": "The blueprint for the modern CB — pace, positioning and elite ball-playing.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "ball_playing_cb",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: Saint-Étienne → Arsenal at 19. Three loan spells (Saint-Étienne, Nice, Marseille) before breaking in at 21. Arsenal Player of the Season 2022-23. French senior squad regular since 22. PL fewest goals conceded as a CB starter in 2023-24."
+    },
+    {
+      "id": "kim_aggressive",
+      "name": "Kim Min-jae-type aggressor",
+      "club": "Bayern Munich",
+      "league": "Bundesliga",
+      "tier": "world_class",
+      "signature_attrs": [
+        "intensity",
+        "courage_in_duels",
+        "speed"
+      ],
+      "anchor": [
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "body_control",
+          "weight": 4
+        },
+        {
+          "key": "work_rate",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "front-foot duels",
+        "huge engine",
+        "aerial machine"
+      ],
+      "summary": "Asian CB who proves the modern game needs aerobic CBs — duels, sprints, repeats.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "aggressive_cb",
+        "path": "asian_academy"
+      }
+    },
+    {
+      "id": "araujo_athletic",
+      "name": "Araújo-type athletic CB",
+      "club": "Barcelona",
+      "league": "La Liga",
+      "tier": "world_class",
+      "signature_attrs": [
+        "speed",
+        "acceleration",
+        "balance"
+      ],
+      "anchor": [
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "body_control",
+          "weight": 4
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "explosive recovery",
+        "wins foot-races",
+        "covers the channels"
+      ],
+      "summary": "Defends a high line confidently because his recovery pace covers most threats.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "athletic_cb",
+        "path": "south_american_pipeline"
+      }
+    },
+    {
+      "id": "stones_inverted",
+      "name": "Stones-type inverted CB",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "first_touch",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "inverts to midfield",
+        "press-resistant",
+        "elegant range"
+      ],
+      "summary": "Inverts into midfield mid-possession — redefines what CB technicality means.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "ball_playing_cb",
+        "path": "english_academy"
+      }
+    },
+    {
+      "id": "marquinhos_reader",
+      "name": "Marquinhos-type reader",
+      "club": "PSG",
+      "league": "Ligue 1",
+      "tier": "elite",
+      "signature_attrs": [
+        "positioning",
+        "scanning",
+        "game_understanding"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "game_understanding",
+          "weight": 5
+        },
+        {
+          "key": "focus",
+          "weight": 4
+        },
+        {
+          "key": "confidence",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "anticipates the pass",
+        "rarely out of position",
+        "captain's energy"
+      ],
+      "summary": "Defends with the brain — reads the game two moves ahead, leads the line vocally.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "leader_cb",
+        "path": "south_american_pipeline"
+      }
+    },
+    {
+      "id": "konate_powerful",
+      "name": "Konaté-type powerful CB",
+      "club": "Liverpool",
+      "league": "Premier League",
+      "tier": "established",
+      "signature_attrs": [
+        "speed",
+        "courage_in_duels",
+        "body_control"
+      ],
+      "anchor": [
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "body_control",
+          "weight": 4
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "powerful frame",
+        "explosive recoveries",
+        "wins everything physical"
+      ],
+      "summary": "Physical specimen who combines pace and power — wins every duel, recovers any ball.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "athletic_cb",
+        "path": "elite_european_academy"
+      }
+    }
   ],
-
   "full back": [
-    {"id": "trent_creator",        "name": "Trent Alexander-Arnold-type","club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["passing", "decision_making", "scanning"], "anchor": [{"key":"passing","weight":5},{"key":"decision_making","weight":5},{"key":"scanning","weight":5},{"key":"first_touch","weight":4},{"key":"weak_foot","weight":3}], "traits": ["delivers like a midfielder", "switches play", "inverts at will"],              "summary": "Plays full-back like a deep-lying playmaker — creates more chances than most #10s.", "profile":{"foot":"right","build":"compact_balanced","role":"creative_fb","path":"english_academy"}},
-    {"id": "cancelo_inverted",     "name": "João Cancelo-type inverted", "club": "Various / Portugal",   "league": "Various",        "tier": "world_class", "signature_attrs": ["ball_control", "first_touch", "passing"], "anchor": [{"key":"ball_control","weight":5},{"key":"first_touch","weight":5},{"key":"passing","weight":5},{"key":"decision_making","weight":4},{"key":"dribbling","weight":4}], "traits": ["drifts into midfield", "press-resistant", "links phases"],                     "summary": "Inverts into midfield to overload the centre — the prototype Pep FB.", "profile":{"foot":"right","build":"compact_balanced","role":"creative_fb","path":"elite_european_academy"}},
-    {"id": "hakimi_explosive",     "name": "Achraf Hakimi-type rocket",  "club": "PSG / Morocco",        "league": "Ligue 1",        "tier": "elite",       "signature_attrs": ["acceleration", "speed", "intensity"], "anchor": [{"key":"acceleration","weight":5},{"key":"speed","weight":5},{"key":"intensity","weight":5},{"key":"dribbling","weight":4},{"key":"work_rate","weight":4}], "traits": ["bombs forward", "wins foot-races", "direct vertical threat"],                  "summary": "Pure athletic engine — gets up and down the flank all day, threatens like a winger.", "profile":{"foot":"right","build":"athletic_runner","role":"attacking_fb","path":"elite_european_academy"}},
-    {"id": "carvajal_defensive",   "name": "Carvajal-type defensive FB", "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["one_v_one", "positioning", "courage_in_duels"], "anchor": [{"key":"one_v_one","weight":5},{"key":"positioning","weight":5},{"key":"courage_in_duels","weight":5},{"key":"scanning","weight":4},{"key":"competitive_mindset","weight":4}], "traits": ["locks down wingers", "champions league veteran", "captain energy"],            "summary": "Defends first, supports second — the most decorated modern right-back.", "profile":{"foot":"right","build":"compact_balanced","role":"defensive_fb","path":"elite_european_academy"}},
-    {"id": "estupinan_modern",     "name": "Pervis Estupiñán-type",      "club": "Brighton",             "league": "Premier League", "tier": "established", "signature_attrs": ["dribbling", "work_rate", "passing"], "anchor": [{"key":"dribbling","weight":4},{"key":"passing","weight":4},{"key":"acceleration","weight":4},{"key":"work_rate","weight":5},{"key":"decision_making","weight":3}], "traits": ["dual threat", "modern complete FB", "consistent end product"],                 "summary": "Modern complete LB — attacks and defends with equal end product.", "profile":{"foot":"left","build":"compact_balanced","role":"attacking_fb","path":"south_american_pipeline"}},
-    {"id": "robertson_engine",     "name": "Robertson-type engine",      "club": "Liverpool",            "league": "Premier League", "tier": "elite",       "signature_attrs": ["intensity", "work_rate", "acceleration"], "anchor": [{"key":"intensity","weight":5},{"key":"work_rate","weight":5},{"key":"acceleration","weight":5},{"key":"passing","weight":4},{"key":"competitive_mindset","weight":3}], "traits": ["tireless overlaps", "lung-busting runs", "elite crossing"],                    "summary": "Pure aerobic monster — never stops running, delivers like a left winger.", "profile":{"foot":"left","build":"athletic_runner","role":"attacking_fb","path":"semi_pro_breakthrough"}},
-    {"id": "walker_recovery",      "name": "Kyle Walker-type pace",      "club": "Manchester City",      "league": "Premier League", "tier": "world_class", "signature_attrs": ["speed", "acceleration", "positioning"], "anchor": [{"key":"speed","weight":5},{"key":"acceleration","weight":5},{"key":"positioning","weight":4},{"key":"one_v_one","weight":4},{"key":"focus","weight":3}], "traits": ["recovery pace specialist", "covers huge ground", "modern RB"],                "summary": "Recovery pace specialist — let him chase down anyone, the cover is automatic.", "profile":{"foot":"right","build":"athletic_runner","role":"defensive_fb","path":"english_academy"}},
-    {"id": "theo_athletic",        "name": "Theo Hernández-type rocket", "club": "AC Milan / France",    "league": "Serie A",        "tier": "elite",       "signature_attrs": ["speed", "acceleration", "shooting"], "anchor": [{"key":"speed","weight":5},{"key":"acceleration","weight":5},{"key":"shooting","weight":5},{"key":"dribbling","weight":4},{"key":"intensity","weight":4}], "traits": ["explosive vertical threat", "rocket left foot", "marauding runs"],            "summary": "Marauding left-back with a rocket left foot — overlaps like a winger.", "profile":{"foot":"left","build":"athletic_runner","role":"attacking_fb","path":"elite_european_academy"}}
+    {
+      "id": "trent_creator",
+      "name": "Trent Alexander-Arnold-type",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "decision_making",
+        "scanning"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "delivers like a midfielder",
+        "switches play",
+        "inverts at will"
+      ],
+      "summary": "Plays full-back like a deep-lying playmaker — creates more chances than most #10s.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "creative_fb",
+        "path": "english_academy"
+      },
+      "career_brief": "Career: 300+ Liverpool appearances since 18. PL champion + UCL winner. Most assists by a defender in PL history at his age. Career PL assists from RB: ~70+ (FBref all-time top-5 for full-backs). England senior squad regular."
+    },
+    {
+      "id": "cancelo_inverted",
+      "name": "João Cancelo-type inverted",
+      "club": "Various / Portugal",
+      "league": "Various",
+      "tier": "world_class",
+      "signature_attrs": [
+        "ball_control",
+        "first_touch",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "drifts into midfield",
+        "press-resistant",
+        "links phases"
+      ],
+      "summary": "Inverts into midfield to overload the centre — the prototype Pep FB.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "creative_fb",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "hakimi_explosive",
+      "name": "Achraf Hakimi-type rocket",
+      "club": "PSG / Morocco",
+      "league": "Ligue 1",
+      "tier": "elite",
+      "signature_attrs": [
+        "acceleration",
+        "speed",
+        "intensity"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "work_rate",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "bombs forward",
+        "wins foot-races",
+        "direct vertical threat"
+      ],
+      "summary": "Pure athletic engine — gets up and down the flank all day, threatens like a winger.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "attacking_fb",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: Real Madrid academy → Dortmund loan → Inter Milan → PSG. Serie A champion + Ligue 1 multiple times. Africa Cup of Nations runner-up captain with Morocco. World Cup 2022 semi-finalist (Morocco). Career FBref progressive carries per 90 from RB: ~7+ (top-3 in his position globally)."
+    },
+    {
+      "id": "carvajal_defensive",
+      "name": "Carvajal-type defensive FB",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "one_v_one",
+        "positioning",
+        "courage_in_duels"
+      ],
+      "anchor": [
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "locks down wingers",
+        "champions league veteran",
+        "captain energy"
+      ],
+      "summary": "Defends first, supports second — the most decorated modern right-back.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "defensive_fb",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "estupinan_modern",
+      "name": "Pervis Estupiñán-type",
+      "club": "Brighton",
+      "league": "Premier League",
+      "tier": "established",
+      "signature_attrs": [
+        "dribbling",
+        "work_rate",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        },
+        {
+          "key": "work_rate",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "dual threat",
+        "modern complete FB",
+        "consistent end product"
+      ],
+      "summary": "Modern complete LB — attacks and defends with equal end product.",
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "attacking_fb",
+        "path": "south_american_pipeline"
+      }
+    },
+    {
+      "id": "robertson_engine",
+      "name": "Robertson-type engine",
+      "club": "Liverpool",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "intensity",
+        "work_rate",
+        "acceleration"
+      ],
+      "anchor": [
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "work_rate",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "tireless overlaps",
+        "lung-busting runs",
+        "elite crossing"
+      ],
+      "summary": "Pure aerobic monster — never stops running, delivers like a left winger.",
+      "profile": {
+        "foot": "left",
+        "build": "athletic_runner",
+        "role": "attacking_fb",
+        "path": "semi_pro_breakthrough"
+      }
+    },
+    {
+      "id": "walker_recovery",
+      "name": "Kyle Walker-type pace",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "speed",
+        "acceleration",
+        "positioning"
+      ],
+      "anchor": [
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "positioning",
+          "weight": 4
+        },
+        {
+          "key": "one_v_one",
+          "weight": 4
+        },
+        {
+          "key": "focus",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "recovery pace specialist",
+        "covers huge ground",
+        "modern RB"
+      ],
+      "summary": "Recovery pace specialist — let him chase down anyone, the cover is automatic.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "defensive_fb",
+        "path": "english_academy"
+      }
+    },
+    {
+      "id": "theo_athletic",
+      "name": "Theo Hernández-type rocket",
+      "club": "AC Milan / France",
+      "league": "Serie A",
+      "tier": "elite",
+      "signature_attrs": [
+        "speed",
+        "acceleration",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "intensity",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "explosive vertical threat",
+        "rocket left foot",
+        "marauding runs"
+      ],
+      "summary": "Marauding left-back with a rocket left foot — overlaps like a winger.",
+      "profile": {
+        "foot": "left",
+        "build": "athletic_runner",
+        "role": "attacking_fb",
+        "path": "elite_european_academy"
+      }
+    }
   ],
-
   "defensive midfielder": [
-    {"id": "rodri_tempo",          "name": "Rodri-type tempo controller","club": "Manchester City",      "league": "Premier League", "tier": "elite",       "signature_attrs": ["passing", "scanning", "decision_making"], "anchor": [{"key":"passing","weight":5},{"key":"scanning","weight":5},{"key":"decision_making","weight":5},{"key":"first_touch","weight":4},{"key":"positioning","weight":4}], "traits": ["controls every rhythm", "Ballon d'Or winner", "press-resistant"],              "summary": "The best #6 in the world — controls every game's tempo with elite scanning.", "profile":{"foot":"right","build":"tall_powerful","role":"tempo_6","path":"elite_european_academy"}},
-    {"id": "casemiro_destroyer",   "name": "Casemiro-type destroyer",    "club": "Manchester United",    "league": "Premier League", "tier": "world_class", "signature_attrs": ["courage_in_duels", "intensity", "positioning"], "anchor": [{"key":"courage_in_duels","weight":5},{"key":"intensity","weight":5},{"key":"positioning","weight":5},{"key":"body_control","weight":4},{"key":"competitive_mindset","weight":4}], "traits": ["wins midfield wars", "screens the back four", "front-foot tackler"],          "summary": "Pure destroyer — wins the ball, kills attacks, lets others play.", "profile":{"foot":"right","build":"tall_powerful","role":"destroyer_6","path":"south_american_pipeline"}},
-    {"id": "fabinho_athletic",     "name": "Fabinho-type athletic shield","club": "Various",             "league": "Various",        "tier": "world_class", "signature_attrs": ["positioning", "intensity", "decision_making"], "anchor": [{"key":"positioning","weight":5},{"key":"intensity","weight":5},{"key":"acceleration","weight":4},{"key":"decision_making","weight":4},{"key":"courage_in_duels","weight":4}], "traits": ["covers ground", "intercepts passes", "physical screen"],                       "summary": "Athletic shield — combines positional intelligence with raw athleticism.", "profile":{"foot":"right","build":"athletic_runner","role":"destroyer_6","path":"south_american_pipeline"}},
-    {"id": "busquets_brain",       "name": "Busquets-type positional",   "club": "Various / Spain",      "league": "—",              "tier": "elite",       "signature_attrs": ["positioning", "scanning", "game_understanding"], "anchor": [{"key":"positioning","weight":5},{"key":"scanning","weight":5},{"key":"game_understanding","weight":5},{"key":"passing","weight":4},{"key":"decision_making","weight":4}], "traits": ["never out of position", "rarely sprints", "reads two moves ahead"],            "summary": "Defends without running — reads the game faster than anyone alive.", "profile":{"foot":"right","build":"compact_balanced","role":"tempo_6","path":"elite_european_academy"}},
-    {"id": "kovacic_carrier",      "name": "Kovacic-type carrier",       "club": "Manchester City",      "league": "Premier League", "tier": "world_class", "signature_attrs": ["ball_control", "first_touch", "dribbling"], "anchor": [{"key":"ball_control","weight":5},{"key":"first_touch","weight":5},{"key":"dribbling","weight":5},{"key":"decision_making","weight":4},{"key":"agility","weight":3}], "traits": ["press-resistant", "carries the ball", "elite close control"],                  "summary": "Press-resistant carrier — escapes pressure with the dribble, finds the next pass.", "profile":{"foot":"right","build":"compact_balanced","role":"carrier_8","path":"elite_european_academy"}},
-    {"id": "barella_engine",       "name": "Barella-type engine",        "club": "Inter Milan",          "league": "Serie A",        "tier": "world_class", "signature_attrs": ["work_rate", "intensity", "passing"], "anchor": [{"key":"work_rate","weight":5},{"key":"intensity","weight":5},{"key":"passing","weight":4},{"key":"competitive_mindset","weight":4},{"key":"timing_of_runs","weight":3}], "traits": ["all-action box-to-box", "leads by energy", "elite passing"],                   "summary": "All-action engine — the modern Serie A midfield prototype.", "profile":{"foot":"right","build":"compact_balanced","role":"box_to_box_8","path":"italian_serie_pipeline"}},
-    {"id": "wharton_young",        "name": "Adam Wharton-type young #6", "club": "Crystal Palace",       "league": "Premier League", "tier": "established", "signature_attrs": ["passing", "scanning", "first_touch"], "anchor": [{"key":"passing","weight":5},{"key":"scanning","weight":5},{"key":"decision_making","weight":4},{"key":"first_touch","weight":4},{"key":"focus","weight":3}], "traits": ["calm beyond his years", "switches play", "press-resistant"],                  "summary": "Young English #6 who plays with the composure of a 30-year-old veteran.", "profile":{"foot":"right","build":"compact_balanced","role":"tempo_6","path":"semi_pro_breakthrough"}},
-    {"id": "valverde_box_to_box",  "name": "Valverde-type box-to-box",   "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["intensity", "shooting", "work_rate"], "anchor": [{"key":"intensity","weight":5},{"key":"shooting","weight":5},{"key":"passing","weight":4},{"key":"work_rate","weight":5},{"key":"timing_of_runs","weight":4}], "traits": ["arrives in both boxes", "rocket shot", "lung-busting"],                       "summary": "Hybrid #6/#8 — defends like a destroyer, finishes like a striker.", "profile":{"foot":"right","build":"athletic_runner","role":"box_to_box_8","path":"south_american_pipeline"}},
-    {"id": "guimaraes_complete",   "name": "Bruno Guimarães-type",       "club": "Newcastle",            "league": "Premier League", "tier": "world_class", "signature_attrs": ["passing", "courage_in_duels", "decision_making"], "anchor": [{"key":"passing","weight":5},{"key":"courage_in_duels","weight":5},{"key":"scanning","weight":4},{"key":"decision_making","weight":5},{"key":"competitive_mindset","weight":4}], "traits": ["complete midfielder", "Brazilian flair + grit", "leadership"],                "summary": "Complete midfielder — combines Brazilian technique with European grit.", "profile":{"foot":"right","build":"compact_balanced","role":"box_to_box_8","path":"south_american_pipeline"}}
+    {
+      "id": "rodri_tempo",
+      "name": "Rodri-type tempo controller",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "scanning",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "positioning",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "controls every rhythm",
+        "Ballon d'Or winner",
+        "press-resistant"
+      ],
+      "summary": "The best #6 in the world — controls every game's tempo with elite scanning.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "tempo_6",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: Atlético → Manchester City (~€70m). 4× Premier League champion · UCL winner 2022-23 (scored the final winner). Ballon d'Or 2024. Spain's senior #6 since 22. FBref career PL passes per 90: 90+, completion ~92%."
+    },
+    {
+      "id": "casemiro_destroyer",
+      "name": "Casemiro-type destroyer",
+      "club": "Manchester United",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "courage_in_duels",
+        "intensity",
+        "positioning"
+      ],
+      "anchor": [
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "body_control",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "wins midfield wars",
+        "screens the back four",
+        "front-foot tackler"
+      ],
+      "summary": "Pure destroyer — wins the ball, kills attacks, lets others play.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "destroyer_6",
+        "path": "south_american_pipeline"
+      },
+      "career_brief": "Career: 300+ Real Madrid appearances (2013-22) · 5× UEFA Champions League winner · 3× La Liga champion · Brazil's senior #5 for a decade. Manchester United since 2022. FBref career duels won per 90: ~7+ (top in his role)."
+    },
+    {
+      "id": "fabinho_athletic",
+      "name": "Fabinho-type athletic shield",
+      "club": "Various",
+      "league": "Various",
+      "tier": "world_class",
+      "signature_attrs": [
+        "positioning",
+        "intensity",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "covers ground",
+        "intercepts passes",
+        "physical screen"
+      ],
+      "summary": "Athletic shield — combines positional intelligence with raw athleticism.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "destroyer_6",
+        "path": "south_american_pipeline"
+      }
+    },
+    {
+      "id": "busquets_brain",
+      "name": "Busquets-type positional",
+      "club": "Various / Spain",
+      "league": "—",
+      "tier": "elite",
+      "signature_attrs": [
+        "positioning",
+        "scanning",
+        "game_understanding"
+      ],
+      "anchor": [
+        {
+          "key": "positioning",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "game_understanding",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "never out of position",
+        "rarely sprints",
+        "reads two moves ahead"
+      ],
+      "summary": "Defends without running — reads the game faster than anyone alive.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "tempo_6",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "kovacic_carrier",
+      "name": "Kovacic-type carrier",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "ball_control",
+        "first_touch",
+        "dribbling"
+      ],
+      "anchor": [
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "agility",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "press-resistant",
+        "carries the ball",
+        "elite close control"
+      ],
+      "summary": "Press-resistant carrier — escapes pressure with the dribble, finds the next pass.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "carrier_8",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "barella_engine",
+      "name": "Barella-type engine",
+      "club": "Inter Milan",
+      "league": "Serie A",
+      "tier": "world_class",
+      "signature_attrs": [
+        "work_rate",
+        "intensity",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "work_rate",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "all-action box-to-box",
+        "leads by energy",
+        "elite passing"
+      ],
+      "summary": "All-action engine — the modern Serie A midfield prototype.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "box_to_box_8",
+        "path": "italian_serie_pipeline"
+      }
+    },
+    {
+      "id": "wharton_young",
+      "name": "Adam Wharton-type young #6",
+      "club": "Crystal Palace",
+      "league": "Premier League",
+      "tier": "established",
+      "signature_attrs": [
+        "passing",
+        "scanning",
+        "first_touch"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "focus",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "calm beyond his years",
+        "switches play",
+        "press-resistant"
+      ],
+      "summary": "Young English #6 who plays with the composure of a 30-year-old veteran.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "tempo_6",
+        "path": "semi_pro_breakthrough"
+      }
+    },
+    {
+      "id": "valverde_box_to_box",
+      "name": "Valverde-type box-to-box",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "intensity",
+        "shooting",
+        "work_rate"
+      ],
+      "anchor": [
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "work_rate",
+          "weight": 5
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "arrives in both boxes",
+        "rocket shot",
+        "lung-busting"
+      ],
+      "summary": "Hybrid #6/#8 — defends like a destroyer, finishes like a striker.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "box_to_box_8",
+        "path": "south_american_pipeline"
+      }
+    },
+    {
+      "id": "guimaraes_complete",
+      "name": "Bruno Guimarães-type",
+      "club": "Newcastle",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "passing",
+        "courage_in_duels",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "complete midfielder",
+        "Brazilian flair + grit",
+        "leadership"
+      ],
+      "summary": "Complete midfielder — combines Brazilian technique with European grit.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "box_to_box_8",
+        "path": "south_american_pipeline"
+      }
+    }
   ],
-
   "central midfielder": [
-    {"id": "kdb_range",            "name": "De Bruyne-type range passer","club": "Manchester City",      "league": "Premier League", "tier": "elite",       "signature_attrs": ["passing", "weak_foot", "shooting"], "anchor": [{"key":"passing","weight":5},{"key":"weak_foot","weight":4},{"key":"shooting","weight":5},{"key":"decision_making","weight":4},{"key":"first_touch","weight":3}], "traits": ["pinpoint range", "elite assists", "shoots from distance"],                    "summary": "Long-range passer who hurts defences from anywhere on the pitch.", "profile":{"foot":"right","build":"athletic_runner","role":"creator_8","path":"city_football_group"}},
-    {"id": "bellingham_engine",    "name": "Bellingham-type complete 8", "club": "Real Madrid / England","league": "La Liga",        "tier": "elite",       "signature_attrs": ["intensity", "competitive_mindset", "shooting"], "anchor": [{"key":"intensity","weight":5},{"key":"competitive_mindset","weight":5},{"key":"shooting","weight":5},{"key":"courage_in_duels","weight":4},{"key":"timing_of_runs","weight":4}], "traits": ["arrives in both boxes", "Galactico mentality", "scores goals"],                "summary": "Generational midfielder — arrives in the box, defends, leads, scores.", "profile":{"foot":"right","build":"tall_powerful","role":"box_arriving_8","path":"english_academy"}},
-    {"id": "modric_vision",        "name": "Modric-type vision",         "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["scanning", "decision_making", "game_understanding"], "anchor": [{"key":"scanning","weight":5},{"key":"passing","weight":5},{"key":"decision_making","weight":5},{"key":"game_understanding","weight":4},{"key":"ball_control","weight":4}], "traits": ["sees the picture early", "Croatian magic", "controls tempo"],                  "summary": "Sees what others miss — unlocks defences with one pass at 38 years old.", "profile":{"foot":"right","build":"small_technical","role":"deep_creator_8","path":"elite_european_academy"}},
-    {"id": "pedri_press_break",    "name": "Pedri-type press-breaker",   "club": "Barcelona",            "league": "La Liga",        "tier": "elite",       "signature_attrs": ["first_touch", "ball_control", "decision_making"], "anchor": [{"key":"first_touch","weight":5},{"key":"ball_control","weight":5},{"key":"decision_making","weight":5},{"key":"scanning","weight":4},{"key":"dribbling","weight":3}], "traits": ["wriggles out of pressure", "always plays forward", "micro-genius"],            "summary": "Press-resistant micro-genius — escapes pressure to find the next forward pass.", "profile":{"foot":"right","build":"small_technical","role":"press_resistant_8","path":"south_american_pipeline"}},
-    {"id": "rice_engine",          "name": "Declan Rice-type engine",    "club": "Arsenal",              "league": "Premier League", "tier": "elite",       "signature_attrs": ["work_rate", "intensity", "courage_in_duels"], "anchor": [{"key":"work_rate","weight":5},{"key":"intensity","weight":5},{"key":"courage_in_duels","weight":5},{"key":"passing","weight":4},{"key":"competitive_mindset","weight":4}], "traits": ["covers every blade", "elite duels", "modern English #6/8"],                   "summary": "Modern English engine — covers ground, wins duels, leads through energy.", "profile":{"foot":"right","build":"tall_powerful","role":"box_to_box_8","path":"english_academy"}},
-    {"id": "kroos_metronome",      "name": "Kroos-type metronome",       "club": "Real Madrid alumni",   "league": "La Liga",        "tier": "elite",       "signature_attrs": ["passing", "first_touch", "scanning"], "anchor": [{"key":"passing","weight":5},{"key":"first_touch","weight":4},{"key":"scanning","weight":4},{"key":"focus","weight":4},{"key":"decision_making","weight":4}], "traits": ["rarely misplaces a pass", "perfect weight", "veteran composure"],              "summary": "The German metronome — every pass perfectly weighted, the engine never breaks.", "profile":{"foot":"right","build":"compact_balanced","role":"deep_creator_8","path":"elite_european_academy"}},
-    {"id": "tonali_complete",      "name": "Sandro Tonali-type",         "club": "Newcastle / Italy",    "league": "Premier League", "tier": "world_class", "signature_attrs": ["passing", "scanning", "intensity"], "anchor": [{"key":"passing","weight":5},{"key":"scanning","weight":4},{"key":"decision_making","weight":4},{"key":"intensity","weight":5},{"key":"work_rate","weight":3}], "traits": ["Italian composure", "elite range", "covers ground"],                          "summary": "Italian composure with a 90-minute engine — controls tempo and defends.", "profile":{"foot":"right","build":"compact_balanced","role":"box_to_box_8","path":"italian_serie_pipeline"}},
-    {"id": "mainoo_young",         "name": "Kobbie Mainoo-type",         "club": "Manchester United",    "league": "Premier League", "tier": "established", "signature_attrs": ["first_touch", "ball_control", "decision_making"], "anchor": [{"key":"first_touch","weight":5},{"key":"ball_control","weight":5},{"key":"scanning","weight":4},{"key":"decision_making","weight":5},{"key":"focus","weight":3}], "traits": ["academy prodigy", "press-resistant", "calm beyond his years"],                "summary": "Young academy prodigy with the composure of a senior midfielder.", "profile":{"foot":"right","build":"compact_balanced","role":"press_resistant_8","path":"english_academy"}},
-    {"id": "wirtz_creator",        "name": "Florian Wirtz-type",         "club": "Bayer Leverkusen",     "league": "Bundesliga",     "tier": "world_class", "signature_attrs": ["dribbling", "decision_making", "passing"], "anchor": [{"key":"dribbling","weight":5},{"key":"decision_making","weight":5},{"key":"passing","weight":4},{"key":"first_touch","weight":4},{"key":"ball_control","weight":4}], "traits": ["German wonderkid", "creates chances", "carries the ball"],                    "summary": "Creative engine — beats his man and finds the killer ball in the same motion.", "profile":{"foot":"right","build":"compact_balanced","role":"creator_8","path":"elite_european_academy"}},
-    {"id": "fabian_compact",       "name": "Fabián Ruiz-type",           "club": "PSG / Spain",          "league": "Ligue 1",        "tier": "world_class", "signature_attrs": ["passing", "weak_foot", "first_touch"], "anchor": [{"key":"passing","weight":5},{"key":"weak_foot","weight":4},{"key":"first_touch","weight":4},{"key":"decision_making","weight":4},{"key":"ball_control","weight":3}], "traits": ["both-footed range", "tall metronome", "calm in build-up"],                    "summary": "Both-footed Spanish metronome — composes through pressure with elite range.", "profile":{"foot":"both","build":"tall_powerful","role":"deep_creator_8","path":"elite_european_academy"}}
+    {
+      "id": "kdb_range",
+      "name": "De Bruyne-type range passer",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "weak_foot",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "weak_foot",
+          "weight": 4
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "pinpoint range",
+        "elite assists",
+        "shoots from distance"
+      ],
+      "summary": "Long-range passer who hurts defences from anywhere on the pitch.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "creator_8",
+        "path": "city_football_group"
+      },
+      "career_brief": "Career: see De Bruyne — 400+ Manchester City appearances, 6× PL champion, PFA Player of the Year twice. PL assists per 90: 0.38 (top-5 all-time outfield)."
+    },
+    {
+      "id": "bellingham_engine",
+      "name": "Bellingham-type complete 8",
+      "club": "Real Madrid / England",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "intensity",
+        "competitive_mindset",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 4
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "arrives in both boxes",
+        "Galactico mentality",
+        "scores goals"
+      ],
+      "summary": "Generational midfielder — arrives in the box, defends, leads, scores.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "box_arriving_8",
+        "path": "english_academy"
+      },
+      "career_brief": "Career: Birmingham → Dortmund → Real Madrid (2023, ~€103m). La Liga top scorer joint-runner-up in his debut Madrid season. England No. 10. La Liga 2023-24 champion + UCL 2023-24 champion in his first Madrid season. Kopa Trophy 2023. La Liga goals per 90 in season 1: ~0.65."
+    },
+    {
+      "id": "modric_vision",
+      "name": "Modric-type vision",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "scanning",
+        "decision_making",
+        "game_understanding"
+      ],
+      "anchor": [
+        {
+          "key": "scanning",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "game_understanding",
+          "weight": 4
+        },
+        {
+          "key": "ball_control",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "sees the picture early",
+        "Croatian magic",
+        "controls tempo"
+      ],
+      "summary": "Sees what others miss — unlocks defences with one pass at 38 years old.",
+      "profile": {
+        "foot": "right",
+        "build": "small_technical",
+        "role": "deep_creator_8",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: see Modric-type composer — 750+ club appearances, 180+ Croatia caps, 6× UCL, Ballon d'Or 2018, FBref career pass completion ~88%. Still starting La Liga matches at 38."
+    },
+    {
+      "id": "pedri_press_break",
+      "name": "Pedri-type press-breaker",
+      "club": "Barcelona",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "first_touch",
+        "ball_control",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "dribbling",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "wriggles out of pressure",
+        "always plays forward",
+        "micro-genius"
+      ],
+      "summary": "Press-resistant micro-genius — escapes pressure to find the next forward pass.",
+      "profile": {
+        "foot": "right",
+        "build": "small_technical",
+        "role": "press_resistant_8",
+        "path": "south_american_pipeline"
+      },
+      "career_brief": "Career: La Masia → Barcelona at 17. Euro 2020 Young Player of the Tournament. Kopa Trophy 2021. Career FBref pass completion in tight zones: ~91%. Euro 2024 winner."
+    },
+    {
+      "id": "rice_engine",
+      "name": "Declan Rice-type engine",
+      "club": "Arsenal",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "work_rate",
+        "intensity",
+        "courage_in_duels"
+      ],
+      "anchor": [
+        {
+          "key": "work_rate",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "covers every blade",
+        "elite duels",
+        "modern English #6/8"
+      ],
+      "summary": "Modern English engine — covers ground, wins duels, leads through energy.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "box_to_box_8",
+        "path": "english_academy"
+      }
+    },
+    {
+      "id": "kroos_metronome",
+      "name": "Kroos-type metronome",
+      "club": "Real Madrid alumni",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "first_touch",
+        "scanning"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "focus",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "rarely misplaces a pass",
+        "perfect weight",
+        "veteran composure"
+      ],
+      "summary": "The German metronome — every pass perfectly weighted, the engine never breaks.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "deep_creator_8",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "tonali_complete",
+      "name": "Sandro Tonali-type",
+      "club": "Newcastle / Italy",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "passing",
+        "scanning",
+        "intensity"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "work_rate",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "Italian composure",
+        "elite range",
+        "covers ground"
+      ],
+      "summary": "Italian composure with a 90-minute engine — controls tempo and defends.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "box_to_box_8",
+        "path": "italian_serie_pipeline"
+      }
+    },
+    {
+      "id": "mainoo_young",
+      "name": "Kobbie Mainoo-type",
+      "club": "Manchester United",
+      "league": "Premier League",
+      "tier": "established",
+      "signature_attrs": [
+        "first_touch",
+        "ball_control",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "scanning",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "focus",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "academy prodigy",
+        "press-resistant",
+        "calm beyond his years"
+      ],
+      "summary": "Young academy prodigy with the composure of a senior midfielder.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "press_resistant_8",
+        "path": "english_academy"
+      }
+    },
+    {
+      "id": "wirtz_creator",
+      "name": "Florian Wirtz-type",
+      "club": "Bayer Leverkusen",
+      "league": "Bundesliga",
+      "tier": "world_class",
+      "signature_attrs": [
+        "dribbling",
+        "decision_making",
+        "passing"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "passing",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "ball_control",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "German wonderkid",
+        "creates chances",
+        "carries the ball"
+      ],
+      "summary": "Creative engine — beats his man and finds the killer ball in the same motion.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "creator_8",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "fabian_compact",
+      "name": "Fabián Ruiz-type",
+      "club": "PSG / Spain",
+      "league": "Ligue 1",
+      "tier": "world_class",
+      "signature_attrs": [
+        "passing",
+        "weak_foot",
+        "first_touch"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "weak_foot",
+          "weight": 4
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "ball_control",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "both-footed range",
+        "tall metronome",
+        "calm in build-up"
+      ],
+      "summary": "Both-footed Spanish metronome — composes through pressure with elite range.",
+      "profile": {
+        "foot": "both",
+        "build": "tall_powerful",
+        "role": "deep_creator_8",
+        "path": "elite_european_academy"
+      }
+    }
   ],
-
   "winger": [
-    {"id": "mbappe_explosive",     "name": "Mbappé-type explosive",      "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["acceleration", "speed", "shooting"], "anchor": [{"key":"acceleration","weight":5},{"key":"speed","weight":5},{"key":"shooting","weight":5},{"key":"dribbling","weight":4},{"key":"one_v_one","weight":3}], "traits": ["beats his man for pace", "elite finish", "world-class threat"],               "summary": "Pure vertical threat — pace and finish in the same player.", "profile":{"foot":"right","build":"athletic_runner","role":"direct_winger","path":"elite_european_academy"}},
-    {"id": "vinicius_dribbler",    "name": "Vinícius-type 1v1 dribbler", "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["dribbling", "one_v_one", "acceleration"], "anchor": [{"key":"dribbling","weight":5},{"key":"one_v_one","weight":5},{"key":"acceleration","weight":5},{"key":"agility","weight":4},{"key":"balance","weight":3}], "traits": ["beats his man cold", "elite close control", "Brazilian flair"],               "summary": "1v1 specialist — isolates and beats his marker every single time.", "profile":{"foot":"right","build":"compact_balanced","role":"dribble_winger","path":"south_american_pipeline"}},
-    {"id": "salah_inverted",       "name": "Salah-type cutting inside",  "club": "Liverpool",            "league": "Premier League", "tier": "elite",       "signature_attrs": ["shooting", "dribbling", "decision_making"], "anchor": [{"key":"shooting","weight":5},{"key":"dribbling","weight":5},{"key":"one_v_one","weight":4},{"key":"decision_making","weight":4},{"key":"acceleration","weight":4}], "traits": ["cuts onto left foot", "elite goalscorer", "consistent threat"],               "summary": "Inverted winger — cuts inside and finishes like a striker.", "profile":{"foot":"left","build":"compact_balanced","role":"inverted_winger","path":"egyptian_pyramid"}},
-    {"id": "saka_two_footed",      "name": "Bukayo Saka-type two-footed","club": "Arsenal",              "league": "Premier League", "tier": "elite",       "signature_attrs": ["passing", "decision_making", "weak_foot"], "anchor": [{"key":"passing","weight":5},{"key":"decision_making","weight":5},{"key":"dribbling","weight":4},{"key":"weak_foot","weight":5},{"key":"first_touch","weight":3}], "traits": ["plays either flank", "elite delivery", "two-footed"],                          "summary": "Two-footed creator — equally dangerous either side, creates as much as he finishes.", "profile":{"foot":"both","build":"compact_balanced","role":"creator_winger","path":"english_academy"}},
-    {"id": "doku_explosive",       "name": "Jeremy Doku-type rocket",    "club": "Manchester City",      "league": "Premier League", "tier": "world_class", "signature_attrs": ["acceleration", "agility", "dribbling"], "anchor": [{"key":"acceleration","weight":5},{"key":"agility","weight":5},{"key":"dribbling","weight":5},{"key":"balance","weight":4},{"key":"speed","weight":3}], "traits": ["lightning quick first step", "wriggly", "down the line"],                     "summary": "Lightning-quick winger — goes outside the FB and crosses with venom.", "profile":{"foot":"left","build":"compact_balanced","role":"direct_winger","path":"elite_european_academy"}},
-    {"id": "leao_long_range",      "name": "Rafael Leão-type",           "club": "AC Milan",             "league": "Serie A",        "tier": "world_class", "signature_attrs": ["speed", "dribbling", "balance"], "anchor": [{"key":"speed","weight":5},{"key":"dribbling","weight":5},{"key":"first_touch","weight":4},{"key":"balance","weight":4},{"key":"acceleration","weight":3}], "traits": ["effortless dribbler", "long stride", "elegant pace"],                          "summary": "Elegant long-strider — covers ground with effortless pace, dribbles through duels.", "profile":{"foot":"right","build":"tall_powerful","role":"direct_winger","path":"elite_european_academy"}},
-    {"id": "kvaratskhelia_flair",  "name": "Kvaratskhelia-type flair",   "club": "PSG",                  "league": "Ligue 1",        "tier": "world_class", "signature_attrs": ["dribbling", "one_v_one", "ball_control"], "anchor": [{"key":"dribbling","weight":5},{"key":"one_v_one","weight":5},{"key":"ball_control","weight":5},{"key":"shooting","weight":4},{"key":"agility","weight":3}], "traits": ["flair dribbler", "skills + end product", "Georgian magic"],                   "summary": "Flair dribbler with end product — skill moves and finishes in equal measure.", "profile":{"foot":"right","build":"compact_balanced","role":"dribble_winger","path":"georgian_balkan_pipeline"}},
-    {"id": "olise_creator_w",      "name": "Olise-type creator winger",  "club": "Bayern Munich",        "league": "Bundesliga",     "tier": "world_class", "signature_attrs": ["passing", "first_touch", "weak_foot"], "anchor": [{"key":"passing","weight":5},{"key":"first_touch","weight":4},{"key":"weak_foot","weight":5},{"key":"decision_making","weight":4},{"key":"dribbling","weight":3}], "traits": ["elite cross", "left-foot magic", "playmaker from wide"],                       "summary": "Playmaker from the wing — creates more chances than most #10s.", "profile":{"foot":"left","build":"compact_balanced","role":"creator_winger","path":"released_then_returned"}}
+    {
+      "id": "mbappe_explosive",
+      "name": "Mbappé-type explosive",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "acceleration",
+        "speed",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "one_v_one",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "beats his man for pace",
+        "elite finish",
+        "world-class threat"
+      ],
+      "summary": "Pure vertical threat — pace and finish in the same player.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "direct_winger",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: 250+ PSG appearances · 6× Ligue 1 champion · 2018 World Cup winner (scored in the final at 19). PSG club record top goalscorer · 40+ France goals before 25 · joined Real Madrid 2024. Career club goals per 90: ~0.85."
+    },
+    {
+      "id": "vinicius_dribbler",
+      "name": "Vinícius-type 1v1 dribbler",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "dribbling",
+        "one_v_one",
+        "acceleration"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "agility",
+          "weight": 4
+        },
+        {
+          "key": "balance",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "beats his man cold",
+        "elite close control",
+        "Brazilian flair"
+      ],
+      "summary": "1v1 specialist — isolates and beats his marker every single time.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "dribble_winger",
+        "path": "south_american_pipeline"
+      },
+      "career_brief": "Career: Flamengo → Real Madrid at 18 (~€45m). 5× La Liga champion · 2× UEFA Champions League winner. Scored the winning goal in the 2022 UCL final. Brazilian senior squad regular since 19. La Liga career dribbles per 90: ~5.2 (FBref top-3 in the league)."
+    },
+    {
+      "id": "salah_inverted",
+      "name": "Salah-type cutting inside",
+      "club": "Liverpool",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "shooting",
+        "dribbling",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "one_v_one",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "cuts onto left foot",
+        "elite goalscorer",
+        "consistent threat"
+      ],
+      "summary": "Inverted winger — cuts inside and finishes like a striker.",
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "inverted_winger",
+        "path": "egyptian_pyramid"
+      },
+      "career_brief": "Career: 350+ Liverpool appearances · 2× Premier League Golden Boot (2017-18 record 32 goals, 2018-19). PL champion + UCL champion · 2017-18 PFA Player of the Year. Egypt's all-time top scorer. Career club goals per 90: ~0.65."
+    },
+    {
+      "id": "saka_two_footed",
+      "name": "Bukayo Saka-type two-footed",
+      "club": "Arsenal",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "decision_making",
+        "weak_foot"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "plays either flank",
+        "elite delivery",
+        "two-footed"
+      ],
+      "summary": "Two-footed creator — equally dangerous either side, creates as much as he finishes.",
+      "profile": {
+        "foot": "both",
+        "build": "compact_balanced",
+        "role": "creator_winger",
+        "path": "english_academy"
+      },
+      "career_brief": "Career: 200+ Arsenal appearances since 17 · Arsenal Player of the Season 3× consecutively (2020-21, 2021-22, 2022-23). England senior debut at 19. Premier League most goal involvements per 90 from a winger in 2022-23."
+    },
+    {
+      "id": "doku_explosive",
+      "name": "Jeremy Doku-type rocket",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "acceleration",
+        "agility",
+        "dribbling"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "agility",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "speed",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "lightning quick first step",
+        "wriggly",
+        "down the line"
+      ],
+      "summary": "Lightning-quick winger — goes outside the FB and crosses with venom.",
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "direct_winger",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "leao_long_range",
+      "name": "Rafael Leão-type",
+      "club": "AC Milan",
+      "league": "Serie A",
+      "tier": "world_class",
+      "signature_attrs": [
+        "speed",
+        "dribbling",
+        "balance"
+      ],
+      "anchor": [
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "acceleration",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "effortless dribbler",
+        "long stride",
+        "elegant pace"
+      ],
+      "summary": "Elegant long-strider — covers ground with effortless pace, dribbles through duels.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "direct_winger",
+        "path": "elite_european_academy"
+      }
+    },
+    {
+      "id": "kvaratskhelia_flair",
+      "name": "Kvaratskhelia-type flair",
+      "club": "PSG",
+      "league": "Ligue 1",
+      "tier": "world_class",
+      "signature_attrs": [
+        "dribbling",
+        "one_v_one",
+        "ball_control"
+      ],
+      "anchor": [
+        {
+          "key": "dribbling",
+          "weight": 5
+        },
+        {
+          "key": "one_v_one",
+          "weight": 5
+        },
+        {
+          "key": "ball_control",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 4
+        },
+        {
+          "key": "agility",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "flair dribbler",
+        "skills + end product",
+        "Georgian magic"
+      ],
+      "summary": "Flair dribbler with end product — skill moves and finishes in equal measure.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "dribble_winger",
+        "path": "georgian_balkan_pipeline"
+      }
+    },
+    {
+      "id": "olise_creator_w",
+      "name": "Olise-type creator winger",
+      "club": "Bayern Munich",
+      "league": "Bundesliga",
+      "tier": "world_class",
+      "signature_attrs": [
+        "passing",
+        "first_touch",
+        "weak_foot"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "dribbling",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "elite cross",
+        "left-foot magic",
+        "playmaker from wide"
+      ],
+      "summary": "Playmaker from the wing — creates more chances than most #10s.",
+      "profile": {
+        "foot": "left",
+        "build": "compact_balanced",
+        "role": "creator_winger",
+        "path": "released_then_returned"
+      }
+    }
   ],
-
   "striker": [
-    {"id": "haaland_predator",     "name": "Haaland-type penalty-box",   "club": "Manchester City",      "league": "Premier League", "tier": "elite",       "signature_attrs": ["shooting", "timing_of_runs", "off_ball_movement"], "anchor": [{"key":"shooting","weight":5},{"key":"timing_of_runs","weight":5},{"key":"off_ball_movement","weight":5},{"key":"acceleration","weight":4},{"key":"courage_in_duels","weight":3}], "traits": ["clinical finisher", "lives in the box", "world-class number 9"],              "summary": "Pure penalty-box predator — every chance finishes in the back of the net.", "profile":{"foot":"left","build":"tall_powerful","role":"penalty_box_9","path":"scandinavian_academy"}},
-    {"id": "mbappe_runner_9",      "name": "Mbappé-as-9 explosive",      "club": "Real Madrid",          "league": "La Liga",        "tier": "elite",       "signature_attrs": ["acceleration", "speed", "shooting"], "anchor": [{"key":"acceleration","weight":5},{"key":"speed","weight":5},{"key":"shooting","weight":5},{"key":"off_ball_movement","weight":4},{"key":"dribbling","weight":3}], "traits": ["beats the last line", "stretches defences", "elite finish"],                  "summary": "Stretches teams by running in behind — pure pace forces deeper lines.", "profile":{"foot":"right","build":"athletic_runner","role":"runner_9","path":"elite_european_academy"}},
-    {"id": "kane_complete",        "name": "Harry Kane-type deep-lying", "club": "Bayern Munich",        "league": "Bundesliga",     "tier": "elite",       "signature_attrs": ["passing", "shooting", "decision_making"], "anchor": [{"key":"passing","weight":5},{"key":"first_touch","weight":4},{"key":"shooting","weight":5},{"key":"decision_making","weight":5},{"key":"game_understanding","weight":4}], "traits": ["drops to link", "shoots from distance", "creates + finishes"],                "summary": "Plays as a #9 + #10 hybrid — drops deep, links play, finishes chances.", "profile":{"foot":"right","build":"tall_powerful","role":"complete_9","path":"english_academy"}},
-    {"id": "lewandowski_finisher", "name": "Lewandowski-type finisher",  "club": "Barcelona",            "league": "La Liga",        "tier": "elite",       "signature_attrs": ["shooting", "first_touch", "weak_foot"], "anchor": [{"key":"shooting","weight":5},{"key":"first_touch","weight":5},{"key":"weak_foot","weight":5},{"key":"balance","weight":4},{"key":"body_control","weight":3}], "traits": ["both-footed finishing", "all kinds of strikes", "elite first touch"],         "summary": "Pure technical executioner — finishes with whatever foot, from any angle.", "profile":{"foot":"both","build":"tall_powerful","role":"complete_9","path":"polish_eastern_european"}},
-    {"id": "lautaro_relentless",   "name": "Lautaro Martínez-type",      "club": "Inter Milan",          "league": "Serie A",        "tier": "elite",       "signature_attrs": ["work_rate", "shooting", "off_ball_movement"], "anchor": [{"key":"work_rate","weight":5},{"key":"intensity","weight":5},{"key":"shooting","weight":5},{"key":"off_ball_movement","weight":4},{"key":"competitive_mindset","weight":4}], "traits": ["relentless presser", "clinical finish", "Argentine grit"],                    "summary": "Relentless presser — leads the front-line press AND finishes chances.", "profile":{"foot":"right","build":"compact_balanced","role":"pressing_9","path":"south_american_pipeline"}},
-    {"id": "isak_complete",        "name": "Alexander Isak-type",        "club": "Newcastle",            "league": "Premier League", "tier": "world_class", "signature_attrs": ["first_touch", "shooting", "balance"], "anchor": [{"key":"first_touch","weight":5},{"key":"shooting","weight":5},{"key":"balance","weight":4},{"key":"decision_making","weight":4},{"key":"weak_foot","weight":4}], "traits": ["elegant complete striker", "elite finish", "both-footed"],                    "summary": "Elegant complete striker — both-footed, intelligent movement, clinical finish.", "profile":{"foot":"both","build":"tall_powerful","role":"complete_9","path":"scandinavian_academy"}},
-    {"id": "osimhen_athletic",     "name": "Victor Osimhen-type",        "club": "Napoli / Galatasaray", "league": "Serie A",        "tier": "world_class", "signature_attrs": ["acceleration", "courage_in_duels", "shooting"], "anchor": [{"key":"acceleration","weight":5},{"key":"courage_in_duels","weight":5},{"key":"balance","weight":4},{"key":"shooting","weight":5},{"key":"body_control","weight":3}], "traits": ["athletic monster", "aerial duels", "in behind"],                              "summary": "Athletic monster — beats defenders for pace, in the air, and on the ground.", "profile":{"foot":"right","build":"athletic_runner","role":"runner_9","path":"african_academy"}},
-    {"id": "watkins_complete",     "name": "Ollie Watkins-type complete","club": "Aston Villa / England","league": "Premier League","tier": "world_class", "signature_attrs": ["off_ball_movement", "timing_of_runs", "shooting"], "anchor": [{"key":"off_ball_movement","weight":5},{"key":"timing_of_runs","weight":5},{"key":"shooting","weight":4},{"key":"acceleration","weight":4},{"key":"work_rate","weight":3}], "traits": ["English #9 prototype", "elite movement", "consistent goals"],                "summary": "Modern English #9 — elite movement, consistent finishing, all-action work rate.", "profile":{"foot":"right","build":"compact_balanced","role":"complete_9","path":"semi_pro_breakthrough"}},
-    {"id": "jackson_runner",       "name": "Nicolas Jackson-type",       "club": "Chelsea",              "league": "Premier League", "tier": "established", "signature_attrs": ["acceleration", "speed", "timing_of_runs"], "anchor": [{"key":"acceleration","weight":5},{"key":"speed","weight":5},{"key":"timing_of_runs","weight":5},{"key":"off_ball_movement","weight":4},{"key":"work_rate","weight":3}], "traits": ["beats the last line", "endless runs", "stretches defences"],                  "summary": "Marauding striker — endless runs in behind stretch defensive lines thin.", "profile":{"foot":"right","build":"athletic_runner","role":"runner_9","path":"african_academy"}},
-    {"id": "darwin_chaos",         "name": "Darwin Núñez-type chaos",    "club": "Various / Uruguay",    "league": "—",              "tier": "established", "signature_attrs": ["acceleration", "intensity", "courage_in_duels"], "anchor": [{"key":"acceleration","weight":5},{"key":"intensity","weight":5},{"key":"shooting","weight":4},{"key":"courage_in_duels","weight":5},{"key":"work_rate","weight":3}], "traits": ["chaotic energy", "high xG", "raw athleticism"],                              "summary": "Chaotic energy striker — high-xG misses but eventually everything goes in.", "profile":{"foot":"right","build":"athletic_runner","role":"pressing_9","path":"south_american_pipeline"}}
+    {
+      "id": "haaland_predator",
+      "name": "Haaland-type penalty-box",
+      "club": "Manchester City",
+      "league": "Premier League",
+      "tier": "elite",
+      "signature_attrs": [
+        "shooting",
+        "timing_of_runs",
+        "off_ball_movement"
+      ],
+      "anchor": [
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 5
+        },
+        {
+          "key": "off_ball_movement",
+          "weight": 5
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "clinical finisher",
+        "lives in the box",
+        "world-class number 9"
+      ],
+      "summary": "Pure penalty-box predator — every chance finishes in the back of the net.",
+      "profile": {
+        "foot": "left",
+        "build": "tall_powerful",
+        "role": "penalty_box_9",
+        "path": "scandinavian_academy"
+      },
+      "career_brief": "Career: Salzburg → Dortmund → Manchester City. Premier League Golden Boot 2022-23 (36 goals — single-season PL record). FWA Footballer of the Year 2022-23. UCL champion 2022-23. Bundesliga champion. Career goals per 90 in all competitions: ~0.95."
+    },
+    {
+      "id": "mbappe_runner_9",
+      "name": "Mbappé-as-9 explosive",
+      "club": "Real Madrid",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "acceleration",
+        "speed",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "off_ball_movement",
+          "weight": 4
+        },
+        {
+          "key": "dribbling",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "beats the last line",
+        "stretches defences",
+        "elite finish"
+      ],
+      "summary": "Stretches teams by running in behind — pure pace forces deeper lines.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "runner_9",
+        "path": "elite_european_academy"
+      },
+      "career_brief": "Career: see Mbappé-explosive — 250+ PSG appearances, World Cup winner 2018. Career club goals per 90: ~0.85."
+    },
+    {
+      "id": "kane_complete",
+      "name": "Harry Kane-type deep-lying",
+      "club": "Bayern Munich",
+      "league": "Bundesliga",
+      "tier": "elite",
+      "signature_attrs": [
+        "passing",
+        "shooting",
+        "decision_making"
+      ],
+      "anchor": [
+        {
+          "key": "passing",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 4
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "decision_making",
+          "weight": 5
+        },
+        {
+          "key": "game_understanding",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "drops to link",
+        "shoots from distance",
+        "creates + finishes"
+      ],
+      "summary": "Plays as a #9 + #10 hybrid — drops deep, links play, finishes chances.",
+      "profile": {
+        "foot": "right",
+        "build": "tall_powerful",
+        "role": "complete_9",
+        "path": "english_academy"
+      },
+      "career_brief": "Career: Tottenham all-time top scorer (213 PL goals — 2nd all-time after Shearer). 3× PL Golden Boot. England's all-time top scorer. Bundesliga 2023-24: 36 goals in 32 league games. Career club goals per 90: ~0.70."
+    },
+    {
+      "id": "lewandowski_finisher",
+      "name": "Lewandowski-type finisher",
+      "club": "Barcelona",
+      "league": "La Liga",
+      "tier": "elite",
+      "signature_attrs": [
+        "shooting",
+        "first_touch",
+        "weak_foot"
+      ],
+      "anchor": [
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "weak_foot",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "body_control",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "both-footed finishing",
+        "all kinds of strikes",
+        "elite first touch"
+      ],
+      "summary": "Pure technical executioner — finishes with whatever foot, from any angle.",
+      "profile": {
+        "foot": "both",
+        "build": "tall_powerful",
+        "role": "complete_9",
+        "path": "polish_eastern_european"
+      }
+    },
+    {
+      "id": "lautaro_relentless",
+      "name": "Lautaro Martínez-type",
+      "club": "Inter Milan",
+      "league": "Serie A",
+      "tier": "elite",
+      "signature_attrs": [
+        "work_rate",
+        "shooting",
+        "off_ball_movement"
+      ],
+      "anchor": [
+        {
+          "key": "work_rate",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "off_ball_movement",
+          "weight": 4
+        },
+        {
+          "key": "competitive_mindset",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "relentless presser",
+        "clinical finish",
+        "Argentine grit"
+      ],
+      "summary": "Relentless presser — leads the front-line press AND finishes chances.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "pressing_9",
+        "path": "south_american_pipeline"
+      }
+    },
+    {
+      "id": "isak_complete",
+      "name": "Alexander Isak-type",
+      "club": "Newcastle",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "first_touch",
+        "shooting",
+        "balance"
+      ],
+      "anchor": [
+        {
+          "key": "first_touch",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "decision_making",
+          "weight": 4
+        },
+        {
+          "key": "weak_foot",
+          "weight": 4
+        }
+      ],
+      "traits": [
+        "elegant complete striker",
+        "elite finish",
+        "both-footed"
+      ],
+      "summary": "Elegant complete striker — both-footed, intelligent movement, clinical finish.",
+      "profile": {
+        "foot": "both",
+        "build": "tall_powerful",
+        "role": "complete_9",
+        "path": "scandinavian_academy"
+      }
+    },
+    {
+      "id": "osimhen_athletic",
+      "name": "Victor Osimhen-type",
+      "club": "Napoli / Galatasaray",
+      "league": "Serie A",
+      "tier": "world_class",
+      "signature_attrs": [
+        "acceleration",
+        "courage_in_duels",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "balance",
+          "weight": 4
+        },
+        {
+          "key": "shooting",
+          "weight": 5
+        },
+        {
+          "key": "body_control",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "athletic monster",
+        "aerial duels",
+        "in behind"
+      ],
+      "summary": "Athletic monster — beats defenders for pace, in the air, and on the ground.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "runner_9",
+        "path": "african_academy"
+      }
+    },
+    {
+      "id": "watkins_complete",
+      "name": "Ollie Watkins-type complete",
+      "club": "Aston Villa / England",
+      "league": "Premier League",
+      "tier": "world_class",
+      "signature_attrs": [
+        "off_ball_movement",
+        "timing_of_runs",
+        "shooting"
+      ],
+      "anchor": [
+        {
+          "key": "off_ball_movement",
+          "weight": 5
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 4
+        },
+        {
+          "key": "acceleration",
+          "weight": 4
+        },
+        {
+          "key": "work_rate",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "English #9 prototype",
+        "elite movement",
+        "consistent goals"
+      ],
+      "summary": "Modern English #9 — elite movement, consistent finishing, all-action work rate.",
+      "profile": {
+        "foot": "right",
+        "build": "compact_balanced",
+        "role": "complete_9",
+        "path": "semi_pro_breakthrough"
+      }
+    },
+    {
+      "id": "jackson_runner",
+      "name": "Nicolas Jackson-type",
+      "club": "Chelsea",
+      "league": "Premier League",
+      "tier": "established",
+      "signature_attrs": [
+        "acceleration",
+        "speed",
+        "timing_of_runs"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "speed",
+          "weight": 5
+        },
+        {
+          "key": "timing_of_runs",
+          "weight": 5
+        },
+        {
+          "key": "off_ball_movement",
+          "weight": 4
+        },
+        {
+          "key": "work_rate",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "beats the last line",
+        "endless runs",
+        "stretches defences"
+      ],
+      "summary": "Marauding striker — endless runs in behind stretch defensive lines thin.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "runner_9",
+        "path": "african_academy"
+      }
+    },
+    {
+      "id": "darwin_chaos",
+      "name": "Darwin Núñez-type chaos",
+      "club": "Various / Uruguay",
+      "league": "—",
+      "tier": "established",
+      "signature_attrs": [
+        "acceleration",
+        "intensity",
+        "courage_in_duels"
+      ],
+      "anchor": [
+        {
+          "key": "acceleration",
+          "weight": 5
+        },
+        {
+          "key": "intensity",
+          "weight": 5
+        },
+        {
+          "key": "shooting",
+          "weight": 4
+        },
+        {
+          "key": "courage_in_duels",
+          "weight": 5
+        },
+        {
+          "key": "work_rate",
+          "weight": 3
+        }
+      ],
+      "traits": [
+        "chaotic energy",
+        "high xG",
+        "raw athleticism"
+      ],
+      "summary": "Chaotic energy striker — high-xG misses but eventually everything goes in.",
+      "profile": {
+        "foot": "right",
+        "build": "athletic_runner",
+        "role": "pressing_9",
+        "path": "south_american_pipeline"
+      }
+    }
   ]
 }

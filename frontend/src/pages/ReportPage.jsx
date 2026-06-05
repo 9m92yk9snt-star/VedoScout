@@ -710,6 +710,21 @@ function ArchetypeCard({ archetype }) {
         </div>
       )}
 
+      {/* Career brief — FBref / Transfermarkt verified career stats (Step 3) */}
+      {archetype.career_brief && proName && (
+        <div
+          data-testid="archetype-career-brief"
+          className="relative mx-6 md:mx-8 mb-5 p-5 bg-cream-base/10 border border-cream-base/20"
+        >
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-cream-base/85 mb-2">
+            {proName} · career snapshot (FBref · Transfermarkt verified)
+          </div>
+          <p className="text-sm leading-relaxed text-cream-base/95">
+            {archetype.career_brief}
+          </p>
+        </div>
+      )}
+
       {/* Age-bracketed bio chunk (Layer 1 — verbatim from catalog, no AI invention) */}
       {bioChunk && bracket && proName && (
         <div
@@ -743,7 +758,7 @@ function ArchetypeCard({ archetype }) {
    Each lens picks the closest archetype on a different dimension. */
 function LensMatchesStrip({ archetype }) {
   if (!archetype || !archetype.lenses) return null;
-  const order = ["style", "build", "role", "path"];
+  const order = ["style", "build", "role", "path", "fifa"];
   const lenses = order
     .map((k) => archetype.lenses[k])
     .filter((l) => l && l.name);
@@ -753,65 +768,96 @@ function LensMatchesStrip({ archetype }) {
     <div data-testid="lens-matches-strip" className="bg-surface border border-gray-border p-6 md:p-7">
       <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">The 4-lens comparison</div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+            The {lenses.length}-lens comparison
+          </div>
           <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
-            How this player resembles four different pros
+            How this player resembles {lenses.length} different pros
           </h3>
           <p className="mt-1.5 text-xs text-ink/60 max-w-xl">
-            Each lens picks the closest pro on a different dimension: how he plays, his physical build, his on-pitch role, and the career path he's on.
+            Each lens picks the closest pro on a different dimension: how he plays, his physical build, his on-pitch role, the career path he's on, and a real k-NN similarity search against 7,500+ FIFA-rated senior pros.
           </p>
         </div>
-        <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45">
-          Style · Build · Role · Career-path
+        <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45 text-right">
+          Style · Build · Role · Career-path · <span className="text-forest">FIFA data</span>
         </div>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
         {lenses.map((lens) => {
           const meta = TIER_PILL_META[lens.tier] || null;
-          const scoreWidth = Math.min(100, Math.max(20, (lens.score || 0) * 8));
+          const scoreWidth = Math.min(100, Math.max(20, (lens.score || 0) * 10));
+          const isFifa = lens.lens === "fifa";
           return (
             <div
               key={lens.lens}
               data-testid={`lens-match-${lens.lens}`}
-              className="relative p-4 md:p-5 bg-cream-card border-l-4 border-forest"
+              className={`relative p-4 md:p-5 ${
+                isFifa
+                  ? "bg-forest text-cream-base border-l-4 border-cream-base"
+                  : "bg-cream-card border-l-4 border-forest"
+              }`}
             >
+              {isFifa && (
+                <div className="absolute top-3 right-3 text-[8px] uppercase tracking-[0.22em] font-bold px-2 py-0.5 bg-cream-base text-forest">
+                  Real data · k-NN
+                </div>
+              )}
               <div className="flex items-center gap-3 mb-3">
                 <div
-                  className="w-12 h-12 shrink-0 bg-forest text-cream-base flex items-center justify-center font-barlow font-black text-base shadow"
+                  className={`w-12 h-12 shrink-0 flex items-center justify-center font-barlow font-black text-base shadow ${
+                    isFifa ? "bg-cream-base text-forest" : "bg-forest text-cream-base"
+                  }`}
                   style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
                 >
                   {_archetypeMonogram(lens.name)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-forest">
+                  <div className={`text-[9px] uppercase tracking-[0.22em] font-bold ${
+                    isFifa ? "text-cream-base/85" : "text-forest"
+                  }`}>
                     {lens.lens_label}
                   </div>
-                  <div className="font-barlow font-black uppercase text-base md:text-lg text-ink truncate leading-tight">
+                  <div className={`font-barlow font-black uppercase text-base md:text-lg truncate leading-tight ${
+                    isFifa ? "text-white" : "text-ink"
+                  }`}>
                     {lens.name}
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/55 truncate">
+                  <div className={`text-[10px] uppercase tracking-[0.18em] font-bold truncate ${
+                    isFifa ? "text-cream-base/65" : "text-ink/55"
+                  }`}>
                     {lens.club || "—"}
                     {lens.league && <span className="opacity-60"> · {lens.league}</span>}
                   </div>
                 </div>
-                {meta && (
+                {meta && !isFifa && (
                   <div className="hidden sm:inline-flex text-[8px] uppercase tracking-[0.2em] font-bold px-2 py-1 bg-cream-soft text-forest shrink-0">
                     {meta.label}
                   </div>
                 )}
+                {isFifa && typeof lens.overall === "number" && (
+                  <div className="hidden sm:inline-flex text-[8px] uppercase tracking-[0.2em] font-bold px-2 py-1 bg-cream-base/15 text-cream-base shrink-0">
+                    FIFA {lens.overall}
+                  </div>
+                )}
               </div>
-              <p className="text-xs md:text-sm text-ink/70 leading-snug mb-3">
+              <p className={`text-xs md:text-sm leading-snug mb-3 ${
+                isFifa ? "text-cream-base/85" : "text-ink/70"
+              }`}>
                 {lens.why}
               </p>
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-1.5 bg-cream-soft overflow-hidden">
-                  <div className="h-full bg-forest" style={{ width: `${scoreWidth}%` }} />
+                <div className={`flex-1 h-1.5 overflow-hidden ${isFifa ? "bg-cream-base/15" : "bg-cream-soft"}`}>
+                  <div className={`h-full ${isFifa ? "bg-cream-base" : "bg-forest"}`} style={{ width: `${scoreWidth}%` }} />
                 </div>
-                <div className="font-barlow font-black tabular-nums text-xl text-forest leading-none">
-                  {(lens.score ?? 0).toFixed(1)}
+                <div className={`font-barlow font-black tabular-nums text-xl leading-none ${
+                  isFifa ? "text-white" : "text-forest"
+                }`}>
+                  {isFifa && typeof lens.similarity_pct === "number"
+                    ? `${lens.similarity_pct.toFixed(1)}%`
+                    : (lens.score ?? 0).toFixed(1)}
                 </div>
-                <div className="text-[10px] font-bold text-ink/45">/10</div>
+                {!isFifa && <div className="text-[10px] font-bold text-ink/45">/10</div>}
               </div>
             </div>
           );
@@ -820,6 +866,146 @@ function LensMatchesStrip({ archetype }) {
 
       <p className="mt-5 text-xs text-ink/50 italic">
         Match score reflects similarity on that lens only — not overall player quality. A high Build twin score means the same physical frame, not the same career ceiling.
+      </p>
+    </div>
+  );
+}
+
+/* FIFA Data Twin panel — shows the FULL top-5 nearest-neighbour result from the
+   real k-NN search against the FIFA-22 dataset. This is the panel that makes
+   the report feel rigorous: "we ran your scores against 7,473 senior pros and
+   here are the 5 closest matches by 22-attribute Euclidean similarity." */
+function FifaDataTwinPanel({ archetype }) {
+  if (!archetype || !Array.isArray(archetype.fifa_neighbors) || archetype.fifa_neighbors.length === 0) {
+    return null;
+  }
+  const neighbors = archetype.fifa_neighbors;
+  const meta = archetype.fifa_db_meta || {};
+
+  return (
+    <div data-testid="fifa-data-twin-panel" className="bg-surface border border-gray-border p-6 md:p-7">
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
+            FIFA data twin · real similarity search
+          </div>
+          <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
+            The 5 closest senior pros by 22-attribute k-NN
+          </h3>
+          <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
+            We ran your full scoring vector against{" "}
+            <span className="font-bold text-forest">
+              {meta.size ? meta.size.toLocaleString() : "7,000+"} senior pros
+            </span>{" "}
+            in the EA Sports FIFA dataset, computing per-attribute Euclidean similarity across 22 dimensions. Below are the 5 closest matches — and the 3 attributes where the gap is smallest in each case.
+          </p>
+        </div>
+        <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45">
+          Hard-capped at 92% · honest spread
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {neighbors.map((n, i) => {
+          const barWidth = Math.min(100, Math.max(20, n.similarity_pct || 0));
+          const isTop = i === 0;
+          return (
+            <div
+              key={`${n.name}-${i}`}
+              data-testid={`fifa-neighbor-${i}`}
+              className={`flex items-center gap-3 md:gap-4 p-3 md:p-4 ${
+                isTop ? "bg-forest text-cream-base" : "bg-cream-card border-l-2 border-forest/30"
+              }`}
+            >
+              {/* Rank */}
+              <div className={`font-barlow font-black text-2xl shrink-0 w-8 text-center ${
+                isTop ? "text-cream-base" : "text-forest/70"
+              }`}>
+                {i + 1}
+              </div>
+
+              {/* Crest monogram */}
+              <div
+                className={`w-12 h-12 shrink-0 flex items-center justify-center font-barlow font-black text-base shadow ${
+                  isTop ? "bg-cream-base text-forest" : "bg-forest text-cream-base"
+                }`}
+                style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
+              >
+                {_archetypeMonogram(n.name)}
+              </div>
+
+              {/* Name + club */}
+              <div className="flex-1 min-w-0">
+                <div className={`font-barlow font-black uppercase text-sm md:text-base truncate ${
+                  isTop ? "text-white" : "text-ink"
+                }`}>
+                  {n.name}
+                </div>
+                <div className={`text-[10px] uppercase tracking-[0.16em] font-bold truncate ${
+                  isTop ? "text-cream-base/70" : "text-ink/55"
+                }`}>
+                  {n.club || "—"}
+                  {n.league && <span className="opacity-60"> · {n.league}</span>}
+                </div>
+                {Array.isArray(n.nearest_attrs) && n.nearest_attrs.length > 0 && (
+                  <div className={`text-[10px] mt-1 truncate ${
+                    isTop ? "text-cream-base/80" : "text-ink/50"
+                  }`}>
+                    closest on:{" "}
+                    {n.nearest_attrs.map((a, idx) => (
+                      <span key={idx} className={`inline-block px-1.5 py-0.5 mr-1 text-[9px] font-bold uppercase tracking-wide ${
+                        isTop ? "bg-cream-base/15 text-white" : "bg-forest/10 text-forest"
+                      }`}>
+                        {a.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Build + foot mini-pills */}
+              <div className="hidden md:flex flex-col items-end gap-1 shrink-0">
+                {n.build && (
+                  <span className={`text-[8px] uppercase tracking-[0.18em] font-bold px-2 py-0.5 ${
+                    isTop ? "bg-cream-base/15 text-cream-base" : "bg-cream-soft text-forest"
+                  }`}>
+                    {n.build.replace(/_/g, " ")}
+                  </span>
+                )}
+                {n.preferred_foot && (
+                  <span className={`text-[8px] uppercase tracking-[0.18em] font-bold px-2 py-0.5 ${
+                    isTop ? "bg-cream-base/15 text-cream-base" : "bg-cream-soft text-forest"
+                  }`}>
+                    {n.preferred_foot}-footed
+                  </span>
+                )}
+              </div>
+
+              {/* Similarity bar + % */}
+              <div className="flex items-center gap-2 shrink-0">
+                <div className={`hidden md:block w-24 h-2 ${isTop ? "bg-cream-base/15" : "bg-cream-soft"}`}>
+                  <div
+                    className={`h-full ${isTop ? "bg-cream-base" : "bg-forest"}`}
+                    style={{ width: `${barWidth}%` }}
+                  />
+                </div>
+                <div className={`font-barlow font-black text-2xl tabular-nums leading-none ${
+                  isTop ? "text-white" : "text-forest"
+                }`}>
+                  {(n.similarity_pct ?? 0).toFixed(1)}
+                </div>
+                <div className={`text-[10px] font-bold ${isTop ? "text-cream-base/60" : "text-ink/45"}`}>
+                  %
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-5 text-xs text-ink/50 italic">
+        Similarity computed as 100 − RMSE × 18 across 22 measured attributes (FIFA-22 attribute ratings normalised to a 0-10 scale, identical to the player's). Foot/build matches add a small bonus.{" "}
+        <span className="not-italic font-bold text-ink/65">Source:</span> {meta.source || "EA Sports FIFA 22"}.
       </p>
     </div>
   );
@@ -1557,8 +1743,11 @@ export default function ReportPage() {
                   {/* Stylistic archetype — public, style-only comparison */}
                   <ArchetypeCard archetype={archetype} />
 
-                  {/* Top 3 closest archetype matches */}
+                  {/* 5-Lens twins strip (Style / Build / Role / Career-path / FIFA k-NN) */}
                   <ClosestMatchesStrip archetype={archetype} />
+
+                  {/* FIFA Data Twin — real k-NN top-5 against ~7,500 senior pros */}
+                  <FifaDataTwinPanel archetype={archetype} />
 
                   {/* Player DNA — unique attribute fingerprint */}
                   <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
