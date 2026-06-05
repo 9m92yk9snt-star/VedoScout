@@ -468,15 +468,15 @@ function DnaFingerprint({ fullReport, ageProfile }) {
 
   return (
     <div data-testid="dna-fingerprint" className="bg-surface border border-gray-border p-6 md:p-8">
-      <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
         <div>
           <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Player DNA</div>
           <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
             Attribute fingerprint
           </h3>
           <p className="mt-2 text-sm text-ink/65 max-w-xl">
-            Every scored attribute as a single visual signature — ordered by what matters most for the position.
-            Two players will never have the same DNA bar.
+            Every scored attribute, ranked by what matters most for the position.
+            Hover any row to see the exact score — every player's fingerprint is unique.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -489,44 +489,44 @@ function DnaFingerprint({ fullReport, ageProfile }) {
         </div>
       </div>
 
-      <div className="relative h-44 flex items-end gap-px bg-cream-soft/30 p-1">
+      {/* Horizontal-row layout — fully readable labels + visible scores */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1.5">
         {bars.map((b) => {
-          const hPct = Math.max(8, (b.score / 10) * 100);
+          const pct = (b.score / 10) * 100;
+          const tone =
+            b.score >= 8 ? "text-forest" :
+            b.score >= 7 ? "text-forest-pop" :
+            b.score >= 5.5 ? "text-amber-700" : "text-ink/50";
           return (
             <div
               key={b.key}
               data-testid={`dna-seg-${b.key}`}
-              className="relative flex-1 group"
-              style={{ height: "100%" }}
-              title={`${b.label} · ${b.score}/10`}
+              className="group flex items-center gap-3 py-1.5"
             >
-              <div
-                className={`absolute bottom-0 left-0 right-0 ${PILLAR_COLOR[b.pillar]} transition-all`}
-                style={{ height: `${hPct}%` }}
-              />
-              <div className="absolute -top-5 left-0 right-0 text-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-[9px] uppercase tracking-wide font-bold text-ink">{b.score}</span>
+              {/* Pillar pip */}
+              <span className={`w-1.5 h-6 ${PILLAR_COLOR[b.pillar]} shrink-0`} />
+              {/* Label */}
+              <span className="text-[11px] uppercase tracking-[0.12em] font-bold text-ink/85 w-[140px] md:w-[150px] shrink-0 capitalize">
+                {b.label}
+              </span>
+              {/* Bar */}
+              <div className="flex-1 h-3 bg-cream-soft/40 relative">
+                <div
+                  className={`absolute inset-y-0 left-0 ${PILLAR_COLOR[b.pillar]} group-hover:opacity-90 transition-opacity`}
+                  style={{ width: `${pct}%` }}
+                />
               </div>
+              {/* Score */}
+              <span className={`font-barlow font-black text-base ${tone} w-9 text-right shrink-0`}>
+                {b.score}
+              </span>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-2 flex gap-px h-10 overflow-hidden">
-        {bars.map((b) => (
-          <div key={b.key} className="flex-1 overflow-hidden">
-            <div
-              className="origin-top-left text-[8px] uppercase tracking-wide font-bold text-ink/55 truncate whitespace-nowrap"
-              style={{ transform: "rotate(35deg) translateY(2px) translateX(-2px)" }}
-            >
-              {b.label}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p className="mt-4 text-xs text-ink/50 italic">
-        Bars are ordered by position priority — the attributes that matter most for this player's role appear first.
+      <p className="mt-6 text-xs text-ink/50 italic">
+        Ordered by position priority — the attributes that matter most for this player's role appear first.
       </p>
     </div>
   );
@@ -537,36 +537,121 @@ function DnaFingerprint({ fullReport, ageProfile }) {
 /* Stylistic archetype card — small, premium, sits inline with the report.
    The named pros are public stylistic references only. We never publish
    their childhood scores. */
+/* Build a 2-3 letter monogram badge from a player/archetype name.
+   Strips the "-type" suffix and any non-letter words. */
+function _archetypeMonogram(name) {
+  if (!name) return "—";
+  // Strip everything after "-type" and any common suffix words
+  const clean = String(name)
+    .replace(/-type.*$/i, "")
+    .replace(/[^a-zA-ZÀ-ÿ\s]/g, "")
+    .trim();
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "—";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+const TIER_PILL_META = {
+  elite:       { label: "Generational",    cls: "bg-cream-base text-forest" },
+  world_class: { label: "World-class",     cls: "bg-cream-base/85 text-forest" },
+  established: { label: "Established pro", cls: "bg-cream-base/70 text-forest" },
+};
+
 function ArchetypeCard({ archetype }) {
   if (!archetype) return null;
   const developing = archetype.developing;
+  if (developing) {
+    return (
+      <div data-testid="archetype-card" className="p-6 md:p-7 bg-cream-card border border-gray-border">
+        <div className="text-[10px] uppercase tracking-[0.28em] font-bold mb-2 text-forest">
+          Stylistic archetype
+        </div>
+        <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
+          <span data-testid="archetype-name">{archetype.name}</span>
+        </h3>
+        <p className="mt-3 text-sm md:text-base text-ink/75 max-w-2xl leading-relaxed">{archetype.summary}</p>
+        <p className="mt-5 text-xs text-ink/50 italic">
+          Stylistic comparisons describe how this player plays today — not their ceiling, and not the named professional's youth data.
+        </p>
+      </div>
+    );
+  }
+  const tierMeta = TIER_PILL_META[archetype.tier] || null;
   return (
     <div
       data-testid="archetype-card"
-      className={`p-6 md:p-7 ${developing ? "bg-cream-card border border-gray-border" : "bg-forest text-cream-base"}`}
+      className="relative overflow-hidden bg-forest text-cream-base"
     >
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      {/* Decorative diagonal accent */}
+      <div className="absolute -top-24 -right-24 w-72 h-72 bg-forest-pop/30 blur-3xl rounded-full pointer-events-none" />
+
+      <div className="relative p-6 md:p-8 flex flex-col lg:flex-row gap-8">
+        {/* Left: Crest monogram + identity */}
+        <div className="lg:w-1/3 shrink-0 flex flex-col gap-4">
+          {/* Crest */}
+          <div className="flex items-center gap-4">
+            <div
+              data-testid="archetype-crest"
+              className="w-20 h-20 shrink-0 bg-cream-base text-forest flex items-center justify-center font-barlow font-black text-2xl border-4 border-cream-base shadow-xl"
+              style={{ clipPath: "polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)" }}
+            >
+              {_archetypeMonogram(archetype.name)}
+            </div>
+            <div className="min-w-0">
+              <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/70">Plays in the mould of</div>
+              <div className="font-barlow font-black uppercase text-lg md:text-xl text-white leading-tight">
+                {archetype.club || "—"}
+              </div>
+              {archetype.league && (
+                <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-cream-base/65 mt-0.5">
+                  {archetype.league}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tier pill + match strength */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {tierMeta && (
+              <span
+                data-testid="archetype-tier-pill"
+                className={`text-[10px] uppercase tracking-[0.2em] font-bold px-3 py-1.5 ${tierMeta.cls}`}
+              >
+                {tierMeta.label}
+              </span>
+            )}
+            {typeof archetype.match_strength === "number" && (
+              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-bold px-3 py-1.5 bg-cream-base/15 text-cream-base">
+                <span className="text-cream-base/70">match</span>
+                <span className="text-white font-barlow font-black text-sm">{archetype.match_strength.toFixed(1)}</span>
+                <span className="text-cream-base/70">/10</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Headline + summary + traits */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[10px] uppercase tracking-[0.28em] font-bold mb-2 ${developing ? "text-forest" : "text-cream-base/75"}`}>
+          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-cream-base/70 mb-2">
             Stylistic archetype
           </div>
-          <h3 className={`font-barlow font-black uppercase text-2xl md:text-3xl leading-tight ${developing ? "text-ink" : "text-white"}`}>
-            <span data-testid="archetype-name">{archetype.name}</span>
+          <h3
+            data-testid="archetype-name"
+            className="font-barlow font-black uppercase text-3xl md:text-4xl leading-[0.95] text-white"
+          >
+            {archetype.name}
           </h3>
-          <p className={`mt-3 text-sm md:text-base leading-relaxed max-w-2xl ${developing ? "text-ink/75" : "text-cream-base/90"}`}>
+          <p className="mt-4 text-sm md:text-base leading-relaxed text-cream-base/90 max-w-2xl">
             {archetype.summary}
           </p>
           {Array.isArray(archetype.traits) && archetype.traits.length > 0 && (
-            <ul className="mt-4 flex flex-wrap gap-2">
+            <ul className="mt-5 flex flex-wrap gap-2">
               {archetype.traits.map((t, i) => (
                 <li
                   key={i}
                   data-testid={`archetype-trait-${i}`}
-                  className={`text-[10px] uppercase tracking-[0.18em] font-bold px-3 py-1.5 ${
-                    developing
-                      ? "bg-cream-soft text-forest"
-                      : "bg-cream-base/15 text-cream-base"
-                  }`}
+                  className="text-[10px] uppercase tracking-[0.18em] font-bold px-3 py-1.5 bg-cream-base/15 text-cream-base"
                 >
                   {t}
                 </li>
@@ -574,17 +659,14 @@ function ArchetypeCard({ archetype }) {
             </ul>
           )}
         </div>
-        {!developing && typeof archetype.match_strength === "number" && (
-          <div className="shrink-0 text-right">
-            <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-cream-base/65">Match strength</div>
-            <div className="mt-1 font-barlow font-black text-3xl text-white leading-none">{archetype.match_strength.toFixed(1)}</div>
-            <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-cream-base/65 mt-1">/10</div>
-          </div>
-        )}
       </div>
-      <p className={`mt-5 text-xs italic ${developing ? "text-ink/50" : "text-cream-base/55"}`}>
-        Stylistic comparisons describe how this player plays today — not their ceiling, and not the named professional's youth data.
-      </p>
+
+      {/* Footer disclaimer */}
+      <div className="relative px-6 md:px-8 pb-5 -mt-2">
+        <p className="text-xs italic text-cream-base/55 max-w-3xl">
+          Stylistic comparisons describe how this player plays <strong>today</strong> — not their ceiling, and not the named professional's youth data.
+        </p>
+      </div>
     </div>
   );
 }
@@ -932,7 +1014,6 @@ export default function ReportPage() {
     { axis: "Tactical", score: full_report.scores?.tactical },
     { axis: "Physical", score: full_report.scores?.physical },
     { axis: "Mentality", score: full_report.scores?.mentality },
-    { axis: "Overall", score: full_report.scores?.overall_development },
   ] : null;
 
   // Pretty content-type label for the awareness banner
@@ -1318,20 +1399,97 @@ export default function ReportPage() {
                   {/* Player DNA — unique attribute fingerprint */}
                   <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
 
-                  {/* Radar chart */}
+                  {/* Performance Radar — 4-pillar visualisation with tier reference rings */}
                   {radarData && (
-                    <div className="bg-surface border border-gray-border p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Performance Radar</h3>
-                      <div className="mt-6 h-80">
+                    <div data-testid="performance-radar-card" className="bg-surface border border-gray-border p-6 md:p-8">
+                      <div className="flex items-start justify-between gap-4 flex-wrap mb-2">
+                        <div>
+                          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Pillar overview</div>
+                          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
+                            Performance radar
+                          </h3>
+                          <p className="mt-2 text-sm text-ink/65 max-w-md">
+                            One shape per pillar — Technical, Tactical, Physical, Mental. The further the shape reaches an axis, the stronger the player is in that area.
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1 items-start">
+                          <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/55">Reference rings</div>
+                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
+                            <span className="w-3 h-1 bg-stone-400" /> <span className="text-ink/70">Standard 4</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
+                            <span className="w-3 h-1 bg-amber-700" /> <span className="text-ink/70">Strong 6</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
+                            <span className="w-3 h-1 bg-forest-pop" /> <span className="text-ink/70">Pro 8</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
+                            <span className="w-3 h-1 bg-forest" /> <span className="text-ink/70">Elite 9.5</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 h-[420px]">
                         <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={radarData}>
-                            <PolarGrid stroke="rgba(255,255,255,0.12)" />
-                            <PolarAngleAxis dataKey="axis" tick={{ fill: "#94A3B8", fontSize: 12 }} />
-                            <PolarRadiusAxis domain={[0, 10]} tick={{ fill: "#94A3B8", fontSize: 10 }} />
-                            <Radar dataKey="score" stroke="#CCFF00" fill="#CCFF00" fillOpacity={0.35} />
+                          <RadarChart data={radarData} margin={{ top: 24, right: 56, bottom: 24, left: 56 }} outerRadius="78%">
+                            <PolarGrid stroke="#D4CFC1" strokeDasharray="2 3" />
+                            <PolarAngleAxis
+                              dataKey="axis"
+                              tick={{ fill: "#0A0F0D", fontSize: 13, fontWeight: 800, letterSpacing: 1 }}
+                            />
+                            <PolarRadiusAxis
+                              angle={90}
+                              domain={[0, 10]}
+                              tickCount={6}
+                              tick={{ fill: "#9CA3AF", fontSize: 10 }}
+                              axisLine={false}
+                              tickFormatter={(v) => (v === 0 ? "" : String(v))}
+                            />
+                            {/* Tier reference rings — drawn as faint radars behind the player shape */}
+                            <Radar
+                              name="Elite"
+                              dataKey={() => 9.5}
+                              data={radarData}
+                              stroke="#1F4F2F"
+                              strokeWidth={1}
+                              strokeDasharray="3 3"
+                              fill="transparent"
+                              isAnimationActive={false}
+                            />
+                            <Radar
+                              name="Pro"
+                              dataKey={() => 8}
+                              data={radarData}
+                              stroke="#2D6B3D"
+                              strokeWidth={1}
+                              strokeDasharray="3 3"
+                              fill="transparent"
+                              isAnimationActive={false}
+                            />
+                            <Radar
+                              name="Strong"
+                              dataKey={() => 6}
+                              data={radarData}
+                              stroke="#B45309"
+                              strokeWidth={1}
+                              strokeDasharray="3 3"
+                              fill="transparent"
+                              isAnimationActive={false}
+                            />
+                            {/* Player shape */}
+                            <Radar
+                              name="Player"
+                              dataKey="score"
+                              stroke="#1F4F2F"
+                              strokeWidth={2.5}
+                              fill="#1F4F2F"
+                              fillOpacity={0.28}
+                            />
                           </RadarChart>
                         </ResponsiveContainer>
                       </div>
+                      <p className="mt-2 text-xs text-ink/50 italic">
+                        Dashed rings = reference levels for Strong Club, Pro Academy, and Elite Academy. The solid forest shape is the player's profile.
+                      </p>
                     </div>
                   )}
 

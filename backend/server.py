@@ -257,6 +257,9 @@ def match_archetype(full_report: dict, player_details: dict) -> Optional[dict]:
             best = {
                 "id": arch["id"],
                 "name": arch["name"],
+                "club": arch.get("club"),
+                "league": arch.get("league"),
+                "tier": arch.get("tier"),
                 "traits": arch.get("traits") or [],
                 "summary": arch.get("summary") or "",
                 "match_strength": round(match, 2),
