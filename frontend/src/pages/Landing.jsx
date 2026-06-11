@@ -343,7 +343,7 @@ export default function Landing() {
   }, []);
 
   const startHref = user ? "/upload" : "/signup";
-  const startLabel = user ? "Upload your video" : "Get started";
+  const startLabel = "Upload your video";
 
   return (
     <div className="min-h-screen bg-deepnavy text-ink relative overflow-hidden">
@@ -403,9 +403,14 @@ export default function Landing() {
                 data-testid="hero-description"
                 className="mt-7 max-w-xl text-base md:text-lg text-ink/80 leading-relaxed"
               >
-                Upload your football video and get{" "}
-                <span className="text-ink font-semibold">professional feedback</span>{" "}
-                from experienced scouts and agents connected to clubs around the world.
+                Upload your football video and receive a detailed scouting report powered by{" "}
+                <span className="text-ink font-semibold">advanced football intelligence</span>,{" "}
+                <span className="text-ink font-semibold">professional player benchmarks</span>, and{" "}
+                <span className="text-ink font-semibold">real scouts and agents</span> connected to clubs around the world.
+                <br />
+                <span className="block mt-3 text-sm md:text-base text-ink/65">
+                  Built for ambitious players from <span className="text-volt font-bold">U7 to U21</span> chasing their football dreams.
+                </span>
               </motion.p>
 
               <motion.div
@@ -441,11 +446,15 @@ export default function Landing() {
 
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={5}
-                className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3 text-xs uppercase tracking-[0.18em] font-bold text-ink/55"
+                data-testid="hero-trust-bar"
+                className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 text-[11px] uppercase tracking-[0.18em] font-bold text-ink/65"
               >
+                <span className="flex items-center gap-1.5"><Trophy className="w-3.5 h-3.5 text-volt" /> Pro player benchmarks</span>
+                <span className="flex items-center gap-1.5"><Brain className="w-3.5 h-3.5 text-volt" /> Football intelligence</span>
+                <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-volt" /> Real scouts &amp; agents</span>
+                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
                 <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> ${price} USD · one-time</span>
-                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
               </motion.div>
             </div>
 
@@ -463,21 +472,18 @@ export default function Landing() {
 
                 {[
                   {
-                    Icon: ClipboardList,
+                    Icon: Trophy,
                     body: (
                       <>
-                        Receive a{" "}
-                        <span className="text-volt font-semibold">detailed visual report</span>{" "}
-                        covering your strengths, weaknesses, playing style, and development areas.
+                        <span className="text-volt font-semibold">Pro player benchmarked</span> — your performance compared to professional profiles and position-specific standards used at the highest level of the game.
                       </>
                     ),
                   },
                   {
-                    Icon: Globe,
+                    Icon: ClipboardList,
                     body: (
                       <>
-                        Exceptional talents may receive{" "}
-                        <span className="text-volt font-semibold">scout attention</span>, trial recommendations, and guidance on the next step in their football journey.
+                        <span className="text-volt font-semibold">Detailed football analysis</span> — technical, tactical, physical and mental scores with strengths, weaknesses, evidence and a personal development plan.
                       </>
                     ),
                   },
@@ -485,8 +491,7 @@ export default function Landing() {
                     Icon: Users,
                     body: (
                       <>
-                        Our network of scouts and agents can provide{" "}
-                        <span className="text-volt font-semibold">guidance</span>, answer questions, and help you explore future opportunities.
+                        <span className="text-volt font-semibold">Real scouts &amp; agents</span> connected to clubs worldwide — guidance on trials, club changes, contracts and finding the right academy for your next step.
                       </>
                     ),
                   },
@@ -1091,11 +1096,11 @@ export default function Landing() {
         </div>
         <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-10 text-center">
           <h2 className="font-barlow font-black uppercase text-5xl md:text-7xl tracking-tighter leading-[0.95]">
-            Your move.
-            <span className="block text-volt mt-2">Show the world what you've got.</span>
+            Ready to discover
+            <span className="block text-volt mt-2">your true level?</span>
           </h2>
           <p className="mt-6 text-ink/65 max-w-2xl mx-auto">
-            Upload a video, mark yourself, and you'll get an instant free preview from our scouts. No card needed to start.
+            Upload your video and get an instant free scout preview. Built for ambitious U7–U21 players chasing the next level. No card needed to start.
           </p>
           <div className="mt-10">
             <Link
