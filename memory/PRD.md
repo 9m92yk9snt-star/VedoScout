@@ -26,6 +26,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 10 — Archetype `academy_bio` FULL PARITY (Feb 15 2026)**:
+  - Filled `academy_bio` (5 age brackets: 8-10 / 11-12 / 13-14 / 15-17 / 18-21) for **all 63 non-AM archetypes** across Goalkeeper, Striker, Winger, Centre Back, Full Back, Defensive Midfielder, Central Midfielder — every position now has the same depth as AM. Also filled all 9 Goalkeeper `career_brief` fields (previously empty).
+  - **Net effect**: every report now renders the "What [PRO] was doing at age N" panel (web + PDF) AND the Gemini personalised narrative (`bio_chunk`-guarded at server.py:1390) for every position, not just AM. Silent quality gap closed.
+  - **Build script**: `/app/backend/scripts/fill_academy_bios.py` — idempotent, only fills empty fields, bumps `_meta.version` to 5. Re-runnable safely.
+  - **Pytests**: 5 new tests in `/app/backend/tests/test_archetype_parity.py` lock the contract: every position present, every archetype has all 5 brackets, all 9 GK have career_brief, no placeholder text, bracket-lookup resolves U7-U21. All 5 pass.
+  - **Sources used**: Wikipedia, Transfermarkt, FBref, club academy pages, mainstream long-form journalism. No invented stats.
+  - **Untouched**: schema, ranker, PDF templates, scoring, payment, auth.
 - ✅ **🆕 Session 9 — Professional Blog + Site-wide SEO + Gemini AI Authoring + Article Series Engine (Feb 15 2026)**:
   - **New modular backend files** `/app/backend/blog_routes.py` + `/app/backend/blog_seo.py` (clean separation, no circular deps with `server.py`).
   - **Public blog**: `/blog` index (search + 5 seeded categories + featured-post bento grid) and `/blog/:slug` article page (cover image, markdown body via `react-markdown` + `remark-gfm`, breadcrumbs, related posts, tags).
