@@ -6,7 +6,7 @@ import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
 import api from "@/lib/api";
-import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap } from "lucide-react";
+import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap, Link as LinkIcon, FileUp } from "lucide-react";
 
 export default function UploadPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,6 +27,12 @@ export default function UploadPage() {
   const [markerPreviewUrl, setMarkerPreviewUrl] = useState(null);
   const [markerTimestamp, setMarkerTimestamp] = useState(0);
   const [isMarking, setIsMarking] = useState(false);
+
+  // ── URL-paste mode ────────────────────────────────────────────────────
+  const [sourceMode, setSourceMode] = useState("file"); // "file" | "url"
+  const [pasteUrl, setPasteUrl] = useState("");
+  const [urlFetching, setUrlFetching] = useState(false);
+  const [tempVideoToken, setTempVideoToken] = useState(null);
 
   // P1: zoom + pan state for the marking overlay
   const [zoom, setZoom] = useState(1);
@@ -246,6 +252,47 @@ export default function UploadPage() {
     setMarkerPreviewUrl(null);
     setMarkerTimestamp(0);
     setIsMarking(false);
+    setTempVideoToken(null); // clear any prior URL-fetch
+  };
+
+  // Fetch a video from a public URL (YouTube / Vimeo / Veo / direct MP4)
+  const handleUrlFetch = async (e) => {
+    e?.preventDefault?.();
+    const url = (pasteUrl || "").trim();
+    if (!url) {
+      toast.error("Paste a video URL first.");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      toast.error("URL must start with http(s)://");
+      return;
+    }
+    setUrlFetching(true);
+    try {
+      const { data } = await api.post("/me/url-fetch", { url }, { timeout: 130000 });
+      // Clear any local file state and use the server-side temp video
+      if (videoUrl && videoUrl.startsWith("blob:")) URL.revokeObjectURL(videoUrl);
+      const apiBase = process.env.REACT_APP_BACKEND_URL || "";
+      const fullPreview = `${apiBase}${data.preview_url}`;
+      // Use a sentinel "file-like" object so the rest of the UI shows a name + size
+      setFile({
+        name: data.filename || "video-from-url.mp4",
+        size: (data.size_mb || 0) * 1024 * 1024,
+        _fromUrl: true,
+      });
+      setVideoUrl(fullPreview);
+      setTempVideoToken(data.token);
+      setMarkerBlob(null);
+      setMarkerPreviewUrl(null);
+      setMarkerTimestamp(0);
+      setIsMarking(false);
+      toast.success(`Video fetched (${(data.size_mb || 0).toFixed(1)} MB) — now mark your player.`);
+    } catch (err) {
+      const msg = err?.response?.data?.detail || err.message || "URL fetch failed.";
+      toast.error(typeof msg === "string" ? msg : "Could not download that video.");
+    } finally {
+      setUrlFetching(false);
+    }
   };
 
   // Force iOS Safari (and other browsers) to render the first frame instead of a black box
@@ -399,7 +446,11 @@ export default function UploadPage() {
 
     setSubmitting(true);
     const fd = new FormData();
-    fd.append("file", file);
+    if (file?._fromUrl && tempVideoToken) {
+      fd.append("temp_video_token", tempVideoToken);
+    } else {
+      fd.append("file", file);
+    }
     fd.append("marker_image", markerBlob, "marker.jpg");
     fd.append("marker_timestamp", String(markerTimestamp || 0));
     Object.entries(form).forEach(([k, v]) => {
@@ -553,14 +604,75 @@ export default function UploadPage() {
                   <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 1 · Video file</span>
                   {file && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Selected</span>}
                 </div>
+
+                {/* === Source mode tabs: file upload OR paste URL === */}
+                <div className="flex items-center gap-px mb-4 border border-gray-border bg-cream-soft/60">
+                  <button
+                    type="button"
+                    onClick={() => setSourceMode("file")}
+                    data-testid="upload-mode-file"
+                    className={`flex-1 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center justify-center gap-2 transition-colors ${
+                      sourceMode === "file"
+                        ? "bg-volt text-white"
+                        : "text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    <FileUp className="w-3.5 h-3.5" /> Upload file
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSourceMode("url")}
+                    data-testid="upload-mode-url"
+                    className={`flex-1 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center justify-center gap-2 transition-colors ${
+                      sourceMode === "url"
+                        ? "bg-volt text-white"
+                        : "text-ink/60 hover:text-ink"
+                    }`}
+                  >
+                    <LinkIcon className="w-3.5 h-3.5" /> Paste URL
+                  </button>
+                </div>
+
+                {/* === URL paste box (when sourceMode === "url") === */}
+                {sourceMode === "url" && (
+                  <div className="mb-4 space-y-2">
+                    <div className="flex items-stretch gap-2">
+                      <input
+                        type="url"
+                        data-testid="upload-url-input"
+                        value={pasteUrl}
+                        onChange={(e) => setPasteUrl(e.target.value)}
+                        placeholder="YouTube · Vimeo · Veo · Google Drive · .mp4 link"
+                        className="flex-1 px-3 py-2.5 bg-cream-soft border border-gray-border focus:border-volt outline-none text-sm font-mono"
+                        disabled={urlFetching}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUrlFetch}
+                        disabled={urlFetching || !pasteUrl.trim()}
+                        data-testid="upload-url-fetch"
+                        className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 flex items-center gap-2 disabled:opacity-50 transition-colors"
+                      >
+                        {urlFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LinkIcon className="w-3.5 h-3.5" />}
+                        {urlFetching ? "Fetching" : "Fetch"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-ink/55 leading-relaxed">
+                      Works with public YouTube, Vimeo, Veo and direct MP4/MOV links. Max 200 MB · max 5 min.
+                    </p>
+                  </div>
+                )}
+
                 <label
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
                     e.preventDefault();
-                    handleFile(e.dataTransfer.files?.[0]);
+                    if (sourceMode === "file") handleFile(e.dataTransfer.files?.[0]);
                   }}
                   data-testid="upload-dropzone"
-                  className="block cursor-pointer border-2 border-dashed border-gray-border hover:border-volt bg-cream-soft p-6 md:p-8 text-center transition-colors"
+                  className={`block cursor-pointer border-2 border-dashed border-gray-border hover:border-volt bg-cream-soft p-6 md:p-8 text-center transition-colors ${
+                    sourceMode === "url" && !file ? "opacity-60" : ""
+                  }`}
                 >
                   <input
                     ref={fileRef}

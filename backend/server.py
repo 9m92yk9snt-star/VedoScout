@@ -55,7 +55,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 8  # v8 = Age Intelligence Scoring System + stage gating
+PDF_RENDER_VERSION = 9  # v9 = 60-Second Scout Summary page + footer report ID
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -2499,7 +2499,8 @@ async def get_current_price() -> float:
 @api_router.post("/reports/upload")
 async def upload_video_and_create_preview(
     background: BackgroundTasks,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    temp_video_token: Optional[str] = Form(None),
     marker_image: UploadFile = File(...),
     marker_timestamp: float = Form(0.0),
     player_name: str = Form(...),
@@ -2530,21 +2531,39 @@ async def upload_video_and_create_preview(
             )
         upload_will_be_paid = free_used and prepaid > 0
 
+    # ============== RESOLVE SOURCE: file upload OR temp URL-fetch token ==============
+    using_temp_token = False
+    temp_file_path: Optional[Path] = None
+    if not file and temp_video_token:
+        temp_file_path = resolve_temp_token_path(upload_dir=UPLOAD_DIR, token=temp_video_token)
+        if not temp_file_path:
+            raise HTTPException(status_code=400, detail="Video URL fetch expired or not found. Please re-paste the link.")
+        using_temp_token = True
+    if not file and not using_temp_token:
+        raise HTTPException(status_code=400, detail="No video provided. Upload a file or paste a video URL.")
+
     # Validate file type
     allowed_mimes = {"video/mp4", "video/quicktime", "video/x-m4v", "video/webm"}
-    if file.content_type not in allowed_mimes:
+    if not using_temp_token and file.content_type not in allowed_mimes:
         raise HTTPException(status_code=400, detail=f"Unsupported video format: {file.content_type}. Use MP4, MOV, or WebM.")
 
     # Save video file
     report_id = str(uuid.uuid4())
-    ext = (file.filename or "video.mp4").split(".")[-1].lower()
+    if using_temp_token:
+        ext = temp_file_path.suffix.lstrip(".").lower() or "mp4"
+    else:
+        ext = (file.filename or "video.mp4").split(".")[-1].lower()
     if ext not in {"mp4", "mov", "m4v", "webm"}:
         ext = "mp4"
     stored_name = f"{report_id}.{ext}"
     file_path = UPLOAD_DIR / stored_name
 
-    with file_path.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    if using_temp_token:
+        # Move the pre-downloaded temp file into the report-id naming convention
+        shutil.move(str(temp_file_path), str(file_path))
+    else:
+        with file_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
     file_size = file_path.stat().st_size
 
@@ -3536,6 +3555,128 @@ def _skill_section_block(section: dict, styles):
     return flow
 
 
+def _scout_summary_page(report_doc: dict, styles):
+    """The signature '60-Second Scout Summary' page — placed right after the cover
+    so a busy academy scout can absorb the report in 60 seconds.
+
+    Distils: name + age + position, big score, archetype 1-liner, top strengths,
+    top development priorities, and a 'If you only read one page' anchor.
+    """
+    full = report_doc.get("full_report") or {}
+    details = report_doc.get("player_details") or {}
+    sc = full.get("scores") or {}
+    sv = full.get("scout_view") or {}
+    archetype = full.get("archetype") or {}
+
+    player_name = details.get("player_name") or "Player"
+    age = details.get("age") or "—"
+    position = details.get("position") or "Player"
+    overall = sc.get("overall_development")
+    overall_str = f"{overall:.1f}" if isinstance(overall, (int, float)) else (str(overall) if overall else "—")
+
+    arch_name = (archetype.get("name") or archetype.get("anchor_name") or "").strip()
+    arch_summary = (archetype.get("summary") or archetype.get("brief") or "").strip()
+    arch_oneliner = arch_name or arch_summary
+
+    strengths = (sv.get("key_strengths") or [])[:3]
+    priorities = (sv.get("development_priorities") or [])[:2]
+
+    flow = []
+
+    # Eyebrow + title
+    flow.append(Paragraph("60-Second Scout Summary", styles["Eyebrow"]))
+    flow.append(Paragraph(player_name, styles["HeroTitle"]))
+    flow.append(Paragraph(
+        f"<font color='#1F4F2F'><b>{position}</b></font>  &middot;  Age {age}",
+        styles["BodyMuted"],
+    ))
+    flow.append(Spacer(1, 0.5 * cm))
+
+    # Score + Archetype card (2 cols)
+    score_block = Paragraph(
+        f"<font color='#1F4F2F' size='8'><b>SCOUT SCORE</b></font><br/>"
+        f"<font color='#0A0F0D' size='36'><b>{overall_str}</b></font>"
+        f"<font color='#0A0F0D' size='14'> / 10</font>",
+        styles["BodyW"],
+    )
+    if arch_oneliner:
+        arch_block = Paragraph(
+            f"<font color='#1F4F2F' size='8'><b>ARCHETYPE MATCH</b></font><br/>"
+            f"<font color='#0A0F0D' size='14'><b>{arch_name or 'Archetype'}</b></font><br/>"
+            f"<font color='#374151' size='9'>{arch_summary or '&nbsp;'}</font>",
+            styles["BodyW"],
+        )
+    else:
+        arch_block = Paragraph(
+            "<font color='#374151' size='9'><i>Archetype matching pending — see full report.</i></font>",
+            styles["BodyW"],
+        )
+
+    summary_card = Table(
+        [[score_block, arch_block]],
+        colWidths=[5.0 * cm, 10.0 * cm],
+        style=TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (0, 0), HexColor("#F4EFE6")),
+            ("BACKGROUND", (1, 0), (1, 0), HexColor("#FBFAF6")),
+            ("BOX", (0, 0), (-1, -1), 0.6, _PDF_BORDER),
+            ("LINEBEFORE", (1, 0), (1, 0), 0.6, _PDF_BORDER),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+            ("TOPPADDING", (0, 0), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ]),
+    )
+    flow.append(summary_card)
+    flow.append(Spacer(1, 0.7 * cm))
+
+    # Strengths + Priorities side-by-side
+    def _bullets_html(items, fg):
+        if not items:
+            return "<font color='#9CA3AF' size='9'><i>None recorded.</i></font>"
+        return "".join(
+            f"<font color='{fg}' size='9'><b>&#9670;</b></font> "
+            f"<font color='#0A0F0D' size='9.5'>{str(it).strip()}</font><br/><br/>"
+            for it in items
+        )
+
+    str_block = Paragraph(
+        "<font color='#1F4F2F' size='8'><b>TOP STRENGTHS</b></font><br/><br/>" + _bullets_html(strengths, "#1F4F2F"),
+        styles["BodyW"],
+    )
+    pri_block = Paragraph(
+        "<font color='#7C2D12' size='8'><b>DEVELOPMENT PRIORITIES</b></font><br/><br/>" + _bullets_html(priorities, "#7C2D12"),
+        styles["BodyW"],
+    )
+    sw_table = Table(
+        [[str_block, pri_block]],
+        colWidths=[7.5 * cm, 7.5 * cm],
+        style=TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BACKGROUND", (0, 0), (0, 0), HexColor("#F4EFE6")),
+            ("BACKGROUND", (1, 0), (1, 0), HexColor("#FBFAF6")),
+            ("BOX", (0, 0), (-1, -1), 0.6, _PDF_BORDER),
+            ("LINEBEFORE", (1, 0), (1, 0), 0.6, _PDF_BORDER),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+            ("TOPPADDING", (0, 0), (-1, -1), 14),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ]),
+    )
+    flow.append(sw_table)
+    flow.append(Spacer(1, 0.9 * cm))
+
+    # Closing anchor line
+    flow.append(Paragraph(
+        "<font color='#1F4F2F' size='9'><b>IF YOU ONLY READ ONE PAGE — THIS IS IT.</b></font><br/>"
+        "<font color='#374151' size='8.5'><i>Continue for the full technical / tactical / physical / mental breakdown, "
+        "video-time evidence, age-bracketed pro comparisons and personalised training plan.</i></font>",
+        styles["BodyW"],
+    ))
+
+    return flow
+
+
 def _overall_benchmark_page(ob: dict, overall_score, styles):
     """The signature 'How you compare' page — forest hero panel + tier landscape."""
     if not isinstance(ob, dict) or not ob.get("tier"):
@@ -4496,7 +4637,13 @@ def build_pdf(report_doc: dict, output_path: str):
     story.append(NextPageTemplate("Inner"))
     story.append(PageBreak())
 
-    # ===== PAGE 2 — EXECUTIVE SUMMARY + SCORE OVERVIEW =====
+    # ===== PAGE 2 — 60-SECOND SCOUT SUMMARY (shareable single-page TL;DR) =====
+    scout_summary_flow = _scout_summary_page(report_doc, styles)
+    if scout_summary_flow:
+        story += scout_summary_flow
+        story.append(PageBreak())
+
+    # ===== EXECUTIVE SUMMARY + SCORE OVERVIEW =====
     story += _section_header("Executive summary", styles, idx=1)
     story.append(Paragraph(exec_summary or "Not provided.", styles["BodyW"]))
     story.append(Spacer(1, 0.8 * cm))
@@ -5847,6 +5994,7 @@ async def admin_delete_report(report_id: str, _=Depends(get_current_admin)):
 # ── Blog & SEO routers (modular extension) ────────────────────────────────
 from blog_routes import build_blog_router, mount_blog_uploads
 from blog_seo import build_seo_router
+from url_video_fetch import build_url_fetch_router, resolve_temp_token_path
 
 api_router.include_router(build_blog_router(
     db=db,
@@ -5855,6 +6003,10 @@ api_router.include_router(build_blog_router(
     call_gemini_text=call_gemini_text,
 ))
 api_router.include_router(build_seo_router(db=db))
+api_router.include_router(build_url_fetch_router(
+    upload_dir=UPLOAD_DIR,
+    get_current_user=get_current_user,
+))
 mount_blog_uploads(app)
 
 app.include_router(api_router)
