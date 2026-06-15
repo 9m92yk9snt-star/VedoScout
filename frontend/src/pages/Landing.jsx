@@ -14,6 +14,7 @@ import {
   Lightbulb, Crown, Calendar, Dumbbell, Mail, Send,
 } from "lucide-react";
 import PaymentBadges from "@/components/PaymentBadges";
+import SEO, { organizationJsonLd } from "@/components/SEO";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -347,6 +348,14 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-deepnavy text-ink relative overflow-hidden">
+      <SEO
+        title="Where talent gets noticed — Football scouting reports"
+        description="Upload your football video and receive a premium scouting report powered by advanced football intelligence, professional player benchmarks, and real scouts. Built for ambitious U7–U21 players."
+        keywords="football scouting, youth football, player report, U14 scouting, U16 scouting, football academy, talent scout, player analysis, football trial"
+        url="/"
+        type="website"
+        jsonLd={organizationJsonLd(typeof window !== "undefined" ? window.location.origin : "")}
+      />
       {/* Scroll progress bar */}
       <motion.div className="scroll-progress-bar" style={{ scaleX: scrollYProgress }} />
       <Navigation transparent />

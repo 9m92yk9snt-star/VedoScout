@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
+import SEO from "@/components/SEO";
 import { ChevronLeft } from "lucide-react";
 
 /* ScoutMePlay methodology — public page + appendix on every PDF.
@@ -60,6 +61,11 @@ const AGE_BRACKETS = [
 export default function MethodologyPage() {
   return (
     <div className="min-h-screen bg-cream-base text-ink">
+      <SEO
+        title="Methodology — How ScoutMePlay grades players"
+        description="A transparent look at the methodology behind ScoutMePlay reports: UEFA youth-development pillars, age-bracketed benchmarks, FIFA k-NN twin matching, and StatsBomb percentile calibration."
+        url="/methodology"
+      />
       <Navigation />
       <main className="container mx-auto px-4 py-12 max-w-4xl">
 

@@ -26,6 +26,24 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 9 — Professional Blog + Site-wide SEO + Gemini AI Authoring (Feb 15 2026)**:
+  - **New modular backend files** `/app/backend/blog_routes.py` + `/app/backend/blog_seo.py` (clean separation, no circular deps with `server.py`).
+  - **Public blog**: `/blog` index (search + 5 seeded categories + featured-post bento grid) and `/blog/:slug` article page (cover image, markdown body via `react-markdown` + `remark-gfm`, breadcrumbs, related posts, tags).
+  - **Admin CMS**: new "Blog" tab in AdminPage with list view, status badges, view counter; full editor with title/subtitle/slug/excerpt, Markdown textarea + live preview, cover image upload OR URL, category dropdown + tag input, author, status, draft/publish buttons.
+  - **Gemini AI authoring**: `POST /api/blog/admin/ai/draft` (topic → full Markdown article with H1/H2/H3 + takeaway), `POST /api/blog/admin/ai/seo` (title + content → meta_title/meta_description/meta_keywords JSON). Uses existing `call_gemini_text()` (gemini-2.5-flash).
+  - **Site-wide SEO infrastructure**: new `SEO.jsx` Helmet wrapper (title/desc/canonical/OG/Twitter/JSON-LD) + helper builders `organizationJsonLd`, `articleJsonLd`, `breadcrumbJsonLd`. Added to Landing, About, Methodology, Blog index, Blog article. `react-helmet-async` HelmetProvider mounted in App.js.
+  - **Crawler endpoints**: `GET /api/sitemap.xml` (auto-includes published blog posts + static routes, resolves public URL via x-forwarded-* headers), `GET /api/robots.txt` (disallows /admin, /api/, /dashboard, /report/, /upload).
+  - **Image uploads**: `POST /api/blog/admin/upload-image` (admin only, 5MB cap, jpg/png/webp/gif), served via static mount `/api/blog/uploads`.
+  - **5 seeded categories**: Training, Scouting Tips, Parent's Guide, Pro Player Path, Reports & Analysis (auto-seeded on first hit).
+  - **Backend verified via curl**: CRUD, sitemap, robots, AI draft (Gemini returned a 7-min article on first try), AI SEO (returned 8 keywords + meta within char limits).
+  - **Frontend dependencies added**: `react-markdown`, `remark-gfm`, `react-helmet-async`, `@tailwindcss/typography`.
+  - **Nav updated**: added "Blog" link to desktop middle nav + mobile menu (between Sample and Methodology).
+- ✅ **🆕 Session 8 — Premium navigation redesign (Feb 13 2026)**:
+  - Removed off-brand "sniper warrior" logo SVG → clean SCOUT[ME]PLAY wordmark.
+  - Real middle nav links (How it works · What's inside · Sample · Blog · Methodology) with animated lime underlines + cross-page smooth-scroll via `?scroll=` param.
+  - Scroll-shrink header with `backdrop-blur-xl bg-ink/85`, lime scroll-progress strip.
+  - CTA buttons get lime halo glow + chevron translate on hover.
+  - Full mobile hamburger panel with forest background.
 - ✅ **🆕 Session 7 — Age Intelligence Scoring System (U6 → Senior, fair for every age) — Feb 05 2026**:
   - **New data file** `/app/backend/data/age_stages.json`: 5 development stages with age bands, focus attributes, downweight attributes, panel-gate flags, and friendly stage-gated messages.
     - **Foundation Stage** (U6-U8): focus on ball contact, coordination, courage, enjoyment, basic dribbling. ALL senior-pro panels gated.

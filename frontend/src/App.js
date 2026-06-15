@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 
 import Landing from "@/pages/Landing";
@@ -14,6 +15,8 @@ import DashboardPage from "@/pages/DashboardPage";
 import AboutPage from "@/pages/AboutPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import MethodologyPage from "@/pages/MethodologyPage";
+import BlogIndexPage from "@/pages/BlogIndexPage";
+import BlogArticlePage from "@/pages/BlogArticlePage";
 
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -25,35 +28,39 @@ function RequireAuth({ children, adminOnly = false }) {
 function App() {
   return (
     <div className="App">
-      <AuthProvider>
-        <BrowserRouter>
-          <Toaster
-            position="top-right"
-            theme="dark"
-            toastOptions={{
-              style: {
-                background: "#0F1623",
-                color: "#fff",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 0,
-              },
-            }}
-          />
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/upload" element={<RequireAuth><UploadPage /></RequireAuth>} />
-            <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
-            <Route path="/report/:id" element={<RequireAuth><ReportPage /></RequireAuth>} />
-            <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/methodology" element={<MethodologyPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      <HelmetProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Toaster
+              position="top-right"
+              theme="dark"
+              toastOptions={{
+                style: {
+                  background: "#0F1623",
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 0,
+                },
+              }}
+            />
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/upload" element={<RequireAuth><UploadPage /></RequireAuth>} />
+              <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+              <Route path="/report/:id" element={<RequireAuth><ReportPage /></RequireAuth>} />
+              <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/methodology" element={<MethodologyPage />} />
+              <Route path="/blog" element={<BlogIndexPage />} />
+              <Route path="/blog/:slug" element={<BlogArticlePage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </HelmetProvider>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { ChevronLeft, ShieldCheck, Brain, Video, Trophy, Mail, Send, Loader2, CheckCircle2 } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import SEO from "@/components/SEO";
 import api from "@/lib/api";
 
 export default function AboutPage() {
@@ -20,6 +21,11 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-deepnavy text-ink">
+      <SEO
+        title="About ScoutMePlay — Built by people who love football"
+        description="ScoutMePlay was built by scouts, parents and engineers who care about young footballers. Learn our story, methodology and what makes our reports different."
+        url="/about"
+      />
       <Navigation />
 
       <div className="max-w-4xl mx-auto px-6 md:px-10 py-14 md:py-20">

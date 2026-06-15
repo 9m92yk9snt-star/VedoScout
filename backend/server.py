@@ -5844,6 +5844,19 @@ async def admin_delete_report(report_id: str, _=Depends(get_current_admin)):
 
 # ============== APP WIRING ==============
 
+# ── Blog & SEO routers (modular extension) ────────────────────────────────
+from blog_routes import build_blog_router, mount_blog_uploads
+from blog_seo import build_seo_router
+
+api_router.include_router(build_blog_router(
+    db=db,
+    get_current_admin=get_current_admin,
+    get_current_user=get_current_user,
+    call_gemini_text=call_gemini_text,
+))
+api_router.include_router(build_seo_router(db=db))
+mount_blog_uploads(app)
+
 app.include_router(api_router)
 
 app.add_middleware(

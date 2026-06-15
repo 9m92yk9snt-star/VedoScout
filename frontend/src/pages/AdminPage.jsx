@@ -9,6 +9,7 @@ import {
   ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
+import BlogAdmin from "@/components/BlogAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
@@ -16,6 +17,7 @@ const ALL_TABS = [
   { id: "reports", label: "Reports", role: "admin" },
   { id: "users", label: "Users", role: "admin" },
   { id: "messages", label: "Messages", role: "admin" },
+  { id: "blog", label: "Blog", role: "admin" },
   { id: "payments", label: "Payments", role: "admin" },
   { id: "settings", label: "Settings", role: "admin" },
 ];
@@ -238,6 +240,8 @@ export default function AdminPage() {
               )}
 
               {activeTab === "scouts" && <ScoutQueue />}
+
+              {activeTab === "blog" && <BlogAdmin />}
 
               {activeTab === "reports" && (
                 <div className="border border-gray-border overflow-x-auto">
