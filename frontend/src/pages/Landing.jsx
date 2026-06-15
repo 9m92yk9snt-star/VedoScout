@@ -676,78 +676,220 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* ===== Cards grid 3 cols ===== */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {reportCards.map((card, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 18 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: 0.5, delay: (i % 3) * 0.08, ease: "easeOut" }}
-                data-testid={`feature-card-${i}`}
-                className="relative bg-surface/80 backdrop-blur-sm border border-gray-border hover:border-volt/40 p-6 md:p-7 flex flex-col group transition-colors"
-              >
-                {/* Number — top right */}
-                <span className="absolute top-5 right-6 font-barlow font-black text-xs text-ink/35 tracking-widest">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
+          {/* ===== BENTO grid — asymmetric, dynamic, alive ===== */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 md:gap-5 auto-rows-min lg:auto-rows-[170px]">
+            {(() => {
+              const bento = [
+                { cls: "sm:col-span-2 lg:col-span-6 lg:row-span-2", variant: "hero" },        // 0 Player Report
+                { cls: "lg:col-span-3", variant: "tint" },                                     // 1 Technical
+                { cls: "lg:col-span-3", variant: "default" },                                  // 2 Tactical
+                { cls: "lg:col-span-3", variant: "default" },                                  // 3 Physical
+                { cls: "lg:col-span-3", variant: "tint" },                                     // 4 Mentality
+                { cls: "lg:col-span-4", variant: "default" },                                  // 5 Scout View
+                { cls: "sm:col-span-2 lg:col-span-8", variant: "wide" },                       // 6 Training Plan
+                { cls: "lg:col-span-4", variant: "tint" },                                     // 7 Potential
+                { cls: "lg:col-span-4", variant: "default" },                                  // 8 Comparison
+                { cls: "lg:col-span-4", variant: "default" },                                  // 9 PDF
+                { cls: "lg:col-span-4", variant: "default" },                                  // 10 Private
+              ];
 
-                {/* Icon */}
-                <card.icon className="w-8 h-8 md:w-9 md:h-9 text-volt mb-6 group-hover:scale-105 transition-transform" strokeWidth={1.5} />
+              const renderCard = (card, i) => {
+                const b = bento[i];
+                const number = String(i + 1).padStart(2, "0");
 
-                {/* Title */}
-                <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink mb-3 leading-tight tracking-tight">
-                  {card.title}
-                </h3>
+                /* ===== HERO variant — Player Report, dark forest, oversized ===== */
+                if (b.variant === "hero") {
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 24 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.2 }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                      data-testid={`feature-card-${i}`}
+                      className={`${b.cls} relative overflow-hidden bg-forest text-cream-card border border-volt/30 p-7 md:p-10 flex flex-col group hover:border-volt transition-all duration-300 hover:-translate-y-1`}
+                      style={{ boxShadow: "0 0 80px rgba(204,255,0,0.08)" }}
+                    >
+                      {/* radial volt glow */}
+                      <div aria-hidden className="absolute -top-24 -right-24 w-72 h-72 bg-volt/15 rounded-full blur-3xl pointer-events-none" />
+                      <div aria-hidden className="absolute -bottom-32 -left-32 w-72 h-72 bg-volt/10 rounded-full blur-3xl pointer-events-none" />
 
-                {/* Description */}
-                <p className="text-sm text-ink/70 leading-relaxed mb-6 flex-1">
-                  {card.text}
-                </p>
+                      <span className="absolute top-6 right-7 font-barlow font-black text-xs text-volt/40 tracking-widest">{number}</span>
 
-                {/* Visualization at bottom */}
-                <div className="mt-auto pt-5 border-t border-gray-border">
-                  <CardViz viz={card.viz} />
-                </div>
-              </motion.div>
-            ))}
+                      <div className="relative flex items-center gap-3 mb-6">
+                        <card.icon className="w-10 h-10 md:w-12 md:h-12 group-hover:scale-110 transition-transform duration-300" strokeWidth={1.5} style={{ color: "#ccff00" }} />
+                        <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-cream-card/70">Hero metric</span>
+                      </div>
 
-            {/* ===== Special highlight card — 12 ===== */}
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.6, delay: 0.18, ease: "easeOut" }}
-              data-testid="feature-card-highlight"
-              className="relative bg-gradient-to-br from-volt/10 via-deepnavy/40 to-deepnavy/40 border-2 border-volt p-6 md:p-7 flex flex-col"
-              style={{ boxShadow: "0 0 60px rgba(204,255,0,0.12)" }}
-            >
-              <span className="absolute top-5 right-6 font-barlow font-black text-xs text-volt/40 tracking-widest">12</span>
+                      <h3 className="relative font-barlow font-black uppercase text-3xl md:text-5xl text-cream-card mb-4 leading-[0.95] tracking-tight">
+                        {card.title}
+                      </h3>
 
-              <Crown className="w-9 h-9 md:w-10 md:h-10 text-volt mb-6" strokeWidth={1.5} fill="#ccff00" fillOpacity="0.18" />
+                      <p className="relative text-sm md:text-base text-cream-card/80 leading-relaxed max-w-md">
+                        {card.text}
+                      </p>
 
-              <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink mb-2 leading-tight tracking-tight">
-                100% Personal.<br />
-                100% Game Changing.
-              </h3>
+                      {/* Giant score pull quote */}
+                      <div className="relative mt-auto pt-8 flex items-end justify-between gap-4 border-t border-cream-card/15">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-cream-card/70 mb-2">Scout Score</span>
+                          <span className="font-barlow font-black text-6xl md:text-7xl leading-none" style={{ color: "#ccff00", textShadow: "0 4px 30px rgba(204,255,0,0.45)" }}>
+                            8.2<span className="text-cream-card/55 text-3xl md:text-4xl">/10</span>
+                          </span>
+                        </div>
+                        <span className="hidden md:inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-card/75 border border-cream-card/25 rounded-full px-3 py-1.5">
+                          Live demo
+                          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#ccff00" }} />
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                }
 
-              <p className="text-sm text-ink/80 leading-relaxed mt-3">
-                This is more than a report.{" "}
-                <span className="text-volt font-serif-italic italic">It's your advantage.</span>
-              </p>
+                /* ===== WIDE variant — Training Plan, horizontal layout ===== */
+                if (b.variant === "wide") {
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 18 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true, amount: 0.2 }}
+                      transition={{ duration: 0.5, delay: 0.08, ease: "easeOut" }}
+                      data-testid={`feature-card-${i}`}
+                      className={`${b.cls} relative bg-surface/80 backdrop-blur-sm border border-gray-border hover:border-volt/50 p-6 md:p-8 flex flex-col md:flex-row md:items-stretch md:gap-8 group hover:-translate-y-1 transition-all duration-300`}
+                    >
+                      <span className="absolute top-5 right-6 font-barlow font-black text-xs text-ink/35 tracking-widest">{number}</span>
 
-              <div className="mt-auto pt-5 border-t border-volt/20">
-                <Link
-                  to={startHref}
-                  data-testid="report-section-cta"
-                  className="inline-flex items-center gap-2 font-barlow font-black uppercase text-xs tracking-[0.22em] text-volt hover:text-ink transition-colors"
-                >
-                  Unlock your report
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            </motion.div>
+                      <div className="md:w-2/5 flex flex-col">
+                        <card.icon className="w-9 h-9 md:w-10 md:h-10 text-volt mb-5 group-hover:scale-110 transition-transform duration-300" strokeWidth={1.5} />
+                        <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink mb-3 leading-tight tracking-tight">
+                          {card.title}
+                        </h3>
+                        <p className="text-sm text-ink/70 leading-relaxed">{card.text}</p>
+                      </div>
+
+                      <div className="hidden md:block w-px bg-gradient-to-b from-transparent via-volt/30 to-transparent" />
+
+                      <div className="md:w-3/5 mt-6 md:mt-0 flex flex-col justify-center gap-3">
+                        {[
+                          { day: "Week 1-2", focus: "First-touch under pressure" },
+                          { day: "Week 3-4", focus: "Weak-foot finishing reps" },
+                          { day: "Week 5-8", focus: "Sprint endurance · 90-min legs" },
+                        ].map((row, k) => (
+                          <div key={k} className="flex items-center gap-3 group/row">
+                            <span className="w-5 h-5 border border-volt/50 flex items-center justify-center shrink-0 group-hover/row:bg-volt transition-colors">
+                              <svg viewBox="0 0 12 12" className="w-3 h-3 text-volt group-hover/row:text-deepnavy" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <polyline points="2,6 5,9 10,3" />
+                              </svg>
+                            </span>
+                            <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-volt w-20 shrink-0">{row.day}</span>
+                            <span className="text-sm text-ink/80">{row.focus}</span>
+                          </div>
+                        ))}
+                        <div className="mt-2 pt-3 border-t border-gray-border">
+                          <CardViz viz={card.viz} />
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                }
+
+                /* ===== TINT / DEFAULT — standard card with optional volt accent ===== */
+                const isTint = b.variant === "tint";
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 18 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 0.5, delay: (i % 4) * 0.06, ease: "easeOut" }}
+                    data-testid={`feature-card-${i}`}
+                    className={`${b.cls} relative overflow-hidden border border-gray-border hover:border-volt/50 p-6 md:p-7 flex flex-col group hover:-translate-y-1 transition-all duration-300 ${
+                      isTint ? "bg-gradient-to-br from-surface/90 via-surface/70 to-volt/[0.06]" : "bg-surface/80 backdrop-blur-sm"
+                    }`}
+                  >
+                    {isTint && (
+                      <div aria-hidden className="absolute -top-12 -right-12 w-32 h-32 bg-volt/15 rounded-full blur-2xl pointer-events-none" />
+                    )}
+                    <span className="absolute top-5 right-6 font-barlow font-black text-xs text-ink/35 tracking-widest">{number}</span>
+
+                    <card.icon className="relative w-8 h-8 md:w-9 md:h-9 text-volt mb-5 group-hover:scale-110 group-hover:rotate-[-4deg] transition-transform duration-300" strokeWidth={1.5} />
+
+                    <h3 className="relative font-barlow font-black uppercase text-xl md:text-2xl text-ink mb-2 leading-tight tracking-tight">
+                      {card.title}
+                    </h3>
+
+                    <p className="relative text-sm text-ink/70 leading-relaxed mb-5 flex-1">
+                      {card.text}
+                    </p>
+
+                    <div className="relative mt-auto pt-4 border-t border-gray-border">
+                      <CardViz viz={card.viz} />
+                    </div>
+                  </motion.div>
+                );
+              };
+
+              return (
+                <>
+                  {/* Cards 0-8 (Player Report → Comparison) */}
+                  {reportCards.slice(0, 9).map((card, i) => renderCard(card, i))}
+
+                  {/* ===== Special highlight CLOSER card — Premium (spans 2 rows on desktop) ===== */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 18 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 0.6, delay: 0.18, ease: "easeOut" }}
+                    data-testid="feature-card-highlight"
+                    className="sm:col-span-2 lg:col-span-4 lg:row-span-2 relative overflow-hidden bg-gradient-to-br from-forest-pop via-forest to-forest border-2 p-7 md:p-8 flex flex-col group hover:-translate-y-1 transition-all duration-300"
+                    style={{ borderColor: "#ccff00", boxShadow: "0 0 80px rgba(204,255,0,0.22)" }}
+                  >
+                    {/* pulsing volt glow */}
+                    <div aria-hidden className="absolute -top-20 -right-20 w-64 h-64 bg-volt/25 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDuration: "4s" }} />
+                    <div aria-hidden className="absolute -bottom-32 -left-20 w-72 h-72 bg-volt/15 rounded-full blur-3xl pointer-events-none" />
+
+                    <span className="absolute top-5 right-6 font-barlow font-black text-xs text-cream-card/40 tracking-widest">12</span>
+
+                    <Crown className="relative w-12 h-12 md:w-14 md:h-14 mb-6 group-hover:scale-110 transition-transform duration-300" strokeWidth={1.5} fill="#ccff00" fillOpacity="0.28" style={{ color: "#ccff00" }} />
+
+                    <h3 className="relative font-barlow font-black uppercase text-2xl md:text-3xl text-cream-card mb-3 leading-[0.95] tracking-tight">
+                      100% Personal.
+                      <br />
+                      <span style={{ color: "#ccff00" }}>100% Game Changing.</span>
+                    </h3>
+
+                    <p className="relative text-sm md:text-base text-cream-card/85 leading-relaxed mt-3">
+                      This is more than a report.{" "}
+                      <span className="font-serif-italic italic" style={{ color: "#ccff00" }}>It&apos;s your advantage.</span>
+                    </p>
+
+                    {/* Mini trust signals */}
+                    <div className="relative mt-6 grid grid-cols-2 gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-cream-card/75">
+                      <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full" style={{ background: "#ccff00" }} /> Pro benchmarks</span>
+                      <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full" style={{ background: "#ccff00" }} /> Real scouts</span>
+                      <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full" style={{ background: "#ccff00" }} /> Premium PDF</span>
+                      <span className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full" style={{ background: "#ccff00" }} /> 5–10 min</span>
+                    </div>
+
+                    <div className="relative mt-auto pt-6 border-t border-cream-card/15">
+                      <Link
+                        to={startHref}
+                        data-testid="report-section-cta"
+                        className="inline-flex items-center gap-2 font-barlow font-black uppercase text-sm tracking-[0.22em] hover:text-cream-card transition-colors group/btn"
+                        style={{ color: "#ccff00" }}
+                      >
+                        Unlock your report
+                        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                      </Link>
+                    </div>
+                  </motion.div>
+
+                  {/* Cards 9-10 (PDF + Private) — rendered after closer to fill bottom row */}
+                  {reportCards.slice(9, 11).map((card, idx) => renderCard(card, idx + 9))}
+                </>
+              );
+            })()}
           </div>
 
           {/* ===== Bottom trust bar ===== */}
