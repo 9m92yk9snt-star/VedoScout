@@ -26,6 +26,40 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 12 — Tier 3 Progress Tracking + $599 Progress Pass (Feb 16 2026)**:
+  - **New backend module** `/app/backend/progress_tracking.py` (~600 lines, self-contained, no server.py imports) — `build_progress_router(...)`, `find_or_create_profile(...)`, `consume_pass_credit(...)`, `_pass_active(...)`.
+  - **New collection** `player_profiles` `{id, user_id, name, normalized_name, last_position, last_age, preferred_foot, report_ids[], cached_trajectory, created_at, updated_at}`. Reports extended (additive) with `player_profile_id`. All 7 existing reports backfilled into 4 profiles.
+  - **API endpoints (`/api/progress/*`)**:
+    - `GET /players` — list user's tracked players with `report_count`.
+    - `GET /players/{id}/trajectory` — full trajectory: timeline (per-report snapshot with date/age/overall/pillars/age-adjusted percentile), verdict (`ahead`/`on_track`/`plateau`/`first_report`), badges, deltas (raw + age-adjusted + per-pillar), archetype_overlay, video_diff, mission status, Gemini narrative.
+    - `GET /players/{id}/growth-card.png` — 1080×1350 PNG via Pillow (header band, verdict chip, raw + age-adjusted delta numbers, pillar delta bars, badge strip).
+    - `DELETE /players/{id}` — delete profile.
+    - `GET /pass/status` — Progress Pass state.
+    - `POST /pass/checkout` — embedded Stripe checkout (live mode) for $599 / 3 reports / 365 days. Inserts `payment_transactions` row with `kind=progress_pass`.
+    - `POST /pass/activate/{session_id}` — server-side activation (idempotent, 402 on unpaid, 403 on mismatched user_id).
+  - **Server.py integration**:
+    - Upload route honours Progress Pass credit: if free preview is used AND no prepaid_uploads BUT pass_state.active → consume 1 credit & generate full report (no Stripe charge).
+    - `find_or_create_profile()` called after every successful upload — auto-matches by `(user_id, normalized_name)`.
+    - `/api/me/upload-eligibility` returns new `progress_pass` field + `reason: "progress_pass"` when only credits remain.
+    - `/api/webhook/stripe-embedded` recognises `kind=progress_pass` → activates pass on session.payment_status=paid (3 credits / 365 days, idempotent by session_id).
+  - **Tier 3 cleverness**:
+    - **Age-adjusted percentile** (honesty moat) — bracket-based mapping (≤10 / ≤12 / ≤14 / ≤17 / >17). Same raw 7.0 lands at 50pct at U13, ~40pct at U17. Surfaces in trajectory as `overall_age_adjusted_pct` + honesty-callout UI block when raw rises but age-adjusted drops.
+    - **Gemini Delta Narrative** — `generate_delta_narrative()` calls `call_gemini_text()` with strict facts-only system msg + 140–180-word output, cached on profile by report_count. Live verified: Lukas A. (5.5-month gap, 13→14, 6.8→8.0 overall, 46%→70% age-adj) → 882-char specific narrative.
+    - **Trajectory Verdict** — `_verdict()` derives `ahead` (yearly_pace ≥ 0.7), `on_track`, `plateau` (≤ 0.05) from overall growth scaled by months span. UI shows hero card with VERDICT_META icons + colour.
+    - **Archetype Trajectory Overlay** — `ARCHETYPE_CURVE` constant maps tier → typical U11/U14/U17/U21 overall. UI renders solid Player line + dashed Archetype path line in same Recharts LineChart.
+    - **Video-evidence diff** — pairs first vs latest `video_comments` with frame_url, max 3 pairs, renders before/after grid in UI.
+    - **Mission/next-focus loop** — reads previous report's `mission_focus`, evaluates each pillar (improved iff Δ ≥ 0.3), auto-suggests next mission from 2 weakest current pillars.
+    - **Growth badges** — `_compute_badges()` returns First Century (pillar ≥ 8), Plateau Breaker (≥1.0 jump after flat pair), Stage Up (band crossed), Pro Comparison Unlocked (age ≥ 12).
+    - **Shareable growth card PNG** — 1080×1350 IG-ready, generated server-side, served via authenticated route.
+  - **Frontend**:
+    - New `/trajectory/:id` route + `TrajectoryPage.jsx` — verdict hero, raw + age-adjusted delta pills, honesty callout (conditional), Recharts LineChart with archetype overlay, Gemini narrative card (forest hero), pillar delta bars, mission status with HIT/MISS chips + next-focus chips, video diff before/after grid, badges grid, reports table.
+    - Rewritten `DashboardPage.jsx` (cream theme) — Progress Pass promo banner ($599 / 3 reports / 12 mo + 4-bullet value prop) OR active banner (credits remaining + expiry); "Your players" section above legacy "Your reports" library. Embedded Stripe modal opens on "Buy Progress Pass" click.
+    - All elements carry stable `data-testid`s for testing.
+  - **Tests** — 22 new pytests in `/app/backend/tests/test_progress_tracking.py` (verdict logic, age-adjusted bands, badges, archetype tier resolution, mission evaluator, pass state) — 22/22 pass. 9 live API integration tests in `/app/backend/tests/test_progress_api_live.py` (added by testing subagent iter13) — 9/9 pass.
+  - **Testing subagent iter13: 100% pass (31/31 backend, 100% frontend).** Stripe live keys protected — modal reaches ready state but no card entered.
+  - **Untouched**: existing report flow, PDF generation, Gemini archetype narrative, FIFA/StatsBomb panels, blog CMS, URL upload, auth, admin.
+
+
 - ✅ **🆕 Session 11 — Upload URL paste + Report share toolbar + PDF "60-Second Scout Summary" (Feb 15 2026)**:
   - **Upload URL paste** (`UploadPage.jsx` + new `backend/url_video_fetch.py`): toggle between **File upload** and **Paste URL**. Backend `POST /api/me/url-fetch` uses `yt-dlp` (added to requirements.txt) to download YouTube, Vimeo, Veo, direct MP4 links into the standard `UPLOAD_DIR` (capped 200MB / 120s). Returns `{token, preview_url, size_mb}` — frontend uses `preview_url` as the marker video source. Existing `/reports/upload` endpoint extended with optional `temp_video_token` Form field (file remains required when token absent — backward compatible).
   - **Report page social share toolbar** (`ReportPage.jsx`): WhatsApp / X (Twitter) / Email / Copy-link icon buttons next to the existing Download PDF and Get Share Card buttons. Native share URLs (`wa.me/?text=…`, `twitter.com/intent/tweet?…`, `mailto:`). All four buttons verified present and styled with brand-forest outline.
