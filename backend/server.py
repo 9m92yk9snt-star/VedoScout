@@ -2514,22 +2514,29 @@ async def upload_video_and_create_preview(
 ):
     # ============== UPLOAD GATE ==============
     # Free users get ONE free preview lifetime. After that, every upload requires
-    # a pre-payment (auto-unlocks the full premium report on completion).
+    # a pre-payment OR a Progress Pass credit.
     is_admin = user.get("role") == "admin"
     free_used = bool(user.get("free_preview_used"))
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
+    pass_state = _progress_pass_active(user)
+    used_pass_credit = False
     upload_will_be_paid = False
     if not is_admin:
-        if free_used and prepaid <= 0:
+        if free_used and prepaid <= 0 and not pass_state.get("active"):
             current_price = await get_current_price()
             raise HTTPException(
                 status_code=402,
                 detail={
                     "code": "PREPAY_REQUIRED",
-                    "message": f"Your free preview is used. Pay ${current_price:g} to upload your next video — full premium report unlocks instantly.",
+                    "message": f"Your free preview is used. Pay ${current_price:g} to upload your next video — or activate a Progress Pass to track growth.",
                 },
             )
-        upload_will_be_paid = free_used and prepaid > 0
+        # Prefer Progress Pass credit when prepaid credits are not present.
+        if free_used and prepaid <= 0 and pass_state.get("active"):
+            used_pass_credit = True
+            upload_will_be_paid = True
+        else:
+            upload_will_be_paid = free_used and prepaid > 0
 
     # ============== RESOLVE SOURCE: file upload OR temp URL-fetch token ==============
     using_temp_token = False
@@ -2690,9 +2697,26 @@ async def upload_video_and_create_preview(
     }
     await db.reports.insert_one(report_doc)
 
+    # ============== LINK TO PLAYER PROFILE ==============
+    try:
+        profile_id = await find_or_create_profile(db, user["id"], details, report_id)
+        if profile_id:
+            await db.reports.update_one({"id": report_id}, {"$set": {"player_profile_id": profile_id}})
+    except Exception as e:
+        logger.warning(f"Player profile link failed for report {report_id}: {e}")
+        profile_id = None
+
     # ============== CONSUME ELIGIBILITY ==============
     if not is_admin:
-        if upload_will_be_paid:
+        if used_pass_credit:
+            # Burn one Progress Pass credit and trigger full report generation
+            await consume_pass_credit(db, user["id"])
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"last_upload_at": now_iso()}},
+            )
+            background.add_task(generate_full_report_task, report_id)
+        elif upload_will_be_paid:
             # Pre-paid upload — consume one credit; full report will be auto-generated below
             await db.users.update_one(
                 {"id": user["id"]},
@@ -5091,14 +5115,22 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
 async def get_upload_eligibility(user=Depends(get_current_user)):
     """Tells the frontend whether the user can upload for free, must pre-pay, or is admin."""
     if user.get("role") == "admin":
-        return {"eligible": True, "reason": "admin", "free_preview_used": True, "prepaid_uploads": 999}
+        return {"eligible": True, "reason": "admin", "free_preview_used": True, "prepaid_uploads": 999,
+                "progress_pass": {"active": False, "credits_remaining": 0}}
     free_used = bool(user.get("free_preview_used"))
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
+    pass_state = _progress_pass_active(user)
     if not free_used:
-        return {"eligible": True, "reason": "free_preview", "free_preview_used": False, "prepaid_uploads": prepaid}
+        return {"eligible": True, "reason": "free_preview", "free_preview_used": False,
+                "prepaid_uploads": prepaid, "progress_pass": pass_state}
     if prepaid > 0:
-        return {"eligible": True, "reason": "prepaid", "free_preview_used": True, "prepaid_uploads": prepaid}
-    return {"eligible": False, "reason": "prepay_required", "free_preview_used": True, "prepaid_uploads": 0}
+        return {"eligible": True, "reason": "prepaid", "free_preview_used": True,
+                "prepaid_uploads": prepaid, "progress_pass": pass_state}
+    if pass_state.get("active"):
+        return {"eligible": True, "reason": "progress_pass", "free_preview_used": True,
+                "prepaid_uploads": 0, "progress_pass": pass_state}
+    return {"eligible": False, "reason": "prepay_required", "free_preview_used": True,
+            "prepaid_uploads": 0, "progress_pass": pass_state}
 
 
 @api_router.post("/payments/prepay-upload")
@@ -5648,6 +5680,34 @@ async def stripe_webhook_embedded(request: Request):
                             "updated_at": now_iso(),
                         }},
                     )
+        elif kind == "progress_pass":
+            user_id = metadata.get("user_id") or (txn or {}).get("user_id")
+            if user_id:
+                u = await db.users.find_one({"id": user_id})
+                existing = (u or {}).get("progress_pass") or {}
+                # Idempotent: only activate if not already activated by THIS session
+                if existing.get("activation_session_id") != session_id:
+                    from datetime import timedelta as _td
+                    now_dt = datetime.now(timezone.utc)
+                    await db.users.update_one(
+                        {"id": user_id},
+                        {"$set": {"progress_pass": {
+                            "purchased_at": now_dt.isoformat(),
+                            "expires_at": (now_dt + _td(days=365)).isoformat(),
+                            "credits_total": 3,
+                            "credits_remaining": 3,
+                            "activation_session_id": session_id,
+                        }}},
+                    )
+                if txn:
+                    await db.payment_transactions.update_one(
+                        {"session_id": session_id},
+                        {"$set": {
+                            "payment_status": "paid",
+                            "status": "complete",
+                            "updated_at": now_iso(),
+                        }},
+                    )
 
     return {"received": True}
 
@@ -5995,6 +6055,12 @@ async def admin_delete_report(report_id: str, _=Depends(get_current_admin)):
 from blog_routes import build_blog_router, mount_blog_uploads
 from blog_seo import build_seo_router
 from url_video_fetch import build_url_fetch_router, resolve_temp_token_path
+from progress_tracking import (
+    build_progress_router,
+    find_or_create_profile,
+    consume_pass_credit,
+    _pass_active as _progress_pass_active,
+)
 
 api_router.include_router(build_blog_router(
     db=db,
@@ -6006,6 +6072,16 @@ api_router.include_router(build_seo_router(db=db))
 api_router.include_router(build_url_fetch_router(
     upload_dir=UPLOAD_DIR,
     get_current_user=get_current_user,
+))
+api_router.include_router(build_progress_router(
+    db=db,
+    get_current_user=get_current_user,
+    call_gemini_text=call_gemini_text,
+    stripe_sdk=stripe_sdk,
+    upload_dir=UPLOAD_DIR,
+    pass_price_usd=float(os.environ.get("PROGRESS_PASS_PRICE_USD", "599")),
+    price_currency=PRICE_CURRENCY.lower() if PRICE_CURRENCY else "usd",
+    arm_stripe_fn=_arm_real_stripe,
 ))
 mount_blog_uploads(app)
 

@@ -1,6 +1,7 @@
 """
 progress_tracking.py — Player Profiles + Trajectory Engine + Gemini Delta Narrative
-+ Progress Pass credits.
++ Progress Pass credits + Tier 3 features (Archetype overlay, Video diff, Mission,
+Growth card PNG).
 
 Self-contained module — no imports from server.py to avoid circular deps.
 Call `build_progress_router(...)` and include the returned router.
@@ -24,13 +25,16 @@ reports (extended — additive, all optional)
 from __future__ import annotations
 
 import json
+import os
 import re
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Any, List, Optional, Dict
+from pathlib import Path
+from typing import Any, List, Optional, Dict, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 log = logging.getLogger("progress_tracking")
@@ -402,6 +406,318 @@ async def find_or_create_profile(db, user_id: str, player_details: dict, report_
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# Tier 3 — Archetype trajectory overlay
+# ──────────────────────────────────────────────────────────────────────────
+
+
+# Crude pro-archetype progression curve by age band. Each band represents the
+# typical pillar score a top-archetype-matched youth player would be at, derived
+# from the same calibrated 0–10 ladder the report uses. These are conservative
+# senior-pro projection curves so the overlay shows the path, not hype.
+ARCHETYPE_CURVE = {
+    "elite":   {"U11": 7.0, "U14": 7.8, "U17": 8.6, "U21": 9.1},
+    "high":    {"U11": 6.5, "U14": 7.3, "U17": 8.0, "U21": 8.6},
+    "mid":     {"U11": 6.0, "U14": 6.8, "U17": 7.5, "U21": 8.0},
+    "low":     {"U11": 5.5, "U14": 6.2, "U17": 6.8, "U21": 7.4},
+}
+
+
+def _archetype_tier_from_report(report_doc: dict) -> str:
+    """Resolve which archetype curve a report should be overlaid against."""
+    arch = report_doc.get("archetype") or {}
+    full = report_doc.get("full_report") or {}
+    ob = full.get("overall_benchmark") or {}
+    tier = (ob.get("tier") or "").lower()
+    if "elite" in tier:
+        return "elite"
+    if "pro" in tier or "academy" in tier:
+        return "high"
+    if "standard" in tier or "grassroots" in tier:
+        return "low"
+    # Fallback: use match strength
+    ms = arch.get("match_strength")
+    if isinstance(ms, (int, float)):
+        if ms >= 8.5:
+            return "elite"
+        if ms >= 7.5:
+            return "high"
+        if ms >= 6.5:
+            return "mid"
+    return "mid"
+
+
+def _band_for_age(age: Optional[int]) -> Optional[str]:
+    if age is None:
+        return None
+    if age <= 11:
+        return "U11"
+    if age <= 14:
+        return "U14"
+    if age <= 17:
+        return "U17"
+    return "U21"
+
+
+def _build_archetype_overlay(timeline: List[dict], reports: List[dict]) -> Optional[dict]:
+    """Build the dataset for the side-by-side curve: player overall trajectory
+    vs the typical archetype path at that age band."""
+    if not timeline:
+        return None
+    # Use the latest report's archetype tier as the reference curve.
+    tier_key = _archetype_tier_from_report(reports[-1])
+    curve = ARCHETYPE_CURVE.get(tier_key) or ARCHETYPE_CURVE["mid"]
+    arch_name = (reports[-1].get("archetype") or {}).get("name") or "Pro archetype"
+    points = []
+    for snap in timeline:
+        band = _band_for_age(snap.get("age"))
+        ref = curve.get(band) if band else None
+        points.append({
+            "date": snap["date"],
+            "age": snap.get("age"),
+            "band": band,
+            "player_overall": snap.get("overall"),
+            "archetype_overall": ref,
+        })
+    return {
+        "archetype_name": arch_name,
+        "tier_key": tier_key,
+        "curve": curve,
+        "points": points,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Tier 3 — Video-evidence diff
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _build_video_diff(reports: List[dict]) -> Optional[dict]:
+    """Pair the FIRST and LATEST report's video_comments (with frame_url) so the
+    UI can show before/after moments side-by-side."""
+    if len(reports) < 2:
+        return None
+    first, last = reports[0], reports[-1]
+    first_full = first.get("full_report") or {}
+    last_full = last.get("full_report") or {}
+    first_comments = [c for c in (first_full.get("video_comments") or []) if c.get("frame_url")]
+    last_comments = [c for c in (last_full.get("video_comments") or []) if c.get("frame_url")]
+    if not first_comments and not last_comments:
+        return None
+    # Up to 3 paired moments
+    pairs = []
+    for i in range(min(3, max(len(first_comments), len(last_comments)))):
+        pair = {
+            "before": first_comments[i] if i < len(first_comments) else None,
+            "after": last_comments[i] if i < len(last_comments) else None,
+        }
+        if pair["before"] or pair["after"]:
+            pairs.append(pair)
+    if not pairs:
+        return None
+    return {
+        "first_report_id": first["id"],
+        "last_report_id": last["id"],
+        "first_age": (first.get("player_details") or {}).get("age"),
+        "last_age": (last.get("player_details") or {}).get("age"),
+        "pairs": pairs,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Tier 3 — Mission status (closing the coaching loop)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _build_mission_status(reports: List[dict]) -> Optional[dict]:
+    """If the previous report declared `mission_focus`, evaluate whether those
+    pillars improved in the latest report. Also auto-recommend the NEXT mission."""
+    if len(reports) < 2:
+        # Single-report case: still suggest the next mission so the UI has something.
+        if not reports:
+            return None
+        last = reports[-1]
+        last_pillars = _pillar_scores(last)
+        if not any(v is not None for v in last_pillars.values()):
+            return None
+        weakest = sorted(
+            [(k, v) for k, v in last_pillars.items() if v is not None],
+            key=lambda kv: kv[1],
+        )[:2]
+        return {
+            "previous_mission": None,
+            "previous_results": [],
+            "next_mission": [{"pillar": k, "current": v} for k, v in weakest],
+        }
+    prev, latest = reports[-2], reports[-1]
+    prev_mission = prev.get("mission_focus") or []
+    prev_pillars = _pillar_scores(prev)
+    last_pillars = _pillar_scores(latest)
+    results = []
+    for pillar in prev_mission:
+        before = prev_pillars.get(pillar)
+        after = last_pillars.get(pillar)
+        if before is not None and after is not None:
+            results.append({
+                "pillar": pillar,
+                "before": before,
+                "after": after,
+                "delta": round(after - before, 2),
+                "improved": after - before >= 0.3,
+            })
+    # next mission: 2 weakest pillars in latest
+    weakest = sorted(
+        [(k, v) for k, v in last_pillars.items() if v is not None],
+        key=lambda kv: kv[1],
+    )[:2]
+    return {
+        "previous_mission": prev_mission,
+        "previous_results": results,
+        "next_mission": [{"pillar": k, "current": v} for k, v in weakest],
+    }
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Tier 3 — Growth card PNG (1080×1350 IG-ready)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def generate_growth_card(profile_doc: dict, trajectory: dict, out_path: Path) -> bool:
+    """Render a shareable PNG summarising the player's progress."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except Exception as e:
+        log.warning("growth card: PIL import failed: %s", e)
+        return False
+
+    timeline = trajectory.get("timeline") or []
+    if not timeline:
+        return False
+    deltas = trajectory.get("deltas") or {}
+    verdict = trajectory.get("verdict") or "first_report"
+    badges = trajectory.get("badges") or []
+
+    name = profile_doc.get("name") or "Player"
+    first, last = timeline[0], timeline[-1]
+    months_span = round((
+        datetime.fromisoformat(last["date"].replace("Z", "+00:00")).timestamp()
+        - datetime.fromisoformat(first["date"].replace("Z", "+00:00")).timestamp()
+    ) / (60 * 60 * 24 * 30.5), 1) if len(timeline) >= 2 else 0
+
+    W, H = 1080, 1350
+    CREAM = (244, 239, 230)
+    FOREST = (31, 79, 47)
+    FOREST_POP = (45, 107, 61)
+    INK = (10, 15, 13)
+    MUTED = (107, 114, 128)
+    AMBER = (185, 110, 17)
+    VERDICT_COLOR = {
+        "ahead": FOREST_POP,
+        "on_track": FOREST,
+        "plateau": AMBER,
+        "first_report": MUTED,
+    }.get(verdict, FOREST)
+    VERDICT_LABEL = {
+        "ahead": "AHEAD OF CURVE",
+        "on_track": "ON TRACK",
+        "plateau": "PLATEAU WATCH",
+        "first_report": "BASELINE SET",
+    }.get(verdict, "PROGRESS")
+
+    img = Image.new("RGB", (W, H), CREAM)
+    d = ImageDraw.Draw(img)
+
+    try:
+        font_xl = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 110)
+        font_lg = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 56)
+        font_md = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
+        font_sm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 22)
+        font_xs = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
+    except Exception:
+        font_xl = font_lg = font_md = font_sm = font_xs = ImageFont.load_default()
+
+    # Forest header band
+    d.rectangle([(0, 0), (W, 280)], fill=FOREST)
+    d.polygon([(W - 220, 0), (W, 0), (W, 220)], fill=FOREST_POP)
+    d.text((48, 36), "SCOUTMEPLAY  ·  PROGRESS", fill=CREAM, font=font_xs)
+    d.text((48, 72), name.upper()[:24], fill=(255, 255, 255), font=font_lg)
+    d.text((48, 148), f"{months_span} MONTH GROWTH STORY".upper() if months_span else "BASELINE REPORT",
+           fill=CREAM, font=font_sm)
+
+    # Verdict chip
+    chip_y = 340
+    chip_text = VERDICT_LABEL
+    bbox = d.textbbox((0, 0), chip_text, font=font_md)
+    cw = bbox[2] - bbox[0]
+    chip_x = (W - cw - 96) // 2
+    d.rectangle([(chip_x, chip_y), (chip_x + cw + 96, chip_y + 72)], fill=VERDICT_COLOR)
+    d.text((chip_x + 48, chip_y + 18), chip_text, fill=(255, 255, 255), font=font_md)
+
+    # Headline delta numbers
+    raw_delta = deltas.get("overall_raw")
+    pct_delta = deltas.get("overall_age_adjusted_pct")
+    y = 480
+    d.text((60, y), "RAW SCORE", fill=MUTED, font=font_xs)
+    raw_text = f"{first.get('overall') or '-'} → {last.get('overall') or '-'}"
+    d.text((60, y + 30), raw_text, fill=INK, font=font_md)
+    if raw_delta is not None:
+        prefix = "+" if raw_delta >= 0 else ""
+        d.text((60, y + 90), f"{prefix}{raw_delta}", fill=FOREST if raw_delta >= 0 else AMBER, font=font_xl)
+        d.text((60, y + 220), "POINTS GAINED" if raw_delta >= 0 else "POINTS LOST", fill=MUTED, font=font_xs)
+
+    if pct_delta is not None:
+        d.text((W // 2 + 30, y), "AGE-ADJUSTED PERCENTILE", fill=MUTED, font=font_xs)
+        prefix = "+" if pct_delta >= 0 else ""
+        d.text((W // 2 + 30, y + 90), f"{prefix}{pct_delta}", fill=FOREST_POP if pct_delta >= 0 else AMBER, font=font_xl)
+        d.text((W // 2 + 30, y + 220), "PERCENTILE SHIFT", fill=MUTED, font=font_xs)
+
+    # Pillar delta bars
+    pillar_deltas = (deltas.get("pillars") or {})
+    bars_y = 880
+    d.text((60, bars_y - 36), "PILLAR DELTAS", fill=FOREST, font=font_xs)
+    sorted_pillars = sorted(pillar_deltas.items(), key=lambda kv: -kv[1].get("delta", 0))
+    for i, (pillar, dat) in enumerate(sorted_pillars[:5]):
+        row_y = bars_y + i * 50
+        d.text((60, row_y), pillar.replace("_", " ").upper(), fill=INK, font=font_xs)
+        delta = dat.get("delta", 0)
+        bar_x0 = 360
+        bar_w = 600
+        bar_h = 28
+        # Background bar
+        d.rectangle([(bar_x0, row_y - 4), (bar_x0 + bar_w, row_y + bar_h)], fill=(229, 231, 235))
+        # Filled portion (delta scaled, max ±2.0 maps to full bar)
+        max_delta = 2.0
+        center = bar_x0 + bar_w // 2
+        if delta >= 0:
+            fill_w = min(bar_w // 2, int((delta / max_delta) * (bar_w // 2)))
+            d.rectangle([(center, row_y - 4), (center + fill_w, row_y + bar_h)], fill=FOREST)
+        else:
+            fill_w = min(bar_w // 2, int((-delta / max_delta) * (bar_w // 2)))
+            d.rectangle([(center - fill_w, row_y - 4), (center, row_y + bar_h)], fill=AMBER)
+        d.line([(center, row_y - 6), (center, row_y + bar_h + 2)], fill=INK, width=2)
+        delta_text = f"{'+' if delta >= 0 else ''}{delta}"
+        d.text((bar_x0 + bar_w + 16, row_y), delta_text, fill=INK, font=font_xs)
+
+    # Badge strip
+    if badges:
+        bg_y = H - 220
+        d.text((60, bg_y), "BADGES", fill=FOREST, font=font_xs)
+        x = 60
+        for b in badges[:3]:
+            label = (b.get("label") or "")[:18]
+            bbox = d.textbbox((0, 0), label, font=font_xs)
+            bw = bbox[2] - bbox[0]
+            d.rectangle([(x, bg_y + 30), (x + bw + 32, bg_y + 70)], fill=FOREST)
+            d.text((x + 16, bg_y + 40), label, fill=(255, 255, 255), font=font_xs)
+            x += bw + 48
+
+    d.text((60, H - 60), "SCOUTMEPLAY.COM  ·  GROUNDED IN DATA · BUILT FOR PARENTS",
+           fill=MUTED, font=font_xs)
+
+    img.save(out_path, "PNG", optimize=True)
+    return True
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # Router
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -416,6 +732,7 @@ def build_progress_router(
     get_current_user,
     call_gemini_text,
     stripe_sdk,
+    upload_dir: Path,
     pass_price_usd: float = 599.0,
     price_currency: str = "USD",
     arm_stripe_fn=None,
@@ -442,6 +759,17 @@ def build_progress_router(
             raise HTTPException(404, "Player profile not found")
 
         traj = await compute_trajectory(db, profile)
+
+        # Pull the actual report docs once so we can build Tier 3 enrichments.
+        report_ids = profile.get("report_ids") or []
+        reports = []
+        if report_ids:
+            cursor = db[REPORTS].find({"id": {"$in": report_ids}}).sort("created_at", 1)
+            reports = [r async for r in cursor]
+        # Tier 3 enrichments
+        traj["archetype_overlay"] = _build_archetype_overlay(traj.get("timeline") or [], reports)
+        traj["video_diff"] = _build_video_diff(reports)
+        traj["mission"] = _build_mission_status(reports)
 
         # Generate narrative if 2+ reports and not cached recently
         cached = profile.get("cached_trajectory") or {}
@@ -472,6 +800,24 @@ def build_progress_router(
             )
 
         return {"profile": _public(profile), "trajectory": traj}
+
+    # ─── Growth card PNG (shareable) ─────────────────────────────────────
+    @router.get("/players/{profile_id}/growth-card.png")
+    async def get_growth_card(profile_id: str, user=Depends(get_current_user)):
+        profile = await db[PLAYER_PROFILES].find_one({"id": profile_id, "user_id": user["id"]})
+        if not profile:
+            raise HTTPException(404, "Player profile not found")
+        traj = await compute_trajectory(db, profile)
+        if not traj.get("timeline"):
+            raise HTTPException(404, "No reports linked yet")
+        cards_dir = upload_dir / "growth_cards"
+        cards_dir.mkdir(parents=True, exist_ok=True)
+        out_path = cards_dir / f"{profile_id}_{traj['report_count']}.png"
+        if not out_path.exists():
+            ok = generate_growth_card(profile, traj, out_path)
+            if not ok:
+                raise HTTPException(500, "Failed to render growth card")
+        return FileResponse(str(out_path), media_type="image/png", filename=f"{profile.get('name','player').replace(' ','_')}_growth.png")
 
     @router.delete("/players/{profile_id}")
     async def delete_my_profile(profile_id: str, user=Depends(get_current_user)):

@@ -1,0 +1,52 @@
+{
+  "summary": "Tier 3 Progress Tracking ($599 Progress Pass / 3 reports / 12 months) — full backend + frontend validation. 31/31 backend tests pass (22 unit + 9 live API). All required frontend data-testids render on /dashboard and /trajectory/{id}. Stripe embedded modal opens to ready state with $599 USD headline. Live keys protected — no real payment attempted.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_progress_tracking.py",
+    "/app/backend/tests/test_progress_api_live.py",
+    "/app/test_reports/pytest/iter13_progress.xml",
+    "/app/test_reports/pytest/iter13_progress_live.xml",
+    "/app/test_reports/pytest/iter13_final.xml"
+  ],
+  "verified_features": {
+    "GET /api/progress/players": "Returns {items:[], total:N} with 2 profiles for premium user: Lukas A. (report_count=2) and Almin Orman (report_count=1). Each item has id, name, report_count.",
+    "GET /api/progress/players/{id}/trajectory": "Returns {profile, trajectory} envelope. Trajectory contains timeline (with date/age/overall/pillars/age_adjusted_pct), verdict, badges, deltas, archetype_overlay (archetype_name/tier_key/curve/points), video_diff, mission (previous_results + next_mission), narrative.",
+    "Lukas (2 reports) trajectory": "verdict='ahead', narrative length=911 chars, badges include 'First Century' (Technical hit 8.0/10) and 'Pro Comparison Unlocked', mission shows 2 previous_results both with HIT badges (Technical 6.8→8 +1.2, Physical 5.8→7 +1.2), deltas overall_raw=+1.2 / age-adjusted=+24pct.",
+    "Almin (1 report) trajectory": "verdict='first_report' as required, narrative empty for single report.",
+    "GET /api/progress/players/{id}/growth-card.png": "HTTP 200, Content-Type image/png, PNG signature valid, dimensions exactly 1080x1350.",
+    "GET /api/progress/pass/status": "Returns {active:false, credits_remaining:0} for premium user.",
+    "GET /api/me/upload-eligibility": "Includes 'progress_pass' field.",
+    "POST /api/progress/pass/checkout": "Stripe Checkout session created successfully (live mode), returns client_secret + session_id. payment_transactions row inserted with kind='progress_pass', amount=599, credits=3, payment_status='initiated', status='open'.",
+    "POST /api/progress/pass/activate/{session_id}": "Returns HTTP 402 'Payment not completed' for un-paid session (as expected).",
+    "POST /api/webhook/stripe-embedded": "Reachable; rejects with 400 for invalid signature (safe).",
+    "Frontend /dashboard": "progress-pass-promo-banner ($599 / 3 reports / 12 months), buy-progress-pass-btn, dashboard-players-section, 2x player-card-{id} (Lukas A., Almin Orman), legacy library section with PREMIUM + PREVIEW badges all render.",
+    "Frontend /trajectory/{Lukas}": "trajectory-page, trajectory-player-name='LUKAS A.', trajectory-verdict-card='AHEAD OF CURVE' +1.2 pts / +24 pct, trajectory-chart-card (Recharts LineChart with Archetype path + Player), trajectory-narrative-card (911 char Gemini narrative), trajectory-pillars-card (pillar-delta-technical/tactical/physical bars), trajectory-mission-card with HIT badges + next-focus chips, trajectory-badges-card with 'FIRST CENTURY' + 'PRO COMPARISON UNLOCKED'.",
+    "Stripe embedded modal": "Opens on Buy Progress Pass click, reaches ready state with Stripe iframe loaded, shows 'ScoutMePlay – Progress Pass / US$599.00 / 3 premium reports for the same player across 12 months'. NOT completed (live mode).",
+    "Growth-card button": "data-testid=trajectory-growth-card-btn link href = /api/progress/players/{id}/growth-card.png (verified).",
+    "Regression": "Existing /dashboard library section with PREMIUM+PREVIEW badges still renders; player card click navigates to /trajectory/{id} successfully; existing /report/{id} routes still load."
+  },
+  "action_items": [],
+  "critical_code_review_comments": [
+    "progress_tracking.py is 955 lines — borderline above the 700-line module threshold. Consider splitting into progress/router.py, progress/trajectory.py, progress/narrative.py, progress/growth_card.py, progress/checkout.py for maintainability.",
+    "Test fixture used `name` field for player list; spec note in review mentioned `display_name`. Backend returns `name` (matches DB). Either is fine but document the field name in API spec.",
+    "Trajectory endpoint returns {profile, trajectory} envelope but the spec described a flat trajectory object. The frontend handles it correctly; if external API consumers exist, document the envelope explicitly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_progress_api_live.py (created — 9 new live integration tests for the Progress Tracking API surface)"
+  ],
+  "success_rate": {"backend": "100% (31/31 — 22 unit + 9 live API)", "frontend": "100% (all required data-testids render, Stripe modal reaches ready state)"},
+  "test_credentials": "premium@elitescout.com / Premium@2026 (used for all premium tests); admin@elitescout.com / Admin@2026!Elite; free@elitescout.com / Free@2026",
+  "seed_data_creation": "None — used pre-seeded Lukas A. (f5554dad-9f27-44f4-abc5-d63c3c669561, 2 reports) and Almin Orman (2e55e2d4-81b3-45f0-9fae-4c9b0839ade5, 1 report).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All Tier 3 Progress Tracking endpoints + frontend integrations verified working. Live API contract: GET /api/progress/players returns {items:[{id,name,report_count,...}], total}; GET /api/progress/players/{id}/trajectory returns {profile, trajectory:{timeline,verdict,badges,deltas,archetype_overlay,video_diff,mission,narrative,...}}. Stripe LIVE keys active — do NOT enter card details; only verify session creation + modal opens. progress_tracking.py at 955 lines is borderline, recommend splitting if more features land. test_progress_api_live.py login helper uses access_token (not 'token').",
+  "rca of the issue": "No bugs found in this iteration. Two test-script-only authoring mistakes were fixed locally: (1) login response field is `access_token` not `token`, (2) player list response shape is {items:[]} not {players:[]} and trajectory is wrapped in {profile, trajectory:{...}}. Once test fixtures matched the actual contract, every assertion passed."
+}

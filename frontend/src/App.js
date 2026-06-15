@@ -17,6 +17,7 @@ import PrivacyPage from "@/pages/PrivacyPage";
 import MethodologyPage from "@/pages/MethodologyPage";
 import BlogIndexPage from "@/pages/BlogIndexPage";
 import BlogArticlePage from "@/pages/BlogArticlePage";
+import TrajectoryPage from "@/pages/TrajectoryPage";
 
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -49,6 +50,7 @@ function App() {
               <Route path="/signup" element={<Signup />} />
               <Route path="/upload" element={<RequireAuth><UploadPage /></RequireAuth>} />
               <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+              <Route path="/trajectory/:id" element={<RequireAuth><TrajectoryPage /></RequireAuth>} />
               <Route path="/report/:id" element={<RequireAuth><ReportPage /></RequireAuth>} />
               <Route path="/admin" element={<RequireAuth adminOnly><AdminPage /></RequireAuth>} />
               <Route path="/about" element={<AboutPage />} />
