@@ -145,6 +145,27 @@ class AISEORequest(BaseModel):
     content_md: str
 
 
+class AISeriesRequest(BaseModel):
+    topic: str = Field(min_length=3, max_length=300)
+    count: int = Field(default=5, ge=3, le=10)
+    audience: Optional[str] = "parents and ambitious young footballers U7–U21"
+
+
+class SeriesItem(BaseModel):
+    title: str
+    brief: Optional[str] = ""
+    category: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    primary_keyword: Optional[str] = ""
+    meta_title: Optional[str] = ""
+    meta_description: Optional[str] = ""
+
+
+class SeriesBulkSaveRequest(BaseModel):
+    topic: str
+    items: List[SeriesItem]
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Router builder
 # ──────────────────────────────────────────────────────────────────────────────
@@ -516,6 +537,129 @@ def build_blog_router(
             "meta_description": (parsed.get("meta_description") or "")[:160],
             "meta_keywords": [str(k).strip().lower() for k in (parsed.get("meta_keywords") or []) if str(k).strip()][:8],
         }
+
+    # ── AI: Generate Article Series ──────────────────────────────────────────
+    @router.post("/admin/ai/series", dependencies=[Depends(get_current_admin)])
+    async def ai_generate_series(payload: AISeriesRequest):
+        sys_msg = (
+            "You are an SEO content strategist for a football scouting platform. "
+            "You design evergreen article series that are sequential, interconnected, "
+            "build topical authority, and target intent-rich long-tail keywords. "
+            "Return ONLY a valid JSON ARRAY. No markdown fences. No prose."
+        )
+        valid_cats = ", ".join(c["name"] for c in DEFAULT_CATEGORIES)
+        prompt = (
+            f"Plan a {payload.count}-article evergreen series on the topic:\n"
+            f"  \"{payload.topic}\"\n\n"
+            f"Audience: {payload.audience}\n\n"
+            f"Return a JSON ARRAY of exactly {payload.count} objects. Each object must have these EXACT keys:\n"
+            f"  - title (string, ≤80 chars, hook-driven and clickable)\n"
+            f"  - brief (string, 1–2 sentences, what this article will cover)\n"
+            f"  - category (string, one of: {valid_cats})\n"
+            f"  - tags (array of 3–5 short lowercase phrases)\n"
+            f"  - primary_keyword (string, the main SEO keyword for this article)\n"
+            f"  - meta_title (string, ≤60 chars)\n"
+            f"  - meta_description (string, ≤160 chars)\n\n"
+            f"Rules:\n"
+            f"- Articles must be sequential (Part 1, Part 2, …) and logically build on each other.\n"
+            f"- Mix instructional, parent-perspective, drill-focused, and case-study angles.\n"
+            f"- Use concrete age brackets (U7–U21) and specific examples, not vague advice.\n"
+            f"- No two primary_keywords or meta_titles should overlap.\n"
+            f"- Output JSON ARRAY only — no explanation, no fences.\n"
+        )
+        try:
+            raw = await call_gemini_text(
+                session_id=f"blog-series-{uuid.uuid4().hex[:8]}",
+                prompt=prompt,
+                system_message=sys_msg,
+            )
+        except Exception as e:
+            raise HTTPException(502, f"Gemini series generation failed: {e}")
+
+        import json
+        cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", (raw or "").strip(), flags=re.MULTILINE)
+        try:
+            parsed = json.loads(cleaned)
+        except Exception:
+            m = re.search(r"\[[\s\S]*\]", cleaned)
+            if not m:
+                raise HTTPException(502, "Could not parse Gemini series response")
+            parsed = json.loads(m.group(0))
+
+        if not isinstance(parsed, list):
+            raise HTTPException(502, "Series response is not a JSON array")
+
+        series = []
+        for idx, item in enumerate(parsed[: payload.count], 1):
+            if not isinstance(item, dict):
+                continue
+            title = (item.get("title") or f"Part {idx}").strip()[:200]
+            series.append({
+                "index": idx,
+                "title": title,
+                "slug": slugify(title),
+                "brief": (item.get("brief") or "").strip(),
+                "category": item.get("category") or None,
+                "tags": [str(t).strip().lower() for t in (item.get("tags") or []) if str(t).strip()][:5],
+                "primary_keyword": (item.get("primary_keyword") or "").strip(),
+                "meta_title": (item.get("meta_title") or title)[:70],
+                "meta_description": (item.get("meta_description") or "")[:160],
+            })
+
+        return {"topic": payload.topic, "count": len(series), "series": series}
+
+    @router.post("/admin/ai/series/save", dependencies=[Depends(get_current_admin)])
+    async def ai_save_series(payload: SeriesBulkSaveRequest):
+        """Save a generated series as draft posts (one per item) with an outline stub."""
+        if not payload.items:
+            raise HTTPException(400, "No items to save")
+        saved = []
+        for idx, item in enumerate(payload.items, 1):
+            title = (item.title or f"{payload.topic} — Part {idx}").strip()
+            brief = (item.brief or "").strip()
+            primary_kw = (item.primary_keyword or "").strip()
+            outline = (
+                f"# {title}\n\n"
+                f"*{brief}*\n\n"
+                f"---\n\n"
+                f"> **Outline placeholder** — open this article and use **AI Draft Assist** at the top "
+                f"to expand it into a full ~800-word article. Suggested primary keyword: `{primary_kw}`.\n\n"
+                f"## What this article will cover\n\n"
+                f"- Hook & opening question\n"
+                f"- 3–4 main sections with H2 headings\n"
+                f"- One concrete example or mini case-study\n"
+                f"- Practical takeaway box (quoted)\n"
+                f"- Closing CTA back to ScoutMePlay\n\n"
+                f"## Cross-links\n\n"
+                f"_Add links to the other articles in this series once they're written._\n"
+            )
+            slug = await unique_slug(title)
+            now = now_iso()
+            doc = {
+                "id": str(uuid.uuid4()),
+                "slug": slug,
+                "title": title,
+                "subtitle": brief or None,
+                "content_md": outline,
+                "excerpt": brief or make_excerpt(outline),
+                "cover_image_url": None,
+                "cover_image_alt": title,
+                "category": item.category,
+                "tags": item.tags or [],
+                "author_name": "ScoutMePlay Editorial",
+                "status": "draft",
+                "published_at": None,
+                "meta_title": (item.meta_title or title)[:70],
+                "meta_description": (item.meta_description or brief or "")[:160],
+                "meta_keywords": [primary_kw] if primary_kw else [],
+                "reading_time_minutes": reading_time_min(outline),
+                "view_count": 0,
+                "created_at": now,
+                "updated_at": now,
+            }
+            await db[BLOG_POSTS].insert_one(doc)
+            saved.append({"id": doc["id"], "slug": slug, "title": title})
+        return {"saved": saved, "count": len(saved)}
 
     return router
 

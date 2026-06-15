@@ -4,11 +4,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Plus, Edit3, Trash2, Eye, FileText, Sparkles, Save, Send, Upload, Loader2, X,
-  ImageIcon, Tag as TagIcon, ArrowLeft,
+  ImageIcon, Tag as TagIcon, ArrowLeft, Layers, ChevronRight,
 } from "lucide-react";
 import api from "@/lib/api";
 
 const STATUS_LABEL = { draft: "Draft", published: "Live" };
+const DEFAULT_AUDIENCE = "parents and ambitious young footballers U7–U21";
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /* Top-level Blog admin: list + open editor                                */
@@ -33,6 +34,7 @@ export default function BlogAdmin() {
 function BlogList({ onNew, onEdit }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [seriesOpen, setSeriesOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -66,14 +68,31 @@ function BlogList({ onNew, onEdit }) {
           <h2 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tight">Blog</h2>
           <p className="text-sm text-ink/60 mt-1">SEO-optimised articles. AI drafting + Gemini SEO suggestions available.</p>
         </div>
-        <button
-          onClick={onNew}
-          data-testid="admin-blog-new-btn"
-          className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 flex items-center gap-2 transition-colors w-fit"
-        >
-          <Plus className="w-4 h-4" /> New post
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSeriesOpen((v) => !v)}
+            data-testid="admin-blog-series-btn"
+            className="text-volt-hover hover:text-white hover:bg-volt-hover border border-volt/40 font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 flex items-center gap-2 transition-colors"
+          >
+            <Layers className="w-4 h-4" /> Generate series
+          </button>
+          <button
+            onClick={onNew}
+            data-testid="admin-blog-new-btn"
+            className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 flex items-center gap-2 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> New post
+          </button>
+        </div>
       </div>
+
+      {/* Generate Series panel (inline, expandable) */}
+      {seriesOpen && (
+        <GenerateSeriesPanel
+          onClose={() => setSeriesOpen(false)}
+          onSaved={() => { setSeriesOpen(false); load(); }}
+        />
+      )}
 
       {loading ? (
         <div className="text-ink/55 py-10">Loading posts…</div>
@@ -81,13 +100,21 @@ function BlogList({ onNew, onEdit }) {
         <div className="border border-gray-border bg-surface p-10 text-center">
           <FileText className="w-10 h-10 text-ink/30 mx-auto" />
           <h3 className="mt-4 font-barlow font-black uppercase text-xl text-ink">No posts yet</h3>
-          <p className="mt-2 text-sm text-ink/60">Write your first SEO article — or let Gemini draft it for you in seconds.</p>
-          <button
-            onClick={onNew}
-            className="mt-5 bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 inline-flex items-center gap-2"
-          >
-            <Sparkles className="w-4 h-4" /> Start writing
-          </button>
+          <p className="mt-2 text-sm text-ink/60">Write your first SEO article — or let Gemini draft a whole 5-article series in seconds.</p>
+          <div className="mt-5 flex gap-3 justify-center">
+            <button
+              onClick={() => setSeriesOpen(true)}
+              className="text-volt-hover border border-volt/40 hover:bg-volt-hover hover:text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 inline-flex items-center gap-2 transition-colors"
+            >
+              <Layers className="w-4 h-4" /> Generate a series
+            </button>
+            <button
+              onClick={onNew}
+              className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 inline-flex items-center gap-2"
+            >
+              <Sparkles className="w-4 h-4" /> Start writing
+            </button>
+          </div>
         </div>
       ) : (
         <div className="border border-gray-border bg-surface overflow-x-auto">
@@ -155,6 +182,266 @@ function BlogList({ onNew, onEdit }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/* Generate Series panel — paste 1 topic → Gemini drafts 5 connected drafts */
+/* ─────────────────────────────────────────────────────────────────────── */
+function GenerateSeriesPanel({ onClose, onSaved }) {
+  const [topic, setTopic] = useState("");
+  const [count, setCount] = useState(5);
+  const [audience, setAudience] = useState(DEFAULT_AUDIENCE);
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [series, setSeries] = useState(null); // {topic, series:[...]}
+
+  const generate = async () => {
+    if (!topic.trim()) { toast.error("Type a topic first"); return; }
+    setGenerating(true);
+    try {
+      const r = await api.post("/blog/admin/ai/series", {
+        topic: topic.trim(),
+        count,
+        audience: audience.trim() || DEFAULT_AUDIENCE,
+      });
+      setSeries(r.data);
+      toast.success(`Gemini drafted a ${r.data.count}-article series — review then save`);
+    } catch (e) {
+      toast.error("Series generation failed: " + (e?.response?.data?.detail || e.message));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const updateItem = (idx, patch) => {
+    setSeries((s) => ({
+      ...s,
+      series: s.series.map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+    }));
+  };
+
+  const removeItem = (idx) => {
+    setSeries((s) => ({ ...s, series: s.series.filter((_, i) => i !== idx) }));
+  };
+
+  const saveAll = async () => {
+    if (!series?.series?.length) return;
+    setSaving(true);
+    try {
+      const payload = {
+        topic: series.topic,
+        items: series.series.map((it) => ({
+          title: it.title,
+          brief: it.brief,
+          category: it.category,
+          tags: it.tags,
+          primary_keyword: it.primary_keyword,
+          meta_title: it.meta_title,
+          meta_description: it.meta_description,
+        })),
+      };
+      const r = await api.post("/blog/admin/ai/series/save", payload);
+      toast.success(`Saved ${r.data.count} drafts. Open each one and click "Draft" to fill in the body.`);
+      onSaved?.();
+    } catch (e) {
+      toast.error("Saving series failed: " + (e?.response?.data?.detail || e.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div data-testid="admin-blog-series-panel" className="border-2 border-volt/40 bg-volt/5 p-5 md:p-6 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Layers className="w-5 h-5 text-volt-hover" />
+          <span className="font-barlow font-black uppercase text-lg tracking-tight text-volt-hover">Article Series Engine</span>
+        </div>
+        <button onClick={onClose} className="text-ink/55 hover:text-ink p-1" aria-label="Close">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {!series ? (
+        <>
+          <p className="text-sm text-ink/70 mb-5">
+            Paste one broad topic. Gemini will outline {count} interconnected, SEO-tuned articles you can save as drafts and publish weekly.
+          </p>
+
+          <div className="grid md:grid-cols-[1fr_120px_240px] gap-3">
+            <input
+              data-testid="admin-blog-series-topic"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="e.g. How U13 attacking midfielders develop into pros"
+              className="px-3 py-2.5 bg-surface border border-gray-border focus:border-forest outline-none text-sm"
+            />
+            <select
+              data-testid="admin-blog-series-count"
+              value={count}
+              onChange={(e) => setCount(parseInt(e.target.value, 10))}
+              className="px-3 py-2.5 bg-surface border border-gray-border focus:border-forest outline-none text-sm"
+            >
+              {[3, 5, 7, 10].map((n) => (
+                <option key={n} value={n}>{n} articles</option>
+              ))}
+            </select>
+            <input
+              data-testid="admin-blog-series-audience"
+              value={audience}
+              onChange={(e) => setAudience(e.target.value)}
+              placeholder="Target audience"
+              className="px-3 py-2.5 bg-surface border border-gray-border focus:border-forest outline-none text-sm"
+            />
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <button
+              onClick={generate}
+              disabled={generating}
+              data-testid="admin-blog-series-generate"
+              className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-6 py-3 flex items-center gap-2 transition-colors disabled:opacity-50"
+            >
+              {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {generating ? "Drafting plan…" : "Generate plan"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-ink/55">Series topic</div>
+              <div className="font-bold text-ink text-base mt-0.5">{series.topic}</div>
+              <div className="text-xs text-ink/55 mt-0.5">{series.series.length} articles drafted by Gemini</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSeries(null)}
+                className="text-xs uppercase tracking-widest font-bold border border-gray-border hover:border-forest px-4 py-2.5"
+              >
+                Start over
+              </button>
+              <button
+                onClick={saveAll}
+                disabled={saving || !series.series.length}
+                data-testid="admin-blog-series-save"
+                className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save {series.series.length} drafts
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3" data-testid="admin-blog-series-list">
+            {series.series.map((it, i) => (
+              <SeriesItemCard
+                key={i}
+                index={i}
+                item={it}
+                onChange={(patch) => updateItem(i, patch)}
+                onRemove={() => removeItem(i)}
+              />
+            ))}
+            {series.series.length === 0 && (
+              <div className="text-sm text-ink/55 italic">No articles in this series. Click &quot;Start over&quot;.</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SeriesItemCard({ index, item, onChange, onRemove }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="border border-gray-border bg-surface p-4 hover:border-volt/40 transition-colors" data-testid={`admin-blog-series-item-${index}`}>
+      <div className="flex items-start gap-3">
+        <div className="shrink-0 w-8 h-8 bg-volt/15 text-volt-hover flex items-center justify-center font-barlow font-black text-sm">
+          {index + 1}
+        </div>
+        <div className="flex-1 min-w-0">
+          <input
+            value={item.title}
+            onChange={(e) => onChange({ title: e.target.value })}
+            className="w-full bg-transparent border-none outline-none font-bold text-ink text-base p-0 focus:bg-cream-soft/40 focus:px-2 focus:py-1 transition-all"
+          />
+          <p className="text-xs text-ink/65 mt-1 italic">{item.brief}</p>
+          <div className="flex flex-wrap items-center gap-2 mt-2.5 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/55">
+            <span className="bg-forest/10 text-forest px-2 py-0.5">{item.category || "—"}</span>
+            {item.tags?.slice(0, 4).map((t) => (
+              <span key={t} className="text-ink/45">#{t}</span>
+            ))}
+            <span className="text-volt-hover">kw: {item.primary_keyword}</span>
+          </div>
+        </div>
+        <div className="flex items-start gap-1">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="text-ink/55 hover:text-ink p-1.5"
+            title={expanded ? "Hide details" : "Edit details"}
+          >
+            <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </button>
+          <button
+            onClick={onRemove}
+            className="text-red-400 hover:text-red-600 p-1.5"
+            title="Drop this article"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mt-4 pt-4 border-t border-gray-border grid md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-1">Brief</label>
+            <textarea
+              value={item.brief}
+              onChange={(e) => onChange({ brief: e.target.value })}
+              rows={2}
+              className="w-full px-3 py-2 bg-cream-soft/40 border border-gray-border focus:border-forest outline-none text-xs"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-1">Primary keyword</label>
+            <input
+              value={item.primary_keyword}
+              onChange={(e) => onChange({ primary_keyword: e.target.value })}
+              className="w-full px-3 py-2 bg-cream-soft/40 border border-gray-border focus:border-forest outline-none text-xs"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-1">Meta title (≤60)</label>
+            <input
+              value={item.meta_title}
+              onChange={(e) => onChange({ meta_title: e.target.value })}
+              className="w-full px-3 py-2 bg-cream-soft/40 border border-gray-border focus:border-forest outline-none text-xs"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-1">Meta description (≤160)</label>
+            <input
+              value={item.meta_description}
+              onChange={(e) => onChange({ meta_description: e.target.value })}
+              className="w-full px-3 py-2 bg-cream-soft/40 border border-gray-border focus:border-forest outline-none text-xs"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-1">Tags (comma separated)</label>
+            <input
+              value={(item.tags || []).join(", ")}
+              onChange={(e) => onChange({ tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+              className="w-full px-3 py-2 bg-cream-soft/40 border border-gray-border focus:border-forest outline-none text-xs"
+            />
+          </div>
         </div>
       )}
     </div>
