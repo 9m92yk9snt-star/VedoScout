@@ -677,7 +677,7 @@ export default function Landing() {
           </div>
 
           {/* ===== BENTO grid — asymmetric, dynamic, alive ===== */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 md:gap-5 auto-rows-min lg:auto-rows-[170px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 md:gap-5 auto-rows-min lg:auto-rows-[240px]">
             {(() => {
               const bento = [
                 { cls: "sm:col-span-2 lg:col-span-6 lg:row-span-2", variant: "hero" },        // 0 Player Report
@@ -729,18 +729,158 @@ export default function Landing() {
                         {card.text}
                       </p>
 
-                      {/* Giant score pull quote */}
+                      {/* ===== ANIMATED 5-AXIS RADAR — live product preview ===== */}
                       <div className="relative mt-auto pt-8 flex items-end justify-between gap-4 border-t border-cream-card/15">
                         <div className="flex flex-col">
-                          <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-cream-card/70 mb-2">Scout Score</span>
-                          <span className="font-barlow font-black text-6xl md:text-7xl leading-none" style={{ color: "#ccff00", textShadow: "0 4px 30px rgba(204,255,0,0.45)" }}>
-                            8.2<span className="text-cream-card/55 text-3xl md:text-4xl">/10</span>
+                          <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-cream-card/70 mb-3">5-Axis Scout Profile</span>
+                          <div className="relative w-[170px] h-[170px] md:w-[180px] md:h-[180px]">
+                            <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible" aria-hidden>
+                              {/* Background grid pentagons */}
+                              {[0.25, 0.5, 0.75, 1].map((scale, gi) => {
+                                const pts = [0, 1, 2, 3, 4].map((j) => {
+                                  const a = ((-90 + j * 72) * Math.PI) / 180;
+                                  const r = 70 * scale;
+                                  return `${100 + r * Math.cos(a)},${100 + r * Math.sin(a)}`;
+                                }).join(" ");
+                                return (
+                                  <polygon
+                                    key={gi}
+                                    points={pts}
+                                    fill="none"
+                                    stroke="rgba(255,253,243,0.12)"
+                                    strokeWidth="0.6"
+                                  />
+                                );
+                              })}
+                              {/* 5 radial spokes */}
+                              {[0, 1, 2, 3, 4].map((j) => {
+                                const a = ((-90 + j * 72) * Math.PI) / 180;
+                                return (
+                                  <line
+                                    key={`s${j}`}
+                                    x1="100"
+                                    y1="100"
+                                    x2={100 + 70 * Math.cos(a)}
+                                    y2={100 + 70 * Math.sin(a)}
+                                    stroke="rgba(255,253,243,0.10)"
+                                    strokeWidth="0.6"
+                                  />
+                                );
+                              })}
+                              {/* Animated data polygon — draws on scroll */}
+                              <motion.polygon
+                                points={[8, 9, 7, 9, 9].map((v, j) => {
+                                  const a = ((-90 + j * 72) * Math.PI) / 180;
+                                  const r = (v / 10) * 70;
+                                  return `${100 + r * Math.cos(a)},${100 + r * Math.sin(a)}`;
+                                }).join(" ")}
+                                fill="#ccff00"
+                                fillOpacity="0.20"
+                                stroke="#ccff00"
+                                strokeWidth="1.6"
+                                strokeLinejoin="round"
+                                initial={{ scale: 0, opacity: 0 }}
+                                whileInView={{ scale: 1, opacity: 1 }}
+                                viewport={{ once: true, amount: 0.3 }}
+                                transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+                                style={{ transformOrigin: "100px 100px", filter: "drop-shadow(0 0 8px rgba(204,255,0,0.5))" }}
+                              />
+                              {/* Animated vertex dots */}
+                              {[8, 9, 7, 9, 9].map((v, j) => {
+                                const a = ((-90 + j * 72) * Math.PI) / 180;
+                                const r = (v / 10) * 70;
+                                const cx = 100 + r * Math.cos(a);
+                                const cy = 100 + r * Math.sin(a);
+                                return (
+                                  <motion.circle
+                                    key={`d${j}`}
+                                    cx={cx}
+                                    cy={cy}
+                                    r="2.8"
+                                    fill="#ccff00"
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    whileInView={{ scale: 1, opacity: 1 }}
+                                    viewport={{ once: true, amount: 0.3 }}
+                                    transition={{ duration: 0.4, delay: 0.85 + j * 0.07, ease: "easeOut" }}
+                                    style={{ transformOrigin: `${cx}px ${cy}px` }}
+                                  />
+                                );
+                              })}
+                              {/* Axis labels with score values */}
+                              {[
+                                { label: "TECH", value: 8 },
+                                { label: "TACT", value: 9 },
+                                { label: "PHYS", value: 7 },
+                                { label: "MENT", value: 9 },
+                                { label: "DEC", value: 9 },
+                              ].map((axis, j) => {
+                                const a = ((-90 + j * 72) * Math.PI) / 180;
+                                const lr = 88;
+                                const lx = 100 + lr * Math.cos(a);
+                                const ly = 100 + lr * Math.sin(a);
+                                return (
+                                  <g key={`l${j}`}>
+                                    <motion.text
+                                      x={lx}
+                                      y={ly - 2}
+                                      fontSize="8"
+                                      fontWeight="800"
+                                      fill="rgba(255,253,243,0.72)"
+                                      textAnchor="middle"
+                                      dominantBaseline="middle"
+                                      letterSpacing="0.4"
+                                      initial={{ opacity: 0 }}
+                                      whileInView={{ opacity: 1 }}
+                                      viewport={{ once: true, amount: 0.3 }}
+                                      transition={{ duration: 0.5, delay: 1.0 + j * 0.06 }}
+                                    >
+                                      {axis.label}
+                                    </motion.text>
+                                    <motion.text
+                                      x={lx}
+                                      y={ly + 7}
+                                      fontSize="7.5"
+                                      fontWeight="900"
+                                      fill="#ccff00"
+                                      textAnchor="middle"
+                                      dominantBaseline="middle"
+                                      initial={{ opacity: 0 }}
+                                      whileInView={{ opacity: 1 }}
+                                      viewport={{ once: true, amount: 0.3 }}
+                                      transition={{ duration: 0.5, delay: 1.15 + j * 0.06 }}
+                                    >
+                                      {axis.value}
+                                    </motion.text>
+                                  </g>
+                                );
+                              })}
+                              {/* Center pulse dot */}
+                              <motion.circle
+                                cx="100"
+                                cy="100"
+                                r="2"
+                                fill="#ccff00"
+                                initial={{ opacity: 0 }}
+                                whileInView={{ opacity: 1 }}
+                                viewport={{ once: true, amount: 0.3 }}
+                                transition={{ duration: 0.4, delay: 0.4 }}
+                              />
+                            </svg>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-3">
+                          <div className="text-right">
+                            <span className="block text-[10px] uppercase tracking-[0.25em] font-bold text-cream-card/70 mb-1">Overall</span>
+                            <span className="font-barlow font-black text-4xl md:text-5xl leading-none" style={{ color: "#ccff00", textShadow: "0 4px 30px rgba(204,255,0,0.45)" }}>
+                              8.2<span className="text-cream-card/55 text-xl md:text-2xl">/10</span>
+                            </span>
+                          </div>
+                          <span className="hidden md:inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-card/75 border border-cream-card/25 rounded-full px-3 py-1.5">
+                            Live demo
+                            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#ccff00" }} />
                           </span>
                         </div>
-                        <span className="hidden md:inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-card/75 border border-cream-card/25 rounded-full px-3 py-1.5">
-                          Live demo
-                          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#ccff00" }} />
-                        </span>
                       </div>
                     </motion.div>
                   );
