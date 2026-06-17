@@ -1463,17 +1463,17 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ FOOTER — Premium forest band w/ texture + ambient lime glow ============ */}
+      {/* ============ FOOTER — Premium solid forest band ============ */}
       <footer
         data-testid="site-footer"
         className="relative mt-12 text-white overflow-hidden"
         style={{
           background:
-            "radial-gradient(120% 80% at 50% -20%, rgba(45, 107, 61, 0.45) 0%, rgba(31, 79, 47, 0.25) 25%, rgba(8, 22, 15, 1) 70%, rgba(5, 13, 8, 1) 100%)",
+            "linear-gradient(180deg, #0E2218 0%, #0A1C12 50%, #050D08 100%)",
         }}
       >
-        {/* Top hairline (lime gradient) */}
-        <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-volt/60 to-transparent" />
+        {/* Crisp lime accent edge at top */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-volt/80 to-transparent" />
         {/* Pitch lines pattern — extremely subtle horizontal scoreline */}
         <div
           aria-hidden
@@ -1486,15 +1486,14 @@ export default function Landing() {
         {/* Soft grain noise for premium texture */}
         <div
           aria-hidden
-          className="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
+          className="absolute inset-0 pointer-events-none opacity-[0.05] mix-blend-overlay"
           style={{
             backgroundImage:
               "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.85'/></svg>\")",
           }}
         />
-        {/* Ambient halos */}
-        <div aria-hidden className="absolute -top-40 left-1/4 w-[560px] h-[560px] bg-volt/[0.06] rounded-full blur-3xl pointer-events-none" />
-        <div aria-hidden className="absolute -bottom-40 right-1/4 w-[480px] h-[480px] bg-forest-pop/20 rounded-full blur-3xl pointer-events-none" />
+        {/* Single contained accent — bottom-right only, very subtle */}
+        <div aria-hidden className="absolute -bottom-32 right-1/4 w-[420px] h-[420px] bg-forest-pop/[0.08] rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-6 md:px-10 pt-16 md:pt-20 pb-10">
           <div className="grid grid-cols-2 md:grid-cols-12 gap-10 md:gap-12">
