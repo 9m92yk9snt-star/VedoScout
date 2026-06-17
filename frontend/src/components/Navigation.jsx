@@ -138,7 +138,7 @@ export default function Navigation() {
               <span>PLAY</span>
             </span>
             <span
-              className={`hidden md:flex items-center gap-2 text-[10px] text-white/55 font-bold uppercase tracking-[0.24em] whitespace-nowrap transition-all duration-300 ${
+              className={`hidden md:flex items-center gap-1.5 text-[9px] text-white/55 font-bold uppercase tracking-[0.14em] whitespace-nowrap transition-all duration-300 ${
                 scrolled ? "opacity-0 max-h-0 mt-0 overflow-hidden" : "opacity-100 mt-1.5"
               }`}
             >
