@@ -554,45 +554,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ TRUST STATS STRIP — animated counters (D1) ============ */}
-      <section
-        data-testid="trust-stats-strip"
-        className="relative py-10 md:py-14 border-t border-gray-border bg-deepnavy overflow-hidden"
-      >
-        {/* Forest glow accents */}
-        <div aria-hidden className="absolute -top-32 left-1/4 w-[420px] h-[420px] bg-volt/5 rounded-full blur-3xl pointer-events-none" />
-        <div aria-hidden className="absolute -bottom-32 right-1/4 w-[360px] h-[360px] bg-forest/20 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative max-w-7xl mx-auto px-6 md:px-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-border/40">
-            {[
-              { value: 12, suffix: "+", label: "Countries served", Icon: Globe },
-              { value: 500, suffix: "+", label: "Players analyzed", Icon: Users },
-              { value: 48, suffix: "h", label: "Scout delivery", Icon: Clock },
-              { value: 4.9, suffix: "/5", label: "Average rating", Icon: Star, decimals: 1 },
-            ].map(({ value, suffix, label, Icon, decimals }, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 14 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.5, delay: i * 0.08, ease: "easeOut" }}
-                data-testid={`trust-stat-${i}`}
-                className="bg-deepnavy/80 backdrop-blur-sm px-5 py-6 md:px-8 md:py-8 flex flex-col items-center text-center hover:bg-deepnavy/95 transition-colors group"
-              >
-                <Icon className="w-5 h-5 md:w-6 md:h-6 text-volt mb-3 group-hover:scale-110 transition-transform" strokeWidth={1.5} />
-                <div className="font-barlow font-black text-4xl md:text-5xl lg:text-6xl leading-none text-ink tracking-tighter">
-                  <AnimatedNumber value={value} duration={1.8} decimals={decimals || 0} suffix={suffix} />
-                </div>
-                <div className="mt-2 text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-bold text-ink/55">
-                  {label}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ============ HOW IT WORKS — 3 steps card (clean section after hero) ============ */}
       <section
         data-testid="how-it-works"
