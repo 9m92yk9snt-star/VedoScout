@@ -151,6 +151,14 @@ export default function MarkerStudio({
   // Box — normalised 0..1 of the wrapper rect
   const [box, setBox] = useState(null); // {x,y,w,h}
 
+  // Multi-anchor strip — confirmed anchors from previous "Lock"s. Each entry is
+  // {t: seconds, box: {x,y,w,h}, thumbDataUrl: string}. The current `box` becomes
+  // anchor N once the user taps "Add". The final "Done" submits anchors + box-of-first.
+  const [anchors, setAnchors] = useState([]);
+  const MAX_ANCHORS = 5;
+  const [autoSuggesting, setAutoSuggesting] = useState(false);
+  const [autoSuggestError, setAutoSuggestError] = useState("");
+
   // Auto-find detections (normalised 0..1 of wrapper rect, in dimmed-video coords)
   const [detections, setDetections] = useState([]);
   const [detecting, setDetecting] = useState(false);
@@ -183,6 +191,9 @@ export default function MarkerStudio({
       setDetectError("");
       setPlaying(false);
       setVideoReady(false);
+      setAnchors([]);
+      setAutoSuggesting(false);
+      setAutoSuggestError("");
     }
   }, [open]);
 
@@ -603,109 +614,405 @@ export default function MarkerStudio({
     toast.success("Player locked. Refine with corner handles or tap Lock above.");
   };
 
-  /* ── Confirm — render the marker JPG and hand off ───────────── */
-  const handleConfirm = () => {
+  /* ── Build a tiny thumbnail data-URL from the current frame + box ─ */
+  const buildAnchorThumb = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || !box) return null;
+    const w = v.videoWidth;
+    const h = v.videoHeight;
+    if (!w || !h) return null;
+    // Crop a slightly padded region around the box in video native coords
+    const bounds = renderedVideoBounds(v);
+    const wrapperW = wrapperRect.w || 1;
+    const wrapperH = wrapperRect.h || 1;
+    const bxPx = box.x * wrapperW;
+    const byPx = box.y * wrapperH;
+    const bwPx = box.w * wrapperW;
+    const bhPx = box.h * wrapperH;
+    const nx = clamp((bxPx - bounds.x) / bounds.w, 0, 1);
+    const ny = clamp((byPx - bounds.y) / bounds.h, 0, 1);
+    const nw = clamp(bwPx / bounds.w, 0.02, 1 - nx);
+    const nh = clamp(bhPx / bounds.h, 0.02, 1 - ny);
+    // Pad 25% around the box for context
+    const pad = 0.25;
+    const px = clamp(nx - nw * pad, 0, 1);
+    const py = clamp(ny - nh * pad, 0, 1);
+    const pw = clamp(nw * (1 + pad * 2), 0.02, 1 - px);
+    const ph = clamp(nh * (1 + pad * 2), 0.02, 1 - py);
+
+    const sx = px * w;
+    const sy = py * h;
+    const sw = pw * w;
+    const sh = ph * h;
+    const out = document.createElement("canvas");
+    const thumbW = 96;
+    const thumbH = Math.round(thumbW * (sh / sw));
+    out.width = thumbW;
+    out.height = thumbH;
+    const ctx = out.getContext("2d");
+    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, thumbW, thumbH);
+    // Volt frame around it
+    ctx.strokeStyle = "#CCFF00";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, thumbW - 2, thumbH - 2);
+    return out.toDataURL("image/jpeg", 0.7);
+  }, [box, wrapperRect]);
+
+  /* ── Add the current box as a new anchor in the strip ─ */
+  const addCurrentAsAnchor = () => {
     const v = videoRef.current;
     if (!v || !box) {
       toast.error("Place a box around your player first.");
       return;
     }
-    // Wait for metadata if it's not ready yet (race-safe)
-    if (v.readyState < 1 || !v.videoWidth || !v.videoHeight) {
-      toast.info("Hold on — the video is still loading. Try again in a second.");
+    if (anchors.length >= MAX_ANCHORS) {
+      toast.info(`Maximum ${MAX_ANCHORS} anchors. Remove one to add another.`);
       return;
     }
-    const w = v.videoWidth;
-    const h = v.videoHeight;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(v, 0, 0, w, h);
+    if (v.readyState < 1 || !v.videoWidth) {
+      toast.info("Hold on — the video is still loading.");
+      return;
+    }
+    const thumb = buildAnchorThumb();
+    const newAnchor = {
+      t: v.currentTime || 0,
+      box: { ...box },
+      thumb,
+    };
+    setAnchors((prev) => [...prev, newAnchor]);
+    setBox(null);
+    setMode("navigate");
+    toast.success(`Anchor ${anchors.length + 1} locked. ${anchors.length + 1 < 3 ? "Add more for tighter precision." : ""}`);
+  };
 
-    // Convert normalised box to wrapper px first
-    const wrapperBounds = renderedVideoBounds(v);
-    // box is normalised to wrapper rect — but wrapper rect contains letterbox
-    // pixels too. Reproject onto the actual video native pixels.
-    const wrapperW = wrapperRect.w || 1;
-    const wrapperH = wrapperRect.h || 1;
-    // px in wrapper
-    const bxPx = box.x * wrapperW;
-    const byPx = box.y * wrapperH;
-    const bwPx = box.w * wrapperW;
-    const bhPx = box.h * wrapperH;
-    // Re-normalise to the actual rendered video bounds
-    const nx = clamp((bxPx - wrapperBounds.x) / wrapperBounds.w, 0, 1);
-    const ny = clamp((byPx - wrapperBounds.y) / wrapperBounds.h, 0, 1);
-    const nw = clamp(bwPx / wrapperBounds.w, MIN_BOX_FRAC, 1 - nx);
-    const nh = clamp(bhPx / wrapperBounds.h, MIN_BOX_FRAC, 1 - ny);
-    const bx = Math.round(nx * w);
-    const by = Math.round(ny * h);
-    const bw = Math.max(8, Math.round(nw * w));
-    const bh = Math.max(8, Math.round(nh * h));
+  const removeAnchor = (idx) => {
+    setAnchors((prev) => prev.filter((_, i) => i !== idx));
+  };
 
-    // Paint dim + lock-on bracket
-    ctx.save();
-    ctx.fillStyle = "rgba(5, 10, 15, 0.45)";
-    ctx.beginPath();
-    ctx.rect(0, 0, w, h);
-    ctx.rect(bx, by, bw, bh);
-    ctx.closePath();
-    ctx.fill("evenodd");
-    ctx.restore();
-    ctx.save();
-    ctx.shadowColor = "#CCFF00";
-    ctx.shadowBlur = Math.max(12, Math.min(w, h) * 0.012);
-    ctx.strokeStyle = "rgba(204, 255, 0, 0.5)";
-    ctx.lineWidth = Math.max(4, Math.min(w, h) * 0.006);
-    ctx.strokeRect(bx, by, bw, bh);
-    ctx.restore();
-    ctx.strokeStyle = "#CCFF00";
-    ctx.lineWidth = Math.max(3, Math.min(w, h) * 0.004);
-    ctx.strokeRect(bx, by, bw, bh);
-    const corner = Math.max(14, Math.min(bw, bh) * 0.18);
-    ctx.strokeStyle = "#FFFFFF";
-    ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.0035);
-    [
-      [bx, by, 1, 1],
-      [bx + bw, by, -1, 1],
-      [bx, by + bh, 1, -1],
-      [bx + bw, by + bh, -1, -1],
-    ].forEach(([cx, cy, dx, dy]) => {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + dy * corner);
-      ctx.lineTo(cx, cy);
-      ctx.lineTo(cx + dx * corner, cy);
-      ctx.stroke();
-    });
-    const label = "LOCKED";
-    ctx.font = `bold ${Math.max(14, w * 0.018)}px Arial`;
-    const tw = ctx.measureText(label).width;
-    const padX = 10;
-    const padY = 5;
-    const lh = Math.max(20, w * 0.025);
-    const lx = bx;
-    const ly = by - lh - 4 < 4 ? by + bh + 4 : by - lh - 4;
-    ctx.fillStyle = "#CCFF00";
-    ctx.fillRect(lx, ly, tw + padX * 2, lh);
-    ctx.fillStyle = "#050A0F";
-    ctx.fillText(label, lx + padX, ly + lh - padY - 2);
-
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          toast.error("Could not capture the frame — try a different moment.");
-          return;
+  /* ── Auto-suggest 5 anchors using MediaPipe + jersey-colour matching ─ */
+  const runAutoSuggest = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.duration < 2) {
+      toast.info("Video too short for multi-anchor suggestion.");
+      return;
+    }
+    if (!anchors.length && !box) {
+      toast.error("Place a box on your player first — we need a reference to match against.");
+      return;
+    }
+    setAutoSuggesting(true);
+    setAutoSuggestError("");
+    try {
+      // Reference jersey colour: from the first anchor if any, otherwise from the current box
+      let refRGB = null;
+      const sampleColor = (b) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(v, 0, 0);
+        const bounds = renderedVideoBounds(v);
+        const wrapperW = wrapperRect.w || 1;
+        const wrapperH = wrapperRect.h || 1;
+        const bxPx = b.x * wrapperW;
+        const byPx = b.y * wrapperH;
+        const bwPx = b.w * wrapperW;
+        const bhPx = b.h * wrapperH;
+        const nx = (bxPx - bounds.x) / bounds.w;
+        const ny = (byPx - bounds.y) / bounds.h;
+        const nw = bwPx / bounds.w;
+        const nh = bhPx / bounds.h;
+        // upper torso ~ middle 60% width, top 18-55% of height
+        const sx = Math.max(0, Math.floor((nx + nw * 0.2) * v.videoWidth));
+        const sy = Math.max(0, Math.floor((ny + nh * 0.18) * v.videoHeight));
+        const sw = Math.floor(nw * v.videoWidth * 0.6);
+        const sh = Math.floor(nh * v.videoHeight * 0.37);
+        if (sw < 4 || sh < 4) return null;
+        const data = ctx.getImageData(sx, sy, sw, sh).data;
+        let r = 0, g = 0, bb = 0, n = 0;
+        for (let i = 0; i < data.length; i += 16) { // sample sparsely
+          r += data[i]; g += data[i + 1]; bb += data[i + 2]; n++;
         }
-        onConfirm({
-          markerBlob: blob,
-          markerTimestamp: v.currentTime || 0,
-          markerBox: { x: nx, y: ny, w: nw, h: nh },
+        return n ? [Math.round(r / n), Math.round(g / n), Math.round(bb / n)] : null;
+      };
+
+      if (anchors.length) {
+        // Use the first anchor: seek there, grab colour
+        const wasPlaying = !v.paused;
+        v.pause();
+        await new Promise((res) => {
+          const onSeeked = () => { v.removeEventListener("seeked", onSeeked); res(); };
+          v.addEventListener("seeked", onSeeked);
+          try { v.currentTime = anchors[0].t; } catch { res(); }
+          setTimeout(res, 800);
         });
-      },
-      "image/jpeg",
-      0.92,
-    );
+        refRGB = sampleColor(anchors[0].box);
+        if (wasPlaying) v.play().catch(() => {});
+      } else if (box) {
+        refRGB = sampleColor(box);
+      }
+      if (!refRGB) refRGB = [128, 128, 128];
+
+      const det = await getDetector();
+
+      // Sample N=6 candidate timestamps across the video. Avoid the first 1s and last 1s.
+      const N = 6;
+      const dur = Math.max(1, v.duration - 2);
+      const candidates = [];
+      for (let i = 0; i < N; i++) {
+        candidates.push(1 + (dur * i) / Math.max(1, N - 1));
+      }
+      // Drop any candidate too close to an existing anchor (within 2s)
+      const filtered = candidates.filter((t) => {
+        if (anchors.some((a) => Math.abs(a.t - t) < 2.0)) return false;
+        return true;
+      });
+
+      const colorDist = (a, b) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+      const wrapperW = wrapperRect.w || 1;
+      const wrapperH = wrapperRect.h || 1;
+      const bounds = renderedVideoBounds(v);
+      const newAnchors = [];
+
+      for (const t of filtered) {
+        if (anchors.length + newAnchors.length >= MAX_ANCHORS) break;
+        // Seek
+        await new Promise((res) => {
+          const onSeeked = () => { v.removeEventListener("seeked", onSeeked); res(); };
+          v.addEventListener("seeked", onSeeked);
+          try { v.currentTime = t; } catch { res(); }
+          setTimeout(res, 800);
+        });
+        // Capture frame
+        const canvas = document.createElement("canvas");
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        canvas.getContext("2d").drawImage(v, 0, 0);
+        const result = det.detect(canvas);
+        if (!result?.detections?.length) continue;
+
+        // For each detection, sample its jersey colour and compare to refRGB
+        let best = null;
+        for (const d of result.detections) {
+          const bb = d.boundingBox;
+          const dx = bb.originX + bb.width * 0.25;
+          const dy = bb.originY + bb.height * 0.20;
+          const dw = bb.width * 0.5;
+          const dh = bb.height * 0.35;
+          if (dw < 4 || dh < 4) continue;
+          try {
+            const data = canvas.getContext("2d").getImageData(
+              Math.max(0, Math.floor(dx)),
+              Math.max(0, Math.floor(dy)),
+              Math.min(canvas.width - dx, Math.floor(dw)),
+              Math.min(canvas.height - dy, Math.floor(dh)),
+            ).data;
+            let r = 0, g = 0, bg = 0, n = 0;
+            for (let i = 0; i < data.length; i += 16) {
+              r += data[i]; g += data[i + 1]; bg += data[i + 2]; n++;
+            }
+            if (!n) continue;
+            const meanRGB = [Math.round(r / n), Math.round(g / n), Math.round(bg / n)];
+            const dist = colorDist(meanRGB, refRGB);
+            if (!best || dist < best.dist) best = { d, dist };
+          } catch { /* ignore */ }
+        }
+        if (!best || best.dist > 90) continue; // too different from reference
+        // Convert detection to normalised wrapper coords
+        const bb = best.d.boundingBox;
+        const px = (bb.originX / v.videoWidth) * bounds.w + bounds.x;
+        const py = (bb.originY / v.videoHeight) * bounds.h + bounds.y;
+        const pw = (bb.width / v.videoWidth) * bounds.w;
+        const ph = (bb.height / v.videoHeight) * bounds.h;
+        const nbox = {
+          x: clamp(px / wrapperW, 0, 1),
+          y: clamp(py / wrapperH, 0, 1),
+          w: clamp(pw / wrapperW, 0.02, 1),
+          h: clamp(ph / wrapperH, 0.02, 1),
+        };
+        // Build thumb (we need to temporarily set state to box-mode-look; just build the canvas)
+        const thumbCanvas = document.createElement("canvas");
+        const thumbW = 96;
+        const thumbH = Math.round(thumbW * (ph / pw));
+        thumbCanvas.width = thumbW;
+        thumbCanvas.height = thumbH;
+        // Crop the detection region with 25% padding
+        const padX = pw * 0.25;
+        const padY = ph * 0.25;
+        const sx = Math.max(0, px - padX) * (canvas.width / wrapperW * (wrapperW / bounds.w));
+        // Simpler: crop in canvas-native pixels using detection box directly
+        const cx = Math.max(0, bb.originX - bb.width * 0.25);
+        const cy = Math.max(0, bb.originY - bb.height * 0.25);
+        const cw = Math.min(canvas.width - cx, bb.width * 1.5);
+        const ch = Math.min(canvas.height - cy, bb.height * 1.5);
+        const tctx = thumbCanvas.getContext("2d");
+        tctx.drawImage(canvas, cx, cy, cw, ch, 0, 0, thumbW, thumbH);
+        tctx.strokeStyle = "#CCFF00";
+        tctx.lineWidth = 2;
+        tctx.strokeRect(1, 1, thumbW - 2, thumbH - 2);
+        // unused vars to satisfy linter
+        void sx; void nbox;
+        newAnchors.push({
+          t,
+          box: nbox,
+          thumb: thumbCanvas.toDataURL("image/jpeg", 0.7),
+          suggested: true,
+        });
+      }
+
+      if (!newAnchors.length) {
+        setAutoSuggestError("Couldn't find enough matching frames. Add a few anchors manually.");
+        return;
+      }
+      setAnchors((prev) => [...prev, ...newAnchors]);
+      toast.success(`Added ${newAnchors.length} AI-suggested anchor${newAnchors.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      console.error("Auto-suggest error", err);
+      setAutoSuggestError("Auto-suggest failed. Try adding anchors manually.");
+    } finally {
+      setAutoSuggesting(false);
+    }
+  };
+
+  /* ── Final Done — submit all anchors plus the marker JPG ───── */
+  const handleDone = () => {
+    const v = videoRef.current;
+    // If a box is still drawn but un-added, add it first
+    const pendingBox = box;
+    let allAnchors = anchors;
+    if (pendingBox && allAnchors.length < MAX_ANCHORS && v && v.videoWidth) {
+      const thumb = buildAnchorThumb();
+      allAnchors = [
+        ...anchors,
+        { t: v.currentTime || 0, box: { ...pendingBox }, thumb },
+      ];
+    }
+    if (!allAnchors.length) {
+      toast.error("Lock onto your player first.");
+      return;
+    }
+    if (v.readyState < 1 || !v.videoWidth) {
+      toast.info("Hold on — the video is still loading.");
+      return;
+    }
+
+    // Render the FIRST anchor as the marker JPG (uses full-quality video frame).
+    const first = allAnchors[0];
+    renderMarkerForAnchor(v, first, allAnchors, (blob, finalAnchors) => {
+      if (!blob) {
+        toast.error("Could not capture the frame — try a different moment.");
+        return;
+      }
+      onConfirm({
+        markerBlob: blob,
+        markerTimestamp: first.t,
+        markerBox: first.box, // legacy single-box field
+        markerAnchors: finalAnchors.map((a) => ({ t: a.t, box: a.box })),
+      });
+    });
+  };
+
+  /** Paint the full-res marker JPG for the FIRST anchor. Identical to the old
+   *  handleConfirm canvas logic but seeks the video to anchor 1's timestamp first. */
+  const renderMarkerForAnchor = (v, anchor, allAnchors, cb) => {
+    const finalise = () => {
+      const w = v.videoWidth;
+      const h = v.videoHeight;
+      if (!w || !h) { cb(null, allAnchors); return; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(v, 0, 0, w, h);
+
+      const bounds = renderedVideoBounds(v);
+      const wrapperW = wrapperRect.w || 1;
+      const wrapperH = wrapperRect.h || 1;
+      const bxPx = anchor.box.x * wrapperW;
+      const byPx = anchor.box.y * wrapperH;
+      const bwPx = anchor.box.w * wrapperW;
+      const bhPx = anchor.box.h * wrapperH;
+      const nx = clamp((bxPx - bounds.x) / bounds.w, 0, 1);
+      const ny = clamp((byPx - bounds.y) / bounds.h, 0, 1);
+      const nw = clamp(bwPx / bounds.w, MIN_BOX_FRAC, 1 - nx);
+      const nh = clamp(bhPx / bounds.h, MIN_BOX_FRAC, 1 - ny);
+      const bx = Math.round(nx * w);
+      const by = Math.round(ny * h);
+      const bw = Math.max(8, Math.round(nw * w));
+      const bh = Math.max(8, Math.round(nh * h));
+
+      // Re-emit the same anchor.box in proper rendered-video coords for backend
+      const finalAnchors = allAnchors.map((a, idx) => idx === 0 ? { ...a, box: { x: nx, y: ny, w: nw, h: nh } } : a);
+
+      ctx.save();
+      ctx.fillStyle = "rgba(5, 10, 15, 0.45)";
+      ctx.beginPath();
+      ctx.rect(0, 0, w, h);
+      ctx.rect(bx, by, bw, bh);
+      ctx.closePath();
+      ctx.fill("evenodd");
+      ctx.restore();
+      ctx.save();
+      ctx.shadowColor = "#CCFF00";
+      ctx.shadowBlur = Math.max(12, Math.min(w, h) * 0.012);
+      ctx.strokeStyle = "rgba(204, 255, 0, 0.5)";
+      ctx.lineWidth = Math.max(4, Math.min(w, h) * 0.006);
+      ctx.strokeRect(bx, by, bw, bh);
+      ctx.restore();
+      ctx.strokeStyle = "#CCFF00";
+      ctx.lineWidth = Math.max(3, Math.min(w, h) * 0.004);
+      ctx.strokeRect(bx, by, bw, bh);
+      const corner = Math.max(14, Math.min(bw, bh) * 0.18);
+      ctx.strokeStyle = "#FFFFFF";
+      ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.0035);
+      [
+        [bx, by, 1, 1],
+        [bx + bw, by, -1, 1],
+        [bx, by + bh, 1, -1],
+        [bx + bw, by + bh, -1, -1],
+      ].forEach(([cx, cy, dx, dy]) => {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + dy * corner);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx + dx * corner, cy);
+        ctx.stroke();
+      });
+      const label = `LOCKED · ${allAnchors.length}`;
+      ctx.font = `bold ${Math.max(14, w * 0.018)}px Arial`;
+      const tw = ctx.measureText(label).width;
+      const padX = 10;
+      const padY = 5;
+      const lh = Math.max(20, w * 0.025);
+      const lx = bx;
+      const ly = by - lh - 4 < 4 ? by + bh + 4 : by - lh - 4;
+      ctx.fillStyle = "#CCFF00";
+      ctx.fillRect(lx, ly, tw + padX * 2, lh);
+      ctx.fillStyle = "#050A0F";
+      ctx.fillText(label, lx + padX, ly + lh - padY - 2);
+
+      canvas.toBlob((blob) => cb(blob, finalAnchors), "image/jpeg", 0.92);
+    };
+    // Seek to anchor 1's time if not already there
+    if (Math.abs(v.currentTime - anchor.t) > 0.1) {
+      const onSeeked = () => { v.removeEventListener("seeked", onSeeked); finalise(); };
+      v.addEventListener("seeked", onSeeked);
+      try { v.currentTime = anchor.t; } catch { finalise(); }
+      setTimeout(finalise, 800); // safety fallback
+    } else {
+      finalise();
+    }
+  };
+
+  /* ── (legacy) handleConfirm now triggers Done if box drawn + no anchors yet ─ */
+  const handleConfirm = () => {
+    if (!anchors.length && box) {
+      // first anchor — add then immediately submit
+      addCurrentAsAnchor();
+      // user will then tap "Done — Lock" below
+      return;
+    }
+    handleDone();
   };
 
   /* ── Derived: transform CSS for the zoom+pan layer ──────────── */
@@ -720,12 +1027,15 @@ export default function MarkerStudio({
   );
 
   const hint = useMemo(() => {
+    if (autoSuggesting) return "Scanning the whole video for your player…";
     if (detecting) return "Locating players…";
     if (detections.length && !box) return "Tap the dot on YOUR player";
+    if (anchors.length >= 3) return "Strong precision lock · tap ✓ DONE to analyse, or add more anchors";
+    if (anchors.length >= 1 && !box) return `Anchor ${anchors.length} set · scrub forward + place another for tighter precision, or tap ✓ DONE`;
     if (mode === "navigate") return "Pan with one finger · Pinch to zoom · Switch to MARK BOX when ready";
-    if (!box) return "Drag around your player · Or tap Auto-find";
-    return "Drag corners to resize · Drag inside to move · Tap ✓ Lock when ready";
-  }, [mode, box, detections.length, detecting]);
+    if (!box) return "Drag around your player · Or tap ✨ Suggest 5";
+    return "Drag corners to resize · Drag inside to move · Tap + ADD to lock this anchor";
+  }, [mode, box, detections.length, detecting, anchors.length, autoSuggesting]);
 
   if (!open) return null;
 
@@ -750,22 +1060,42 @@ export default function MarkerStudio({
           <X className="w-5 h-5" />
         </button>
         <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-volt">
-          Lock onto your player
+          {anchors.length === 0
+            ? "Lock onto your player"
+            : `Anchor ${anchors.length} / ${MAX_ANCHORS} locked`}
         </div>
-        <button
-          type="button"
-          onClick={handleConfirm}
-          disabled={!box || !videoReady}
-          data-testid="ms-confirm"
-          className={`px-3.5 h-10 flex items-center gap-1.5 text-[12px] uppercase tracking-widest font-black transition-colors ${
-            box && videoReady
-              ? "bg-volt text-deepnavy hover:bg-volt/90"
-              : "bg-cream-card/10 text-cream-card/30"
-          }`}
-        >
-          <Check className="w-4 h-4" />
-          Lock
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* ADD = lock the current box as a new anchor (stays in studio) */}
+          <button
+            type="button"
+            onClick={addCurrentAsAnchor}
+            disabled={!box || !videoReady || anchors.length >= MAX_ANCHORS}
+            data-testid="ms-add-anchor"
+            className={`px-2.5 h-10 flex items-center gap-1 text-[11px] uppercase tracking-widest font-black transition-colors ${
+              box && videoReady && anchors.length < MAX_ANCHORS
+                ? "bg-cream-card/15 text-cream-card hover:bg-cream-card/25"
+                : "bg-cream-card/5 text-cream-card/30"
+            }`}
+            aria-label="Add this box as an anchor"
+          >
+            + Add
+          </button>
+          {/* DONE = finalise all anchors → submit */}
+          <button
+            type="button"
+            onClick={handleDone}
+            disabled={(!box && !anchors.length) || !videoReady}
+            data-testid="ms-confirm"
+            className={`px-3 h-10 flex items-center gap-1.5 text-[12px] uppercase tracking-widest font-black transition-colors ${
+              (anchors.length || box) && videoReady
+                ? "bg-volt text-deepnavy hover:bg-volt/90"
+                : "bg-cream-card/10 text-cream-card/30"
+            }`}
+          >
+            <Check className="w-4 h-4" />
+            {anchors.length || box ? "Done" : "Lock"}
+          </button>
+        </div>
       </div>
 
       {/* ── Video stage ─────────────────────────────── */}
@@ -920,6 +1250,76 @@ export default function MarkerStudio({
 
       {/* ── Bottom toolbar ─────────────────────────── */}
       <div className="border-t border-cream-card/10 bg-deepnavy">
+        {/* Anchor strip */}
+        {(anchors.length > 0 || autoSuggesting || autoSuggestError) && (
+          <div className="px-3 pt-2 pb-1">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[9px] uppercase tracking-[0.25em] font-bold text-cream-card/55">
+                Anchors {anchors.length}/{MAX_ANCHORS}
+              </span>
+              {anchors.length >= 3 && (
+                <span className="text-[9px] uppercase tracking-widest font-bold text-volt">
+                  ✓ Strong precision
+                </span>
+              )}
+              {anchors.length > 0 && anchors.length < 3 && (
+                <span className="text-[9px] uppercase tracking-widest font-bold text-cream-card/45">
+                  Add {3 - anchors.length} more for tight precision
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1" data-testid="ms-anchor-strip">
+              {anchors.map((a, i) => (
+                <div
+                  key={i}
+                  className="relative flex-shrink-0 group"
+                  style={{ width: 48, height: 64 }}
+                  data-testid={`ms-anchor-${i}`}
+                >
+                  <img
+                    src={a.thumb}
+                    alt={`anchor ${i + 1}`}
+                    className="w-full h-full object-cover border border-volt/60"
+                  />
+                  <span className="absolute top-0 left-0 bg-volt text-deepnavy text-[8px] uppercase tracking-wider font-black px-1 py-px">
+                    {i + 1}
+                  </span>
+                  <span className="absolute bottom-0 right-0 bg-deepnavy/90 text-cream-card/85 text-[8px] tabular-nums px-1">
+                    {formatTime(a.t)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeAnchor(i)}
+                    data-testid={`ms-anchor-remove-${i}`}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500/90 text-white text-[10px] leading-none flex items-center justify-center rounded-full"
+                    aria-label="Remove anchor"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {anchors.length < MAX_ANCHORS && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBox(null);
+                    setMode("box");
+                  }}
+                  data-testid="ms-anchor-add-btn"
+                  className="flex-shrink-0 flex items-center justify-center bg-cream-card/8 hover:bg-cream-card/15 border border-dashed border-cream-card/30 text-cream-card/65 text-[10px] uppercase tracking-widest font-bold"
+                  style={{ width: 48, height: 64 }}
+                  aria-label="Add another anchor"
+                >
+                  +
+                </button>
+              )}
+            </div>
+            {autoSuggestError && (
+              <p className="mt-1 text-[10px] text-red-300/85">{autoSuggestError}</p>
+            )}
+          </div>
+        )}
+
         {/* Scrubber row */}
         <div className="flex items-center gap-2 px-3 py-2">
           <button
@@ -986,12 +1386,13 @@ export default function MarkerStudio({
           <button
             type="button"
             data-testid="ms-autofind"
-            onClick={runAutoFind}
-            disabled={detecting}
+            onClick={runAutoSuggest}
+            disabled={autoSuggesting || (!anchors.length && !box) || anchors.length >= MAX_ANCHORS}
             className="px-3 py-2 flex items-center gap-1.5 bg-volt/15 border border-volt/40 text-volt text-[11px] uppercase tracking-widest font-bold hover:bg-volt/25 disabled:opacity-50"
+            title="AI scans the video and suggests up to 5 anchors matching your locked player"
           >
-            {detecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            Auto-find
+            {autoSuggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            ✨ Suggest 5
           </button>
         </div>
 

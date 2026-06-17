@@ -1559,6 +1559,18 @@ export default function ReportPage() {
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
+  // Auto-open the embedded checkout when ?unlock=1 (Hero Teaser navigates here with this param)
+  /* eslint-disable */
+  useEffect(() => {
+    if (searchParams.get("unlock") === "1" && report && !report.is_paid && !report.manually_unlocked) {
+      setEmbeddedOpen(true);
+      const np = new URLSearchParams(searchParams);
+      np.delete("unlock");
+      setSearchParams(np, { replace: true });
+    }
+  }, [searchParams.get("unlock"), report]);
+  /* eslint-enable */
+
   // Handle Stripe redirect with session_id polling
   useEffect(() => {
     const sessionId = searchParams.get("session_id");

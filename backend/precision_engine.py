@@ -78,6 +78,32 @@ def _hex_from_rgb(rgb: tuple[int, int, int]) -> str:
     return "#{0:02X}{1:02X}{2:02X}".format(*rgb)
 
 
+def extract_frame_at(video_path: str | Path, t_seconds: float, out_path: str | Path) -> bool:
+    """Extract a single still frame from `video_path` at time `t_seconds` to `out_path`.
+
+    Returns True on success, False otherwise. Used to grab the per-anchor frame so
+    we can crop each anchor's subject patch from the actual video, not from a
+    pre-rendered marker image.
+    """
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-loglevel", "error",
+                "-ss", f"{max(0.0, float(t_seconds)):.3f}",
+                "-i", str(video_path),
+                "-frames:v", "1",
+                "-q:v", "3",
+                str(out_path),
+            ],
+            check=True,
+            timeout=30,
+        )
+        return Path(out_path).exists() and Path(out_path).stat().st_size > 0
+    except Exception as e:
+        logger.warning(f"extract_frame_at failed at t={t_seconds}: {e}")
+        return False
+
+
 def _dominant_colour(pixels: np.ndarray, k: int = 3) -> tuple[int, int, int]:
     """k-means colour clustering; returns the most populous cluster centre.
 
@@ -379,6 +405,31 @@ LANGUAGE & VOICE RULES (absolute, no exceptions):
 """
 
 
+def build_anchor_ensemble_block(anchor_descriptions: list[dict]) -> str:
+    """Prompt block describing N anchors of the same player at different timestamps.
+
+    Each item in `anchor_descriptions` is {t: float, jersey_name, shorts_name, body_ratio}.
+    The actual anchor crop images are attached separately as file_contents — this is the
+    written instruction telling Gemini what those crops are.
+    """
+    if not anchor_descriptions:
+        return ""
+    rows = []
+    for i, a in enumerate(anchor_descriptions, start=1):
+        rows.append(
+            f"  • Anchor {i} @ {float(a.get('t', 0)):.2f}s — "
+            f"jersey {a.get('jersey_name', '?')}, shorts {a.get('shorts_name', '?')}, "
+            f"body ratio {float(a.get('body_ratio', 0)):.2f}"
+        )
+    return (
+        f"MULTI-ANCHOR LOCK — {len(anchor_descriptions)} confirmed sightings of the SAME player "
+        "at different moments in the video. The first N images attached are these anchors in order. "
+        "Use ALL of them as the visual reference — the player you must analyse is the one matching "
+        "every anchor. Ignore all other players.\n"
+        + "\n".join(rows)
+    )
+
+
 def build_preview_prompt(
     base_prompt: str,
     fingerprint: PlayerFingerprint,
@@ -387,6 +438,7 @@ def build_preview_prompt(
     content_type: str = "other",
     player_visible: str = "clear",
     camera_distance: str = "medium",
+    anchors: list[dict] | None = None,
 ) -> str:
     """Wrap the existing preview prompt with the new precision priors."""
     details_str = json.dumps(player_details, ensure_ascii=False)
@@ -397,12 +449,15 @@ def build_preview_prompt(
         .replace("{player_visible}", str(player_visible))
         .replace("{camera_distance}", str(camera_distance))
     )
-    return (
-        f"{fingerprint.to_prompt_block()}\n\n"
-        f"{audio_events_to_prompt_block(audio_events)}\n\n"
-        f"{CONFIDENT_VOICE_RULES}\n\n"
-        f"{primed}"
-    )
+    anchor_block = build_anchor_ensemble_block(anchors or [])
+    sections = [
+        anchor_block,
+        fingerprint.to_prompt_block(),
+        audio_events_to_prompt_block(audio_events),
+        CONFIDENT_VOICE_RULES,
+        primed,
+    ]
+    return "\n\n".join(s for s in sections if s)
 
 
 def build_full_prompt(
@@ -415,6 +470,7 @@ def build_full_prompt(
     player_visible: str = "clear",
     camera_distance: str = "medium",
     games_detected: int = 1,
+    anchors: list[dict] | None = None,
 ) -> str:
     details_str = json.dumps(player_details, ensure_ascii=False)
     primed = (
@@ -426,12 +482,15 @@ def build_full_prompt(
         .replace("{camera_distance}", str(camera_distance))
         .replace("{games_detected}", str(games_detected))
     )
-    return (
-        f"{fingerprint.to_prompt_block()}\n\n"
-        f"{audio_events_to_prompt_block(audio_events)}\n\n"
-        f"{CONFIDENT_VOICE_RULES}\n\n"
-        f"{primed}"
-    )
+    anchor_block = build_anchor_ensemble_block(anchors or [])
+    sections = [
+        anchor_block,
+        fingerprint.to_prompt_block(),
+        audio_events_to_prompt_block(audio_events),
+        CONFIDENT_VOICE_RULES,
+        primed,
+    ]
+    return "\n\n".join(s for s in sections if s)
 
 
 # ── Post-process confident voice scrubber ─────────────────────────────
@@ -480,9 +539,11 @@ def scrub_hedging(payload):
 __all__ = [
     "PlayerFingerprint",
     "AudioEvent",
+    "extract_frame_at",
     "extract_player_fingerprint",
     "extract_audio_events",
     "audio_events_to_prompt_block",
+    "build_anchor_ensemble_block",
     "build_preview_prompt",
     "build_full_prompt",
     "scrub_hedging",

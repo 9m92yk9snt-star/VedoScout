@@ -36,6 +36,7 @@ from emergentintegrations.payments.stripe.checkout import (
 from precision_engine import (
     extract_player_fingerprint,
     extract_audio_events,
+    extract_frame_at,
     build_preview_prompt as precision_build_preview_prompt,
     build_full_prompt as precision_build_full_prompt,
     scrub_hedging,
@@ -2245,9 +2246,15 @@ async def call_gemini_with_video(
     video_path: str,
     marker_path: Optional[str] = None,
     crop_path: Optional[str] = None,
+    anchor_crops: Optional[list[str]] = None,
 ) -> dict:
-    """Send a video file (+ optional marker image and tight subject crop) + prompt
-    to Gemini and return parsed JSON."""
+    """Send a video file (+ optional marker image, subject crop, and multi-anchor crops)
+    + prompt to Gemini and return parsed JSON.
+
+    `anchor_crops` is a list of additional same-player crops at different timestamps.
+    They go FIRST in file_contents so Gemini sees the player from every angle before
+    being given the wide marker frame and full video.
+    """
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
@@ -2261,8 +2268,18 @@ async def call_gemini_with_video(
     ).with_model("gemini", "gemini-2.5-pro")
 
     file_contents = []
-    # Subject crop first so the model sees the locked player up close before the wide marker
-    if crop_path and Path(crop_path).exists():
+    # Multi-anchor crops first — these are the same player at different moments
+    if anchor_crops:
+        for p in anchor_crops:
+            try:
+                if p and Path(p).exists():
+                    file_contents.append(
+                        FileContentWithMimeType(file_path=p, mime_type="image/jpeg")
+                    )
+            except Exception:
+                pass
+    # Subject crop (legacy single-anchor) — only if no multi-anchor ensemble provided
+    if not anchor_crops and crop_path and Path(crop_path).exists():
         file_contents.append(
             FileContentWithMimeType(file_path=crop_path, mime_type="image/jpeg")
         )
@@ -2566,7 +2583,8 @@ async def upload_video_and_create_preview(
     temp_video_token: Optional[str] = Form(None),
     marker_image: UploadFile = File(...),
     marker_timestamp: float = Form(0.0),
-    marker_box: Optional[str] = Form(None),  # JSON {"x":0..1,"y":0..1,"w":0..1,"h":0..1}
+    marker_box: Optional[str] = Form(None),  # legacy: JSON {"x":0..1,...}
+    marker_anchors: Optional[str] = Form(None),  # NEW: JSON [{"t":sec,"box":{x,y,w,h}}, ...]
     player_name: str = Form(...),
     age: int = Form(...),
     position: str = Form(...),
@@ -2638,30 +2656,37 @@ async def upload_video_and_create_preview(
 
     file_size = file_path.stat().st_size
 
-    # Save marker image (the frame with the player circled)
+    # Save marker image (the frame the user circled the player on)
     marker_filename = f"{report_id}-marker.jpg"
     marker_path = UPLOAD_DIR / marker_filename
     with marker_path.open("wb") as buffer:
         shutil.copyfileobj(marker_image.file, buffer)
 
-    # ============== PRECISION SCOUT — VISUAL FINGERPRINT ==============
-    # Parse the user-drawn box around their player. Extract jersey colour,
-    # shorts colour, body ratio + save a tight subject crop. These become
-    # strong identity priors so Gemini never loses the locked player.
+    # ============== PRECISION SCOUT — VISUAL FINGERPRINT (anchor 1 only here) ==============
+    # We extract the FIRST anchor's fingerprint synchronously from the marker image so we
+    # can populate jersey/shorts colours before the AI sees anything. Additional anchor
+    # crops are extracted AFTER the web-friendly MP4 is transcoded (so we can pull frames
+    # at any timestamp via ffmpeg).
     fingerprint_payload = None
     crop_filename = None
     crop_path = None
+    primary_box_data = None
     try:
         if marker_box:
-            box_data = json.loads(marker_box)
-        else:
-            # Backward-compat: legacy circle/dot markers — assume a centered box
-            box_data = {"x": 0.40, "y": 0.30, "w": 0.20, "h": 0.50}
+            primary_box_data = json.loads(marker_box)
+        elif marker_anchors:
+            anchors_seed = json.loads(marker_anchors)
+            if isinstance(anchors_seed, list) and anchors_seed:
+                primary_box_data = anchors_seed[0].get("box")
+        if primary_box_data is None:
+            # Legacy fallback — assume a centered box
+            primary_box_data = {"x": 0.40, "y": 0.30, "w": 0.20, "h": 0.50}
+
         crop_filename = f"{report_id}-subject.jpg"
         crop_path = UPLOAD_DIR / crop_filename
         fp = extract_player_fingerprint(
             marker_image_path=str(marker_path),
-            box=box_data,
+            box=primary_box_data,
             crop_save_path=str(crop_path),
         )
         fingerprint_payload = {
@@ -2683,6 +2708,68 @@ async def upload_video_and_create_preview(
     # Convert video to a web-friendly MP4 (H.264) so it plays in every browser.
     web_path = transcode_to_web_mp4(file_path)
     web_filename = web_path.name
+
+    # ============== PRECISION SCOUT — EXTRA ANCHOR CROPS ==============
+    # If the user (or auto-find) provided more than one anchor, extract the same-player
+    # crop from the actual video at each additional timestamp. These become the multi-
+    # anchor ensemble Gemini sees first.
+    extra_anchors_payload: list[dict] = []
+    anchor_crop_paths: list[str] = []
+    # Anchor 1 = the one we already cropped above
+    if fp is not None and crop_path and Path(crop_path).exists():
+        anchor_crop_paths.append(str(crop_path))
+        extra_anchors_payload.append({
+            "i": 1,
+            "t": float(marker_timestamp or 0.0),
+            "box": fp.box,
+            "jersey_name": fp.jersey_name,
+            "shorts_name": fp.shorts_name,
+            "body_ratio": fp.body_ratio,
+            "crop_filename": crop_filename,
+        })
+    if marker_anchors:
+        try:
+            all_anchors = json.loads(marker_anchors)
+            if not isinstance(all_anchors, list):
+                all_anchors = []
+        except Exception:
+            all_anchors = []
+        # Skip the FIRST anchor — already processed above as the marker.
+        for idx, a in enumerate(all_anchors[1:6], start=2):  # cap at 5 total
+            try:
+                t_anchor = float(a.get("t", 0.0))
+                box_anchor = a.get("box") or {}
+                if not box_anchor:
+                    continue
+                frame_filename = f"{report_id}-anchor-frame-{idx}.jpg"
+                frame_path = UPLOAD_DIR / frame_filename
+                if not extract_frame_at(web_path, t_anchor, frame_path):
+                    continue
+                crop_filename_a = f"{report_id}-anchor-{idx}.jpg"
+                crop_path_a = UPLOAD_DIR / crop_filename_a
+                fp_a = extract_player_fingerprint(
+                    marker_image_path=str(frame_path),
+                    box=box_anchor,
+                    crop_save_path=str(crop_path_a),
+                )
+                # The full-size anchor frame is no longer needed — only the crop matters.
+                try:
+                    frame_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                if fp_a.crop_path and Path(fp_a.crop_path).exists():
+                    anchor_crop_paths.append(str(crop_path_a))
+                    extra_anchors_payload.append({
+                        "i": idx,
+                        "t": t_anchor,
+                        "box": fp_a.box,
+                        "jersey_name": fp_a.jersey_name,
+                        "shorts_name": fp_a.shorts_name,
+                        "body_ratio": fp_a.body_ratio,
+                        "crop_filename": crop_filename_a,
+                    })
+            except Exception as e:
+                logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
 
     # Enforce 5-minute (300 sec) cap server-side
     duration_sec = get_video_duration_seconds(web_path)
@@ -2759,6 +2846,7 @@ async def upload_video_and_create_preview(
                 content_type=str(gate.get("content_type", "other")),
                 player_visible=str(gate.get("player_visible", "clear")),
                 camera_distance=str(gate.get("camera_distance", "medium")),
+                anchors=extra_anchors_payload,
             )
         else:
             preview_prompt = (
@@ -2774,6 +2862,7 @@ async def upload_video_and_create_preview(
             video_path=str(preview_clip_path),
             marker_path=str(marker_path),
             crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
+            anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
         )
         # Strip any residual hedging language from the model output
         preview = scrub_hedging(preview)
@@ -2822,6 +2911,7 @@ async def upload_video_and_create_preview(
         # ── Precision Scout artefacts (auto-detected, never edited by user) ──
         "fingerprint": fingerprint_payload,
         "subject_crop_filename": crop_filename,
+        "anchors": extra_anchors_payload,
         "audio_events_preview": [
             {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_preview
         ],
@@ -2941,6 +3031,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
         "subject_crop_url": f"/api/uploads/{subject_crop_filename}" if subject_crop_filename else None,
         "fingerprint": doc.get("fingerprint"),
+        "anchors": doc.get("anchors", []),
         "audio_events_preview": doc.get("audio_events_preview", []),
         "audio_events_full": doc.get("audio_events_full", []),
         "preview": doc.get("preview"),
@@ -3075,6 +3166,17 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
         if cp.exists():
             crop_path_str = str(cp)
 
+    # Multi-anchor crops (in order) — pass them all to Gemini as the locked-player ensemble
+    anchor_payload_list = doc.get("anchors") or []
+    anchor_crops_full: list[str] = []
+    for a in anchor_payload_list:
+        cf = a.get("crop_filename") if isinstance(a, dict) else None
+        if not cf:
+            continue
+        p = UPLOAD_DIR / cf
+        if p.exists():
+            anchor_crops_full.append(str(p))
+
     details_str = json.dumps(doc["player_details"], ensure_ascii=False)
     # Pull the gate info captured at upload time so the full report adapts to content type.
     gate = doc.get("content_gate") or {}
@@ -3113,6 +3215,7 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
                 player_visible=str(gate.get("player_visible", "clear")),
                 camera_distance=str(gate.get("camera_distance", "medium")),
                 games_detected=int(gate.get("games_detected", 1) or 1),
+                anchors=anchor_payload_list,
             )
         else:
             full_prompt = (
@@ -3130,6 +3233,7 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
             video_path=str(file_path),
             marker_path=marker_path,
             crop_path=crop_path_str,
+            anchor_crops=anchor_crops_full if anchor_crops_full else None,
         )
         full = scrub_hedging(full)
     except HTTPException:
@@ -3174,6 +3278,16 @@ async def generate_full_report_task(report_id: str) -> None:
             if cp.exists():
                 crop_path_str = str(cp)
 
+        anchor_payload_list = doc.get("anchors") or []
+        anchor_crops_full: list[str] = []
+        for a in anchor_payload_list:
+            cf = a.get("crop_filename") if isinstance(a, dict) else None
+            if not cf:
+                continue
+            p = UPLOAD_DIR / cf
+            if p.exists():
+                anchor_crops_full.append(str(p))
+
         details_str = json.dumps(doc["player_details"], ensure_ascii=False)
         gate = doc.get("content_gate") or {}
 
@@ -3210,6 +3324,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 player_visible=str(gate.get("player_visible", "clear")),
                 camera_distance=str(gate.get("camera_distance", "medium")),
                 games_detected=int(gate.get("games_detected", 1) or 1),
+                anchors=anchor_payload_list,
             )
         else:
             full_prompt = (
@@ -3227,6 +3342,7 @@ async def generate_full_report_task(report_id: str) -> None:
             video_path=str(file_path),
             marker_path=marker_path,
             crop_path=crop_path_str,
+            anchor_crops=anchor_crops_full if anchor_crops_full else None,
         )
         full = scrub_hedging(full)
         await db.reports.update_one(

@@ -7,6 +7,9 @@ import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
 import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import MarkerStudio from "@/components/MarkerStudio";
+import HeroTeaser from "@/components/HeroTeaser";
+
+const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp } from "lucide-react";
 
@@ -49,6 +52,9 @@ export default function UploadPage() {
     description: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
+  const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
+  const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser
 
   const fileRef = useRef(null);
   const videoRef = useRef(null);
@@ -237,14 +243,21 @@ export default function UploadPage() {
   };
 
   /* ── MarkerStudio handoff ────────────────────────────────── */
-  const handleStudioConfirm = ({ markerBlob: blob, markerTimestamp: ts, markerBox: nbox }) => {
+  const [markerAnchors, setMarkerAnchors] = useState(null);
+  const handleStudioConfirm = ({ markerBlob: blob, markerTimestamp: ts, markerBox: nbox, markerAnchors: anchors }) => {
     if (markerPreviewUrl) URL.revokeObjectURL(markerPreviewUrl);
     setMarkerBlob(blob);
     setMarkerPreviewUrl(URL.createObjectURL(blob));
     setMarkerTimestamp(ts || 0);
     setMarkerBox(nbox || null);
+    setMarkerAnchors(anchors && anchors.length ? anchors : null);
     setStudioOpen(false);
-    toast.success("Player locked. We'll analyse only the player in the box.");
+    const count = anchors?.length || 1;
+    toast.success(
+      count > 1
+        ? `${count} anchors locked. The AI will track this exact player across the whole clip.`
+        : "Player locked. We'll analyse only the player in the box.",
+    );
   };
 
   const reMark = () => {
@@ -291,20 +304,48 @@ export default function UploadPage() {
         }),
       );
     }
+    if (markerAnchors && markerAnchors.length) {
+      fd.append(
+        "marker_anchors",
+        JSON.stringify(
+          markerAnchors.map((a) => ({
+            t: Number((a.t || 0).toFixed(2)),
+            box: {
+              x: Number(a.box.x.toFixed(4)),
+              y: Number(a.box.y.toFixed(4)),
+              w: Number(a.box.w.toFixed(4)),
+              h: Number(a.box.h.toFixed(4)),
+            },
+          })),
+        ),
+      );
+    }
     Object.entries(form).forEach(([k, v]) => {
       if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v));
     });
 
     try {
+      setUploadPct(0);
+      setUploadPhase("uploading");
       const { data } = await api.post("/reports/upload", fd, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 600000,
+        onUploadProgress: (ev) => {
+          if (ev.total) {
+            const pct = Math.min(100, Math.round((ev.loaded * 100) / ev.total));
+            setUploadPct(pct);
+            if (pct >= 100) setUploadPhase("analyzing");
+          }
+        },
       });
-      toast.success(
-        eligibility?.reason === "prepaid"
-          ? "Upload received — generating your premium report."
-          : "Free preview generated. Review your insights."
-      );
+      setUploadPhase("done");
+      // For free preview generations (not prepaid uploads), show the Hero Teaser
+      // before navigating away. For prepaid, just go straight to the report.
+      if (eligibility?.reason !== "prepaid") {
+        setHeroReport(data);
+        return; // HeroTeaser modal will navigate on dismiss
+      }
+      toast.success("Upload received — generating your premium report.");
       navigate(`/report/${data.id}`);
     } catch (err) {
       // 402 with structured detail = pre-pay required
@@ -317,6 +358,7 @@ export default function UploadPage() {
           (typeof detail === "string" ? detail : detail?.message) || "Upload failed. Please try again."
         );
       }
+      setUploadPhase("idle");
     } finally {
       setSubmitting(false);
     }
@@ -343,7 +385,26 @@ export default function UploadPage() {
         onSuccess={handleEmbeddedSuccess}
         onClose={() => setEmbeddedOpen(false)}
       />
-      <PrecisionScanOverlay open={submitting} />
+      <PrecisionScanOverlay
+        open={submitting && !heroReport}
+        phase={uploadPhase === "uploading" ? "uploading" : "analyzing"}
+        uploadPct={uploadPct}
+      />
+      <HeroTeaser
+        open={!!heroReport}
+        report={heroReport}
+        assetBase={ASSET_BASE}
+        price={price || 159}
+        onUnlock={() => {
+          if (heroReport?.id) {
+            navigate(`/report/${heroReport.id}?unlock=1`);
+          }
+        }}
+        onDismiss={() => {
+          setHeroReport(null);
+          if (heroReport?.id) navigate(`/report/${heroReport.id}`);
+        }}
+      />
       <MarkerStudio
         open={studioOpen}
         videoUrl={videoUrl}
