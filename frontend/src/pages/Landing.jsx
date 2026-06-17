@@ -1489,36 +1489,134 @@ export default function Landing() {
       {/* ============ TRUST — 2-column with football photo plate ============ */}
       <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-gray-border">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
-          {/* ── Refund Guarantee strip — bold risk-reversal banner ── */}
+          {/* ── Refund Guarantee — premium graphic banner ── */}
           <div
             data-testid="refund-guarantee-strip"
-            className="mb-14 grid md:grid-cols-12 border-2 border-volt bg-deepnavy overflow-hidden"
+            className="relative mb-14 grid md:grid-cols-12 border-2 border-forest bg-deepnavy overflow-hidden"
             style={{
               boxShadow:
-                "0 24px 50px -20px rgba(31, 79, 47, 0.18), 0 8px 18px -6px rgba(31, 79, 47, 0.10)",
+                "0 32px 60px -24px rgba(31, 79, 47, 0.28), 0 12px 24px -8px rgba(31, 79, 47, 0.14)",
             }}
           >
-            {/* Left: bold guarantee badge */}
-            <div className="relative md:col-span-4 bg-volt text-ink p-6 md:p-8 flex flex-col items-center justify-center text-center overflow-hidden">
-              <div aria-hidden className="absolute -top-12 -right-12 w-40 h-40 bg-ink/[0.04] rounded-full pointer-events-none" />
-              <ShieldCheck className="relative w-12 h-12 text-ink mb-3" strokeWidth={1.6} />
-              <div className="relative text-[10px] uppercase tracking-[0.28em] font-bold text-ink/70">Our promise</div>
-              <div className="relative font-barlow font-black text-3xl md:text-4xl tracking-tighter leading-[0.95] mt-2">
-                48h or<br />it&apos;s free.
+            {/* ─── LEFT: 48h stopwatch panel ─── */}
+            <div className="relative md:col-span-5 bg-forest text-white p-6 md:p-8 overflow-hidden flex items-center">
+              {/* Diagonal scoreline pattern */}
+              <div
+                aria-hidden
+                className="absolute inset-0 pointer-events-none opacity-[0.07]"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg, #fff 0, #fff 2px, transparent 2px, transparent 18px)",
+                }}
+              />
+              {/* Big stopwatch glow */}
+              <div aria-hidden className="absolute -right-16 -bottom-16 w-72 h-72 rounded-full bg-volt/[0.10] blur-3xl pointer-events-none" />
+
+              <div className="relative w-full flex items-center gap-4 md:gap-5">
+                {/* Stopwatch SVG */}
+                <svg
+                  aria-hidden
+                  viewBox="0 0 200 200"
+                  className="shrink-0 w-20 md:w-24 h-20 md:h-24"
+                >
+                  {/* Crown / top button */}
+                  <rect x="92" y="12" width="16" height="14" fill="#ccff00" />
+                  <rect x="88" y="6"  width="24" height="8" fill="#ccff00" />
+                  {/* Outer ring */}
+                  <circle cx="100" cy="110" r="78" fill="none" stroke="#ccff00" strokeWidth="6" />
+                  {/* Inner face */}
+                  <circle cx="100" cy="110" r="66" fill="#0a1f13" stroke="#ccff00" strokeWidth="2" />
+                  {/* Tick marks */}
+                  {Array.from({ length: 12 }).map((_, i) => {
+                    const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+                    const x1 = 100 + Math.cos(a) * 58;
+                    const y1 = 110 + Math.sin(a) * 58;
+                    const x2 = 100 + Math.cos(a) * 64;
+                    const y2 = 110 + Math.sin(a) * 64;
+                    return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ccff00" strokeWidth={i % 3 === 0 ? "3" : "1.5"} opacity={i % 3 === 0 ? "1" : "0.55"} />;
+                  })}
+                  {/* Arc — "48 of 60" progress */}
+                  <circle cx="100" cy="110" r="52" fill="none" stroke="#ccff00" strokeWidth="6" strokeDasharray={`${(48 / 60) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} strokeDashoffset={0} transform="rotate(-90 100 110)" strokeLinecap="round" opacity="0.9" />
+                  {/* Hand pointing at "48" position */}
+                  <line x1="100" y1="110" x2={100 + Math.cos((48 / 60) * Math.PI * 2 - Math.PI / 2) * 44} y2={110 + Math.sin((48 / 60) * Math.PI * 2 - Math.PI / 2) * 44} stroke="#fff" strokeWidth="3.5" strokeLinecap="round" />
+                  {/* Center pin */}
+                  <circle cx="100" cy="110" r="5" fill="#ccff00" />
+                </svg>
+
+                {/* Text stack — clean 2-line hierarchy, all white for max readability on forest */}
+                <div className="min-w-0 flex flex-col">
+                  <div className="font-barlow font-black tracking-tighter leading-[0.85] whitespace-nowrap text-white text-5xl md:text-6xl lg:text-7xl">
+                    48h
+                  </div>
+                  <div className="font-barlow font-black uppercase text-base md:text-lg tracking-tight leading-tight mt-2 whitespace-nowrap text-white">
+                    OR <span className="italic">IT&apos;S FREE.</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 mt-3 text-[9px] uppercase tracking-[0.30em] font-bold text-volt">
+                    <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-volt" style={{ boxShadow: "0 0 6px #ccff00" }} />
+                    No questions asked
+                  </div>
+                </div>
+              </div>
+
+              {/* Rotated lime "GUARANTEED" stamp — top-right corner */}
+              <div
+                aria-hidden
+                className="absolute top-4 right-4 md:top-5 md:right-5 select-none pointer-events-none"
+                style={{ transform: "rotate(-12deg)" }}
+              >
+                <div className="border-[2.5px] border-volt text-volt font-barlow font-black uppercase tracking-[0.22em] text-[10px] px-2.5 py-1.5">
+                  Guaranteed
+                </div>
               </div>
             </div>
-            {/* Right: explanation */}
-            <div className="md:col-span-8 p-6 md:p-8 flex flex-col justify-center">
-              <h3 className="font-barlow font-black uppercase text-xl md:text-2xl tracking-tighter leading-[1.05]">
-                Your report in <span className="text-volt">48 hours</span>, or your money back. No questions.
-              </h3>
-              <p className="mt-3 text-sm text-ink/70 leading-relaxed max-w-2xl">
-                We promise a complete, scout-reviewed report within 48 hours of your payment. If we miss that window for any reason, we refund your purchase in full — automatically, no support tickets, no arguments. It&apos;s how confident we are in our process.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/60">
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-forest" /> No questions asked</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-forest" /> 100% Stripe refund</span>
-                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-forest" /> Within 5 business days</span>
+
+            {/* ─── RIGHT: 3-step journey + body ─── */}
+            <div className="md:col-span-7 p-8 md:p-10 bg-deepnavy text-ink relative">
+              {/* Faint scout-notebook dot pattern */}
+              <div
+                aria-hidden
+                className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                style={{
+                  backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+                  backgroundSize: "26px 26px",
+                }}
+              />
+              <div className="relative">
+                <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter leading-[1.02]">
+                  Your report in <span className="text-forest">48 hours</span>,<br />
+                  or we refund you.<br />
+                  <span className="text-forest">Automatically.</span>
+                </h3>
+
+                {/* 3-step visual journey */}
+                <ol className="mt-6 grid grid-cols-3 gap-0 relative">
+                  {/* Connecting horizontal line behind dots */}
+                  <span aria-hidden className="absolute left-[16%] right-[16%] top-[18px] h-[2px] bg-forest/25 pointer-events-none" />
+                  {[
+                    { n: "01", t: "You pay", d: "Stripe-secure checkout" },
+                    { n: "02", t: "Scout reviews", d: "Real human watches" },
+                    { n: "03", t: "Report sent", d: "Within 48 hours flat" },
+                  ].map((s, i) => (
+                    <li key={i} data-testid={`refund-step-${i}`} className="relative flex flex-col items-center text-center px-1.5">
+                      <span className="relative w-9 h-9 rounded-full bg-forest text-white flex items-center justify-center font-barlow font-black text-sm shadow-md">
+                        {s.n}
+                      </span>
+                      <span className="mt-2.5 font-barlow font-black uppercase text-[12px] tracking-tight text-ink leading-tight">
+                        {s.t}
+                      </span>
+                      <span className="mt-0.5 text-[10px] uppercase tracking-[0.14em] font-bold text-ink/55 leading-tight">
+                        {s.d}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+
+                {/* Bottom: trust chips */}
+                <div className="mt-7 pt-4 border-t border-gray-border flex flex-wrap items-center gap-x-5 gap-y-2 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/65">
+                  <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-forest" /> No support tickets</span>
+                  <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-forest" /> 100% Stripe refund</span>
+                  <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-forest" /> Auto-issued in 5 days</span>
+                </div>
               </div>
             </div>
           </div>
