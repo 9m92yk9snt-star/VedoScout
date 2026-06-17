@@ -735,7 +735,7 @@ export default function Landing() {
                 { cls: "lg:col-span-4", variant: "tint" },                                     // 7 Potential
                 { cls: "lg:col-span-4", variant: "default" },                                  // 8 Comparison
                 { cls: "lg:col-span-4", variant: "default" },                                  // 9 PDF
-                { cls: "lg:col-span-4", variant: "default" },                                  // 10 Private
+                { cls: "sm:col-span-2 lg:col-span-12", variant: "default" },                   // 10 Private (full-width finale)
               ];
 
               const renderCard = (card, i) => {

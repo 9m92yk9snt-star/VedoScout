@@ -90,11 +90,15 @@ export default function PricingCards({
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.4 }}
           data-testid="pricing-card-single"
-          className={`md:col-span-2 relative p-6 md:p-8 flex flex-col h-full border transition-shadow ${
+          className={`md:col-span-2 relative p-6 md:p-8 flex flex-col h-full border transition-all duration-300 hover:scale-[1.008] ${
             isDark
               ? "bg-surface border-gray-border hover:border-forest"
-              : "bg-cream-card border-gray-border hover:border-forest hover:shadow-xl"
+              : "bg-cream-card border-gray-border hover:border-forest"
           }`}
+          style={{
+            boxShadow:
+              "0 22px 48px -20px rgba(10, 15, 13, 0.18), 0 12px 24px -10px rgba(31, 79, 47, 0.14), 0 4px 8px -2px rgba(10, 15, 13, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
+          }}
         >
           <div className="flex items-center gap-2 mb-2">
             <FileCheck2 className={`w-4 h-4 ${isDark ? "text-volt" : "text-forest"}`} />
