@@ -159,20 +159,40 @@ export default function PricingCards({
           }`}
           style={{ boxShadow: "0 20px 80px rgba(31, 79, 47, 0.18)" }}
         >
-          {/* Best Value ribbon */}
+          {/* MOBILE-only banner — full-width, sticky-top "Best Value" + social proof.
+              First thing a thumb-scroller sees on the $399 card. */}
           {savings > 0 && (
-            <div className="absolute -top-3 right-6 bg-cream-card text-forest text-[10px] uppercase tracking-[0.22em] font-black px-3 py-1.5 flex items-center gap-1.5 border border-forest/30 shadow-md">
+            <div
+              data-testid="pricing-pass-mobile-banner"
+              className="md:hidden -mt-6 -mx-6 mb-5 bg-cream-card text-forest border-b border-forest/20"
+            >
+              <div className="px-4 py-2.5 flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.2em] font-black">
+                <span className="flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5" />
+                  Best value · Save ${savings}
+                </span>
+                <span className="flex items-center gap-1.5 text-forest/70">
+                  <Users className="w-3 h-3" />
+                  Most parents pick this
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Best Value ribbon — DESKTOP only (hidden on mobile, mobile uses banner above) */}
+          {savings > 0 && (
+            <div className="hidden md:flex absolute -top-3 right-6 bg-cream-card text-forest text-[10px] uppercase tracking-[0.22em] font-black px-3 py-1.5 items-center gap-1.5 border border-forest/30 shadow-md">
               <Crown className="w-3 h-3" />
               Best value · Save ${savings}
             </div>
           )}
-          {/* Social proof tag (top-left of pass card) */}
-          <div className="absolute -top-3 left-6 bg-forest-pop text-white text-[10px] uppercase tracking-[0.22em] font-black px-3 py-1.5 flex items-center gap-1.5 shadow-md">
+          {/* Social proof tag — DESKTOP only */}
+          <div className="hidden md:flex absolute -top-3 left-6 bg-forest-pop text-white text-[10px] uppercase tracking-[0.22em] font-black px-3 py-1.5 items-center gap-1.5 shadow-md">
             <Users className="w-3 h-3" />
             Most parents pick this
           </div>
 
-          <div className="flex items-center gap-2 mb-2 mt-3">
+          <div className="flex items-center gap-2 mb-2 md:mt-3">
             <BarChart3 className="w-4 h-4 text-volt" />
             <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">12 months · 3 reports</span>
           </div>
@@ -198,7 +218,7 @@ export default function PricingCards({
             One-time · No subscription · 3 reports / 12 months
           </p>
 
-          <div className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm flex-1">
+          <div className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2 sm:gap-y-2.5 text-[13px] sm:text-sm flex-1">
             <Feature dark>3 full reports across 12 months</Feature>
             <Feature dark>Advanced benchmarked intelligence × 3</Feature>
             <Feature dark highlight>Scout / agent review on every report</Feature>
@@ -276,7 +296,7 @@ function Feature({ children, dark = false, highlight = false }) {
   return (
     <li className="flex items-start gap-2">
       <Icon
-        className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+        className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
           highlight
             ? "text-volt"
             : dark

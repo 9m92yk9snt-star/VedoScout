@@ -26,6 +26,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 15 — Mobile-first pricing polish on $399 card (Feb 17 2026 late evening)**:
+  - **Pinned BEST VALUE banner** at the very top of the $399 card on mobile only — full-width, flush against the card edge, combines `BEST VALUE · SAVE $78` + `MOST PARENTS PICK THIS` as the first thing a thumb-scroller sees.
+  - **Desktop ribbon badges hidden on mobile** (`hidden md:flex`) — replaced by the banner. Desktop layout unchanged.
+  - **Compressed 8-feature grid** on mobile: single column (already was via `sm:grid-cols-2`), tighter row spacing (`gap-y-2` instead of `2.5`), smaller body text (`text-[13px]` mobile / `text-sm` desktop), smaller icons (`w-3.5 h-3.5` mobile / `w-4 h-4` desktop) via responsive Feature component.
+  - **Surgical change**: only `PricingCards.jsx` touched. No other component, no backend, no tests broken. Desktop pixel-identical to iter 15.
+  - Verified live: mobile banner visible + correctly hidden on desktop; both desktop ribbons remain visible at md+ breakpoint; features grid resolves to single 290px column on iPhone-size viewport.
+
 - ✅ **🆕 Session 14 — Pricing UX cleanup + sign-in→checkout auto-resume (Feb 17 2026 evening)**:
   - **Single purchase point**: removed the duplicate `$159` Premium overlay from the sample-report visualization on Landing. The floating card is now a price-free "SAMPLE · SEE IT IN ACTION / THIS IS YOUR REPORT / SEE PLANS ↓" teaser that smooth-scrolls down to `#pricing`. Also removed the `$159 USD · one-time` pill from the hero trust bar — replaced with "One-time payment · no subscription". The pricing section is now the **only** purchase-decision surface on the front page.
   - **Pricing section polish (7 upgrades shipped)**: (1) trust strip above cards — "Scout review in 48h · Trusted across 12+ countries · Secure Stripe checkout"; (2) "MOST PARENTS PICK THIS" badge top-LEFT on $399 card; (3) "BEST VALUE · SAVE $78" ribbon top-RIGHT; (4) savings hint band below cards — "$159 × 3 = $477 · You pay only $399 · Save $78"; (5) 3-column guarantee row — 48h delivery / refund · Reviewed by real scouts · Secure Stripe · no subscription; (6) hover-lift on both cards via Framer Motion `whileHover y=-4`; (7) equal-height cards via flex `h-full`; subtle forest-dot background pattern adds depth without distraction.
