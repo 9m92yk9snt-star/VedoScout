@@ -37,7 +37,7 @@ NEW_FREE = ("testfree-mar@elitescout.com", "Free@2026!", "Test Free Mar")
 NEW_PREMIUM = ("testpremium-mar@elitescout.com", "Premium@2026!", "Test Premium Mar")
 
 
-async def upsert(db, email, password, name, role="user"):
+async def upsert(db, email, password, name, role="user", prepaid_uploads=0):
     existing = await db.users.find_one({"email": email.lower()})
     if existing:
         await db.users.update_one(
@@ -46,16 +46,13 @@ async def upsert(db, email, password, name, role="user"):
                 "password_hash": hash_password(password),
                 "full_name": name,
                 "role": role,
+                "prepaid_uploads": prepaid_uploads,
+                "free_preview_used": True if prepaid_uploads > 0 else False,
             }},
         )
-        # Wipe any past reports + payments so the free preview is fresh
+        # Wipe any past reports + payments so it stays fresh
         user_id = existing["id"]
         await db.reports.delete_many({"user_id": user_id})
-        # Reset payment / preview flags
-        await db.users.update_one(
-            {"id": user_id},
-            {"$unset": {"free_preview_used": "", "prepaid_uploads": ""}},
-        )
         return user_id
     user_id = str(uuid.uuid4())
     await db.users.insert_one({
@@ -64,6 +61,8 @@ async def upsert(db, email, password, name, role="user"):
         "password_hash": hash_password(password),
         "full_name": name,
         "role": role,
+        "prepaid_uploads": prepaid_uploads,
+        "free_preview_used": True if prepaid_uploads > 0 else False,
         "created_at": now_iso(),
     })
     return user_id
@@ -102,14 +101,16 @@ async def main():
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]
 
-    free_id = await upsert(db, *NEW_FREE)
+    # Test free account: 5 PRE-PAID uploads so every upload generates a FULL premium
+    # report without payment — perfect for reviewing the precision pipeline.
+    free_id = await upsert(db, *NEW_FREE, prepaid_uploads=5)
     premium_id = await upsert(db, *NEW_PREMIUM)
     rid = await seed_premium(db, premium_id, NEW_PREMIUM[0])
 
     print("\n=== FRESH DEMO ACCOUNTS READY ===\n")
     print(f"FREE     : {NEW_FREE[0]} / {NEW_FREE[1]}")
-    print("           → free preview NOT used, NO reports yet")
-    print("           → upload now to experience Hero Teaser must-buy reveal\n")
+    print("           → 5 prepaid uploads — every upload yields the FULL premium report")
+    print("           → use this to review precision without paying\n")
     print(f"PREMIUM  : {NEW_PREMIUM[0]} / {NEW_PREMIUM[1]}")
     print(f"           → 1 unlocked premium demo report: {rid}")
     print("           → dashboard shows the full 'Lukas A.' premium report\n")
