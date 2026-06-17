@@ -273,6 +273,143 @@ const sample = {
   },
 };
 
+// ── Position variants — switch the SAMPLE CARD between 4 player profiles (D)
+const SAMPLE_VARIANTS = {
+  CAM: { // existing Lukas (default)
+    player: sample.player,
+    scores: sample.scores,
+    summary: sample.summary,
+    shortVerdict: sample.shortVerdict,
+    strengths: sample.strengths,
+    improvement: sample.improvement,
+  },
+  GK: {
+    player: {
+      name: "Aron P.",
+      number: 1,
+      age: 14,
+      position: "Goalkeeper",
+      positionShort: "GK",
+      foot: "Right",
+      club: "FC Nordvest U15",
+      videoType: "Training session",
+      type: "Quick reflexes · brave on through balls",
+    },
+    scores: { technical: 7, tactical: 8, physical: 8, mentality: 9, overall: 8 },
+    summary:
+      "Aron is a calm, confident keeper who reads the game well. His distribution starts attacks — both feet are accurate over 30 metres. The bravery to come off his line on through balls is already at U17 level. Areas to grow: aerial command in crowded boxes and a louder voice organising the back four.",
+    strengths: [
+      "Brave coming off his line on through balls",
+      "Both feet accurate up to 30 m for distribution",
+      "Stays calm and composed when his team is under pressure",
+    ],
+    improvement:
+      "Needs louder communication to organise the back four, and better aerial command in crowded six-yard boxes.",
+  },
+  DEF: {
+    player: {
+      name: "Mateo R.",
+      number: 4,
+      age: 14,
+      position: "Centre Back",
+      positionShort: "CB",
+      foot: "Right",
+      club: "AC Stelvio U15",
+      videoType: "Match clip",
+      type: "Aerial monster · strong reader of the game",
+    },
+    scores: { technical: 7, tactical: 9, physical: 9, mentality: 8, overall: 8 },
+    summary:
+      "Mateo dominates the air in his box and reads the game two steps ahead of strikers his age. He wins almost every duel and stays calm when his team is under pressure. To unlock the next level: improve his first step on quick turns, and cleaner passing under press.",
+    strengths: [
+      "Wins almost every aerial duel in his box",
+      "Reads attackers two steps ahead — anticipates passes",
+      "Stays composed when his side is under pressure",
+    ],
+    improvement:
+      "First step on quick turns needs sharpening, and his short passing under high press still drops in accuracy.",
+  },
+  FWD: {
+    player: {
+      name: "Liam K.",
+      number: 9,
+      age: 14,
+      position: "Striker",
+      positionShort: "ST",
+      foot: "Right",
+      club: "IFK Visby U15",
+      videoType: "Match highlights",
+      type: "Cold finisher · clever runs in behind",
+    },
+    scores: { technical: 8, tactical: 8, physical: 8, mentality: 9, overall: 8 },
+    summary:
+      "Liam scores in moments where others freeze. The composure inside the box is rare for his age and his timing of runs in behind defences is already pro-level. To round out the game: link play with the midfield and intensity off the ball when his team loses possession.",
+    strengths: [
+      "Stays cold-blooded inside the box — finishes when others freeze",
+      "Timing of runs in behind defences is already pro-level",
+      "First-touch turn-and-shoot is consistent across both feet",
+    ],
+    improvement:
+      "Link-up play with the midfield needs more variety, and pressing intensity drops the moment his team loses the ball.",
+  },
+};
+const POSITIONS = [
+  { id: "GK",  label: "GK" },
+  { id: "DEF", label: "DEF" },
+  { id: "CAM", label: "MID" },
+  { id: "FWD", label: "FWD" },
+];
+
+/* ─────────────────────────────────────────────────────────────────
+ * BentoTiltCard — 3D mouse-tracked tilt wrapper for cards (C)
+ * Tilts up to 5° based on mouse position over the card.
+ * Returns smoothly to neutral on mouse-leave.
+ * Drop-in replacement for <motion.div> with all motion props supported.
+ * ──────────────────────────────────────────────────────────────── */
+const BentoTiltCard = React.forwardRef(function BentoTiltCard(
+  { children, className, style, maxTilt = 5, ...rest },
+  fwdRef
+) {
+  const localRef = useRef(null);
+  const ref = fwdRef || localRef;
+  const rotateX = useMotionValue(0);
+  const rotateY = useMotionValue(0);
+
+  const handleMove = (e) => {
+    const node = ref.current;
+    if (!node) return;
+    const r = node.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width;
+    const y = (e.clientY - r.top) / r.height;
+    rotateY.set((x - 0.5) * maxTilt * 2);
+    rotateX.set(-(y - 0.5) * maxTilt * 2);
+  };
+  const handleLeave = () => {
+    animate(rotateX, 0, { duration: 0.4, ease: "easeOut" });
+    animate(rotateY, 0, { duration: 0.4, ease: "easeOut" });
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      className={className}
+      style={{
+        rotateX,
+        rotateY,
+        transformPerspective: 1000,
+        transformStyle: "preserve-3d",
+        willChange: "transform",
+        ...style,
+      }}
+      {...rest}
+    >
+      {children}
+    </motion.div>
+  );
+});
+
 const radarData = [
   { axis: "Technical", v: sample.scores.technical },
   { axis: "Tactical", v: sample.scores.tactical },
@@ -344,6 +481,18 @@ export default function Landing() {
     linkedin_url:  "https://www.linkedin.com/company/scoutmeplay",
     instagram_url: "https://www.instagram.com/scoutmeplay",
   });
+  // Position switcher state (D) — current sample-card player
+  const [activePosition, setActivePosition] = useState("CAM");
+  const current = SAMPLE_VARIANTS[activePosition] || SAMPLE_VARIANTS.CAM;
+  // Dynamically re-derive radar data for the active player
+  const dynamicRadar = [
+    { axis: "Technical", v: current.scores.technical },
+    { axis: "Tactical",  v: current.scores.tactical },
+    { axis: "Physical",  v: current.scores.physical },
+    { axis: "Mentality", v: current.scores.mentality },
+    { axis: "Overall",   v: current.scores.overall },
+  ];
+
   const { user } = useAuth();
   const { scrollYProgress } = useScroll();
 
@@ -745,14 +894,14 @@ export default function Landing() {
                 /* ===== HERO variant — Player Report, dark forest, oversized ===== */
                 if (b.variant === "hero") {
                   return (
-                    <motion.div
+                    <BentoTiltCard
                       key={i}
                       initial={{ opacity: 0, y: 24 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true, amount: 0.2 }}
-                      transition={{ duration: 0.6, ease: "easeOut" }}
+                      transition={{ duration: 0.6, delay: i * 0.06, ease: "easeOut" }}
                       data-testid={`feature-card-${i}`}
-                      className={`${b.cls} relative overflow-hidden bg-forest text-cream-card border border-volt/30 p-7 md:p-10 flex flex-col group hover:border-volt transition-all duration-300 hover:-translate-y-1`}
+                      className={`${b.cls} relative overflow-hidden bg-forest text-cream-card border border-volt/30 p-7 md:p-10 flex flex-col group hover:border-volt transition-colors duration-300`}
                       style={{ boxShadow: "0 0 80px rgba(204,255,0,0.08)" }}
                     >
                       {/* radial volt glow */}
@@ -927,21 +1076,21 @@ export default function Landing() {
                           </span>
                         </div>
                       </div>
-                    </motion.div>
+                    </BentoTiltCard>
                   );
                 }
 
                 /* ===== WIDE variant — Training Plan, horizontal layout ===== */
                 if (b.variant === "wide") {
                   return (
-                    <motion.div
+                    <BentoTiltCard
                       key={i}
                       initial={{ opacity: 0, y: 18 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true, amount: 0.2 }}
-                      transition={{ duration: 0.5, delay: 0.08, ease: "easeOut" }}
+                      transition={{ duration: 0.5, delay: i * 0.06, ease: "easeOut" }}
                       data-testid={`feature-card-${i}`}
-                      className={`${b.cls} relative bg-surface/80 backdrop-blur-sm border border-gray-border hover:border-volt/50 p-6 md:p-8 flex flex-col md:flex-row md:items-stretch md:gap-8 group hover:-translate-y-1 transition-all duration-300`}
+                      className={`${b.cls} relative bg-surface/80 backdrop-blur-sm border border-gray-border hover:border-volt/50 p-6 md:p-8 flex flex-col md:flex-row md:items-stretch md:gap-8 group transition-colors duration-300`}
                     >
                       <span className="absolute top-5 right-6 font-barlow font-black text-xs text-ink/35 tracking-widest">{number}</span>
 
@@ -975,21 +1124,21 @@ export default function Landing() {
                           <CardViz viz={card.viz} />
                         </div>
                       </div>
-                    </motion.div>
+                    </BentoTiltCard>
                   );
                 }
 
                 /* ===== TINT / DEFAULT — standard card with optional volt accent ===== */
                 const isTint = b.variant === "tint";
                 return (
-                  <motion.div
+                  <BentoTiltCard
                     key={i}
                     initial={{ opacity: 0, y: 18 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, amount: 0.2 }}
                     transition={{ duration: 0.5, delay: (i % 4) * 0.06, ease: "easeOut" }}
                     data-testid={`feature-card-${i}`}
-                    className={`${b.cls} relative overflow-hidden border border-gray-border hover:border-volt/50 p-6 md:p-7 flex flex-col group hover:-translate-y-1 transition-all duration-300 ${
+                    className={`${b.cls} relative overflow-hidden border border-gray-border hover:border-volt/50 p-6 md:p-7 flex flex-col group transition-colors duration-300 ${
                       isTint ? "bg-gradient-to-br from-surface/90 via-surface/70 to-volt/[0.06]" : "bg-surface/80 backdrop-blur-sm"
                     }`}
                   >
@@ -1011,7 +1160,7 @@ export default function Landing() {
                     <div className="relative mt-auto pt-4 border-t border-gray-border">
                       <CardViz viz={card.viz} />
                     </div>
-                  </motion.div>
+                  </BentoTiltCard>
                 );
               };
 
@@ -1139,32 +1288,63 @@ export default function Landing() {
                 <div className="absolute inset-0 bg-gradient-to-tr from-deepnavy via-deepnavy/85 to-deepnavy/40" />
               </div>
 
-              {/* Top stripe with badge + free tag */}
-              <div className="relative flex items-center justify-between px-5 py-3 border-b border-gray-border bg-cream-card/90">
-                <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+              {/* Top stripe with badge + free tag + position switcher (D) */}
+              <div className="relative flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-border bg-cream-card/90">
+                <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5 whitespace-nowrap">
                   <span className="w-1.5 h-1.5 bg-volt rounded-full animate-pulse" /> Free Preview
                 </span>
-                <span className="text-ink/50 text-[10px] uppercase tracking-[0.2em] font-bold">{sample.player.videoType}</span>
+                {/* Position tab switcher (4 positions) */}
+                <div
+                  data-testid="sample-position-switcher"
+                  className="flex items-stretch gap-px bg-gray-border border border-gray-border"
+                >
+                  {POSITIONS.map((p) => {
+                    const isActive = activePosition === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setActivePosition(p.id)}
+                        data-testid={`sample-position-${p.id.toLowerCase()}`}
+                        aria-pressed={isActive}
+                        className={`px-2.5 sm:px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] font-bold transition-colors ${
+                          isActive
+                            ? "bg-forest text-white"
+                            : "bg-cream-card text-ink/55 hover:text-ink hover:bg-cream-soft/60"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-ink/50 text-[10px] uppercase tracking-[0.2em] font-bold hidden sm:inline whitespace-nowrap">{current.player.videoType}</span>
               </div>
 
-              <div className="relative px-5 md:px-7 py-6 md:py-7">
+              <motion.div
+                key={activePosition}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+                className="relative px-5 md:px-7 py-6 md:py-7"
+              >
                 {/* Big jersey number + name */}
                 <div className="flex items-start gap-5">
                   <div className="flex-shrink-0">
                     <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-volt/70 mb-1">No.</div>
                     <div className="font-barlow font-black text-volt leading-none" style={{ fontSize: "5.5rem", textShadow: "0 4px 24px rgba(204,255,0,0.3)" }}>
-                      {sample.player.number}
+                      {current.player.number}
                     </div>
                   </div>
                   <div className="flex-1 min-w-0 pt-2">
                     <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50 mb-1">Player</div>
                     <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.9] text-ink">
-                      {sample.player.name}
+                      {current.player.name}
                     </h3>
                     <div className="mt-2 inline-flex items-center gap-2 bg-volt/10 border border-volt/30 px-2.5 py-1">
-                      <span className="font-barlow font-black uppercase text-volt text-sm leading-none">{sample.player.positionShort}</span>
+                      <span className="font-barlow font-black uppercase text-volt text-sm leading-none">{current.player.positionShort}</span>
                       <span className="text-ink/65 text-[11px]">·</span>
-                      <span className="text-ink/80 text-xs">{sample.player.position}</span>
+                      <span className="text-ink/80 text-xs">{current.player.position}</span>
                     </div>
                   </div>
                 </div>
@@ -1173,36 +1353,37 @@ export default function Landing() {
                 <div className="mt-6 grid grid-cols-3 gap-px bg-cream-soft/20 border border-gray-border">
                   <div className="bg-cream-card/90 p-3">
                     <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Age</div>
-                    <div className="font-barlow font-black text-ink text-2xl leading-none mt-1">{sample.player.age}</div>
+                    <div className="font-barlow font-black text-ink text-2xl leading-none mt-1">{current.player.age}</div>
                   </div>
                   <div className="bg-cream-card/90 p-3">
                     <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Foot</div>
-                    <div className="font-barlow font-black text-ink text-lg leading-none mt-1.5">{sample.player.foot}</div>
+                    <div className="font-barlow font-black text-ink text-lg leading-none mt-1.5">{current.player.foot}</div>
                   </div>
                   <div className="bg-cream-card/90 p-3">
                     <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Team</div>
-                    <div className="font-barlow font-black text-ink text-sm leading-none mt-1.5 truncate">{sample.player.club}</div>
+                    <div className="font-barlow font-black text-ink text-sm leading-none mt-1.5 truncate">{current.player.club}</div>
                   </div>
                 </div>
 
                 {/* Style tag */}
                 <div className="mt-4 flex items-center gap-2 text-xs text-ink/70">
                   <Star className="w-3.5 h-3.5 text-volt flex-shrink-0" fill="currentColor" />
-                  <span className="font-bold">{sample.player.type}</span>
+                  <span className="font-bold">{current.player.type}</span>
                 </div>
 
-                {/* Score row — pillar pitch-zone heatmap behind each cell */}
+                {/* Score row — pillar pitch-zone heatmap + animated bar (A) */}
                 <div className="mt-5 grid grid-cols-4 gap-px bg-cream-soft/40 border border-volt/20">
                   {[
-                    { k: "TECH", v: sample.scores.technical, Icon: Footprints },
-                    { k: "TACT", v: sample.scores.tactical,  Icon: Target },
-                    { k: "PHYS", v: sample.scores.physical,  Icon: Activity },
-                    { k: "MENT", v: sample.scores.mentality, Icon: Lightbulb },
+                    { k: "TECH", v: current.scores.technical, Icon: Footprints },
+                    { k: "TACT", v: current.scores.tactical,  Icon: Target },
+                    { k: "PHYS", v: current.scores.physical,  Icon: Activity },
+                    { k: "MENT", v: current.scores.mentality, Icon: Lightbulb },
                   ].map((s, i) => {
                     // Heatmap intensity: score 9+ = strongest tint, < 6 = nearly empty
                     const intensity = Math.max(0.06, Math.min(0.32, (s.v - 5) * 0.06));
+                    const pct = Math.max(5, Math.min(100, s.v * 10));
                     return (
-                      <div key={i} className="relative bg-cream-card py-3 text-center overflow-hidden">
+                      <div key={`${activePosition}-${i}`} data-testid={`sample-score-${s.k.toLowerCase()}`} className="relative bg-cream-card py-3 text-center overflow-hidden">
                         {/* Pitch-zone heatmap behind */}
                         <div
                           aria-hidden
@@ -1215,12 +1396,25 @@ export default function Landing() {
                           <s.Icon className="w-2.5 h-2.5 text-forest" strokeWidth={2} />
                           {s.k}
                         </div>
-                        <div className="relative font-barlow font-black text-3xl text-volt mt-0.5 leading-none">{s.v}</div>
+                        <div className="relative font-barlow font-black text-3xl text-volt mt-0.5 leading-none">
+                          <AnimatedNumber value={s.v} duration={1.4} />
+                        </div>
+                        {/* Animated horizontal bar (A) */}
+                        <div className="relative mt-2 mx-3 h-[3px] bg-cream-soft/60 overflow-hidden">
+                          <motion.div
+                            key={`${activePosition}-${i}-bar`}
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${pct}%` }}
+                            viewport={{ once: false, margin: "-30px" }}
+                            transition={{ duration: 1.3, delay: 0.1 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                            className="h-full bg-gradient-to-r from-forest via-forest-pop to-volt"
+                          />
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             {/* Brief summary card */}
@@ -1229,14 +1423,14 @@ export default function Landing() {
                 <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">What our scouts saw</span>
                 <span className="text-ink/40 text-[10px] uppercase tracking-widest font-bold">Free preview</span>
               </div>
-              <p className="text-ink text-base md:text-[17px] leading-[1.65]">{sample.summary}</p>
+              <p className="text-ink text-base md:text-[17px] leading-[1.65]">{current.summary}</p>
 
               <div className="mt-7 grid sm:grid-cols-2 gap-6 pt-6 border-t border-gray-border">
                 <div>
                   <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">What he does well</div>
                   <ul className="space-y-2.5">
-                    {sample.strengths.map((s, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-sm text-ink leading-snug">
+                    {current.strengths.map((s, i) => (
+                      <li key={`${activePosition}-${i}`} className="flex items-start gap-2.5 text-sm text-ink leading-snug">
                         <CheckCircle2 className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
                         <span>{s}</span>
                       </li>
@@ -1245,7 +1439,7 @@ export default function Landing() {
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">What to work on</div>
-                  <p className="text-sm text-ink/85 leading-relaxed">{sample.improvement}</p>
+                  <p className="text-sm text-ink/85 leading-relaxed">{current.improvement}</p>
                 </div>
               </div>
             </div>
@@ -1261,7 +1455,7 @@ export default function Landing() {
                 <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Performance map</h3>
                 <div className="mt-4 h-56">
                   <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData}>
+                    <RadarChart data={dynamicRadar}>
                       <PolarGrid stroke="rgba(255,255,255,0.15)" />
                       <PolarAngleAxis dataKey="axis" tick={{ fill: "#94A3B8", fontSize: 10 }} />
                       <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
