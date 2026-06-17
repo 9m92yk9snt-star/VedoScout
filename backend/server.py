@@ -32,6 +32,16 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutSessionRequest,
 )
 
+# Precision Scout — multi-signal player tracking + confident-voice pipeline
+from precision_engine import (
+    extract_player_fingerprint,
+    extract_audio_events,
+    build_preview_prompt as precision_build_preview_prompt,
+    build_full_prompt as precision_build_full_prompt,
+    scrub_hedging,
+    PlayerFingerprint,
+)
+
 # Raw Stripe SDK — required for `ui_mode="embedded"` checkout (not supported by emergentintegrations wrapper).
 import stripe as stripe_sdk
 
@@ -2229,21 +2239,37 @@ def extract_json(text: str) -> dict:
     return json.loads(candidate)
 
 
-async def call_gemini_with_video(session_id: str, prompt: str, video_path: str, marker_path: Optional[str] = None) -> dict:
-    """Send a video file (+ optional marker image) + prompt to Gemini and return parsed JSON."""
+async def call_gemini_with_video(
+    session_id: str,
+    prompt: str,
+    video_path: str,
+    marker_path: Optional[str] = None,
+    crop_path: Optional[str] = None,
+) -> dict:
+    """Send a video file (+ optional marker image and tight subject crop) + prompt
+    to Gemini and return parsed JSON."""
     chat = LlmChat(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
-        system_message="You are an experienced football coach giving honest, friendly feedback to a young player and their family. You speak in plain, natural football language — never jargon. You ALWAYS respond with valid JSON only.",
+        system_message=(
+            "You are an experienced football scout writing in a confident, definitive "
+            "voice — never hedge. ALWAYS respond with valid JSON only. When you describe "
+            "the locked player you observed something — state it as fact. If you cannot "
+            "see them in a moment, write OFF-CAMERA instead. Never describe a different "
+            "player."
+        ),
     ).with_model("gemini", "gemini-2.5-pro")
 
     file_contents = []
-    if marker_path and Path(marker_path).exists():
-        marker_file = FileContentWithMimeType(
-            file_path=marker_path,
-            mime_type="image/jpeg",
+    # Subject crop first so the model sees the locked player up close before the wide marker
+    if crop_path and Path(crop_path).exists():
+        file_contents.append(
+            FileContentWithMimeType(file_path=crop_path, mime_type="image/jpeg")
         )
-        file_contents.append(marker_file)
+    if marker_path and Path(marker_path).exists():
+        file_contents.append(
+            FileContentWithMimeType(file_path=marker_path, mime_type="image/jpeg")
+        )
     video_file = FileContentWithMimeType(
         file_path=video_path,
         mime_type="video/mp4",
@@ -2540,6 +2566,7 @@ async def upload_video_and_create_preview(
     temp_video_token: Optional[str] = Form(None),
     marker_image: UploadFile = File(...),
     marker_timestamp: float = Form(0.0),
+    marker_box: Optional[str] = Form(None),  # JSON {"x":0..1,"y":0..1,"w":0..1,"h":0..1}
     player_name: str = Form(...),
     age: int = Form(...),
     position: str = Form(...),
@@ -2617,6 +2644,42 @@ async def upload_video_and_create_preview(
     with marker_path.open("wb") as buffer:
         shutil.copyfileobj(marker_image.file, buffer)
 
+    # ============== PRECISION SCOUT — VISUAL FINGERPRINT ==============
+    # Parse the user-drawn box around their player. Extract jersey colour,
+    # shorts colour, body ratio + save a tight subject crop. These become
+    # strong identity priors so Gemini never loses the locked player.
+    fingerprint_payload = None
+    crop_filename = None
+    crop_path = None
+    try:
+        if marker_box:
+            box_data = json.loads(marker_box)
+        else:
+            # Backward-compat: legacy circle/dot markers — assume a centered box
+            box_data = {"x": 0.40, "y": 0.30, "w": 0.20, "h": 0.50}
+        crop_filename = f"{report_id}-subject.jpg"
+        crop_path = UPLOAD_DIR / crop_filename
+        fp = extract_player_fingerprint(
+            marker_image_path=str(marker_path),
+            box=box_data,
+            crop_save_path=str(crop_path),
+        )
+        fingerprint_payload = {
+            "jersey_hex": fp.jersey_hex,
+            "jersey_name": fp.jersey_name,
+            "shorts_hex": fp.shorts_hex,
+            "shorts_name": fp.shorts_name,
+            "body_ratio": fp.body_ratio,
+            "box": fp.box,
+        }
+        if not fp.crop_path:
+            crop_filename = None
+            crop_path = None
+    except Exception as e:
+        logger.warning(f"Precision fingerprint failed for {report_id}: {e}")
+        fp = None
+        fingerprint_payload = None
+
     # Convert video to a web-friendly MP4 (H.264) so it plays in every browser.
     web_path = transcode_to_web_mp4(file_path)
     web_filename = web_path.name
@@ -2654,6 +2717,15 @@ async def upload_video_and_create_preview(
     # Build a short preview clip (15s window around the marker) for the FREE preview
     preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
 
+    # ============== PRECISION SCOUT — AUDIO TIMELINE ==============
+    # Detect loud peaks (crowd, whistle, shouts) on the SHORT preview clip — they
+    # become independent evidence for goals / big plays the AI can cross-check.
+    try:
+        audio_events_preview = extract_audio_events(preview_clip_path, top_n=5)
+    except Exception as e:
+        logger.warning(f"Audio extraction failed (preview) for {report_id}: {e}")
+        audio_events_preview = []
+
     # ============== CONTENT GATE ==============
     # Validate the clip is actually football and the player is visible. Rejects
     # non-football videos, unwatchable footage, or clips where the marked player
@@ -2675,20 +2747,36 @@ async def upload_video_and_create_preview(
 
     # Generate FREE preview synchronously (Gemini receives marker image + short clip).
     # The prompt is content-aware: it adapts to the gate's content_type and visibility findings.
+    # When a fingerprint was extracted, the prompt also injects the locked player's jersey/shorts
+    # colours + body ratio + audio event timeline → much tighter player tracking and confident voice.
     try:
-        preview_prompt = (
-            PREVIEW_PROMPT
-            .replace("{player_details}", details_str)
-            .replace("{content_type}", str(gate.get("content_type", "other")))
-            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-        )
+        if fp is not None:
+            preview_prompt = precision_build_preview_prompt(
+                base_prompt=PREVIEW_PROMPT,
+                fingerprint=fp,
+                audio_events=audio_events_preview,
+                player_details=details,
+                content_type=str(gate.get("content_type", "other")),
+                player_visible=str(gate.get("player_visible", "clear")),
+                camera_distance=str(gate.get("camera_distance", "medium")),
+            )
+        else:
+            preview_prompt = (
+                PREVIEW_PROMPT
+                .replace("{player_details}", details_str)
+                .replace("{content_type}", str(gate.get("content_type", "other")))
+                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+            )
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=preview_prompt,
             video_path=str(preview_clip_path),
             marker_path=str(marker_path),
+            crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
         )
+        # Strip any residual hedging language from the model output
+        preview = scrub_hedging(preview)
     except HTTPException:
         # Cleanup on failure
         for p in {file_path, web_path, marker_path, preview_clip_path}:
@@ -2731,6 +2819,12 @@ async def upload_video_and_create_preview(
         "manually_unlocked": False,
         "created_at": now_iso(),
         "paid_at": now_iso() if upload_will_be_paid else None,
+        # ── Precision Scout artefacts (auto-detected, never edited by user) ──
+        "fingerprint": fingerprint_payload,
+        "subject_crop_filename": crop_filename,
+        "audio_events_preview": [
+            {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_preview
+        ],
     }
     await db.reports.insert_one(report_doc)
 
@@ -2836,6 +2930,7 @@ async def _ensure_agent_review(doc: dict) -> dict:
 async def _serialize_report(doc: dict, include_full: bool) -> dict:
     poster_filename = doc.get("poster_filename")
     marker_filename = doc.get("marker_filename")
+    subject_crop_filename = doc.get("subject_crop_filename")
     out = {
         "id": doc["id"],
         "user_id": doc["user_id"],
@@ -2844,6 +2939,10 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "video_url": f"/api/uploads/{doc['video_filename']}",
         "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
         "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
+        "subject_crop_url": f"/api/uploads/{subject_crop_filename}" if subject_crop_filename else None,
+        "fingerprint": doc.get("fingerprint"),
+        "audio_events_preview": doc.get("audio_events_preview", []),
+        "audio_events_full": doc.get("audio_events_full", []),
         "preview": doc.get("preview"),
         "content_gate": doc.get("content_gate"),
         "is_paid": doc.get("is_paid", False),
@@ -2970,25 +3069,69 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
         if mp.exists():
             marker_path = str(mp)
 
+    crop_path_str = None
+    if doc.get("subject_crop_filename"):
+        cp = UPLOAD_DIR / doc["subject_crop_filename"]
+        if cp.exists():
+            crop_path_str = str(cp)
+
     details_str = json.dumps(doc["player_details"], ensure_ascii=False)
     # Pull the gate info captured at upload time so the full report adapts to content type.
     gate = doc.get("content_gate") or {}
+
+    # ── Precision priors: rebuild fingerprint object + extract audio peaks on the FULL clip ──
+    fp_obj = None
+    fp_payload = doc.get("fingerprint")
+    if fp_payload:
+        try:
+            fp_obj = PlayerFingerprint(
+                jersey_hex=fp_payload.get("jersey_hex", "#888888"),
+                jersey_name=fp_payload.get("jersey_name", "unclear"),
+                shorts_hex=fp_payload.get("shorts_hex", "#888888"),
+                shorts_name=fp_payload.get("shorts_name", "unclear"),
+                body_ratio=float(fp_payload.get("body_ratio", 2.0)),
+                crop_path=crop_path_str,
+                box=fp_payload.get("box", {}),
+                confidence="ok",
+            )
+        except Exception:
+            fp_obj = None
     try:
-        full_prompt = (
-            FULL_REPORT_PROMPT
-            .replace("{player_details}", details_str)
-            .replace("{content_type}", str(gate.get("content_type", "other")))
-            .replace("{quality}", str(gate.get("quality", "good")))
-            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-            .replace("{games_detected}", str(gate.get("games_detected", 1)))
-        )
+        audio_events_full = extract_audio_events(file_path, top_n=10)
+    except Exception:
+        audio_events_full = []
+
+    try:
+        if fp_obj is not None:
+            full_prompt = precision_build_full_prompt(
+                base_prompt=FULL_REPORT_PROMPT,
+                fingerprint=fp_obj,
+                audio_events=audio_events_full,
+                player_details=doc["player_details"],
+                content_type=str(gate.get("content_type", "other")),
+                quality=str(gate.get("quality", "good")),
+                player_visible=str(gate.get("player_visible", "clear")),
+                camera_distance=str(gate.get("camera_distance", "medium")),
+                games_detected=int(gate.get("games_detected", 1) or 1),
+            )
+        else:
+            full_prompt = (
+                FULL_REPORT_PROMPT
+                .replace("{player_details}", details_str)
+                .replace("{content_type}", str(gate.get("content_type", "other")))
+                .replace("{quality}", str(gate.get("quality", "good")))
+                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+                .replace("{games_detected}", str(gate.get("games_detected", 1)))
+            )
         full = await call_gemini_with_video(
             session_id=f"full-{report_id}",
             prompt=full_prompt,
             video_path=str(file_path),
             marker_path=marker_path,
+            crop_path=crop_path_str,
         )
+        full = scrub_hedging(full)
     except HTTPException:
         raise
     except Exception as e:
@@ -2997,7 +3140,13 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
 
     await db.reports.update_one(
         {"id": report_id},
-        {"$set": {"full_report": full, "full_generated_at": now_iso()}},
+        {"$set": {
+            "full_report": full,
+            "full_generated_at": now_iso(),
+            "audio_events_full": [
+                {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_full
+            ],
+        }},
     )
     return {"status": "generated", "report_id": report_id}
 
@@ -3019,26 +3168,76 @@ async def generate_full_report_task(report_id: str) -> None:
             if mp.exists():
                 marker_path = str(mp)
 
+        crop_path_str = None
+        if doc.get("subject_crop_filename"):
+            cp = UPLOAD_DIR / doc["subject_crop_filename"]
+            if cp.exists():
+                crop_path_str = str(cp)
+
         details_str = json.dumps(doc["player_details"], ensure_ascii=False)
         gate = doc.get("content_gate") or {}
-        full_prompt = (
-            FULL_REPORT_PROMPT
-            .replace("{player_details}", details_str)
-            .replace("{content_type}", str(gate.get("content_type", "other")))
-            .replace("{quality}", str(gate.get("quality", "good")))
-            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-            .replace("{games_detected}", str(gate.get("games_detected", 1)))
-        )
+
+        # ── Precision priors ──
+        fp_obj = None
+        fp_payload = doc.get("fingerprint")
+        if fp_payload:
+            try:
+                fp_obj = PlayerFingerprint(
+                    jersey_hex=fp_payload.get("jersey_hex", "#888888"),
+                    jersey_name=fp_payload.get("jersey_name", "unclear"),
+                    shorts_hex=fp_payload.get("shorts_hex", "#888888"),
+                    shorts_name=fp_payload.get("shorts_name", "unclear"),
+                    body_ratio=float(fp_payload.get("body_ratio", 2.0)),
+                    crop_path=crop_path_str,
+                    box=fp_payload.get("box", {}),
+                    confidence="ok",
+                )
+            except Exception:
+                fp_obj = None
+        try:
+            audio_events_full = extract_audio_events(file_path, top_n=10)
+        except Exception:
+            audio_events_full = []
+
+        if fp_obj is not None:
+            full_prompt = precision_build_full_prompt(
+                base_prompt=FULL_REPORT_PROMPT,
+                fingerprint=fp_obj,
+                audio_events=audio_events_full,
+                player_details=doc["player_details"],
+                content_type=str(gate.get("content_type", "other")),
+                quality=str(gate.get("quality", "good")),
+                player_visible=str(gate.get("player_visible", "clear")),
+                camera_distance=str(gate.get("camera_distance", "medium")),
+                games_detected=int(gate.get("games_detected", 1) or 1),
+            )
+        else:
+            full_prompt = (
+                FULL_REPORT_PROMPT
+                .replace("{player_details}", details_str)
+                .replace("{content_type}", str(gate.get("content_type", "other")))
+                .replace("{quality}", str(gate.get("quality", "good")))
+                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+                .replace("{games_detected}", str(gate.get("games_detected", 1)))
+            )
         full = await call_gemini_with_video(
             session_id=f"full-{report_id}",
             prompt=full_prompt,
             video_path=str(file_path),
             marker_path=marker_path,
+            crop_path=crop_path_str,
         )
+        full = scrub_hedging(full)
         await db.reports.update_one(
             {"id": report_id},
-            {"$set": {"full_report": full, "full_generated_at": now_iso()}},
+            {"$set": {
+                "full_report": full,
+                "full_generated_at": now_iso(),
+                "audio_events_full": [
+                    {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_full
+                ],
+            }},
         )
         # Ensure scout review is queued for every paid/unlocked report
         try:
@@ -5880,8 +6079,8 @@ async def admin_delete_user(user_id: str, admin=Depends(get_current_admin)):
 
     # Cascade-delete the user's reports + files
     reports_deleted = 0
-    async for r in db.reports.find({"user_id": user_id}, {"_id": 0, "id": 1, "video_filename": 1, "poster_filename": 1, "marker_filename": 1}):
-        for fname_key in ("video_filename", "poster_filename", "marker_filename"):
+    async for r in db.reports.find({"user_id": user_id}, {"_id": 0, "id": 1, "video_filename": 1, "poster_filename": 1, "marker_filename": 1, "subject_crop_filename": 1}):
+        for fname_key in ("video_filename", "poster_filename", "marker_filename", "subject_crop_filename"):
             fname = r.get(fname_key)
             if fname:
                 try:

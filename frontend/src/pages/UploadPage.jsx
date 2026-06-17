@@ -5,6 +5,7 @@ import Navigation from "@/components/Navigation";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
+import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import api from "@/lib/api";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Plus, Minus, Maximize2, Lock, Zap, Link as LinkIcon, FileUp } from "lucide-react";
 
@@ -26,6 +27,10 @@ export default function UploadPage() {
   const [markerBlob, setMarkerBlob] = useState(null);
   const [markerPreviewUrl, setMarkerPreviewUrl] = useState(null);
   const [markerTimestamp, setMarkerTimestamp] = useState(0);
+  // ── Precision Scout: box-drag marker (normalised 0-1 coords) ──
+  const [markerBox, setMarkerBox] = useState(null);       // {x,y,w,h} 0-1 once committed
+  const [drawingBox, setDrawingBox] = useState(null);     // {x,y,w,h} live during drag (px in overlay space)
+  const boxStartRef = useRef(null);                       // {sx, sy} drag start in overlay pixels
   const [isMarking, setIsMarking] = useState(false);
 
   // ── URL-paste mode ────────────────────────────────────────────────────
@@ -71,10 +76,10 @@ export default function UploadPage() {
     }
   };
 
+  /* eslint-disable */
   useEffect(() => {
     refreshEligibility();
     api.get("/settings/price").then(({ data }) => setPrice(data.price)).catch(() => {});
-    // eslint-disable-next-line
   }, []);
 
   // Handle return from Stripe prepay checkout (?prepay_session=... or ?prepay_canceled=1)
@@ -163,6 +168,7 @@ export default function UploadPage() {
       setPan({ x: 0, y: 0 });
     }
   }, [isMarking, videoUrl]);
+  /* eslint-enable */
 
   // Zoom controls (clamped 1× – 4×)
   const clampZoom = (z) => Math.max(1, Math.min(4, z));
@@ -178,7 +184,7 @@ export default function UploadPage() {
     setPan({ x: 0, y: 0 });
   };
 
-  // Pinch + pan gesture handlers (only active while marking)
+  // Pinch (2-finger) zoom only — single-finger drags now belong to the box marker
   const onWrapperTouchStart = (e) => {
     if (!isMarking) return;
     if (e.touches.length === 2) {
@@ -190,17 +196,8 @@ export default function UploadPage() {
         startZoom: zoom,
       };
       movedRef.current = true;
-    } else if (e.touches.length === 1 && zoom > 1.01) {
-      gestureRef.current = {
-        type: "pan",
-        startX: e.touches[0].clientX,
-        startY: e.touches[0].clientY,
-        startPan: pan,
-      };
-      movedRef.current = false;
     } else {
       gestureRef.current = null;
-      movedRef.current = false;
     }
   };
 
@@ -216,12 +213,6 @@ export default function UploadPage() {
       setZoom(nz);
       if (nz <= 1.01) setPan({ x: 0, y: 0 });
       movedRef.current = true;
-    } else if (gestureRef.current.type === "pan" && e.touches.length === 1) {
-      e.preventDefault();
-      const dx = e.touches[0].clientX - gestureRef.current.startX;
-      const dy = e.touches[0].clientY - gestureRef.current.startY;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) movedRef.current = true;
-      setPan({ x: gestureRef.current.startPan.x + dx, y: gestureRef.current.startPan.y + dy });
     }
   };
 
@@ -315,36 +306,111 @@ export default function UploadPage() {
     }
     video.pause();
     setIsMarking(true);
+    setDrawingBox(null);
+    setMarkerBox(null);
   };
 
-  const cancelMarking = () => setIsMarking(false);
+  const cancelMarking = () => {
+    setIsMarking(false);
+    setDrawingBox(null);
+  };
 
-  const handleOverlayClick = (e) => {
-    // Ignore clicks that are actually the end of a pan/pinch gesture
-    if (movedRef.current) {
-      movedRef.current = false;
+  // Helpers — overlay-relative pixel coordinates for a pointer event
+  const overlayCoords = (e) => {
+    const overlay = overlayRef.current;
+    if (!overlay) return null;
+    const rect = overlay.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(rect.width, e.clientX - rect.left)),
+      y: Math.max(0, Math.min(rect.height, e.clientY - rect.top)),
+      w: rect.width,
+      h: rect.height,
+    };
+  };
+
+  // Pointer-driven box drawing — works on touch and mouse
+  const onOverlayPointerDown = (e) => {
+    if (!isMarking) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const p = overlayCoords(e);
+    if (!p) return;
+    boxStartRef.current = { sx: p.x, sy: p.y, w: p.w, h: p.h };
+    movedRef.current = true; // prevent the wrapper's click-after-touch logic
+    // Capture the exact moment of the video at the moment the user starts drawing
+    const video = videoRef.current;
+    if (video) setMarkerTimestamp(video.currentTime || 0);
+    // Seed a tiny box at the click point so user gets instant visual feedback
+    setDrawingBox({ x: p.x, y: p.y, w: 0, h: 0 });
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch (_) { /* ignore */ }
+  };
+
+  const onOverlayPointerMove = (e) => {
+    if (!isMarking || !boxStartRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const p = overlayCoords(e);
+    if (!p) return;
+    const { sx, sy } = boxStartRef.current;
+    const x = Math.min(sx, p.x);
+    const y = Math.min(sy, p.y);
+    const w = Math.abs(p.x - sx);
+    const h = Math.abs(p.y - sy);
+    setDrawingBox({ x, y, w, h });
+  };
+
+  const onOverlayPointerUp = (e) => {
+    if (!isMarking || !boxStartRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    } catch (_) { /* ignore */ }
+    const start = boxStartRef.current;
+    boxStartRef.current = null;
+    if (!drawingBox) return;
+    const { sx, sy, w: rw, h: rh } = start;
+
+    let { x, y, w, h } = drawingBox;
+    // If user only tapped (very small box), auto-grow to a default size around the tap
+    const minSide = Math.max(36, Math.min(rw, rh) * 0.12);
+    if (w < minSide || h < minSide) {
+      const defaultW = Math.max(rw * 0.15, 60);
+      const defaultH = defaultW * 1.8; // tall portrait box, fits a person
+      x = Math.max(0, sx - defaultW / 2);
+      y = Math.max(0, sy - defaultH / 2);
+      w = Math.min(rw - x, defaultW);
+      h = Math.min(rh - y, defaultH);
+    }
+    // Commit normalised box
+    const norm = {
+      x: x / rw,
+      y: y / rh,
+      w: w / rw,
+      h: h / rh,
+    };
+    setMarkerBox(norm);
+    setDrawingBox({ x, y, w, h }); // keep visual box while confirm UI is shown
+  };
+
+  // Render the marker image (frame + green rectangle around the locked player)
+  // and finalise. Called when user taps "Confirm" or after pointer-up on the
+  // very rare desktop drag where we want immediate confirm.
+  const confirmMarkerBox = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!markerBox) {
+      toast.error("Draw a box around your player first.");
       return;
     }
-    const video = videoRef.current;
-    const overlay = overlayRef.current;
-    if (!video || !overlay) return;
-
-    const rect = overlay.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-    const xRatio = clickX / rect.width;
-    const yRatio = clickY / rect.height;
-
     const w = video.videoWidth;
     const h = video.videoHeight;
     if (!w || !h) {
-      toast.error("Couldn't read the video frame. Try playing the video first then mark again.");
+      toast.error("Couldn't read the video frame. Try playing it briefly then re-mark.");
       return;
     }
-
-    // Capture the exact moment of the video at the click time
-    const captureTime = video.currentTime || 0;
-    setMarkerTimestamp(captureTime);
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -352,57 +418,68 @@ export default function UploadPage() {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, w, h);
 
-    // Draw glowing circle around the click point
-    const px = xRatio * w;
-    const py = yRatio * h;
-    const radius = Math.max(w, h) * 0.05;
+    // Project normalised box into pixel coords
+    const bx = Math.round(markerBox.x * w);
+    const by = Math.round(markerBox.y * h);
+    const bw = Math.max(8, Math.round(markerBox.w * w));
+    const bh = Math.max(8, Math.round(markerBox.h * h));
 
-    // Outer glow
+    // Outer dim — darkens everything outside the box, focuses scout attention
+    ctx.save();
+    ctx.fillStyle = "rgba(5, 10, 15, 0.45)";
     ctx.beginPath();
-    ctx.arc(px, py, radius * 1.6, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(204, 255, 0, 0.25)";
-    ctx.lineWidth = radius * 0.6;
-    ctx.stroke();
+    ctx.rect(0, 0, w, h);
+    ctx.rect(bx, by, bw, bh);
+    ctx.closePath();
+    ctx.fill("evenodd");
+    ctx.restore();
 
-    // Main bright ring
-    ctx.beginPath();
-    ctx.arc(px, py, radius, 0, Math.PI * 2);
+    // Glow halo
+    ctx.save();
+    ctx.shadowColor = "#CCFF00";
+    ctx.shadowBlur = Math.max(12, Math.min(w, h) * 0.012);
+    ctx.strokeStyle = "rgba(204, 255, 0, 0.5)";
+    ctx.lineWidth = Math.max(4, Math.min(w, h) * 0.006);
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.restore();
+
+    // Crisp volt border
     ctx.strokeStyle = "#CCFF00";
-    ctx.lineWidth = Math.max(4, radius * 0.18);
-    ctx.stroke();
+    ctx.lineWidth = Math.max(3, Math.min(w, h) * 0.004);
+    ctx.strokeRect(bx, by, bw, bh);
 
-    // Inner dot
-    ctx.beginPath();
-    ctx.arc(px, py, radius * 0.18, 0, Math.PI * 2);
+    // Corner ticks — 4 L-shaped marks for that "lock-on" look
+    const corner = Math.max(14, Math.min(bw, bh) * 0.18);
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.0035);
+    [
+      [bx, by, +1, +1],
+      [bx + bw, by, -1, +1],
+      [bx, by + bh, +1, -1],
+      [bx + bw, by + bh, -1, -1],
+    ].forEach(([cx, cy, dx, dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + dy * corner);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(cx + dx * corner, cy);
+      ctx.stroke();
+    });
+
+    // Label
+    const label = "LOCKED";
+    const labelFont = `bold ${Math.max(14, w * 0.018)}px Arial`;
+    ctx.font = labelFont;
+    const tw = ctx.measureText(label).width;
+    const padX = 10;
+    const padY = 5;
+    const lh = Math.max(20, w * 0.025);
+    let lx = bx;
+    let ly = by - lh - 4;
+    if (ly < 4) ly = by + bh + 4;
     ctx.fillStyle = "#CCFF00";
-    ctx.fill();
-
-    // Crosshair lines from circle to edges (subtle)
-    ctx.beginPath();
-    ctx.strokeStyle = "rgba(204, 255, 0, 0.45)";
-    ctx.lineWidth = Math.max(2, radius * 0.08);
-    ctx.setLineDash([radius * 0.4, radius * 0.4]);
-    ctx.moveTo(px - radius * 1.6, py);
-    ctx.lineTo(0, py);
-    ctx.moveTo(px + radius * 1.6, py);
-    ctx.lineTo(w, py);
-    ctx.moveTo(px, py - radius * 1.6);
-    ctx.lineTo(px, 0);
-    ctx.moveTo(px, py + radius * 1.6);
-    ctx.lineTo(px, h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Label tag
-    const tagText = "THIS PLAYER";
-    ctx.font = `bold ${Math.max(16, w * 0.022)}px Arial`;
-    const textW = ctx.measureText(tagText).width;
-    const tagX = Math.min(Math.max(px - textW / 2 - 12, 8), w - textW - 16);
-    const tagY = Math.min(py + radius * 1.8 + 6, h - 36);
-    ctx.fillStyle = "#CCFF00";
-    ctx.fillRect(tagX, tagY, textW + 24, 32);
+    ctx.fillRect(lx, ly, tw + padX * 2, lh);
     ctx.fillStyle = "#050A0F";
-    ctx.fillText(tagText, tagX + 12, tagY + 22);
+    ctx.fillText(label, lx + padX, ly + lh - padY - 2);
 
     canvas.toBlob(
       (blob) => {
@@ -414,18 +491,26 @@ export default function UploadPage() {
         setMarkerBlob(blob);
         setMarkerPreviewUrl(URL.createObjectURL(blob));
         setIsMarking(false);
-        toast.success("Player marked. Confirm below or re-mark if needed.");
+        setDrawingBox(null);
+        toast.success("Player locked. We'll analyse only the player in the box.");
       },
       "image/jpeg",
-      0.9,
+      0.92,
     );
   };
+
+  // Legacy single-click handler removed — pointer drag now drives everything.
+  // (Old function preserved as no-op to avoid touching JSX wiring that still
+  // references it. New handlers live on the overlay's pointer events.)
+  const handleOverlayClick = () => { /* deprecated — see onOverlayPointer* */ };
 
   const reMark = () => {
     if (markerPreviewUrl) URL.revokeObjectURL(markerPreviewUrl);
     setMarkerBlob(null);
     setMarkerPreviewUrl(null);
     setMarkerTimestamp(0);
+    setMarkerBox(null);
+    setDrawingBox(null);
     setIsMarking(true);
   };
 
@@ -453,6 +538,17 @@ export default function UploadPage() {
     }
     fd.append("marker_image", markerBlob, "marker.jpg");
     fd.append("marker_timestamp", String(markerTimestamp || 0));
+    if (markerBox) {
+      fd.append(
+        "marker_box",
+        JSON.stringify({
+          x: Number(markerBox.x.toFixed(4)),
+          y: Number(markerBox.y.toFixed(4)),
+          w: Number(markerBox.w.toFixed(4)),
+          h: Number(markerBox.h.toFixed(4)),
+        }),
+      );
+    }
     Object.entries(form).forEach(([k, v]) => {
       if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v));
     });
@@ -505,16 +601,17 @@ export default function UploadPage() {
         onSuccess={handleEmbeddedSuccess}
         onClose={() => setEmbeddedOpen(false)}
       />
+      <PrecisionScanOverlay open={submitting} />
 
       <div className="pt-28 pb-16 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="mb-10">
             <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Step 01</span>
             <h1 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.95]" data-testid="upload-title">
-              Upload your video & mark your player
+              Upload your video & lock onto your player
             </h1>
             <p className="mt-3 text-ink/65 max-w-2xl text-sm md:text-base">
-              Upload the clip, scrub to the best moment, and click on the player. Our scouts then review only that exact player.
+              Upload the clip, scrub to the clearest moment, then drag a box around your player — head to feet. Our AI locks onto their jersey, shorts, and body, and follows only that player through the video.
             </p>
 
             {/* Eligibility status pill */}
@@ -708,7 +805,7 @@ export default function UploadPage() {
                       <p className="text-xs text-ink/55">MP4, MOV or WebM · max 5 minutes</p>
                       <span className="mt-1 text-xs text-volt uppercase tracking-widest font-bold">or click to browse</span>
                       <p className="mt-3 text-[11px] text-ink/50 leading-relaxed max-w-[260px] text-center">
-                        Tip: pick your child's best moments — scouts decide in the first 3 minutes. Quality beats quantity.
+                        Tip: pick your child&apos;s best moments — scouts decide in the first 3 minutes. Quality beats quantity.
                       </p>
                     </div>
                   )}
@@ -718,8 +815,8 @@ export default function UploadPage() {
               {/* ===== STEP 2: VIDEO + MARK PLAYER ===== */}
               <div className="bg-surface p-6 md:p-8 lg:col-span-3">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 2 · Mark your player</span>
-                  {markerBlob && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Marked</span>}
+                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 2 · Lock onto your player</span>
+                  {markerBlob && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Locked</span>}
                 </div>
 
                 {!file ? (
@@ -743,6 +840,7 @@ export default function UploadPage() {
                         style={{
                           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                           transformOrigin: "0 0",
+                          // eslint-disable-next-line
                           transition: gestureRef.current ? "none" : "transform 0.15s ease-out",
                           willChange: "transform",
                         }}
@@ -761,11 +859,80 @@ export default function UploadPage() {
                         {isMarking && (
                           <div
                             ref={overlayRef}
-                            onClick={handleOverlayClick}
+                            onPointerDown={onOverlayPointerDown}
+                            onPointerMove={onOverlayPointerMove}
+                            onPointerUp={onOverlayPointerUp}
+                            onPointerCancel={onOverlayPointerUp}
                             className="absolute inset-0 cursor-crosshair"
-                            style={{ backgroundColor: "rgba(5, 10, 15, 0.18)" }}
+                            style={{
+                              backgroundColor: "rgba(5, 10, 15, 0.18)",
+                              touchAction: "none",
+                            }}
                             data-testid="upload-mark-overlay"
-                          />
+                          >
+                            {drawingBox && (
+                              <>
+                                {/* Dim everything outside the box for instant focus */}
+                                <div className="absolute inset-0 pointer-events-none" style={{
+                                  background: `
+                                    linear-gradient(rgba(5,10,15,0.55), rgba(5,10,15,0.55))
+                                  `,
+                                  WebkitMaskImage: `
+                                    linear-gradient(#000,#000),
+                                    linear-gradient(#000,#000)
+                                  `,
+                                  WebkitMaskClip: "padding-box, padding-box",
+                                  WebkitMaskComposite: "xor",
+                                  maskComposite: "exclude",
+                                }} />
+                                {/* The visible box */}
+                                <div
+                                  className="absolute pointer-events-none"
+                                  style={{
+                                    left: drawingBox.x,
+                                    top: drawingBox.y,
+                                    width: drawingBox.w,
+                                    height: drawingBox.h,
+                                    boxShadow:
+                                      "0 0 0 9999px rgba(5,10,15,0.55), 0 0 28px rgba(204,255,0,0.45) inset, 0 0 22px rgba(204,255,0,0.35)",
+                                    border: "2px solid #CCFF00",
+                                  }}
+                                >
+                                  {/* Corner ticks */}
+                                  {["tl", "tr", "bl", "br"].map((corner) => {
+                                    const base = {
+                                      position: "absolute",
+                                      width: 14,
+                                      height: 14,
+                                      borderColor: "#FFFFFF",
+                                      borderStyle: "solid",
+                                    };
+                                    const map = {
+                                      tl: { ...base, top: -1, left: -1, borderWidth: "2px 0 0 2px" },
+                                      tr: { ...base, top: -1, right: -1, borderWidth: "2px 2px 0 0" },
+                                      bl: { ...base, bottom: -1, left: -1, borderWidth: "0 0 2px 2px" },
+                                      br: { ...base, bottom: -1, right: -1, borderWidth: "0 2px 2px 0" },
+                                    };
+                                    return <span key={corner} style={map[corner]} />;
+                                  })}
+                                  {/* LOCKED tag */}
+                                  {drawingBox.w > 70 && drawingBox.h > 30 && (
+                                    <span
+                                      className="absolute text-[9px] uppercase tracking-widest font-black px-1.5 py-0.5"
+                                      style={{
+                                        top: -18,
+                                        left: 0,
+                                        background: "#CCFF00",
+                                        color: "#050A0F",
+                                      }}
+                                    >
+                                      LOCKED
+                                    </span>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                       </div>
 
@@ -774,7 +941,7 @@ export default function UploadPage() {
                         <>
                           <div className="pointer-events-none absolute top-3 left-3 right-3 flex items-center justify-between z-10">
                             <span className="pointer-events-auto bg-volt text-white text-[10px] uppercase tracking-widest font-black px-2 py-1 animate-pulse">
-                              Tap on your player
+                              {markerBox ? "Confirm or redraw" : "Drag a box around your player"}
                             </span>
                             <button
                               type="button"
@@ -788,6 +955,35 @@ export default function UploadPage() {
                               Cancel
                             </button>
                           </div>
+
+                          {/* Confirm bar — appears once the user has finished drawing */}
+                          {markerBox && (
+                            <div className="pointer-events-none absolute bottom-3 left-3 z-20 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  confirmMarkerBox();
+                                }}
+                                data-testid="upload-mark-confirm"
+                                className="pointer-events-auto bg-volt hover:bg-volt/90 text-white font-barlow font-black uppercase tracking-widest text-[11px] px-3 py-2 flex items-center gap-1.5 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" /> Lock player
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMarkerBox(null);
+                                  setDrawingBox(null);
+                                }}
+                                data-testid="upload-mark-redraw"
+                                className="pointer-events-auto bg-cream-card/95 backdrop-blur text-ink text-[10px] uppercase tracking-widest font-bold px-2.5 py-2 border border-gray-border flex items-center gap-1"
+                              >
+                                <RefreshCw className="w-3 h-3" /> Redraw
+                              </button>
+                            </div>
+                          )}
 
                           {/* Zoom controls */}
                           <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-center gap-1.5">
@@ -855,8 +1051,9 @@ export default function UploadPage() {
                         <div className="flex items-start gap-2.5 text-sm text-ink/80">
                           <AlertCircle className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
                           <span>
-                            Scrub to a clear moment, then tap "Mark this player".{" "}
-                            <span className="text-volt/80">Pinch to zoom for precision on mobile.</span>
+                            Scrub to the clearest moment of your player, then{" "}
+                            <span className="text-volt font-bold">drag a box around them</span> — head to feet.
+                            <span className="text-ink/60"> Pinch to zoom for tight precision.</span>
                           </span>
                         </div>
                         <button
@@ -866,7 +1063,7 @@ export default function UploadPage() {
                           className="flex-shrink-0 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 transition-colors flex items-center gap-2"
                         >
                           <Crosshair className="w-3.5 h-3.5" />
-                          Mark this player
+                          Lock onto your player
                         </button>
                       </div>
                     )}
@@ -875,7 +1072,7 @@ export default function UploadPage() {
                       <div className="bg-cream-card/90 border border-volt/30 p-3">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1.5">
-                            <Check className="w-3 h-3" /> Player marked
+                            <Check className="w-3 h-3" /> Player locked
                           </span>
                           <button
                             type="button"
@@ -888,12 +1085,12 @@ export default function UploadPage() {
                         </div>
                         <img
                           src={markerPreviewUrl}
-                          alt="Marked player"
+                          alt="Locked player"
                           data-testid="upload-mark-preview"
                           className="w-full aspect-video object-contain bg-black border border-gray-border"
                         />
                         <p className="mt-2 text-[11px] text-ink/55 text-center">
-                          We'll review <span className="text-volt font-bold">only the player circled above</span>.
+                          We&apos;ll analyse <span className="text-volt font-bold">only the player inside the box</span>.
                         </p>
                       </div>
                     )}
@@ -1022,21 +1219,21 @@ export default function UploadPage() {
                 {submitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Analysing... this can take 1–3 minutes
+                    Locking on · tracking · analysing
                   </>
                 ) : !file ? (
                   "Upload a video first"
                 ) : !markerBlob ? (
-                  "Mark your player first"
+                  "Lock onto your player first"
                 ) : (
                   <>
-                    Generate free preview
+                    Start precision scan
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
               </button>
               <p className="text-xs text-ink/50 text-center">
-                The scouts will review <span className="text-volt font-bold">only the player you marked</span>. Other players in the video are ignored.
+                The AI locks onto the player in your box and tracks <span className="text-volt font-bold">only them</span>. Other players are ignored.
               </p>
             </div>
           </form>

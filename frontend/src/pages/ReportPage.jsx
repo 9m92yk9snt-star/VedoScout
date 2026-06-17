@@ -175,19 +175,9 @@ function SectionGrid({ title, section }) {
                 </>
               )}
 
-              {/* Confidence + evidence */}
-              {confidence && !cannotEval && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <ConfidenceBadge level={confidence} reason={val?.confidence_reason} />
-                  {typeof val?.observations_used === "number" && val.observations_used > 0 && (
-                    <span className="text-[9px] uppercase tracking-widest font-bold text-ink/50">
-                      · {val.observations_used} obs
-                    </span>
-                  )}
-                </div>
-              )}
+              {/* Evidence list — confidence badge removed for confident-voice UX */}
               {evidence.length > 0 && (
-                <details className="mt-2 group">
+                <details className="mt-3 group">
                   <summary className="cursor-pointer text-[10px] uppercase tracking-widest font-bold text-ink/50 hover:text-volt transition-colors list-none">
                     Show evidence ({evidence.length})
                   </summary>
@@ -1730,7 +1720,7 @@ export default function ReportPage() {
   }
   if (!report) return null;
 
-  const { preview, full_report, player_details, video_url, poster_url, marker_url, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration, age_intelligence, statsbomb_calibration_gated_message, trial_readiness_gated_message } = report;
+  const { preview, full_report, player_details, video_url, poster_url, marker_url, fingerprint, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration, age_intelligence, statsbomb_calibration_gated_message, trial_readiness_gated_message } = report;
   const unlocked = is_paid || manually_unlocked || user?.role === "admin";
 
   const radarData = full_report ? [
@@ -1756,7 +1746,6 @@ export default function ReportPage() {
     };
     return map[t] || t;
   })();
-  const scoresConfidence = full_report?.scores_confidence;
   const evidenceQualityNote = full_report?.evidence_quality_note;
   const couldNotAssess = full_report?.scout_view?.what_we_could_not_assess;
 
@@ -1865,15 +1854,37 @@ export default function ReportPage() {
                   <div className="mt-5 border border-gray-border bg-cream-card/90 p-3 max-w-md" data-testid="marker-card">
                     <div className="flex items-center gap-2 mb-2">
                       <Star className="w-3 h-3 text-volt" fill="currentColor" />
-                      <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Verified player</span>
+                      <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Locked player</span>
                     </div>
                     <img
                       src={`${ASSET_BASE}${marker_url}`}
-                      alt="Marked player"
+                      alt="Locked player"
                       className="w-full aspect-video object-cover border border-gray-border"
                     />
+                    {fingerprint && (fingerprint.jersey_name || fingerprint.shorts_name) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="player-fingerprint">
+                        {fingerprint.jersey_hex && (
+                          <span className="inline-flex items-center gap-1.5 border border-gray-border bg-surface px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-ink/75">
+                            <span
+                              className="w-3 h-3 inline-block border border-ink/20"
+                              style={{ background: fingerprint.jersey_hex }}
+                            />
+                            {fingerprint.jersey_name || "jersey"}
+                          </span>
+                        )}
+                        {fingerprint.shorts_hex && (
+                          <span className="inline-flex items-center gap-1.5 border border-gray-border bg-surface px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-ink/75">
+                            <span
+                              className="w-3 h-3 inline-block border border-ink/20"
+                              style={{ background: fingerprint.shorts_hex }}
+                            />
+                            {fingerprint.shorts_name || "shorts"}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <p className="mt-2 text-[11px] text-ink/60">
-                      We analysed only the player you circled above.
+                      AI tracks only the player inside this box across every frame.
                     </p>
                   </div>
                 )}
@@ -1887,21 +1898,12 @@ export default function ReportPage() {
                     { key: "physical", label: "Physical", v: full_report.scores?.physical },
                     { key: "mentality", label: "Mentality", v: full_report.scores?.mentality },
                     { key: "overall_development", label: "Overall", v: full_report.scores?.overall_development },
-                  ].map((s, i) => {
-                    const conf = scoresConfidence?.[s.key];
-                    const c = conf ? CONFIDENCE_STYLES[conf] : null;
-                    return (
-                      <div key={i} className="bg-surface p-3 text-center">
-                        <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">{s.label}</div>
-                        <div className={`font-barlow font-black text-3xl mt-1 ${scoreColor(s.v)}`}>{s.v ?? "-"}</div>
-                        {c && (
-                          <div className={`mt-1.5 text-[8px] uppercase tracking-widest font-bold ${c.color}`} title={`Confidence: ${conf}`}>
-                            {conf}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  ].map((s, i) => (
+                    <div key={i} className="bg-surface p-3 text-center">
+                      <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">{s.label}</div>
+                      <div className={`font-barlow font-black text-3xl mt-1 ${scoreColor(s.v)}`}>{s.v ?? "-"}</div>
+                    </div>
+                  ))}
                 </div>
               )}
 
