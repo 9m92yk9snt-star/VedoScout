@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
   ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
+  Share2, Twitter, Facebook, Linkedin, Instagram,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
@@ -54,6 +55,17 @@ export default function AdminPage() {
   const [savingPassPrice, setSavingPassPrice] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Social links (admin-editable)
+  const DEFAULT_SOCIAL = {
+    twitter_url:   "https://twitter.com/scoutmeplay",
+    facebook_url:  "https://www.facebook.com/scoutmeplay",
+    linkedin_url:  "https://www.linkedin.com/company/scoutmeplay",
+    instagram_url: "https://www.instagram.com/scoutmeplay",
+  };
+  const [social, setSocial] = useState(DEFAULT_SOCIAL);
+  const [socialInput, setSocialInput] = useState(DEFAULT_SOCIAL);
+  const [savingSocial, setSavingSocial] = useState(false);
+
   // Users tab — segment filter + scout creation modal
   const [userSegment, setUserSegment] = useState("all");   // all | free | premium | scout | admin
   const [showCreateScout, setShowCreateScout] = useState(false);
@@ -87,6 +99,10 @@ export default function AdminPage() {
         setPassPrice(pr.data.pass_price ?? 399);
         setPassPriceInput(String(pr.data.pass_price ?? 399));
         setMessages(m.data);
+        if (pr.data.social) {
+          setSocial(pr.data.social);
+          setSocialInput(pr.data.social);
+        }
       }
     } catch (err) {
       toast.error("Failed to load admin data");
@@ -131,6 +147,31 @@ export default function AdminPage() {
       toast.error("Failed to update 12-month plan price");
     } finally {
       setSavingPassPrice(false);
+    }
+  };
+
+  const handleSocialSave = async () => {
+    const payload = {};
+    for (const k of Object.keys(DEFAULT_SOCIAL)) {
+      const v = (socialInput[k] || "").trim();
+      if (v && !(v.startsWith("https://") || v.startsWith("http://"))) {
+        toast.error(`${k.replace("_url", "").toUpperCase()} link must start with https://`);
+        return;
+      }
+      payload[k] = v;
+    }
+    setSavingSocial(true);
+    try {
+      const { data } = await api.put("/admin/social-links", payload);
+      if (data.social) {
+        setSocial(data.social);
+        setSocialInput(data.social);
+      }
+      toast.success("Social links saved");
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to update social links");
+    } finally {
+      setSavingSocial(false);
     }
   };
 
@@ -632,6 +673,58 @@ export default function AdminPage() {
                       </div>
                       <p className="mt-3 text-xs text-ink/50">Currently active: <span className="text-volt font-bold">${passPrice} USD</span></p>
                     </div>
+                  </div>
+
+                  {/* ── Social Links card ── */}
+                  <div className="bg-surface border border-gray-border p-6 md:p-8">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Share2 className="w-4 h-4 text-volt" />
+                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">Footer</span>
+                    </div>
+                    <h2 className="font-barlow font-black uppercase text-2xl text-ink">Social links</h2>
+                    <p className="mt-2 text-ink/65 text-sm">
+                      The &ldquo;Follow us&rdquo; icons in the public footer link to these URLs. Leave a field empty to hide that icon.
+                    </p>
+
+                    <div className="mt-6 space-y-4">
+                      {[
+                        { key: "instagram_url", label: "Instagram", Icon: Instagram, placeholder: "https://www.instagram.com/yourhandle" },
+                        { key: "twitter_url",   label: "X (Twitter)", Icon: Twitter,  placeholder: "https://twitter.com/yourhandle" },
+                        { key: "facebook_url",  label: "Facebook",  Icon: Facebook,  placeholder: "https://www.facebook.com/yourpage" },
+                        { key: "linkedin_url",  label: "LinkedIn",  Icon: Linkedin,  placeholder: "https://www.linkedin.com/company/yourcompany" },
+                      ].map(({ key, label, Icon, placeholder }) => (
+                        <div key={key}>
+                          <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 flex items-center gap-2 mb-2">
+                            <Icon className="w-3.5 h-3.5 text-forest" strokeWidth={1.8} />
+                            {label}
+                          </label>
+                          <input
+                            type="url"
+                            value={socialInput[key] || ""}
+                            onChange={(e) => setSocialInput({ ...socialInput, [key]: e.target.value })}
+                            placeholder={placeholder}
+                            data-testid={`admin-social-${key.replace("_url", "")}-input`}
+                            className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink text-sm focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={handleSocialSave}
+                      disabled={savingSocial}
+                      data-testid="admin-social-save"
+                      className="mt-6 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {savingSocial ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save social links
+                    </button>
+                    <p className="mt-3 text-xs text-ink/50">
+                      Currently active:&nbsp;
+                      <span className="text-volt font-bold">
+                        {Object.values(social).filter((v) => v).length} of 4 links live
+                      </span>
+                    </p>
                   </div>
                 </div>
               )}

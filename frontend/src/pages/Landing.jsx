@@ -338,11 +338,20 @@ function ScoreBar({ label, value, locked = false, benchmark = 65 }) {
 
 export default function Landing() {
   const [price, setPrice] = useState(1);
+  const [social, setSocial] = useState({
+    twitter_url:   "https://twitter.com/scoutmeplay",
+    facebook_url:  "https://www.facebook.com/scoutmeplay",
+    linkedin_url:  "https://www.linkedin.com/company/scoutmeplay",
+    instagram_url: "https://www.instagram.com/scoutmeplay",
+  });
   const { user } = useAuth();
   const { scrollYProgress } = useScroll();
 
   useEffect(() => {
-    api.get("/settings/price").then(({ data }) => setPrice(data.price)).catch(() => {});
+    api.get("/settings/price").then(({ data }) => {
+      setPrice(data.price);
+      if (data.social) setSocial(data.social);
+    }).catch(() => {});
   }, []);
 
   const startHref = user ? "/upload" : "/signup";
@@ -1454,16 +1463,40 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ FOOTER — Premium dark forest band ============ */}
+      {/* ============ FOOTER — Premium forest band w/ texture + ambient lime glow ============ */}
       <footer
         data-testid="site-footer"
-        className="relative mt-10 bg-ink text-white overflow-hidden"
+        className="relative mt-12 text-white overflow-hidden"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 50% -20%, rgba(45, 107, 61, 0.45) 0%, rgba(31, 79, 47, 0.25) 25%, rgba(8, 22, 15, 1) 70%, rgba(5, 13, 8, 1) 100%)",
+        }}
       >
-        {/* Top hairline + ambient lime glow */}
-        <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-volt/40 to-transparent" />
-        <div aria-hidden className="absolute -top-40 left-1/3 w-[520px] h-[520px] bg-volt/5 rounded-full blur-3xl pointer-events-none" />
+        {/* Top hairline (lime gradient) */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-volt/60 to-transparent" />
+        {/* Pitch lines pattern — extremely subtle horizontal scoreline */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(0deg, rgba(255,255,255,0.4) 0 1px, transparent 1px 56px)",
+          }}
+        />
+        {/* Soft grain noise for premium texture */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.85'/></svg>\")",
+          }}
+        />
+        {/* Ambient halos */}
+        <div aria-hidden className="absolute -top-40 left-1/4 w-[560px] h-[560px] bg-volt/[0.06] rounded-full blur-3xl pointer-events-none" />
+        <div aria-hidden className="absolute -bottom-40 right-1/4 w-[480px] h-[480px] bg-forest-pop/20 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative max-w-7xl mx-auto px-6 md:px-10 pt-14 md:pt-20 pb-10">
+        <div className="relative max-w-7xl mx-auto px-6 md:px-10 pt-16 md:pt-20 pb-10">
           <div className="grid grid-cols-2 md:grid-cols-12 gap-10 md:gap-12">
 
             {/* ── Brand block ── */}
@@ -1490,13 +1523,13 @@ export default function Landing() {
                 </span>
               </Link>
 
-              <p className="mt-6 text-sm text-white/60 leading-relaxed max-w-md">
+              <p className="mt-6 text-sm text-white/65 leading-relaxed max-w-md">
                 A premium football scouting platform that gives ambitious young players honest,
                 professional feedback — built to help every player understand their game and reach the next level.
               </p>
 
-              {/* Social share — outstanding, premium */}
-              <div className="mt-7">
+              {/* Social share — premium pill row */}
+              <div className="mt-8">
                 <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/40 mb-3">
                   Share ScoutMePlay
                 </div>
@@ -1505,27 +1538,22 @@ export default function Landing() {
                     {
                       label: "Share on X",
                       Icon: Twitter,
-                      href: "https://twitter.com/intent/tweet?text=Discover%20ScoutMePlay%20%E2%80%94%20where%20talent%20gets%20noticed.%20A%20premium%20football%20scouting%20platform%20for%20U7%E2%80%93U21%20players.&url=https%3A%2F%2Fscoutmeplay.com",
+                      href: `https://twitter.com/intent/tweet?text=${encodeURIComponent("Discover ScoutMePlay — where talent gets noticed. A premium football scouting platform for U7–U21 players.")}&url=${encodeURIComponent(typeof window !== "undefined" ? window.location.origin : "")}`,
                     },
                     {
                       label: "Share on Facebook",
                       Icon: Facebook,
-                      href: "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fscoutmeplay.com",
+                      href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(typeof window !== "undefined" ? window.location.origin : "")}`,
                     },
                     {
                       label: "Share on LinkedIn",
                       Icon: Linkedin,
-                      href: "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fscoutmeplay.com",
+                      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(typeof window !== "undefined" ? window.location.origin : "")}`,
                     },
                     {
                       label: "Share on WhatsApp",
                       Icon: MessageCircle,
-                      href: "https://wa.me/?text=Check%20out%20ScoutMePlay%20%E2%80%94%20football%20scouting%20reports%20for%20young%20players.%20https%3A%2F%2Fscoutmeplay.com",
-                    },
-                    {
-                      label: "Follow on Instagram",
-                      Icon: Instagram,
-                      href: "https://www.instagram.com/",
+                      href: `https://wa.me/?text=${encodeURIComponent("Check out ScoutMePlay — football scouting reports for young players. " + (typeof window !== "undefined" ? window.location.origin : ""))}`,
                     },
                   ].map(({ label, Icon, href }, i) => (
                     <a
@@ -1535,11 +1563,38 @@ export default function Landing() {
                       rel="noopener noreferrer"
                       data-testid={`footer-share-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}
                       aria-label={label}
-                      className="group w-10 h-10 flex items-center justify-center rounded-full border border-white/15 bg-white/[0.03] text-white/55 hover:text-white hover:border-volt/60 hover:bg-volt/[0.07] transition-all duration-300"
+                      className="group w-10 h-10 flex items-center justify-center rounded-full border border-white/15 bg-white/[0.04] backdrop-blur-sm text-white/60 hover:text-ink hover:border-volt hover:bg-volt transition-all duration-300"
                     >
                       <Icon className="w-4 h-4 transition-transform group-hover:scale-110" strokeWidth={1.8} />
                     </a>
                   ))}
+                </div>
+
+                {/* Follow row — admin-editable handles */}
+                <div className="mt-5 text-[10px] uppercase tracking-[0.25em] font-bold text-white/40 mb-3">
+                  Follow us
+                </div>
+                <div className="flex items-center gap-2.5">
+                  {[
+                    { key: "instagram_url", label: "Follow on Instagram", Icon: Instagram },
+                    { key: "twitter_url",   label: "Follow on X",         Icon: Twitter },
+                    { key: "facebook_url",  label: "Follow on Facebook",  Icon: Facebook },
+                    { key: "linkedin_url",  label: "Follow on LinkedIn",  Icon: Linkedin },
+                  ]
+                    .filter((it) => social && social[it.key])
+                    .map(({ key, label, Icon }, i) => (
+                      <a
+                        key={i}
+                        href={social[key]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`footer-follow-${key.replace("_url", "")}`}
+                        aria-label={label}
+                        className="group w-10 h-10 flex items-center justify-center rounded-full border border-white/15 bg-white/[0.04] backdrop-blur-sm text-white/60 hover:text-ink hover:border-volt hover:bg-volt transition-all duration-300"
+                      >
+                        <Icon className="w-4 h-4 transition-transform group-hover:scale-110" strokeWidth={1.8} />
+                      </a>
+                    ))}
                 </div>
               </div>
             </div>
@@ -1606,7 +1661,7 @@ function FooterLink({ to, children, testid, icon: IconCmp }) {
       <Link
         to={to}
         data-testid={testid}
-        className="group inline-flex items-center gap-1.5 text-white/55 hover:text-white transition-colors duration-300"
+        className="group inline-flex items-center gap-1.5 text-white/60 hover:text-white transition-colors duration-300"
       >
         {IconCmp && <IconCmp className="w-3.5 h-3.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />}
         <span className="relative">

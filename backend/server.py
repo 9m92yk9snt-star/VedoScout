@@ -99,6 +99,12 @@ ADMIN_EMAIL = os.environ["ADMIN_EMAIL"]
 ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
 DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_USD", "159"))
 DEFAULT_PASS_PRICE = float(os.environ.get("DEFAULT_PASS_PRICE_USD", "399"))
+DEFAULT_SOCIAL_LINKS = {
+    "twitter_url":   "https://twitter.com/scoutmeplay",
+    "facebook_url":  "https://www.facebook.com/scoutmeplay",
+    "linkedin_url":  "https://www.linkedin.com/company/scoutmeplay",
+    "instagram_url": "https://www.instagram.com/scoutmeplay",
+}
 PRICE_CURRENCY = os.environ.get("DEFAULT_REPORT_CURRENCY", "usd").lower()
 
 # ---- App ----
@@ -1866,6 +1872,13 @@ class PriceUpdate(BaseModel):
     price_dkk: Optional[float] = None
 
 
+class SocialLinksUpdate(BaseModel):
+    twitter_url:   Optional[str] = None
+    facebook_url:  Optional[str] = None
+    linkedin_url:  Optional[str] = None
+    instagram_url: Optional[str] = None
+
+
 class CheckoutInit(BaseModel):
     report_id: str
     origin_url: str
@@ -2494,7 +2507,16 @@ async def public_price():
         "pass_price": float(pass_value),
         "currency": PRICE_CURRENCY,
         "price_dkk": float(value),
+        "social": await get_social_links(),
     }
+
+
+async def get_social_links() -> dict:
+    """Resolve current social-link configuration: stored overrides merged onto defaults."""
+    doc = await db.settings.find_one({"key": "social_links"})
+    if doc and isinstance(doc.get("value"), dict):
+        return {**DEFAULT_SOCIAL_LINKS, **doc["value"]}
+    return DEFAULT_SOCIAL_LINKS
 
 
 async def get_current_price() -> float:
@@ -6058,6 +6080,27 @@ async def admin_update_pass_price(payload: PriceUpdate, _=Depends(get_current_ad
         upsert=True,
     )
     return {"pass_price": float(new_price), "currency": PRICE_CURRENCY}
+
+
+@api_router.put("/admin/social-links")
+async def admin_update_social_links(payload: SocialLinksUpdate, _=Depends(get_current_admin)):
+    """Update the public social media URLs shown in the footer.
+    Accepts any subset of {twitter_url, facebook_url, linkedin_url, instagram_url};
+    each provided value must be a full http(s) URL or an empty string (empty string keeps it hidden)."""
+    current = await get_social_links()
+    update = {k: (v.strip() if isinstance(v, str) else v) for k, v in payload.dict().items() if v is not None}
+    for k, v in update.items():
+        if v and not (v.startswith("https://") or v.startswith("http://")):
+            raise HTTPException(status_code=400, detail=f"{k} must start with https:// or http://")
+        if v and len(v) > 500:
+            raise HTTPException(status_code=400, detail=f"{k} is too long")
+    merged = {**current, **update}
+    await db.settings.update_one(
+        {"key": "social_links"},
+        {"$set": {"key": "social_links", "value": merged, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"social": merged}
 
 
 @api_router.post("/admin/reports/{report_id}/unlock")

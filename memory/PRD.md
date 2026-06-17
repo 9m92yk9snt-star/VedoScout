@@ -26,6 +26,29 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 19 — Premium footer gradient + admin-editable social handles (Feb 17 2026 late night)**:
+  - **Premium footer redesign** — replaced flat `bg-ink` with a rich radial-gradient backdrop (`#2D6B3D@45%` at top → `rgba(8,22,15)` → `rgba(5,13,8)` at bottom), looks like a stadium night sky. Added two ambient halos (volt top-left + forest-pop bottom-right), a barely-visible repeating horizontal pitch-line pattern, and an SVG fractal-noise grain overlay (`mix-blend-overlay` @ 6%). No longer "too black" — has depth, texture and athletic-brand feel.
+  - **Two-row icon strip in footer**:
+    - **Share ScoutMePlay** (4 icons): X / Facebook / LinkedIn / WhatsApp — share intents built from `window.location.origin` so the share link matches whichever environment is live.
+    - **Follow us** (up to 4 icons): Instagram / X / Facebook / LinkedIn — URLs read live from `GET /api/settings/price.social`. Icons with empty URLs are hidden automatically.
+    - Pill hover state: outline → fully-lit lime fill with dark-ink icon (premium athletic-brand feel).
+  - **Admin-editable social handles**:
+    - **Backend** (`server.py`):
+      - New `DEFAULT_SOCIAL_LINKS` constant.
+      - New `SocialLinksUpdate` Pydantic model + `get_social_links()` helper.
+      - Extended `GET /api/settings/price` to include `social` field (defaults + DB overrides merged).
+      - New `PUT /api/admin/social-links` (admin-only, validates http(s) scheme + 500-char cap, empty string hides the icon, partial updates supported via dict merge).
+    - **Frontend** (`AdminPage.jsx`):
+      - New Settings-tab "Social Links" card with 4 inputs (Instagram / X / Facebook / LinkedIn), each labelled with its brand icon.
+      - "Save social links" button → `PUT /api/admin/social-links` with toast feedback.
+      - Live status line: "Currently active: N of 4 links live".
+      - Data-testids: `admin-social-{instagram|twitter|facebook|linkedin}-input`, `admin-social-save`.
+    - **Frontend** (`Landing.jsx`):
+      - Loads `social` from the same `/settings/price` call (no extra request).
+      - Falls back to sensible defaults on first paint / network failure.
+  - **Live verified end-to-end via curl**: admin login → PUT social-links with custom Instagram URL → public `/settings/price` returns the new URL → footer renders new handle → restored to defaults.
+  - **Surgical scope**: only `server.py`, `Landing.jsx`, `AdminPage.jsx` touched. Zero impact on payments, scout queue, blog, scoring, or any existing functionality.
+
 - ✅ **🆕 Session 18 — Footer redesign + Terms of Service + brand cleanup (Feb 17 2026 late night)**:
   - **New Terms of Service page** at `/terms` (14 sections — acceptance, what we provide, what we don't promise, eligibility, video rights, payments/refunds, acceptable use, IP, liability cap, service availability, termination, governing law (Denmark), changes, contact). Routes added to `App.js`. Links to message-form for contact (no mailto).
   - **Premium new footer** in `Landing.jsx`:
