@@ -26,6 +26,17 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 14 — Pricing UX cleanup + sign-in→checkout auto-resume (Feb 17 2026 evening)**:
+  - **Single purchase point**: removed the duplicate `$159` Premium overlay from the sample-report visualization on Landing. The floating card is now a price-free "SAMPLE · SEE IT IN ACTION / THIS IS YOUR REPORT / SEE PLANS ↓" teaser that smooth-scrolls down to `#pricing`. Also removed the `$159 USD · one-time` pill from the hero trust bar — replaced with "One-time payment · no subscription". The pricing section is now the **only** purchase-decision surface on the front page.
+  - **Pricing section polish (7 upgrades shipped)**: (1) trust strip above cards — "Scout review in 48h · Trusted across 12+ countries · Secure Stripe checkout"; (2) "MOST PARENTS PICK THIS" badge top-LEFT on $399 card; (3) "BEST VALUE · SAVE $78" ribbon top-RIGHT; (4) savings hint band below cards — "$159 × 3 = $477 · You pay only $399 · Save $78"; (5) 3-column guarantee row — 48h delivery / refund · Reviewed by real scouts · Secure Stripe · no subscription; (6) hover-lift on both cards via Framer Motion `whileHover y=-4`; (7) equal-height cards via flex `h-full`; subtle forest-dot background pattern adds depth without distraction.
+  - **Sign-in → checkout auto-resume**:
+    - `Login.jsx` reads `?next=` + `?open_pass=`, redirects to the resolved next URL post-login; preserves `location.search` on the "Create account" cross-link.
+    - `Signup.jsx` same — reads `?next=`, lands user there post-signup; preserves `location.search` on "Log in" cross-link.
+    - `DashboardPage.jsx` listens for `?open_pass=1` → auto-opens the embedded Stripe modal → strips the query so refresh doesn't reopen.
+    - Pricing CTAs route smartly: anon single-CTA → `/signup?next=/upload` (skip login since they need an account); anon pass-CTA → `/login?next=/dashboard&open_pass=1`; logged-in single-CTA → `/upload` direct; logged-in pass-CTA → opens modal in-place.
+  - **Verified end-to-end**: anon clicks pricing-pass-cta → /login → log in → `/dashboard` with Stripe modal auto-opened showing **US$399.00 · ScoutMePlay – 12-month Plan**. Zero re-clicks.
+  - **Testing**: `testing_agent_v3_fork iter15 → 100% pass (19/19 critical frontend assertions + 36/36 backend pytests).` One disposable test signup user created during flow validation and cleaned up automatically.
+
 - ✅ **🆕 Session 13 — 2-Card Pricing UX + Admin-editable prices (Feb 17 2026)**:
   - **Pricing model finalized**: $159 single report + $399 12-month plan (3 reports). Both **include scout/agent text review automatically** (no add-on). Both **admin-editable** from Settings tab.
   - **Backend**:

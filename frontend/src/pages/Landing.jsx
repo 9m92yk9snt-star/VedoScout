@@ -464,7 +464,7 @@ export default function Landing() {
                 <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-volt" /> Real scouts &amp; agents</span>
                 <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
                 <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
-                <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> ${price} USD · one-time</span>
+                <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> One-time payment · no subscription</span>
               </motion.div>
             </div>
 
