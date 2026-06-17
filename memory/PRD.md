@@ -26,7 +26,24 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
-- ✅ **🆕 Session 24 — PRECISION SCOUT upgrade (Feb 18 2026)**:
+- ✅ **🆕 Session 25 — Marker Studio (fullscreen marking + MediaPipe Auto-find, Feb 18 2026)**:
+  - **User pain**: on mobile the inline marker was unworkable — zoom shoved the video off-screen, no way to pan zoomed content, controls overlapped the picture, no way to resize/move the box after drawing it, players too tiny to mark precisely.
+  - **MarkerStudio.jsx** (~1,060 lines, new): premium fullscreen marking sheet rendered via `createPortal` to document.body, locks body scroll.
+    - **Top bar**: ✕ Cancel · "Lock onto your player" · ✓ Lock (disabled until box + video ready).
+    - **Video stage**: fills the screen. Centre-origin transform — no off-screen drift. Independent blob URL created from the File so the studio doesn't fight the inline preview for the same blob.
+    - **Two clear modes (segmented toggle)**: NAVIGATE (single-finger pan + pinch zoom) ↔ MARK BOX (single-finger draw / move / resize). Pinch works in both modes.
+    - **Movable + resizable box**: 4 corner handles, drag-body-to-move, drag-corner-to-resize with min-size + invert protection. Volt-green border, white corner ticks, soft outer dim.
+    - **Bottom toolbar**: ▶ play/pause · scrubber · ±1 frame buttons · [NAVIGATE | MARK BOX] segmented · ✨ Auto-find · mode-aware hint text.
+    - **✨ Auto-find** (MediaPipe ObjectDetector): lazy-loads `@mediapipe/tasks-vision` WASM + EfficientDet-lite0 model on first click (~9 MB from CDN). Detects every "person" in the current frame, renders numbered tappable dots over each. User taps a dot → box snaps with 1.2% padding. Graceful "No players detected" message when frame has no humans.
+    - **Self-rendered marker JPG**: full-resolution canvas paint with dim mask, glow halo, volt rectangle, white L-shaped corner ticks, "LOCKED" tag.
+  - **UploadPage.jsx** refactor: inline overlay-marker UI (~250 lines) replaced with a single "Lock onto your player" button + compact video preview. Old `zoom/pan/gestureRef/overlayRef/onWrapperTouch*/onOverlayPointer*` state and handlers all removed. New `studioOpen` + `handleStudioConfirm` (~30 lines) drive the flow.
+  - **Mobile gesture math fixed**: zoom uses `transform-origin: 50% 50%` (centre-anchored) so the video never drifts off-screen. Pinch zoom anchors to finger midpoint. Pan is now properly available at any zoom level via single finger in NAVIGATE mode.
+  - **Race-safe video loading**: tryReady() called synchronously on effect mount AND on `loadedmetadata` + `loadeddata` so the `videoReady` flag fires whether the metadata arrives before or after React attaches the listener.
+  - **Tested**: 21/21 backend tests pass (precision_engine + iter16 API). 13/13 frontend UI assertions pass (studio mounts, mode toggle, box draw, lock confirm, Auto-find lazy-load in 3.5s, graceful no-detections, cancel, no confidence badges anywhere). Zero JS console errors.
+  - **Dependencies added**: `@mediapipe/tasks-vision@0.10.35` (lazy-loaded only on Auto-find click → no impact on cold page load).
+  - **Files**: NEW `/app/frontend/src/components/MarkerStudio.jsx`. MODIFIED `/app/frontend/src/pages/UploadPage.jsx`, `/app/frontend/package.json`.
+
+- ✅ **Session 24 — PRECISION SCOUT upgrade (Feb 18 2026)**:
   - **User pain**: marking a tiny player on a phone with a single tap was imprecise, AND the AI sometimes described the wrong action (e.g. "set up a teammate" when the player actually scored).
   - **Mobile box-drag marker** replaced single-tap circle. User drags a rectangle around the player (head-to-feet) on `/upload`. A single tap auto-creates a default-sized box around the tap point. Confirm + Redraw controls appear after the drag.
   - **Visual fingerprint extraction** (`/app/backend/precision_engine.py`): jersey colour, shorts colour, body ratio + tight subject crop auto-detected from the marked region using OpenCV k-means. Mapped to plain-language kit colour names (navy blue, white, red, etc.).
