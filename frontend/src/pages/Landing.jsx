@@ -464,14 +464,24 @@ export default function Landing() {
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={5}
                 data-testid="hero-trust-bar"
-                className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 text-[11px] uppercase tracking-[0.18em] font-bold text-ink/65"
+                className="mt-7 max-w-xl grid grid-cols-2 gap-px bg-volt/15 border border-volt/15 text-[10px] sm:text-[11px] uppercase tracking-[0.16em] font-bold text-ink/70"
               >
-                <span className="flex items-center gap-1.5"><Trophy className="w-3.5 h-3.5 text-volt" /> Pro player benchmarks</span>
-                <span className="flex items-center gap-1.5"><Brain className="w-3.5 h-3.5 text-volt" /> Football intelligence</span>
-                <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-volt" /> Real scouts &amp; agents</span>
-                <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-volt" /> Premium PDF report</span>
-                <span className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-volt" /> Secure Stripe payment</span>
-                <span className="flex items-center gap-1.5"><Star className="w-3.5 h-3.5 text-volt" /> One-time payment · no subscription</span>
+                {[
+                  { Icon: Trophy,      label: "Pro player benchmarks" },
+                  { Icon: Brain,       label: "Football intelligence" },
+                  { Icon: Users,       label: "Real scouts & agents" },
+                  { Icon: FileText,    label: "Premium PDF report" },
+                  { Icon: ShieldCheck, label: "Secure Stripe payment" },
+                  { Icon: Star,        label: "One-time · no subscription" },
+                ].map(({ Icon, label }, i) => (
+                  <span
+                    key={i}
+                    className="flex items-center gap-2 bg-deepnavy px-3 py-2.5 min-w-0"
+                  >
+                    <Icon className="w-3.5 h-3.5 text-volt shrink-0" strokeWidth={2} />
+                    <span className="truncate">{label}</span>
+                  </span>
+                ))}
               </motion.div>
             </div>
 
