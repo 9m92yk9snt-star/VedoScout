@@ -1483,9 +1483,46 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ============ FAQ — Most common parent / player questions ============ */}
+      <FAQSection />
+
       {/* ============ TRUST — 2-column with football photo plate ============ */}
       <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-gray-border">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
+          {/* ── Refund Guarantee strip — bold risk-reversal banner ── */}
+          <div
+            data-testid="refund-guarantee-strip"
+            className="mb-14 grid md:grid-cols-12 border-2 border-volt bg-deepnavy overflow-hidden"
+            style={{
+              boxShadow:
+                "0 24px 50px -20px rgba(31, 79, 47, 0.18), 0 8px 18px -6px rgba(31, 79, 47, 0.10)",
+            }}
+          >
+            {/* Left: bold guarantee badge */}
+            <div className="relative md:col-span-4 bg-volt text-ink p-6 md:p-8 flex flex-col items-center justify-center text-center overflow-hidden">
+              <div aria-hidden className="absolute -top-12 -right-12 w-40 h-40 bg-ink/[0.04] rounded-full pointer-events-none" />
+              <ShieldCheck className="relative w-12 h-12 text-ink mb-3" strokeWidth={1.6} />
+              <div className="relative text-[10px] uppercase tracking-[0.28em] font-bold text-ink/70">Our promise</div>
+              <div className="relative font-barlow font-black text-3xl md:text-4xl tracking-tighter leading-[0.95] mt-2">
+                48h or<br />it&apos;s free.
+              </div>
+            </div>
+            {/* Right: explanation */}
+            <div className="md:col-span-8 p-6 md:p-8 flex flex-col justify-center">
+              <h3 className="font-barlow font-black uppercase text-xl md:text-2xl tracking-tighter leading-[1.05]">
+                Your report in <span className="text-volt">48 hours</span>, or your money back. No questions.
+              </h3>
+              <p className="mt-3 text-sm text-ink/70 leading-relaxed max-w-2xl">
+                We promise a complete, scout-reviewed report within 48 hours of your payment. If we miss that window for any reason, we refund your purchase in full — automatically, no support tickets, no arguments. It&apos;s how confident we are in our process.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/60">
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-forest" /> No questions asked</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-forest" /> 100% Stripe refund</span>
+                <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-forest" /> Within 5 business days</span>
+              </div>
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-12 border border-gray-border bg-surface overflow-hidden">
             {/* Left: football photo plate (5/12) */}
             <div className="relative md:col-span-5 min-h-[220px] md:min-h-[280px] bg-deepnavy overflow-hidden">
@@ -1772,5 +1809,132 @@ function FooterLink({ to, children, testid, icon: IconCmp }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ *  FAQ Section — accordion of the most common parent / player questions
+ *  Honest, no promises, no metrics.
+ * ───────────────────────────────────────────────────────────────── */
+const FAQ_ITEMS = [
+  {
+    q: "How long does it take to get my report?",
+    a: "Every report is delivered within 48 hours of payment. If we miss that window for any reason, your purchase is refunded in full — automatically, no support tickets needed.",
+  },
+  {
+    q: "Is my child too young for this?",
+    a: "ScoutMePlay is built for ambitious players aged U7 to U21. The report adjusts to the player's age — a 9-year-old is benchmarked against age-appropriate development standards, not against a senior pro. You get an honest read of where the player is, and where they could realistically go next.",
+  },
+  {
+    q: "What if my video isn't great quality?",
+    a: "A phone camera at training or a game is perfectly fine. We need to see your player on the pitch with the ball. Wider shots (showing more of the pitch) are better than tight close-ups, and a clear view of the player's movement helps the scout review. If our scout can't fairly assess the video, we contact you and either offer a re-upload or a refund.",
+  },
+  {
+    q: "How is this different from my child's coach feedback?",
+    a: "A coach knows your player from the inside — that's irreplaceable. A scout looks from the outside, comparing your player against thousands of others in a structured 4-pillar framework (Technical, Tactical, Physical, Mentality). Coaches build your player day by day. ScoutMePlay tells you where they stand right now and what to focus on next.",
+  },
+  {
+    q: "Does this guarantee a trial or contract?",
+    a: "No, and we'll never claim that. ScoutMePlay is built to help players grow, not to broker contracts. Anyone promising guaranteed trials is selling you something we won't sell. Our job is to give you honest, professional feedback so you can train smarter — the rest is up to the player.",
+  },
+  {
+    q: "Will my video be kept private?",
+    a: "Yes. Your video is used only to produce your report and is never published, sold, or shared outside the scout reviewing it. You retain full ownership of your video and your report. You can request deletion of your account and data at any time from your dashboard.",
+  },
+  {
+    q: "What's the difference between the $159 single report and the $399 plan?",
+    a: "The $159 is one complete report for one player. The $399 plan gives you 3 reports across 365 days for the same player — perfect if you want to track progress every few months and see how training translates into score improvements. The 12-month plan also includes a trajectory dashboard showing changes between reports.",
+  },
+  {
+    q: "Can I get reports for more than one player?",
+    a: "Yes — but each player needs their own report (or plan), so the analysis stays fair and personal. If you have multiple kids in football, each upload is reviewed independently against age-appropriate benchmarks.",
+  },
+];
+
+function FAQSection() {
+  const [openIdx, setOpenIdx] = useState(0);
+  return (
+    <section
+      data-testid="faq-section"
+      className="section-accent-top relative py-16 md:py-20 border-t border-gray-border bg-deepnavy"
+    >
+      {/* Subtle scout-notebook dot pattern */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        style={{
+          backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+          backgroundSize: "32px 32px",
+        }}
+      />
+      <div className="relative max-w-3xl mx-auto px-6 md:px-10">
+        <div className="text-center mb-10">
+          <span className="text-volt text-[10px] uppercase tracking-[0.28em] font-bold">
+            Common questions
+          </span>
+          <h2 className="mt-3 font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95]">
+            Honest answers.<br />
+            <span className="text-forest">No fluff.</span>
+          </h2>
+        </div>
+
+        <div className="space-y-2">
+          {FAQ_ITEMS.map((item, i) => {
+            const isOpen = openIdx === i;
+            return (
+              <div
+                key={i}
+                data-testid={`faq-item-${i}`}
+                className={`border border-gray-border bg-surface transition-all duration-300 ${
+                  isOpen ? "shadow-md" : "hover:border-forest/40"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenIdx(isOpen ? -1 : i)}
+                  data-testid={`faq-toggle-${i}`}
+                  aria-expanded={isOpen}
+                  className="w-full flex items-start justify-between gap-4 text-left px-5 py-4 md:px-6 md:py-5"
+                >
+                  <span className="font-barlow font-black uppercase text-base md:text-lg tracking-tight leading-tight text-ink">
+                    {item.q}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={`shrink-0 mt-1 w-7 h-7 flex items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                      isOpen ? "bg-volt border-volt rotate-45" : "border-forest/40 text-forest"
+                    }`}
+                  >
+                    <span className="text-lg leading-none font-bold">+</span>
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-5 md:px-6 md:pb-6 -mt-1">
+                    <p className="text-sm md:text-[15px] text-ink/70 leading-relaxed border-l-2 border-volt/40 pl-4">
+                      {item.a}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Soft pointer to the contact form for unanswered questions */}
+        <div className="mt-10 text-center">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-ink/50 font-bold">
+            Still have questions?
+          </p>
+          <Link
+            to="/about#contact"
+            data-testid="faq-contact-link"
+            className="inline-flex items-center gap-2 mt-3 text-forest hover:text-forest-pop font-barlow font-black uppercase tracking-widest text-sm transition-colors"
+          >
+            <Send className="w-4 h-4" />
+            Send us a message
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
