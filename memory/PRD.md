@@ -26,6 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 24 — PRECISION SCOUT upgrade (Feb 18 2026)**:
+  - **User pain**: marking a tiny player on a phone with a single tap was imprecise, AND the AI sometimes described the wrong action (e.g. "set up a teammate" when the player actually scored).
+  - **Mobile box-drag marker** replaced single-tap circle. User drags a rectangle around the player (head-to-feet) on `/upload`. A single tap auto-creates a default-sized box around the tap point. Confirm + Redraw controls appear after the drag.
+  - **Visual fingerprint extraction** (`/app/backend/precision_engine.py`): jersey colour, shorts colour, body ratio + tight subject crop auto-detected from the marked region using OpenCV k-means. Mapped to plain-language kit colour names (navy blue, white, red, etc.).
+  - **Audio event timeline**: extracts wav with ffmpeg, scans rolling RMS, returns timestamps of loud peaks (crowd cheers / whistles / goal shouts). Up to 8 per video. Passed to Gemini as independent event evidence.
+  - **CONFIDENT_VOICE_RULES** prompt block injected into every Gemini call: forbids "appears to / seems to / likely / possibly / might have" language, requires OFF-CAMERA for moments where the locked player isn't visible, instructs cross-checking of described goals against audio peaks.
+  - **Hedging scrubber** (`scrub_hedging`) recursively strips residual weasel words from Gemini's JSON response on the way out — a safety net.
+  - **No more confidence badges** in the UI: ConfidenceBadge under each skill removed, the High/Medium/Low pill under the 5-score grid removed, `evidence_quality_note` retained for internal QA only.
+  - **No pre-paywall verification gate**: free preview is a teaser as before, no "is this right?" step. User pays and trusts.
+  - **Premium "Precision Scan" loader** (`PrecisionScanOverlay.jsx`): full-screen multi-step ladder (Locking → Tracking → Listening → Detecting actions → Writing report) with pulsing crosshair animation, shown during upload analysis.
+  - **Locked Player badge** on report: shows the auto-detected jersey + shorts colour chips. Gracefully hides when fingerprint is null (legacy reports).
+  - **12 new precision_engine unit tests + 9 new API integration tests** — all passing. Backward compatibility verified (legacy demo report serializes cleanly with fingerprint=null).
+  - **Dependencies added**: ffmpeg (apt), opencv-python-headless==4.13.0.92, scipy==1.17.1.
+  - **Files**: NEW `/app/backend/precision_engine.py`, NEW `/app/backend/tests/test_precision_engine.py`, NEW `/app/frontend/src/components/PrecisionScanOverlay.jsx`. MODIFIED `/app/backend/server.py` (upload + generate-full now run precision pipeline), `/app/frontend/src/pages/UploadPage.jsx` (box-drag marker), `/app/frontend/src/pages/ReportPage.jsx` (locked-player badge, confidence pills removed).
+
 - ✅ **🆕 Session 23 — Blog admin filter pills + draft-count badge (Feb 17 2026 late night)**:
   - Discovery: full blog admin workflow (Generate Series · New Post · Edit · Save Draft · Publish · View Live · status badges) was already built in `BlogAdmin.jsx`. User was unaware because no posts had been generated yet (empty state shows welcome card).
   - **Added status filter pills** above the posts table: `All (N) · Drafts (N) · Live (N)` with live counts. Only renders when posts exist (empty state preserved).
