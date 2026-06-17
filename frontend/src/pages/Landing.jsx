@@ -1492,82 +1492,157 @@ export default function Landing() {
           {/* ── Refund Guarantee — premium graphic banner ── */}
           <div
             data-testid="refund-guarantee-strip"
-            className="relative mb-14 grid md:grid-cols-12 border-2 border-forest bg-deepnavy overflow-hidden"
+            className="relative mb-14 grid md:grid-cols-12 border border-gray-border bg-deepnavy overflow-hidden"
             style={{
               boxShadow:
-                "0 32px 60px -24px rgba(31, 79, 47, 0.28), 0 12px 24px -8px rgba(31, 79, 47, 0.14)",
+                "0 36px 70px -28px rgba(10, 15, 13, 0.45), 0 12px 28px -10px rgba(10, 15, 13, 0.18)",
             }}
           >
-            {/* ─── LEFT: 48h stopwatch panel ─── */}
-            <div className="relative md:col-span-5 bg-forest text-white p-6 md:p-8 overflow-hidden flex items-center">
-              {/* Diagonal scoreline pattern */}
+            {/* ─── LEFT: Gold Champion Medallion ─── */}
+            <div className="relative md:col-span-5 bg-ink text-white p-8 md:p-10 overflow-hidden flex items-center justify-center">
+              {/* Deep navy → ink radial backdrop with soft warm glow behind badge */}
               <div
                 aria-hidden
-                className="absolute inset-0 pointer-events-none opacity-[0.07]"
+                className="absolute inset-0 pointer-events-none"
                 style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg, #fff 0, #fff 2px, transparent 2px, transparent 18px)",
+                  background:
+                    "radial-gradient(circle at 50% 50%, rgba(212,175,55,0.10) 0%, rgba(212,175,55,0.04) 30%, rgba(10,15,13,1) 70%)",
                 }}
               />
-              {/* Big stopwatch glow */}
-              <div aria-hidden className="absolute -right-16 -bottom-16 w-72 h-72 rounded-full bg-volt/[0.10] blur-3xl pointer-events-none" />
-
-              <div className="relative w-full flex items-center gap-4 md:gap-5">
-                {/* Stopwatch SVG */}
-                <svg
-                  aria-hidden
-                  viewBox="0 0 200 200"
-                  className="shrink-0 w-20 md:w-24 h-20 md:h-24"
-                >
-                  {/* Crown / top button */}
-                  <rect x="92" y="12" width="16" height="14" fill="#ccff00" />
-                  <rect x="88" y="6"  width="24" height="8" fill="#ccff00" />
-                  {/* Outer ring */}
-                  <circle cx="100" cy="110" r="78" fill="none" stroke="#ccff00" strokeWidth="6" />
-                  {/* Inner face */}
-                  <circle cx="100" cy="110" r="66" fill="#0a1f13" stroke="#ccff00" strokeWidth="2" />
-                  {/* Tick marks */}
-                  {Array.from({ length: 12 }).map((_, i) => {
-                    const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
-                    const x1 = 100 + Math.cos(a) * 58;
-                    const y1 = 110 + Math.sin(a) * 58;
-                    const x2 = 100 + Math.cos(a) * 64;
-                    const y2 = 110 + Math.sin(a) * 64;
-                    return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ccff00" strokeWidth={i % 3 === 0 ? "3" : "1.5"} opacity={i % 3 === 0 ? "1" : "0.55"} />;
-                  })}
-                  {/* Arc — "48 of 60" progress */}
-                  <circle cx="100" cy="110" r="52" fill="none" stroke="#ccff00" strokeWidth="6" strokeDasharray={`${(48 / 60) * 2 * Math.PI * 52} ${2 * Math.PI * 52}`} strokeDashoffset={0} transform="rotate(-90 100 110)" strokeLinecap="round" opacity="0.9" />
-                  {/* Hand pointing at "48" position */}
-                  <line x1="100" y1="110" x2={100 + Math.cos((48 / 60) * Math.PI * 2 - Math.PI / 2) * 44} y2={110 + Math.sin((48 / 60) * Math.PI * 2 - Math.PI / 2) * 44} stroke="#fff" strokeWidth="3.5" strokeLinecap="round" />
-                  {/* Center pin */}
-                  <circle cx="100" cy="110" r="5" fill="#ccff00" />
-                </svg>
-
-                {/* Text stack — clean 2-line hierarchy, all white for max readability on forest */}
-                <div className="min-w-0 flex flex-col">
-                  <div className="font-barlow font-black tracking-tighter leading-[0.85] whitespace-nowrap text-white text-5xl md:text-6xl lg:text-7xl">
-                    48h
-                  </div>
-                  <div className="font-barlow font-black uppercase text-base md:text-lg tracking-tight leading-tight mt-2 whitespace-nowrap text-white">
-                    OR <span className="italic">IT&apos;S FREE.</span>
-                  </div>
-                  <div className="inline-flex items-center gap-1.5 mt-3 text-[9px] uppercase tracking-[0.30em] font-bold text-volt">
-                    <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-volt" style={{ boxShadow: "0 0 6px #ccff00" }} />
-                    No questions asked
-                  </div>
-                </div>
-              </div>
-
-              {/* Rotated lime "GUARANTEED" stamp — top-right corner */}
+              {/* Tiny stars pattern */}
               <div
                 aria-hidden
-                className="absolute top-4 right-4 md:top-5 md:right-5 select-none pointer-events-none"
-                style={{ transform: "rotate(-12deg)" }}
+                className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(circle at 25% 25%, #F4D87C 1px, transparent 1.5px), radial-gradient(circle at 75% 65%, #F4D87C 1px, transparent 1.5px), radial-gradient(circle at 40% 80%, #F4D87C 1px, transparent 1.5px)",
+                  backgroundSize: "120px 120px",
+                }}
+              />
+
+              {/* SVG MEDALLION */}
+              <svg
+                viewBox="0 0 300 300"
+                aria-hidden
+                className="relative w-[240px] md:w-[280px] h-auto"
+                style={{
+                  filter:
+                    "drop-shadow(0 24px 36px rgba(0,0,0,0.55)) drop-shadow(0 8px 14px rgba(168,136,41,0.35))",
+                }}
               >
-                <div className="border-[2.5px] border-volt text-volt font-barlow font-black uppercase tracking-[0.22em] text-[10px] px-2.5 py-1.5">
-                  Guaranteed
-                </div>
-              </div>
+                <defs>
+                  {/* Outer ring metallic gold */}
+                  <linearGradient id="gold-rim" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#F4D87C" />
+                    <stop offset="35%" stopColor="#D4AF37" />
+                    <stop offset="70%" stopColor="#A88829" />
+                    <stop offset="100%" stopColor="#7A6018" />
+                  </linearGradient>
+                  {/* Inner medallion face — radial highlight */}
+                  <radialGradient id="gold-face" cx="40%" cy="32%" r="75%">
+                    <stop offset="0%" stopColor="#FBE9A6" />
+                    <stop offset="45%" stopColor="#E6C76A" />
+                    <stop offset="85%" stopColor="#B7902B" />
+                    <stop offset="100%" stopColor="#8B7126" />
+                  </radialGradient>
+                  {/* Inner dark ring */}
+                  <radialGradient id="dark-ring" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#1A1A18" />
+                    <stop offset="100%" stopColor="#0A0807" />
+                  </radialGradient>
+                  {/* Text path — full circle, going CW from top */}
+                  <path
+                    id="badge-ring-text-path"
+                    d="M 150,38 A 112,112 0 1,1 149.99,38"
+                    fill="none"
+                  />
+                </defs>
+
+                {/* Starburst rays behind */}
+                {Array.from({ length: 24 }).map((_, i) => {
+                  const a = (i / 24) * 360;
+                  return (
+                    <line
+                      key={i}
+                      x1="150"
+                      y1="150"
+                      x2={150 + Math.cos((a * Math.PI) / 180) * 145}
+                      y2={150 + Math.sin((a * Math.PI) / 180) * 145}
+                      stroke="#D4AF37"
+                      strokeWidth={i % 2 === 0 ? "1.5" : "0.8"}
+                      opacity={i % 2 === 0 ? "0.22" : "0.10"}
+                    />
+                  );
+                })}
+
+                {/* Outer gold ring */}
+                <circle cx="150" cy="150" r="140" fill="url(#gold-rim)" />
+                {/* Dark inner ring (where the curved text sits) */}
+                <circle cx="150" cy="150" r="125" fill="url(#dark-ring)" />
+                {/* Medallion face */}
+                <circle cx="150" cy="150" r="108" fill="url(#gold-face)" />
+
+                {/* Inner thin gold accent ring */}
+                <circle cx="150" cy="150" r="100" fill="none" stroke="#7A6018" strokeWidth="1.5" opacity="0.5" />
+                <circle cx="150" cy="150" r="96" fill="none" stroke="#FBE9A6" strokeWidth="0.6" opacity="0.85" />
+
+                {/* Outer ring curved text */}
+                <text fontFamily="Barlow Condensed, Barlow, sans-serif" fontWeight="900" fontSize="14" fill="#FBE9A6" letterSpacing="3.6">
+                  <textPath href="#badge-ring-text-path" startOffset="0">
+                    ★ GUARANTEED · 48 HOURS · GUARANTEED · 48 HOURS ★
+                  </textPath>
+                </text>
+
+                {/* Center: "48" big */}
+                <text
+                  x="150"
+                  y="158"
+                  fontFamily="Barlow Condensed, Barlow, sans-serif"
+                  fontWeight="900"
+                  fontSize="92"
+                  fill="#0A0807"
+                  textAnchor="middle"
+                  letterSpacing="-3"
+                >
+                  48h
+                </text>
+                {/* Subtle text shine highlight */}
+                <text
+                  x="150"
+                  y="158"
+                  fontFamily="Barlow Condensed, Barlow, sans-serif"
+                  fontWeight="900"
+                  fontSize="92"
+                  fill="#FBE9A6"
+                  textAnchor="middle"
+                  letterSpacing="-3"
+                  opacity="0.18"
+                  transform="translate(0,-2)"
+                >
+                  48h
+                </text>
+
+                {/* Below "OR IT'S FREE" */}
+                <text
+                  x="150"
+                  y="198"
+                  fontFamily="Barlow Condensed, Barlow, sans-serif"
+                  fontWeight="900"
+                  fontSize="13"
+                  fill="#0A0807"
+                  textAnchor="middle"
+                  letterSpacing="3.5"
+                >
+                  OR IT&apos;S FREE
+                </text>
+
+                {/* Decorative side stars inside the face */}
+                <text x="78" y="160" fontSize="14" fill="#7A6018" textAnchor="middle" opacity="0.6">★</text>
+                <text x="222" y="160" fontSize="14" fill="#7A6018" textAnchor="middle" opacity="0.6">★</text>
+
+                {/* Bottom laurel-style chevron */}
+                <text x="150" y="222" fontSize="10" fill="#7A6018" textAnchor="middle" letterSpacing="2" opacity="0.7">— SCOUTMEPLAY —</text>
+              </svg>
             </div>
 
             {/* ─── RIGHT: 3-step journey + body ─── */}
