@@ -19,6 +19,7 @@ import TermsPage from "@/pages/TermsPage";
 import BlogIndexPage from "@/pages/BlogIndexPage";
 import BlogArticlePage from "@/pages/BlogArticlePage";
 import TrajectoryPage from "@/pages/TrajectoryPage";
+import CookieBanner from "@/components/CookieBanner";
 
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -62,6 +63,7 @@ function App() {
               <Route path="/blog/:slug" element={<BlogArticlePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <CookieBanner />
           </BrowserRouter>
         </AuthProvider>
       </HelmetProvider>
