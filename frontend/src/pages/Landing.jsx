@@ -423,10 +423,7 @@ export default function Landing() {
                 data-testid="hero-description"
                 className="mt-7 max-w-xl text-base md:text-lg text-ink/80 leading-relaxed"
               >
-                You train every day. You give everything on the pitch. But does anyone actually{" "}
-                <span className="text-ink font-semibold italic">see you</span>?{" "}
-                Upload your video. Get the{" "}
-                <span className="text-ink font-semibold">scout view</span>. See where you stand and what it&apos;ll take to reach the next level.
+                You train every day. You give everything on the pitch. But does anyone actually <span className="text-ink font-semibold italic">see you</span>? Upload your video. Get the <span className="text-ink font-semibold">scout view</span>. See where you stand and what it&apos;ll take to reach the next level.
                 <br />
                 <span className="block mt-3 text-sm md:text-base text-ink/65">
                   For ambitious players, <span className="text-volt font-bold">U7 to U21</span>.
