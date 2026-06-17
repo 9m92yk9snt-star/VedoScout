@@ -66,6 +66,9 @@ export default function AdminPage() {
   const [socialInput, setSocialInput] = useState(DEFAULT_SOCIAL);
   const [savingSocial, setSavingSocial] = useState(false);
 
+  // Blog draft count — surfaced as a badge on the Blog tab
+  const [blogDraftCount, setBlogDraftCount] = useState(0);
+
   // Users tab — segment filter + scout creation modal
   const [userSegment, setUserSegment] = useState("all");   // all | free | premium | scout | admin
   const [showCreateScout, setShowCreateScout] = useState(false);
@@ -82,13 +85,14 @@ export default function AdminPage() {
         setPassPrice(pr.data.pass_price ?? 399);
         setPassPriceInput(String(pr.data.pass_price ?? 399));
       } else {
-        const [s, r, u, p, pr, m] = await Promise.all([
+        const [s, r, u, p, pr, m, bd] = await Promise.all([
           api.get("/admin/stats"),
           api.get("/admin/reports"),
           api.get("/admin/users"),
           api.get("/admin/payments"),
           api.get("/settings/price"),
           api.get("/admin/contact-messages"),
+          api.get("/blog/admin/posts", { params: { status: "draft" } }).catch(() => ({ data: { items: [] } })),
         ]);
         setStats(s.data);
         setReports(r.data);
@@ -99,6 +103,7 @@ export default function AdminPage() {
         setPassPrice(pr.data.pass_price ?? 399);
         setPassPriceInput(String(pr.data.pass_price ?? 399));
         setMessages(m.data);
+        setBlogDraftCount((bd.data?.items || []).length);
         if (pr.data.social) {
           setSocial(pr.data.social);
           setSocialInput(pr.data.social);
@@ -258,7 +263,9 @@ export default function AdminPage() {
           {/* Tabs */}
           <div className="mt-8 border-b border-gray-border flex gap-1 overflow-x-auto">
             {tabs.map((t) => {
-              const newCount = t.id === "messages" ? messages.filter((m) => m.status === "new").length : 0;
+              let badgeCount = 0;
+              if (t.id === "messages") badgeCount = messages.filter((m) => m.status === "new").length;
+              else if (t.id === "blog")  badgeCount = blogDraftCount;
               return (
                 <button
                   key={t.id}
@@ -269,12 +276,16 @@ export default function AdminPage() {
                   }`}
                 >
                   {t.label}
-                  {newCount > 0 && (
+                  {badgeCount > 0 && (
                     <span
-                      data-testid="admin-tab-messages-badge"
-                      className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 bg-volt text-white text-[10px] font-black"
+                      data-testid={`admin-tab-${t.id}-badge`}
+                      className={`ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-black ${
+                        t.id === "blog"
+                          ? "bg-ink/12 text-ink"   /* drafts pending — subtle */
+                          : "bg-volt text-white"   /* new messages — vivid */
+                      }`}
                     >
-                      {newCount}
+                      {badgeCount}
                     </span>
                   )}
                 </button>

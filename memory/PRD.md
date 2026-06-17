@@ -26,6 +26,14 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 23 — Blog admin filter pills + draft-count badge (Feb 17 2026 late night)**:
+  - Discovery: full blog admin workflow (Generate Series · New Post · Edit · Save Draft · Publish · View Live · status badges) was already built in `BlogAdmin.jsx`. User was unaware because no posts had been generated yet (empty state shows welcome card).
+  - **Added status filter pills** above the posts table: `All (N) · Drafts (N) · Live (N)` with live counts. Only renders when posts exist (empty state preserved).
+  - **Added draft-count badge** to the "Blog" admin tab in `AdminPage.jsx` — uses subtle `bg-ink/12` (not vivid volt) so pending drafts surface as an at-a-glance reminder without competing with the more vivid Messages badge.
+  - Tab badge logic refactored to support multiple tabs cleanly; existing Messages badge unchanged.
+  - Backend load extended to fetch `/blog/admin/posts?status=draft` in parallel with other admin data (with safe fallback). Zero new endpoints.
+  - **Surgical scope**: only `BlogAdmin.jsx` + `AdminPage.jsx` touched. Zero changes to existing flows, data-testids, copy, or any other tab.
+
 - ✅ **🆕 Session 22 — Hero copy rewrite to athlete voice (Feb 17 2026 late night)**:
   - **Old sub-copy** (feature-y): "Upload your football video and receive a detailed scouting report powered by advanced football intelligence, professional player benchmarks, and real scouts and agents connected to clubs around the world. Built for ambitious players from U7 to U21 chasing their football dreams."
   - **New sub-copy** (Option 2 — athlete-to-athlete confident voice): "You train every day. You give everything on the pitch. But does anyone actually *see you*? Upload your video. Get the **scout view**. See where you stand and what it'll take to reach the next level. For ambitious players, U7 to U21."

@@ -35,6 +35,7 @@ function BlogList({ onNew, onEdit }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [seriesOpen, setSeriesOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all"); // all | draft | published
 
   const load = async () => {
     setLoading(true);
@@ -60,6 +61,16 @@ function BlogList({ onNew, onEdit }) {
       toast.error("Delete failed: " + (e?.response?.data?.detail || e.message));
     }
   };
+
+  // Counts per status
+  const draftCount     = posts.filter((p) => p.status === "draft").length;
+  const publishedCount = posts.filter((p) => p.status === "published").length;
+  const allCount       = posts.length;
+
+  // Filtered posts based on selected status
+  const visiblePosts = statusFilter === "all"
+    ? posts
+    : posts.filter((p) => p.status === statusFilter);
 
   return (
     <div data-testid="admin-blog-list">
@@ -117,7 +128,40 @@ function BlogList({ onNew, onEdit }) {
           </div>
         </div>
       ) : (
-        <div className="border border-gray-border bg-surface overflow-x-auto">
+        <>
+          {/* ── Status filter pills + counts ── */}
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            {[
+              { id: "all",       label: "All",       count: allCount },
+              { id: "draft",     label: "Drafts",    count: draftCount },
+              { id: "published", label: "Live",      count: publishedCount },
+            ].map((opt) => {
+              const active = statusFilter === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setStatusFilter(opt.id)}
+                  data-testid={`admin-blog-filter-${opt.id}`}
+                  className={`px-3.5 py-2 text-[11px] uppercase tracking-[0.18em] font-bold border transition-all ${
+                    active
+                      ? "bg-volt text-white border-volt"
+                      : "bg-transparent text-ink/65 border-gray-border hover:text-ink hover:border-volt/60"
+                  }`}
+                >
+                  {opt.label}
+                  <span className={`ml-2 ${active ? "text-white/85" : "text-ink/45"}`}>
+                    {opt.count}
+                  </span>
+                </button>
+              );
+            })}
+            {statusFilter !== "all" && visiblePosts.length === 0 && (
+              <span className="text-xs text-ink/50 ml-2">No posts in this view.</span>
+            )}
+          </div>
+
+          <div className="border border-gray-border bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-cream-soft border-b border-gray-border">
               <tr className="text-left">
@@ -130,7 +174,7 @@ function BlogList({ onNew, onEdit }) {
               </tr>
             </thead>
             <tbody>
-              {posts.map((p) => (
+              {visiblePosts.map((p) => (
                 <tr key={p.id} className="border-b border-gray-border last:border-0 hover:bg-cream-soft/40">
                   <td className="p-3">
                     <div className="font-bold text-ink">{p.title}</div>
@@ -183,6 +227,7 @@ function BlogList({ onNew, onEdit }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
