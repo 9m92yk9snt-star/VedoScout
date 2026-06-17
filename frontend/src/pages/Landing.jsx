@@ -8,7 +8,7 @@ import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
-  ArrowRight, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
+  ArrowRight, ArrowDown, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
   Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
   Lightbulb, Crown, Calendar, Dumbbell, Mail, Send,
@@ -1312,42 +1312,40 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* The premium CTA overlay */}
+            {/* The sample-report SHOWCASE overlay (price-free — directs to /pricing) */}
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true, margin: "-100px" }}
                 transition={{ duration: 0.5 }}
-                className="pointer-events-auto border border-volt/30 bg-cream-card backdrop-blur-2xl p-8 md:p-10 max-w-md mx-6 text-center shadow-2xl"
-                style={{ boxShadow: "0 20px 80px rgba(204,255,0,0.15)" }}
+                className="pointer-events-auto border border-forest/20 bg-cream-card backdrop-blur-2xl p-8 md:p-10 max-w-md mx-6 text-center shadow-2xl"
+                style={{ boxShadow: "0 20px 80px rgba(31, 79, 47, 0.15)" }}
               >
-                <div className="inline-flex items-center justify-center w-14 h-14 bg-volt/10 border border-volt/30 mb-5">
-                  <Lock className="w-6 h-6 text-volt" strokeWidth={1.5} />
+                <div className="inline-flex items-center justify-center w-14 h-14 bg-forest/10 border border-forest/25 mb-5">
+                  <Eye className="w-6 h-6 text-forest" strokeWidth={1.5} />
                 </div>
-                <span className="text-volt text-[11px] uppercase tracking-[0.3em] font-bold">Premium</span>
+                <span className="text-forest text-[11px] uppercase tracking-[0.3em] font-bold">Sample · See it in action</span>
                 <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
-                  Unlock the<br />full report
+                  This is your<br />report
                 </h3>
                 <p className="mt-4 text-sm text-ink/70 leading-relaxed">
-                  Full performance map · all 4 score categories · scout view · 5 personal drills · 30 & 90-day plan · timestamped video comments · premium PDF.
+                  Full performance map · all 4 score categories · scout view · 5 personal drills · 30 &amp; 90-day plan · timestamped video comments · personal scout review · premium PDF.
                 </p>
 
-                <div className="mt-6 flex items-baseline justify-center gap-2">
-                  <span className="font-barlow font-black text-5xl md:text-6xl text-volt leading-none">${price}</span>
-                  <span className="text-ink/65 uppercase tracking-widest font-bold text-sm">USD</span>
-                </div>
-                <p className="text-[10px] text-ink/50 uppercase tracking-widest font-bold mt-1">one-time · no subscription</p>
-
-                <Link
-                  to={startHref}
-                  data-testid="sample-unlock-cta"
-                  className="mt-6 w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+                <button
+                  type="button"
+                  data-testid="sample-see-plans-cta"
+                  onClick={() => {
+                    const el = document.getElementById("pricing");
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="mt-7 w-full bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
                 >
-                  {startLabel}
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-                <p className="mt-3 text-[10px] text-ink/50 flex items-center justify-center gap-1.5">
+                  See plans
+                  <ArrowDown className="w-4 h-4" />
+                </button>
+                <p className="mt-3 text-[10px] text-ink/55 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
                 </p>
                 <div className="mt-4 pt-4 border-t border-gray-border flex justify-center">
@@ -1360,8 +1358,18 @@ export default function Landing() {
       </section>
 
       {/* ============ PRICING ============ */}
-      <section id="pricing" data-testid="pricing-section" className="section-accent-top relative py-20 md:py-28 border-t border-gray-border">
-        <div className="max-w-7xl mx-auto px-6 md:px-10">
+      <section id="pricing" data-testid="pricing-section" className="section-accent-top relative py-20 md:py-28 border-t border-gray-border overflow-hidden">
+        {/* Subtle background pattern */}
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+        <div className="relative max-w-7xl mx-auto px-6 md:px-10">
           <div className="text-center max-w-3xl mx-auto">
             <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Pricing</span>
             <h2 className="mt-3 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
@@ -1371,6 +1379,21 @@ export default function Landing() {
             <p className="mt-5 text-ink/70 text-base md:text-lg leading-relaxed">
               Both plans include a personal review from a real scout / agent on top of the advanced benchmarked intelligence analysis.
             </p>
+
+            {/* Trust strip — sits above the cards to reduce price anxiety */}
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] uppercase tracking-[0.18em] font-bold text-ink/55">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-forest" /> Scout review in 48h
+              </span>
+              <span className="text-ink/25">·</span>
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-forest" /> Trusted across 12+ countries
+              </span>
+              <span className="text-ink/25">·</span>
+              <span className="flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-forest" /> Secure Stripe checkout
+              </span>
+            </div>
           </div>
 
           <div className="mt-12">

@@ -11,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
-  ShieldCheck, Star, ArrowRight, Crown, Check, BarChart3, Sparkles, Award, FileCheck2,
+  ShieldCheck, Star, ArrowRight, Crown, Check, BarChart3, Sparkles, Award, FileCheck2, Users, Lock,
 } from "lucide-react";
 import api from "@/lib/api";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
@@ -55,6 +55,16 @@ export default function PricingCards({
     }
   };
 
+  const handleSingleClick = () => {
+    if (!isLoggedIn) {
+      // Anon users need an account first — send them straight to signup,
+      // then bounce to /upload after sign-up so the buy chain is seamless.
+      navigate(`/signup?next=${encodeURIComponent("/upload")}`);
+      return;
+    }
+    navigate(singleHref);
+  };
+
   const handlePassClick = () => {
     if (!isLoggedIn) {
       navigate("/login?next=/dashboard&open_pass=1");
@@ -71,18 +81,19 @@ export default function PricingCards({
       data-testid="pricing-cards"
       className={`relative ${isDark ? "" : ""}`}
     >
-      <div className="grid md:grid-cols-5 gap-5 md:gap-6">
+      <div className="grid md:grid-cols-5 gap-5 md:gap-6 items-stretch">
         {/* ─────────────── Card 1: Single Report ─────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -4 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.4 }}
           data-testid="pricing-card-single"
-          className={`md:col-span-2 relative p-6 md:p-8 flex flex-col border ${
+          className={`md:col-span-2 relative p-6 md:p-8 flex flex-col h-full border transition-shadow ${
             isDark
-              ? "bg-surface border-gray-border"
-              : "bg-cream-card border-gray-border"
+              ? "bg-surface border-gray-border hover:border-forest"
+              : "bg-cream-card border-gray-border hover:border-forest hover:shadow-xl"
           }`}
         >
           <div className="flex items-center gap-2 mb-2">
@@ -94,7 +105,7 @@ export default function PricingCards({
           <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95] text-ink">
             One Full Report
           </h3>
-          <p className="mt-2 text-sm text-ink/70">
+          <p className="mt-2 text-sm text-ink/70 min-h-[40px]">
             A complete picture of where your player stands today.
           </p>
 
@@ -106,7 +117,7 @@ export default function PricingCards({
           </div>
           <p className="text-[10px] text-ink/50 uppercase tracking-widest font-bold mt-1">One-time · No subscription</p>
 
-          <ul className="mt-6 space-y-2.5 text-sm">
+          <ul className="mt-6 space-y-2.5 text-sm flex-1">
             <Feature>Upload 1 football video</Feature>
             <Feature>Advanced benchmarked intelligence analysis</Feature>
             <Feature>Pro-player archetype match</Feature>
@@ -117,16 +128,16 @@ export default function PricingCards({
 
           <button
             type="button"
-            onClick={() => navigate(singleHref)}
+            onClick={handleSingleClick}
             data-testid="pricing-single-cta"
-            className={`mt-6 w-full font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors ${
+            className={`mt-6 w-full font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-all group/btn ${
               isDark
                 ? "bg-volt hover:bg-forest-pop text-white"
                 : "bg-forest hover:bg-forest-pop text-white"
             }`}
           >
             {ctaSingle}
-            <ArrowRight className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
           </button>
           <p className="mt-3 text-[10px] text-ink/50 flex items-center justify-center gap-1.5">
             <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
@@ -137,13 +148,14 @@ export default function PricingCards({
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
+          whileHover={{ y: -4 }}
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.4, delay: 0.1 }}
           data-testid="pricing-card-pass"
-          className={`md:col-span-3 relative p-6 md:p-8 flex flex-col border-2 ${
+          className={`md:col-span-3 relative p-6 md:p-8 flex flex-col h-full border-2 transition-shadow ${
             isDark
-              ? "bg-forest text-white border-volt"
-              : "bg-forest text-white border-forest"
+              ? "bg-forest text-white border-volt hover:shadow-2xl"
+              : "bg-forest text-white border-forest hover:shadow-2xl"
           }`}
           style={{ boxShadow: "0 20px 80px rgba(31, 79, 47, 0.18)" }}
         >
@@ -154,15 +166,20 @@ export default function PricingCards({
               Best value · Save ${savings}
             </div>
           )}
+          {/* Social proof tag (top-left of pass card) */}
+          <div className="absolute -top-3 left-6 bg-forest-pop text-white text-[10px] uppercase tracking-[0.22em] font-black px-3 py-1.5 flex items-center gap-1.5 shadow-md">
+            <Users className="w-3 h-3" />
+            Most parents pick this
+          </div>
 
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 mt-3">
             <BarChart3 className="w-4 h-4 text-volt" />
             <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">12 months · 3 reports</span>
           </div>
           <h3 className="font-barlow font-black uppercase text-3xl md:text-5xl tracking-tighter leading-[0.95]">
             Track The Full Year
           </h3>
-          <p className="mt-2 text-sm text-white/70 max-w-md">
+          <p className="mt-2 text-sm text-white/70 max-w-md min-h-[40px]">
             Watch your player grow across a full season — three full reports, real progress tracking, real scout reviews.
           </p>
 
@@ -181,7 +198,7 @@ export default function PricingCards({
             One-time · No subscription · 3 reports / 12 months
           </p>
 
-          <div className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+          <div className="mt-6 grid sm:grid-cols-2 gap-x-6 gap-y-2.5 text-sm flex-1">
             <Feature dark>3 full reports across 12 months</Feature>
             <Feature dark>Advanced benchmarked intelligence × 3</Feature>
             <Feature dark highlight>Scout / agent review on every report</Feature>
@@ -197,10 +214,10 @@ export default function PricingCards({
               type="button"
               onClick={handlePassClick}
               data-testid="pricing-pass-cta"
-              className="flex-1 bg-cream-card hover:bg-white text-forest font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 bg-cream-card hover:bg-white text-forest font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-all group/btn"
             >
               {ctaPass}
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" />
             </button>
           </div>
           <p className="mt-3 text-[10px] text-white/55 flex items-center justify-center gap-1.5">
@@ -209,13 +226,37 @@ export default function PricingCards({
         </motion.div>
       </div>
 
-      {/* Footer trust line */}
-      <p className={`mt-6 text-center text-xs ${isDark ? "text-ink/55" : "text-ink/60"} flex items-center justify-center gap-2 flex-wrap`}>
-        <ShieldCheck className="w-3.5 h-3.5 text-forest" />
-        Both plans include a personal review from a real scout / agent.
-        Both include a free preview before you pay.
-        Secure Stripe checkout.
-      </p>
+      {/* Savings hint band — sits BETWEEN cards conceptually */}
+      {price && passPrice && savings > 0 && (
+        <div className="mt-5 flex justify-center">
+          <div className="inline-flex items-center gap-2 bg-cream-card border border-forest/25 px-4 py-2 text-xs text-ink/75">
+            <Crown className="w-3.5 h-3.5 text-forest" />
+            <span>
+              <span className="font-bold text-ink">${price} × 3 = ${Math.round(price * 3)}</span>
+              <span className="text-ink/55 mx-2">·</span>
+              <span>You pay only <span className="font-bold text-forest">${passPrice}</span></span>
+              <span className="text-ink/55 mx-2">·</span>
+              <span className="font-bold text-forest">Save ${savings}</span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Guarantee + trust line */}
+      <div className={`mt-6 grid sm:grid-cols-3 gap-3 text-xs ${isDark ? "text-ink/65" : "text-ink/65"}`}>
+        <div className="flex items-center justify-center sm:justify-start gap-2 border border-gray-border bg-cream-card/60 px-4 py-3">
+          <ShieldCheck className="w-4 h-4 text-forest flex-shrink-0" />
+          <span><span className="font-bold text-ink">48h delivery</span> or full refund</span>
+        </div>
+        <div className="flex items-center justify-center gap-2 border border-gray-border bg-cream-card/60 px-4 py-3">
+          <Award className="w-4 h-4 text-forest flex-shrink-0" />
+          <span>Reviewed by <span className="font-bold text-ink">real scouts</span></span>
+        </div>
+        <div className="flex items-center justify-center sm:justify-end gap-2 border border-gray-border bg-cream-card/60 px-4 py-3">
+          <Lock className="w-4 h-4 text-forest flex-shrink-0" />
+          <span>Secure Stripe · <span className="font-bold text-ink">no subscription</span></span>
+        </div>
+      </div>
 
       <EmbeddedCheckoutModal
         open={passModalOpen}

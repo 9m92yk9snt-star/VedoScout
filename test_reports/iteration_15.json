@@ -1,0 +1,55 @@
+{
+  "summary": "Iteration 15 — verified ELIMINATION of dual-purchase confusion (no $159 in floating sample overlay), pricing section polish (trust strip, social-proof badge, ribbon, savings band, guarantee row), and the end-to-end sign-in → checkout auto-resume flow. All 36 backend pytest assertions pass; all critical frontend flows verified live in browser against the public preview URL.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Landing hero trust bar", "issues": ["Hero trust bar (line ~467 Landing.jsx) still renders the literal pill '$159 USD · one-time'. Request scope only required removing price from the floating SAMPLE overlay (which is correctly done). Flagging as informational only — main agent can confirm whether to remove this hero pill for full consistency with the 'single purchase point' principle."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_progress_tracking.py",
+    "/app/backend/tests/test_pricing_2cards.py",
+    "/app/test_reports/pytest/iter15_backend.xml"
+  ],
+  "action_items": [
+    "(Optional / informational) Decide whether to also remove the '$159 USD · one-time' pill from the hero trust bar in Landing.jsx (~line 467) for full alignment with the 'pricing-section is the only purchase point' direction."
+  ],
+  "critical_code_review_comments": [
+    "Landing.jsx is 1566 lines — exceeds the 700-line guideline. Should be split into smaller components (HeroSection, HowItWorks, WhatYouGet, SampleReport, PricingSectionWrapper, TrustSection, Footer) for maintainability.",
+    "PricingCards.handleSingleClick correctly bypasses the passed singleHref prop for anonymous users by hard-coding /signup?next=/upload. This is the intended behavior but the singleHref prop becomes effectively unused for anon paths — consider documenting or removing the prop.",
+    "DashboardPage useEffect for ?open_pass=1 strips the param via navigate(replace) — verified working (URL is /dashboard with no query after modal opens)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "100% (all 17 critical assertions passed)"},
+  "test_credentials": "Admin admin@elitescout.com / Admin@2026!Elite; Premium premium@elitescout.com / Premium@2026 — both verified working.",
+  "seed_data_creation": "Created one disposable signup user flowtest_1781657920@example.com during ?next=/upload signup flow test. CLEANED UP via db.users.delete_one — confirmed deleted_count=1.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All sign-in → checkout auto-resume mechanics work: Login/Signup pages read ?next= and ?open_pass=, Dashboard auto-opens EmbeddedCheckoutModal (US$399.00 confirmed via screenshot of Stripe iframe) and strips query. Anon → pricing-single-cta → /signup?next=%2Fupload. Anon → pricing-pass-cta → /login?next=/dashboard&open_pass=1. Cross-links symmetric on both Login (Create account preserves search) and Signup (Log in preserves search). Premium logged-in user: pass-cta opens modal in-place, single-cta navigates to /upload directly (no signup detour). Admin /admin Settings still has both admin-price-input and admin-pass-price-input. Sample player 'Lukas A.' still rendered on landing. Backend pytest test_progress_tracking.py + test_pricing_2cards.py = 36/36 passing.",
+  "verified_assertions": {
+    "sample_cta_visible_says_SEE_PLANS": true,
+    "no_dollar_159_in_floating_overlay": true,
+    "click_smooth_scrolls_to_pricing_section_in_viewport": true,
+    "trust_strip_3_items_present": true,
+    "most_parents_pick_this_badge": true,
+    "best_value_save_ribbon": true,
+    "savings_band_159_x_3_eq_477_pay_399_save_78": true,
+    "guarantee_row_48h_real_scouts_no_subscription": true,
+    "anon_single_cta_to_signup_next_upload": true,
+    "anon_pass_cta_to_login_next_dashboard_open_pass": true,
+    "login_next_open_pass_premium_lands_dashboard_modal_399_query_stripped": true,
+    "signup_next_upload_new_account_lands_on_upload": true,
+    "login_create_account_preserves_query": true,
+    "signup_log_in_preserves_query": true,
+    "premium_logged_pass_cta_opens_modal_no_redirect": true,
+    "premium_logged_single_cta_navigates_to_upload": true,
+    "admin_settings_has_both_price_inputs": true,
+    "sample_player_lukas_still_renders": true,
+    "backend_pytest_36_of_36_pass": true
+  }
+}

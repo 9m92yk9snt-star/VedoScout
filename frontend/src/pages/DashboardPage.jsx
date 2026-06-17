@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
@@ -19,6 +19,8 @@ const VERDICT_META = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [players, setPlayers] = useState([]);
   const [passState, setPassState] = useState(null);
@@ -37,6 +39,20 @@ export default function DashboardPage() {
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-open the Progress Pass modal when user lands here with ?open_pass=1
+  // (e.g. after logging-in from the pricing page's "Start the 12-Month Plan" CTA).
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("open_pass") === "1") {
+      setPassModalOpen(true);
+      // strip the query so a refresh doesn't keep reopening
+      params.delete("open_pass");
+      const newSearch = params.toString();
+      navigate({ pathname: location.pathname, search: newSearch ? `?${newSearch}` : "" }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   const startPassCheckout = async () => ({
     ...(await api.post("/progress/pass/checkout", {

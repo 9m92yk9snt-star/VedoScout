@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import Navigation from "@/components/Navigation";
@@ -12,6 +12,14 @@ export default function Signup() {
   const [submitting, setSubmitting] = useState(false);
   const { signup } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const params = new URLSearchParams(location.search);
+  const nextParam = params.get("next");
+  const openPass = params.get("open_pass");
+  const resolvedNext = nextParam
+    ? (openPass ? `${nextParam}${nextParam.includes("?") ? "&" : "?"}open_pass=${openPass}` : nextParam)
+    : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,7 +31,7 @@ export default function Signup() {
     try {
       await signup(email, password, fullName);
       toast.success("Account created. Let's upload your video.");
-      navigate("/upload");
+      navigate(resolvedNext || "/upload");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Sign up failed");
     } finally {
@@ -90,7 +98,7 @@ export default function Signup() {
 
           <p className="mt-8 text-sm text-ink/55 text-center">
             Have an account?{" "}
-            <Link to="/login" data-testid="signup-to-login" className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold">
+            <Link to={`/login${location.search || ""}`} data-testid="signup-to-login" className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold">
               Log in
             </Link>
           </p>

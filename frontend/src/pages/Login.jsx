@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import Navigation from "@/components/Navigation";
@@ -11,6 +11,15 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const params = new URLSearchParams(location.search);
+  const nextParam = params.get("next");
+  const openPass = params.get("open_pass");
+  // Build the destination after login
+  const resolvedNext = nextParam
+    ? (openPass ? `${nextParam}${nextParam.includes("?") ? "&" : "?"}open_pass=${openPass}` : nextParam)
+    : null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,7 +27,11 @@ export default function Login() {
     try {
       const u = await login(email, password);
       toast.success("Welcome back");
-      navigate(u.role === "admin" || u.role === "scout" ? "/admin" : "/dashboard");
+      if (resolvedNext) {
+        navigate(resolvedNext);
+      } else {
+        navigate(u.role === "admin" || u.role === "scout" ? "/admin" : "/dashboard");
+      }
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Login failed");
     } finally {
@@ -73,7 +86,11 @@ export default function Login() {
 
           <p className="mt-8 text-sm text-ink/55 text-center">
             New here?{" "}
-            <Link to="/signup" data-testid="login-to-signup" className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold">
+            <Link
+              to={`/signup${location.search || ""}`}
+              data-testid="login-to-signup"
+              className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold"
+            >
               Create account
             </Link>
           </p>
