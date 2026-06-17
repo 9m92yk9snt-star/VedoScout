@@ -152,12 +152,15 @@ export default function PricingCards({
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.4, delay: 0.1 }}
           data-testid="pricing-card-pass"
-          className={`md:col-span-3 relative p-6 md:p-8 flex flex-col h-full border-2 transition-shadow ${
+          className={`md:col-span-3 relative p-6 md:p-8 flex flex-col h-full border-2 transition-all duration-300 hover:scale-[1.012] ${
             isDark
-              ? "bg-forest text-white border-volt hover:shadow-2xl"
-              : "bg-forest text-white border-forest hover:shadow-2xl"
+              ? "bg-forest text-white border-volt"
+              : "bg-forest text-white border-forest"
           }`}
-          style={{ boxShadow: "0 20px 80px rgba(31, 79, 47, 0.18)" }}
+          style={{
+            boxShadow:
+              "0 36px 80px -28px rgba(10, 15, 13, 0.55), 0 24px 48px -16px rgba(31, 79, 47, 0.45), 0 10px 22px -6px rgba(31, 79, 47, 0.28), 0 2px 4px rgba(10, 15, 13, 0.18), inset 0 1px 0 rgba(204, 255, 0, 0.18)",
+          }}
         >
           {/* MOBILE-only banner — full-width, sticky-top "Best Value" + social proof.
               First thing a thumb-scroller sees on the $399 card. */}

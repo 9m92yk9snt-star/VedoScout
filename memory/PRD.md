@@ -26,6 +26,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 16 — Landing page visual depth (A1/A2/B2/D1) (Feb 17 2026 late night)**:
+  - **A1/A2 — whitespace tightening**: 4 sections moved from `py-24 md:py-32` → `py-16 md:py-20/24` (What you receive, Sample report, Pricing, Final CTA). Page feels less SaaS-y, more rhythmic; same density of content.
+  - **B2 — multi-layered 3D shadow on $399 card**: PricingCards.jsx replaced single `boxShadow` with a 5-layer composition (deep ambient, mid-falloff, near-tight, hair-thin definition, inset volt highlight) — gives the pass card visible lift/depth without changing layout or copy. Also added `hover:scale-[1.012]` for premium-feel micro-interaction.
+  - **D1 — animated counter trust strip**: NEW `[data-testid=trust-stats-strip]` section between hero and "How it works". 4-column grid with `AnimatedNumber` (now supports decimals) counting up: **12+ Countries · 500+ Players analyzed · 48h Scout delivery · 4.9/5 Average rating**. Forest glow accents + Framer Motion stagger. Each stat carries `[data-testid=trust-stat-{i}]`.
+  - **AnimatedNumber upgrade (backward-compatible)**: now accepts `decimals`, `prefix`, `suffix` props. Existing callers continue to work (default decimals=0).
+  - **C1/C5 — photos already in place** from prior session (hero stadium + final-CTA action shot), no change needed.
+  - **Surgical change**: only `Landing.jsx` + `PricingCards.jsx` touched. Zero backend, zero data-testid removed, zero copy changes, zero functionality impact.
+  - Smoke-tested live: 3 screenshots confirm hero photo + new trust strip + pricing depth + final CTA all render correctly.
+
 - ✅ **🆕 Session 15 — Mobile-first pricing polish on $399 card (Feb 17 2026 late evening)**:
   - **Pinned BEST VALUE banner** at the very top of the $399 card on mobile only — full-width, flush against the card edge, combines `BEST VALUE · SAVE $78` + `MOST PARENTS PICK THIS` as the first thing a thumb-scroller sees.
   - **Desktop ribbon badges hidden on mobile** (`hidden md:flex`) — replaced by the banner. Desktop layout unchanged.
