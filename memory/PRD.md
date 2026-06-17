@@ -26,6 +26,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 20 — Football atmosphere + bespoke graphics on flat sections (Feb 17 2026 late night)**:
+  - **Sample-teaser card** copy rewritten — "Sample · See it in action / This is your report / (CSV of features)" → **"The full breakdown / See what a scout sees / Where your player stands today. What separates them from the next level. The 5 drills that will actually move the needle. Reviewed by a real scout — not just a number on a page."** Scout-voice, emotional, persuasive.
+  - **How it works** — added a forest-tinted goal-net photo backdrop (filter: sepia + hue-rotate for unified duotone), gradient overlay, and 4 lime corner-bracket marks like a scout's notepad framing the card.
+  - **Trust section** — completely restructured from a plain shield-card into a magazine-style 2-column block: left side is a forest-tinted player-action photo with corner brackets and a floating "Built for growth · not for promises" floor eyebrow; right side carries "Our promise" eyebrow + dual-tone headline + the existing trust copy.
+  - **Pricing section** — added a subtle stadium photo plate + a custom SVG 4-3-3 formation diagram backdrop (pitch outline, centre circle, 11 player dots, one highlighted in volt with halo) at 6% opacity. Cards float over an actual football tactics board.
+  - **Sample stat cells** (TECH / TACT / PHYS / MENT) — each cell now has a pillar icon (Footprints / Target / Activity / Lightbulb) above the label, and a forest-green radial heatmap behind the number whose intensity scales with the score (9 = strong tint, 7 = mid, ≤6 = empty). Scouts get an instant visual read.
+  - **Unified visual treatment** — every newly-added photo uses the same forest-duotone CSS filter (`sepia(0.35-0.4) saturate(1.5-1.6) hue-rotate(75deg)`) so the page reads as one brand, not a stock-photo collage.
+  - **Surgical scope**: only `Landing.jsx` touched. Zero backend, zero functionality changes, all existing data-testids preserved.
+
 - ✅ **🆕 Session 19 — Premium footer gradient + admin-editable social handles (Feb 17 2026 late night)**:
   - **Premium footer redesign** — replaced flat `bg-ink` with a rich radial-gradient backdrop (`#2D6B3D@45%` at top → `rgba(8,22,15)` → `rgba(5,13,8)` at bottom), looks like a stadium night sky. Added two ambient halos (volt top-left + forest-pop bottom-right), a barely-visible repeating horizontal pitch-line pattern, and an SVG fractal-noise grain overlay (`mix-blend-overlay` @ 6%). No longer "too black" — has depth, texture and athletic-brand feel.
   - **Two-row icon strip in footer**:

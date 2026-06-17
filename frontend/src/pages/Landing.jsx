@@ -563,12 +563,28 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ HOW IT WORKS — 3 steps card (clean section after hero) ============ */}
+      {/* ============ HOW IT WORKS — 3 steps card with football backdrop ============ */}
       <section
         data-testid="how-it-works"
-        className="relative py-16 md:py-20 border-t border-gray-border bg-deepnavy"
+        className="relative py-16 md:py-20 border-t border-gray-border bg-deepnavy overflow-hidden"
       >
-        <div className="max-w-3xl mx-auto px-6 md:px-10">
+        {/* Football photo backdrop — forest-tinted duotone */}
+        <div aria-hidden className="absolute inset-0 z-0 pointer-events-none">
+          <img
+            src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
+            alt=""
+            className="w-full h-full object-cover opacity-[0.18]"
+            style={{ filter: "sepia(0.4) saturate(1.6) hue-rotate(75deg) contrast(0.95)" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-deepnavy/70 via-deepnavy/40 to-deepnavy/70" />
+          {/* Scoreline accent — corner brackets like a scout's notepad */}
+          <span className="absolute top-8 left-8 w-6 h-6 border-t-2 border-l-2 border-volt/60" />
+          <span className="absolute top-8 right-8 w-6 h-6 border-t-2 border-r-2 border-volt/60" />
+          <span className="absolute bottom-8 left-8 w-6 h-6 border-b-2 border-l-2 border-volt/60" />
+          <span className="absolute bottom-8 right-8 w-6 h-6 border-b-2 border-r-2 border-volt/60" />
+        </div>
+
+        <div className="relative z-10 max-w-3xl mx-auto px-6 md:px-10">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1166,19 +1182,34 @@ export default function Landing() {
                   <span className="font-bold">{sample.player.type}</span>
                 </div>
 
-                {/* Score row */}
+                {/* Score row — pillar pitch-zone heatmap behind each cell */}
                 <div className="mt-5 grid grid-cols-4 gap-px bg-cream-soft/40 border border-volt/20">
                   {[
-                    { k: "TECH", v: sample.scores.technical },
-                    { k: "TACT", v: sample.scores.tactical },
-                    { k: "PHYS", v: sample.scores.physical },
-                    { k: "MENT", v: sample.scores.mentality },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-cream-card py-3 text-center">
-                      <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">{s.k}</div>
-                      <div className="font-barlow font-black text-3xl text-volt mt-0.5 leading-none">{s.v}</div>
-                    </div>
-                  ))}
+                    { k: "TECH", v: sample.scores.technical, Icon: Footprints },
+                    { k: "TACT", v: sample.scores.tactical,  Icon: Target },
+                    { k: "PHYS", v: sample.scores.physical,  Icon: Activity },
+                    { k: "MENT", v: sample.scores.mentality, Icon: Lightbulb },
+                  ].map((s, i) => {
+                    // Heatmap intensity: score 9+ = strongest tint, < 6 = nearly empty
+                    const intensity = Math.max(0.06, Math.min(0.32, (s.v - 5) * 0.06));
+                    return (
+                      <div key={i} className="relative bg-cream-card py-3 text-center overflow-hidden">
+                        {/* Pitch-zone heatmap behind */}
+                        <div
+                          aria-hidden
+                          className="absolute inset-0 pointer-events-none"
+                          style={{
+                            background: `radial-gradient(ellipse at center bottom, rgba(31, 79, 47, ${intensity}) 0%, rgba(31, 79, 47, 0) 70%)`,
+                          }}
+                        />
+                        <div className="relative flex items-center justify-center gap-1 text-[9px] uppercase tracking-widest text-ink/55 font-bold">
+                          <s.Icon className="w-2.5 h-2.5 text-forest" strokeWidth={2} />
+                          {s.k}
+                        </div>
+                        <div className="relative font-barlow font-black text-3xl text-volt mt-0.5 leading-none">{s.v}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1335,12 +1366,12 @@ export default function Landing() {
                 <div className="inline-flex items-center justify-center w-14 h-14 bg-forest/10 border border-forest/25 mb-5">
                   <Eye className="w-6 h-6 text-forest" strokeWidth={1.5} />
                 </div>
-                <span className="text-forest text-[11px] uppercase tracking-[0.3em] font-bold">Sample · See it in action</span>
+                <span className="text-forest text-[11px] uppercase tracking-[0.3em] font-bold">The full breakdown</span>
                 <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
-                  This is your<br />report
+                  See what a<br />scout sees
                 </h3>
                 <p className="mt-4 text-sm text-ink/70 leading-relaxed">
-                  Full performance map · all 4 score categories · scout view · 5 personal drills · 30 &amp; 90-day plan · timestamped video comments · personal scout review · premium PDF.
+                  Where your player stands today. What separates them from the next level. The 5 drills that will actually move the needle. Reviewed by a real scout — not just a number on a page.
                 </p>
 
                 <button
@@ -1367,9 +1398,20 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ PRICING ============ */}
+      {/* ============ PRICING — football atmosphere + formation backdrop ============ */}
       <section id="pricing" data-testid="pricing-section" className="section-accent-top relative py-16 md:py-20 border-t border-gray-border overflow-hidden">
-        {/* Subtle background pattern */}
+        {/* Football photo plate — top fade, forest duotone */}
+        <div aria-hidden className="absolute inset-0 z-0 pointer-events-none">
+          <img
+            src="https://images.unsplash.com/photo-1706675780107-7c43cc487928?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwyfHxzb2NjZXIlMjBwbGF5ZXIlMjBzdGFkaXVtJTIwbGlnaHRzJTIwbmlnaHR8ZW58MHx8fHwxNzgwNDE1ODUwfDA&ixlib=rb-4.1.0&q=85"
+            alt=""
+            className="w-full h-full object-cover opacity-[0.10]"
+            style={{ filter: "sepia(0.5) saturate(1.5) hue-rotate(75deg) contrast(0.9)" }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-deepnavy/70 via-deepnavy/85 to-deepnavy" />
+        </div>
+
+        {/* Subtle dot pattern */}
         <div
           aria-hidden
           className="absolute inset-0 opacity-[0.04] pointer-events-none"
@@ -1379,7 +1421,38 @@ export default function Landing() {
             backgroundSize: "24px 24px",
           }}
         />
-        <div className="relative max-w-7xl mx-auto px-6 md:px-10">
+
+        {/* Formation diagram backdrop — 4-3-3, subtle white dots */}
+        <svg
+          aria-hidden
+          viewBox="0 0 1200 800"
+          preserveAspectRatio="xMidYMid slice"
+          className="absolute inset-0 w-full h-full opacity-[0.06] pointer-events-none"
+        >
+          {/* Pitch outline */}
+          <rect x="80" y="60" width="1040" height="680" fill="none" stroke="#1F4F2F" strokeWidth="2" />
+          {/* Centre line + circle */}
+          <line x1="600" y1="60" x2="600" y2="740" stroke="#1F4F2F" strokeWidth="2" />
+          <circle cx="600" cy="400" r="80" fill="none" stroke="#1F4F2F" strokeWidth="2" />
+          {/* Penalty boxes */}
+          <rect x="80" y="240" width="160" height="320" fill="none" stroke="#1F4F2F" strokeWidth="2" />
+          <rect x="960" y="240" width="160" height="320" fill="none" stroke="#1F4F2F" strokeWidth="2" />
+          {/* 4-3-3 formation player dots (left side) */}
+          {[
+            [140, 400],   // GK
+            [260, 180], [260, 320], [260, 480], [260, 620],   // 4 defenders
+            [400, 260], [400, 400], [400, 540],   // 3 mids
+            [540, 220], [540, 580],   // 2 wide forwards
+            [560, 400],   // CF
+          ].map(([cx, cy], i) => (
+            <circle key={i} cx={cx} cy={cy} r="14" fill="#1F4F2F" opacity="0.6" />
+          ))}
+          {/* Highlighted player — volt with halo */}
+          <circle cx="400" cy="400" r="20" fill="#CCFF00" opacity="0.5" />
+          <circle cx="400" cy="400" r="32" fill="none" stroke="#CCFF00" strokeWidth="2" opacity="0.4" />
+        </svg>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
           <div className="text-center max-w-3xl mx-auto">
             <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Pricing</span>
             <h2 className="mt-3 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
@@ -1412,14 +1485,42 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ TRUST ============ */}
+      {/* ============ TRUST — 2-column with football photo plate ============ */}
       <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-gray-border">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
-          <div className="border border-gray-border bg-surface p-8 md:p-12 flex flex-col md:flex-row gap-6 md:items-center">
-            <ShieldCheck className="w-12 h-12 text-volt flex-shrink-0" strokeWidth={1.5} />
-            <div>
-              <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl">Honest scouting feedback. Built for growth.</h3>
-              <p className="mt-3 text-sm text-ink/70 leading-relaxed max-w-3xl">
+          <div className="grid md:grid-cols-12 border border-gray-border bg-surface overflow-hidden">
+            {/* Left: football photo plate (5/12) */}
+            <div className="relative md:col-span-5 min-h-[220px] md:min-h-[280px] bg-deepnavy overflow-hidden">
+              <img
+                src="https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg"
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: "sepia(0.35) saturate(1.5) hue-rotate(75deg) contrast(0.95)" }}
+              />
+              {/* Forest tint overlay + corner brackets like a scout notepad */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-forest/85 via-forest/45 to-forest/15" />
+              <span aria-hidden className="absolute top-5 left-5 w-6 h-6 border-t-2 border-l-2 border-volt" />
+              <span aria-hidden className="absolute top-5 right-5 w-6 h-6 border-t-2 border-r-2 border-volt" />
+              <span aria-hidden className="absolute bottom-5 left-5 w-6 h-6 border-b-2 border-l-2 border-volt" />
+              <span aria-hidden className="absolute bottom-5 right-5 w-6 h-6 border-b-2 border-r-2 border-volt" />
+              {/* Floating eyebrow + shield */}
+              <div className="absolute bottom-6 left-6 right-6 flex items-center gap-3 text-white">
+                <ShieldCheck className="w-8 h-8 text-volt shrink-0" strokeWidth={1.5} />
+                <span className="text-[10px] uppercase tracking-[0.28em] font-bold text-white/90">
+                  Built for growth · not for promises
+                </span>
+              </div>
+            </div>
+            {/* Right: copy (7/12) */}
+            <div className="md:col-span-7 p-8 md:p-12 flex flex-col justify-center">
+              <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold mb-3">
+                Our promise
+              </span>
+              <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter leading-[0.95]">
+                Honest scouting feedback.
+                <span className="block text-forest mt-1">Built for growth.</span>
+              </h3>
+              <p className="mt-4 text-sm text-ink/70 leading-relaxed max-w-2xl">
                 ScoutMePlay gives you honest, professional football feedback to help young players get better.
                 It does <strong className="text-ink">not</strong> promise trials, contracts, or academy spots.
                 Your scores are here to guide your training — not to decide your future.
