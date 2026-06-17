@@ -26,6 +26,16 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 17 — Navigation premium overhaul (Feb 17 2026 late night)**:
+  - **Premium wordmark stamp**: replaced muted forest-green "ME" with a bright lime-yellow block (`#CCFF00` background + ink text) — looks like an athletic-brand stamp, dramatically improves contrast on black header.
+  - **Explicit HOME link in nav**: added Home (with house icon) as first item in both desktop and mobile nav. On landing it smooth-scrolls to top; on sub-pages it navigates to `/`. Active state shows lime underline when on landing.
+  - **Lime accent dot** beside tagline "See your game through scout eyes" with lime glow.
+  - **Section Rail** (NEW component `<SectionRail/>` in Navigation.jsx): right-edge vertical scroll-spy on desktop (xl breakpoint, landing only). Shows 6 dots — Top · How it works · Inside · Sample · Pricing · Start. Active section gets a forest-filled dot with halo + revealed label. Click any dot to smooth-scroll. Appears after 200px scroll.
+  - **Back-to-Top button** (NEW component `<BackToTop/>` in Navigation.jsx): floating forest-green pill bottom-right with multi-layered shadow + lime inset highlight. Fades in after 600px scroll. Smooth-scrolls to top.
+  - **Nav links fit one line**: added `whitespace-nowrap` to prevent the 7 items from wrapping on smaller desktops.
+  - **All additive**: only `/app/frontend/src/components/Navigation.jsx` touched. Zero changes to any page content, zero data-testids removed, zero functionality impact. New data-testids: `nav-link-home`, `mobile-nav-home`, `section-rail`, `rail-{section-id}`, `back-to-top`.
+  - Smoke-tested live across desktop + mobile + section rail + back-to-top + Home-click scroll behavior.
+
 - ✅ **🆕 Session 16 — Landing page visual depth (A1/A2/B2/D1) (Feb 17 2026 late night)**:
   - **A1/A2 — whitespace tightening**: 4 sections moved from `py-24 md:py-32` → `py-16 md:py-20/24` (What you receive, Sample report, Pricing, Final CTA). Page feels less SaaS-y, more rhythmic; same density of content.
   - **B2 — multi-layered 3D shadow on $399 card**: PricingCards.jsx replaced single `boxShadow` with a 5-layer composition (deep ambient, mid-falloff, near-tight, hair-thin definition, inset volt highlight) — gives the pass card visible lift/depth without changing layout or copy. Also added `hover:scale-[1.012]` for premium-feel micro-interaction.
