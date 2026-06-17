@@ -837,11 +837,19 @@ def build_progress_router(
     async def progress_pass_checkout(payload: StartProgressPassCheckoutRequest, user=Depends(get_current_user)):
         if not stripe_sdk or not arm_stripe_fn:
             raise HTTPException(503, "Stripe not configured")
+        # Read live price from settings (admin-editable). Fallback to constructor default.
+        live_price = pass_price_usd
+        try:
+            doc = await db["settings"].find_one({"key": "pass_price"})
+            if doc and "value" in doc:
+                live_price = float(doc["value"])
+        except Exception:
+            log.warning("pass_price lookup failed — falling back to constructor default")
         try:
             arm_stripe_fn()
             origin = payload.origin_url.rstrip("/")
             return_url = f"{origin}/dashboard?pass_session={{CHECKOUT_SESSION_ID}}"
-            amount_cents = int(round(float(pass_price_usd) * 100))
+            amount_cents = int(round(float(live_price) * 100))
             session = stripe_sdk.checkout.Session.create(
                 ui_mode="embedded",
                 mode="payment",
@@ -850,8 +858,8 @@ def build_progress_router(
                     "price_data": {
                         "currency": price_currency,
                         "product_data": {
-                            "name": "ScoutMePlay – Progress Pass",
-                            "description": "3 premium reports for the same player across 12 months. Track real growth over time.",
+                            "name": "ScoutMePlay – 12-month Plan",
+                            "description": "3 premium reports for the same player across 12 months. Track real growth over time. Includes scout review on every report.",
                         },
                         "unit_amount": amount_cents,
                     },
@@ -881,7 +889,7 @@ def build_progress_router(
             "user_email": user["email"],
             "kind": "progress_pass",
             "ui_mode": "embedded",
-            "amount": float(pass_price_usd),
+            "amount": float(live_price),
             "currency": price_currency,
             "credits": PASS_CREDITS,
             "payment_status": "initiated",

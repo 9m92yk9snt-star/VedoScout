@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 14 — Verified 2-card pricing UX ($159 single + $399 12-month plan), both admin-editable, live-propagated to landing, with scout/agent review baked in. 45/45 backend tests pass (14 new pricing tests + 22 progress_tracking unit + 9 progress_api_live). All required data-testids render on landing + admin Settings. Stripe checkout creates session at the LIVE admin-edited price. Regression: existing scout review on Lukas A. and trajectory page still work perfectly. Prices reset to 159/399 after testing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pricing_2cards.py",
+    "/app/test_reports/pytest/iter14_pricing.xml",
+    "/app/test_reports/pytest/iter14_full.xml"
+  ],
+  "verified_features": {
+    "GET /api/settings/price": "Returns {price:159, pass_price:399, currency:'usd', price_dkk:159} — backward-compatible price_dkk alias preserved.",
+    "PUT /api/admin/price": "Admin-only (401 unauth, 403 free), 400 for <=0 or >999, 200 for valid. Update propagates to /settings/price immediately.",
+    "PUT /api/admin/pass-price": "Admin-only (401 unauth, 403 free), 400 for <=0 or >9999, 200 for valid. Update propagates to /settings/price immediately.",
+    "Pass checkout uses live price": "After PUT /admin/pass-price to 449, POST /api/progress/pass/checkout creates Stripe session and payment_transactions row with amount=449 (verified via /api/admin/payments lookup by session_id).",
+    "/admin/agent-queue": "Returns list of paid/unlocked reports with non-null agent_review.status ('pending' or 'delivered') for every row. Lukas A. row shows delivered.",
+    "Landing pricing section": "data-testid='pricing-section' renders below hero, with pricing-card-single ($159, ONE FULL REPORT, GET MY REPORT CTA), pricing-card-pass ($399, TRACK THE FULL YEAR, BEST VALUE · SAVE $78 ribbon, $477 strikethrough, START THE 12-MONTH PLAN CTA).",
+    "Pricing CTAs": "Single CTA navigates to /upload (logged-in) or /signup; Pass CTA opens Stripe modal when logged-in or redirects to /login?next=/dashboard&open_pass=1 when not — verified the unauthenticated redirect.",
+    "Admin Settings tab": "Two side-by-side cards: data-testid='admin-price-input' (159) + admin-price-save; admin-pass-price-input (399) + admin-pass-price-save. Both Save buttons issue PUT and show success toast ('12 month plan price updated to $399 USD' was observed).",
+    "Live propagation": "Set admin → single=169, pass=449 → reload landing → cards show $169 / $449. Reset back to 159 / 399; /api/settings/price confirms reset.",
+    "Regression — scout review on Lukas A.": "/report/64f59196-a520-4ba4-a0f9-de96df8802ef shows data-testid='scout-review-delivered' with the existing 'Elite Scout Team' review text intact.",
+    "Regression — /trajectory/{Lukas}": "Renders trajectory-page with verdict 'AHEAD OF CURVE' (+1.2 pts / +24 pct), growth chart, between-the-lines narrative, pillar deltas (Technical/Tactical/Physical +1.2), mission status with HIT badges, growth badges (First Century, Pro Comparison Unlocked).",
+    "Regression — pytest test_progress_tracking.py": "22/22 still pass."
+  },
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/backend/tests/test_progress_api_live.py had a stale hardcoded assertion `amount in (599, 599.0, 59900)` from iter 13 — fixed to assert amount > 0 since the price is now admin-editable.",
+    "The pytest fixture in tests/test_progress_api_live.py uses default DB_NAME='test_database'. There is no conftest loading /app/backend/.env. Must run with `DB_NAME=elite_scout_db MONGO_URL=mongodb://localhost:27017 pytest ...` or add a conftest.py that loads dotenv. Consider adding /app/backend/tests/conftest.py with load_dotenv('/app/backend/.env') so the suite works without manual env-setting.",
+    "progress_tracking.py is still ~963 lines — recommend splitting (carried over from iter 13)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pricing_2cards.py (created — 14 new pricing API tests)",
+    "/app/backend/tests/test_progress_api_live.py (updated stale 599 assertion to be price-agnostic)"
+  ],
+  "success_rate": {"backend": "100% (45/45 — 14 new pricing + 22 progress unit + 9 progress live)", "frontend": "100% (all required data-testids present, live admin-edit propagation verified, regression flows intact)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite; premium@elitescout.com / Premium@2026; free@elitescout.com / Free@2026 (all from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — only temporarily edited price settings (169/449) and reset to 159/399.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pricing API contract: GET /api/settings/price returns {price, pass_price, currency, price_dkk}; PUT /api/admin/price and /api/admin/pass-price are admin-only (use PriceUpdate {price:number}). Pass checkout reads pass_price from db.settings at request time. Always run progress_api_live tests with `DB_NAME=elite_scout_db MONGO_URL=mongodb://localhost:27017` because there's no conftest auto-loading .env. Live Stripe keys are still active — do not enter card details.",
+  "rca of the issue": "No production bugs found. One test-only stale assertion in test_progress_api_live.py hardcoded the old $599 price; updated to be price-agnostic. Pytest env-loading is a known test-infra gap (no conftest.py loading .env)."
+}

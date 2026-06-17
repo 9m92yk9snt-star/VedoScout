@@ -14,6 +14,7 @@ import {
   Lightbulb, Crown, Calendar, Dumbbell, Mail, Send,
 } from "lucide-react";
 import PaymentBadges from "@/components/PaymentBadges";
+import PricingCards from "@/components/PricingCards";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 
 const fadeUp = {
@@ -1354,6 +1355,26 @@ export default function Landing() {
                 </div>
               </motion.div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ============ PRICING ============ */}
+      <section id="pricing" data-testid="pricing-section" className="section-accent-top relative py-20 md:py-28 border-t border-gray-border">
+        <div className="max-w-7xl mx-auto px-6 md:px-10">
+          <div className="text-center max-w-3xl mx-auto">
+            <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Pricing</span>
+            <h2 className="mt-3 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
+              Where does your player stand —
+              <span className="block text-volt mt-2">and where will they be in a year?</span>
+            </h2>
+            <p className="mt-5 text-ink/70 text-base md:text-lg leading-relaxed">
+              Both plans include a personal review from a real scout / agent on top of the advanced benchmarked intelligence analysis.
+            </p>
+          </div>
+
+          <div className="mt-12">
+            <PricingCards isLoggedIn={!!user} singleHref={startHref} />
           </div>
         </div>
       </section>

@@ -97,7 +97,8 @@ JWT_ALG = os.environ.get("JWT_ALGORITHM", "HS256")
 JWT_EXP_MIN = int(os.environ.get("JWT_EXPIRES_MINUTES", "1440"))
 ADMIN_EMAIL = os.environ["ADMIN_EMAIL"]
 ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
-DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_USD", "1"))
+DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_USD", "159"))
+DEFAULT_PASS_PRICE = float(os.environ.get("DEFAULT_PASS_PRICE_USD", "399"))
 PRICE_CURRENCY = os.environ.get("DEFAULT_REPORT_CURRENCY", "usd").lower()
 
 # ---- App ----
@@ -2485,8 +2486,15 @@ async def me(user=Depends(get_current_user)):
 async def public_price():
     doc = await db.settings.find_one({"key": "report_price"}, {"_id": 0})
     value = doc.get("value", DEFAULT_PRICE) if doc else DEFAULT_PRICE
+    pass_doc = await db.settings.find_one({"key": "pass_price"}, {"_id": 0})
+    pass_value = pass_doc.get("value", DEFAULT_PASS_PRICE) if pass_doc else DEFAULT_PASS_PRICE
     # `price_dkk` is kept only as a legacy alias for older frontend builds
-    return {"price": float(value), "currency": PRICE_CURRENCY, "price_dkk": float(value)}
+    return {
+        "price": float(value),
+        "pass_price": float(pass_value),
+        "currency": PRICE_CURRENCY,
+        "price_dkk": float(value),
+    }
 
 
 async def get_current_price() -> float:
@@ -2494,6 +2502,13 @@ async def get_current_price() -> float:
     if doc and "value" in doc:
         return float(doc["value"])
     return DEFAULT_PRICE
+
+
+async def get_pass_price() -> float:
+    doc = await db.settings.find_one({"key": "pass_price"})
+    if doc and "value" in doc:
+        return float(doc["value"])
+    return DEFAULT_PASS_PRICE
 
 
 @api_router.post("/reports/upload")
@@ -3003,6 +3018,17 @@ async def generate_full_report_task(report_id: str) -> None:
             {"id": report_id},
             {"$set": {"full_report": full, "full_generated_at": now_iso()}},
         )
+        # Ensure scout review is queued for every paid/unlocked report
+        try:
+            fresh = await db.reports.find_one({"id": report_id})
+            if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
+                review = _default_agent_review(fresh.get("paid_at"))
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"agent_review": review}},
+                )
+        except Exception:
+            logger.exception(f"Failed to queue agent_review for {report_id}")
     except Exception:
         logger.exception(f"generate_full_report_task failed for {report_id}")
 
@@ -6018,6 +6044,22 @@ async def admin_update_price(payload: PriceUpdate, _=Depends(get_current_admin))
     return {"price": float(new_price), "currency": PRICE_CURRENCY, "price_dkk": float(new_price)}
 
 
+@api_router.put("/admin/pass-price")
+async def admin_update_pass_price(payload: PriceUpdate, _=Depends(get_current_admin)):
+    """Update the 12-month plan / Progress Pass price."""
+    new_price = payload.price if payload.price is not None else payload.price_dkk
+    if new_price is None or new_price <= 0:
+        raise HTTPException(status_code=400, detail="Price must be > 0")
+    if new_price > 9999:
+        raise HTTPException(status_code=400, detail="Price must be <= 9999")
+    await db.settings.update_one(
+        {"key": "pass_price"},
+        {"$set": {"key": "pass_price", "value": float(new_price), "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"pass_price": float(new_price), "currency": PRICE_CURRENCY}
+
+
 @api_router.post("/admin/reports/{report_id}/unlock")
 async def admin_unlock(report_id: str, _=Depends(get_current_admin)):
     res = await db.reports.update_one(
@@ -6079,7 +6121,7 @@ api_router.include_router(build_progress_router(
     call_gemini_text=call_gemini_text,
     stripe_sdk=stripe_sdk,
     upload_dir=UPLOAD_DIR,
-    pass_price_usd=float(os.environ.get("PROGRESS_PASS_PRICE_USD", "599")),
+    pass_price_usd=float(os.environ.get("PROGRESS_PASS_PRICE_USD", str(DEFAULT_PASS_PRICE))),
     price_currency=PRICE_CURRENCY.lower() if PRICE_CURRENCY else "usd",
     arm_stripe_fn=_arm_real_stripe,
 ))
