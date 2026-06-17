@@ -15,6 +15,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import AboutPage from "@/pages/AboutPage";
 import PrivacyPage from "@/pages/PrivacyPage";
 import MethodologyPage from "@/pages/MethodologyPage";
+import TermsPage from "@/pages/TermsPage";
 import BlogIndexPage from "@/pages/BlogIndexPage";
 import BlogArticlePage from "@/pages/BlogArticlePage";
 import TrajectoryPage from "@/pages/TrajectoryPage";
@@ -56,6 +57,7 @@ function App() {
               <Route path="/about" element={<AboutPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/methodology" element={<MethodologyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
               <Route path="/blog" element={<BlogIndexPage />} />
               <Route path="/blog/:slug" element={<BlogArticlePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

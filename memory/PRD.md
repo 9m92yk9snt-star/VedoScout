@@ -26,6 +26,22 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 18 — Footer redesign + Terms of Service + brand cleanup (Feb 17 2026 late night)**:
+  - **New Terms of Service page** at `/terms` (14 sections — acceptance, what we provide, what we don't promise, eligibility, video rights, payments/refunds, acceptable use, IP, liability cap, service availability, termination, governing law (Denmark), changes, contact). Routes added to `App.js`. Links to message-form for contact (no mailto).
+  - **Premium new footer** in `Landing.jsx`:
+    - Dark forest band with ambient lime glow, matches the top-nav aesthetic exactly.
+    - Same SCOUTMEPLAY wordmark as the top bar (lime "ME" stamp + lime accent dot + tagline).
+    - 3-column layout: **Explore** (Home · About · Blog · Contact) · **Product** (How it works · What's inside · Sample report · Pricing — all use `?scroll=` for cross-page anchors) · **Legal** (Privacy · Terms · Methodology).
+    - **5 share buttons** — Twitter/X, Facebook, LinkedIn, WhatsApp, Instagram. Outline circular pills (`w-10 h-10 rounded-full`), low opacity (`bg-white/[0.03]`, `border-white/15`, `text-white/55`), hover to volt accent + slight scale.
+    - Bottom bar: `© 2026 ScoutMePlay · All rights reserved` + lime dot + "Where talent gets noticed".
+    - All previously-broken `/about#what-we-do` link → now routes via `/?scroll=how-it-works` (uses the existing scroll-spy system).
+    - `mailto:scoutmeplay@gmail.com` link **removed** — single source of truth is the message form.
+    - New `FooterLink` helper with consistent underline-on-hover micro-animation.
+  - **"Mentalkids" word stripped** from 6 places across the frontend (Landing footer, AboutPage 2x, PrivacyPage 2x, EmbeddedCheckoutModal, CheckoutTransitionModal). All copyrights now read "© ScoutMePlay · All rights reserved". Zero `Mentalkids` matches remain in `/app/frontend/src`.
+  - Copy throughout is honest and professional — no exposure of LLM/tech provider names to end users.
+  - **Verified live**: 11 footer links resolve to correct paths, 5 share links open in new tab, 0 mailto links remain, `/terms` route renders correctly.
+  - **Only files touched**: `Landing.jsx`, `AboutPage.jsx`, `PrivacyPage.jsx`, `EmbeddedCheckoutModal.jsx`, `CheckoutTransitionModal.jsx`, `App.js` (route), and new `TermsPage.jsx`. Zero backend, zero functionality changed.
+
 - ✅ **🆕 Session 17 — Navigation premium overhaul (Feb 17 2026 late night)**:
   - **Premium wordmark stamp**: replaced muted forest-green "ME" with a bright lime-yellow block (`#CCFF00` background + ink text) — looks like an athletic-brand stamp, dramatically improves contrast on black header.
   - **Explicit HOME link in nav**: added Home (with house icon) as first item in both desktop and mobile nav. On landing it smooth-scrolls to top; on sub-pages it navigates to `/`. Active state shows lime underline when on landing.

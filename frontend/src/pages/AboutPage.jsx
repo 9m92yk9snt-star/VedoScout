@@ -52,7 +52,7 @@ export default function AboutPage() {
 
         <section className="mt-12 space-y-5 text-ink/75 leading-relaxed text-base">
           <p>
-            ScoutMePlay is a premium football analysis platform built by <span className="text-volt font-bold">Mentalkids</span> — a small team
+              ScoutMePlay is a premium football analysis platform — a small team
             of football, technology and youth-development specialists based in Denmark. We grew up in football, watched too many
             talented kids slip through cracks for reasons that had nothing to do with their ability, and decided to build the tool
             we wish had existed when we were 14.
@@ -108,10 +108,10 @@ export default function AboutPage() {
         <section className="mt-14">
           <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Who we are</div>
           <h2 className="mt-3 font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl">
-            Mentalkids — the company behind ScoutMePlay
+            The team behind ScoutMePlay
           </h2>
           <p className="mt-4 text-ink/70 leading-relaxed">
-            Mentalkids is the parent company of ScoutMePlay. We work with young athletes, parents and coaches across Scandinavia,
+            We work with young athletes, parents and coaches across Scandinavia and beyond,
             building products that respect the kid's effort and the parent's wallet equally. We're not chasing 100 million users —
             we're trying to help the few thousand families who care enough to invest one premium report into their kid's future.
           </p>
@@ -128,20 +128,12 @@ export default function AboutPage() {
           </p>
 
           <ContactForm />
-
-          <p className="mt-4 text-xs text-ink/50">
-            Prefer email? Reach us directly at{" "}
-            <a href="mailto:scoutmeplay@gmail.com" className="text-volt underline">
-              scoutmeplay@gmail.com
-            </a>
-            .
-          </p>
         </section>
       </div>
 
       <footer className="border-t border-gray-border py-10 mt-10">
         <div className="max-w-7xl mx-auto px-6 md:px-10 text-center text-[10px] uppercase tracking-[0.22em] text-ink/50">
-          © {new Date().getFullYear()} Mentalkids · ScoutMePlay · All rights reserved
+          © {new Date().getFullYear()} ScoutMePlay · All rights reserved
         </div>
       </footer>
     </div>

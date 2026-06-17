@@ -84,7 +84,7 @@ export default function CheckoutTransitionModal({
             {/* PRODUCT LABEL */}
             <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/10 px-3 py-1.5 mb-6">
               <ShieldCheck className="w-3 h-3" />
-              Mentalkids · ScoutMePlay
+              ScoutMePlay
             </div>
 
             {/* ICON BLOCK */}

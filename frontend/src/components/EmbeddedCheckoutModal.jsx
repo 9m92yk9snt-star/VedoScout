@@ -167,7 +167,7 @@ export default function EmbeddedCheckoutModal({
                 </div>
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">
-                    Mentalkids · ScoutMePlay
+                    ScoutMePlay
                   </div>
                   <div className="font-barlow font-black uppercase text-ink text-sm leading-tight mt-0.5">
                     Secure checkout

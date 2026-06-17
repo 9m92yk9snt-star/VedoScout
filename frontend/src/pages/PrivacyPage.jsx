@@ -30,9 +30,9 @@ export default function PrivacyPage() {
         <article className="mt-10 space-y-7 text-ink/75 leading-relaxed text-[15px]">
           <Section title="1. Who we are">
             <p>
-              ScoutMePlay is operated by <span className="text-volt font-bold">Mentalkids</span>, based in Denmark.
-              For all questions about this Privacy Policy or how we handle your personal data, please contact us
-              at <a className="text-volt underline" href="mailto:scoutmeplay@gmail.com">scoutmeplay@gmail.com</a>.
+              ScoutMePlay is operated from Denmark.
+              For all questions about this Privacy Policy or how we handle your personal data, please reach us through our{" "}
+              <Link to="/about#contact" className="text-volt underline">message form</Link>.
             </p>
           </Section>
 
@@ -135,21 +135,21 @@ export default function PrivacyPage() {
             <p className="text-sm">
               Questions? Reach us anytime:
             </p>
-            <a
-              href="mailto:scoutmeplay@gmail.com"
-              data-testid="privacy-contact-email"
-              className="mt-3 inline-flex items-center gap-2 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
+            <Link
+              to="/about#contact"
+              data-testid="privacy-contact-form"
+              className="mt-3 inline-flex items-center gap-2 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
             >
               <Mail className="w-4 h-4" />
-              scoutmeplay@gmail.com
-            </a>
+              Send us a message
+            </Link>
           </div>
         </article>
       </div>
 
       <footer className="border-t border-gray-border py-10 mt-10">
         <div className="max-w-7xl mx-auto px-6 md:px-10 text-center text-[10px] uppercase tracking-[0.22em] text-ink/50">
-          © {new Date().getFullYear()} Mentalkids · ScoutMePlay · All rights reserved
+          © {new Date().getFullYear()} ScoutMePlay · All rights reserved
         </div>
       </footer>
     </div>

@@ -11,7 +11,7 @@ import {
   ArrowRight, ArrowDown, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
   Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
-  Lightbulb, Crown, Calendar, Dumbbell, Mail, Send,
+  Lightbulb, Crown, Calendar, Dumbbell, Mail, Send, Twitter, Facebook, Linkedin, Instagram, MessageCircle,
 } from "lucide-react";
 import PaymentBadges from "@/components/PaymentBadges";
 import PricingCards from "@/components/PricingCards";
@@ -1454,113 +1454,170 @@ export default function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-gray-border mt-10">
-        <div className="max-w-7xl mx-auto px-6 md:px-10 py-12">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-10">
-            {/* Brand */}
-            <div className="col-span-2">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-volt flex items-center justify-center">
-                  <span className="text-ink font-barlow font-black text-base leading-none">S</span>
+      {/* ============ FOOTER — Premium dark forest band ============ */}
+      <footer
+        data-testid="site-footer"
+        className="relative mt-10 bg-ink text-white overflow-hidden"
+      >
+        {/* Top hairline + ambient lime glow */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-volt/40 to-transparent" />
+        <div aria-hidden className="absolute -top-40 left-1/3 w-[520px] h-[520px] bg-volt/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto px-6 md:px-10 pt-14 md:pt-20 pb-10">
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-10 md:gap-12">
+
+            {/* ── Brand block ── */}
+            <div className="col-span-2 md:col-span-5">
+              {/* Same wordmark as the top nav */}
+              <Link to="/" data-testid="footer-logo" className="inline-flex flex-col leading-none group">
+                <span className="font-barlow font-black uppercase text-white text-2xl tracking-[0.16em] whitespace-nowrap flex items-baseline gap-[1px]">
+                  <span>SCOUT</span>
+                  <span
+                    className="relative inline-block px-[3px] text-ink transition-colors duration-300"
+                    style={{ background: "#ccff00" }}
+                  >
+                    ME
+                  </span>
+                  <span>PLAY</span>
+                </span>
+                <span className="mt-2 flex items-center gap-1.5 text-[9px] text-white/55 font-bold uppercase tracking-[0.14em] whitespace-nowrap">
+                  <span
+                    aria-hidden
+                    className="inline-block w-1 h-1 rounded-full"
+                    style={{ background: "#ccff00", boxShadow: "0 0 6px #ccff0099" }}
+                  />
+                  See your game through scout eyes
+                </span>
+              </Link>
+
+              <p className="mt-6 text-sm text-white/60 leading-relaxed max-w-md">
+                A premium football scouting platform that gives ambitious young players honest,
+                professional feedback — built to help every player understand their game and reach the next level.
+              </p>
+
+              {/* Social share — outstanding, premium */}
+              <div className="mt-7">
+                <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-white/40 mb-3">
+                  Share ScoutMePlay
                 </div>
-                <div>
-                  <div className="font-barlow font-black uppercase tracking-tight text-base leading-none">ScoutMePlay</div>
-                  <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50 mt-1">by Mentalkids</div>
+                <div className="flex items-center gap-2.5">
+                  {[
+                    {
+                      label: "Share on X",
+                      Icon: Twitter,
+                      href: "https://twitter.com/intent/tweet?text=Discover%20ScoutMePlay%20%E2%80%94%20where%20talent%20gets%20noticed.%20A%20premium%20football%20scouting%20platform%20for%20U7%E2%80%93U21%20players.&url=https%3A%2F%2Fscoutmeplay.com",
+                    },
+                    {
+                      label: "Share on Facebook",
+                      Icon: Facebook,
+                      href: "https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fscoutmeplay.com",
+                    },
+                    {
+                      label: "Share on LinkedIn",
+                      Icon: Linkedin,
+                      href: "https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fscoutmeplay.com",
+                    },
+                    {
+                      label: "Share on WhatsApp",
+                      Icon: MessageCircle,
+                      href: "https://wa.me/?text=Check%20out%20ScoutMePlay%20%E2%80%94%20football%20scouting%20reports%20for%20young%20players.%20https%3A%2F%2Fscoutmeplay.com",
+                    },
+                    {
+                      label: "Follow on Instagram",
+                      Icon: Instagram,
+                      href: "https://www.instagram.com/",
+                    },
+                  ].map(({ label, Icon, href }, i) => (
+                    <a
+                      key={i}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid={`footer-share-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}
+                      aria-label={label}
+                      className="group w-10 h-10 flex items-center justify-center rounded-full border border-white/15 bg-white/[0.03] text-white/55 hover:text-white hover:border-volt/60 hover:bg-volt/[0.07] transition-all duration-300"
+                    >
+                      <Icon className="w-4 h-4 transition-transform group-hover:scale-110" strokeWidth={1.8} />
+                    </a>
+                  ))}
                 </div>
               </div>
-              <p className="mt-4 text-sm text-ink/60 leading-relaxed max-w-xs">
-                ScoutMePlay combines advanced scouting technology with human review to deliver
-                honest player feedback. Where talent gets noticed.
-              </p>
             </div>
 
-            {/* About column */}
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">About</div>
-              <ul className="mt-4 space-y-2.5 text-sm">
-                <li>
-                  <Link
-                    to="/about"
-                    data-testid="footer-link-about"
-                    className="text-ink/70 hover:text-volt transition-colors"
-                  >
-                    About ScoutMePlay
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/about#what-we-do"
-                    className="text-ink/70 hover:text-volt transition-colors"
-                  >
-                    How it works
-                  </Link>
-                </li>
-                <li>
-                  <span className="text-ink/50 cursor-default">Mentalkids · Denmark</span>
-                </li>
+            {/* ── Explore column ── */}
+            <div className="col-span-1 md:col-span-2">
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Explore</div>
+              <ul className="mt-5 space-y-3 text-sm">
+                <FooterLink to="/" testid="footer-link-home">Home</FooterLink>
+                <FooterLink to="/about" testid="footer-link-about">About</FooterLink>
+                <FooterLink to="/blog" testid="footer-link-blog">Blog</FooterLink>
+                <FooterLink to="/about#contact" testid="footer-link-contact-form" icon={Send}>
+                  Contact
+                </FooterLink>
               </ul>
             </div>
 
-            {/* Contact + Privacy column */}
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Contact</div>
-              <ul className="mt-4 space-y-2.5 text-sm">
-                <li>
-                  <Link
-                    to="/about#contact"
-                    data-testid="footer-link-contact-form"
-                    className="inline-flex items-center gap-1.5 text-ink/70 hover:text-volt transition-colors"
-                  >
-                    <Send className="w-3.5 h-3.5 shrink-0" />
-                    Send us a message
-                  </Link>
-                </li>
-                <li>
-                  <a
-                    href="mailto:scoutmeplay@gmail.com"
-                    data-testid="footer-link-email"
-                    className="inline-flex items-center gap-1.5 text-ink/70 hover:text-volt transition-colors break-all"
-                  >
-                    <Mail className="w-3.5 h-3.5 shrink-0" />
-                    scoutmeplay@gmail.com
-                  </a>
-                </li>
+            {/* ── Product column ── */}
+            <div className="col-span-1 md:col-span-3">
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Product</div>
+              <ul className="mt-5 space-y-3 text-sm">
+                <FooterLink to="/?scroll=how-it-works" testid="footer-link-how-it-works">How it works</FooterLink>
+                <FooterLink to="/?scroll=what-you-get" testid="footer-link-whats-inside">What&apos;s inside</FooterLink>
+                <FooterLink to="/?scroll=example-report" testid="footer-link-sample">Sample report</FooterLink>
+                <FooterLink to="/?scroll=pricing-section" testid="footer-link-pricing">Pricing</FooterLink>
               </ul>
+            </div>
 
-              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt mt-6">Legal</div>
-              <ul className="mt-4 space-y-2.5 text-sm">
-                <li>
-                  <Link
-                    to="/privacy"
-                    data-testid="footer-link-privacy"
-                    className="text-ink/70 hover:text-volt transition-colors"
-                  >
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/methodology"
-                    data-testid="footer-link-methodology"
-                    className="text-ink/70 hover:text-volt transition-colors"
-                  >
-                    Methodology
-                  </Link>
-                </li>
+            {/* ── Legal column ── */}
+            <div className="col-span-2 md:col-span-2">
+              <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">Legal</div>
+              <ul className="mt-5 space-y-3 text-sm">
+                <FooterLink to="/privacy" testid="footer-link-privacy">Privacy Policy</FooterLink>
+                <FooterLink to="/terms" testid="footer-link-terms">Terms of Service</FooterLink>
+                <FooterLink to="/methodology" testid="footer-link-methodology">Methodology</FooterLink>
               </ul>
             </div>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-gray-border flex flex-col md:flex-row justify-between gap-3 items-center">
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
-              © {new Date().getFullYear()} Mentalkids · ScoutMePlay
+          {/* Bottom bar */}
+          <div className="mt-14 pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between gap-3 items-center">
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45">
+              © {new Date().getFullYear()} ScoutMePlay · All rights reserved
             </p>
-            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/50">
-              Where talent gets noticed · Football scouting service
+            <p className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/45 flex items-center gap-2">
+              <span
+                aria-hidden
+                className="inline-block w-1 h-1 rounded-full"
+                style={{ background: "#ccff00", boxShadow: "0 0 6px #ccff0099" }}
+              />
+              Where talent gets noticed
             </p>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+/* Footer link helper — keeps every link visually consistent + on-brand hover */
+function FooterLink({ to, children, testid, icon: IconCmp }) {
+  return (
+    <li>
+      <Link
+        to={to}
+        data-testid={testid}
+        className="group inline-flex items-center gap-1.5 text-white/55 hover:text-white transition-colors duration-300"
+      >
+        {IconCmp && <IconCmp className="w-3.5 h-3.5 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />}
+        <span className="relative">
+          {children}
+          <span
+            aria-hidden
+            className="absolute left-0 -bottom-0.5 h-px w-0 group-hover:w-full transition-all duration-300"
+            style={{ background: "#ccff00" }}
+          />
+        </span>
+      </Link>
+    </li>
   );
 }
