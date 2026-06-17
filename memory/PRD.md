@@ -26,7 +26,42 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
-- ✅ **🆕 Session 25 — Marker Studio (fullscreen marking + MediaPipe Auto-find, Feb 18 2026)**:
+- ✅ **🆕 Session 26 — Multi-anchor marking + premium upload UX + Hero Teaser (Feb 18 2026 late evening)**:
+  - **User asks (3 of them, single committed package)**:
+    1. Multi-anchor marking — same player at 3-5 different timestamps → ~10× tracking precision.
+    2. Real upload progress + knowledge content while waiting + a "must-buy" reveal screen for free users.
+    3. More accurate timestamp screenshots in the final report.
+
+  - **(1) Multi-anchor backend & UI**:
+    - **`precision_engine.extract_frame_at(video, t, out)`** — pulls a frame at any timestamp via ffmpeg. Used to grab each anchor's frame after web-MP4 transcode.
+    - **`build_anchor_ensemble_block` + `anchors=` kwarg** on `build_preview_prompt` / `build_full_prompt`. The prompt now opens with *"MULTI-ANCHOR LOCK — N confirmed sightings of the SAME player..."* and lists each anchor's t/jersey/shorts.
+    - **`call_gemini_with_video(... anchor_crops=[paths])`** — all anchor crops attached FIRST in `file_contents` so Gemini sees the player from every angle before the wide marker + video.
+    - **`POST /api/reports/upload`** accepts new `marker_anchors` form field (JSON array of `{t, box}`). Server extracts each anchor's crop using ffmpeg + the precision fingerprinter, caps at 5, persists `anchors` list on the report doc. Backward-compatible: legacy `marker_box` alone still works.
+    - **Frontend `MarkerStudio.jsx`** — new state `anchors`, new handlers `addCurrentAsAnchor`, `removeAnchor`, `runAutoSuggest`, `handleDone`, `renderMarkerForAnchor`, `buildAnchorThumb`. Top bar split into **[+ ADD]** (locks current box as anchor, studio stays open) + **[✓ DONE]** (submits all anchors). Bottom toolbar gets the **anchor strip** — horizontal thumbnails of every locked anchor with volt-green border, index badge, timestamp pill, and `×` remove button. Hint text adapts to anchor count (`"Add 2 more for tight precision"` / `"Strong precision lock"`).
+    - **✨ Suggest 5** (bottom toolbar) — MediaPipe ObjectDetector scans 6 evenly-spaced timestamps across the video, samples each detected person's jersey colour, picks the closest match to the first anchor's reference colour (distance threshold 90), normalises detection boxes to the wrapper rect, generates a thumbnail, and appends to the anchor strip. Skips timestamps too close (<2s) to existing anchors. Graceful "No matching frames" error.
+    - **Required 1 anchor (today's behaviour). Recommended 3. Maximum 5.** Strong-precision badge appears at ≥3 anchors.
+
+  - **(2) Real upload progress + KnowledgeCarousel + Hero Teaser**:
+    - **Real progress**: `axios` `onUploadProgress` wired → `setUploadPct` 0-100. `setUploadPhase('uploading' | 'analyzing' | 'done')` reflects state.
+    - **`PrecisionScanOverlay` rewritten** — accepts `phase` + `uploadPct` props. In `uploading` phase shows big `text-7xl` percentage (`data-testid=upload-pct`) + volt progress bar + spinning hero. In `analyzing` phase shows the 5-step ladder (unchanged). Both phases mount the new KnowledgeCarousel underneath.
+    - **`KnowledgeCarousel.jsx`** (NEW) — 8 football "did you know" facts (3-minute scout rule, off-ball value, U12 position changes, sprint count vs speed, lefties rarity, etc.) auto-rotating every 6 s with motion fade + dot indicator strip.
+    - **`HeroTeaser.jsx`** (NEW) — the must-buy reveal shown to free-preview users right after analysis completes. Staggered animation:
+      1. Pulsing volt halo around the locked marker frame
+      2. *"AI ANALYSIS COMPLETE"* with pulsing dots
+      3. Player name (text-5xl barlow black) + age/role/jersey
+      4. Spring-animated **overall score** (text-8xl, `/100`)
+      5. 3-cell stat row (touches · key actions · sprints)
+      6. **Top trait** chip + 4 blurred locked sections (scout view, training plan, agent review, archetype). Real CSS `filter: blur(5px)` behind lock icons so users can SEE there's content.
+      7. **Pulsing volt CTA** "Unlock the full report — $159" with a shimmer-sweep animation. Subtle "48-hour refund guarantee · One-time payment".
+      8. Small "Take me to dashboard instead" link below.
+    - **Wiring**: UploadPage detects `eligibility.reason !== 'prepaid'` → sets `heroReport` after upload → HeroTeaser opens → `onUnlock` navigates to `/report/{id}?unlock=1` which auto-opens the embedded Stripe checkout in `ReportPage`. Prepaid uploads (admin, paid users) skip the teaser entirely.
+
+  - **(3) Thumbnail accuracy**: Multi-anchor itself dramatically improves Gemini's per-moment precision because the model now has 1-5 visual references of the SAME player. Server-side per-thumbnail verification + auto-zoom + reticle deferred to next round (described in roadmap).
+
+  - **Tested**: ✅ 33/33 backend tests pass (12 precision_engine + 12 new iter18 multi-anchor + 9 iter16 regression — all green). ✅ 15/15 frontend assertions pass (anchor strip, [+ ADD], DONE, ✨ Suggest 5 lazy-loads MediaPipe in ~8 s, HeroTeaser file structure + 6 testids, KnowledgeCarousel rotates 8 facts every 6 s, PrecisionScanOverlay phase + upload-pct testid). Zero JS console errors. Backward compatibility verified — single-anchor flow still works for legacy clients.
+  - **Files**: NEW `/app/frontend/src/components/HeroTeaser.jsx`, NEW `/app/frontend/src/components/KnowledgeCarousel.jsx`, NEW `/app/backend/tests/test_iter18_multianchor.py`. MODIFIED `/app/backend/precision_engine.py`, `/app/backend/server.py`, `/app/frontend/src/components/MarkerStudio.jsx`, `/app/frontend/src/components/PrecisionScanOverlay.jsx`, `/app/frontend/src/pages/UploadPage.jsx`, `/app/frontend/src/pages/ReportPage.jsx`.
+
+- ✅ **Session 25 — Marker Studio (fullscreen marking + MediaPipe Auto-find, Feb 18 2026)**:
   - **User pain**: on mobile the inline marker was unworkable — zoom shoved the video off-screen, no way to pan zoomed content, controls overlapped the picture, no way to resize/move the box after drawing it, players too tiny to mark precisely.
   - **MarkerStudio.jsx** (~1,060 lines, new): premium fullscreen marking sheet rendered via `createPortal` to document.body, locks body scroll.
     - **Top bar**: ✕ Cancel · "Lock onto your player" · ✓ Lock (disabled until box + video ready).
