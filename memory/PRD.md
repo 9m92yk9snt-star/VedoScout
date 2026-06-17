@@ -26,6 +26,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 22 — Hero copy rewrite to athlete voice (Feb 17 2026 late night)**:
+  - **Old sub-copy** (feature-y): "Upload your football video and receive a detailed scouting report powered by advanced football intelligence, professional player benchmarks, and real scouts and agents connected to clubs around the world. Built for ambitious players from U7 to U21 chasing their football dreams."
+  - **New sub-copy** (Option 2 — athlete-to-athlete confident voice): "You train every day. You give everything on the pitch. But does anyone actually *see you*? Upload your video. Get the **scout view**. See where you stand and what it'll take to reach the next level. For ambitious players, U7 to U21."
+  - Emphasis style: *see you* in italic + **scout view** in bold creates emotional hook → value prop reading order.
+  - Headline preserved ("Where *talent* gets noticed.").
+  - Surgical scope: only `Landing.jsx` hero `<motion.p data-testid="hero-description">` block touched. Zero other changes.
+
 - ✅ **🆕 Session 21 — Cinematic-bookends premium pass (Feb 17 2026 late night)**:
   - Removed the faded photo backdrops from middle sections (they were creating amateur "ghost photo" seams between adjacent sections).
   - **How it works** — replaced photo with: a subtle SVG turf-grid texture @ 5%, scout-notepad corner brackets (forest @ 40%), and a lime accent stripe on the left edge (playbook-spine motif). No photo, all football.

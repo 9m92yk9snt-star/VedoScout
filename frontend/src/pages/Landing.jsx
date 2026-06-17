@@ -423,13 +423,13 @@ export default function Landing() {
                 data-testid="hero-description"
                 className="mt-7 max-w-xl text-base md:text-lg text-ink/80 leading-relaxed"
               >
-                Upload your football video and receive a detailed scouting report powered by{" "}
-                <span className="text-ink font-semibold">advanced football intelligence</span>,{" "}
-                <span className="text-ink font-semibold">professional player benchmarks</span>, and{" "}
-                <span className="text-ink font-semibold">real scouts and agents</span> connected to clubs around the world.
+                You train every day. You give everything on the pitch. But does anyone actually{" "}
+                <span className="text-ink font-semibold italic">see you</span>?{" "}
+                Upload your video. Get the{" "}
+                <span className="text-ink font-semibold">scout view</span>. See where you stand and what it&apos;ll take to reach the next level.
                 <br />
                 <span className="block mt-3 text-sm md:text-base text-ink/65">
-                  Built for ambitious players from <span className="text-volt font-bold">U7 to U21</span> chasing their football dreams.
+                  For ambitious players, <span className="text-volt font-bold">U7 to U21</span>.
                 </span>
               </motion.p>
 
