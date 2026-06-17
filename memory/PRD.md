@@ -26,6 +26,16 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 21 — Cinematic-bookends premium pass (Feb 17 2026 late night)**:
+  - Removed the faded photo backdrops from middle sections (they were creating amateur "ghost photo" seams between adjacent sections).
+  - **How it works** — replaced photo with: a subtle SVG turf-grid texture @ 5%, scout-notepad corner brackets (forest @ 40%), and a lime accent stripe on the left edge (playbook-spine motif). No photo, all football.
+  - **Pricing** — removed the stadium photo plate. Kept the custom 4-3-3 formation SVG diagram (clean line art) and the subtle dot pattern. Result: cards float over an obvious football tactics board without any photo muddiness.
+  - **Hero · Trust card · Final CTA photos** — preserved (these are intentional cinematic moments, not background fades).
+  - **Sample stat heatmaps** + **pillar icons** — preserved (pure CSS, zero seam issues).
+  - **Scout-voice copy** on the sample teaser card preserved.
+  - Result: page now reads as a clean typographic sequence with cinematic photo bookends at the top and bottom. No metrics added anywhere — football identity carried entirely by corner brackets, line-art formation, and SVG turf texture.
+  - **Surgical scope**: only Landing.jsx touched. Zero backend, zero functionality changes.
+
 - ✅ **🆕 Session 20 — Football atmosphere + bespoke graphics on flat sections (Feb 17 2026 late night)**:
   - **Sample-teaser card** copy rewritten — "Sample · See it in action / This is your report / (CSV of features)" → **"The full breakdown / See what a scout sees / Where your player stands today. What separates them from the next level. The 5 drills that will actually move the needle. Reviewed by a real scout — not just a number on a page."** Scout-voice, emotional, persuasive.
   - **How it works** — added a forest-tinted goal-net photo backdrop (filter: sepia + hue-rotate for unified duotone), gradient overlay, and 4 lime corner-bracket marks like a scout's notepad framing the card.

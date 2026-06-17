@@ -563,26 +563,28 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ HOW IT WORKS — 3 steps card with football backdrop ============ */}
+      {/* ============ HOW IT WORKS — clean section with scout-notepad framing ============ */}
       <section
         data-testid="how-it-works"
         className="relative py-16 md:py-20 border-t border-gray-border bg-deepnavy overflow-hidden"
       >
-        {/* Football photo backdrop — forest-tinted duotone */}
-        <div aria-hidden className="absolute inset-0 z-0 pointer-events-none">
-          <img
-            src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
-            alt=""
-            className="w-full h-full object-cover opacity-[0.18]"
-            style={{ filter: "sepia(0.4) saturate(1.6) hue-rotate(75deg) contrast(0.95)" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-deepnavy/70 via-deepnavy/40 to-deepnavy/70" />
-          {/* Scoreline accent — corner brackets like a scout's notepad */}
-          <span className="absolute top-8 left-8 w-6 h-6 border-t-2 border-l-2 border-volt/60" />
-          <span className="absolute top-8 right-8 w-6 h-6 border-t-2 border-r-2 border-volt/60" />
-          <span className="absolute bottom-8 left-8 w-6 h-6 border-b-2 border-l-2 border-volt/60" />
-          <span className="absolute bottom-8 right-8 w-6 h-6 border-b-2 border-r-2 border-volt/60" />
-        </div>
+        {/* Subtle football turf SVG texture — tiles uniformly, no seam issues */}
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><path d='M24 0v48M0 24h48' stroke='%231F4F2F' stroke-width='0.4' opacity='0.6'/><circle cx='24' cy='24' r='1' fill='%231F4F2F' opacity='0.4'/></svg>\")",
+            backgroundSize: "48px 48px",
+          }}
+        />
+        {/* Single lime accent strip on the left edge — scout's playbook spine */}
+        <div aria-hidden className="absolute left-0 top-12 bottom-12 w-[3px] bg-gradient-to-b from-transparent via-volt/40 to-transparent pointer-events-none" />
+        {/* Scout-notepad corner brackets — kept (these are not photos, they're identity marks) */}
+        <span aria-hidden className="absolute top-8 left-8 w-6 h-6 border-t-2 border-l-2 border-forest/40" />
+        <span aria-hidden className="absolute top-8 right-8 w-6 h-6 border-t-2 border-r-2 border-forest/40" />
+        <span aria-hidden className="absolute bottom-8 left-8 w-6 h-6 border-b-2 border-l-2 border-forest/40" />
+        <span aria-hidden className="absolute bottom-8 right-8 w-6 h-6 border-b-2 border-r-2 border-forest/40" />
 
         <div className="relative z-10 max-w-3xl mx-auto px-6 md:px-10">
           <motion.div
@@ -1398,19 +1400,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ============ PRICING — football atmosphere + formation backdrop ============ */}
+      {/* ============ PRICING — clean section with formation backdrop (line art only) ============ */}
       <section id="pricing" data-testid="pricing-section" className="section-accent-top relative py-16 md:py-20 border-t border-gray-border overflow-hidden">
-        {/* Football photo plate — top fade, forest duotone */}
-        <div aria-hidden className="absolute inset-0 z-0 pointer-events-none">
-          <img
-            src="https://images.unsplash.com/photo-1706675780107-7c43cc487928?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwyfHxzb2NjZXIlMjBwbGF5ZXIlMjBzdGFkaXVtJTIwbGlnaHRzJTIwbmlnaHR8ZW58MHx8fHwxNzgwNDE1ODUwfDA&ixlib=rb-4.1.0&q=85"
-            alt=""
-            className="w-full h-full object-cover opacity-[0.10]"
-            style={{ filter: "sepia(0.5) saturate(1.5) hue-rotate(75deg) contrast(0.9)" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-deepnavy/70 via-deepnavy/85 to-deepnavy" />
-        </div>
-
         {/* Subtle dot pattern */}
         <div
           aria-hidden
