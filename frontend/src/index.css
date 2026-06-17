@@ -43,6 +43,16 @@
         font-family: 'DM Sans', system-ui, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        scroll-behavior: smooth;
+    }
+    /* Sticky-nav offset so scroll-to-section never hides content under the top bar. */
+    section[data-testid] {
+        scroll-margin-top: 80px;
+    }
+    @media (min-width: 768px) {
+        section[data-testid] {
+            scroll-margin-top: 96px;
+        }
     }
     h1, h2, h3, h4, h5, h6 {
         font-family: 'Barlow Condensed', sans-serif;
