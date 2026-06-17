@@ -26,6 +26,24 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 13 — 2-Card Pricing UX + Admin-editable prices (Feb 17 2026)**:
+  - **Pricing model finalized**: $159 single report + $399 12-month plan (3 reports). Both **include scout/agent text review automatically** (no add-on). Both **admin-editable** from Settings tab.
+  - **Backend**:
+    - `DEFAULT_PRICE = 159` (was 1), `DEFAULT_PASS_PRICE = 399` (was 599).
+    - `/api/settings/price` extended to return `{price, pass_price, currency, price_dkk}` — backward-compatible.
+    - New `PUT /api/admin/pass-price` endpoint (admin-only, ≤9999 cap, mirrors `/admin/price`).
+    - `progress_tracking.py` `/pass/checkout` now reads `pass_price` from `db.settings` at request time — admin price changes take effect on next checkout.
+    - `generate_full_report_task` eagerly creates `agent_review` for every freshly-paid/unlocked report → all paid reports auto-appear in the existing `ScoutQueue` admin page.
+    - DB seed values written: `settings.report_price=159`, `settings.pass_price=399`.
+  - **Frontend**:
+    - New reusable `<PricingCards />` component (`/app/frontend/src/components/PricingCards.jsx`) — 2-card layout with: single card (cream, $159, "ONE FULL REPORT"), pass card (forest hero, $399, "TRACK THE FULL YEAR", "BEST VALUE · SAVE $78" ribbon, strikethrough $477, ✓ "Scout / agent review on every report" highlighted). Both CTAs handle logged-in + logged-out states.
+    - Pricing copy uses "advanced benchmarked intelligence analysis" framing (no "AI" word per user request).
+    - Inserted into `Landing.jsx` as a new `#pricing` section before the TRUST section — does NOT replace the existing sample-report overlay (zero regression).
+    - `AdminPage.jsx` Settings tab now has TWO price cards (single + 12-month plan), each with input + Save button + live current-price chip. Both wire to the new PUT endpoints with success toasts.
+    - Scout review system (`ScoutQueue.jsx`, `ScoutReview.jsx`, `/admin/agent-queue`, `/reports/{id}/agent-review`) **fully untouched** per user request — they just receive reports faster thanks to eager `agent_review` creation.
+  - **Tests**: 14 new pricing pytests in `/app/backend/tests/test_pricing_2cards.py` (added by testing subagent iter14, all pass) + new `/app/backend/tests/conftest.py` auto-loading `.env` so the test suite runs without manual env-setting.
+  - **Testing subagent iter14: 100% pass (45/45 backend + frontend).** Verified live admin-edit propagation: change single→169 / pass→449 in admin → reload landing → cards show new prices → progress pass checkout creates Stripe session at the new $449. Reset to defaults after.
+
 - ✅ **🆕 Session 12 — Tier 3 Progress Tracking + $599 Progress Pass (Feb 16 2026)**:
   - **New backend module** `/app/backend/progress_tracking.py` (~600 lines, self-contained, no server.py imports) — `build_progress_router(...)`, `find_or_create_profile(...)`, `consume_pass_credit(...)`, `_pass_active(...)`.
   - **New collection** `player_profiles` `{id, user_id, name, normalized_name, last_position, last_age, preferred_foot, report_ids[], cached_trajectory, created_at, updated_at}`. Reports extended (additive) with `player_profile_id`. All 7 existing reports backfilled into 4 profiles.
