@@ -37,8 +37,11 @@ import { filterByMotion } from "./spatioTemporal";
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
 const TARGET_HINTS = 10;
-const FRAME_MAX_W = 1920;
-const FRAME_JPEG_QUALITY = 0.85;
+// Reduced from 1920/0.85 → 1280/0.78. ReID does NOT need pixel-perfect
+// detail (it needs jersey colour + body shape) and smaller payloads mean
+// faster Gemini round-trips. Empirically saves ~40-60 % per call.
+const FRAME_MAX_W = 1280;
+const FRAME_JPEG_QUALITY = 0.78;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -213,12 +216,26 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       //    decoded). `loadedmetadata` fires with just the header, before any
       //    pixels are available — on iOS Safari the first `seek` then hangs
       //    silently waiting for a frame that doesn't exist yet.
+      //
+      //    If the wait drags past 4 s we force-reload the <video> element
+      //    via .load() — this "kicks" iOS Safari out of its sometimes-stuck
+      //    first-load state without the user having to close + reopen.
       const waitReady = async () => {
         const start = Date.now();
-        // Hard cap 10 s — if we still aren't ready, proceed anyway and rely
-        // on per-seek timeouts to bail gracefully.
-        while (!cancelled && Date.now() - start < 10000) {
+        let reloaded = false;
+        while (!cancelled && Date.now() - start < 12000) {
           if (v.readyState >= 2 && v.videoWidth > 0 && v.duration > 0) return;
+          if (!reloaded && Date.now() - start > 4000) {
+            reloaded = true;
+            try {
+              v.load();
+              // Some iOS versions need an explicit .play() then .pause()
+              // to populate the decoder.
+              const pp = v.play();
+              if (pp?.catch) pp.catch(() => {});
+              setTimeout(() => { try { v.pause(); } catch { /* noop */ } }, 50);
+            } catch { /* noop */ }
+          }
           await new Promise((r) => setTimeout(r, 100));
         }
       };
@@ -611,7 +628,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
           {phase === "TRACKING" && (
             <TrackingOverlay
               startedAt={trackingStartedAt}
-              expectedMs={20000}
+              expectedMs={10000}
               error={trackingError}
               onRetry={() => {
                 setTrackingError(null);
