@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 20 — verified Trust-Stack 4-improvement Marker Studio additions. BACKEND regression on 4 pre-existing suites: 35/40 tests pass; 5 failures ALL caused by missing ffmpeg binary in this fresh env (no code regression, exactly as the request warned). Public sample PDF endpoint GET /api/sample/scoutmeplay-report.pdf still returns 200 application/pdf 85,747 bytes (%PDF- magic confirmed). FRONTEND unit tests for spatioTemporal.js — 10/10 pass (boxCentreDist, maxPlausibleDelta, filterByMotion kept/rejected, scoreCandidate high/low/missing, MAX_PLAYER_SPEED_MPS===8 m/s, suggestSecondTapTime). FRONTEND E2E: logged in as testfree-mar@elitescout.com, /upload → Lock onto your player → MarkerStudio opens in ROSTER mode (ms-roster-overlay visible, INSTANT ROSTER badge, 'Tap your player from the list' headline). Roster scan finishes ≤1s on test clip → empty-state branch with ms-roster-rescan + ms-roster-manual. Click ms-roster-manual → MANUAL mode; ms-roster-overlay disappears; ms-back-to-roster visible. Old zoom buttons (ms-zoom-in, ms-zoom-out) — confirmed ABSENT (0/0). Manual marking still works: drew box on video, ms-add-anchor → label updates to 'REVIEW 1 ANCHOR → CONFIDENCE' (relabel confirmed). ms-confirm relabeled to 'REVIEW' (confirmed). Landing page sample-pdf-download-cta still present with correct href. Static code review confirmed all required testids exist in AnchorPreview.jsx (ms-preview-overlay, ms-preview-grid, ms-preview-back, ms-preview-second-tap, ms-preview-take-second-tap, ms-preview-done, ms-preview-anchor-{idx}, ms-preview-replace-{idx}, ms-preview-enrolling). 0 console errors / 0 pageerrors during the full UI session. NOTE: The PREVIEW-mode E2E flow (mounting the AnchorPreview overlay, second-tap CTA, done-gating, replace flow) COULD NOT be exercised live because headless Chromium in this container cannot decode the H264 test mp4 — ms-video reports error.code=4 (MEDIA_ERR_SRC_NOT_SUPPORTED), duration=NaN, videoWidth=0. Without a playable video, runAutoSuggest cannot produce suggested anchors and goToPreview's await runAutoSuggest() never reaches setStudioMode('PREVIEW'). This is a pure test-environment codec limitation, NOT a code defect.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "tests/test_iter19_thumbnail_verify.py + test_precision_engine.py + test_iter18_multianchor.py", "issue": "5 tests fail with FileNotFoundError: 'ffmpeg' — missing binary in this preview env. Not a code regression; same suites passed in iter19 when ffmpeg was installed. Install via: apt-get install -y ffmpeg."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_thumbnail_verify.py",
+    "/app/backend/tests/test_precision_engine.py",
+    "/app/backend/tests/test_iter18_multianchor.py",
+    "/app/backend/tests/test_archetype_4layer.py",
+    "/app/test_reports/pytest/iter20_regression.xml",
+    "/app/frontend/src/components/marker-studio/spatioTemporal.test.js"
+  ],
+  "action_items": [
+    "Install ffmpeg in the preview container: `apt-get update && apt-get install -y ffmpeg` — required so that the 5 video-frame-extraction tests (verify_and_pick_thumbnail, audio_events, extract_frame_at) can run. This is the SAME issue iter19's tester didn't see because ffmpeg was already installed then.",
+    "To E2E-test the new PREVIEW mode (Trust-Stack #3 & #4) you need a video clip that Chromium-headless in this container can decode (e.g. a small VP8/VP9 .webm — H264 mp4 fails with MEDIA_ERR_SRC_NOT_SUPPORTED here). Consider committing a tiny webm test fixture to /app/frontend/public/test-fixtures/ so future iterations can stop relying on external clip downloads.",
+    "Optional follow-up — runAutoSuggest at /app/frontend/src/components/MarkerStudio.jsx:814 silently returns when v.duration < 2. Suggest also surfacing a toast when v.duration is NaN (currently NaN<2 is false so we proceed into MediaPipe but with a 0x0 canvas — could fail in confusing ways). Low-priority because real users never see this state."
+  ],
+  "critical_code_review_comments": [
+    "MarkerStudio.jsx now 2148 lines (was ~1500 in iter19). With the addition of multiPoseRef state, goToPreview, handlePreviewReplace, handlePreviewSecondTap, runEnrollmentInBackground, and the rewritten runAutoSuggest, this file urgently needs to be split per the iter18/iter19 review comments. Extract: useRosterScan hook, useMultiPoseEnrollment hook, useAutoSuggest hook, separate AnchorOverlay component, separate ModeBar component. Current size makes regressions hard to spot.",
+    "goToPreview (MarkerStudio.jsx:1253) correctly guards autoSuggesting + missing video, but the dependency array on line 1269 deliberately omits runAutoSuggest with the comment 'stable via closure' — note that runAutoSuggest is NOT useCallback-wrapped, so each render creates a new closure. Capturing the first render's closure may miss state updates (anchors, multiPoseRef). Recommend wrapping runAutoSuggest in useCallback or hoisting it into the same useCallback as goToPreview to be safe.",
+    "AnchorPreview.jsx line 301 — `sorted.length - greenCount - yellowCount + yellowCount` collapses to `sorted.length - greenCount`. The redundant ±yellowCount looks like leftover refactor noise; clean up for readability.",
+    "spatioTemporal.test.js — 10/10 pass and cover the documented confidence bands + 8 m/s rule. Solid coverage for a pure-logic module. ✓",
+    "AnchorPreview.jsx done button label & disabled-state logic (line 327: `disabled={!doneAllowed || enrolling}`) matches the spec — DONE gated until ≥3 green anchors. Could not exercise live (no playable video) but static inspection confirms wiring is correct.",
+    "Public PDF endpoint still appropriate for the marketing CTA — recommend HTTP Cache-Control header (re-raised from iter19, still applies)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "87.5% (35/40 pytest; remaining 5 fail only because ffmpeg binary missing in this env — not a code regression) + public PDF endpoint 200 OK",
+    "frontend": "100% on every assertion the test environment could exercise (ROSTER default-mount + empty-state + manual-fallback round-trip + REVIEW relabel on ms-confirm and ms-done-fullwidth + ms-back-to-roster + zoom buttons absent + sample-pdf CTA + unit tests 10/10 + 0 console errors). PREVIEW-mode runtime behaviour NOT exercised — see context_for_next_testing_agent."
+  },
+  "test_credentials": "testfree-mar@elitescout.com / Free@2026! (used). admin not needed.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "CRITICAL ENV NOTE for future iterations: this preview Chromium cannot play arbitrary H264 mp4 inside a blob URL (ms-video gets error.code=4 / duration=NaN / videoWidth=0). To E2E-test ANY marker-studio flow that depends on the <video> actually being ready (PREVIEW mode, enrollment indicator, auto-suggest, second-tap CTA, replace flow), the test must feed a Chromium-compatible clip — recommended: a tiny VP9/Opus .webm baked into /app/frontend/public/test-fixtures/. With such a fixture you can exercise: (1) ms-enroll-indicator briefly appearing after ms-add-anchor, (2) clicking ms-done-fullwidth → runAutoSuggest → ms-preview-overlay visible, (3) ms-preview-grid card count, (4) ms-preview-anchor-N + 'Your tap' label + ms-preview-replace-N for non-user anchors, (5) ms-preview-second-tap + ms-preview-take-second-tap when <3 green (most likely on synthetic clips), (6) ms-preview-done disabled with label 'Need ≥ 3 strong anchors (X/3)' and enabled only at ≥3 green, (7) ms-preview-back returning to MANUAL with anchors intact, (8) Replace flow not appending to anchors[]. All required data-testid attributes were CONFIRMED PRESENT in /app/frontend/src/components/marker-studio/AnchorPreview.jsx via static inspection — only their runtime mounting is unverified. Also: ffmpeg needs `apt-get install -y ffmpeg` before re-running backend regression. Iter19 backend regression went green because ffmpeg WAS installed then; iter20's preview env was rebuilt without it.",
+  "rca of the issue": "No code bugs identified. Two environment limitations: (a) backend container missing ffmpeg binary → 5 video-frame tests cannot run; reproducible with `which ffmpeg` (empty); fix = install ffmpeg via apt; (b) headless Chromium codec gap → <video data-testid='ms-video'> fails to decode the test BBB H264 mp4, blocking the runtime PREVIEW E2E path. Reproduce: open studio, inspect document.querySelector('[data-testid=ms-video]').error.code → 4. Mitigation = use a VP9 webm fixture. Both limitations apply only to automated testing, NOT to real users on real browsers."
+}

@@ -42,6 +42,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { enrollFromMark } from "./marker-studio/multiPoseEnroll";
+import {
+  filterByMotion,
+  scoreCandidate,
+  suggestSecondTapTime,
+} from "./marker-studio/spatioTemporal";
+import AnchorPreview from "./marker-studio/AnchorPreview";
+
 /* ─────────────────────────────────────────────────────────────────────
  * Geometry helpers
  * ─────────────────────────────────────────────────────────────────── */
@@ -163,12 +171,29 @@ export default function MarkerStudio({
   // studioMode controls the top-level UX flow.
   //   "ROSTER"  → auto-scan video → show numbered roster tile grid → user taps their player
   //   "MANUAL"  → existing fullscreen mark/anchor flow (kept 100% intact as fallback)
+  //   "PREVIEW" → final review screen — anchors with confidence rings (Improvement #3)
   const [studioMode, setStudioMode] = useState("ROSTER");
   const [rosterScanning, setRosterScanning] = useState(false);
   const [rosterError, setRosterError] = useState("");
   const [rosterProgress, setRosterProgress] = useState(0); // 0..1
   const [rosterCandidates, setRosterCandidates] = useState([]); // [{id, color:[r,g,b], colorHex, appearances, bestT, bestBox, thumb}]
   const rosterRanRef = useRef(false);
+
+  // ── Trust Stack v1 — Improvements #1..#4 ─────────────────────────
+  //   multiPoseRef    : enrollment fingerprint built from ±5s around the user's first tap
+  //   enrolling       : true while enrollFromMark is running
+  //   enrollProgress  : 0..1 progress signal for the AnchorPreview overlay
+  //   refAnchorTime   : the time of the user's FIRST manual anchor — treated as ground truth,
+  //                     never replaced by AnchorPreview's Replace flow.
+  //   suggestedTapT   : recommended timestamp for the "one more tap" hint
+  //   replaceIdx      : when the user pressed Replace on a preview card, the index they want to redo
+  const [multiPoseRef, setMultiPoseRef] = useState(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollProgress, setEnrollProgress] = useState(0);
+  const [refAnchorTime, setRefAnchorTime] = useState(null);
+  const [suggestedTapT, setSuggestedTapT] = useState(null);
+  const [replaceIdx, setReplaceIdx] = useState(null);
+  const enrollAbortRef = useRef(null);
 
   // Auto-find detections (normalised 0..1 of wrapper rect, in dimmed-video coords)
   const [detections, setDetections] = useState([]);
@@ -211,6 +236,17 @@ export default function MarkerStudio({
       setRosterProgress(0);
       setRosterCandidates([]);
       rosterRanRef.current = false;
+      // Trust Stack v1
+      setMultiPoseRef(null);
+      setEnrolling(false);
+      setEnrollProgress(0);
+      setRefAnchorTime(null);
+      setSuggestedTapT(null);
+      setReplaceIdx(null);
+      if (enrollAbortRef.current) {
+        enrollAbortRef.current.abort();
+        enrollAbortRef.current = null;
+      }
     }
   }, [open]);
 
@@ -690,17 +726,88 @@ export default function MarkerStudio({
       box: { ...box },
       thumb,
     };
+    // If we're in REPLACE mode (user came from AnchorPreview "Replace"),
+    // swap that slot instead of appending.
+    if (replaceIdx != null && anchors[replaceIdx]) {
+      setAnchors((prev) =>
+        prev.map((a, i) => (i === replaceIdx ? { ...newAnchor, confidence: 1.0, band: "green" } : a)),
+      );
+      setBox(null);
+      setMode("navigate");
+      setReplaceIdx(null);
+      toast.success(`Anchor replaced. Returning to preview…`);
+      // Re-run auto-suggest with the refreshed reference fingerprint, then
+      // go back to preview.
+      setStudioMode("PREVIEW");
+      return;
+    }
+
+    const isFirstAnchor = anchors.length === 0;
     setAnchors((prev) => [...prev, newAnchor]);
     setBox(null);
     setMode("navigate");
+    // Track which anchor was the user's first manual tap — that's the ground
+    // truth we never let AnchorPreview "Replace" overwrite.
+    if (isFirstAnchor) setRefAnchorTime(newAnchor.t);
+
+    // Improvement #1 — kick off multi-pose enrollment in the background on
+    // the FIRST anchor only. Subsequent adds just append manually; they
+    // already trust the enrollment from the first tap.
+    if (isFirstAnchor) {
+      runEnrollmentInBackground(newAnchor);
+    } else if (anchors.length === 1 && multiPoseRef) {
+      // SECOND anchor — Improvement #4 fallback completed. Trigger a quick
+      // re-run of auto-suggest with the enriched reference.
+      setTimeout(() => { runAutoSuggest(); }, 300);
+    }
     toast.success(`Anchor ${anchors.length + 1} locked. ${anchors.length + 1 < 3 ? "Add more for tighter precision." : ""}`);
   };
+
+  /* ── Improvement #1 — run multi-pose enrollment silently in the background.
+   *    Tracks the user's marked player ±5s and gathers 8-14 same-player
+   *    crops so the auto-suggest stage can match against the full fingerprint
+   *    instead of a single brittle frame. */
+  const runEnrollmentInBackground = useCallback(async (anchor) => {
+    const v = videoRef.current;
+    if (!v || !anchor) return;
+    if (multiPoseRef) return; // already enrolled once
+    if (enrollAbortRef.current) enrollAbortRef.current.abort();
+    const ac = new AbortController();
+    enrollAbortRef.current = ac;
+    setEnrolling(true);
+    setEnrollProgress(0);
+    try {
+      const detector = await getDetector();
+      const ref = await enrollFromMark(v, anchor, detector, {
+        wrapperRect,
+        signal: ac.signal,
+        onProgress: (p) => setEnrollProgress(p),
+      });
+      if (ac.signal.aborted) return;
+      if (ref) {
+        setMultiPoseRef(ref);
+      } else {
+        toast.info(
+          "We couldn't track your kid past your first mark — add another anchor manually for better precision.",
+        );
+      }
+    } catch (err) {
+      console.warn("Enrollment failed", err);
+    } finally {
+      setEnrolling(false);
+      setEnrollProgress(1);
+    }
+  }, [wrapperRect, multiPoseRef]);
 
   const removeAnchor = (idx) => {
     setAnchors((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  /* ── Auto-suggest 5 anchors using MediaPipe + jersey-colour matching ─ */
+  /* ── Auto-suggest 5 anchors — Trust-Stack v1.
+   *    Uses the multiPoseRef (Improvement #1) for matching, scores each
+   *    candidate with scoreCandidate (#2's confidence math), applies the
+   *    spatial-temporal sanity filter (#2), and transitions to the
+   *    AnchorPreview screen (#3) on completion.                       */
   const runAutoSuggest = async () => {
     const v = videoRef.current;
     if (!v) return;
@@ -715,123 +822,88 @@ export default function MarkerStudio({
     setAutoSuggesting(true);
     setAutoSuggestError("");
     try {
-      // Reference jersey colour: from the first anchor if any, otherwise from the current box
-      let refRGB = null;
-      const sampleColor = (b) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = v.videoWidth;
-        canvas.height = v.videoHeight;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(v, 0, 0);
-        const bounds = renderedVideoBounds(v);
-        const wrapperW = wrapperRect.w || 1;
-        const wrapperH = wrapperRect.h || 1;
-        const bxPx = b.x * wrapperW;
-        const byPx = b.y * wrapperH;
-        const bwPx = b.w * wrapperW;
-        const bhPx = b.h * wrapperH;
-        const nx = (bxPx - bounds.x) / bounds.w;
-        const ny = (byPx - bounds.y) / bounds.h;
-        const nw = bwPx / bounds.w;
-        const nh = bhPx / bounds.h;
-        // upper torso ~ middle 60% width, top 18-55% of height
-        const sx = Math.max(0, Math.floor((nx + nw * 0.2) * v.videoWidth));
-        const sy = Math.max(0, Math.floor((ny + nh * 0.18) * v.videoHeight));
-        const sw = Math.floor(nw * v.videoWidth * 0.6);
-        const sh = Math.floor(nh * v.videoHeight * 0.37);
-        if (sw < 4 || sh < 4) return null;
-        const data = ctx.getImageData(sx, sy, sw, sh).data;
-        let r = 0, g = 0, bb = 0, n = 0;
-        for (let i = 0; i < data.length; i += 16) { // sample sparsely
-          r += data[i]; g += data[i + 1]; bb += data[i + 2]; n++;
-        }
-        return n ? [Math.round(r / n), Math.round(g / n), Math.round(bb / n)] : null;
-      };
-
-      if (anchors.length) {
-        // Use the first anchor: seek there, grab colour
-        const wasPlaying = !v.paused;
-        v.pause();
-        await new Promise((res) => {
-          const onSeeked = () => { v.removeEventListener("seeked", onSeeked); res(); };
-          v.addEventListener("seeked", onSeeked);
-          try { v.currentTime = anchors[0].t; } catch { res(); }
-          setTimeout(res, 800);
-        });
-        refRGB = sampleColor(anchors[0].box);
-        if (wasPlaying) v.play().catch(() => {});
-      } else if (box) {
-        refRGB = sampleColor(box);
-      }
-      if (!refRGB) refRGB = [128, 128, 128];
-
       const det = await getDetector();
 
-      // Sample N=6 candidate timestamps across the video. Avoid the first 1s and last 1s.
-      const N = 6;
-      const dur = Math.max(1, v.duration - 2);
-      const candidates = [];
-      for (let i = 0; i < N; i++) {
-        candidates.push(1 + (dur * i) / Math.max(1, N - 1));
+      // 1) Ensure we have a fingerprint to match against.
+      let ref = multiPoseRef;
+      if (!ref) {
+        // Build a quick one — anchors[0] (or current box) becomes the seed
+        const seedAnchor = anchors.length
+          ? anchors[0]
+          : { t: v.currentTime || 0, box };
+        setEnrolling(true);
+        ref = await enrollFromMark(v, seedAnchor, det, {
+          wrapperRect,
+          onProgress: (p) => setEnrollProgress(p),
+        });
+        setEnrolling(false);
+        if (ref) setMultiPoseRef(ref);
       }
-      // Drop any candidate too close to an existing anchor (within 2s)
-      const filtered = candidates.filter((t) => {
-        if (anchors.some((a) => Math.abs(a.t - t) < 2.0)) return false;
-        return true;
-      });
+      if (!ref) {
+        // No enrollment possible — degrade to single-frame match against the
+        // seed anchor's jersey colour (legacy behaviour, but with confidence).
+        ref = {
+          avgJerseyRGB: [128, 128, 128],
+          avgShortsRGB: null,
+          avgHairRGB: null,
+          crops: [],
+        };
+      }
 
-      const colorDist = (a, b) => Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
       const wrapperW = wrapperRect.w || 1;
       const wrapperH = wrapperRect.h || 1;
       const bounds = renderedVideoBounds(v);
-      const newAnchors = [];
 
+      // 2) Sample N=8 candidate timestamps across the video (skip first/last 1s).
+      const N = 8;
+      const dur = Math.max(1, v.duration - 2);
+      const candidates = [];
+      for (let i = 0; i < N; i++) candidates.push(1 + (dur * i) / Math.max(1, N - 1));
+      // Drop candidates too close to existing anchors (within 1.5 s)
+      const filtered = candidates.filter(
+        (t) => !anchors.some((a) => Math.abs(a.t - t) < 1.5),
+      );
+
+      const scoredAnchors = [];
       for (const t of filtered) {
-        if (anchors.length + newAnchors.length >= MAX_ANCHORS) break;
         // Seek
         await new Promise((res) => {
           const onSeeked = () => { v.removeEventListener("seeked", onSeeked); res(); };
           v.addEventListener("seeked", onSeeked);
           try { v.currentTime = t; } catch { res(); }
-          setTimeout(res, 800);
+          setTimeout(res, 700);
         });
-        // Capture frame
+        // Draw and detect
         const canvas = document.createElement("canvas");
         canvas.width = v.videoWidth;
         canvas.height = v.videoHeight;
-        canvas.getContext("2d").drawImage(v, 0, 0);
-        const result = det.detect(canvas);
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(v, 0, 0);
+        let result;
+        try { result = det.detect(canvas); } catch { result = null; }
         if (!result?.detections?.length) continue;
 
-        // For each detection, sample its jersey colour and compare to refRGB
+        // Score each detection against multiPoseRef; keep the best.
         let best = null;
         for (const d of result.detections) {
           const bb = d.boundingBox;
-          const dx = bb.originX + bb.width * 0.25;
-          const dy = bb.originY + bb.height * 0.20;
-          const dw = bb.width * 0.5;
-          const dh = bb.height * 0.35;
-          if (dw < 4 || dh < 4) continue;
-          try {
-            const data = canvas.getContext("2d").getImageData(
-              Math.max(0, Math.floor(dx)),
-              Math.max(0, Math.floor(dy)),
-              Math.min(canvas.width - dx, Math.floor(dw)),
-              Math.min(canvas.height - dy, Math.floor(dh)),
-            ).data;
-            let r = 0, g = 0, bg = 0, n = 0;
-            for (let i = 0; i < data.length; i += 16) {
-              r += data[i]; g += data[i + 1]; bg += data[i + 2]; n++;
-            }
-            if (!n) continue;
-            const meanRGB = [Math.round(r / n), Math.round(g / n), Math.round(bg / n)];
-            const dist = colorDist(meanRGB, refRGB);
-            if (!best || dist < best.dist) best = { d, dist };
-          } catch { /* ignore */ }
+          if (bb.width < 18 || bb.height < 36) continue;
+          const cand = {
+            jerseyRGB: sampleRegion(ctx, bb, "jersey"),
+            shortsRGB: sampleRegion(ctx, bb, "shorts"),
+            hairRGB: sampleRegion(ctx, bb, "hair"),
+            area: bb.width * bb.height,
+            bbox: bb,
+          };
+          const { score, band, detail } = scoreCandidate(cand, ref);
+          if (!best || score > best.score) {
+            best = { bbox: bb, score, band, detail };
+          }
         }
-        if (!best || best.dist > 90) continue; // too different from reference
-        // Convert detection to normalised wrapper coords
-        const bb = best.d.boundingBox;
+        if (!best || best.score < 0.60) continue; // below confidence floor
+
+        // Build the wrapper-normalised box and a thumb.
+        const bb = best.bbox;
         const px = (bb.originX / v.videoWidth) * bounds.w + bounds.x;
         const py = (bb.originY / v.videoHeight) * bounds.h + bounds.y;
         const pw = (bb.width / v.videoWidth) * bounds.w;
@@ -839,45 +911,60 @@ export default function MarkerStudio({
         const nbox = {
           x: clamp(px / wrapperW, 0, 1),
           y: clamp(py / wrapperH, 0, 1),
-          w: clamp(pw / wrapperW, 0.02, 1),
-          h: clamp(ph / wrapperH, 0.02, 1),
+          w: clamp(pw / wrapperW, MIN_BOX_FRAC, 1),
+          h: clamp(ph / wrapperH, MIN_BOX_FRAC, 1),
         };
-        // Build thumb (we need to temporarily set state to box-mode-look; just build the canvas)
         const thumbCanvas = document.createElement("canvas");
-        const thumbW = 96;
+        const thumbW = 160;
         const thumbH = Math.round(thumbW * (ph / pw));
         thumbCanvas.width = thumbW;
         thumbCanvas.height = thumbH;
-        // Crop the detection region with 25% padding
-        const padX = pw * 0.25;
-        const padY = ph * 0.25;
-        const sx = Math.max(0, px - padX) * (canvas.width / wrapperW * (wrapperW / bounds.w));
-        // Simpler: crop in canvas-native pixels using detection box directly
-        const cx = Math.max(0, bb.originX - bb.width * 0.25);
-        const cy = Math.max(0, bb.originY - bb.height * 0.25);
-        const cw = Math.min(canvas.width - cx, bb.width * 1.5);
-        const ch = Math.min(canvas.height - cy, bb.height * 1.5);
-        const tctx = thumbCanvas.getContext("2d");
-        tctx.drawImage(canvas, cx, cy, cw, ch, 0, 0, thumbW, thumbH);
-        tctx.strokeStyle = "#CCFF00";
-        tctx.lineWidth = 2;
-        tctx.strokeRect(1, 1, thumbW - 2, thumbH - 2);
-        // unused vars to satisfy linter
-        void sx; void nbox;
-        newAnchors.push({
+        const cx = Math.max(0, bb.originX - bb.width * 0.22);
+        const cy = Math.max(0, bb.originY - bb.height * 0.22);
+        const cw = Math.min(canvas.width - cx, bb.width * 1.44);
+        const ch = Math.min(canvas.height - cy, bb.height * 1.44);
+        thumbCanvas.getContext("2d").drawImage(canvas, cx, cy, cw, ch, 0, 0, thumbW, thumbH);
+        scoredAnchors.push({
           t,
           box: nbox,
-          thumb: thumbCanvas.toDataURL("image/jpeg", 0.7),
+          thumb: thumbCanvas.toDataURL("image/jpeg", 0.82),
+          confidence: best.score,
+          band: best.band,
+          detail: best.detail,
           suggested: true,
         });
       }
 
-      if (!newAnchors.length) {
-        setAutoSuggestError("Couldn't find enough matching frames. Add a few anchors manually.");
-        return;
+      // 3) Apply spatial-temporal filter — reject teleporting candidates.
+      const seedAnchor = anchors[0]
+        ? { t: anchors[0].t, box: anchors[0].box, confidence: 1.0 }
+        : null;
+      const { kept, rejected } = filterByMotion(scoredAnchors, seedAnchor);
+      if (rejected.length) {
+        console.info(
+          `[Trust] rejected ${rejected.length} teleporting candidate(s):`,
+          rejected.map((r) => r.reason),
+        );
       }
-      setAnchors((prev) => [...prev, ...newAnchors]);
-      toast.success(`Added ${newAnchors.length} AI-suggested anchor${newAnchors.length === 1 ? "" : "s"}.`);
+      if (!kept.length) {
+        setAutoSuggestError("Couldn't lock 5 strong matches. Add a manual anchor or try a second tap below.");
+        // Still transition to preview with whatever we have — including the
+        // user's first anchor — so the second-tap CTA appears.
+      }
+
+      // 4) Append kept anchors, but cap total at MAX_ANCHORS. Keep the user's
+      //    manual anchors as ground-truth; new ones are confidence-scored.
+      const combined = [...anchors, ...kept].slice(0, MAX_ANCHORS);
+      setAnchors(combined);
+
+      // 5) Compute the suggested second-tap time and transition to preview.
+      const refT = refAnchorTime ?? anchors[0]?.t ?? null;
+      const suggested = suggestSecondTapTime(kept, refT);
+      setSuggestedTapT(suggested);
+      setStudioMode("PREVIEW");
+      if (kept.length) {
+        toast.success(`Added ${kept.length} AI-suggested anchor${kept.length === 1 ? "" : "s"}. Review confidence rings →`);
+      }
     } catch (err) {
       console.error("Auto-suggest error", err);
       setAutoSuggestError("Auto-suggest failed. Try adding anchors manually.");
@@ -885,6 +972,39 @@ export default function MarkerStudio({
       setAutoSuggesting(false);
     }
   };
+
+  /** Local helper — sample a body region (jersey/shorts/hair) of a detection box. */
+  function sampleRegion(ctx, bb, region) {
+    let sx, sy, sw, sh;
+    if (region === "jersey") {
+      sx = bb.originX + bb.width * 0.25;
+      sy = bb.originY + bb.height * 0.18;
+      sw = bb.width * 0.5; sh = bb.height * 0.35;
+    } else if (region === "shorts") {
+      sx = bb.originX + bb.width * 0.30;
+      sy = bb.originY + bb.height * 0.55;
+      sw = bb.width * 0.40; sh = bb.height * 0.22;
+    } else { // hair
+      sx = bb.originX + bb.width * 0.30;
+      sy = bb.originY;
+      sw = bb.width * 0.40; sh = bb.height * 0.15;
+    }
+    sx = Math.max(0, Math.floor(sx));
+    sy = Math.max(0, Math.floor(sy));
+    sw = Math.max(2, Math.floor(sw));
+    sh = Math.max(2, Math.floor(sh));
+    if (sw < 4 || sh < 4) return null;
+    try {
+      const data = ctx.getImageData(sx, sy, sw, sh).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < data.length; i += 20) {
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+      }
+      return n ? [Math.round(r / n), Math.round(g / n), Math.round(b / n)] : null;
+    } catch {
+      return null;
+    }
+  }
 
   /* ── Instant Roster scan — sample frames across the video,
    *     detect every person, cluster by jersey colour into unique
@@ -1120,8 +1240,65 @@ export default function MarkerStudio({
     setMode("navigate");
     setStudioMode("MANUAL");
     setCurrentTime(cand.bestT);
-    toast.success(`Roster #${cand.number} locked. Add more anchors for tighter precision, or tap ✓ DONE.`);
-  }, [wrapperRect]);
+    setRefAnchorTime(newAnchor.t);
+    // Improvement #1 — kick off multi-pose enrollment from this tile pick
+    runEnrollmentInBackground(newAnchor);
+    toast.success(`Roster #${cand.number} locked. Tap ✨ Find player to lock 5 anchors, or ✓ Done.`);
+  }, [wrapperRect, runEnrollmentInBackground]);
+
+  /* ── DONE button in MANUAL mode → route through the AnchorPreview screen
+   *    instead of submitting directly. Improvement #3 of the Trust Stack.
+   *    Runs auto-suggest first (if it hasn't been run yet) so the preview
+   *    has the 5 confidence-scored anchors. */
+  const goToPreview = useCallback(async () => {
+    if (autoSuggesting) return;
+    const v = videoRef.current;
+    if (!v) return;
+    if (!anchors.length && !box) {
+      toast.error("Lock onto your player first.");
+      return;
+    }
+    // If the user has only one manual anchor and we haven't auto-suggested
+    // yet → run it now to populate the preview.
+    const suggestedCount = anchors.filter((a) => a.suggested).length;
+    if (suggestedCount === 0) {
+      await runAutoSuggest();
+    } else {
+      setStudioMode("PREVIEW");
+    }
+  }, [autoSuggesting, anchors, box]); // runAutoSuggest is stable via closure
+
+  /* ── Improvement #4 — user took the second-tap hint. Drop them back into
+   *    MANUAL mode pre-seeked to the suggested timestamp; they re-mark and
+   *    we re-run auto-suggest with double the reference data. */
+  const handlePreviewSecondTap = useCallback((t) => {
+    const v = videoRef.current;
+    if (!v || t == null) return;
+    setStudioMode("MANUAL");
+    setMode("box");
+    setBox(null);
+    setCurrentTime(t);
+    try { v.currentTime = t; } catch { /* noop */ }
+    toast.info("Tap your kid in this frame — we'll re-run with both anchors.");
+  }, []);
+
+  /* ── User pressed "Replace" on an anchor in the preview. Drop them back
+   *    into MANUAL pre-seeked to that timestamp. When they re-add an anchor,
+   *    we replace the slot rather than appending. */
+  const handlePreviewReplace = useCallback((idx) => {
+    const sorted = [...anchors].sort((a, b) => a.t - b.t);
+    const target = sorted[idx];
+    if (!target) return;
+    setReplaceIdx(anchors.indexOf(target));
+    setStudioMode("MANUAL");
+    setMode("box");
+    setBox(null);
+    const v = videoRef.current;
+    if (v) {
+      try { v.currentTime = target.t; } catch { /* noop */ }
+    }
+    toast.info(`Re-mark your kid at ${formatTime(target.t)}.`);
+  }, [anchors]);
 
   /* ── Final Done — submit all anchors plus the marker JPG ───── */
   const handleDone = () => {
@@ -1334,21 +1511,25 @@ export default function MarkerStudio({
               </button>
             </>
           )}
-          {/* DONE — visible only in MANUAL mode (full-width row below also appears when anchors locked) */}
+          {/* DONE/REVIEW — visible only in MANUAL mode (full-width row below
+              also appears when anchors locked). In MANUAL mode this DOES NOT
+              submit directly; it routes through the AnchorPreview screen so
+              the user can review the 5 anchors with confidence rings before
+              committing. */}
           {studioMode === "MANUAL" && (
             <button
               type="button"
-              onClick={handleDone}
-              disabled={(!box && !anchors.length) || !videoReady}
+              onClick={goToPreview}
+              disabled={(!box && !anchors.length) || !videoReady || autoSuggesting}
               data-testid="ms-confirm"
               className={`px-3 h-10 flex items-center gap-1.5 text-[12px] uppercase tracking-widest font-black transition-colors ${
-                (anchors.length || box) && videoReady
+                (anchors.length || box) && videoReady && !autoSuggesting
                   ? "bg-[#CCFF00] text-ink hover:bg-[#CCFF00]/90"
                   : "bg-white/10 text-white/30"
               }`}
             >
-              <Check className="w-4 h-4" />
-              {anchors.length || box ? "Done" : "Lock"}
+              {autoSuggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {anchors.length || box ? "Review" : "Lock"}
             </button>
           )}
           {studioMode === "ROSTER" && (
@@ -1641,23 +1822,39 @@ export default function MarkerStudio({
           {hint}
         </div>
 
-        {/* Full-width DONE button when at least 1 anchor (or a pending box) is ready */}
+        {/* Full-width REVIEW button when at least 1 anchor (or a pending box) is ready.
+            Routes through the AnchorPreview screen — see Trust Stack Improvement #3. */}
         {(anchors.length > 0 || box) && (
           <div className="px-3 pb-3">
             <button
               type="button"
-              onClick={handleDone}
-              disabled={!videoReady}
+              onClick={goToPreview}
+              disabled={!videoReady || autoSuggesting}
               data-testid="ms-done-fullwidth"
               className={`w-full h-12 flex items-center justify-center gap-2 text-[13px] uppercase tracking-widest font-black transition-all ${
-                videoReady
+                videoReady && !autoSuggesting
                   ? "bg-[#CCFF00] text-ink hover:bg-[#CCFF00]/90 shadow-[0_0_22px_rgba(204,255,0,0.45)]"
                   : "bg-white/10 text-white/40"
               }`}
             >
-              <Check className="w-5 h-5" />
-              Done · {Math.max(1, anchors.length + (box ? 1 : 0))} anchor{(anchors.length + (box ? 1 : 0)) === 1 ? "" : "s"} → analyse
+              {autoSuggesting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Finding {Math.max(1, anchors.length + (box ? 1 : 0))}/5 anchors…
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5" />
+                  Review {Math.max(1, anchors.length + (box ? 1 : 0))} anchor{(anchors.length + (box ? 1 : 0)) === 1 ? "" : "s"} → confidence
+                </>
+              )}
             </button>
+            {enrolling && (
+              <div className="mt-2 flex items-center gap-2 text-[10px] text-white/65" data-testid="ms-enroll-indicator">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Learning your kid&apos;s look — {Math.round((enrollProgress || 0) * 100)} %
+              </div>
+            )}
           </div>
         )}
 
@@ -1702,6 +1899,22 @@ export default function MarkerStudio({
             setRosterProgress(0);
             runRosterScan();
           }}
+        />
+      )}
+
+      {/* ── Anchor Preview overlay — Trust Stack Improvement #3 + #4 ── */}
+      {studioMode === "PREVIEW" && (
+        <AnchorPreview
+          open={true}
+          anchors={anchors}
+          refAnchorT={refAnchorTime}
+          onReplace={handlePreviewReplace}
+          onSecondTap={handlePreviewSecondTap}
+          onDone={handleDone}
+          onBack={() => setStudioMode("MANUAL")}
+          suggestedTapTime={suggestedTapT}
+          enrolling={enrolling || autoSuggesting}
+          enrollProgress={autoSuggesting ? 0.5 : enrollProgress}
         />
       )}
 
