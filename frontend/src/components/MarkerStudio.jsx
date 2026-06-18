@@ -1650,15 +1650,22 @@ export default function MarkerStudio({
       >
         {/* Scaled layer — video + box live here so they zoom/pan together */}
         <div className="absolute inset-0 pointer-events-none" style={transformStyle}>
-          <video
-            ref={videoRef}
-            src={activeUrl}
-            playsInline
-            preload="metadata"
-            className="w-full h-full object-contain bg-black"
-            data-testid="ms-video"
-          />
-          {/* The box overlay (rendered in normalised wrapper coords) */}
+          {/* NOTE: when Scout Mode is open we DO NOT mount this <video>
+              element. Two <video> tags pointing at the same source URL
+              compete for the iOS Safari media decoder and one ends up
+              black after the boot scrub. Scout Mode has its own <video>;
+              we yield the decoder to it. The element re-mounts cleanly
+              when the user cancels Scout Mode and falls back to MANUAL. */}
+          {!scoutOpen && (
+            <video
+              ref={videoRef}
+              src={activeUrl}
+              playsInline
+              preload="metadata"
+              className="w-full h-full object-contain bg-black"
+              data-testid="ms-video"
+            />
+          )}          {/* The box overlay (rendered in normalised wrapper coords) */}
           {box && (
             <div
               className="absolute"
