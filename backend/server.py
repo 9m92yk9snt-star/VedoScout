@@ -10,6 +10,7 @@ import shutil
 import re
 import base64
 import tempfile
+import asyncio
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Tuple
@@ -2490,6 +2491,221 @@ async def scout_detect_players(req: _ScoutDetectRequest):
         if tmp_path:
             try:
                 os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+# ── Scout Mode v4 — Track ONE Player Across Multiple Frames ─────────
+#
+# The user taps ONE player in the first keyframe. This endpoint then asks
+# Gemini Vision to find that SAME player in each of the other 9 keyframes
+# — using jersey, shorts, body shape, hair, sock colour, every visual cue.
+# Calls run in parallel (`asyncio.gather`) so 9 frames complete in ~15-20 s
+# instead of ~90 s sequential.
+
+class _TrackRefBox(BaseModel):
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+class _TrackRef(BaseModel):
+    image: str          # data URL or raw base64 of the FRAME the user tapped on
+    box: _TrackRefBox   # fractional 0-1 location of the tapped player
+
+
+class _TrackTarget(BaseModel):
+    id: str             # caller-provided identifier (e.g. "hint-2")
+    image: str          # data URL or raw base64 of the frame to search
+
+
+class _TrackPlayerRequest(BaseModel):
+    reference: _TrackRef
+    targets: list[_TrackTarget]
+
+
+def _decode_data_url(s: str) -> bytes:
+    """Strip optional data-URL header and base64-decode the payload."""
+    raw = s or ""
+    if raw.startswith("data:"):
+        try:
+            _, b64 = raw.split(",", 1)
+        except ValueError:
+            raise ValueError("Invalid data URL")
+    else:
+        b64 = raw
+    return base64.b64decode(b64)
+
+
+def _build_track_prompt(ref_box: dict) -> str:
+    """Crafts the Gemini prompt for one ref→target re-identification call."""
+    return (
+        "You are a professional football-analysis assistant.\n\n"
+        "IMAGE 1 is a frame from a youth football match. The PLAYER I want "
+        "to track is the kid inside the bounding box:\n"
+        f"  x = {ref_box['x']:.3f},  y = {ref_box['y']:.3f},  "
+        f"w = {ref_box['w']:.3f},  h = {ref_box['h']:.3f}\n"
+        "(coordinates are 0–1 fractions of IMAGE 1).\n\n"
+        "IMAGE 2 is a DIFFERENT frame from the SAME match (same two teams, "
+        "same kit colours, same pitch). Your job is to find the EXACT SAME "
+        "player in IMAGE 2.\n\n"
+        "Use every visual cue available:\n"
+        "  • jersey colour / kit pattern\n"
+        "  • shorts colour\n"
+        "  • sock colour\n"
+        "  • body shape / build / height\n"
+        "  • hair colour / style\n"
+        "  • skin tone\n"
+        "  • position on the pitch and orientation of play\n\n"
+        "Return a TIGHT bounding box hugging the player in IMAGE 2, with "
+        "coordinates as 0–1 fractions of IMAGE 2 size:\n"
+        '  { "box": { "x": 0.0, "y": 0.0, "w": 0.0, "h": 0.0 }, '
+        '"confidence": 0.0-1.0, "reason": "<short reason>" }\n\n'
+        "If the player is NOT visible in IMAGE 2 OR you cannot identify them "
+        "with reasonable confidence, respond:\n"
+        '  { "box": null, "confidence": 0.0, "reason": "not visible" }\n\n'
+        "Respond with VALID JSON ONLY — no markdown fences, no commentary."
+    )
+
+
+async def _track_one_frame(ref_path: str, ref_box: dict, target_path: str, target_id: str) -> dict:
+    """Single ref→target Gemini call. Always returns a dict (never raises)."""
+    try:
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"scout-track-{uuid.uuid4().hex}",
+            system_message=(
+                "You are a precise computer-vision assistant for football "
+                "scouting. You return tight bounding boxes for ONE specific "
+                "player across multiple match frames. You always respond "
+                "with VALID JSON."
+            ),
+        ).with_model("gemini", "gemini-2.5-pro")
+        msg = UserMessage(
+            text=_build_track_prompt(ref_box),
+            file_contents=[
+                FileContentWithMimeType(file_path=ref_path, mime_type="image/jpeg"),
+                FileContentWithMimeType(file_path=target_path, mime_type="image/jpeg"),
+            ],
+        )
+        response = await chat.send_message(msg)
+        text = response if isinstance(response, str) else str(response)
+        try:
+            parsed = extract_json(text)
+        except Exception as e:
+            logger.warning(f"Scout track[{target_id}]: parse_failed {e} | head={text[:240]}")
+            return {"id": target_id, "box": None, "confidence": 0.0, "reason": "parse_failed"}
+
+        box_raw = parsed.get("box")
+        conf = float(parsed.get("confidence", 0) or 0)
+        reason = str(parsed.get("reason", ""))[:120]
+
+        if not box_raw or not isinstance(box_raw, dict):
+            return {"id": target_id, "box": None, "confidence": conf, "reason": reason or "not_found"}
+
+        try:
+            x = float(box_raw.get("x", 0))
+            y = float(box_raw.get("y", 0))
+            w = float(box_raw.get("w", box_raw.get("width", 0)))
+            h = float(box_raw.get("h", box_raw.get("height", 0)))
+            if w <= 0 or h <= 0:
+                return {"id": target_id, "box": None, "confidence": conf, "reason": reason or "zero_box"}
+            return {
+                "id": target_id,
+                "box": {
+                    "x": max(0.0, min(1.0, x)),
+                    "y": max(0.0, min(1.0, y)),
+                    "w": max(0.005, min(1.0, w)),
+                    "h": max(0.005, min(1.0, h)),
+                },
+                "confidence": max(0.0, min(1.0, conf)),
+                "reason": reason,
+            }
+        except Exception:
+            return {"id": target_id, "box": None, "confidence": conf, "reason": "bad_coords"}
+    except Exception as e:
+        logger.warning(f"Scout track[{target_id}]: gemini_call_failed {e}")
+        return {"id": target_id, "box": None, "confidence": 0.0, "reason": "gemini_error"}
+
+
+@api_router.post("/scout/track-player")
+async def scout_track_player(req: _TrackPlayerRequest):
+    """Re-identify the tapped player across multiple keyframes in parallel.
+
+    Input:
+      {
+        "reference": { "image": "data:image/jpeg;base64,...", "box": {x,y,w,h} },
+        "targets":   [{ "id": "hint-2", "image": "data:..." }, ... up to ~12]
+      }
+
+    Output:
+      {
+        "matches": [
+          { "id": "hint-2", "box": {x,y,w,h}, "confidence": 0.92, "reason": "white jersey + black shorts" },
+          { "id": "hint-3", "box": null,      "confidence": 0.0,  "reason": "not visible" },
+          ...
+        ]
+      }
+
+    Box coordinates are 0–1 fractional. The endpoint NEVER raises — failed
+    Gemini calls return `box: null` so the frontend can flag them in the
+    review grid for the user to manually retap.
+    """
+    if not req.targets:
+        raise HTTPException(status_code=400, detail="targets list is empty")
+    if len(req.targets) > 14:
+        raise HTTPException(status_code=400, detail="too many targets (max 14)")
+
+    # Decode reference image
+    try:
+        ref_bytes = _decode_data_url(req.reference.image)
+        if len(ref_bytes) < 1024:
+            raise ValueError("reference too small")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid reference image")
+    ref_box = req.reference.box.dict()
+
+    # Write reference + every target image to temp files (Gemini SDK reads from disk)
+    temp_paths: list[str] = []
+    target_paths: list[tuple[str, str]] = []  # (id, path)
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+            f.write(ref_bytes)
+            ref_path = f.name
+            temp_paths.append(ref_path)
+
+        for t in req.targets:
+            try:
+                tb = _decode_data_url(t.image)
+                if len(tb) < 512:
+                    target_paths.append((t.id, ""))
+                    continue
+            except Exception:
+                target_paths.append((t.id, ""))
+                continue
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                f.write(tb)
+                target_paths.append((t.id, f.name))
+                temp_paths.append(f.name)
+
+        # PARALLEL Gemini calls — the whole reason this endpoint exists.
+        async def _stub_invalid(tid: str) -> dict:
+            return {"id": tid, "box": None, "confidence": 0.0, "reason": "invalid_target"}
+
+        tasks = []
+        for (tid, tpath) in target_paths:
+            if not tpath:
+                tasks.append(_stub_invalid(tid))
+            else:
+                tasks.append(_track_one_frame(ref_path, ref_box, tpath, tid))
+
+        matches = await asyncio.gather(*tasks)
+        return {"matches": list(matches)}
+    finally:
+        for p in temp_paths:
+            try:
+                os.unlink(p)
             except Exception:
                 pass
 
