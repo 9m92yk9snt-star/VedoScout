@@ -64,7 +64,7 @@ async function getScoutDetector() {
         modelAssetPath:
           "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite",
       },
-      scoreThreshold: 0.15, // permissive — catch small distant players in motion blur
+      scoreThreshold: 0.10, // max recall — catch small distant players & motion blur
       maxResults: 40,        // raise — we filter aggressively for tall/human-shaped below
       runningMode: "IMAGE",
       categoryAllowlist: ["person"],
@@ -255,6 +255,31 @@ export default function ScoutMode({
     return () => ro.disconnect();
   }, []);
 
+  // ── Wait for the next painted video frame ─────────────────────────
+  //   On iOS Safari (and sometimes Android Chrome), the `seeked` event
+  //   fires BEFORE the new frame is actually presented to the compositor.
+  //   Calling `drawImage(v, 0, 0)` immediately captures the previous frame
+  //   (often black, since the video was paused mid-seek). Result: detector
+  //   gets a blank canvas and returns 0 detections → no chips above kids.
+  //
+  //   `requestVideoFrameCallback` is the standard hook that fires right
+  //   AFTER each new frame is presented. Fallback: two RAF ticks (one to
+  //   schedule + one to wait for paint).
+  const waitForFreshFrame = useCallback((videoEl) => {
+    return new Promise((resolve) => {
+      if (!videoEl) return resolve();
+      if (typeof videoEl.requestVideoFrameCallback === "function") {
+        let done = false;
+        const t = setTimeout(() => { if (!done) { done = true; resolve(); } }, 400);
+        videoEl.requestVideoFrameCallback(() => {
+          if (!done) { done = true; clearTimeout(t); resolve(); }
+        });
+      } else {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      }
+    });
+  }, []);
+
   // ── Run MediaPipe on the current frame whenever it stabilises ──────
   const runDetectionOnCurrent = useCallback(async () => {
     const v = videoRef.current;
@@ -262,6 +287,10 @@ export default function ScoutMode({
     if (!v || !det || v.readyState < 2 || !v.videoWidth) return;
     setDetecting(true);
     try {
+      // CRITICAL: wait for the newly-seeked frame to actually paint before
+      // capturing it. Skipping this is what causes "AI sees nothing" on iOS.
+      await waitForFreshFrame(v);
+
       let canvas = renderCanvasRef.current;
       if (!canvas) {
         canvas = document.createElement("canvas");
@@ -273,6 +302,13 @@ export default function ScoutMode({
       ctx.drawImage(v, 0, 0);
       const result = det.detect(canvas);
       const allRaw = result?.detections || [];
+
+      // Diagnostic log — helps if user opens Safari Web Inspector
+      if (allRaw.length === 0) {
+        console.info("[ScoutMode] detector ran but found 0 boxes for t=", v.currentTime);
+      } else {
+        console.info(`[ScoutMode] detector found ${allRaw.length} raw boxes for t=`, v.currentTime);
+      }
 
       // Keep the raw boxes for the debug overlay (no filtering, no sort).
       setRawDetections(
@@ -319,11 +355,16 @@ export default function ScoutMode({
     } finally {
       setDetecting(false);
     }
-  }, []);
+  }, [waitForFreshFrame]);
 
+  // Debounced trigger — wait 250 ms after currentTime stops changing so
+  // we don't thrash the detector while the user is dragging the scrubber.
   useEffect(() => {
     if (!open || booting || !videoReady) return;
-    runDetectionOnCurrent();
+    const id = setTimeout(() => {
+      runDetectionOnCurrent();
+    }, 250);
+    return () => clearTimeout(id);
   }, [open, booting, videoReady, currentTime, runDetectionOnCurrent]);
 
   // ── Tap handler — locks a detection as the next anchor ────────────
@@ -750,11 +791,27 @@ export default function ScoutMode({
                 · {TARGET_TAPS - anchors.length} more
               </span>
             </div>
-            {detectorStatus === "failed" && (
-              <div className="mt-1 text-[9px] uppercase tracking-widest font-black text-white/65 bg-ink/85 px-2 py-0.5">
-                AI offline — tap directly
-              </div>
-            )}
+            {/* AI status — tells user honestly how many players the AI sees */}
+            <div
+              className={`mt-1 text-[10px] uppercase tracking-widest font-black px-2 py-0.5 ${
+                detectorStatus === "failed"
+                  ? "text-white/65 bg-ink/85"
+                  : detecting
+                    ? "text-[#CCFF00] bg-ink/85"
+                    : detections.length > 0
+                      ? "text-[#22C55E] bg-ink/90 border border-[#22C55E]/40"
+                      : "text-amber-300 bg-ink/85"
+              }`}
+              data-testid="scout-ai-status"
+            >
+              {detectorStatus === "failed"
+                ? "AI offline · tap directly"
+                : detecting
+                  ? "AI scanning frame…"
+                  : detections.length > 0
+                    ? `AI sees ${detections.length} player${detections.length === 1 ? "" : "s"} · chips above their heads`
+                    : "AI sees none here · tap directly or scrub"}
+            </div>
           </div>
         )}
       </div>
