@@ -120,6 +120,53 @@ function sampleJersey(ctx, bb, w, h) {
   }
 }
 
+/** Is the ground just below the detection box GREEN (grass)?
+ *
+ *  Real players are standing on the pitch. Parents/spectators standing
+ *  on asphalt, gravel or behind fences are NOT on grass — their feet
+ *  are over concrete (grey), wood, or the fence itself. By sampling a
+ *  small strip of pixels just BELOW the bounding box and checking that
+ *  the green channel dominates, we filter out almost all non-player
+ *  detections without touching the model.
+ */
+function isOnGrass(ctx, bb, vw, vh) {
+  const stripH = Math.max(4, Math.floor(bb.height * 0.15));
+  const sy = Math.min(vh - stripH - 1, Math.floor(bb.originY + bb.height));
+  const sx = Math.max(0, Math.floor(bb.originX + bb.width * 0.1));
+  const sw = Math.max(2, Math.floor(Math.min(vw - sx, bb.width * 0.8)));
+  const sh = Math.max(2, Math.min(vh - sy, stripH));
+  if (sw < 6 || sh < 4) return true; // tiny strip — don't reject
+  try {
+    const data = ctx.getImageData(sx, sy, sw, sh).data;
+    let greenWins = 0, total = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      // Loose grass test: green channel must be > red AND > blue with a
+      // small margin. This catches astroturf, real grass, faded turf —
+      // but rejects concrete (G≈R≈B), asphalt (dark grey), sand, fence.
+      if (g > r + 6 && g > b + 6 && g > 50) greenWins++;
+      total++;
+    }
+    // ≥ 40 % of sampled pixels must be grass for the box to pass
+    return total > 0 && greenWins / total >= 0.40;
+  } catch {
+    return true; // sampling failed — don't reject; let the user filter
+  }
+}
+
+/** Intersection-over-Union for two MediaPipe boundingBoxes. */
+function iou(a, b) {
+  const x1 = Math.max(a.originX, b.originX);
+  const y1 = Math.max(a.originY, b.originY);
+  const x2 = Math.min(a.originX + a.width, b.originX + b.width);
+  const y2 = Math.min(a.originY + a.height, b.originY + b.height);
+  const iw = Math.max(0, x2 - x1);
+  const ih = Math.max(0, y2 - y1);
+  const inter = iw * ih;
+  const ua = a.width * a.height + b.width * b.height - inter;
+  return ua > 0 ? inter / ua : 0;
+}
+
 export default function ScoutMode({
   open,
   videoUrl,
@@ -330,31 +377,54 @@ export default function ScoutMode({
         })),
       );
 
-      // Real player filter — three rules, in this order:
+      // Real player filter — five rules, in this order. Each rule is cheap
+      // to compute, and together they kill almost every false positive
+      // (parents behind the fence, building fragments, fences, clusters
+      // of two kids hugging that read as one wide blob).
+      //
       //   1. Big enough to actually tap (8 × 24 px min in source pixels)
-      //   2. Tall-shaped (h ≥ 1.4 × w) — humans are taller than wide,
-      //      so this kicks out fences, distant cars, building fragments
-      //      that occasionally get misclassified as "person"
+      //   2. Tall-shaped (h ≥ 1.5 × w) — humans are taller than wide,
+      //      so this kicks out fences, distant cars, building fragments,
+      //      and crucially CLUSTERS of two kids hugging which appear
+      //      almost square.
       //   3. Not absurdly huge (height < 0.95 of frame) — a single box
-      //      covering ~the whole frame is almost always a misfire
-      //      (e.g. a sideline parent in foreground covering everything)
-      const dets = allRaw
+      //      covering ~the whole frame is almost always a misfire.
+      //   4. FEET in the bottom 65 % of the frame — players' feet are
+      //      on the pitch which sits in the lower portion of the shot
+      //      from a phone held at sideline level. Anyone whose feet are
+      //      high up is a parent behind a fence or someone in a window.
+      //   5. ON GRASS — sample pixels just below the box and require
+      //      the green channel to dominate. Stops parents on asphalt
+      //      and people behind chain-link fences from getting chips.
+      const FIELD_FEET_MAX_Y = canvas.height * 0.95;   // feet may go all the way down
+      const FIELD_FEET_MIN_Y = canvas.height * 0.35;   // feet must be at least 35 % down
+      const filtered = allRaw
         .filter((d) => {
           const bb = d.boundingBox;
           if (bb.width < 8 || bb.height < 24) return false;
-          if (bb.height < 1.4 * bb.width) return false;
+          if (bb.height < 1.5 * bb.width) return false; // cluster / fence reject
           if (bb.height > 0.95 * canvas.height) return false;
+          const feetY = bb.originY + bb.height;
+          if (feetY < FIELD_FEET_MIN_Y || feetY > FIELD_FEET_MAX_Y) return false;
+          if (!isOnGrass(ctx, bb, canvas.width, canvas.height)) return false;
           return true;
-        })
-        // Sort by CONFIDENCE — highest first. This is the key fix: the
-        // previous sort-by-area kept buildings/crowd-clusters on top and
-        // pushed your kid out of the top-20 slots. The model's score is
-        // a much better "is this actually a human" signal.
-        .sort(
-          (a, b) =>
-            (b.categories?.[0]?.score ?? 0) - (a.categories?.[0]?.score ?? 0),
-        )
-        .slice(0, 20) // full team + GKs + a couple of refs
+        });
+
+      // Non-Max-Suppression — when MediaPipe outputs two heavily
+      // overlapping boxes for the same kid (very common at threshold
+      // 0.10), keep only the more confident one.
+      const sorted = [...filtered].sort(
+        (a, b) =>
+          (b.categories?.[0]?.score ?? 0) - (a.categories?.[0]?.score ?? 0),
+      );
+      const kept = [];
+      for (const d of sorted) {
+        const dup = kept.some((k) => iou(k.boundingBox, d.boundingBox) > 0.45);
+        if (!dup) kept.push(d);
+      }
+
+      const dets = kept
+        .slice(0, 15) // up to 15 chips — plenty for an 11v11 + GKs + ref
         .map((d, idx) => ({
           idx,
           bbox: d.boundingBox,
@@ -919,10 +989,71 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
   const renderedW = vw * scale, renderedH = vh * scale;
   const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
 
-  const CHIP = 52; // chip diameter
-  const TAP = 64;  // larger tap target for finger
-  const TOP_GUARD = 56; // banner + status pill vertical extent
+  const CHIP = 32;          // chip diameter — small enough not to cover the kid
+  const TAP = 56;           // tap target — bigger than chip for easy fingers
+  const TOP_GUARD = 56;     // banner + status pill vertical extent
   const FOOTER_GUARD = 20;
+  const CHIP_OFFSET = 6;    // distance between chip & box corner
+
+  // ── Step 1: compute the "ideal" chip position for each detection ────
+  //   Strategy: place chip OFF the player (upper-right corner of the box)
+  //   so the kid's face / number stays visible. If box is near right edge,
+  //   place chip top-LEFT instead. If both top corners are above the top
+  //   banner, drop chip to the bottom-right (below the feet).
+  const placements = detections.map((d) => {
+    const bb = d.bbox;
+    const boxX = bb.originX * scale + offX;
+    const boxY = bb.originY * scale + offY;
+    const boxW = bb.width * scale;
+    const boxH = bb.height * scale;
+
+    // Prefer top-right corner; if too close to right edge, use top-left.
+    const preferRight = boxX + boxW + CHIP + CHIP_OFFSET < sw - 4;
+    let cx = preferRight
+      ? boxX + boxW + CHIP_OFFSET + CHIP / 2
+      : Math.max(CHIP / 2 + 4, boxX - CHIP_OFFSET - CHIP / 2);
+    let cy = boxY - CHIP_OFFSET; // chip TOP is offset above box top
+
+    // If chip top is hidden behind the banner, drop it to bottom-right
+    const useBelow = cy < TOP_GUARD;
+    if (useBelow) {
+      cy = Math.min(sh - CHIP - FOOTER_GUARD, boxY + boxH - CHIP);
+      cx = preferRight
+        ? boxX + boxW + CHIP_OFFSET + CHIP / 2
+        : Math.max(CHIP / 2 + 4, boxX - CHIP_OFFSET - CHIP / 2);
+    }
+    // Final clamp so chip never escapes the stage
+    cx = Math.max(CHIP / 2 + 4, Math.min(sw - CHIP / 2 - 4, cx));
+    cy = Math.max(TOP_GUARD, Math.min(sh - CHIP - FOOTER_GUARD, cy));
+
+    return { boxX, boxY, boxW, boxH, cx, cy, useBelow };
+  });
+
+  // ── Step 2: CHIP FANNING — de-overlap chips. When two chips would land
+  //   within (CHIP + 4) px of each other, nudge them apart horizontally.
+  //   We do a single pass left-to-right, sorted by current X. Good enough
+  //   for the 10-15 chips we ever show.
+  const order = [...placements.keys()].sort(
+    (a, b) => placements[a].cx - placements[b].cx,
+  );
+  const MIN_GAP = CHIP + 4;
+  for (let i = 1; i < order.length; i++) {
+    const prev = placements[order[i - 1]];
+    const cur = placements[order[i]];
+    if (cur.cx - prev.cx < MIN_GAP) {
+      cur.cx = Math.min(sw - CHIP / 2 - 4, prev.cx + MIN_GAP);
+    }
+  }
+  // Second pass — push down chips that landed too close vertically too
+  for (let i = 0; i < placements.length; i++) {
+    for (let j = i + 1; j < placements.length; j++) {
+      const a = placements[i], b = placements[j];
+      if (Math.abs(a.cx - b.cx) < CHIP && Math.abs(a.cy - b.cy) < CHIP) {
+        // Nudge the later one down
+        b.cy = Math.min(sh - CHIP - FOOTER_GUARD, a.cy + CHIP + 4);
+      }
+    }
+  }
 
   return (
     <div
@@ -938,30 +1069,30 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
       }}
     >
       {detections.map((d, i) => {
-        const bb = d.bbox;
         const num = i + 1;
         const flashing = tapFlashIdx === d.idx;
         const accent = flashing ? "#22C55E" : "#CCFF00";
+        const { boxX, boxY, boxW, boxH, cx, cy } = placements[i];
 
-        // Screen-space rectangle for the player's bounding box
-        const boxX = bb.originX * scale + offX;
-        const boxY = bb.originY * scale + offY;
-        const boxW = bb.width * scale;
-        const boxH = bb.height * scale;
-
-        // Chip placement — ABOVE the head by default, BELOW the feet if
-        // it would land in the banner zone at the top.
-        const cxRaw = boxX + boxW / 2;
-        const cx = Math.max(TAP / 2 + 4, Math.min(sw - TAP / 2 - 4, cxRaw));
-        const chipAboveY = boxY - CHIP - 10;
-        const chipBelowY = Math.min(sh - CHIP - FOOTER_GUARD, boxY + boxH + 10);
-        const useBelow = chipAboveY < TOP_GUARD;
-        const cy = useBelow ? chipBelowY : chipAboveY;
+        // Connector: thin line from chip centre to the nearest box corner
+        const chipCenterX = cx;
+        const chipCenterY = cy + CHIP / 2;
+        const targetX = chipCenterX < boxX + boxW / 2
+          ? boxX + boxW * 0.15   // chip is left of box → connect to upper-left
+          : boxX + boxW * 0.85;  // chip is right of box → connect to upper-right
+        const targetY = chipCenterY < boxY + boxH / 2
+          ? boxY + 6              // chip above middle → connect to top of box
+          : boxY + boxH - 6;      // chip below middle → connect to bottom
+        // Connector as a 1.5 px SVG line (handles any angle cleanly)
+        const dx = targetX - chipCenterX;
+        const dy = targetY - chipCenterY;
+        const connLen = Math.sqrt(dx * dx + dy * dy);
+        const connAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
         return (
           <div key={`player-${i}`} style={{ pointerEvents: "none" }}>
-            {/* 1. Thin OUTLINE BOX around the player's body — proves to the
-                  user that the AI sees this specific kid, not a building. */}
+            {/* 1. Thin OUTLINE BOX around the player — softer (1.5 px, 60 %
+                  opacity) so it doesn't compete visually with the chip. */}
             <div
               style={{
                 position: "absolute",
@@ -969,16 +1100,32 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
                 top: boxY,
                 width: boxW,
                 height: boxH,
-                border: `2px solid ${accent}`,
-                borderRadius: 4,
-                boxShadow: `0 0 0 1px rgba(0,0,0,0.65), 0 0 10px ${accent}55`,
+                border: `1.5px solid ${accent}`,
+                borderRadius: 3,
+                boxShadow: `0 0 0 1px rgba(0,0,0,0.55)`,
                 background: flashing ? `${accent}25` : "transparent",
+                opacity: flashing ? 1 : 0.7,
                 pointerEvents: "none",
               }}
             />
 
-            {/* 2. Tap target — large invisible button covering chip+box so
-                  the user has a generous hit area on small phones. */}
+            {/* 2. Connector — thin line from chip → nearest corner of box */}
+            <div
+              style={{
+                position: "absolute",
+                left: chipCenterX,
+                top: chipCenterY,
+                width: connLen,
+                height: 1.5,
+                background: accent,
+                opacity: 0.7,
+                transformOrigin: "0 50%",
+                transform: `rotate(${connAngle}deg)`,
+                pointerEvents: "none",
+              }}
+            />
+
+            {/* 3. Tap target — large invisible button centred on the chip. */}
             <button
               type="button"
               data-testid={`scout-chip-${num}`}
@@ -1005,9 +1152,7 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
               }}
             />
 
-            {/* 3. The visible CHIP itself — drawn as a plain absolutely-
-                  positioned div (no nested transforms, no animations) so
-                  iOS Safari renders it reliably. */}
+            {/* 4. The visible CHIP itself */}
             <div
               style={{
                 position: "absolute",
@@ -1021,38 +1166,21 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
                 borderRadius: "50%",
                 background: flashing ? "#22C55E" : "#0A0F0D",
                 color: flashing ? "#0A0F0D" : "#CCFF00",
-                border: `3px solid ${accent}`,
+                border: `2px solid ${accent}`,
                 fontWeight: 900,
-                fontSize: 22,
+                fontSize: 14,
                 lineHeight: 1,
                 fontFamily: "-apple-system, system-ui, sans-serif",
+                fontVariantNumeric: "tabular-nums",
                 boxShadow: flashing
-                  ? `0 0 24px ${accent}, 0 0 0 2px #FFFFFF`
-                  : `0 0 0 2px rgba(0,0,0,0.85), 0 0 18px rgba(204,255,0,0.55)`,
+                  ? `0 0 18px ${accent}, 0 0 0 2px #FFFFFF`
+                  : `0 0 0 1.5px rgba(0,0,0,0.85), 0 0 10px rgba(204,255,0,0.4)`,
                 pointerEvents: "none",
                 zIndex: 51,
               }}
             >
               {num}
             </div>
-
-            {/* 4. Connector line from chip → head of the player. Makes
-                  it visually obvious which chip belongs to which kid. */}
-            <div
-              style={{
-                position: "absolute",
-                left: cx - 1,
-                top: useBelow ? boxY + boxH : cy + CHIP,
-                width: 2,
-                height: useBelow
-                  ? Math.max(0, cy - (boxY + boxH))
-                  : Math.max(0, boxY - (cy + CHIP)),
-                background: accent,
-                opacity: 0.85,
-                boxShadow: `0 0 4px ${accent}`,
-                pointerEvents: "none",
-              }}
-            />
           </div>
         );
       })}
