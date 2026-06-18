@@ -218,6 +218,9 @@ export default function ScoutMode({
   // includes the goalkeeper, splits hugging-kid clusters). Per-frame cache
   // so we never re-call for a timestamp we already analysed.
   const [geminiRefining, setGeminiRefining] = useState(false);
+  // Timestamp (ms) when the current Gemini call started — used to drive
+  // the elapsed counter + progress bar in the "Identifying players…" card.
+  const [geminiStartedAt, setGeminiStartedAt] = useState(null);
   const geminiCacheRef = useRef(new Map()); // key: t.toFixed(2) → players[]
   const lastGeminiTRef = useRef(null);
 
@@ -299,6 +302,7 @@ export default function ScoutMode({
       setSkipped([]);
       setDetectorStatus("loading");
       setGeminiRefining(false);
+      setGeminiStartedAt(null);
       geminiCacheRef.current.clear();
       lastGeminiTRef.current = null;
     }
@@ -474,17 +478,21 @@ export default function ScoutMode({
     }
     lastGeminiTRef.current = key;
     try {
-      // Capture current frame as a JPEG. Resize to 1280 px wide for speed.
+      // Capture current frame as a JPEG. Send at FULL source resolution
+      // up to 1920 px wide @ 0.92 quality so Gemini sees the small/distant
+      // players clearly — previously we downscaled to 1280 px @ 0.78 which
+      // dropped enough pixel detail that 5–6 kids were typically missed.
       const SRC_VW = v.videoWidth, SRC_VH = v.videoHeight;
-      const targetW = Math.min(1280, SRC_VW);
+      const targetW = Math.min(1920, SRC_VW);
       const targetH = Math.round(SRC_VH * (targetW / SRC_VW));
       const cap = document.createElement("canvas");
       cap.width = targetW;
       cap.height = targetH;
       cap.getContext("2d").drawImage(v, 0, 0, targetW, targetH);
-      const dataUrl = cap.toDataURL("image/jpeg", 0.78);
+      const dataUrl = cap.toDataURL("image/jpeg", 0.92);
 
       setGeminiRefining(true);
+      setGeminiStartedAt(Date.now());
       const res = await fetch(`${API_BASE}/api/scout/detect-players`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -540,6 +548,7 @@ export default function ScoutMode({
       console.warn("ScoutMode Gemini refine failed:", err);
     } finally {
       setGeminiRefining(false);
+      setGeminiStartedAt(null);
     }
   }, []);
 
@@ -855,48 +864,17 @@ export default function ScoutMode({
           />
         )}
 
-        {/* "Identifying players…" — clean, professional, centred. Shown
-            while Gemini is refining (the only time we trust to display
-            chips). Replaces the un-professional moment where chips were
+        {/* "Identifying players…" — real-time progress card so the user
+            never thinks the app has frozen. Shows:
+              • Animated pulsing dot
+              • Rotating status messages (every 2s)
+              • Elapsed time counter (0:03 / ~0:12)
+              • Thin horizontal progress bar filling toward the expected
+                ~12 s typical Gemini Vision response time
+            Replaces the un-professional moment where chips were
             rendered on background buildings. */}
         {!booting && videoReady && !showVerify && geminiRefining && stageRect.w > 0 && (
-          <div
-            data-testid="scout-identifying-players"
-            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2"
-            style={{
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              padding: "10px 16px",
-              background: "rgba(10,15,13,0.88)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-              border: "1px solid rgba(204,255,0,0.45)",
-              zIndex: 30,
-              pointerEvents: "none",
-            }}
-          >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#CCFF00",
-                boxShadow: "0 0 8px #CCFF00",
-                animation: "scoutPulse 1.2s ease-in-out infinite",
-              }}
-            />
-            <span
-              style={{
-                color: "#FFFFFF",
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              Identifying players…
-            </span>
-          </div>
+          <IdentifyingPlayersCard startedAt={geminiStartedAt} />
         )}
 
         {/* Debug overlay — raw detector boxes BEFORE filtering. Lets us
@@ -1633,3 +1611,140 @@ function VerificationGrid({ anchors, sceneCuts, onReplace, onBack, onSubmit }) {
 }
 
 ScoutMode.displayName = "ScoutMode";
+
+// ── IdentifyingPlayersCard — real progress feedback while Gemini is
+//   refining. Replaces the static "Identifying players…" pill with:
+//     • Pulsing dot
+//     • Cycling status messages (every 2 s)
+//     • Elapsed time counter (m:ss)
+//     • Thin horizontal progress bar filling toward ~12 s expected time
+//   The user can clearly see the system is alive and working.
+function IdentifyingPlayersCard({ startedAt }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!startedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const elapsedMs = startedAt ? Math.max(0, now - startedAt) : 0;
+  const elapsedSec = Math.floor(elapsedMs / 1000);
+
+  // Estimated max — typical Gemini Vision call resolves in 8-14 s.
+  // The bar fills 95% over EXPECTED_MS so it never reaches 100% until
+  // the call actually completes (avoids fake "stuck at 100%" feeling).
+  const EXPECTED_MS = 12000;
+  const pct = Math.min(95, (elapsedMs / EXPECTED_MS) * 95);
+
+  // Rotating status messages — give the user something new to read
+  // every couple of seconds so they know progress is happening.
+  const STAGES = [
+    "Reading frame…",
+    "Detecting players on the pitch…",
+    "Filtering out spectators…",
+    "Identifying the goalkeeper…",
+    "Almost ready…",
+  ];
+  const stageIdx = Math.min(STAGES.length - 1, Math.floor(elapsedSec / 2));
+  const message = STAGES[stageIdx];
+
+  const m = Math.floor(elapsedSec / 60);
+  const s = elapsedSec % 60;
+  const elapsedLabel = `${m}:${String(s).padStart(2, "0")}`;
+
+  return (
+    <div
+      data-testid="scout-identifying-players"
+      className="absolute left-1/2"
+      style={{
+        top: "50%",
+        transform: "translate(-50%, -50%)",
+        width: "min(82vw, 320px)",
+        padding: "14px 16px",
+        background: "rgba(10,15,13,0.92)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: "1px solid rgba(204,255,0,0.45)",
+        boxShadow: "0 10px 32px rgba(0,0,0,0.55)",
+        zIndex: 30,
+        pointerEvents: "none",
+      }}
+    >
+      {/* Top row — status dot + label + elapsed timer */}
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: "#CCFF00",
+              boxShadow: "0 0 10px #CCFF00",
+              animation: "scoutPulse 1.1s ease-in-out infinite",
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              color: "#FFFFFF",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            Identifying players
+          </span>
+        </div>
+        <span
+          className="tabular-nums"
+          style={{
+            color: "rgba(255,255,255,0.55)",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            flexShrink: 0,
+          }}
+        >
+          {elapsedLabel} <span style={{ color: "rgba(255,255,255,0.35)" }}>/ ~0:12</span>
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div
+        style={{
+          height: 3,
+          background: "rgba(255,255,255,0.1)",
+          borderRadius: 0,
+          overflow: "hidden",
+          marginBottom: 8,
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: "100%",
+            background: "linear-gradient(90deg, #CCFF00 0%, #22C55E 100%)",
+            transition: "width 0.25s ease-out",
+            boxShadow: "0 0 6px rgba(204,255,0,0.55)",
+          }}
+        />
+      </div>
+
+      {/* Rotating status message */}
+      <div
+        style={{
+          color: "rgba(255,255,255,0.78)",
+          fontSize: 12,
+          fontWeight: 500,
+          letterSpacing: "0.01em",
+        }}
+      >
+        {message}
+      </div>
+    </div>
+  );
+}

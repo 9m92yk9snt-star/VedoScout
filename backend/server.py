@@ -2362,30 +2362,37 @@ class _ScoutDetectRequest(BaseModel):
 
 SCOUT_DETECT_PROMPT = (
     "You are looking at a single still frame from a YOUTH football (soccer) "
-    "match video. Identify EVERY child football player currently visible "
-    "and actively positioned ON the pitch playing surface.\n\n"
-    "INCLUDE:\n"
-    "- Field players from both teams\n"
-    "- Goalkeepers — even when standing inside the goal area, partly occluded by the goalpost/net\n\n"
-    "EXCLUDE (do NOT return boxes for):\n"
-    "- Parents, coaches, photographers, spectators, club staff\n"
-    "- ANYONE behind a chain-link fence, railing, wall, or boundary\n"
-    "- ANYONE on a terrace, balcony, path, sidewalk, parking area, or visible inside an apartment window\n"
-    "- ANYONE on a substitute bench or warm-up area outside the pitch\n"
-    "- Adults in coats, jackets, hi-vis vests, or street clothes\n"
+    "match video. Your job is to identify EVERY player visible on the pitch.\n\n"
+    "BE THOROUGH. A typical frame has 6–20 players on screen — do not stop "
+    "after finding only a few. Scan EVERY region of the image: left wing, "
+    "right wing, midfield, near both goals, background, foreground. Look "
+    "for players that are small, distant, blurred, in motion, partly "
+    "occluded, in shadow, or only partly on screen — INCLUDE THEM ALL.\n\n"
+    "INCLUDE every player on the pitch:\n"
+    "- Field players from both teams (any age, any pose: running, "
+    "  standing, falling, jumping, passing, defending)\n"
+    "- Goalkeepers — even when partly hidden by the goal frame/net\n"
+    "- Players who are partly off-screen, blurred, distant, or in shadow\n"
+    "- Players in clusters / close together — separate them into individual boxes\n\n"
+    "ONLY EXCLUDE if you are CONFIDENT the person is not a player:\n"
+    "- Adults in coats, hi-vis vests, or street clothes (parents, coaches, photographers)\n"
+    "- People clearly behind a fence/railing/wall (NOT on the pitch surface)\n"
+    "- People on a paved path, sidewalk, parking lot, bench, or terrace\n"
     "- Referees in striped or all-black uniforms\n"
-    "- ANYONE whose feet are NOT clearly on the green grass / artificial turf of the playing pitch\n"
-    "- Buildings, windows, fence posts, lamp posts (these are NOT people, never include them)\n"
-    "- If uncertain whether someone is a player or a spectator/parent → EXCLUDE them.\n\n"
-    "Return a bounding box for each kept player. Coordinates MUST be fractions "
-    "of the full image size in the range 0.0 to 1.0:\n"
+    "- Buildings, windows, lamp posts, fence posts (NOT people)\n\n"
+    "DECISION RULE: If a person appears to be wearing a football jersey "
+    "AND their feet are on the green pitch surface → INCLUDE them. "
+    "When uncertain, prefer to INCLUDE rather than exclude.\n\n"
+    "For each player return a TIGHT bounding box with coordinates as "
+    "fractions of the full image size (0.0 to 1.0):\n"
     "  - x  = left edge of the box\n"
     "  - y  = top edge of the box (top of the head)\n"
     "  - w  = box width\n"
-    "  - h  = box height (head to feet, hugging the player)\n"
-    "Boxes must hug each player TIGHTLY — head at the top, feet at the bottom, "
-    "shoulders defining the width. Do NOT merge multiple players into one box.\n\n"
-    'Respond with VALID JSON ONLY in this exact shape (no markdown fences, no commentary):\n'
+    "  - h  = box height (head to feet)\n"
+    "Box must hug each player TIGHTLY — head at the top, feet at the bottom, "
+    "shoulders defining the width. DO NOT merge multiple players into one box; "
+    "give each player their own box even if they are close together.\n\n"
+    'Respond with VALID JSON ONLY in this exact shape (no markdown, no commentary):\n'
     '{"players": [{"x": 0.12, "y": 0.45, "w": 0.05, "h": 0.18, "label": "kid in white jersey #9"}, ...]}'
 )
 
@@ -2476,8 +2483,8 @@ async def scout_detect_players(req: _ScoutDetectRequest):
             except Exception:
                 continue
 
-        # Cap at 15 (full team + GKs + ref) so we don't drown the UI
-        cleaned = cleaned[:15]
+        # Cap at 25 — covers a full 11v11 + GKs + substitutes warming up
+        cleaned = cleaned[:25]
         return {"players": cleaned}
     finally:
         if tmp_path:
