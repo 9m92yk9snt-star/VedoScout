@@ -391,42 +391,43 @@ export default function ScoutMode({
         })),
       );
 
-      // Real player filter — five rules, in this order. Each rule is cheap
-      // to compute, and together they kill almost every false positive
-      // (parents behind the fence, building fragments, fences, clusters
-      // of two kids hugging that read as one wide blob).
+      // Real player filter — stricter than before to avoid hallucinated
+      // background detections (building windows, fences, distant cars).
+      // This pass is now treated as a FALLBACK — the user never sees these
+      // chips unless Gemini Vision fails, because ChipsLayer is hidden
+      // while `geminiRefining` is true. Tightened to maximise precision.
       //
       //   1. Big enough to actually tap (8 × 24 px min in source pixels)
-      //   2. Tall-shaped (h ≥ 1.5 × w) — humans are taller than wide,
-      //      so this kicks out fences, distant cars, building fragments,
-      //      and crucially CLUSTERS of two kids hugging which appear
-      //      almost square.
-      //   3. Not absurdly huge (height < 0.95 of frame) — a single box
-      //      covering ~the whole frame is almost always a misfire.
-      //   4. FEET in the bottom 65 % of the frame — players' feet are
-      //      on the pitch which sits in the lower portion of the shot
-      //      from a phone held at sideline level. Anyone whose feet are
-      //      high up is a parent behind a fence or someone in a window.
-      //   5. ON GRASS — sample pixels just below the box and require
-      //      the green channel to dominate. Stops parents on asphalt
-      //      and people behind chain-link fences from getting chips.
-      const FIELD_FEET_MAX_Y = canvas.height * 0.95;   // feet may go all the way down
-      const FIELD_FEET_MIN_Y = canvas.height * 0.35;   // feet must be at least 35 % down
+      //   2. Strongly tall-shaped (h ≥ 1.8 × w) — humans are clearly
+      //      taller than wide; this kicks out building edges/fences.
+      //   3. Not absurdly huge (height < 0.70 of frame).
+      //   4. Head (top of box) must be BELOW 20 % of frame height —
+      //      a "person" whose head is in the upper 20% is almost always
+      //      a building roofline / sky / apartment window misfire.
+      //   5. FEET must be in the bottom 55 % of the frame.
+      //   6. ON GRASS — sample pixels just below the box and require
+      //      the green channel to dominate.
+      //   7. Score ≥ 0.25 — only confident detections.
+      const FIELD_HEAD_MIN_Y = canvas.height * 0.20;   // head must be below the sky
+      const FIELD_FEET_MAX_Y = canvas.height * 0.95;
+      const FIELD_FEET_MIN_Y = canvas.height * 0.45;   // feet must be at least 45 % down
       const filtered = allRaw
         .filter((d) => {
           const bb = d.boundingBox;
           if (bb.width < 8 || bb.height < 24) return false;
-          if (bb.height < 1.5 * bb.width) return false; // cluster / fence reject
-          if (bb.height > 0.95 * canvas.height) return false;
+          if (bb.height < 1.8 * bb.width) return false;
+          if (bb.height > 0.70 * canvas.height) return false;
+          if (bb.originY < FIELD_HEAD_MIN_Y) return false;
           const feetY = bb.originY + bb.height;
           if (feetY < FIELD_FEET_MIN_Y || feetY > FIELD_FEET_MAX_Y) return false;
           if (!isOnGrass(ctx, bb, canvas.width, canvas.height)) return false;
+          const sc = d.categories?.[0]?.score ?? 0;
+          if (sc < 0.25) return false;
           return true;
         });
 
       // Non-Max-Suppression — when MediaPipe outputs two heavily
-      // overlapping boxes for the same kid (very common at threshold
-      // 0.10), keep only the more confident one.
+      // overlapping boxes for the same kid, keep only the more confident one.
       const sorted = [...filtered].sort(
         (a, b) =>
           (b.categories?.[0]?.score ?? 0) - (a.categories?.[0]?.score ?? 0),
@@ -438,7 +439,7 @@ export default function ScoutMode({
       }
 
       const dets = kept
-        .slice(0, 15) // up to 15 chips — plenty for an 11v11 + GKs + ref
+        .slice(0, 11) // full XI on the pitch — covers any realistic frame
         .map((d, idx) => ({
           idx,
           bbox: d.boundingBox,
@@ -837,8 +838,13 @@ export default function ScoutMode({
           onSeeked={(e) => setCurrentTime(e.target.currentTime)}
         />
 
-        {/* Numbered chips */}
-        {!booting && videoReady && !showVerify && detections.length > 0 && stageRect.w > 0 && (
+        {/* Numbered chips — only shown when we have CLEAN detections.
+            We deliberately hide chips while Gemini is refining so the
+            user never sees MediaPipe's hallucinated boxes on buildings
+            or windows. When the cache hit returns instantly OR Gemini
+            responds, chips appear; otherwise the user sees the
+            "Identifying players…" status below until ready. */}
+        {!booting && videoReady && !showVerify && !geminiRefining && detections.length > 0 && stageRect.w > 0 && (
           <ChipsLayer
             detections={detections}
             videoEl={videoRef.current}
@@ -847,6 +853,50 @@ export default function ScoutMode({
             nextNumber={anchors.length + 1}
             onTap={handleChipTap}
           />
+        )}
+
+        {/* "Identifying players…" — clean, professional, centred. Shown
+            while Gemini is refining (the only time we trust to display
+            chips). Replaces the un-professional moment where chips were
+            rendered on background buildings. */}
+        {!booting && videoReady && !showVerify && geminiRefining && stageRect.w > 0 && (
+          <div
+            data-testid="scout-identifying-players"
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2"
+            style={{
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              padding: "10px 16px",
+              background: "rgba(10,15,13,0.88)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              border: "1px solid rgba(204,255,0,0.45)",
+              zIndex: 30,
+              pointerEvents: "none",
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#CCFF00",
+                boxShadow: "0 0 8px #CCFF00",
+                animation: "scoutPulse 1.2s ease-in-out infinite",
+              }}
+            />
+            <span
+              style={{
+                color: "#FFFFFF",
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Identifying players…
+            </span>
+          </div>
         )}
 
         {/* Debug overlay — raw detector boxes BEFORE filtering. Lets us
@@ -1178,6 +1228,63 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap, nextNu
 
         return (
           <div key={`player-${i}`} style={{ pointerEvents: "none" }}>
+            {/* Leader line — ALWAYS visible. Thin 1.5 px line from the
+                chip back to the player's head. The user can instantly
+                see which chip belongs to which kid, especially when
+                chip-fanning has nudged chips off their natural spot. */}
+            {(() => {
+              const chipCenterX = cx;
+              const chipCenterY = cy + CHIP / 2;
+              const targetX = boxX + boxW / 2;
+              const targetY = boxY + 2;
+              const dx = targetX - chipCenterX;
+              const dy = targetY - chipCenterY;
+              const lineLen = Math.sqrt(dx * dx + dy * dy);
+              const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+              if (lineLen < 2) return null;
+              const lineColor = flashing || isActive ? "#CCFF00" : "rgba(255,255,255,0.65)";
+              return (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: chipCenterX,
+                    top: chipCenterY,
+                    width: lineLen,
+                    height: flashing || isActive ? 2 : 1.5,
+                    background: lineColor,
+                    transformOrigin: "0 50%",
+                    transform: `rotate(${angle}deg)`,
+                    boxShadow: flashing || isActive
+                      ? "0 0 6px rgba(204,255,0,0.7), 0 0 0 1px rgba(0,0,0,0.55)"
+                      : "0 0 4px rgba(0,0,0,0.7)",
+                    pointerEvents: "none",
+                  }}
+                />
+              );
+            })()}
+
+            {/* Selected-player highlight box — appears only when the
+                user has JUST tapped this chip. Bright lime outline
+                around the player's body. Same colour as the chip so
+                chip + player + leader line all read as ONE selection. */}
+            {flashing && (
+              <div
+                data-testid={`scout-player-highlight-${num}`}
+                style={{
+                  position: "absolute",
+                  left: boxX - 2,
+                  top: boxY - 2,
+                  width: boxW + 4,
+                  height: boxH + 4,
+                  border: "2.5px solid #CCFF00",
+                  borderRadius: 4,
+                  boxShadow: "0 0 0 1px rgba(0,0,0,0.7), 0 0 18px rgba(204,255,0,0.75)",
+                  pointerEvents: "none",
+                  zIndex: 49,
+                }}
+              />
+            )}
+
             {/* Soft spotlight under the player's feet */}
             <div
               style={{
