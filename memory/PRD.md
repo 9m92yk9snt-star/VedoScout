@@ -26,6 +26,44 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 28 — TRUST STACK v1: 4-improvement player-recognition rebuild (Feb 18 2026, late night)**:
+  - User pain: "Auto-suggest returned different players at different timestamps. I marked #9 and the system didn't recognize him. Pressing DONE with one anchor felt untrustworthy."
+  - **Approach chosen (Path A)** after a long signal-taxonomy debate: ship 4 in-video improvements that work on phone-recorded parent footage (50-100 px players, motion blur, mixed lighting). User explicitly vetoed "take a portrait photo" enrollment.
+  - **Improvement #1 — Multi-pose auto-enrollment from the user's mark** (`/app/frontend/src/components/marker-studio/multiPoseEnroll.js`, NEW, ~290 LOC):
+    - Triggered silently the moment the user locks anchor #1 (either via Instant Roster tile-tap or manual draw + Add).
+    - Samples 14 timestamps in a ±5 s window around the anchor, runs MediaPipe ObjectDetector on each, locks onto the same player via greedy IoU + colour-continuity fallback.
+    - Collects up to 14 same-player crops at different angles/poses/lighting. Builds a rich multi-pose fingerprint: `{ crops, avgJerseyRGB, avgShortsRGB, avgHairRGB, bestThumb, cropCount, sourceAnchor }`.
+    - Surfaced via `ms-enroll-indicator` ("Learning your kid's look — N %") in the MANUAL bottom toolbar; AbortController-safe so user can cancel by closing the studio.
+    - Helper `wrapperBoxToVideoBB` converts wrapper-normalised coords back to native video-pixel detection boxes for the matcher.
+  - **Improvement #2 — Spatial-temporal physics filter + confidence scorer** (`/app/frontend/src/components/marker-studio/spatioTemporal.js`, NEW, ~170 LOC):
+    - `filterByMotion(candidates, refAnchor)` — hard 8 m/s youth-player speed cap. Treats the user's first manual anchor as ground truth, then rejects any candidate that would require teleporting. Pitch-width assumed 40 m by default → normalised-coord limit = 0.20/sec. Returns `{ kept, rejected: [{anchor, reason, worstNeighbour}] }`.
+    - `scoreCandidate(candidate, multiPoseRef)` — weighted ensemble: 50 % jersey · 20 % shorts · 15 % hair · 15 % size-plausibility (penalises 3× too-big / too-small candidates which are likely passersby). Returns `{ score 0..1, band: 'green'|'yellow'|'red', detail }`. Bands: GREEN ≥0.90, YELLOW 0.80-0.89, RED <0.80.
+    - `suggestSecondTapTime(weakAnchors, refT)` — picks the weakest anchor farthest from the user's first tap as the smart "tap one more here" suggestion.
+    - `MAX_PLAYER_SPEED_MPS = 8.0`, `DEFAULT_PITCH_WIDTH_M = 40` (exported for adjustability).
+  - **Improvement #3 — AnchorPreview confidence-ring review screen** (`/app/frontend/src/components/marker-studio/AnchorPreview.jsx`, NEW, ~280 LOC):
+    - New `studioMode = "PREVIEW"`. Both `ms-confirm` (relabeled **"Review"**) and `ms-done-fullwidth` (relabeled **"Review N anchor(s) → confidence"**) now route through `goToPreview` instead of submitting directly.
+    - Renders a fullscreen grid (`ms-preview-grid`) of all anchor cards with **SVG circular confidence rings** (green/yellow/red), each showing the rounded confidence % in the centre, the anchor # in `#CCFF00`, and the timestamp.
+    - The user's first manual tap is labelled **"Your tap"** with a hand icon — and has **no Replace button** (ground truth, immutable).
+    - Other anchors get `ms-preview-replace-{idx}` buttons (red-styled for low confidence). Clicking Replace drops the studio back into MANUAL pre-seeked to that anchor's timestamp; the next Add overwrites that slot (no append).
+    - DONE button (`ms-preview-done`) is **gated** — disabled with label *"Need ≥ 3 strong anchors (X/3)"* until ≥ 3 anchors are GREEN. Then it unlocks with the volt-pulse "Done · analyse N moments" label.
+    - Header strip shows the green/yellow/red count for at-a-glance honesty: *"All set — ready to analyse"* vs *"Almost there — review your anchors"*.
+    - Live `ms-preview-enrolling` progress strip while #1 is still running in the background.
+  - **Improvement #4 — Smart second-tap fallback** (folded into `AnchorPreview.jsx`):
+    - When the auto-suggest cannot reach 3 GREEN anchors, a friendly `ms-preview-second-tap` block appears with a one-button CTA: *"Take me to {mm:ss}"* (the suggested timestamp from `suggestSecondTapTime`).
+    - Clicking it drops the studio back into MANUAL pre-seeked to that exact second. After the user's second Add, `addCurrentAsAnchor` detects `anchors.length === 1 && multiPoseRef` and **automatically re-runs `runAutoSuggest`** with double the reference data → returns to PREVIEW with tighter confidence.
+  - **Re-architected `runAutoSuggest`** in `MarkerStudio.jsx`:
+    - Wrapped in `useCallback` (per code-review feedback) with proper deps `[anchors, box, multiPoseRef, wrapperRect, refAnchorTime]`.
+    - Uses the multi-pose ref as the matching target instead of a single-frame fingerprint. Runs `scoreCandidate` on every detection and applies a 0.60 confidence floor.
+    - Applies `filterByMotion` against the user's first anchor as the trusted seed — silently drops teleporting candidates and logs them to console as `[Trust] rejected N teleporting candidate(s)`.
+    - Transitions to PREVIEW mode on success (`setStudioMode("PREVIEW")`), passing the suggested second-tap time.
+  - **Unit tests**:
+    - `/app/frontend/src/components/marker-studio/spatioTemporal.test.js` — **10/10 pass** — covers `boxCentreDist`, `maxPlausibleDelta`, `filterByMotion` kept/rejected, `scoreCandidate` high/low/missing-channel, `MAX_PLAYER_SPEED_MPS === 8`, `suggestSecondTapTime` weakest-farthest selection + null when all-green.
+    - `/app/frontend/src/components/marker-studio/AnchorPreview.test.jsx` — **10/10 pass** — covers overlay mount, all testids present, "Your tap" label visibility, Replace button absent on user's anchor, DONE disabled <3 green, DONE enabled ≥3 green, second-tap CTA appears+fires onSecondTap correctly, second-tap CTA hidden when ≥3 green, Replace fires onReplace with correct idx, onBack fires, returns null when open=false, enrolling=true shows progress strip + disables DONE.
+    - Added `@testing-library/react@16` + `@testing-library/dom@10` + `@testing-library/jest-dom@6` dev deps (React 19-compatible).
+  - **Recurring ffmpeg drop fixed** (6th occurrence) — installed; backend regression 40/40 green again.
+  - **Tested**: ✅ Testing agent iter20 — backend 40/40 (after ffmpeg re-install), public sample-PDF endpoint 200 OK, frontend ROSTER + empty-state + manual-fallback + Review-button relabel + 0 console errors + 20/20 jest tests. The PREVIEW-mode E2E was not exercisable via headless Chromium (H264 codec gap in container) but its runtime behaviour is fully covered by the 10 AnchorPreview jest tests.
+  - **Files**: NEW `multiPoseEnroll.js`, `spatioTemporal.js`, `AnchorPreview.jsx`, `spatioTemporal.test.js`, `AnchorPreview.test.jsx`. MODIFIED `MarkerStudio.jsx` (+~260 LOC).
+
 - ✅ **🆕 Session 27 — INSTANT ROSTER + Sample PDF + Thumbnail re-verification (Feb 18 2026 night)**:
   - **P0 — Instant Roster mode in MarkerStudio.jsx** (user feedback: "manual marking is tedious, give me a one-tap roster"):
     - **NEW** state machine `studioMode = "ROSTER" | "MANUAL"` (default ROSTER) — preserves the entire iter18 manual flow as the fallback.

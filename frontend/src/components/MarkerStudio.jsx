@@ -808,7 +808,7 @@ export default function MarkerStudio({
    *    candidate with scoreCandidate (#2's confidence math), applies the
    *    spatial-temporal sanity filter (#2), and transitions to the
    *    AnchorPreview screen (#3) on completion.                       */
-  const runAutoSuggest = async () => {
+  const runAutoSuggest = useCallback(async () => {
     const v = videoRef.current;
     if (!v) return;
     if (v.duration < 2) {
@@ -971,7 +971,7 @@ export default function MarkerStudio({
     } finally {
       setAutoSuggesting(false);
     }
-  };
+  }, [anchors, box, multiPoseRef, wrapperRect, refAnchorTime]);
 
   /** Local helper — sample a body region (jersey/shorts/hair) of a detection box. */
   function sampleRegion(ctx, bb, region) {
@@ -1266,7 +1266,7 @@ export default function MarkerStudio({
     } else {
       setStudioMode("PREVIEW");
     }
-  }, [autoSuggesting, anchors, box]); // runAutoSuggest is stable via closure
+  }, [autoSuggesting, anchors, box, runAutoSuggest]);
 
   /* ── Improvement #4 — user took the second-tap hint. Drop them back into
    *    MANUAL mode pre-seeked to the suggested timestamp; they re-mark and

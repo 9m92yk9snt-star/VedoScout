@@ -298,7 +298,7 @@ export default function AnchorPreview({
               </div>
               <p className="text-white/70 text-[12px] mt-0.5 leading-snug">
                 We&apos;re not 100&nbsp;% sure on{" "}
-                {sorted.length - greenCount - yellowCount + yellowCount} of the
+                {sorted.length - greenCount} of the
                 anchors. Try tapping your kid around{" "}
                 <span className="font-bold text-[#CCFF00]">
                   {formatTime(suggestedTapTime)}
