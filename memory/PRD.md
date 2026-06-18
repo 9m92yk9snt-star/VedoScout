@@ -26,6 +26,32 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 27 — INSTANT ROSTER + Sample PDF + Thumbnail re-verification (Feb 18 2026 night)**:
+  - **P0 — Instant Roster mode in MarkerStudio.jsx** (user feedback: "manual marking is tedious, give me a one-tap roster"):
+    - **NEW** state machine `studioMode = "ROSTER" | "MANUAL"` (default ROSTER) — preserves the entire iter18 manual flow as the fallback.
+    - **NEW** `runRosterScan()` (~150 LOC) — samples 8-12 evenly-spaced timestamps across the video, runs MediaPipe ObjectDetector on each, clusters detections by upper-torso jersey colour (RGB Euclidean threshold 58), picks the largest-bbox frame per identity as the tile thumbnail. Skips degenerate detections (size <20×40, dark <25). Cluster filter: ≥2 sightings required.
+    - **NEW** `RosterOverlay` + `RosterTile` components — fullscreen grid of numbered tiles (#1, #2, #3…) with jersey colour chip (rounded swatch + sighting count), large player thumbnail, hover-volt border. Tap → `pickRosterPlayer()` auto-fills anchor 1 with the detection's bbox at the matched timestamp, switches studio to MANUAL mode with anchor strip + full-width DONE pre-populated.
+    - **NEW** fallback chain — `ms-roster-manual` ("Don't see your player? Mark manually") + `ms-back-to-roster` ("← Back to auto-roster") + `ms-roster-rescan` ("Try scan again"). Empty-state branch (0 candidates) renders cleanly with all 3 escape hatches.
+    - **Contrast & layout fixes** — replaced `bg-deepnavy` → `bg-ink` (true `#0A0F0D`) everywhere in MarkerStudio (the `deepnavy` token resolves to cream `#F4EFE6` in the new aesthetic, which broke white-on-cream contrast). Replaced `text-cream-card/55-65` → `text-white/55-95`. Hard-coded `#CCFF00` for the volt accent (the `volt` token now points to forest green).
+    - **Removed** the old top-right `ms-zoom-in` / `ms-zoom-out` buttons (confirmed absent from DOM by testing agent). Pinch-to-zoom still works on touch devices.
+    - **NEW** full-width pulsing-volt DONE button (`ms-done-fullwidth`) — appears in MANUAL mode the moment anchors.length > 0 or a box is drawn. Label is dynamic: "DONE · N anchor(s) → analyse".
+
+  - **P1 — Public Sample PDF download on landing**:
+    - **NEW** backend route `GET /api/sample/scoutmeplay-report.pdf` (no auth) — resolves the most recent paid report and serves its built PDF with `Cache-Control: public, max-age=3600`. Optional admin-pin via `db.settings.sample_demo_report_id`.
+    - **NEW** Landing.jsx `<a data-testid="sample-pdf-download-cta">` button inside the floating SAMPLE-REPORT teaser card — opens `${REACT_APP_BACKEND_URL}/api/sample/scoutmeplay-report.pdf` in a new tab. Sits directly under the "See plans" CTA.
+    - **Route ordering note**: registered at `/sample/scoutmeplay-report.pdf` (not `/reports/sample-pdf`) to avoid collision with the auth-gated `/reports/{report_id}` matcher.
+    - **Verified live** via curl: HTTP 200, `application/pdf`, 85,747 bytes, `%PDF-` magic.
+
+  - **P1 — Backend thumbnail re-verification**:
+    - **NEW** `verify_and_pick_thumbnail(video_path, seconds, fingerprint, out_path, window=1.0, samples=5, reticle=True)` in `precision_engine.py` — samples 5 candidate frames in a ±1s window around the AI's timestamp, scores each frame by jersey + shorts colour match (OpenCV connected-component analysis, aspect-ratio sanity check), picks the best one, draws a volt-green reticle with white corner ticks around the matched region, downsizes to 720px wide JPEG. Returns `(ok: bool, meta: {picked_ts, match_score, reticle: {x,y,w,h normalised}, ok})`.
+    - **Integrated** into `ensure_video_frames()` — when a fingerprint exists on the report, every video-comment thumbnail now goes through the verifier. Falls back to plain `_extract_video_frame` when no match or no fingerprint. The meta is attached to each comment as `frame_verified` / `frame_picked_ts` / `frame_match_score` / `frame_reticle` so the frontend can render the reticle as an HTML overlay if desired.
+    - **NEW** test file `tests/test_iter19_thumbnail_verify.py` — 3 tests (missing-video fallback, picks the red-jersey frame in a synthetic 5-frame video, no-match fallback). 3/3 pass.
+
+  - **Recurring ffmpeg drop fixed** (5th occurrence) — `apt-get install -y ffmpeg`, all 12 precision_engine tests green again.
+
+  - **Tested**: ✅ Testing agent iter19 → backend 40/40 tests pass (3 new iter19 + 12 precision_engine + 12 iter18_multianchor + 13 archetype_4layer), public PDF endpoint 200, auth-gated PDF still 401. ✅ Frontend 100% on all critical assertions — roster default mode, empty-state, manual-fallback round-trip, existing manual flow, sample PDF CTA, See-plans CTA, no old zoom buttons, 0 console errors.
+  - **Files**: NEW `/app/backend/tests/test_iter19_thumbnail_verify.py`. MODIFIED `/app/backend/precision_engine.py`, `/app/backend/server.py`, `/app/frontend/src/components/MarkerStudio.jsx`, `/app/frontend/src/pages/Landing.jsx`.
+
 - ✅ **🆕 Session 26 — Multi-anchor marking + premium upload UX + Hero Teaser (Feb 18 2026 late evening)**:
   - **User asks (3 of them, single committed package)**:
     1. Multi-anchor marking — same player at 3-5 different timestamps → ~10× tracking precision.
