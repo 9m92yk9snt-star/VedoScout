@@ -9,7 +9,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
   ArrowRight, ArrowDown, Upload, Zap, ShieldCheck, FileText, Star, Brain, Target,
-  Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2,
+  Activity, Heart, Eye, Trophy, Footprints, Lock, Play, CheckCircle2, Download,
   TrendingUp, Clock, Award, ClipboardList, Globe, Users,
   Lightbulb, Crown, Calendar, Dumbbell, Mail, Send, Twitter, Facebook, Linkedin, Instagram, MessageCircle,
 } from "lucide-react";
@@ -1589,6 +1589,16 @@ export default function Landing() {
                   See plans
                   <ArrowDown className="w-4 h-4" />
                 </button>
+                <a
+                  href={`${process.env.REACT_APP_BACKEND_URL}/api/sample/scoutmeplay-report.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="sample-pdf-download-cta"
+                  className="mt-2 w-full bg-white hover:bg-cream-soft text-forest border-2 border-forest font-barlow font-black uppercase tracking-widest text-sm py-3 flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download sample PDF
+                </a>
                 <p className="mt-3 text-[10px] text-ink/55 flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
                 </p>

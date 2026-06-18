@@ -32,13 +32,13 @@ import {
   Square,
   Sparkles,
   X,
-  ZoomIn,
-  ZoomOut,
   ChevronLeft,
   ChevronRight,
   Loader2,
   Play,
   Pause,
+  Users,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -159,6 +159,17 @@ export default function MarkerStudio({
   const [autoSuggesting, setAutoSuggesting] = useState(false);
   const [autoSuggestError, setAutoSuggestError] = useState("");
 
+  // ── Instant Roster mode ───────────────────────────────────────────
+  // studioMode controls the top-level UX flow.
+  //   "ROSTER"  → auto-scan video → show numbered roster tile grid → user taps their player
+  //   "MANUAL"  → existing fullscreen mark/anchor flow (kept 100% intact as fallback)
+  const [studioMode, setStudioMode] = useState("ROSTER");
+  const [rosterScanning, setRosterScanning] = useState(false);
+  const [rosterError, setRosterError] = useState("");
+  const [rosterProgress, setRosterProgress] = useState(0); // 0..1
+  const [rosterCandidates, setRosterCandidates] = useState([]); // [{id, color:[r,g,b], colorHex, appearances, bestT, bestBox, thumb}]
+  const rosterRanRef = useRef(false);
+
   // Auto-find detections (normalised 0..1 of wrapper rect, in dimmed-video coords)
   const [detections, setDetections] = useState([]);
   const [detecting, setDetecting] = useState(false);
@@ -184,6 +195,7 @@ export default function MarkerStudio({
   useEffect(() => {
     if (open) {
       setMode("navigate");
+      setStudioMode("ROSTER");
       setZoom(1);
       setPan({ x: 0, y: 0 });
       setBox(null);
@@ -194,6 +206,11 @@ export default function MarkerStudio({
       setAnchors([]);
       setAutoSuggesting(false);
       setAutoSuggestError("");
+      setRosterScanning(false);
+      setRosterError("");
+      setRosterProgress(0);
+      setRosterCandidates([]);
+      rosterRanRef.current = false;
     }
   }, [open]);
 
@@ -520,12 +537,6 @@ export default function MarkerStudio({
   };
   const onCanvasTouchEnd = () => {
     if (gestureRef.current?.type === "pinch") gestureRef.current = null;
-  };
-
-  /* ── Zoom buttons / slider ──────────────────────────────────── */
-  const stepZoom = (delta) => {
-    setZoom((z) => clamp(z + delta, 1, MAX_ZOOM));
-    if (zoom + delta <= 1.01) setPan({ x: 0, y: 0 });
   };
 
   /* ── Frame ±1 ────────────────────────────────────────────── */
@@ -875,6 +886,243 @@ export default function MarkerStudio({
     }
   };
 
+  /* ── Instant Roster scan — sample frames across the video,
+   *     detect every person, cluster by jersey colour into unique
+   *     identities. Renders a tile grid the user taps. ─────── */
+  const runRosterScan = useCallback(async () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.readyState < 2 || !v.videoWidth || !v.duration) {
+      // Not ready yet — caller will retry on metadata-ready
+      return;
+    }
+    if (rosterRanRef.current) return;
+    rosterRanRef.current = true;
+
+    setRosterScanning(true);
+    setRosterError("");
+    setRosterProgress(0);
+    setRosterCandidates([]);
+
+    try {
+      const det = await getDetector();
+      const dur = v.duration;
+      const N = Math.min(12, Math.max(8, Math.floor(dur / 2))); // 8-12 samples
+      const start = Math.min(0.6, dur * 0.05);
+      const end = Math.max(start + 1, dur - Math.min(0.6, dur * 0.05));
+      const ts = [];
+      for (let i = 0; i < N; i++) {
+        ts.push(start + ((end - start) * i) / Math.max(1, N - 1));
+      }
+
+      // Pre-create scratch canvases at video native size for sampling
+      const canvas = document.createElement("canvas");
+      canvas.width = v.videoWidth;
+      canvas.height = v.videoHeight;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      const sampleJerseyRGB = (bb) => {
+        // Upper torso: middle 50% wide, top 20-55% of height
+        const sx = Math.max(0, Math.floor(bb.originX + bb.width * 0.25));
+        const sy = Math.max(0, Math.floor(bb.originY + bb.height * 0.20));
+        const sw = Math.max(2, Math.floor(Math.min(canvas.width - sx, bb.width * 0.5)));
+        const sh = Math.max(2, Math.floor(Math.min(canvas.height - sy, bb.height * 0.35)));
+        if (sw < 4 || sh < 4) return null;
+        try {
+          const data = ctx.getImageData(sx, sy, sw, sh).data;
+          let r = 0, g = 0, b = 0, n = 0;
+          for (let i = 0; i < data.length; i += 20) {
+            r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
+          }
+          if (!n) return null;
+          return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+        } catch { return null; }
+      };
+
+      const colorDist = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+      const CLUSTER_THRESHOLD = 58; // RGB Euclidean — tight enough to separate jerseys
+      const clusters = []; // [{id, color, sumColor:[r,g,b], n, bestArea, bestT, bestBB}]
+
+      const wasPaused = v.paused;
+      v.pause();
+
+      for (let i = 0; i < ts.length; i++) {
+        const t = ts[i];
+        // Seek and wait
+        await new Promise((res) => {
+          let done = false;
+          const finish = () => { if (done) return; done = true; v.removeEventListener("seeked", finish); res(); };
+          v.addEventListener("seeked", finish);
+          try { v.currentTime = t; } catch { finish(); }
+          setTimeout(finish, 700);
+        });
+        // Draw frame
+        try {
+          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        } catch { continue; }
+        // Detect
+        let result;
+        try { result = det.detect(canvas); } catch { result = null; }
+        if (!result?.detections?.length) {
+          setRosterProgress((i + 1) / ts.length);
+          continue;
+        }
+
+        for (const d of result.detections) {
+          const bb = d.boundingBox;
+          if (!bb || bb.width < 20 || bb.height < 40) continue;
+          const rgb = sampleJerseyRGB(bb);
+          if (!rgb) continue;
+          // Skip very washed-out / sky-coloured detections (likely partial / out of focus)
+          const minC = Math.min(...rgb); const maxC = Math.max(...rgb);
+          if (maxC < 25) continue; // pure dark = likely shadow/no info
+          // Find nearest cluster
+          let best = null;
+          for (const c of clusters) {
+            const dist = colorDist(rgb, c.color);
+            if (dist < CLUSTER_THRESHOLD && (!best || dist < best.dist)) {
+              best = { c, dist };
+            }
+          }
+          const area = bb.width * bb.height;
+          if (best) {
+            best.c.n += 1;
+            best.c.sumColor[0] += rgb[0];
+            best.c.sumColor[1] += rgb[1];
+            best.c.sumColor[2] += rgb[2];
+            best.c.color = [
+              Math.round(best.c.sumColor[0] / best.c.n),
+              Math.round(best.c.sumColor[1] / best.c.n),
+              Math.round(best.c.sumColor[2] / best.c.n),
+            ];
+            if (area > best.c.bestArea) {
+              best.c.bestArea = area;
+              best.c.bestT = t;
+              best.c.bestBB = { ...bb };
+              best.c.bestThumb = captureThumbFromBB(canvas, bb);
+            }
+          } else {
+            clusters.push({
+              id: `c${clusters.length + 1}`,
+              color: rgb.slice(),
+              sumColor: rgb.slice(),
+              n: 1,
+              bestArea: area,
+              bestT: t,
+              bestBB: { ...bb },
+              bestThumb: captureThumbFromBB(canvas, bb),
+            });
+          }
+        }
+        setRosterProgress((i + 1) / ts.length);
+      }
+
+      if (wasPaused) {
+        // already paused, leave it
+      }
+
+      // Keep clusters with ≥2 sightings AND a thumb. Sort by appearances desc, then area desc.
+      const candidates = clusters
+        .filter((c) => c.n >= 2 && c.bestThumb)
+        .sort((a, b) => (b.n - a.n) || (b.bestArea - a.bestArea))
+        .slice(0, 12)
+        .map((c, idx) => ({
+          id: c.id,
+          number: idx + 1,
+          color: c.color,
+          colorHex: `rgb(${c.color[0]}, ${c.color[1]}, ${c.color[2]})`,
+          appearances: c.n,
+          bestT: c.bestT,
+          bestBB: c.bestBB,
+          thumb: c.bestThumb,
+        }));
+
+      if (!candidates.length) {
+        setRosterError("No players auto-detected. Switch to manual mode and mark your player.");
+      }
+      setRosterCandidates(candidates);
+    } catch (err) {
+      console.error("Roster scan error", err);
+      setRosterError("Auto-scan failed. Switch to manual mode and mark your player.");
+    } finally {
+      setRosterScanning(false);
+      setRosterProgress(1);
+    }
+  }, []);
+
+  /** Crop a small thumbnail (data-URL JPEG) from the given canvas at a detection BB. */
+  function captureThumbFromBB(canvas, bb) {
+    const pad = 0.22;
+    const cx = Math.max(0, bb.originX - bb.width * pad);
+    const cy = Math.max(0, bb.originY - bb.height * pad);
+    const cw = Math.min(canvas.width - cx, bb.width * (1 + pad * 2));
+    const ch = Math.min(canvas.height - cy, bb.height * (1 + pad * 2));
+    if (cw < 8 || ch < 8) return null;
+    const out = document.createElement("canvas");
+    const W = 140;
+    const H = Math.round(W * (ch / cw));
+    out.width = W;
+    out.height = H;
+    const octx = out.getContext("2d");
+    try { octx.drawImage(canvas, cx, cy, cw, ch, 0, 0, W, H); } catch { return null; }
+    return out.toDataURL("image/jpeg", 0.78);
+  }
+
+  /* ── Auto-run roster scan as soon as the video is ready ───── */
+  useEffect(() => {
+    if (!open) return;
+    if (studioMode !== "ROSTER") return;
+    if (!videoReady) return;
+    if (rosterRanRef.current) return;
+    // Slight delay so the video has decoded frames
+    const t = setTimeout(() => { runRosterScan(); }, 250);
+    return () => clearTimeout(t);
+  }, [open, studioMode, videoReady, runRosterScan]);
+
+  /* ── User taps a roster tile → auto-fill first anchor + switch to MANUAL ─ */
+  const pickRosterPlayer = useCallback(async (cand) => {
+    const v = videoRef.current;
+    if (!v || !cand) return;
+    // Seek to that candidate's best frame
+    await new Promise((res) => {
+      let done = false;
+      const finish = () => { if (done) return; done = true; v.removeEventListener("seeked", finish); res(); };
+      v.addEventListener("seeked", finish);
+      try { v.currentTime = cand.bestT; } catch { finish(); }
+      setTimeout(finish, 700);
+    });
+
+    // Convert detection bbox (native video px) into wrapper-relative normalised 0..1
+    const bounds = renderedVideoBounds(v);
+    const wrapperW = wrapperRect.w || 1;
+    const wrapperH = wrapperRect.h || 1;
+    const bb = cand.bestBB;
+    const px = (bb.originX / v.videoWidth) * bounds.w + bounds.x;
+    const py = (bb.originY / v.videoHeight) * bounds.h + bounds.y;
+    const pw = (bb.width / v.videoWidth) * bounds.w;
+    const ph = (bb.height / v.videoHeight) * bounds.h;
+    const newBox = {
+      x: clamp(px / wrapperW, 0, 1),
+      y: clamp(py / wrapperH, 0, 1),
+      w: clamp(pw / wrapperW, MIN_BOX_FRAC, 1),
+      h: clamp(ph / wrapperH, MIN_BOX_FRAC, 1),
+    };
+
+    // Build thumb canvas for this anchor (use the candidate thumb directly)
+    const newAnchor = {
+      t: cand.bestT,
+      box: newBox,
+      thumb: cand.thumb,
+    };
+
+    setAnchors([newAnchor]);
+    setBox(null);
+    setMode("navigate");
+    setStudioMode("MANUAL");
+    setCurrentTime(cand.bestT);
+    toast.success(`Roster #${cand.number} locked. Add more anchors for tighter precision, or tap ✓ DONE.`);
+  }, [wrapperRect]);
+
   /* ── Final Done — submit all anchors plus the marker JPG ───── */
   const handleDone = () => {
     const v = videoRef.current;
@@ -1020,7 +1268,7 @@ export default function MarkerStudio({
     () => ({
       transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
       transformOrigin: "50% 50%",
-      transition: gestureRef.current ? "none" : "transform 0.18s ease-out", // eslint-disable-line
+      transition: gestureRef.current ? "none" : "transform 0.18s ease-out",
       willChange: "transform",
     }),
     [pan, zoom],
@@ -1044,57 +1292,70 @@ export default function MarkerStudio({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] bg-deepnavy text-cream-card flex flex-col"
+      className="fixed inset-0 z-[200] bg-ink text-white flex flex-col"
       data-testid="marker-studio"
       style={{ touchAction: "none" }}
     >
       {/* ── Top bar ───────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-cream-card/10">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
         <button
           type="button"
           onClick={onCancel}
           data-testid="ms-cancel"
-          className="w-10 h-10 flex items-center justify-center text-cream-card/80 hover:text-cream-card"
+          className="w-10 h-10 flex items-center justify-center text-white/80 hover:text-white"
           aria-label="Cancel"
         >
           <X className="w-5 h-5" />
         </button>
-        <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-volt">
-          {anchors.length === 0
-            ? "Lock onto your player"
-            : `Anchor ${anchors.length} / ${MAX_ANCHORS} locked`}
+        <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-[#CCFF00]">
+          {studioMode === "ROSTER"
+            ? "Pick your player from the roster"
+            : anchors.length === 0
+              ? "Lock onto your player"
+              : `Anchor ${anchors.length} / ${MAX_ANCHORS} locked`}
         </div>
         <div className="flex items-center gap-1.5">
-          {/* ADD = lock the current box as a new anchor (stays in studio) */}
-          <button
-            type="button"
-            onClick={addCurrentAsAnchor}
-            disabled={!box || !videoReady || anchors.length >= MAX_ANCHORS}
-            data-testid="ms-add-anchor"
-            className={`px-2.5 h-10 flex items-center gap-1 text-[11px] uppercase tracking-widest font-black transition-colors ${
-              box && videoReady && anchors.length < MAX_ANCHORS
-                ? "bg-cream-card/15 text-cream-card hover:bg-cream-card/25"
-                : "bg-cream-card/5 text-cream-card/30"
-            }`}
-            aria-label="Add this box as an anchor"
-          >
-            + Add
-          </button>
-          {/* DONE = finalise all anchors → submit */}
-          <button
-            type="button"
-            onClick={handleDone}
-            disabled={(!box && !anchors.length) || !videoReady}
-            data-testid="ms-confirm"
-            className={`px-3 h-10 flex items-center gap-1.5 text-[12px] uppercase tracking-widest font-black transition-colors ${
-              (anchors.length || box) && videoReady
-                ? "bg-volt text-deepnavy hover:bg-volt/90"
-                : "bg-cream-card/10 text-cream-card/30"
-            }`}
-          >
-            <Check className="w-4 h-4" />
-            {anchors.length || box ? "Done" : "Lock"}
-          </button>
+          {studioMode === "MANUAL" && (
+            <>
+              {/* ADD = lock the current box as a new anchor (stays in studio) */}
+              <button
+                type="button"
+                onClick={addCurrentAsAnchor}
+                disabled={!box || !videoReady || anchors.length >= MAX_ANCHORS}
+                data-testid="ms-add-anchor"
+                className={`px-2.5 h-10 flex items-center gap-1 text-[11px] uppercase tracking-widest font-black transition-colors ${
+                  box && videoReady && anchors.length < MAX_ANCHORS
+                    ? "bg-white/15 text-white hover:bg-white/25"
+                    : "bg-white/5 text-white/30"
+                }`}
+                aria-label="Add this box as an anchor"
+              >
+                + Add
+              </button>
+            </>
+          )}
+          {/* DONE — visible only in MANUAL mode (full-width row below also appears when anchors locked) */}
+          {studioMode === "MANUAL" && (
+            <button
+              type="button"
+              onClick={handleDone}
+              disabled={(!box && !anchors.length) || !videoReady}
+              data-testid="ms-confirm"
+              className={`px-3 h-10 flex items-center gap-1.5 text-[12px] uppercase tracking-widest font-black transition-colors ${
+                (anchors.length || box) && videoReady
+                  ? "bg-[#CCFF00] text-ink hover:bg-[#CCFF00]/90"
+                  : "bg-white/10 text-white/30"
+              }`}
+            >
+              <Check className="w-4 h-4" />
+              {anchors.length || box ? "Done" : "Lock"}
+            </button>
+          )}
+          {studioMode === "ROSTER" && (
+            <span className="px-3 h-10 flex items-center text-[10px] uppercase tracking-widest font-bold text-white/55">
+              {rosterScanning ? `${Math.round(rosterProgress * 100)}%` : `${rosterCandidates.length} found`}
+            </span>
+          )}
         </div>
       </div>
 
@@ -1204,8 +1465,8 @@ export default function MarkerStudio({
 
         {/* Detecting overlay */}
         {detecting && (
-          <div className="absolute inset-0 flex items-center justify-center bg-deepnavy/60 backdrop-blur-sm pointer-events-none">
-            <div className="flex items-center gap-2 text-volt text-[11px] uppercase tracking-widest font-bold">
+          <div className="absolute inset-0 flex items-center justify-center bg-ink/70 backdrop-blur-sm pointer-events-none">
+            <div className="flex items-center gap-2 text-[#CCFF00] text-[11px] uppercase tracking-widest font-bold">
               <Loader2 className="w-4 h-4 animate-spin" />
               Locating players…
             </div>
@@ -1213,57 +1474,36 @@ export default function MarkerStudio({
         )}
 
         {detectError && !detecting && (
-          <div className="absolute top-3 left-3 right-3 bg-deepnavy/90 backdrop-blur border border-red-500/40 text-red-200 text-xs px-3 py-2">
+          <div className="absolute top-3 left-3 right-3 bg-ink/95 backdrop-blur border border-red-500/40 text-red-200 text-xs px-3 py-2">
             {detectError}
           </div>
         )}
 
         {/* Mode chip top-left */}
-        <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 bg-deepnavy/85 backdrop-blur text-cream-card text-[10px] uppercase tracking-widest font-bold px-2 py-1">
+        <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2 py-1">
           {mode === "navigate" ? <Move className="w-3 h-3" /> : <Square className="w-3 h-3" />}
           {mode === "navigate" ? "Navigate" : "Mark box"}
-          {zoom > 1.05 && <span className="text-volt">· {zoom.toFixed(1)}×</span>}
-        </div>
-
-        {/* Zoom buttons top-right (always visible, never overlapping content because they're at the edge) */}
-        <div className="pointer-events-none absolute top-3 right-3 flex flex-col gap-1">
-          <button
-            type="button"
-            data-testid="ms-zoom-in"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); stepZoom(0.5); }}
-            className="pointer-events-auto w-9 h-9 flex items-center justify-center bg-deepnavy/85 backdrop-blur border border-cream-card/15 text-cream-card hover:text-volt"
-            aria-label="Zoom in"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            data-testid="ms-zoom-out"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); stepZoom(-0.5); }}
-            className="pointer-events-auto w-9 h-9 flex items-center justify-center bg-deepnavy/85 backdrop-blur border border-cream-card/15 text-cream-card hover:text-volt"
-            aria-label="Zoom out"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
+          {zoom > 1.05 && <span className="text-[#CCFF00]">· {zoom.toFixed(1)}×</span>}
         </div>
       </div>
 
-      {/* ── Bottom toolbar ─────────────────────────── */}
-      <div className="border-t border-cream-card/10 bg-deepnavy">
+      {/* ── Bottom toolbar (only visible in MANUAL mode) ─────── */}
+      {studioMode === "MANUAL" && (
+      <div className="border-t border-white/10 bg-ink">
         {/* Anchor strip */}
         {(anchors.length > 0 || autoSuggesting || autoSuggestError) && (
           <div className="px-3 pt-2 pb-1">
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[9px] uppercase tracking-[0.25em] font-bold text-cream-card/55">
+              <span className="text-[9px] uppercase tracking-[0.25em] font-bold text-white/65">
                 Anchors {anchors.length}/{MAX_ANCHORS}
               </span>
               {anchors.length >= 3 && (
-                <span className="text-[9px] uppercase tracking-widest font-bold text-volt">
+                <span className="text-[9px] uppercase tracking-widest font-bold text-[#CCFF00]">
                   ✓ Strong precision
                 </span>
               )}
               {anchors.length > 0 && anchors.length < 3 && (
-                <span className="text-[9px] uppercase tracking-widest font-bold text-cream-card/45">
+                <span className="text-[9px] uppercase tracking-widest font-bold text-white/55">
                   Add {3 - anchors.length} more for tight precision
                 </span>
               )}
@@ -1279,12 +1519,12 @@ export default function MarkerStudio({
                   <img
                     src={a.thumb}
                     alt={`anchor ${i + 1}`}
-                    className="w-full h-full object-cover border border-volt/60"
+                    className="w-full h-full object-cover border border-[#CCFF00]/70"
                   />
-                  <span className="absolute top-0 left-0 bg-volt text-deepnavy text-[8px] uppercase tracking-wider font-black px-1 py-px">
+                  <span className="absolute top-0 left-0 bg-[#CCFF00] text-ink text-[8px] uppercase tracking-wider font-black px-1 py-px">
                     {i + 1}
                   </span>
-                  <span className="absolute bottom-0 right-0 bg-deepnavy/90 text-cream-card/85 text-[8px] tabular-nums px-1">
+                  <span className="absolute bottom-0 right-0 bg-ink/90 text-white/95 text-[8px] tabular-nums px-1">
                     {formatTime(a.t)}
                   </span>
                   <button
@@ -1306,7 +1546,7 @@ export default function MarkerStudio({
                     setMode("box");
                   }}
                   data-testid="ms-anchor-add-btn"
-                  className="flex-shrink-0 flex items-center justify-center bg-cream-card/8 hover:bg-cream-card/15 border border-dashed border-cream-card/30 text-cream-card/65 text-[10px] uppercase tracking-widest font-bold"
+                  className="flex-shrink-0 flex items-center justify-center bg-white/10 hover:bg-white/20 border border-dashed border-white/35 text-white/75 text-[10px] uppercase tracking-widest font-bold"
                   style={{ width: 48, height: 64 }}
                   aria-label="Add another anchor"
                 >
@@ -1326,7 +1566,7 @@ export default function MarkerStudio({
             type="button"
             onClick={togglePlay}
             data-testid="ms-play"
-            className="w-9 h-9 flex items-center justify-center bg-cream-card/10 hover:bg-cream-card/20 text-cream-card"
+            className="w-9 h-9 flex items-center justify-center bg-white/12 hover:bg-white/22 text-white"
             aria-label={playing ? "Pause" : "Play"}
           >
             {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -1341,19 +1581,19 @@ export default function MarkerStudio({
               const v = videoRef.current;
               if (v) v.currentTime = parseFloat(e.target.value);
             }}
-            className="flex-1 h-1 accent-volt"
+            className="flex-1 h-1 accent-[#CCFF00]"
             data-testid="ms-scrub"
           />
-          <div className="text-[10px] uppercase tracking-widest font-bold text-cream-card/60 tabular-nums min-w-[80px] text-right">
+          <div className="text-[10px] uppercase tracking-widest font-bold text-white/75 tabular-nums min-w-[80px] text-right">
             {formatTime(currentTime)} / {formatTime(duration)}
           </div>
           <div className="flex">
             <button type="button" data-testid="ms-frame-back" onClick={() => stepFrame(-1)}
-              className="w-9 h-9 flex items-center justify-center bg-cream-card/10 hover:bg-cream-card/20 text-cream-card">
+              className="w-9 h-9 flex items-center justify-center bg-white/12 hover:bg-white/22 text-white">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button type="button" data-testid="ms-frame-fwd" onClick={() => stepFrame(1)}
-              className="w-9 h-9 flex items-center justify-center bg-cream-card/10 hover:bg-cream-card/20 text-cream-card">
+              className="w-9 h-9 flex items-center justify-center bg-white/12 hover:bg-white/22 text-white">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -1361,13 +1601,13 @@ export default function MarkerStudio({
 
         {/* Mode toggle + Auto-find */}
         <div className="flex items-center gap-2 px-3 pb-2">
-          <div className="flex flex-1 border border-cream-card/15 overflow-hidden" data-testid="ms-mode-toggle">
+          <div className="flex flex-1 border border-white/20 overflow-hidden" data-testid="ms-mode-toggle">
             <button
               type="button"
               data-testid="ms-mode-navigate"
               onClick={() => setMode("navigate")}
               className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition-colors ${
-                mode === "navigate" ? "bg-volt text-deepnavy" : "bg-transparent text-cream-card/75"
+                mode === "navigate" ? "bg-[#CCFF00] text-ink" : "bg-transparent text-white/85"
               }`}
             >
               <Move className="w-3.5 h-3.5" /> Navigate
@@ -1377,7 +1617,7 @@ export default function MarkerStudio({
               data-testid="ms-mode-box"
               onClick={() => setMode("box")}
               className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-widest font-bold transition-colors ${
-                mode === "box" ? "bg-volt text-deepnavy" : "bg-transparent text-cream-card/75"
+                mode === "box" ? "bg-[#CCFF00] text-ink" : "bg-transparent text-white/85"
               }`}
             >
               <Square className="w-3.5 h-3.5" /> Mark box
@@ -1388,7 +1628,7 @@ export default function MarkerStudio({
             data-testid="ms-autofind"
             onClick={runAutoSuggest}
             disabled={autoSuggesting || (!anchors.length && !box) || anchors.length >= MAX_ANCHORS}
-            className="px-3 py-2 flex items-center gap-1.5 bg-volt/15 border border-volt/40 text-volt text-[11px] uppercase tracking-widest font-bold hover:bg-volt/25 disabled:opacity-50"
+            className="px-3 py-2 flex items-center gap-1.5 bg-[#CCFF00]/15 border border-[#CCFF00]/45 text-[#CCFF00] text-[11px] uppercase tracking-widest font-bold hover:bg-[#CCFF00]/25 disabled:opacity-50"
             title="AI scans the video and suggests up to 5 anchors matching your locked player"
           >
             {autoSuggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
@@ -1397,10 +1637,73 @@ export default function MarkerStudio({
         </div>
 
         {/* Hint row */}
-        <div className="px-3 pb-3 text-[11px] text-cream-card/65 text-center">
+        <div className="px-3 pb-2 text-[12px] text-white/85 text-center font-medium">
           {hint}
         </div>
+
+        {/* Full-width DONE button when at least 1 anchor (or a pending box) is ready */}
+        {(anchors.length > 0 || box) && (
+          <div className="px-3 pb-3">
+            <button
+              type="button"
+              onClick={handleDone}
+              disabled={!videoReady}
+              data-testid="ms-done-fullwidth"
+              className={`w-full h-12 flex items-center justify-center gap-2 text-[13px] uppercase tracking-widest font-black transition-all ${
+                videoReady
+                  ? "bg-[#CCFF00] text-ink hover:bg-[#CCFF00]/90 shadow-[0_0_22px_rgba(204,255,0,0.45)]"
+                  : "bg-white/10 text-white/40"
+              }`}
+            >
+              <Check className="w-5 h-5" />
+              Done · {Math.max(1, anchors.length + (box ? 1 : 0))} anchor{(anchors.length + (box ? 1 : 0)) === 1 ? "" : "s"} → analyse
+            </button>
+          </div>
+        )}
+
+        {/* Back-to-roster fallback */}
+        <div className="px-3 pb-3 text-center">
+          <button
+            type="button"
+            onClick={() => {
+              setAnchors([]);
+              setBox(null);
+              setStudioMode("ROSTER");
+              rosterRanRef.current = false;
+              setRosterCandidates([]);
+              setRosterError("");
+              setRosterProgress(0);
+            }}
+            data-testid="ms-back-to-roster"
+            className="text-[10px] uppercase tracking-widest font-bold text-white/55 hover:text-[#CCFF00] underline decoration-dotted underline-offset-4"
+          >
+            ← Back to auto-roster
+          </button>
+        </div>
       </div>
+      )}
+
+      {/* ── Roster overlay (default first screen) ───────────── */}
+      {studioMode === "ROSTER" && (
+        <RosterOverlay
+          scanning={rosterScanning}
+          progress={rosterProgress}
+          candidates={rosterCandidates}
+          error={rosterError}
+          onPick={pickRosterPlayer}
+          onSwitchToManual={() => {
+            setStudioMode("MANUAL");
+            setMode("box");
+          }}
+          onRescan={() => {
+            rosterRanRef.current = false;
+            setRosterCandidates([]);
+            setRosterError("");
+            setRosterProgress(0);
+            runRosterScan();
+          }}
+        />
+      )}
 
       {/* Local keyframes */}
       <style>{`
@@ -1443,7 +1746,7 @@ function BoxHandlesOverlay({ box, zoom, pan, wrapperRect }) {
         return (
           <span
             key={k}
-            className="absolute bg-volt border-2 border-white"
+            className="absolute bg-[#CCFF00] border-2 border-white"
             style={{
               left: s.x - 8,
               top: s.y - 8,
@@ -1455,5 +1758,177 @@ function BoxHandlesOverlay({ box, zoom, pan, wrapperRect }) {
         );
       })}
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * RosterOverlay — the default fullscreen "tap your player" sheet.
+ * MediaPipe scans the video, clusters by jersey colour, and renders a
+ * numbered tile grid. The user simply taps their tile. A "Mark manually"
+ * link falls back to the existing manual flow.
+ * ─────────────────────────────────────────────────────────────────── */
+
+function RosterOverlay({ scanning, progress, candidates, error, onPick, onSwitchToManual, onRescan }) {
+  return (
+    <div
+      className="absolute inset-0 z-[210] flex flex-col bg-ink/97 backdrop-blur-md"
+      style={{ paddingTop: 50 /* leave room for top bar */ }}
+      data-testid="ms-roster-overlay"
+    >
+      {/* Headline */}
+      <div className="px-4 pt-4 pb-3 text-center">
+        <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.32em] font-black text-[#CCFF00] mb-2">
+          <Users className="w-3.5 h-3.5" />
+          Instant roster
+        </div>
+        <h2 className="text-white text-2xl md:text-3xl font-black leading-tight">
+          Tap <span className="text-[#CCFF00]">your player</span> from the list
+        </h2>
+        <p className="text-white/75 text-sm mt-1.5 max-w-md mx-auto">
+          We scanned the clip and grouped every player by jersey colour. Pick yours &mdash; one tap and you&apos;re done.
+        </p>
+      </div>
+
+      {/* Body — scanning OR grid OR empty */}
+      <div className="flex-1 overflow-y-auto px-4 pb-4">
+        {scanning && (
+          <div className="flex flex-col items-center justify-center min-h-[280px] gap-4" data-testid="ms-roster-scanning">
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 rounded-full border-4 border-[#CCFF00]/15"></div>
+              <div
+                className="absolute inset-0 rounded-full border-4 border-[#CCFF00] border-t-transparent animate-spin"
+                style={{ animationDuration: "1.1s" }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center text-[#CCFF00] font-black text-base tabular-nums">
+                {Math.round((progress || 0) * 100)}%
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-white font-bold text-[15px]">Scanning the pitch…</div>
+              <div className="text-white/65 text-xs mt-1">Finding every player on the field</div>
+            </div>
+            {/* Live previews while scanning, if any candidates appear early */}
+            {candidates.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 w-full max-w-sm mt-4">
+                {candidates.slice(0, 6).map((c) => (
+                  <RosterTile key={c.id} cand={c} onPick={onPick} compact />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!scanning && candidates.length > 0 && (
+          <div
+            className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+            data-testid="ms-roster-grid"
+          >
+            {candidates.map((c) => (
+              <RosterTile key={c.id} cand={c} onPick={onPick} />
+            ))}
+          </div>
+        )}
+
+        {!scanning && candidates.length === 0 && (
+          <div className="flex flex-col items-center justify-center min-h-[260px] text-center gap-3" data-testid="ms-roster-empty">
+            <div className="w-14 h-14 rounded-full bg-white/8 flex items-center justify-center">
+              <Users className="w-7 h-7 text-white/65" />
+            </div>
+            <div className="text-white font-bold text-[15px]">
+              {error || "No players auto-detected"}
+            </div>
+            <p className="text-white/65 text-sm max-w-xs">
+              The clip might be tightly cropped or low-light. Try scanning again or mark your player manually.
+            </p>
+            <button
+              type="button"
+              onClick={onRescan}
+              data-testid="ms-roster-rescan"
+              className="px-4 py-2 bg-white/12 hover:bg-white/22 text-white text-[11px] uppercase tracking-widest font-bold"
+            >
+              Try scan again
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer — manual fallback always visible */}
+      <div className="border-t border-white/12 px-4 py-3 bg-ink">
+        <button
+          type="button"
+          onClick={onSwitchToManual}
+          data-testid="ms-roster-manual"
+          className="w-full flex items-center justify-center gap-2 py-3 text-[12px] uppercase tracking-widest font-bold text-white/95 bg-white/10 hover:bg-white/18 transition-colors"
+        >
+          <Pencil className="w-4 h-4" />
+          Don&apos;t see your player? Mark manually
+        </button>
+        <p className="mt-2 text-[10px] text-white/50 text-center">
+          Manual mode lets you drag a box around your player and add up to 5 timestamp anchors.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function RosterTile({ cand, onPick, compact = false }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(cand)}
+      data-testid={`ms-roster-tile-${cand.number}`}
+      className={`relative overflow-hidden bg-white/8 hover:bg-white/14 border border-white/20 hover:border-[#CCFF00] active:scale-[0.97] transition-all text-left ${
+        compact ? "min-h-[110px]" : "min-h-[170px]"
+      }`}
+      style={{ boxShadow: "0 8px 20px rgba(0,0,0,0.35)" }}
+    >
+      {cand.thumb ? (
+        <img
+          src={cand.thumb}
+          alt={`Player ${cand.number}`}
+          className="w-full h-full object-cover absolute inset-0"
+          draggable={false}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-white/6" />
+      )}
+      {/* Dim overlay for readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/75 pointer-events-none" />
+
+      {/* Big number top-left */}
+      <div className="absolute top-2 left-2 flex items-center gap-1.5">
+        <span
+          className={`bg-[#CCFF00] text-ink font-black ${
+            compact ? "text-base px-2 py-0.5" : "text-xl px-2.5 py-0.5"
+          } leading-none`}
+          style={{ boxShadow: "0 0 14px rgba(204,255,0,0.55)" }}
+        >
+          #{cand.number}
+        </span>
+      </div>
+
+      {/* Jersey colour chip top-right */}
+      <div className="absolute top-2 right-2">
+        <span
+          className="block rounded-full border-2 border-white shadow-[0_0_8px_rgba(0,0,0,0.45)]"
+          style={{
+            width: compact ? 18 : 22,
+            height: compact ? 18 : 22,
+            backgroundColor: cand.colorHex,
+          }}
+          title={`Jersey ~${cand.colorHex}`}
+        />
+      </div>
+
+      {/* Footer copy */}
+      <div className="absolute bottom-1.5 left-2 right-2 text-white">
+        <div className={`font-bold ${compact ? "text-[11px]" : "text-[13px]"}`}>
+          Player #{cand.number}
+        </div>
+        <div className={`text-white/85 ${compact ? "text-[9px]" : "text-[10px]"} uppercase tracking-widest font-bold`}>
+          {cand.appearances} sighting{cand.appearances === 1 ? "" : "s"}
+        </div>
+      </div>
+    </button>
   );
 }

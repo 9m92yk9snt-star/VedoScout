@@ -548,4 +548,210 @@ __all__ = [
     "build_full_prompt",
     "scrub_hedging",
     "CONFIDENT_VOICE_RULES",
+    "verify_and_pick_thumbnail",
 ]
+
+
+# ── Thumbnail re-verification ─────────────────────────────────────────
+#
+# Goal: when generating per-timestamp thumbnails for the final report, we
+# don't blindly trust the raw `ts` value from Gemini. Instead we sample a
+# small window (±1.0 s) of candidate frames around the timestamp and pick
+# the one whose pixels best match the LOCKED PLAYER's jersey + shorts
+# fingerprint. Then we draw a small volt-green reticle around the matching
+# region so the reader sees AT A GLANCE which player on screen the comment
+# refers to.
+#
+# This dramatically improves report credibility — even if Gemini's
+# timestamp is off by 600-800 ms, the thumbnail still shows the right
+# player rather than a random teammate caught in a different moment.
+
+def _hex_to_rgb(h: str) -> tuple[int, int, int]:
+    h = (h or "#888888").lstrip("#")
+    if len(h) != 6:
+        return (136, 136, 136)
+    try:
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
+    except ValueError:
+        return (136, 136, 136)
+
+
+def _color_match_mask_bgr(frame_bgr: np.ndarray, target_rgb: tuple[int, int, int], tol: int = 55) -> np.ndarray:
+    """Return a boolean mask of pixels close to `target_rgb` in the BGR frame."""
+    b, g, r = cv2.split(frame_bgr)
+    tr, tg, tb = target_rgb
+    dist2 = (r.astype(np.int32) - tr) ** 2 + (g.astype(np.int32) - tg) ** 2 + (b.astype(np.int32) - tb) ** 2
+    return dist2 < (tol * tol)
+
+
+def verify_and_pick_thumbnail(
+    video_path: str | Path,
+    seconds: float,
+    fingerprint,  # PlayerFingerprint
+    out_path: str | Path,
+    *,
+    window: float = 1.0,
+    samples: int = 5,
+    reticle: bool = True,
+) -> tuple[bool, dict]:
+    """Pick the best thumbnail in a small time window around `seconds` and save it.
+
+    Returns (ok, meta). `meta` carries the chosen timestamp, the match score
+    (proportion of jersey-matching pixels in the largest connected region), and
+    the reticle bounding box in normalised 0..1 coordinates (so the frontend
+    could draw an overlay if wanted).
+    """
+    video_path = Path(video_path)
+    out_path = Path(out_path)
+    meta = {
+        "picked_ts": float(seconds),
+        "match_score": 0.0,
+        "reticle": None,
+        "window_used": float(window),
+        "samples": int(samples),
+        "ok": False,
+    }
+    if not video_path.exists():
+        return False, meta
+
+    jersey_rgb = _hex_to_rgb(getattr(fingerprint, "jersey_hex", "#888888"))
+    shorts_rgb = _hex_to_rgb(getattr(fingerprint, "shorts_hex", "#888888"))
+
+    # Sample N candidate timestamps evenly across [s-window, s+window]
+    offsets = np.linspace(-window, window, max(2, samples))
+    candidates = []  # (ts, frame_bgr, score, bbox)
+
+    tmp_dir = out_path.parent
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    for off in offsets:
+        ts = max(0.0, float(seconds) + float(off))
+        tmp_frame = tmp_dir / f".verify_{out_path.stem}_{ts:.2f}.jpg"
+        ok = extract_frame_at(video_path, ts, tmp_frame)
+        if not ok or not tmp_frame.exists():
+            continue
+        img = cv2.imread(str(tmp_frame), cv2.IMREAD_COLOR)
+        try:
+            tmp_frame.unlink(missing_ok=True)
+        except Exception:
+            pass
+        if img is None or img.size == 0:
+            continue
+
+        # Combined match mask: jersey AND shorts pixels both contribute (jersey weighted higher)
+        mj = _color_match_mask_bgr(img, jersey_rgb, tol=55)
+        ms = _color_match_mask_bgr(img, shorts_rgb, tol=55)
+        mask = (mj.astype(np.uint8) * 2) + (ms.astype(np.uint8) * 1)
+        # Strict mask: pixels close to either colour
+        any_match = ((mj | ms).astype(np.uint8) * 255)
+
+        # Find connected components — biggest blob is likely the player
+        n_lbl, labels, stats, _ = cv2.connectedComponentsWithStats(any_match, connectivity=8)
+        if n_lbl <= 1:
+            candidates.append((ts, img, 0.0, None))
+            continue
+
+        # Skip background label 0; pick the largest blob with area within plausible range
+        h, w = img.shape[:2]
+        total_px = float(h * w)
+        best_idx = -1
+        best_area = 0
+        for i in range(1, n_lbl):
+            area = stats[i, cv2.CC_STAT_AREA]
+            if area < 200:
+                continue
+            # too huge => probably background (sky, pitch line); cap
+            if area > total_px * 0.12:
+                continue
+            if area > best_area:
+                best_area = area
+                best_idx = i
+
+        if best_idx < 0:
+            candidates.append((ts, img, 0.0, None))
+            continue
+
+        x = int(stats[best_idx, cv2.CC_STAT_LEFT])
+        y = int(stats[best_idx, cv2.CC_STAT_TOP])
+        bw = int(stats[best_idx, cv2.CC_STAT_WIDTH])
+        bh = int(stats[best_idx, cv2.CC_STAT_HEIGHT])
+
+        # Score = jersey-matched pixels in box / total box area, weighted by box centrality
+        sub = mask[y:y + bh, x:x + bw]
+        if sub.size == 0:
+            candidates.append((ts, img, 0.0, None))
+            continue
+        jersey_density = float((sub > 0).sum()) / float(sub.size)
+        # Penalise very narrow boxes (a sliver isn't a player)
+        aspect = bh / max(1, bw)
+        aspect_factor = 1.0 if 1.2 <= aspect <= 4.0 else 0.55
+        score = jersey_density * aspect_factor
+
+        bbox_norm = {
+            "x": x / w, "y": y / h,
+            "w": bw / w, "h": bh / h,
+        }
+        candidates.append((ts, img, score, bbox_norm))
+
+    if not candidates:
+        # Last-resort: just dump the original timestamp frame, no reticle
+        ok = extract_frame_at(video_path, float(seconds), out_path)
+        meta["ok"] = ok
+        return ok, meta
+
+    # Pick best by score; if all-zero, pick centermost timestamp
+    candidates.sort(key=lambda c: (c[2], -abs(c[0] - float(seconds))), reverse=True)
+    best_ts, best_img, best_score, best_bbox = candidates[0]
+    if best_score <= 0:
+        # Just use the requested ts thumbnail, no reticle
+        ok = extract_frame_at(video_path, float(seconds), out_path)
+        meta["ok"] = ok
+        return ok, meta
+
+    # Draw a volt-green reticle around the matched region
+    out_img = best_img.copy()
+    if reticle and best_bbox:
+        h, w = out_img.shape[:2]
+        bx = int(best_bbox["x"] * w)
+        by = int(best_bbox["y"] * h)
+        bw = int(best_bbox["w"] * w)
+        bh = int(best_bbox["h"] * h)
+        # Slight padding outward
+        pad = int(max(bw, bh) * 0.18)
+        bx2 = max(0, bx - pad)
+        by2 = max(0, by - pad)
+        bw2 = min(w - bx2, bw + 2 * pad)
+        bh2 = min(h - by2, bh + 2 * pad)
+        # OpenCV uses BGR — volt #CCFF00 is RGB(204,255,0) → BGR(0,255,204)
+        volt_bgr = (0, 255, 204)
+        thickness = max(2, min(w, h) // 240)
+        # Outer subtle halo
+        cv2.rectangle(out_img, (bx2 - 2, by2 - 2), (bx2 + bw2 + 2, by2 + bh2 + 2), volt_bgr, 1)
+        # Main rectangle
+        cv2.rectangle(out_img, (bx2, by2), (bx2 + bw2, by2 + bh2), volt_bgr, thickness)
+        # Corner ticks (L-shaped, white)
+        c = min(bw2, bh2) // 5
+        white = (255, 255, 255)
+        for (x0, y0, dx, dy) in [
+            (bx2, by2, 1, 1),
+            (bx2 + bw2, by2, -1, 1),
+            (bx2, by2 + bh2, 1, -1),
+            (bx2 + bw2, by2 + bh2, -1, -1),
+        ]:
+            cv2.line(out_img, (x0, y0), (x0 + dx * c, y0), white, max(2, thickness - 1))
+            cv2.line(out_img, (x0, y0), (x0, y0 + dy * c), white, max(2, thickness - 1))
+
+    # Downscale to keep file size reasonable (max 720 wide)
+    h, w = out_img.shape[:2]
+    if w > 720:
+        scale = 720 / w
+        out_img = cv2.resize(out_img, (720, int(h * scale)), interpolation=cv2.INTER_AREA)
+    cv2.imwrite(str(out_path), out_img, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+
+    meta.update({
+        "picked_ts": float(best_ts),
+        "match_score": float(round(best_score, 4)),
+        "reticle": best_bbox,
+        "ok": True,
+    })
+    return True, meta

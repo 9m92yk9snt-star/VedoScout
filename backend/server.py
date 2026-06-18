@@ -1663,7 +1663,14 @@ def _extract_video_frame(video_path: Path, seconds: int, out_path: Path) -> bool
 def ensure_video_frames(report_doc: dict) -> list:
     """For every video_comments entry, ensure a frame JPEG exists on disk and
     attach a `frame_url` to the comment. Falls back to a branded placeholder
-    when the video file is missing or ffmpeg fails."""
+    when the video file is missing or ffmpeg fails.
+
+    When a player fingerprint exists on the report, each thumbnail is verified
+    against the locked player using `verify_and_pick_thumbnail` — we sample a
+    small window around the AI's timestamp, pick the frame whose pixels best
+    match the marked player's jersey/shorts, and stamp a volt-green reticle so
+    readers can see exactly which player on screen the comment refers to.
+    """
     full = report_doc.get("full_report") or {}
     comments = full.get("video_comments") or []
     if not comments:
@@ -1680,6 +1687,26 @@ def ensure_video_frames(report_doc: dict) -> list:
     video_path = UPLOAD_DIR / video_filename if video_filename else None
     have_video = bool(video_path and video_path.exists())
 
+    # Try to reconstruct the player fingerprint for thumbnail re-verification.
+    fingerprint_obj = None
+    fp_dict = report_doc.get("fingerprint")
+    if isinstance(fp_dict, dict):
+        try:
+            from precision_engine import PlayerFingerprint  # local import to avoid circulars
+            fingerprint_obj = PlayerFingerprint(
+                jersey_hex=fp_dict.get("jersey_hex", "#888888"),
+                jersey_name=fp_dict.get("jersey_name", "unclear"),
+                shorts_hex=fp_dict.get("shorts_hex", "#888888"),
+                shorts_name=fp_dict.get("shorts_name", "unclear"),
+                body_ratio=float(fp_dict.get("body_ratio", 2.0)),
+                crop_path=fp_dict.get("crop_path"),
+                box=fp_dict.get("box", {}),
+                confidence=fp_dict.get("confidence", "ok"),
+            )
+        except Exception as e:
+            logging.warning(f"thumbnail verify: could not reconstruct fingerprint: {e}")
+            fingerprint_obj = None
+
     enriched = []
     for idx, c in enumerate(comments):
         if not isinstance(c, dict):
@@ -1687,16 +1714,33 @@ def ensure_video_frames(report_doc: dict) -> list:
             continue
         ts = c.get("timestamp", "")
         out_path = frames_dir / f"frame_{idx:02d}.jpg"
+        frame_meta = None
         if not out_path.exists():
             ok = False
             if have_video:
                 seconds = _ts_to_seconds(ts)
                 if seconds is not None:
-                    ok = _extract_video_frame(video_path, seconds, out_path)
+                    # Prefer the verified-and-reticled thumbnail when we have a fingerprint
+                    if fingerprint_obj is not None:
+                        try:
+                            from precision_engine import verify_and_pick_thumbnail
+                            ok, frame_meta = verify_and_pick_thumbnail(
+                                video_path, float(seconds), fingerprint_obj, out_path,
+                            )
+                        except Exception as e:
+                            logging.warning(f"thumbnail verify failed for ts={ts}: {e}")
+                            ok = False
+                    if not ok:
+                        ok = _extract_video_frame(video_path, seconds, out_path)
             if not ok:
                 _make_placeholder_frame(ts, c.get("comment", ""), out_path)
         out = dict(c)
         out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
+        if frame_meta:
+            out["frame_verified"] = bool(frame_meta.get("ok"))
+            out["frame_picked_ts"] = frame_meta.get("picked_ts")
+            out["frame_match_score"] = frame_meta.get("match_score")
+            out["frame_reticle"] = frame_meta.get("reticle")
         enriched.append(out)
     return enriched
 
@@ -5470,6 +5514,87 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"]["player_name"])
     filename = f"EliteScout_{player_name_safe}_Report.pdf"
     return FileResponse(str(pdf_path), media_type="application/pdf", filename=filename)
+
+
+# Cached path of the public sample PDF (built once on first hit).
+_SAMPLE_PDF_PATH = Path(__file__).resolve().parent / "uploads" / "scoutmeplay_sample_report.pdf"
+_SAMPLE_REPORT_ID_HINT_KEY = "sample_demo_report_id"
+
+
+async def _resolve_sample_report() -> dict | None:
+    """Return a fully-unlocked demo report doc suitable for the public sample PDF.
+
+    Strategy: prefer an admin-pinned doc id stored in settings; otherwise pick the
+    most recent paid report belonging to the seeded premium demo user (Lukas A.).
+    """
+    pinned = await db.settings.find_one({"_id": _SAMPLE_REPORT_ID_HINT_KEY})
+    if pinned and pinned.get("report_id"):
+        doc = await db.reports.find_one({"id": pinned["report_id"]})
+        if doc and doc.get("full_report"):
+            return doc
+    # Fallback — most recent paid report with a full_report payload (avoid empties)
+    doc = await db.reports.find_one(
+        {"is_paid": True, "full_report": {"$exists": True, "$ne": None}},
+        sort=[("created_at", -1)],
+    )
+    return doc
+
+
+@api_router.get("/sample/scoutmeplay-report.pdf")
+async def download_public_sample_pdf():
+    """Public, no-auth endpoint that streams a curated sample premium PDF.
+
+    Used by the landing page's "Download sample PDF" button to give prospects an
+    honest preview of what the full premium report looks like before paying.
+    Cached on disk; rebuilds when the source report is updated.
+    """
+    doc = await _resolve_sample_report()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Sample report not available yet")
+    src_id = doc["id"]
+
+    # Use the same per-report PDF cache that the authenticated download uses, so
+    # admin tweaks propagate. Then expose it under a public filename.
+    pdf_path = _pdf_cache_path(src_id)
+    if not pdf_path.exists():
+        _purge_stale_pdfs(src_id)
+        doc["trial_readiness"] = compute_trial_readiness(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        doc["archetype"] = match_archetype(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        if isinstance(doc.get("archetype"), dict) and doc.get("archetype_narrative"):
+            if doc.get("archetype_narrative_archetype_id") == doc["archetype"].get("id"):
+                doc["archetype"]["narrative"] = doc["archetype_narrative"]
+        doc["age_profile_reference"] = compute_age_profile_reference(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        doc["statsbomb_calibration"] = compute_statsbomb_calibration(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        age_intel = compute_age_intelligence(
+            doc.get("full_report") or {},
+            doc.get("player_details") or {},
+        )
+        if age_intel:
+            apply_stage_gating(doc, age_intel)
+            doc["age_intelligence"] = age_intel
+        enriched_comments = ensure_video_frames(doc)
+        if enriched_comments and isinstance(doc.get("full_report"), dict):
+            doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
+        build_pdf(doc, str(pdf_path))
+
+    return FileResponse(
+        str(pdf_path),
+        media_type="application/pdf",
+        filename="ScoutMePlay_Sample_Report.pdf",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 # ============== PAYMENTS (STRIPE) ==============
