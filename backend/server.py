@@ -8,6 +8,8 @@ import math
 import logging
 import shutil
 import re
+import base64
+import tempfile
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Tuple
@@ -2345,6 +2347,140 @@ async def call_gemini_with_video(
     except Exception as e:
         logger.error(f"Failed to parse Gemini response: {e}\n{response_text[:500]}")
         raise HTTPException(status_code=500, detail="AI analysis returned invalid format. Please try again.")
+
+
+# ── Scout Mode helper — Gemini Vision frame detection ────────────────
+#
+#   Replaces the client-side MediaPipe "person" detector that cannot tell
+#   parents/spectators apart from real child players. Gemini understands
+#   the scene (a youth football match) and only returns kids ON the pitch.
+class _ScoutDetectRequest(BaseModel):
+    image: str  # data:image/jpeg;base64,... OR raw base64
+    frame_w: Optional[int] = None  # source frame size (for diagnostics)
+    frame_h: Optional[int] = None
+
+
+SCOUT_DETECT_PROMPT = (
+    "You are looking at a single still frame from a YOUTH football (soccer) "
+    "match video. Identify EVERY child football player currently visible "
+    "on the pitch.\n\n"
+    "INCLUDE:\n"
+    "- Field players (both teams)\n"
+    "- Goalkeepers — even when standing inside the goal area, partly occluded by the goalpost/net\n\n"
+    "EXCLUDE (do NOT return boxes for):\n"
+    "- Parents, coaches, photographers, spectators\n"
+    "- Anyone standing on the sideline, behind a fence/wall, on a path or terrace\n"
+    "- Adults in coats or street clothes\n"
+    "- Referees in striped or all-black uniforms\n"
+    "- Anyone whose feet are clearly NOT on the grass / artificial turf\n\n"
+    "Return a bounding box for each kept player. Coordinates MUST be fractions "
+    "of the full image size in the range 0.0 to 1.0:\n"
+    "  - x  = left edge of the box\n"
+    "  - y  = top edge of the box (top of the head)\n"
+    "  - w  = box width\n"
+    "  - h  = box height (head to feet, hugging the player)\n"
+    "Boxes must hug each player TIGHTLY — head at the top, feet at the bottom, "
+    "shoulders defining the width. Do NOT merge multiple players into one box.\n\n"
+    'Respond with VALID JSON ONLY in this exact shape (no markdown fences, no commentary):\n'
+    '{"players": [{"x": 0.12, "y": 0.45, "w": 0.05, "h": 0.18, "label": "kid in white jersey #9"}, ...]}'
+)
+
+
+@api_router.post("/scout/detect-players")
+async def scout_detect_players(req: _ScoutDetectRequest):
+    """Single-frame detection: Gemini Vision returns precise boxes for every
+    child football player visible on the pitch in the supplied frame.
+    Excludes parents, spectators, refs, anyone off the field.
+
+    Response: { "players": [{ "x": 0..1, "y": 0..1, "w": 0..1, "h": 0..1, "label": str, "score": 0..1 }, ...] }
+    Returns an empty list (never raises) when Gemini misbehaves, so the
+    frontend can gracefully fall back to its MediaPipe boxes."""
+    raw = req.image or ""
+    if raw.startswith("data:"):
+        try:
+            _, b64 = raw.split(",", 1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid data URL image")
+    else:
+        b64 = raw
+    try:
+        img_bytes = base64.b64decode(b64)
+        if len(img_bytes) < 1024:
+            raise ValueError("decoded image too small")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid base64 image payload")
+
+    tmp_path: Optional[str] = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp.write(img_bytes)
+            tmp_path = tmp.name
+
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"scout-detect-{uuid.uuid4().hex}",
+            system_message=(
+                "You are a precise computer-vision assistant. You return "
+                "tight bounding boxes only for children actively playing "
+                "football on the pitch. You always respond with VALID JSON."
+            ),
+        ).with_model("gemini", "gemini-2.5-pro")
+
+        user_message = UserMessage(
+            text=SCOUT_DETECT_PROMPT,
+            file_contents=[FileContentWithMimeType(file_path=tmp_path, mime_type="image/jpeg")],
+        )
+        try:
+            response = await chat.send_message(user_message)
+        except Exception as e:
+            logger.warning(f"Scout detect: Gemini call failed: {e}")
+            return {"players": [], "error": "gemini_unavailable"}
+        text = response if isinstance(response, str) else str(response)
+
+        try:
+            parsed = extract_json(text)
+        except Exception as e:
+            logger.warning(f"Scout detect: failed to parse Gemini JSON: {e} | head={text[:240]}")
+            return {"players": [], "error": "parse_failed"}
+
+        items = parsed.get("players") or parsed.get("boxes") or []
+        if not isinstance(items, list):
+            return {"players": [], "error": "shape_unexpected"}
+
+        cleaned: list[dict] = []
+        for p in items:
+            if not isinstance(p, dict):
+                continue
+            try:
+                x = float(p.get("x", 0))
+                y = float(p.get("y", 0))
+                w = float(p.get("w", p.get("width", 0)))
+                h = float(p.get("h", p.get("height", 0)))
+                if w <= 0 or h <= 0 or w > 0.95 or h > 0.95:
+                    continue
+                # Tall-shaped sanity check — humans aren't wider than tall
+                if h < 1.1 * w:
+                    continue
+                cleaned.append({
+                    "x": max(0.0, min(1.0, x)),
+                    "y": max(0.0, min(1.0, y)),
+                    "w": max(0.005, min(1.0, w)),
+                    "h": max(0.005, min(1.0, h)),
+                    "label": str(p.get("label", ""))[:80],
+                    "score": float(p.get("confidence", p.get("score", 0.95))),
+                })
+            except Exception:
+                continue
+
+        # Cap at 15 (full team + GKs + ref) so we don't drown the UI
+        cleaned = cleaned[:15]
+        return {"players": cleaned}
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 async def run_content_gate(report_id: str, clip_path: Path, marker_path: Optional[Path]) -> dict:

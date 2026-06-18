@@ -38,6 +38,9 @@ import {
 
 import { detectSceneCuts, distributeHints } from "./sceneDetect";
 
+// Backend base URL — same env var the rest of the frontend uses.
+const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
+
 /* ── Dedicated MediaPipe ObjectDetector for Scout Mode ──────────────
  *  Created in ScoutMode (NOT shared with the rest of MarkerStudio) so we
  *  can use a much more permissive scoreThreshold (0.20) and a higher
@@ -208,6 +211,13 @@ export default function ScoutMode({
   // just tapped. Independent of MediaPipe — works even when the detector
   // is silent. { x, y, num } in stage-local screen coords. Cleared ~1.4s later.
   const [tapMarker, setTapMarker] = useState(null);
+  // Gemini Vision refinement — when true, a backend call is in-flight that
+  // will REPLACE the MediaPipe chips with smarter ones (excludes parents,
+  // includes the goalkeeper, splits hugging-kid clusters). Per-frame cache
+  // so we never re-call for a timestamp we already analysed.
+  const [geminiRefining, setGeminiRefining] = useState(false);
+  const geminiCacheRef = useRef(new Map()); // key: t.toFixed(2) → players[]
+  const lastGeminiTRef = useRef(null);
 
   // ── Bootstrap: load detector, detect scene cuts, build hints ─────────
   useEffect(() => {
@@ -287,6 +297,9 @@ export default function ScoutMode({
       setSkipped([]);
       setTapMarker(null);
       setDetectorStatus("loading");
+      setGeminiRefining(false);
+      geminiCacheRef.current.clear();
+      lastGeminiTRef.current = null;
     }
   }, [open]);
 
@@ -439,15 +452,108 @@ export default function ScoutMode({
     }
   }, [waitForFreshFrame]);
 
+  // ── Gemini-Vision refinement — the smart layer that REPLACES MediaPipe
+  //   results with a list of REAL child players on the pitch (excluding
+  //   parents/spectators, including the goalkeeper). Fires ~250 ms after
+  //   the user lands on a frame. MediaPipe chips stay visible meanwhile
+  //   so the user never sees an empty field.
+  const refineWithGemini = useCallback(async () => {
+    const v = videoRef.current;
+    if (!v || !v.videoWidth || !API_BASE) return;
+    const t = v.currentTime || 0;
+    const key = t.toFixed(2);
+    // Per-frame cache so revisiting a frame is instant
+    if (geminiCacheRef.current.has(key)) {
+      const cached = geminiCacheRef.current.get(key);
+      if (cached && cached.length) {
+        setDetections(cached);
+      }
+      return;
+    }
+    lastGeminiTRef.current = key;
+    try {
+      // Capture current frame as a JPEG. Resize to 1280 px wide for speed.
+      const SRC_VW = v.videoWidth, SRC_VH = v.videoHeight;
+      const targetW = Math.min(1280, SRC_VW);
+      const targetH = Math.round(SRC_VH * (targetW / SRC_VW));
+      const cap = document.createElement("canvas");
+      cap.width = targetW;
+      cap.height = targetH;
+      cap.getContext("2d").drawImage(v, 0, 0, targetW, targetH);
+      const dataUrl = cap.toDataURL("image/jpeg", 0.78);
+
+      setGeminiRefining(true);
+      const res = await fetch(`${API_BASE}/api/scout/detect-players`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl, frame_w: SRC_VW, frame_h: SRC_VH }),
+      });
+      if (!res.ok) {
+        console.warn("Gemini detect endpoint returned", res.status);
+        return;
+      }
+      const json = await res.json();
+      // If the user has scrubbed to a different frame while we were waiting,
+      // drop the stale response — don't render chips at the wrong timestamp.
+      if (lastGeminiTRef.current !== key) return;
+
+      const players = Array.isArray(json?.players) ? json.players : [];
+      if (!players.length) {
+        // Gemini found no players — keep the MediaPipe fallback chips
+        geminiCacheRef.current.set(key, []);
+        return;
+      }
+
+      // Convert Gemini's 0-1 fractional boxes to MediaPipe-style
+      // pixel boxes so the rest of the pipeline (sampleJersey, the chip
+      // layer's toScreen math, tap handler) all keeps working unchanged.
+      const SRC_W = SRC_VW, SRC_H = SRC_VH;
+      const canvas = renderCanvasRef.current;
+      const ctx = canvas?.getContext("2d", { willReadFrequently: true });
+      const dets = players.map((p, idx) => {
+        const bbox = {
+          originX: p.x * SRC_W,
+          originY: p.y * SRC_H,
+          width: p.w * SRC_W,
+          height: p.h * SRC_H,
+        };
+        let jersey = [128, 128, 128];
+        if (ctx) {
+          try {
+            jersey = sampleJersey(ctx, bbox, SRC_W, SRC_H);
+          } catch { /* noop */ }
+        }
+        return {
+          idx,
+          bbox,
+          jerseyRGB: jersey,
+          score: p.score ?? 0.95,
+          label: p.label || "",
+          source: "gemini",
+        };
+      });
+      geminiCacheRef.current.set(key, dets);
+      setDetections(dets);
+    } catch (err) {
+      console.warn("ScoutMode Gemini refine failed:", err);
+    } finally {
+      setGeminiRefining(false);
+    }
+  }, []);
+
   // Debounced trigger — wait 250 ms after currentTime stops changing so
   // we don't thrash the detector while the user is dragging the scrubber.
+  // After MediaPipe instant chips render, kick off Gemini refinement to
+  // get smarter (parent-aware, goalkeeper-aware) boxes.
   useEffect(() => {
     if (!open || booting || !videoReady) return;
     const id = setTimeout(() => {
       runDetectionOnCurrent();
+      // Fire Gemini refinement in parallel — non-blocking
+      refineWithGemini();
     }, 250);
     return () => clearTimeout(id);
-  }, [open, booting, videoReady, currentTime, runDetectionOnCurrent]);
+  }, [open, booting, videoReady, currentTime, runDetectionOnCurrent, refineWithGemini]);
 
   // ── Tap handler — locks a detection as the next anchor ────────────
   const handleChipTap = useCallback((det) => {
@@ -878,21 +984,25 @@ export default function ScoutMode({
               className={`mt-1 text-[10px] uppercase tracking-widest font-black px-2 py-0.5 ${
                 detectorStatus === "failed"
                   ? "text-white/65 bg-ink/85"
-                  : detecting
-                    ? "text-[#CCFF00] bg-ink/85"
-                    : detections.length > 0
-                      ? "text-[#22C55E] bg-ink/90 border border-[#22C55E]/40"
-                      : "text-amber-300 bg-ink/85"
+                  : geminiRefining
+                    ? "text-[#CCFF00] bg-ink/90 border border-[#CCFF00]/40"
+                    : detecting
+                      ? "text-[#CCFF00] bg-ink/85"
+                      : detections.length > 0
+                        ? "text-[#22C55E] bg-ink/90 border border-[#22C55E]/40"
+                        : "text-amber-300 bg-ink/85"
               }`}
               data-testid="scout-ai-status"
             >
               {detectorStatus === "failed"
                 ? "AI offline · tap directly"
-                : detecting
-                  ? "AI scanning frame…"
-                  : detections.length > 0
-                    ? `AI sees ${detections.length} player${detections.length === 1 ? "" : "s"} · chips above their heads`
-                    : "AI sees none here · tap directly or scrub"}
+                : geminiRefining
+                  ? "AI refining (Gemini)…"
+                  : detecting
+                    ? "AI scanning frame…"
+                    : detections.length > 0
+                      ? `AI sees ${detections.length} player${detections.length === 1 ? "" : "s"} · chips above their heads`
+                      : "AI sees none here · tap directly or scrub"}
             </div>
           </div>
         )}
@@ -989,11 +1099,11 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
   const renderedW = vw * scale, renderedH = vh * scale;
   const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
 
-  const CHIP = 32;          // chip diameter — small enough not to cover the kid
-  const TAP = 56;           // tap target — bigger than chip for easy fingers
+  const CHIP = 28;          // chip diameter — small enough not to cover the kid
+  const TAP = 52;           // tap target — bigger than chip for easy fingers
   const TOP_GUARD = 56;     // banner + status pill vertical extent
   const FOOTER_GUARD = 20;
-  const CHIP_OFFSET = 6;    // distance between chip & box corner
+  const CHIP_OFFSET = 12;   // distance between chip & box corner
 
   // ── Step 1: compute the "ideal" chip position for each detection ────
   //   Strategy: place chip OFF the player (upper-right corner of the box)
@@ -1168,13 +1278,13 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
                 color: flashing ? "#0A0F0D" : "#CCFF00",
                 border: `2px solid ${accent}`,
                 fontWeight: 900,
-                fontSize: 14,
+                fontSize: 12,
                 lineHeight: 1,
                 fontFamily: "-apple-system, system-ui, sans-serif",
                 fontVariantNumeric: "tabular-nums",
                 boxShadow: flashing
-                  ? `0 0 18px ${accent}, 0 0 0 2px #FFFFFF`
-                  : `0 0 0 1.5px rgba(0,0,0,0.85), 0 0 10px rgba(204,255,0,0.4)`,
+                  ? `0 0 16px ${accent}, 0 0 0 2px #FFFFFF`
+                  : `0 0 0 1.5px rgba(0,0,0,0.9), 0 0 8px rgba(204,255,0,0.45)`,
                 pointerEvents: "none",
                 zIndex: 51,
               }}
