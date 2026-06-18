@@ -244,16 +244,28 @@ export default function ScoutMode({
   }, [open]);
 
   // ── Observe stage size so chips can be positioned in render coords ──
+  //   IMPORTANT: deps must include `open` — on initial mount the component
+  //   returns null (open=false), so `stageRef.current` is never attached.
+  //   When `open` flips true the JSX renders the stage div, refs are set,
+  //   and THIS effect MUST re-run to register the observer. Otherwise
+  //   stageRect stays {0,0} forever and the ChipsLayer silently bails.
+  //   We also seed the rect synchronously from getBoundingClientRect so
+  //   the very first detection has correct screen coords (instead of
+  //   waiting for the next paint tick).
   useEffect(() => {
+    if (!open) return;
     if (!stageRef.current) return;
     const el = stageRef.current;
+    // Seed immediately so chips can render on the FIRST detection.
+    const initial = el.getBoundingClientRect();
+    setStageRect({ w: initial.width, h: initial.height });
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
       setStageRect({ w: r.width, h: r.height });
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [open]);
 
   // ── Wait for the next painted video frame ─────────────────────────
   //   On iOS Safari (and sometimes Android Chrome), the `seeked` event
