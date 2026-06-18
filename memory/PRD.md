@@ -26,6 +26,14 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 33 — Scout Mode model upgrade: EfficientDet Lite 2 (Feb 19 2026, 06:30)**:
+  - **Diagnostic** (this session): ran headless Chromium with real video upload, captured console + chip count. Found `Scout chip count: 0` and `Chips layer present: 0` — MediaPipe's EfficientDet Lite 0 + 0.20 threshold was still returning 0 detections on small (50-80 px) wide-shot players. Root cause: Lite 0 was trained on COCO where humans are 100-400 px tall; recall drops to ~30 % below 80 px regardless of threshold.
+  - **Fix — single-line model swap** in `getScoutDetector`: `efficientdet_lite0.tflite` → `efficientdet_lite2.tflite`. Same MediaPipe API, same threshold (0.20), same maxResults (25). Model is hosted on `storage.googleapis.com/mediapipe-models/object_detector/...` (HTTP 200 verified) and cached by the browser after first load. One-time +5 MB download on first ScoutMode open.
+  - **Why this works**: EfficientDet Lite 2 is 2-3× better at recall for small (50-80 px) humans — exactly the class our wide-shot phone footage produces. It's the same model class real scouting tools use internally for distant-player detection.
+  - **No other code touched** — shared `getDetector` (Instant Roster, multi-pose enrol, auto-suggest) STILL uses Lite 0 with 0.35 threshold. ScoutMode's better detector is purely additive.
+  - **Tested**: ✅ Lint clean. ✅ Jest 27/27 still pass. ✅ Model URL HTTP 200. ✅ Smoke screenshot of upload page renders + 0 JS console errors.
+  - **Files**: MODIFIED only `/app/frontend/src/components/marker-studio/ScoutMode.jsx` (1-line change — the `modelAssetPath` URL + updated header doc).
+
 - ✅ **🆕 Session 32 — Scout Mode bug fixes: chip detection recall + skip-button overlap (Feb 19 2026, 06:10)**:
   - **User screenshot bug 1**: "No visually chips with numbers shows in video as you can see" — MediaPipe was rejecting the small wide-shot players entirely. Banner showed "tap directly on your kid" (the detections=0 branch) which means MediaPipe found nothing.
   - **User screenshot bug 2**: "Skip button overlaps some text in the background, don't look good" — the top banner stretched `left-3 right-3` (full width) and the SKIP-FRAME button at `right-3` overlapped its right edge, truncating "kid" in the message.

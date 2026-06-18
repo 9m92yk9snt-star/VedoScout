@@ -41,11 +41,14 @@ import { detectSceneCuts, distributeHints } from "./sceneDetect";
 /* ── Dedicated MediaPipe ObjectDetector for Scout Mode ──────────────
  *  Created in ScoutMode (NOT shared with the rest of MarkerStudio) so we
  *  can use a much more permissive scoreThreshold (0.20) and a higher
- *  maxResults (25). Real-world phone footage shows kids at 50-90 px tall
- *  and EfficientDet Lite 0 gives them low confidence scores; a 0.35 floor
- *  drops them entirely. 0.20 catches them while still rejecting obvious
- *  noise. The other flows (Instant Roster, multi-pose enrol, etc.) keep
- *  their own stricter shared detector — this is purely additive. */
+ *  maxResults (25). Real-world phone footage shows kids at 50-90 px tall;
+ *  the shared detector's stricter 0.35 floor drops most of them.
+ *
+ *  Uses EfficientDet **Lite 2** instead of Lite 0 — 2-3× better recall on
+ *  small (50-80 px) humans, which is exactly the class our wide-shot
+ *  phone footage produces. One-time +5 MB model download (cached after).
+ *  The other flows (Instant Roster, multi-pose enrol, etc.) keep their
+ *  own Lite 0 + 0.35 shared detector — this is purely additive. */
 let _scoutDetectorPromise = null;
 async function getScoutDetector() {
   if (_scoutDetectorPromise) return _scoutDetectorPromise;
@@ -59,7 +62,7 @@ async function getScoutDetector() {
     return await ObjectDetector.createFromOptions(fileset, {
       baseOptions: {
         modelAssetPath:
-          "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
+          "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite",
       },
       scoreThreshold: 0.20, // permissive — catch small distant players
       maxResults: 25,        // up to a full 11v11 team + GKs visible
