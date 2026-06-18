@@ -205,10 +205,14 @@ export default function ScoutMode({
       ctx.drawImage(v, 0, 0);
       const result = det.detect(canvas);
       const dets = (result?.detections || [])
-        .filter((d) => d.boundingBox.width >= 18 && d.boundingBox.height >= 36)
+        // Loose size floor — phone wide shots typically have players at
+        // 30-100 px tall. We accept anything that's roughly the height of
+        // a person (2:1 ratio give or take). Detected players that pass
+        // this filter still get tappable chips below.
+        .filter((d) => d.boundingBox.width >= 10 && d.boundingBox.height >= 20)
         // Largest first — likely closer to camera, easier to tap
         .sort((a, b) => b.boundingBox.width * b.boundingBox.height - a.boundingBox.width * a.boundingBox.height)
-        .slice(0, 14)
+        .slice(0, 22) // up to 22 chips so a whole team fits on the field
         .map((d, idx) => ({
           idx,
           bbox: d.boundingBox,
@@ -281,6 +285,88 @@ export default function ScoutMode({
     });
   }, []);
 
+  /* ── Bulletproof fallback: user taps ANYWHERE on the video stage that
+   *    is not already a chip. We treat that point as the player's body
+   *    center and lock an anchor there. This guarantees a tap path even
+   *    when MediaPipe misses small / blurry / occluded players. */
+  const handleStageTap = useCallback((e) => {
+    if (showVerify || booting) return;
+    if (anchors.length >= TARGET_TAPS) return;
+    // Skip if the tap originated on a chip — chips have their own onClick
+    const targetEl = e.target;
+    if (targetEl?.closest?.('[data-testid^="scout-chip-"]')) return;
+    if (targetEl?.closest?.('[data-testid="scout-tap-anywhere-hint"]')) return;
+
+    const v = videoRef.current;
+    const canvas = renderCanvasRef.current;
+    const stage = stageRef.current;
+    if (!v || !stage || !v.videoWidth) return;
+    // Ensure canvas has the freshest frame
+    let workCanvas = canvas;
+    if (!workCanvas) {
+      workCanvas = document.createElement("canvas");
+      renderCanvasRef.current = workCanvas;
+    }
+    workCanvas.width = v.videoWidth;
+    workCanvas.height = v.videoHeight;
+    workCanvas.getContext("2d").drawImage(v, 0, 0);
+
+    // Compute tap position in stage-local pixels
+    const r = stage.getBoundingClientRect();
+    const tx = (e.touches?.[0]?.clientX ?? e.clientX) - r.left;
+    const ty = (e.touches?.[0]?.clientY ?? e.clientY) - r.top;
+    const sw = r.width, sh = r.height;
+    if (tx < 0 || ty < 0 || tx > sw || ty > sh) return;
+
+    // Convert to video-native coords using object-contain mapping
+    const vw = v.videoWidth, vh = v.videoHeight;
+    const scale = Math.min(sw / vw, sh / vh);
+    const renderedW = vw * scale, renderedH = vh * scale;
+    const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
+    if (tx < offX || tx > offX + renderedW || ty < offY || ty > offY + renderedH) return;
+
+    const vx = (tx - offX) / scale;
+    const vy = (ty - offY) / scale;
+    // Default bounding box around the tap point — typical player silhouette
+    const bw = Math.min(vw * 0.10, 90);
+    const bh = bw * 2.2; // 1:2.2 player aspect
+    const bb = {
+      originX: clamp(vx - bw / 2, 0, vw - bw),
+      // The user usually taps the body/head — extend the box mostly downward
+      originY: clamp(vy - bh * 0.30, 0, vh - bh),
+      width: bw,
+      height: bh,
+    };
+    const thumb = cropThumb(workCanvas, bb);
+    const jerseyRGB = sampleJersey(workCanvas.getContext("2d"), bb, vw, vh);
+    const t = v.currentTime || 0;
+    const newAnchor = {
+      t,
+      box: {
+        x: bb.originX / vw,
+        y: bb.originY / vh,
+        w: clamp(bb.width / vw, MIN_BOX_FRAC, 1),
+        h: clamp(bb.height / vh, MIN_BOX_FRAC, 1),
+      },
+      thumb,
+      jerseyRGB,
+      segment: segmentIndexFor(t, sceneCuts),
+      freeform: true,
+    };
+    setAnchors((prev) => {
+      const out = [...prev, newAnchor];
+      const nextHintT = nextUntappedHint(out, hints);
+      if (out.length < TARGET_TAPS && nextHintT != null) {
+        setTimeout(() => {
+          try { v.currentTime = nextHintT; } catch { /* noop */ }
+        }, 220);
+      } else if (out.length === TARGET_TAPS) {
+        setTimeout(() => setShowVerify(true), 350);
+      }
+      return out;
+    });
+  }, [showVerify, booting, anchors.length, hints, sceneCuts]);
+
   // ── Replace from verification grid → pop the slot, seek there, exit verify ──
   const handleReplaceFromVerify = useCallback((idx) => {
     setAnchors((prev) => {
@@ -352,6 +438,7 @@ export default function ScoutMode({
         ref={stageRef}
         className="relative flex-1 bg-black overflow-hidden flex items-center justify-center"
         data-testid="scout-stage"
+        onClick={handleStageTap}
       >
         <video
           ref={videoRef}
@@ -409,25 +496,25 @@ export default function ScoutMode({
           </div>
         )}
 
-        {/* Empty-detection nudge */}
-        {!booting && videoReady && !showVerify && detections.length === 0 && !detecting && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-ink/90 backdrop-blur px-4 py-2.5 text-center">
-            <div className="text-white font-bold text-sm">No players visible here</div>
-            <div className="text-white/70 text-[11px] mt-0.5">Scrub the timeline to a moment with players on screen</div>
-          </div>
-        )}
-
         {/* Help banner top of stage — Hint chip when not done */}
         {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length > 0 && (
-          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[60%]">
+          <div
+            className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[60%]"
+            data-testid="scout-tap-anywhere-hint"
+          >
             <Hand className="w-3.5 h-3.5 text-[#CCFF00]" />
-            Tap your kid&apos;s number — {TARGET_TAPS - anchors.length} more to go
+            Tap your kid — {TARGET_TAPS - anchors.length} more to go
           </div>
         )}
         {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length === 0 && !detecting && (
-          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[60%]">
-            <Hand className="w-3.5 h-3.5 text-[#CCFF00]" />
-            No players in this frame — scrub the timeline to find your kid
+          <div
+            className="absolute top-3 left-3 right-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1.5"
+            data-testid="scout-tap-anywhere-hint"
+          >
+            <Hand className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
+            <span>
+              No numbered boxes here — <span className="text-[#CCFF00]">tap directly on your kid</span> and we&apos;ll lock the anchor at that spot.
+            </span>
           </div>
         )}
       </div>
@@ -501,7 +588,14 @@ function segmentIndexFor(t, cuts) {
   return idx;
 }
 
-// ── ChipsLayer — overlays numbered chips on every detection ────────────
+// ── ChipsLayer — overlays a TAPPABLE rectangle on every detection ─────
+//
+// Each detection becomes a big rectangle covering the whole player. The
+// numbered badge sits in the top-left corner. The whole rectangle is the
+// tap target — much easier to hit than a small chip floating above the
+// head, especially on small wide-shot players. Border colour = the
+// player's jersey colour (sampled live) so teammates are visually
+// distinguishable at a glance.
 
 function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
   if (!videoEl || !stageRect.w) return null;
@@ -509,7 +603,7 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
   const vh = videoEl.videoHeight || 1;
   const sw = stageRect.w, sh = stageRect.h;
   // object-contain mapping
-  const sx = sw / vw, sy = sh / vh, scale = Math.min(sx, sy);
+  const scale = Math.min(sw / vw, sh / vh);
   const renderedW = vw * scale, renderedH = vh * scale;
   const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
   const toScreen = (bb) => ({
@@ -518,10 +612,17 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
     w: bb.width * scale,
     h: bb.height * scale,
   });
+  // Minimum tap target — even if MediaPipe says the player is 20×40 px,
+  // we render at least a 36 × 80 hit area to stay finger-friendly.
+  const MIN_W = 36, MIN_H = 80;
   return (
     <div className="absolute inset-0 pointer-events-none" data-testid="scout-chips-layer">
       {detections.map((d, i) => {
         const r = toScreen(d.bbox);
+        const w = Math.max(MIN_W, r.w);
+        const h = Math.max(MIN_H, r.h);
+        const x = r.x + r.w / 2 - w / 2;
+        const y = r.y + r.h / 2 - h / 2;
         const num = i + 1;
         const flashing = tapFlashIdx === d.idx;
         const ringColor = `rgb(${d.jerseyRGB[0]}, ${d.jerseyRGB[1]}, ${d.jerseyRGB[2]})`;
@@ -530,26 +631,39 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
             key={`chip-${i}`}
             type="button"
             data-testid={`scout-chip-${num}`}
-            onClick={(e) => { e.preventDefault(); onTap(d); }}
-            className="pointer-events-auto absolute flex items-center justify-center transition-all active:scale-90"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onTap(d);
+            }}
+            className="pointer-events-auto absolute transition-transform active:scale-95"
             style={{
-              left: r.x + r.w / 2 - 28,
-              top: Math.max(2, r.y - 18),
-              width: 56,
-              height: 56,
-              transform: flashing ? "scale(1.25)" : undefined,
+              left: x,
+              top: y,
+              width: w,
+              height: h,
+              border: `2px solid ${flashing ? "#22C55E" : ringColor}`,
+              backgroundColor: flashing
+                ? "rgba(34, 197, 94, 0.25)"
+                : "rgba(204, 255, 0, 0.06)",
+              boxShadow: flashing
+                ? "0 0 22px rgba(34,197,94,0.65), inset 0 0 18px rgba(34,197,94,0.4)"
+                : "0 0 10px rgba(0,0,0,0.45)",
+              transform: flashing ? "scale(1.03)" : undefined,
             }}
             aria-label={`Tap player number ${num}`}
           >
+            {/* Numbered badge — top-left of the box */}
             <span
-              className="block w-full h-full rounded-full flex items-center justify-center font-black text-[18px]"
+              className="absolute -top-2 -left-2 flex items-center justify-center font-black text-[15px]"
               style={{
+                width: 30,
+                height: 30,
+                borderRadius: "50%",
                 backgroundColor: flashing ? "#22C55E" : "#0A0F0D",
                 color: flashing ? "#0A0F0D" : "#CCFF00",
-                border: `3px solid ${flashing ? "#22C55E" : ringColor}`,
-                boxShadow: flashing
-                  ? "0 0 22px rgba(34,197,94,0.65)"
-                  : "0 0 12px rgba(0,0,0,0.55), inset 0 0 8px rgba(204,255,0,0.18)",
+                border: `2.5px solid ${flashing ? "#22C55E" : "#CCFF00"}`,
+                boxShadow: "0 0 10px rgba(0,0,0,0.6)",
               }}
             >
               {num}

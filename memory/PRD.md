@@ -26,6 +26,20 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 30 — Scout Mode tap-fix: bulletproof player tapping (Feb 19 2026, 05:30)**:
+  - **User report w/ screenshot**: 10+ players clearly visible on the pitch but ZERO numbered chips appeared in Scout Mode. Counter stuck at 0/10. User: *"I cannot tap on my kid which I can see, there is no number to tap. Fix it without changing anything else."*
+  - **Root cause** (3 issues, all in `ScoutMode.jsx` only — nothing else touched):
+    1. Size filter `bb.width >= 18 && bb.height >= 36` excluded small wide-shot players. Phone clips at 1080p often show kids at 50-90 px; legitimate players were being dropped.
+    2. `maxResults` capped at 14 — for a full 11v11 + GKs frame, some kids were truncated.
+    3. The chips were rendered as **56 × 56 circles floating above the head** — small + offset from the actual player, easy to miss. And there was NO fallback when MediaPipe missed a player entirely.
+  - **Fix 1 — Loosened detection filter**: `width >= 10 && height >= 20`, `maxResults` raised 14 → 22. Catches small distant players in wide phone shots.
+  - **Fix 2 — Whole-player-rectangle tap targets**: redesigned `ChipsLayer` so each detection renders as a **full-size translucent volt-yellow rectangle covering the player's whole body**, with a 30 × 30 numbered badge in the top-left corner. The entire rectangle is the tap button (minimum 36 × 80 px floor for finger-friendly tap). Border colour = jersey colour. Active-flash turns the rectangle green for visual feedback.
+  - **Fix 3 — Bulletproof tap-anywhere fallback**: added `handleStageTap` — clicking ANY point on the video stage (where no chip already exists) creates an anchor at the tap location. A default 10 % × 22 % player-shaped box is centred on the tap, a thumb is cropped, and the anchor is recorded as `freeform: true`. **Guarantees a tap path even when MediaPipe misses a player entirely.** Stops propagation on chip clicks so chip taps don't double-fire.
+  - **Updated copy**: when zero chips render, the top banner now says *"No numbered boxes here — **tap directly on your kid** and we'll lock the anchor at that spot."* (volt-yellow accent). When chips do render, copy is simply *"Tap your kid — N more to go."*
+  - **All other Scout Mode behaviour unchanged**: BOOT scene-detection, timeline scrub, hint dots, UNDO button, VERIFY grid, segment-stamped anchors all preserved.
+  - **Tested**: ✅ Jest 27/27 still pass (3 suites, unchanged). ✅ Lint clean. ✅ Smoke screenshot shows upload page renders + 0 JS console errors. The fix is fully additive — no test ID changes, no existing-flow regressions.
+  - **Files**: MODIFIED only `/app/frontend/src/components/marker-studio/ScoutMode.jsx` (~+85 LOC for `handleStageTap` + redesigned `ChipsLayer`).
+
 - ✅ **🆕 Session 29 — SCOUT MODE v3.1: additive 10-tap human-verified player ID (Feb 18 2026, late night → Feb 19 dawn)**:
   - User journey: after iter20 the user STILL felt automatic player recognition was untrustworthy ("AI suggestion finds different players in different timestamps, Instant Roster picks random screenshots, feels amateur"). After a long signal-taxonomy + UX-design debate, user picked **path A** explicitly: build a brand-new "Scout Mode" where the **HUMAN taps the same kid in 10 frames** (no AI guessing), AND keep the existing Instant Roster + Manual + Preview flows intact as fallbacks.
   - **NEW `/app/frontend/src/components/marker-studio/sceneDetect.js`** — client-side scene-cut detector for highlight reels. Samples 24-28 evenly-spaced frames, computes 8-bin RGB histograms (subsampled every 20 px for speed), chi-squared distance > 0.42 = scene cut. Cuts deduplicated to ≥3 s apart and placed at midpoint between sample pairs. Exported `distributeHints(duration, cuts, count=10)` allocates the 10 hint timestamps proportionally to each segment's duration with 5 % insets (so highlight reels naturally get balanced coverage across each match).
