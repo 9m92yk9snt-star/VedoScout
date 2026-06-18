@@ -418,10 +418,16 @@ export default function ScoutMode({
         )}
 
         {/* Help banner top of stage — Hint chip when not done */}
-        {!booting && !showVerify && anchors.length < TARGET_TAPS && (
+        {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length > 0 && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[60%]">
             <Hand className="w-3.5 h-3.5 text-[#CCFF00]" />
             Tap your kid&apos;s number — {TARGET_TAPS - anchors.length} more to go
+          </div>
+        )}
+        {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length === 0 && !detecting && (
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[60%]">
+            <Hand className="w-3.5 h-3.5 text-[#CCFF00]" />
+            No players in this frame — scrub the timeline to find your kid
           </div>
         )}
       </div>
