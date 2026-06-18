@@ -38,6 +38,38 @@ import {
 
 import { detectSceneCuts, distributeHints } from "./sceneDetect";
 
+/* ── Dedicated MediaPipe ObjectDetector for Scout Mode ──────────────
+ *  Created in ScoutMode (NOT shared with the rest of MarkerStudio) so we
+ *  can use a much more permissive scoreThreshold (0.20) and a higher
+ *  maxResults (25). Real-world phone footage shows kids at 50-90 px tall
+ *  and EfficientDet Lite 0 gives them low confidence scores; a 0.35 floor
+ *  drops them entirely. 0.20 catches them while still rejecting obvious
+ *  noise. The other flows (Instant Roster, multi-pose enrol, etc.) keep
+ *  their own stricter shared detector — this is purely additive. */
+let _scoutDetectorPromise = null;
+async function getScoutDetector() {
+  if (_scoutDetectorPromise) return _scoutDetectorPromise;
+  _scoutDetectorPromise = (async () => {
+    const { ObjectDetector, FilesetResolver } = await import(
+      "@mediapipe/tasks-vision"
+    );
+    const fileset = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm",
+    );
+    return await ObjectDetector.createFromOptions(fileset, {
+      baseOptions: {
+        modelAssetPath:
+          "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
+      },
+      scoreThreshold: 0.20, // permissive — catch small distant players
+      maxResults: 25,        // up to a full 11v11 team + GKs visible
+      runningMode: "IMAGE",
+      categoryAllowlist: ["person"],
+    });
+  })();
+  return _scoutDetectorPromise;
+}
+
 const TARGET_TAPS = 10;
 const MIN_BOX_FRAC = 0.02;
 
@@ -127,7 +159,15 @@ export default function ScoutMode({
     setShowVerify(false);
     (async () => {
       try {
-        detectorRef.current = await getDetector();
+        // Use our own permissive detector — see getScoutDetector at the top
+        // of this file. Falls back to the shared getDetector prop if the
+        // dedicated init fails for any reason (e.g. CDN hiccup).
+        try {
+          detectorRef.current = await getScoutDetector();
+        } catch (innerErr) {
+          console.warn("Scout detector init fallback to shared:", innerErr);
+          detectorRef.current = await getDetector();
+        }
         if (aborted) return;
         const v = videoRef.current;
         if (!v) return;
@@ -555,24 +595,28 @@ export default function ScoutMode({
           </button>
         )}
 
-        {/* Help banner top of stage — Hint chip when not done */}
+        {/* Help banner top of stage — Hint chip when not done.
+            NOTE: right inset = 9rem to leave room for the floating
+            Skip Frame button (top-right corner) so they never overlap. */}
         {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length > 0 && (
           <div
-            className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[60%]"
+            className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[55%]"
             data-testid="scout-tap-anywhere-hint"
+            style={{ right: "9rem" }}
           >
-            <Hand className="w-3.5 h-3.5 text-[#CCFF00]" />
-            Tap your kid — {TARGET_TAPS - anchors.length} more to go
+            <Hand className="w-3.5 h-3.5 text-[#CCFF00] flex-shrink-0" />
+            <span className="truncate">Tap your kid — {TARGET_TAPS - anchors.length} more to go</span>
           </div>
         )}
         {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length === 0 && !detecting && (
           <div
-            className="absolute top-3 left-3 right-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1.5"
+            className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1.5"
             data-testid="scout-tap-anywhere-hint"
+            style={{ right: "9rem" }}
           >
             <Hand className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
-            <span>
-              No numbered boxes here — <span className="text-[#CCFF00]">tap directly on your kid</span> and we&apos;ll lock the anchor at that spot.
+            <span className="leading-tight">
+              <span className="text-[#CCFF00]">Tap directly on your kid</span>
             </span>
           </div>
         )}
