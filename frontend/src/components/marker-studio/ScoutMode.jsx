@@ -154,6 +154,13 @@ export default function ScoutMode({
   // filter logic is actually keeping the right ones. Toggle via the 🐞 pill.
   const [debugMode, setDebugMode] = useState(false);
   const [rawDetections, setRawDetections] = useState([]); // pre-filter detections, for debug
+  // Detector status — tells us (and the user) if MediaPipe loaded at all.
+  // 'loading' | 'ready' | 'failed'
+  const [detectorStatus, setDetectorStatus] = useState("loading");
+  // Visible confirmation chip rendered at the EXACT pixel where the user
+  // just tapped. Independent of MediaPipe — works even when the detector
+  // is silent. { x, y, num } in stage-local screen coords. Cleared ~1.4s later.
+  const [tapMarker, setTapMarker] = useState(null);
 
   // ── Bootstrap: load detector, detect scene cuts, build hints ─────────
   useEffect(() => {
@@ -171,9 +178,17 @@ export default function ScoutMode({
         // dedicated init fails for any reason (e.g. CDN hiccup).
         try {
           detectorRef.current = await getScoutDetector();
+          setDetectorStatus("ready");
         } catch (innerErr) {
           console.warn("Scout detector init fallback to shared:", innerErr);
-          detectorRef.current = await getDetector();
+          try {
+            detectorRef.current = await getDetector();
+            setDetectorStatus("ready");
+          } catch (fallbackErr) {
+            console.warn("Shared detector init also failed:", fallbackErr);
+            detectorRef.current = null;
+            setDetectorStatus("failed");
+          }
         }
         if (aborted) return;
         const v = videoRef.current;
@@ -223,6 +238,8 @@ export default function ScoutMode({
       setBooting(true);
       setBootProgress(0);
       setSkipped([]);
+      setTapMarker(null);
+      setDetectorStatus("loading");
     }
   }, [open]);
 
@@ -337,14 +354,27 @@ export default function ScoutMode({
       const out = [...prev, newAnchor];
       // Auto-advance to next un-tapped hint after a beat
       setTapFlash(det.idx);
-      setTimeout(() => setTapFlash(null), 600);
+      setTimeout(() => setTapFlash(null), 900);
+      // Also show the BIG tap marker at the centre of the chip
+      const stage = stageRef.current;
+      if (stage) {
+        const r = stage.getBoundingClientRect();
+        const sw = r.width, sh = r.height;
+        const scale = Math.min(sw / vw, sh / vh);
+        const renderedW = vw * scale, renderedH = vh * scale;
+        const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
+        const sx = (bb.originX + bb.width / 2) * scale + offX;
+        const sy = (bb.originY + bb.height / 2) * scale + offY;
+        setTapMarker({ x: sx, y: sy, num: out.length });
+        setTimeout(() => setTapMarker(null), 1400);
+      }
       const nextHintT = nextUntappedHint(out, hints);
       if (out.length < TARGET_TAPS && nextHintT != null) {
         setTimeout(() => {
           try { v.currentTime = nextHintT; } catch { /* noop */ }
-        }, 220);
+        }, 900);
       } else if (out.length === TARGET_TAPS) {
-        setTimeout(() => setShowVerify(true), 350);
+        setTimeout(() => setShowVerify(true), 1100);
       }
       return out;
     });
@@ -473,13 +503,17 @@ export default function ScoutMode({
     };
     setAnchors((prev) => {
       const out = [...prev, newAnchor];
+      // INSTANT visual chip at the tap location — independent of MediaPipe.
+      // This is the chip the user actually sees confirming their tap landed.
+      setTapMarker({ x: tx, y: ty, num: out.length });
+      setTimeout(() => setTapMarker(null), 1400);
       const nextHintT = nextUntappedHint(out, hints);
       if (out.length < TARGET_TAPS && nextHintT != null) {
         setTimeout(() => {
           try { v.currentTime = nextHintT; } catch { /* noop */ }
-        }, 220);
+        }, 900);
       } else if (out.length === TARGET_TAPS) {
-        setTimeout(() => setShowVerify(true), 350);
+        setTimeout(() => setShowVerify(true), 1100);
       }
       return out;
     });
@@ -571,6 +605,7 @@ export default function ScoutMode({
         className="relative flex-1 bg-black overflow-hidden flex items-center justify-center"
         data-testid="scout-stage"
         onClick={handleStageTap}
+        style={{ cursor: !booting && !showVerify && anchors.length < TARGET_TAPS ? "crosshair" : "default" }}
       >
         <video
           ref={videoRef}
@@ -609,6 +644,50 @@ export default function ScoutMode({
           />
         )}
 
+        {/* ── Instant tap confirmation chip — drawn at the exact pixel
+              where the user tapped. Independent of MediaPipe. */}
+        {tapMarker && (
+          <div
+            className="absolute pointer-events-none"
+            data-testid="scout-tap-marker"
+            style={{
+              left: tapMarker.x - 36,
+              top: Math.max(8, tapMarker.y - 96),
+              zIndex: 60,
+              animation: "scoutTapPop 1.4s ease-out forwards",
+            }}
+          >
+            <div
+              className="w-[72px] h-[72px] flex items-center justify-center font-black text-3xl"
+              style={{
+                borderRadius: "50%",
+                backgroundColor: "#22C55E",
+                color: "#0A0F0D",
+                border: "4px solid #FFFFFF",
+                boxShadow: "0 0 0 3px rgba(0,0,0,0.85), 0 0 40px rgba(34,197,94,0.95)",
+              }}
+            >
+              {tapMarker.num}
+            </div>
+            <div
+              className="text-center mt-1 text-[10px] uppercase tracking-widest font-black text-[#22C55E] bg-ink/90 px-1.5 py-0.5"
+              style={{ textShadow: "0 0 4px rgba(0,0,0,0.9)" }}
+            >
+              Locked
+            </div>
+          </div>
+        )}
+        {/* Keyframes for the tap marker pulse */}
+        <style>{`
+          @keyframes scoutTapPop {
+            0%   { transform: scale(0.4); opacity: 0; }
+            18%  { transform: scale(1.25); opacity: 1; }
+            35%  { transform: scale(1.0); opacity: 1; }
+            85%  { transform: scale(1.0); opacity: 1; }
+            100% { transform: scale(0.85); opacity: 0; }
+          }
+        `}</style>
+
         {/* Booting overlay */}
         {booting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink/95 backdrop-blur-md text-white px-6">
@@ -633,7 +712,7 @@ export default function ScoutMode({
 
         {/* Detecting indicator */}
         {!booting && detecting && (
-          <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-ink/85 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2 py-1">
+          <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-ink/85 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2 py-1" style={{ zIndex: 9 }}>
             <Loader2 className="w-3 h-3 animate-spin text-[#CCFF00]" />
             Scanning frame…
           </div>
@@ -654,29 +733,28 @@ export default function ScoutMode({
           </button>
         )}
 
-        {/* Help banner top of stage — Hint chip when not done.
-            NOTE: right inset = 9rem to leave room for the floating
-            Skip Frame button (top-right corner) so they never overlap. */}
-        {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length > 0 && (
+        {/* ── BIG centred banner — always shown when waiting for a tap.
+              Replaces the two old small hint banners. */}
+        {!booting && !showVerify && anchors.length < TARGET_TAPS && (
           <div
-            className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1 max-w-[55%]"
+            className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
             data-testid="scout-tap-anywhere-hint"
-            style={{ right: "9rem" }}
+            style={{ top: 12, zIndex: 15, pointerEvents: "none" }}
           >
-            <Hand className="w-3.5 h-3.5 text-[#CCFF00] flex-shrink-0" />
-            <span className="truncate">Tap your kid — {TARGET_TAPS - anchors.length} more to go</span>
-          </div>
-        )}
-        {!booting && !showVerify && anchors.length < TARGET_TAPS && detections.length === 0 && !detecting && (
-          <div
-            className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/90 backdrop-blur text-white text-[11px] font-bold px-2 py-1.5"
-            data-testid="scout-tap-anywhere-hint"
-            style={{ right: "9rem" }}
-          >
-            <Hand className="w-4 h-4 text-[#CCFF00] flex-shrink-0" />
-            <span className="leading-tight">
-              <span className="text-[#CCFF00]">Tap directly on your kid</span>
-            </span>
+            <div className="flex items-center gap-2 bg-ink/95 backdrop-blur border-2 border-[#CCFF00] px-3 py-1.5 shadow-[0_4px_18px_rgba(0,0,0,0.55)]">
+              <Hand className="w-4 h-4 text-[#CCFF00]" />
+              <span className="text-[14px] sm:text-[15px] font-black text-[#CCFF00] uppercase tracking-wide leading-none">
+                Tap kid #{anchors.length + 1}
+              </span>
+              <span className="text-[10px] font-bold text-white/70 tabular-nums leading-none ml-1">
+                · {TARGET_TAPS - anchors.length} more
+              </span>
+            </div>
+            {detectorStatus === "failed" && (
+              <div className="mt-1 text-[9px] uppercase tracking-widest font-black text-white/65 bg-ink/85 px-2 py-0.5">
+                AI offline — tap directly
+              </div>
+            )}
           </div>
         )}
       </div>
