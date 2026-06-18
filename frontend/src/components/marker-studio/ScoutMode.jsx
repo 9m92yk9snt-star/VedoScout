@@ -208,9 +208,11 @@ export default function ScoutMode({
   // 'loading' | 'ready' | 'failed'
   const [detectorStatus, setDetectorStatus] = useState("loading");
   // Visible confirmation chip rendered at the EXACT pixel where the user
-  // just tapped. Independent of MediaPipe — works even when the detector
-  // is silent. { x, y, num } in stage-local screen coords. Cleared ~1.4s later.
-  const [tapMarker, setTapMarker] = useState(null);
+  // just tapped. REMOVED — created confusion by appearing visually above
+  // the player and making users think they selected a different player.
+  // Selection state is now communicated ONLY through the chip itself
+  // (the chip turns to a clear "locked" colour for ~900ms before auto-
+  // advancing to the next hint frame).
   // Gemini Vision refinement — when true, a backend call is in-flight that
   // will REPLACE the MediaPipe chips with smarter ones (excludes parents,
   // includes the goalkeeper, splits hugging-kid clusters). Per-frame cache
@@ -295,7 +297,6 @@ export default function ScoutMode({
       setBooting(true);
       setBootProgress(0);
       setSkipped([]);
-      setTapMarker(null);
       setDetectorStatus("loading");
       setGeminiRefining(false);
       geminiCacheRef.current.clear();
@@ -581,22 +582,11 @@ export default function ScoutMode({
     };
     setAnchors((prev) => {
       const out = [...prev, newAnchor];
-      // Auto-advance to next un-tapped hint after a beat
+      // The chip itself turns to the "locked" colour for ~900ms before
+      // we advance — that's the ONLY visual feedback (no more big green
+      // marker that used to appear above the tap, which confused users).
       setTapFlash(det.idx);
       setTimeout(() => setTapFlash(null), 900);
-      // Also show the BIG tap marker at the centre of the chip
-      const stage = stageRef.current;
-      if (stage) {
-        const r = stage.getBoundingClientRect();
-        const sw = r.width, sh = r.height;
-        const scale = Math.min(sw / vw, sh / vh);
-        const renderedW = vw * scale, renderedH = vh * scale;
-        const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
-        const sx = (bb.originX + bb.width / 2) * scale + offX;
-        const sy = (bb.originY + bb.height / 2) * scale + offY;
-        setTapMarker({ x: sx, y: sy, num: out.length });
-        setTimeout(() => setTapMarker(null), 1400);
-      }
       const nextHintT = nextUntappedHint(out, hints);
       if (out.length < TARGET_TAPS && nextHintT != null) {
         setTimeout(() => {
@@ -732,10 +722,6 @@ export default function ScoutMode({
     };
     setAnchors((prev) => {
       const out = [...prev, newAnchor];
-      // INSTANT visual chip at the tap location — independent of MediaPipe.
-      // This is the chip the user actually sees confirming their tap landed.
-      setTapMarker({ x: tx, y: ty, num: out.length });
-      setTimeout(() => setTapMarker(null), 1400);
       const nextHintT = nextUntappedHint(out, hints);
       if (out.length < TARGET_TAPS && nextHintT != null) {
         setTimeout(() => {
@@ -874,49 +860,12 @@ export default function ScoutMode({
           />
         )}
 
-        {/* ── Instant tap confirmation chip — drawn at the exact pixel
-              where the user tapped. Independent of MediaPipe. */}
-        {tapMarker && (
-          <div
-            className="absolute pointer-events-none"
-            data-testid="scout-tap-marker"
-            style={{
-              left: tapMarker.x - 36,
-              top: Math.max(8, tapMarker.y - 96),
-              zIndex: 60,
-              animation: "scoutTapPop 1.4s ease-out forwards",
-            }}
-          >
-            <div
-              className="w-[72px] h-[72px] flex items-center justify-center font-black text-3xl"
-              style={{
-                borderRadius: "50%",
-                backgroundColor: "#22C55E",
-                color: "#0A0F0D",
-                border: "4px solid #FFFFFF",
-                boxShadow: "0 0 0 3px rgba(0,0,0,0.85), 0 0 40px rgba(34,197,94,0.95)",
-              }}
-            >
-              {tapMarker.num}
-            </div>
-            <div
-              className="text-center mt-1 text-[10px] uppercase tracking-widest font-black text-[#22C55E] bg-ink/90 px-1.5 py-0.5"
-              style={{ textShadow: "0 0 4px rgba(0,0,0,0.9)" }}
-            >
-              Locked
-            </div>
-          </div>
-        )}
-        {/* Keyframes for the tap marker pulse */}
-        <style>{`
-          @keyframes scoutTapPop {
-            0%   { transform: scale(0.4); opacity: 0; }
-            18%  { transform: scale(1.25); opacity: 1; }
-            35%  { transform: scale(1.0); opacity: 1; }
-            85%  { transform: scale(1.0); opacity: 1; }
-            100% { transform: scale(0.85); opacity: 0; }
-          }
-        `}</style>
+        {/* ── Instant tap confirmation chip — REMOVED.
+              Selection state is now communicated only via the chip
+              itself (it turns to a "locked" colour for ~900ms before
+              we auto-advance). The previous large green floating
+              marker created confusion because it appeared above the
+              player and made users think they'd selected someone else. */}
 
         {/* Booting overlay */}
         {booting && (
@@ -1274,8 +1223,12 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap, nextNu
             />
 
             {/* The visible CHIP — premium white pill with ink number.
-                Active (next-to-tap) chip gets the lime accent ring; all
-                others stay clean & quiet so the user isn't overwhelmed. */}
+                Three states:
+                  • idle (default for non-next chips)  → white bg, ink text
+                  • active (the NEXT chip to tap)      → white bg + lime ring
+                  • locked (just got tapped)           → solid lime fill +
+                    dark ink check & number; this is the ONLY signal of
+                    selection, no floating popup markers. */}
             <div
               style={{
                 position: "absolute",
@@ -1287,25 +1240,33 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap, nextNu
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: "50%",
-                background: flashing ? "#22C55E" : "#FFFFFF",
-                color: flashing ? "#FFFFFF" : "#0A0F0D",
-                border: isActive
-                  ? "1.5px solid #CCFF00"
-                  : "1px solid rgba(255,255,255,0.45)",
+                background: flashing
+                  ? "#CCFF00"          // locked — solid lime
+                  : "#FFFFFF",         // idle / active — white
+                color: flashing
+                  ? "#0A0F0D"          // locked — ink number
+                  : "#0A0F0D",
+                border: flashing
+                  ? "1.5px solid #0A0F0D"
+                  : isActive
+                    ? "1.5px solid #CCFF00"
+                    : "1px solid rgba(255,255,255,0.45)",
                 fontWeight: 800,
                 fontSize: 12,
                 lineHeight: 1,
                 letterSpacing: "-0.01em",
                 fontFamily: "-apple-system, system-ui, sans-serif",
                 fontVariantNumeric: "tabular-nums",
-                boxShadow: isActive
-                  ? "0 2px 10px rgba(0,0,0,0.55), 0 0 0 3px rgba(204,255,0,0.22), 0 0 12px rgba(204,255,0,0.35)"
-                  : "0 2px 6px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.25)",
+                boxShadow: flashing
+                  ? "0 2px 10px rgba(0,0,0,0.55), 0 0 0 3px rgba(204,255,0,0.65)"
+                  : isActive
+                    ? "0 2px 10px rgba(0,0,0,0.55), 0 0 0 3px rgba(204,255,0,0.22), 0 0 12px rgba(204,255,0,0.35)"
+                    : "0 2px 6px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.25)",
                 pointerEvents: "none",
                 zIndex: 51,
               }}
             >
-              {num}
+              {flashing ? "✓" : num}
             </div>
           </div>
         );

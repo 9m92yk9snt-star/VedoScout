@@ -168,12 +168,15 @@ export default function MarkerStudio({
   const [autoSuggesting, setAutoSuggesting] = useState(false);
   const [autoSuggestError, setAutoSuggestError] = useState("");
 
-  // ── Instant Roster mode ───────────────────────────────────────────
-  // studioMode controls the top-level UX flow.
-  //   "ROSTER"  → auto-scan video → show numbered roster tile grid → user taps their player
+  // ── Instant Roster mode — REMOVED (no longer in use) ─────────────
+  // The Instant Roster feature was removed: it could not reliably tell
+  // child players apart from coaches/parents/refs and frequently
+  // hallucinated jersey-colour matches. State + helpers below are kept
+  // dormant only to avoid touching working code paths elsewhere; the
+  // overlay JSX is no longer rendered and the auto-scan never fires.
   //   "MANUAL"  → existing fullscreen mark/anchor flow (kept 100% intact as fallback)
   //   "PREVIEW" → final review screen — anchors with confidence rings (Improvement #3)
-  const [studioMode, setStudioMode] = useState("ROSTER");
+  const [studioMode, setStudioMode] = useState("MANUAL");
   const [rosterScanning, setRosterScanning] = useState(false);
   const [rosterError, setRosterError] = useState("");
   const [rosterProgress, setRosterProgress] = useState(0); // 0..1
@@ -231,7 +234,7 @@ export default function MarkerStudio({
   useEffect(() => {
     if (open) {
       setMode("navigate");
-      setStudioMode("ROSTER");
+      setStudioMode("MANUAL");
       setZoom(1);
       setPan({ x: 0, y: 0 });
       setBox(null);
@@ -1212,6 +1215,19 @@ export default function MarkerStudio({
     return () => clearTimeout(t);
   }, [open, studioMode, videoReady, runRosterScan]);
 
+  /* ── Auto-open Scout Mode as soon as the video is ready ────────
+     Replaces the old Instant Roster auto-scan entry point. Scout Mode
+     was previously launched from the Roster screen via "Try Scout Mode";
+     now we take the user straight there since Roster has been removed. */
+  useEffect(() => {
+    if (!open) return;
+    if (!videoReady) return;
+    if (scoutOpen) return;
+    if (anchors.length > 0) return; // user already started — don't reopen
+    const t = setTimeout(() => { setScoutOpen(true); }, 250);
+    return () => clearTimeout(t);
+  }, [open, videoReady, scoutOpen, anchors.length]);
+
   /* ── User taps a roster tile → auto-fill first anchor + switch to MANUAL ─ */
   const pickRosterPlayer = useCallback(async (cand) => {
     const v = videoRef.current;
@@ -1937,50 +1953,11 @@ export default function MarkerStudio({
           </div>
         )}
 
-        {/* Back-to-roster fallback */}
-        <div className="px-3 pb-3 text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setAnchors([]);
-              setBox(null);
-              setStudioMode("ROSTER");
-              rosterRanRef.current = false;
-              setRosterCandidates([]);
-              setRosterError("");
-              setRosterProgress(0);
-            }}
-            data-testid="ms-back-to-roster"
-            className="text-[10px] uppercase tracking-widest font-bold text-white/55 hover:text-[#CCFF00] underline decoration-dotted underline-offset-4"
-          >
-            ← Back to auto-roster
-          </button>
-        </div>
+        {/* Back-to-roster fallback — REMOVED (Instant Roster removed) */}
       </div>
       )}
 
-      {/* ── Roster overlay (default first screen) ───────────── */}
-      {studioMode === "ROSTER" && (
-        <RosterOverlay
-          scanning={rosterScanning}
-          progress={rosterProgress}
-          candidates={rosterCandidates}
-          error={rosterError}
-          onPick={pickRosterPlayer}
-          onSwitchToManual={() => {
-            setStudioMode("MANUAL");
-            setMode("box");
-          }}
-          onOpenScout={() => setScoutOpen(true)}
-          onRescan={() => {
-            rosterRanRef.current = false;
-            setRosterCandidates([]);
-            setRosterError("");
-            setRosterProgress(0);
-            runRosterScan();
-          }}
-        />
-      )}
+      {/* ── Roster overlay — REMOVED (Instant Roster removed) ─── */}
 
       {/* ── Anchor Preview overlay — Trust Stack Improvement #3 + #4 ── */}
       {studioMode === "PREVIEW" && (
