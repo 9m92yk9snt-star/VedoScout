@@ -858,6 +858,7 @@ export default function ScoutMode({
             videoEl={videoRef.current}
             stageRect={stageRect}
             tapFlashIdx={tapFlash}
+            nextNumber={anchors.length + 1}
             onTap={handleChipTap}
           />
         )}
@@ -939,73 +940,112 @@ export default function ScoutMode({
           </div>
         )}
 
-        {/* Detecting indicator */}
-        {!booting && detecting && (
-          <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-ink/85 backdrop-blur text-white text-[10px] uppercase tracking-widest font-bold px-2 py-1" style={{ zIndex: 9 }}>
-            <Loader2 className="w-3 h-3 animate-spin text-[#CCFF00]" />
-            Scanning frame…
+        {/* Detecting indicator — tiny corner dot only */}
+        {!booting && detecting && !geminiRefining && (
+          <div
+            className="absolute top-2 right-2 flex items-center gap-1 text-white/70 text-[10px] tracking-wide font-medium"
+            style={{ zIndex: 9, pointerEvents: "none" }}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
           </div>
         )}
 
-        {/* ── Skip-this-frame floating button (top-right) ── */}
-        {!booting && !showVerify && !detecting && anchors.length < TARGET_TAPS && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); handleSkipFrame(); }}
-            data-testid="scout-skip-frame"
-            className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-ink/90 backdrop-blur border border-[#CCFF00] text-[#CCFF00] text-[11px] uppercase tracking-widest font-black px-3 py-2 hover:bg-[#CCFF00] hover:text-ink transition-colors shadow-[0_6px_18px_rgba(0,0,0,0.5)]"
-            aria-label="My kid isn't in this frame — find another"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Kid not here · find another</span>
-            <span className="sm:hidden">Skip frame</span>
-          </button>
-        )}
-
-        {/* ── BIG centred banner — always shown when waiting for a tap.
-              Replaces the two old small hint banners. */}
+        {/* ── Single elegant instruction strip — sits at the top of the
+              video stage, dark glass, no chunky borders. Holds the
+              count, action prompt, AI status, and the Skip-frame link
+              in ONE clean horizontal line. */}
         {!booting && !showVerify && anchors.length < TARGET_TAPS && (
           <div
-            className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center"
+            className="absolute left-0 right-0 flex items-center justify-between"
             data-testid="scout-tap-anywhere-hint"
-            style={{ top: 12, zIndex: 15, pointerEvents: "none" }}
+            style={{
+              top: 0,
+              height: 44,
+              padding: "0 14px",
+              background: "linear-gradient(180deg, rgba(10,15,13,0.92) 0%, rgba(10,15,13,0.78) 60%, rgba(10,15,13,0) 100%)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              zIndex: 15,
+              pointerEvents: "none",
+            }}
           >
-            <div className="flex items-center gap-2 bg-ink/95 backdrop-blur border-2 border-[#CCFF00] px-3 py-1.5 shadow-[0_4px_18px_rgba(0,0,0,0.55)]">
-              <Hand className="w-4 h-4 text-[#CCFF00]" />
-              <span className="text-[14px] sm:text-[15px] font-black text-[#CCFF00] uppercase tracking-wide leading-none">
-                Tap kid #{anchors.length + 1}
+            {/* Left: counter + prompt */}
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span
+                className="text-white font-black tabular-nums leading-none"
+                style={{ fontSize: 22, letterSpacing: "-0.01em" }}
+              >
+                {anchors.length + 1}
+                <span className="text-white/45 font-bold" style={{ fontSize: 14 }}> /{TARGET_TAPS}</span>
               </span>
-              <span className="text-[10px] font-bold text-white/70 tabular-nums leading-none ml-1">
-                · {TARGET_TAPS - anchors.length} more
+              <span
+                className="text-white/85 truncate"
+                style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.01em" }}
+              >
+                Tap your player
               </span>
             </div>
-            {/* AI status — tells user honestly how many players the AI sees */}
-            <div
-              className={`mt-1 text-[10px] uppercase tracking-widest font-black px-2 py-0.5 ${
-                detectorStatus === "failed"
-                  ? "text-white/65 bg-ink/85"
-                  : geminiRefining
-                    ? "text-[#CCFF00] bg-ink/90 border border-[#CCFF00]/40"
-                    : detecting
-                      ? "text-[#CCFF00] bg-ink/85"
+
+            {/* Right: AI status pill + skip link */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <span
+                className="flex items-center gap-1.5"
+                data-testid="scout-ai-status"
+                style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em" }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background:
+                      detectorStatus === "failed" ? "#9CA3AF"
+                        : geminiRefining ? "#CCFF00"
+                          : detections.length > 0 ? "#22C55E"
+                            : "#FBBF24",
+                    boxShadow: geminiRefining ? "0 0 8px #CCFF00" : undefined,
+                    animation: geminiRefining ? "scoutPulse 1.2s ease-in-out infinite" : undefined,
+                  }}
+                />
+                <span className="text-white/75 uppercase">
+                  {detectorStatus === "failed"
+                    ? "tap directly"
+                    : geminiRefining
+                      ? "AI refining"
                       : detections.length > 0
-                        ? "text-[#22C55E] bg-ink/90 border border-[#22C55E]/40"
-                        : "text-amber-300 bg-ink/85"
-              }`}
-              data-testid="scout-ai-status"
-            >
-              {detectorStatus === "failed"
-                ? "AI offline · tap directly"
-                : geminiRefining
-                  ? "AI refining (Gemini)…"
-                  : detecting
-                    ? "AI scanning frame…"
-                    : detections.length > 0
-                      ? `AI sees ${detections.length} player${detections.length === 1 ? "" : "s"} · chips above their heads`
-                      : "AI sees none here · tap directly or scrub"}
+                        ? `${detections.length} on field`
+                        : "tap directly"}
+                </span>
+              </span>
+              {!detecting && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleSkipFrame(); }}
+                  data-testid="scout-skip-frame"
+                  className="text-white/65 hover:text-[#CCFF00] transition-colors"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    pointerEvents: "auto",
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px 0",
+                  }}
+                  aria-label="My kid isn't in this frame — find another"
+                >
+                  Skip frame →
+                </button>
+              )}
             </div>
           </div>
         )}
+        <style>{`
+          @keyframes scoutPulse {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.45; }
+          }
+        `}</style>
       </div>
 
       {/* ── Timeline strip ───────────────────────────────── */}
@@ -1089,7 +1129,7 @@ function segmentIndexFor(t, cuts) {
 //     by parent stacking contexts.
 //   • All elements at zIndex 50 (well above the banner + skip button).
 
-function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
+function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap, nextNumber }) {
   if (!videoEl || !stageRect.w) return null;
   const vw = videoEl.videoWidth || 1;
   const vh = videoEl.videoHeight || 1;
@@ -1099,17 +1139,17 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
   const renderedW = vw * scale, renderedH = vh * scale;
   const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
 
-  const CHIP = 28;          // chip diameter — small enough not to cover the kid
-  const TAP = 52;           // tap target — bigger than chip for easy fingers
-  const TOP_GUARD = 56;     // banner + status pill vertical extent
-  const FOOTER_GUARD = 20;
-  const CHIP_OFFSET = 12;   // distance between chip & box corner
+  const CHIP = 26;
+  const TAP = 48;
+  const TOP_GUARD = 50;        // strip + breathing room
+  const FOOTER_GUARD = 28;
+  const HEAD_GAP = 10;         // px between chip BOTTOM and head TOP
+  const SIDE_GAP = 12;         // px between chip & side of body
 
-  // ── Step 1: compute the "ideal" chip position for each detection ────
-  //   Strategy: place chip OFF the player (upper-right corner of the box)
-  //   so the kid's face / number stays visible. If box is near right edge,
-  //   place chip top-LEFT instead. If both top corners are above the top
-  //   banner, drop chip to the bottom-right (below the feet).
+  // ── Step 1: compute clean placement ─────────────────────────────────
+  //   Prefer ABOVE the head with HEAD_GAP gap.
+  //   If that would clip into the top strip, place BESIDE the body at
+  //   mid-height (right side, fallback to left). Never overlap the body.
   const placements = detections.map((d) => {
     const bb = d.bbox;
     const boxX = bb.originX * scale + offX;
@@ -1117,49 +1157,47 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
     const boxW = bb.width * scale;
     const boxH = bb.height * scale;
 
-    // Prefer top-right corner; if too close to right edge, use top-left.
-    const preferRight = boxX + boxW + CHIP + CHIP_OFFSET < sw - 4;
-    let cx = preferRight
-      ? boxX + boxW + CHIP_OFFSET + CHIP / 2
-      : Math.max(CHIP / 2 + 4, boxX - CHIP_OFFSET - CHIP / 2);
-    let cy = boxY - CHIP_OFFSET; // chip TOP is offset above box top
-
-    // If chip top is hidden behind the banner, drop it to bottom-right
-    const useBelow = cy < TOP_GUARD;
-    if (useBelow) {
-      cy = Math.min(sh - CHIP - FOOTER_GUARD, boxY + boxH - CHIP);
-      cx = preferRight
-        ? boxX + boxW + CHIP_OFFSET + CHIP / 2
-        : Math.max(CHIP / 2 + 4, boxX - CHIP_OFFSET - CHIP / 2);
+    const idealAboveY = boxY - CHIP - HEAD_GAP;
+    let cx, cy;
+    if (idealAboveY >= TOP_GUARD) {
+      // Comfortable space above the head
+      cx = boxX + boxW / 2;
+      cy = idealAboveY;
+    } else {
+      // No room above → place to the SIDE at mid-height
+      cy = Math.max(TOP_GUARD, Math.min(sh - CHIP - FOOTER_GUARD, boxY + boxH / 2 - CHIP / 2));
+      // Right side preferred
+      const rightCx = boxX + boxW + SIDE_GAP + CHIP / 2;
+      if (rightCx + CHIP / 2 <= sw - 4) {
+        cx = rightCx;
+      } else {
+        cx = Math.max(CHIP / 2 + 4, boxX - SIDE_GAP - CHIP / 2);
+      }
     }
-    // Final clamp so chip never escapes the stage
     cx = Math.max(CHIP / 2 + 4, Math.min(sw - CHIP / 2 - 4, cx));
     cy = Math.max(TOP_GUARD, Math.min(sh - CHIP - FOOTER_GUARD, cy));
 
-    return { boxX, boxY, boxW, boxH, cx, cy, useBelow };
+    return { boxX, boxY, boxW, boxH, cx, cy };
   });
 
-  // ── Step 2: CHIP FANNING — de-overlap chips. When two chips would land
-  //   within (CHIP + 4) px of each other, nudge them apart horizontally.
-  //   We do a single pass left-to-right, sorted by current X. Good enough
-  //   for the 10-15 chips we ever show.
-  const order = [...placements.keys()].sort(
+  // ── Step 2: chip fanning — push apart any chips that would overlap.
+  //   We do TWO passes: horizontal (left→right), then vertical.
+  const horizSort = [...placements.keys()].sort(
     (a, b) => placements[a].cx - placements[b].cx,
   );
-  const MIN_GAP = CHIP + 4;
-  for (let i = 1; i < order.length; i++) {
-    const prev = placements[order[i - 1]];
-    const cur = placements[order[i]];
-    if (cur.cx - prev.cx < MIN_GAP) {
-      cur.cx = Math.min(sw - CHIP / 2 - 4, prev.cx + MIN_GAP);
+  const MIN_HORIZ = CHIP + 6;
+  for (let i = 1; i < horizSort.length; i++) {
+    const prev = placements[horizSort[i - 1]];
+    const cur = placements[horizSort[i]];
+    if (cur.cx - prev.cx < MIN_HORIZ && Math.abs(cur.cy - prev.cy) < CHIP) {
+      cur.cx = Math.min(sw - CHIP / 2 - 4, prev.cx + MIN_HORIZ);
     }
   }
-  // Second pass — push down chips that landed too close vertically too
+  // Vertical de-overlap pass
   for (let i = 0; i < placements.length; i++) {
     for (let j = i + 1; j < placements.length; j++) {
       const a = placements[i], b = placements[j];
       if (Math.abs(a.cx - b.cx) < CHIP && Math.abs(a.cy - b.cy) < CHIP) {
-        // Nudge the later one down
         b.cy = Math.min(sh - CHIP - FOOTER_GUARD, a.cy + CHIP + 4);
       }
     }
@@ -1181,61 +1219,34 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
       {detections.map((d, i) => {
         const num = i + 1;
         const flashing = tapFlashIdx === d.idx;
-        const accent = flashing ? "#22C55E" : "#CCFF00";
-        const { boxX, boxY, boxW, boxH, cx, cy } = placements[i];
+        const isActive = num === nextNumber; // the chip the user should tap NEXT
+        const { boxX, boxW, boxY, boxH, cx, cy } = placements[i];
 
-        // Connector: thin line from chip centre to the nearest box corner
-        const chipCenterX = cx;
-        const chipCenterY = cy + CHIP / 2;
-        const targetX = chipCenterX < boxX + boxW / 2
-          ? boxX + boxW * 0.15   // chip is left of box → connect to upper-left
-          : boxX + boxW * 0.85;  // chip is right of box → connect to upper-right
-        const targetY = chipCenterY < boxY + boxH / 2
-          ? boxY + 6              // chip above middle → connect to top of box
-          : boxY + boxH - 6;      // chip below middle → connect to bottom
-        // Connector as a 1.5 px SVG line (handles any angle cleanly)
-        const dx = targetX - chipCenterX;
-        const dy = targetY - chipCenterY;
-        const connLen = Math.sqrt(dx * dx + dy * dy);
-        const connAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+        // Spotlight dot at the player's feet — confident "AI tracked" cue
+        // without a chunky bounding box. Lime, soft glow.
+        const footX = boxX + boxW / 2;
+        const footY = boxY + boxH - 2;
 
         return (
           <div key={`player-${i}`} style={{ pointerEvents: "none" }}>
-            {/* 1. Thin OUTLINE BOX around the player — softer (1.5 px, 60 %
-                  opacity) so it doesn't compete visually with the chip. */}
+            {/* Soft spotlight under the player's feet */}
             <div
               style={{
                 position: "absolute",
-                left: boxX,
-                top: boxY,
-                width: boxW,
-                height: boxH,
-                border: `1.5px solid ${accent}`,
-                borderRadius: 3,
-                boxShadow: `0 0 0 1px rgba(0,0,0,0.55)`,
-                background: flashing ? `${accent}25` : "transparent",
-                opacity: flashing ? 1 : 0.7,
+                left: footX - 9,
+                top: footY - 4,
+                width: 18,
+                height: 6,
+                borderRadius: "50%",
+                background: isActive ? "#CCFF00" : "#FFFFFF",
+                opacity: isActive ? 0.85 : 0.32,
+                filter: `blur(${isActive ? 2 : 1}px)`,
+                boxShadow: isActive ? "0 0 12px rgba(204,255,0,0.7)" : undefined,
                 pointerEvents: "none",
               }}
             />
 
-            {/* 2. Connector — thin line from chip → nearest corner of box */}
-            <div
-              style={{
-                position: "absolute",
-                left: chipCenterX,
-                top: chipCenterY,
-                width: connLen,
-                height: 1.5,
-                background: accent,
-                opacity: 0.7,
-                transformOrigin: "0 50%",
-                transform: `rotate(${connAngle}deg)`,
-                pointerEvents: "none",
-              }}
-            />
-
-            {/* 3. Tap target — large invisible button centred on the chip. */}
+            {/* Tap target — invisible button centred on the chip */}
             <button
               type="button"
               data-testid={`scout-chip-${num}`}
@@ -1262,7 +1273,9 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
               }}
             />
 
-            {/* 4. The visible CHIP itself */}
+            {/* The visible CHIP — premium white pill with ink number.
+                Active (next-to-tap) chip gets the lime accent ring; all
+                others stay clean & quiet so the user isn't overwhelmed. */}
             <div
               style={{
                 position: "absolute",
@@ -1274,17 +1287,20 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
                 alignItems: "center",
                 justifyContent: "center",
                 borderRadius: "50%",
-                background: flashing ? "#22C55E" : "#0A0F0D",
-                color: flashing ? "#0A0F0D" : "#CCFF00",
-                border: `2px solid ${accent}`,
-                fontWeight: 900,
+                background: flashing ? "#22C55E" : "#FFFFFF",
+                color: flashing ? "#FFFFFF" : "#0A0F0D",
+                border: isActive
+                  ? "1.5px solid #CCFF00"
+                  : "1px solid rgba(255,255,255,0.45)",
+                fontWeight: 800,
                 fontSize: 12,
                 lineHeight: 1,
+                letterSpacing: "-0.01em",
                 fontFamily: "-apple-system, system-ui, sans-serif",
                 fontVariantNumeric: "tabular-nums",
-                boxShadow: flashing
-                  ? `0 0 16px ${accent}, 0 0 0 2px #FFFFFF`
-                  : `0 0 0 1.5px rgba(0,0,0,0.9), 0 0 8px rgba(204,255,0,0.45)`,
+                boxShadow: isActive
+                  ? "0 2px 10px rgba(0,0,0,0.55), 0 0 0 3px rgba(204,255,0,0.22), 0 0 12px rgba(204,255,0,0.35)"
+                  : "0 2px 6px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,0,0,0.25)",
                 pointerEvents: "none",
                 zIndex: 51,
               }}
@@ -1296,11 +1312,6 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
       })}
     </div>
   );
-}
-
-/** Small helper kept local — main `clamp` is for fractions, this is for px. */
-function clampNum(v, lo, hi) {
-  return Math.max(lo, Math.min(hi, v));
 }
 
 // ── DebugLayer — visualises raw MediaPipe detections so you can see why
