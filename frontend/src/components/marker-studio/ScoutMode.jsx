@@ -42,7 +42,13 @@ const FRAME_JPEG_QUALITY = 0.85;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Seek the video and wait for the next painted frame (iOS-safe). */
+/** Seek the video and wait for the next painted frame (iOS-safe).
+ *
+ *  Uses a hard outer timeout of 1500 ms so the boot loop NEVER hangs even
+ *  if the seek silently fails — on iOS Safari `requestVideoFrameCallback`
+ *  can fail to fire on a freshly-mounted <video> element until the first
+ *  successful paint, which would otherwise stall the entire pipeline.
+ */
 function seekTo(videoEl, t) {
   return new Promise((resolve) => {
     if (!videoEl) return resolve();
@@ -50,17 +56,23 @@ function seekTo(videoEl, t) {
     const finish = () => {
       if (done) return;
       done = true;
-      videoEl.removeEventListener("seeked", finish);
-      // Wait one frame so the canvas captures the new pixels (not the stale ones).
+      videoEl.removeEventListener("seeked", onSeeked);
+      // Wait one frame so the canvas captures the new pixels.
+      let painted = false;
+      const paintDone = () => { if (!painted) { painted = true; resolve(); } };
       if (typeof videoEl.requestVideoFrameCallback === "function") {
-        videoEl.requestVideoFrameCallback(() => resolve());
+        try { videoEl.requestVideoFrameCallback(paintDone); } catch { /* noop */ }
       } else {
-        requestAnimationFrame(() => requestAnimationFrame(resolve));
+        requestAnimationFrame(() => requestAnimationFrame(paintDone));
       }
+      // Hard cap — never wait more than 400 ms for the paint callback.
+      setTimeout(paintDone, 400);
     };
-    videoEl.addEventListener("seeked", finish);
+    const onSeeked = () => finish();
+    videoEl.addEventListener("seeked", onSeeked);
     try { videoEl.currentTime = t; } catch { finish(); }
-    setTimeout(finish, 1200);
+    // Outer hard cap — never wait more than 1500 ms total for any one seek.
+    setTimeout(finish, 1500);
   });
 }
 
@@ -197,6 +209,22 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       const v = videoRef.current;
       if (!v) return;
 
+      // 0. Wait until the video is TRULY playable (readyState >= 2 + frames
+      //    decoded). `loadedmetadata` fires with just the header, before any
+      //    pixels are available — on iOS Safari the first `seek` then hangs
+      //    silently waiting for a frame that doesn't exist yet.
+      const waitReady = async () => {
+        const start = Date.now();
+        // Hard cap 10 s — if we still aren't ready, proceed anyway and rely
+        // on per-seek timeouts to bail gracefully.
+        while (!cancelled && Date.now() - start < 10000) {
+          if (v.readyState >= 2 && v.videoWidth > 0 && v.duration > 0) return;
+          await new Promise((r) => setTimeout(r, 100));
+        }
+      };
+      await waitReady();
+      if (cancelled) return;
+
       // 1. Scene-cut detection (~3 s)
       setBootStage("scene");
       setBootProgress(0);
@@ -215,29 +243,48 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       // 2. Distribute 10 hint timestamps
       const dur = v.duration || vidDur || 0;
       const hs = distributeHints(dur, cuts, TARGET_HINTS);
-      if (cancelled || !hs.length) return;
-      setHints(hs);
+      if (cancelled || !hs.length) {
+        // Final safety net: if duration is unknown, just split [0..30s].
+        // Better to show something than hang at 0%.
+        const fallback = [];
+        const fbDur = dur || 30;
+        for (let i = 0; i < TARGET_HINTS; i++) {
+          fallback.push((fbDur * (i + 0.5)) / TARGET_HINTS);
+        }
+        setHints(fallback);
+      } else {
+        setHints(hs);
+      }
+      const finalHints = hs.length ? hs : (() => {
+        const fb = [];
+        const fbDur = dur || 30;
+        for (let i = 0; i < TARGET_HINTS; i++) fb.push((fbDur * (i + 0.5)) / TARGET_HINTS);
+        return fb;
+      })();
 
-      // 3. Pre-capture all 10 keyframes as JPEGs
+      // 3. Pre-capture all 10 keyframes as JPEGs.
+      //    Each seekTo has a 1500 ms hard cap, so even if iOS Safari
+      //    refuses to seek, we'll move on rather than hang.
       setBootStage("frames");
+      setBootProgress(0.4);
       const captured = [];
-      for (let i = 0; i < hs.length; i++) {
+      for (let i = 0; i < finalHints.length; i++) {
         if (cancelled) return;
         try {
-          await seekTo(v, hs[i]);
+          await seekTo(v, finalHints[i]);
           const dataUrl = captureFrame(v);
-          captured.push({ t: hs[i], jpegDataUrl: dataUrl });
+          captured.push({ t: finalHints[i], jpegDataUrl: dataUrl });
         } catch (err) {
-          console.warn("frame capture failed at t=", hs[i], err);
-          captured.push({ t: hs[i], jpegDataUrl: null });
+          console.warn("frame capture failed at t=", finalHints[i], err);
+          captured.push({ t: finalHints[i], jpegDataUrl: null });
         }
-        if (!cancelled) setBootProgress(0.4 + 0.6 * ((i + 1) / hs.length));
+        if (!cancelled) setBootProgress(0.4 + 0.6 * ((i + 1) / finalHints.length));
       }
       if (cancelled) return;
       setFrameCache(captured);
 
       // 4. Seek back to first hint and move to TAP_REFERENCE
-      try { await seekTo(v, hs[0]); } catch { /* noop */ }
+      try { await seekTo(v, finalHints[0]); } catch { /* noop */ }
       if (cancelled) return;
       setActiveHintIdx(0);
       setBootProgress(1);
@@ -498,6 +545,13 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
             preload="auto"
             muted
             onLoadedMetadata={(e) => {
+              setVidDur(e.target.duration || 0);
+            }}
+            onCanPlay={(e) => {
+              // Wait for actual pixel data (readyState >= 3) before kicking
+              // off the boot pipeline. `loadedmetadata` is too early — only
+              // the header is decoded then and iOS Safari hangs on the first
+              // seek.
               setVideoReady(true);
               setVidDur(e.target.duration || 0);
             }}
