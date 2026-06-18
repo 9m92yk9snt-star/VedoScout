@@ -1,3 +1,5 @@
+/* eslint-env jest */
+/* global describe, test, expect */
 /**
  * Quick logic smoke tests for spatioTemporal.js — Trust Stack #2.
  *

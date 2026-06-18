@@ -1,3 +1,5 @@
+/* eslint-env jest */
+/* global describe, test, expect, jest */
 /**
  * AnchorPreview.test.jsx — Trust-Stack #3 + #4 runtime rendering tests.
  *

@@ -49,6 +49,7 @@ import {
   suggestSecondTapTime,
 } from "./marker-studio/spatioTemporal";
 import AnchorPreview from "./marker-studio/AnchorPreview";
+import ScoutMode from "./marker-studio/ScoutMode";
 
 /* ─────────────────────────────────────────────────────────────────────
  * Geometry helpers
@@ -187,6 +188,16 @@ export default function MarkerStudio({
   //                     never replaced by AnchorPreview's Replace flow.
   //   suggestedTapT   : recommended timestamp for the "one more tap" hint
   //   replaceIdx      : when the user pressed Replace on a preview card, the index they want to redo
+  // ── Scout Mode v3.1 — additive high-precision flow ──────────────
+  // When opened (from the Roster screen via "Try Scout Mode"), this overlay
+  // takes over until the user either confirms 10 verified anchors or cancels.
+  // On confirm, we receive { anchors, sceneCuts } and feed them straight into
+  // the existing handleDone() pipeline so no upload-payload changes are
+  // required at the call-site. The existing Instant Roster + Manual + Preview
+  // flows remain 100% intact as fallbacks.
+  const [scoutOpen, setScoutOpen] = useState(false);
+  const [scoutSceneCuts, setScoutSceneCuts] = useState([]);
+
   const [multiPoseRef, setMultiPoseRef] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollProgress, setEnrollProgress] = useState(0);
@@ -243,6 +254,8 @@ export default function MarkerStudio({
       setRefAnchorTime(null);
       setSuggestedTapT(null);
       setReplaceIdx(null);
+      setScoutOpen(false);
+      setScoutSceneCuts([]);
       if (enrollAbortRef.current) {
         enrollAbortRef.current.abort();
         enrollAbortRef.current = null;
@@ -1300,6 +1313,72 @@ export default function MarkerStudio({
     toast.info(`Re-mark your kid at ${formatTime(target.t)}.`);
   }, [anchors]);
 
+  /* ── Scout Mode v3.1 — confirm handler ─────────────────────────
+   *    ScoutMode emits anchors in VIDEO-NATIVE-normalised coords (matches
+   *    what the backend `extract_player_fingerprint` expects, since the
+   *    marker JPG is the full-resolution video frame). We seek our existing
+   *    videoRef to anchor 1's timestamp, draw the native-resolution frame
+   *    to a canvas, and submit blob + anchors via the existing onConfirm
+   *    contract — no upload/backend changes needed. */
+  const handleScoutConfirm = useCallback(({ anchors: scoutAnchors, sceneCuts }) => {
+    if (!scoutAnchors?.length) return;
+    const v = videoRef.current;
+    if (!v) {
+      toast.error("Video element unavailable — please retry.");
+      return;
+    }
+    setScoutSceneCuts(sceneCuts || []);
+    const first = scoutAnchors[0];
+    const finalise = () => {
+      const w = v.videoWidth, h = v.videoHeight;
+      if (!w || !h) {
+        toast.error("Could not capture the frame — try a different moment.");
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(v, 0, 0, w, h);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            toast.error("Could not capture the frame — try a different moment.");
+            return;
+          }
+          onConfirm({
+            markerBlob: blob,
+            markerTimestamp: first.t,
+            markerBox: first.box,
+            markerAnchors: scoutAnchors.map((a) => ({
+              t: a.t,
+              box: a.box,
+              segment: a.segment ?? 0,
+            })),
+            sceneCuts: sceneCuts || [],
+            scoutMode: true,
+          });
+        },
+        "image/jpeg",
+        0.92,
+      );
+    };
+    if (Math.abs(v.currentTime - first.t) < 0.15) {
+      finalise();
+    } else {
+      const onSeeked = () => {
+        v.removeEventListener("seeked", onSeeked);
+        finalise();
+      };
+      v.addEventListener("seeked", onSeeked);
+      try { v.currentTime = first.t; } catch { finalise(); }
+      setTimeout(() => {
+        v.removeEventListener("seeked", onSeeked);
+        finalise();
+      }, 900);
+    }
+    setScoutOpen(false);
+  }, [onConfirm]);
+
   /* ── Final Done — submit all anchors plus the marker JPG ───── */
   const handleDone = () => {
     const v = videoRef.current;
@@ -1892,6 +1971,7 @@ export default function MarkerStudio({
             setStudioMode("MANUAL");
             setMode("box");
           }}
+          onOpenScout={() => setScoutOpen(true)}
           onRescan={() => {
             rosterRanRef.current = false;
             setRosterCandidates([]);
@@ -1917,6 +1997,19 @@ export default function MarkerStudio({
           enrollProgress={autoSuggesting ? 0.5 : enrollProgress}
         />
       )}
+
+      {/* ── Scout Mode v3.1 overlay — additive 10-tap high-precision path ── */}
+      <ScoutMode
+        open={scoutOpen}
+        videoUrl={videoUrl}
+        duration={videoRef.current?.duration || 0}
+        getDetector={getDetector}
+        onConfirm={handleScoutConfirm}
+        onCancel={() => setScoutOpen(false)}
+      />
+      {/* Reference the unused state to satisfy linter — sceneCuts will be sent in payload */}
+      {/* eslint-disable-next-line no-unused-expressions */}
+      {scoutSceneCuts && null}
 
       {/* Local keyframes */}
       <style>{`
@@ -1981,7 +2074,7 @@ function BoxHandlesOverlay({ box, zoom, pan, wrapperRect }) {
  * link falls back to the existing manual flow.
  * ─────────────────────────────────────────────────────────────────── */
 
-function RosterOverlay({ scanning, progress, candidates, error, onPick, onSwitchToManual, onRescan }) {
+function RosterOverlay({ scanning, progress, candidates, error, onPick, onSwitchToManual, onOpenScout, onRescan }) {
   return (
     <div
       className="absolute inset-0 z-[210] flex flex-col bg-ink/97 backdrop-blur-md"
@@ -2065,8 +2158,19 @@ function RosterOverlay({ scanning, progress, candidates, error, onPick, onSwitch
         )}
       </div>
 
-      {/* Footer — manual fallback always visible */}
-      <div className="border-t border-white/12 px-4 py-3 bg-ink">
+      {/* Footer — Scout Mode (high precision) + manual fallback always visible */}
+      <div className="border-t border-white/12 px-4 py-3 bg-ink space-y-2">
+        {onOpenScout && (
+          <button
+            type="button"
+            onClick={onOpenScout}
+            data-testid="ms-roster-open-scout"
+            className="w-full flex items-center justify-center gap-2 py-3 text-[12px] uppercase tracking-widest font-black text-ink bg-[#CCFF00] hover:bg-[#CCFF00]/90 shadow-[0_0_18px_rgba(204,255,0,0.45)] transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            Scout Mode · 10 taps · 100 % verified
+          </button>
+        )}
         <button
           type="button"
           onClick={onSwitchToManual}
@@ -2076,8 +2180,10 @@ function RosterOverlay({ scanning, progress, candidates, error, onPick, onSwitch
           <Pencil className="w-4 h-4" />
           Don&apos;t see your player? Mark manually
         </button>
-        <p className="mt-2 text-[10px] text-white/50 text-center">
-          Manual mode lets you drag a box around your player and add up to 5 timestamp anchors.
+        <p className="mt-1 text-[10px] text-white/50 text-center">
+          {onOpenScout
+            ? "Scout Mode = the new high-precision flow. Manual mode = draw a box around your kid and add up to 5 anchors."
+            : "Manual mode lets you drag a box around your player and add up to 5 timestamp anchors."}
         </p>
       </div>
     </div>
