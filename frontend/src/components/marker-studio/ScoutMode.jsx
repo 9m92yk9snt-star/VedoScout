@@ -64,8 +64,8 @@ async function getScoutDetector() {
         modelAssetPath:
           "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite",
       },
-      scoreThreshold: 0.20, // permissive — catch small distant players
-      maxResults: 25,        // up to a full 11v11 team + GKs visible
+      scoreThreshold: 0.15, // permissive — catch small distant players in motion blur
+      maxResults: 40,        // raise — we filter aggressively for tall/human-shaped below
       runningMode: "IMAGE",
       categoryAllowlist: ["person"],
     });
@@ -150,6 +150,10 @@ export default function ScoutMode({
   const [tapFlash, setTapFlash] = useState(null); // detection index that just got tapped (for animation)
   // Timestamps the user has been shown but skipped — we don't surface them again
   const [skipped, setSkipped] = useState([]);
+  // Debug overlay — shows ALL raw detections (red boxes) so we can verify the
+  // filter logic is actually keeping the right ones. Toggle via the 🐞 pill.
+  const [debugMode, setDebugMode] = useState(false);
+  const [rawDetections, setRawDetections] = useState([]); // pre-filter detections, for debug
 
   // ── Bootstrap: load detector, detect scene cuts, build hints ─────────
   useEffect(() => {
@@ -212,6 +216,7 @@ export default function ScoutMode({
     if (!open) {
       setAnchors([]);
       setDetections([]);
+      setRawDetections([]);
       setHints([]);
       setSceneCuts([]);
       setShowVerify(false);
@@ -250,15 +255,41 @@ export default function ScoutMode({
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.drawImage(v, 0, 0);
       const result = det.detect(canvas);
-      const dets = (result?.detections || [])
-        // Loose size floor — phone wide shots typically have players at
-        // 30-100 px tall. We accept anything that's roughly the height of
-        // a person (2:1 ratio give or take). Detected players that pass
-        // this filter still get tappable chips below.
-        .filter((d) => d.boundingBox.width >= 10 && d.boundingBox.height >= 20)
-        // Largest first — likely closer to camera, easier to tap
-        .sort((a, b) => b.boundingBox.width * b.boundingBox.height - a.boundingBox.width * a.boundingBox.height)
-        .slice(0, 22) // up to 22 chips so a whole team fits on the field
+      const allRaw = result?.detections || [];
+
+      // Keep the raw boxes for the debug overlay (no filtering, no sort).
+      setRawDetections(
+        allRaw.map((d) => ({
+          bbox: d.boundingBox,
+          score: d.categories?.[0]?.score ?? 0,
+        })),
+      );
+
+      // Real player filter — three rules, in this order:
+      //   1. Big enough to actually tap (8 × 24 px min in source pixels)
+      //   2. Tall-shaped (h ≥ 1.4 × w) — humans are taller than wide,
+      //      so this kicks out fences, distant cars, building fragments
+      //      that occasionally get misclassified as "person"
+      //   3. Not absurdly huge (height < 0.95 of frame) — a single box
+      //      covering ~the whole frame is almost always a misfire
+      //      (e.g. a sideline parent in foreground covering everything)
+      const dets = allRaw
+        .filter((d) => {
+          const bb = d.boundingBox;
+          if (bb.width < 8 || bb.height < 24) return false;
+          if (bb.height < 1.4 * bb.width) return false;
+          if (bb.height > 0.95 * canvas.height) return false;
+          return true;
+        })
+        // Sort by CONFIDENCE — highest first. This is the key fix: the
+        // previous sort-by-area kept buildings/crowd-clusters on top and
+        // pushed your kid out of the top-20 slots. The model's score is
+        // a much better "is this actually a human" signal.
+        .sort(
+          (a, b) =>
+            (b.categories?.[0]?.score ?? 0) - (a.categories?.[0]?.score ?? 0),
+        )
+        .slice(0, 20) // full team + GKs + a couple of refs
         .map((d, idx) => ({
           idx,
           bbox: d.boundingBox,
@@ -501,6 +532,20 @@ export default function ScoutMode({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            onClick={() => setDebugMode((v) => !v)}
+            data-testid="scout-debug-toggle"
+            className={`h-7 px-2 flex items-center justify-center text-[9px] uppercase tracking-widest font-black transition-colors border ${
+              debugMode
+                ? "border-[#CCFF00] text-[#CCFF00] bg-[#CCFF00]/12"
+                : "border-white/25 text-white/55 hover:text-white/85"
+            }`}
+            aria-label="Toggle detector debug overlay"
+            title="Show raw AI detections (debug)"
+          >
+            🐞 {debugMode ? "ON" : "DBG"}
+          </button>
+          <button
+            type="button"
             onClick={handleUndo}
             disabled={!anchors.length || showVerify}
             data-testid="scout-undo"
@@ -550,6 +595,17 @@ export default function ScoutMode({
             stageRect={stageRect}
             tapFlashIdx={tapFlash}
             onTap={handleChipTap}
+          />
+        )}
+
+        {/* Debug overlay — raw detector boxes BEFORE filtering. Lets us
+            see why the AI is/isn't seeing the players. Toggle via 🐞 pill. */}
+        {debugMode && !booting && videoReady && !showVerify && rawDetections.length > 0 && stageRect.w > 0 && (
+          <DebugLayer
+            rawDetections={rawDetections}
+            keptCount={detections.length}
+            videoEl={videoRef.current}
+            stageRect={stageRect}
           />
         )}
 
@@ -724,19 +780,34 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
   });
 
   // Chip visual size (px); the tap target extends slightly larger for fingers
-  const CHIP = 44;
-  const TAP = 56;
+  const CHIP = 48;
+  const TAP = 64;
+  // Reserved space at top of stage (banner+skip-button vertical extent).
+  // Chips placed inside this zone get pushed to BELOW the player's feet so
+  // they remain visible and tappable instead of disappearing behind the UI.
+  const TOP_GUARD = 60;
 
   return (
-    <div className="absolute inset-0 pointer-events-none" data-testid="scout-chips-layer">
+    <div
+      className="absolute inset-0 pointer-events-none"
+      data-testid="scout-chips-layer"
+      style={{ zIndex: 40 }}
+    >
       {detections.map((d, i) => {
         const r = toScreen(d.bbox);
         const num = i + 1;
         const flashing = tapFlashIdx === d.idx;
         const ringColor = `rgb(${d.jerseyRGB[0]}, ${d.jerseyRGB[1]}, ${d.jerseyRGB[2]})`;
-        // Chip centred above the head: x = box centre, y = box top - chip - 4
-        const cx = r.x + r.w / 2;
-        const cy = Math.max(2, r.y - CHIP - 6);
+        // Smart vertical placement:
+        //   default → ABOVE the head (r.y is the head/top of the box)
+        //   if that would be hidden under the top banner → BELOW the feet
+        const headTopY = r.y - CHIP - 8;
+        const wouldBeHidden = headTopY < TOP_GUARD;
+        const cx = clampNum(r.x + r.w / 2, TAP / 2 + 4, sw - TAP / 2 - 4);
+        const cy = wouldBeHidden
+          ? Math.min(sh - CHIP - 8, r.y + r.h + 8) // below feet
+          : headTopY;
+        const tailBelow = wouldBeHidden; // tail points UP to the head when chip is below
         return (
           <button
             key={`chip-${i}`}
@@ -756,40 +827,53 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
               transform: flashing ? "scale(1.18)" : undefined,
               background: "transparent",
               border: "none",
+              zIndex: 41,
             }}
             aria-label={`Tap to lock player number ${num}`}
           >
-            {/* Pointer-tail (small inverted triangle under the chip, pointing
-                to the head — helps the user visually associate chip→player) */}
+            {/* Pointer-tail (triangle) — points toward the player. Down if
+                chip sits above the head, up if chip sits below the feet. */}
             <span
               aria-hidden
               className="absolute pointer-events-none"
-              style={{
-                bottom: 2,
-                left: "50%",
-                width: 0,
-                height: 0,
-                marginLeft: -6,
-                borderLeft: "6px solid transparent",
-                borderRight: "6px solid transparent",
-                borderTop: `8px solid ${flashing ? "#22C55E" : "#CCFF00"}`,
-                filter: "drop-shadow(0 0 4px rgba(0,0,0,0.55))",
-              }}
+              style={tailBelow
+                ? {
+                    top: 2,
+                    left: "50%",
+                    width: 0,
+                    height: 0,
+                    marginLeft: -7,
+                    borderLeft: "7px solid transparent",
+                    borderRight: "7px solid transparent",
+                    borderBottom: `10px solid ${flashing ? "#22C55E" : "#CCFF00"}`,
+                    filter: "drop-shadow(0 0 4px rgba(0,0,0,0.55))",
+                  }
+                : {
+                    bottom: 2,
+                    left: "50%",
+                    width: 0,
+                    height: 0,
+                    marginLeft: -7,
+                    borderLeft: "7px solid transparent",
+                    borderRight: "7px solid transparent",
+                    borderTop: `10px solid ${flashing ? "#22C55E" : "#CCFF00"}`,
+                    filter: "drop-shadow(0 0 4px rgba(0,0,0,0.55))",
+                  }}
             />
-            {/* The chip itself */}
+            {/* The chip itself — thick double-stroke for max contrast on any background */}
             <span
               className="flex items-center justify-center font-black"
               style={{
                 width: CHIP,
                 height: CHIP,
-                fontSize: 19,
+                fontSize: 20,
                 borderRadius: "50%",
                 backgroundColor: flashing ? "#22C55E" : "#0A0F0D",
                 color: flashing ? "#0A0F0D" : "#CCFF00",
                 border: `3px solid ${flashing ? "#22C55E" : "#CCFF00"}`,
                 boxShadow: flashing
-                  ? "0 0 22px rgba(34,197,94,0.7)"
-                  : `0 0 14px rgba(0,0,0,0.65), inset 0 0 6px rgba(204,255,0,0.18), 0 0 0 1px ${ringColor}33`,
+                  ? "0 0 22px rgba(34,197,94,0.85)"
+                  : `0 0 0 2px rgba(0,0,0,0.8), 0 0 18px rgba(204,255,0,0.6), inset 0 0 6px rgba(204,255,0,0.25), 0 0 0 3px ${ringColor}66`,
               }}
             >
               {num}
@@ -797,6 +881,71 @@ function ChipsLayer({ detections, videoEl, stageRect, tapFlashIdx, onTap }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** Small helper kept local — main `clamp` is for fractions, this is for px. */
+function clampNum(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// ── DebugLayer — visualises raw MediaPipe detections so you can see why
+// chips are/aren't appearing. Red boxes = filtered OUT. Lime boxes = kept.
+function DebugLayer({ rawDetections, keptCount, videoEl, stageRect }) {
+  if (!videoEl || !stageRect.w) return null;
+  const vw = videoEl.videoWidth || 1;
+  const vh = videoEl.videoHeight || 1;
+  const sw = stageRect.w, sh = stageRect.h;
+  const scale = Math.min(sw / vw, sh / vh);
+  const renderedW = vw * scale, renderedH = vh * scale;
+  const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      data-testid="scout-debug-layer"
+      style={{ zIndex: 38 }}
+    >
+      {rawDetections.map((d, i) => {
+        const bb = d.bbox;
+        const x = bb.originX * scale + offX;
+        const y = bb.originY * scale + offY;
+        const w = bb.width * scale;
+        const h = bb.height * scale;
+        const ratio = bb.height / Math.max(1, bb.width);
+        const isHuman = ratio >= 1.4 && bb.height >= 24 && bb.width >= 8;
+        return (
+          <div
+            key={`raw-${i}`}
+            className="absolute"
+            style={{
+              left: x,
+              top: y,
+              width: w,
+              height: h,
+              border: `2px solid ${isHuman ? "#CCFF00" : "#EF4444"}`,
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.6)",
+            }}
+          >
+            <span
+              className="absolute -top-3 left-0 text-[8px] font-black tabular-nums px-1 py-0.5"
+              style={{
+                color: isHuman ? "#0A0F0D" : "#FFFFFF",
+                background: isHuman ? "#CCFF00" : "#EF4444",
+              }}
+            >
+              {Math.round((d.score || 0) * 100)}% · {ratio.toFixed(1)}:1
+            </span>
+          </div>
+        );
+      })}
+      <div
+        className="absolute bottom-3 left-3 bg-ink/95 border border-[#CCFF00] text-[10px] font-black px-2 py-1 text-white"
+        style={{ letterSpacing: "0.1em" }}
+      >
+        AI saw {rawDetections.length} · kept {keptCount} (
+        <span className="text-[#CCFF00]">lime = kid</span> · <span className="text-red-400">red = rejected</span>)
+      </div>
     </div>
   );
 }
