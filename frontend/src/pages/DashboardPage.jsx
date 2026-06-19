@@ -199,7 +199,12 @@ export default function DashboardPage() {
                   />
                   <ul className="mt-3 bg-cream-card border border-ink/10 divide-y divide-ink/10">
                     {players.map((p) => (
-                      <PlayerRow key={p.id} p={p} isPremium={!!passState?.active} />
+                      <PlayerRow
+                        key={p.id}
+                        p={p}
+                        isPremium={!!passState?.active}
+                        onUpgradeClick={() => setPassModalOpen(true)}
+                      />
                     ))}
                   </ul>
                 </section>
@@ -267,7 +272,7 @@ function SectionHeader({ icon: Icon, eyebrow, title, countLabel }) {
  *    estate efficiently — especially on mobile. The right-hand premium
  *    pill mirrors the report cards so users have a consistent visual
  *    language for "what's unlocked vs locked." */
-function PlayerRow({ p, isPremium }) {
+function PlayerRow({ p, isPremium, onUpgradeClick }) {
   return (
     <li className="relative">
       {/* Left status stripe — forest when the user is on Premium / has the
@@ -301,26 +306,58 @@ function PlayerRow({ p, isPremium }) {
             {` · ${p.report_count} ${p.report_count === 1 ? "report" : "reports"}`}
           </p>
         </div>
-        {/* Right: premium/preview pill + arrow */}
+        {/* Right: premium pill (when applicable) + spacer-reservation for
+            the locked-upgrade button (which renders OUTSIDE this Link to
+            keep the HTML valid — buttons must not be descendants of <a>) +
+            navigation arrow. */}
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {isPremium ? (
-            <span className="hidden sm:flex items-center gap-1 bg-forest text-white text-[9px] uppercase tracking-widest font-black px-2 py-1">
-              <CheckCircle2 className="w-3 h-3" strokeWidth={2.4} /> Premium
-            </span>
+            <>
+              <span className="hidden sm:flex items-center gap-1 bg-forest text-white text-[9px] uppercase tracking-widest font-black px-2 py-1">
+                <CheckCircle2 className="w-3 h-3" strokeWidth={2.4} /> Premium
+              </span>
+              <CheckCircle2 className="sm:hidden w-4 h-4 text-forest" strokeWidth={2.4} aria-hidden="true" />
+            </>
           ) : (
-            <span className="hidden sm:flex items-center gap-1 bg-cream-soft border border-ink/15 text-ink/65 text-[9px] uppercase tracking-widest font-bold px-2 py-1">
-              <Lock className="w-3 h-3" strokeWidth={2.4} /> Locked
-            </span>
-          )}
-          {/* Mobile-only compact icon (saves horizontal space) */}
-          {isPremium ? (
-            <CheckCircle2 className="sm:hidden w-4 h-4 text-forest" strokeWidth={2.4} aria-label="Premium" />
-          ) : (
-            <Lock className="sm:hidden w-3.5 h-3.5 text-ink/45" strokeWidth={2.4} aria-label="Locked" />
+            <>
+              {/* Reserved width so the arrow stays in the same column as
+                  the premium rows — the upgrade button is absolutely
+                  positioned over this space (see sibling block below). */}
+              <span aria-hidden="true" className="hidden sm:inline-block w-[78px] h-[22px]" />
+              <span aria-hidden="true" className="sm:hidden inline-block w-7 h-7" />
+            </>
           )}
           <ArrowRight className="w-4 h-4 text-forest group-hover:translate-x-1 transition-transform" />
         </div>
       </Link>
+      {/* Upgrade button — sibling of the Link (not nested!) so we don't
+          produce <button> inside <a> which is invalid HTML. Absolutely
+          positioned over the reserved space so it visually sits in the
+          row. Tapping it opens the Progress Pass checkout without
+          triggering the row navigation. */}
+      {!isPremium && onUpgradeClick && (
+        <>
+          <button
+            type="button"
+            onClick={onUpgradeClick}
+            data-testid={`player-row-upgrade-${p.id}`}
+            aria-label={`Unlock Progress Pass to track ${p.name}`}
+            title="Unlock Progress Pass"
+            className="hidden sm:flex absolute z-10 right-9 top-1/2 -translate-y-1/2 items-center gap-1 bg-cream-soft hover:bg-forest hover:text-white hover:border-forest border border-ink/15 text-ink/65 text-[9px] uppercase tracking-widest font-bold px-2 py-1 transition-colors cursor-pointer"
+          >
+            <Lock className="w-3 h-3" strokeWidth={2.4} /> Unlock
+          </button>
+          <button
+            type="button"
+            onClick={onUpgradeClick}
+            data-testid={`player-row-upgrade-mobile-${p.id}`}
+            aria-label={`Unlock Progress Pass to track ${p.name}`}
+            className="sm:hidden absolute z-10 right-8 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-ink/45 hover:text-forest active:text-forest transition-colors cursor-pointer"
+          >
+            <Lock className="w-3.5 h-3.5" strokeWidth={2.4} />
+          </button>
+        </>
+      )}
     </li>
   );
 }
