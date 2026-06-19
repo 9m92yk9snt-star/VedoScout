@@ -26,6 +26,23 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 44 — "What Changed" delta banner at the top of trajectory pages (Feb 19 2026, 22:50)**:
+  - **What**: at the top of every multi-report `/trajectory/:id`, immediately below the player header and above the verdict hero, a sticky-moment banner that auto-summarises pillar deltas first-vs-latest as a single punchy line: `WHAT CHANGED · SEP 15 → MAR 12 · 5.8 MO` + up to 4 colour-coded chips sorted by absolute magnitude — biggest movers first.
+  - **How**: zero new compute. Reads the already-returned `traj.deltas.pillars` (first-vs-latest pillar deltas, already in the backend). Pure presentation layer.
+  - **Visual treatment**:
+    - 3 px forest accent stripe on the left (consistent with PlayerRow + Compare Mode design language).
+    - Sparkles icon + `WHAT CHANGED` eyebrow + sub-line showing the date range and months elapsed (e.g., `DEC 15 → MAR 12 · 2.9 MO`).
+    - Up to 4 chips: green pill (forest/10 bg, forest text) for positive deltas, amber pill (amber-600/10 bg, amber-700 text) for negatives. Honest, no spin.
+    - Sorted by `Math.abs(delta)` DESC so the biggest mover (positive or negative) leads.
+    - Capped at 4 to keep the line punchy on mobile.
+  - **Triple-safety gating**:
+    1. Parent only renders when `!oneReport` (≥ 2 reports).
+    2. Component returns `null` if `deltas` is undefined.
+    3. Component returns `null` if all deltas are 0 / missing.
+  - **Untouched**: every other route, every existing card on the page (verdict, growth chart, narrative, pillar deltas, Compare Mode, mission, badges, timeline table), all backend endpoints. The banner is purely additive between the header and the verdict hero.
+  - **Tested**: ✅ ESLint clean. ✅ Mock-rendered with two scenarios: (a) all-positive 4-chip top row → all green, biggest first (`+1.3 Tactical`, `+1.2 Technical`, `+1 Decision Making`, `+0.9 Mental`); (b) regression scenario with `-1.5 Physical` plus smaller positives → physical chip renders amber and leads the row, the verdict hero below switches to "PLATEAU WATCH" (amber) for a perfectly consistent visual story.
+  - **Files**: MODIFIED only `/app/frontend/src/pages/TrajectoryPage.jsx` (added `WhatChangedBanner` component + insertion JSX, ~70 lines net).
+
 - ✅ **🆕 Session 43 — Compare Mode (Progress-Pass killer feature) (Feb 19 2026, 22:30)**:
   - **What**: a new card on `/trajectory/:id` that lets a parent see two of their player's reports side-by-side as synced radar charts with a scrub slider morphing one polygon into the other, a per-pillar delta strip, and side-by-side posters. The literal "watch yourself improve" promise made tangible.
   - **How**: pure additive — no new endpoint, no new compute path. Reads the existing `/api/progress/players/:id/trajectory` payload (already returns the full `timeline[]` with all 5 pillars per snapshot). All math (delta computation, polygon interpolation, biggest-jump selection) runs client-side.

@@ -156,6 +156,26 @@ export default function TrajectoryPage() {
             </div>
           </div>
 
+          {/* ── WHAT CHANGED banner — top-of-page sticky moment. Auto-computed
+             from traj.deltas.pillars (first vs latest, already there). Sorted
+             by absolute delta DESC, capped at the 4 biggest movers, colour-
+             coded so positives feel like wins and negatives stay honest. */}
+          {!oneReport && (
+            <WhatChangedBanner
+              deltas={traj?.deltas?.pillars}
+              firstDate={traj?.timeline?.[0]?.date}
+              lastDate={traj?.timeline?.[traj.timeline.length - 1]?.date}
+              monthsBetween={(() => {
+                const tl = traj?.timeline;
+                if (!tl || tl.length < 2) return null;
+                const a = new Date(tl[0].date);
+                const b = new Date(tl[tl.length - 1].date);
+                if (isNaN(a) || isNaN(b)) return null;
+                return Math.round(((b - a) / (1000 * 60 * 60 * 24 * 30.5)) * 10) / 10;
+              })()}
+            />
+          )}
+
           {/* VERDICT HERO */}
           <motion.div
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
@@ -426,6 +446,83 @@ function PillarDelta({ pillar, info }) {
       </div>
       <div className="mt-2 text-xs text-ink/60">{info.from} → {info.to}</div>
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * What Changed Banner — top-of-trajectory "sticky moment"
+ *
+ *   Auto-computed from `traj.deltas.pillars` (already returned by the
+ *   backend — first vs latest report). Sorted by absolute delta DESC so
+ *   the biggest movers come first; capped at 4 chips to keep the line
+ *   punchy. Green for positive, amber for negative — honest, no spin.
+ *
+ *   Hidden when there's <2 reports or the pillars deltas map is empty
+ *   (defensive — if a snapshot is missing pillar scores).
+ * ─────────────────────────────────────────────────────────────────── */
+function WhatChangedBanner({ deltas, firstDate, lastDate, monthsBetween }) {
+  if (!deltas) return null;
+  const entries = Object.entries(deltas)
+    .filter(([, info]) => info && typeof info.delta === "number" && info.delta !== 0)
+    .sort((a, b) => Math.abs(b[1].delta) - Math.abs(a[1].delta))
+    .slice(0, 4);
+  if (entries.length === 0) return null;
+
+  const fmtShort = (s) => {
+    try {
+      return new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } catch {
+      return null;
+    }
+  };
+  const firstLabel = fmtShort(firstDate);
+  const lastLabel = fmtShort(lastDate);
+  const since = firstLabel
+    ? (lastLabel ? `${firstLabel} → ${lastLabel}` : `since ${firstLabel}`)
+    : "across reports";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.05 }}
+      data-testid="trajectory-what-changed-banner"
+      className="mt-6 relative bg-cream-card border border-ink/10 pl-4 pr-4 md:pl-6 md:pr-6 py-4 flex flex-col md:flex-row md:items-center gap-3 md:gap-5"
+    >
+      {/* Forest accent stripe on the left */}
+      <span aria-hidden="true" className="absolute left-0 top-0 bottom-0 w-[3px] bg-forest" />
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Sparkles className="w-3.5 h-3.5 text-forest" strokeWidth={2.4} />
+        <div className="text-[10px] uppercase tracking-[0.22em] font-black text-forest leading-tight">
+          What changed
+          <span className="block text-ink/55 font-bold tracking-widest mt-0.5">
+            {since}{monthsBetween ? ` · ${monthsBetween} mo` : ""}
+          </span>
+        </div>
+      </div>
+      <div className="flex-1 flex flex-wrap items-center gap-2">
+        {entries.map(([pillar, info]) => {
+          const d = info.delta;
+          const positive = d > 0;
+          return (
+            <span
+              key={pillar}
+              data-testid={`what-changed-${pillar}`}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] uppercase tracking-widest font-black ${
+                positive
+                  ? "bg-forest/10 text-forest"
+                  : "bg-amber-600/10 text-amber-700"
+              }`}
+            >
+              <span className="font-barlow font-black text-sm tabular-nums">
+                {positive ? "+" : ""}{Math.round(d * 10) / 10}
+              </span>
+              <span>{PILLAR_LABEL[pillar] || pillar}</span>
+            </span>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
 
