@@ -247,6 +247,23 @@
         animation: sweep-slow 12s linear infinite;
     }
 
+    /* ===== ONE-SHOT ATTENTION PULSE (Stripe / Linear pattern) =====
+       Used by:
+         • DashboardPage  · first-visit nudge on the Unlock Progress Pass pills
+         • Navigation     · first-visit nudge on the Upload Video CTA for new users
+       Single-iteration forest-green ring. Gated by per-feature localStorage. */
+    @keyframes scoutme-unlock-pulse {
+        0%   { box-shadow: 0 0 0 0 rgba(45, 107, 61, 0.55); }
+        70%  { box-shadow: 0 0 0 9px rgba(45, 107, 61, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(45, 107, 61, 0); }
+    }
+    .scoutme-unlock-pulse {
+        animation: scoutme-unlock-pulse 1.6s ease-out 0.4s 1 both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .scoutme-unlock-pulse { animation: none; }
+    }
+
     /* ===== SCROLLBAR ===== */
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: #EAE3D2; }

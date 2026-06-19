@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
+import api from "@/lib/api";
 import { LogOut, Shield, LayoutDashboard, Upload, ChevronRight, Menu, X, Home, ArrowUp } from "lucide-react";
 
 const LIME = "#ccff00";
@@ -51,6 +52,43 @@ export default function Navigation() {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
+
+  // One-shot first-visit pulse on the Upload Video CTA for brand-new users
+  // (0 reports). Mirrors the Dashboard's Unlock-pill pulse pattern — a tiny
+  // forest-green ring fires once to draw the eye to the next-step CTA, then
+  // a localStorage flag keeps subsequent visits calm.
+  const [uploadCtaPulse, setUploadCtaPulse] = useState(false);
+  useEffect(() => {
+    if (!user) return; // no auth → no fetch, no pulse
+    const key = `nav_upload_pulse_seen_v1_${user.id || user.email || "u"}`;
+    let cancelled = false;
+    try {
+      if (window.localStorage.getItem(key)) return;
+    } catch { return; }
+    // Lazy-fetch report count only when the flag is missing (cost: one call
+    // per browser per user, ever). The /reports endpoint is what the
+    // Dashboard already calls — backed by the same handler.
+    (async () => {
+      try {
+        const { data } = await api.get("/reports");
+        if (cancelled) return;
+        const count = Array.isArray(data) ? data.length : (data?.reports?.length || 0);
+        if (count > 0) {
+          // user already has reports — they've passed this milestone; mark
+          // the flag so we never fetch again on subsequent navigations.
+          try { window.localStorage.setItem(key, "1"); } catch { /* private mode */ }
+          return;
+        }
+        setUploadCtaPulse(true);
+        try { window.localStorage.setItem(key, "1"); } catch { /* private mode */ }
+        // remove the class after the animation completes so the DOM stays clean
+        setTimeout(() => { if (!cancelled) setUploadCtaPulse(false); }, 2200);
+      } catch {
+        // silently ignore — pulse hint is non-critical
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Cross-page anchor: ?scroll=<testid>
   useEffect(() => {
@@ -211,7 +249,7 @@ export default function Navigation() {
                 <Link
                   to="/upload"
                   data-testid="nav-upload-cta"
-                  className="group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-2 transition-all"
+                  className={`${uploadCtaPulse ? "scoutme-unlock-pulse " : ""}group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-2 transition-all`}
                   onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 24px 2px ${LIME}40`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
                 >

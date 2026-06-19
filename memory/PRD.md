@@ -26,6 +26,22 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 42 — Navbar "Upload Video" CTA first-visit pulse for 0-report users (Feb 19 2026, 21:05)**:
+  - **Why**: brand-new free users land on the app and don't always notice the navbar CTA on the right. A single one-shot pulse on first visit (gated to 0-report users only) draws the eye to the next step — same Stripe/Linear pattern shipped on the Dashboard's Unlock pills.
+  - **Implementation**:
+    - Promoted the `@keyframes scoutme-unlock-pulse` + `.scoutme-unlock-pulse` class from DashboardPage's inline `<style>` to **`/app/frontend/src/index.css`** as a global utility (header comment documents it as a shared first-visit nudge primitive). Honours `prefers-reduced-motion: reduce`. Single iteration, 1.6 s ease-out, 0.4 s delay.
+    - `/app/frontend/src/components/Navigation.jsx`:
+      - New `uploadCtaPulse` state + `useEffect` on `user` change.
+      - Guards: skip if no auth, skip if `localStorage[nav_upload_pulse_seen_v1_<user-id>]` is set.
+      - Otherwise lazily calls `api.get("/reports")` once. If `count > 0` → just sets the flag (don't pulse, but cache so we don't re-fetch). If `count === 0` → sets the flag + sets `uploadCtaPulse=true`; auto-clears after 2.2 s so the DOM stays clean.
+      - Per-user namespaced localStorage key — different users on the same browser each get their own first-visit nudge.
+      - Wrapped in `try/catch` for private-browsing safety; silently swallows api errors so the hint is non-critical.
+      - Pulse class applied conditionally to the existing `nav-upload-cta` Link — no structural change, no new DOM nodes.
+    - Removed the now-duplicate inline `<style>` block from DashboardPage.jsx.
+  - **Untouched**: backend, auth context, all existing nav links, dashboard data fetch, every other feature. Pulse is invisible to users with reports.
+  - **Tested**: ✅ ESLint clean on both files. ✅ Smoke test with mocked `/reports → []`: navbar Upload CTA gains `.scoutme-unlock-pulse` class + per-user localStorage flag (`nav_upload_pulse_seen_v1_<uuid>`) is set. With the real `/reports` response (testfree-mar has 6 reports): pulse class is NOT applied — the upgrade hint correctly stays calm for engaged users.
+  - **Files**: MODIFIED `/app/frontend/src/components/Navigation.jsx`, `/app/frontend/src/index.css`, and `/app/frontend/src/pages/DashboardPage.jsx` (dedupe).
+
 - ✅ **🆕 Session 41 — First-visit Unlock-pill pulse hint (Stripe / Linear pattern) (Feb 19 2026, 20:50)**:
   - **Why**: free users now have an inline UNLOCK pill on every locked tracked-player row (Session 40), but on a busy dashboard the eye doesn't immediately register it as a tap-target. Premium SaaS apps use a one-shot pulse animation on first visit to draw attention to the upgrade path without being annoying.
   - **Implementation** (zero new code paths — single CSS keyframe + `localStorage` flag):

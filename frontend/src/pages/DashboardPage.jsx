@@ -246,25 +246,6 @@ export default function DashboardPage() {
         product="Progress Pass — 3 reports / 12 months"
         onSuccess={onPassSuccess}
       />
-
-      {/* One-shot first-visit pulse keyframe for the Unlock pills. Stripe
-          / Linear-style attention nudge — a soft forest-green ring that
-          expands once and fades. Runs only when the .scoutme-unlock-pulse
-          class is applied (gated by localStorage in DashboardPage). */}
-      <style>{`
-        @keyframes scoutme-unlock-pulse {
-          0%   { box-shadow: 0 0 0 0 rgba(45, 107, 61, 0.55); }
-          70%  { box-shadow: 0 0 0 9px rgba(45, 107, 61, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(45, 107, 61, 0); }
-        }
-        .scoutme-unlock-pulse {
-          animation: scoutme-unlock-pulse 1.6s ease-out 1 both;
-          animation-delay: 0.4s;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .scoutme-unlock-pulse { animation: none; }
-        }
-      `}</style>
     </div>
   );
 }
