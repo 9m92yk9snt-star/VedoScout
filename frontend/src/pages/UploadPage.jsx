@@ -55,6 +55,9 @@ export default function UploadPage() {
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
   const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser
+  // Holds the completed upload response while the "done" celebration is on
+  // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
+  const pendingDoneRef = useRef(null);
 
   const fileRef = useRef(null);
   const videoRef = useRef(null);
@@ -339,6 +342,19 @@ export default function UploadPage() {
         },
       });
       setUploadPhase("done");
+      // Remember the response so the CTA on the success overlay can fire it
+      // straight away (otherwise we wait ~1.8 s for the celebration to land).
+      pendingDoneRef.current = { data, isPrepaid: eligibility?.reason === "prepaid" };
+      // Brief celebratory "done" beat so the user clearly sees the analysis
+      // completed and the report exists. Without this hold the overlay just
+      // vanishes and the user is left wondering whether anything actually
+      // happened. Then we hand off to the existing HeroTeaser / navigate
+      // branching, exactly as before.
+      await new Promise((r) => setTimeout(r, 1800));
+      // If the user already tapped "View your scout report", the CTA handler
+      // cleared pendingDoneRef and did the navigation itself — bail.
+      if (!pendingDoneRef.current) return;
+      pendingDoneRef.current = null;
       // For free preview generations (not prepaid uploads), show the Hero Teaser
       // before navigating away. For prepaid, just go straight to the report.
       if (eligibility?.reason !== "prepaid") {
@@ -387,8 +403,19 @@ export default function UploadPage() {
       />
       <PrecisionScanOverlay
         open={submitting && !heroReport}
-        phase={uploadPhase === "uploading" ? "uploading" : "analyzing"}
+        phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
+        onViewReport={() => {
+          const pending = pendingDoneRef.current;
+          if (!pending) return;
+          pendingDoneRef.current = null;
+          if (!pending.isPrepaid) {
+            // Free preview: show the HeroTeaser (mirrors the timer-driven path).
+            setHeroReport(pending.data);
+          } else {
+            navigate(`/report/${pending.data.id}`);
+          }
+        }}
       />
       <HeroTeaser
         open={!!heroReport}

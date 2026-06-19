@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Crosshair, Activity, Volume2, Brain, ScanSearch, UploadCloud } from "lucide-react";
+import { Crosshair, Activity, Volume2, Brain, ScanSearch, UploadCloud, CheckCircle2, FileText, ArrowRight } from "lucide-react";
 import KnowledgeCarousel from "./KnowledgeCarousel";
 
 /**
  * PrecisionScanOverlay
- * Full-screen premium loader with two phases:
+ * Full-screen premium loader with three phases:
  *   • UPLOADING — real upload-progress percentage from XHR.upload.onprogress
  *   • ANALYZING — 5-step Precision Scout ladder (auto-progressing)
- * Beneath both, a rotating KnowledgeCarousel keeps the user engaged.
+ *   • DONE      — celebratory "report ready" confirmation with primary CTA
+ * Beneath uploading/analyzing, a rotating KnowledgeCarousel keeps the user engaged.
  *
  * Props
  *   open      — boolean
- *   phase     — 'uploading' | 'analyzing' | undefined (defaults to analyzing)
+ *   phase     — 'uploading' | 'analyzing' | 'done' (defaults to analyzing)
  *   uploadPct — 0..100 number, used only when phase === 'uploading'
+ *   onViewReport — () => void, called when the user taps the done-phase CTA
  */
 const ANALYSE_STEPS = [
   { id: 1, title: "Locking onto your player", caption: "Reading jersey + shorts colour and body shape", icon: Crosshair, dur: 5 },
@@ -23,7 +25,7 @@ const ANALYSE_STEPS = [
   { id: 5, title: "Writing your scout report", caption: "Confident voice — no guesses, no hedging", icon: Brain, dur: 8 },
 ];
 
-export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0 }) {
+export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, onViewReport }) {
   const [stepIdx, setStepIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -88,14 +90,49 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
               animate={{ scale: [1, 1.25, 1] }}
               transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
             />
-            {phase === "uploading" ? (
+            {phase === "done" ? (
+              <CheckCircle2 className="w-10 h-10 text-volt relative" strokeWidth={1.6} />
+            ) : phase === "uploading" ? (
               <UploadCloud className="w-9 h-9 text-volt relative" strokeWidth={1.5} />
             ) : (
               <Crosshair className="w-9 h-9 text-volt relative" strokeWidth={1.5} />
             )}
           </div>
 
-          {phase === "uploading" ? (
+          {phase === "done" ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className="text-center"
+              data-testid="scan-done-state"
+            >
+              <p className="text-forest text-[10px] uppercase tracking-[0.3em] font-bold mb-3">
+                Precision Scout · Complete
+              </p>
+              <h3 className="font-barlow font-black uppercase text-ink text-3xl md:text-4xl tracking-tight leading-tight">
+                Your scout report is ready
+              </h3>
+              <p className="mt-3 text-ink/75 text-sm leading-relaxed max-w-sm mx-auto">
+                We&rsquo;ve locked onto your player, scored every touch, and written the full report. It&rsquo;s saved to your dashboard too — you can come back to it any time.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => { if (onViewReport) onViewReport(); }}
+                data-testid="scan-done-cta"
+                className="mt-7 w-full flex items-center justify-center gap-2 py-4 bg-volt text-cream-base font-barlow font-black uppercase tracking-widest text-[13px] hover:bg-forest transition-colors shadow-[0_8px_24px_rgba(45,107,61,0.35)]"
+              >
+                <FileText className="w-4 h-4" strokeWidth={2.2} />
+                View your scout report
+                <ArrowRight className="w-4 h-4" strokeWidth={2.2} />
+              </button>
+
+              <p className="mt-4 text-ink/55 text-[11px]">
+                Taking you there in a moment&hellip;
+              </p>
+            </motion.div>
+          ) : phase === "uploading" ? (
             <>
               <div className="text-center mb-6">
                 <p className="text-forest text-[10px] uppercase tracking-[0.3em] font-bold mb-3">
@@ -196,16 +233,20 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
             </>
           )}
 
-          <div className="mt-2 pt-5 border-t border-cream-card/10">
-            <p className="text-center text-forest/75 text-[9px] uppercase tracking-[0.3em] font-bold mb-3">
-              While you wait
-            </p>
-            <KnowledgeCarousel />
-          </div>
+          {phase !== "done" && (
+            <>
+              <div className="mt-2 pt-5 border-t border-cream-card/10">
+                <p className="text-center text-forest/75 text-[9px] uppercase tracking-[0.3em] font-bold mb-3">
+                  While you wait
+                </p>
+                <KnowledgeCarousel />
+              </div>
 
-          <p className="mt-6 text-center text-forest/70 text-[10px] uppercase tracking-[0.3em] font-bold">
-            Elapsed · {Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}
-          </p>
+              <p className="mt-6 text-center text-forest/70 text-[10px] uppercase tracking-[0.3em] font-bold">
+                Elapsed · {Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}
+              </p>
+            </>
+          )}
         </div>
       </motion.div>
     </AnimatePresence>
