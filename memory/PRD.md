@@ -26,6 +26,23 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 43 — Compare Mode (Progress-Pass killer feature) (Feb 19 2026, 22:30)**:
+  - **What**: a new card on `/trajectory/:id` that lets a parent see two of their player's reports side-by-side as synced radar charts with a scrub slider morphing one polygon into the other, a per-pillar delta strip, and side-by-side posters. The literal "watch yourself improve" promise made tangible.
+  - **How**: pure additive — no new endpoint, no new compute path. Reads the existing `/api/progress/players/:id/trajectory` payload (already returns the full `timeline[]` with all 5 pillars per snapshot). All math (delta computation, polygon interpolation, biggest-jump selection) runs client-side.
+  - **Backend**: ONE additive field — `poster_url` added to each timeline snapshot in `compute_trajectory()` (`/app/backend/progress_tracking.py` line ~234). Single string per snapshot, no extra DB calls. Backwards-compatible.
+  - **Frontend** (`/app/frontend/src/pages/TrajectoryPage.jsx`):
+    - New `CompareMode` component + 3 sub-components (`DatePicker`, `RadarPanel`, `ComparePoster`) at the bottom of the file.
+    - Hidden when `report_count < 2` (matches the existing Pillar Deltas one-report behaviour).
+    - 5-step UX: preset chips (`First ↔ Latest` / `Biggest jump`) → date pickers → synced `<RadarChart>` pair (recharts) → morph slider (range input, 0..1, drives polygon interpolation in real time) → per-pillar delta strip → optional side-by-side posters.
+    - "Biggest jump" preset uses `useMemo` to auto-find the consecutive snapshot pair with the largest positive `overall` delta — pure dopamine for the user.
+    - Direction-safe: `[aIdx, bIdx]` is always sorted chronologically regardless of selection order, so deltas always read "earlier → later" (no accidental negative growth).
+    - Locked-state UX: free users see the card fully working on the default First↔Latest pair (including scrub slider). The Biggest-jump preset, the date pickers (for indexes other than first/last), and a footer "Unlock to compare any two moments" CTA all open the existing `EmbeddedCheckoutModal` (`onUnlock={() => setPassModalOpen(true)}`). Native `<select>` adds a 🔒 emoji prefix on locked options inside the dropdown.
+    - Premium users (`passState.active === true`): no lock icons, no unlock CTA, full access.
+  - **No changes to**: the existing growth chart (LineChart), pillar-deltas card, narrative, mission, badges, timeline table, or any backend route. The card slots in between the narrative and the existing pillar-deltas card.
+  - **Tested** (`/app/test_reports/iteration_24.json`): ✅ 10/10 acceptance criteria pass on both free and premium users. ESLint clean. Stripe modal opens correctly on locked taps (live mode, no card submission). Scrub slider morphs the default pair for free users without gating. Biggest jump correctly picks the largest consecutive-pair delta. Card hides when timeline has only 1 snapshot.
+  - **Files**: MODIFIED `/app/frontend/src/pages/TrajectoryPage.jsx` (added CompareMode + 3 sub-components, +~270 lines) and `/app/backend/progress_tracking.py` (added `poster_url` to timeline snapshot, +4 lines).
+  - **Backlog note from testing agent**: TrajectoryPage.jsx is now ~845 lines. Refactor candidate — extract CompareMode + sub-components into `/app/frontend/src/components/trajectory/`. Tracked for future cleanup.
+
 - ✅ **🆕 Session 42 — Navbar "Upload Video" CTA first-visit pulse for 0-report users (Feb 19 2026, 21:05)**:
   - **Why**: brand-new free users land on the app and don't always notice the navbar CTA on the right. A single one-shot pulse on first visit (gated to 0-report users only) draws the eye to the next step — same Stripe/Linear pattern shipped on the Dashboard's Unlock pills.
   - **Implementation**:
