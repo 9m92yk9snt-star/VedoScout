@@ -1,0 +1,44 @@
+{
+  "summary": "Compare Mode (Progress-Pass killer feature) on /trajectory/{id} fully tested via Playwright with mocked /api/progress/players/*/trajectory and /api/progress/pass/status endpoints. All 10 acceptance criteria pass for both free and premium users. No new-component React errors detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results_detail": {
+    "free_user": {
+      "trajectory_compare_card_renders": "PASS",
+      "first_latest_preset_highlighted_bg_forest_text_white": "PASS",
+      "biggest_jump_has_lock_icon_and_aria_label_unlock": "PASS (svg lucide-lock present; aria-label='Unlock Progress Pass to use Biggest jump')",
+      "compare_unlock_cta_present": "PASS",
+      "click_biggest_opens_stripe_modal_and_pair_unchanged": "PASS — embedded-checkout-inner-{hash}.html iframe loaded; from value stayed at index 0",
+      "select_middle_from_option_opens_stripe_and_value_doesnt_persist": "PASS — stripe iframe loaded; select value reverted to '0'",
+      "unlock_cta_opens_stripe_modal": "PASS — embedded-checkout-inner-{hash}.html iframe loaded",
+      "scrub_slider_morph_works_on_default_pair": "PASS — status text changed 'Showing Mar 12, 2026' → 'In-between 50%'",
+      "one_report_regression_card_hidden": "PASS — trajectory-compare-card absent when timeline has 1 snapshot"
+    },
+    "premium_user": {
+      "trajectory_compare_card_renders": "PASS",
+      "no_lock_icon_on_biggest_preset": "PASS — only lucide-zap svg present, no lucide-lock",
+      "no_unlock_cta_in_dom": "PASS",
+      "biggest_jump_switches_pair_to_largest_consecutive_delta": "PASS — from=index 1 (Jan 30, 26 · age 11 · ovr 6.8), to=index 2 (Mar 12, 26 · age 11 · ovr 7.5); the r2→r3 +0.7 jump beats r1→r2 +0.4",
+      "no_stripe_modal_opens_for_premium": "PASS"
+    },
+    "console_errors": "No errors related to new components (RadarChart, CompareMode, DatePicker, RadarPanel, ComparePoster). Only pre-existing noise: Recharts width=-1 warnings (asked to ignore), 404s for unrelated resources, 500 from a Stripe analytics call, WebGL GPU stall warning."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "TrajectoryPage.jsx is now ~845 lines — recommend extracting CompareMode + its sub-components (DatePicker, RadarPanel, ComparePoster) into /app/frontend/src/components/trajectory/ for the next iteration (file-size guideline >700 lines).",
+    "Minor: DatePicker option label uses 🔒 emoji prefix for locked indices in the native select. This is fine functionally but inconsistent with the design system; the visible UI relies on the locked-click handler to gate, so the emoji is purely decorative inside the native dropdown.",
+    "Defensive: applyPreset('biggest') gates by isPremium AND biggestJump, but the click handler routes locked clicks through onLockedClick BEFORE calling applyPreset — so the isPremium check inside applyPreset is redundant but harmless. Not a bug."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped)", "frontend": "100%"},
+  "test_credentials": "testfree-mar@elitescout.com / Free@2026! and testpremium-mar@elitescout.com / Premium@2026! — both worked.",
+  "seed_data_creation": "None — used Playwright page.route() to intercept /api/progress/players/*/trajectory and /api/progress/pass/status with synthetic 3-snapshot + 1-snapshot BORO payloads and passState.active toggled per user.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Compare Mode is at /app/frontend/src/pages/TrajectoryPage.jsx line ~480 onwards. Test by intercepting trajectory + pass status endpoints BEFORE page.goto — gating logic is purely client-side. When asserting Stripe modal opened, look for 'embedded-checkout-inner' substring in frame URLs (the file has a hash suffix in production, e.g. 'embedded-checkout-inner-{40-char-hash}.html'). The Biggest-jump preset selects the consecutive pair with the largest positive overall delta (not first↔last). Default pair is first↔latest with scrub=1."
+}

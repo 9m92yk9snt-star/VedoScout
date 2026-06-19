@@ -3,14 +3,17 @@ import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Loader2, Rocket, TrendingUp, AlertCircle, Award, Target,
-  ArrowRight, Download, Lock, Sparkles, Flame, Activity, Trophy
+  ArrowRight, Download, Lock, Sparkles, Flame, Activity, Trophy,
+  ArrowLeftRight, Zap, ChevronDown,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from "recharts";
 
 import Navigation from "@/components/Navigation";
 import api, { API_BASE } from "@/lib/api";
+import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 
 const VERDICT_META = {
   ahead: { label: "Ahead of curve", icon: Rocket, color: "text-white", bg: "bg-forest-pop" },
@@ -32,16 +35,38 @@ export default function TrajectoryPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [passState, setPassState] = useState(null);
+  const [passModalOpen, setPassModalOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    api.get(`/progress/players/${id}/trajectory`)
-      .then(({ data }) => { if (mounted) setData(data); })
+    Promise.all([
+      api.get(`/progress/players/${id}/trajectory`).then(({ data }) => { if (mounted) setData(data); }),
+      api.get("/progress/pass/status").then(({ data }) => { if (mounted) setPassState(data); }).catch(() => {}),
+    ])
       .catch((e) => { if (mounted) setError(e?.response?.data?.detail || "Failed to load trajectory"); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, [id]);
+
+  const startPassCheckout = async () => ({
+    ...(await api.post("/progress/pass/checkout", {
+      origin_url: window.location.origin,
+    })).data,
+  });
+
+  const onPassSuccess = async ({ session_id }) => {
+    try {
+      await api.post(`/progress/pass/activate/${session_id}`);
+      setPassModalOpen(false);
+      // re-fetch pass state so Compare Mode unlocks in-place
+      const { data: ps } = await api.get("/progress/pass/status");
+      setPassState(ps);
+    } catch {
+      setPassModalOpen(false);
+    }
+  };
 
   const traj = data?.trajectory || {};
   const profile = data?.profile || {};
@@ -214,6 +239,15 @@ export default function TrajectoryPage() {
             </div>
           )}
 
+          {/* ── COMPARE MOMENTS — Progress-Pass killer feature ────────── */}
+          {!oneReport && (
+            <CompareMode
+              timeline={traj.timeline || []}
+              isPremium={!!passState?.active}
+              onUnlock={() => setPassModalOpen(true)}
+            />
+          )}
+
           {/* PILLAR DELTAS */}
           {!oneReport && traj?.deltas?.pillars && Object.keys(traj.deltas.pillars).length > 0 && (
             <div data-testid="trajectory-pillars-card" className="mt-6 bg-cream-card border border-gray-border p-5 md:p-8">
@@ -338,6 +372,16 @@ export default function TrajectoryPage() {
 
         </div>
       </div>
+
+      <EmbeddedCheckoutModal
+        open={passModalOpen}
+        onClose={() => setPassModalOpen(false)}
+        sessionInit={startPassCheckout}
+        amount={599}
+        currency="USD"
+        product="Progress Pass — 3 reports / 12 months"
+        onSuccess={onPassSuccess}
+      />
     </div>
   );
 }
@@ -413,6 +457,388 @@ function DiffFrame({ frame, label }) {
       <div className="p-3 text-xs text-ink/70 leading-relaxed">
         {frame.comment || "—"}
       </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * Compare Mode — Progress Pass killer feature
+ *
+ *   Renders two synced radar charts of the same player's pillar scores at
+ *   two different report dates, with a scrub slider that animates between
+ *   them, per-pillar delta strip, side-by-side posters. Source data is the
+ *   ALREADY-FETCHED `traj.timeline` — no new backend calls.
+ *
+ *   Gating (per product decision):
+ *     • Default pair "First ↔ Latest" works for everyone with 2+ reports.
+ *     • "Biggest jump" preset + custom dropdowns are PASS-locked.
+ *
+ *   Hidden entirely when there are <2 reports (matches the existing
+ *   one-report behaviour of the Pillar Deltas card).
+ * ───────────────────────────────────────────────────────────────────── */
+const PILLAR_KEYS = ["technical", "tactical", "physical", "mental", "decision_making"];
+
+function CompareMode({ timeline, isPremium, onUnlock }) {
+  // Sort chronologically (defensive — the API returns oldest→newest already).
+  const sorted = useMemo(
+    () => [...timeline].sort((a, b) => new Date(a.date) - new Date(b.date)),
+    [timeline],
+  );
+
+  // Auto-find the consecutive pair with the largest positive overall delta.
+  const biggestJump = useMemo(() => {
+    if (sorted.length < 2) return null;
+    let best = null;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      if (a.overall == null || b.overall == null) continue;
+      const d = b.overall - a.overall;
+      if (best == null || d > best.delta) best = { fromIdx: i, toIdx: i + 1, delta: d };
+    }
+    return best;
+  }, [sorted]);
+
+  // Default selection: first ↔ latest.
+  const [fromIdx, setFromIdx] = useState(0);
+  const [toIdx, setToIdx] = useState(sorted.length - 1);
+  // Scrub: 0 = full A, 1 = full B. Animates the radar polygon between states.
+  const [scrub, setScrub] = useState(1);
+
+  // Keep fromIdx < toIdx (chronological) regardless of selection order so
+  // deltas always read "earlier → later". A swap also resets the scrub.
+  const [aIdx, bIdx] = fromIdx <= toIdx ? [fromIdx, toIdx] : [toIdx, fromIdx];
+  const A = sorted[aIdx];
+  const B = sorted[bIdx];
+
+  // Radar series. Each axis is a pillar, value is 0..10. Interpolated by
+  // the scrub slider so the polygon morphs between A and B.
+  const radarData = useMemo(() => {
+    if (!A || !B) return [];
+    return PILLAR_KEYS.map((k) => {
+      const a = A.pillars?.[k];
+      const b = B.pillars?.[k];
+      const aVal = a == null ? 0 : a;
+      const bVal = b == null ? 0 : b;
+      const live = aVal + (bVal - aVal) * scrub;
+      return {
+        pillar: PILLAR_LABEL[k] || k,
+        a: aVal,
+        b: bVal,
+        live: Math.round(live * 10) / 10,
+      };
+    });
+  }, [A, B, scrub]);
+
+  // Per-pillar deltas (b − a). Pure client-side math, same as the backend's
+  // first-vs-last delta logic but on the user-picked pair.
+  const deltas = useMemo(() => {
+    const out = {};
+    if (!A || !B) return out;
+    for (const k of PILLAR_KEYS) {
+      const a = A.pillars?.[k];
+      const b = B.pillars?.[k];
+      if (a == null || b == null) continue;
+      out[k] = Math.round((b - a) * 10) / 10;
+    }
+    return out;
+  }, [A, B]);
+
+  // Defensive: if for some reason A or B is missing, render nothing.
+  if (!A || !B) return null;
+
+  const fmtDate = (s) => new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  const applyPreset = (preset) => {
+    if (preset === "first_latest") {
+      setFromIdx(0); setToIdx(sorted.length - 1); setScrub(1);
+    } else if (preset === "biggest" && biggestJump && isPremium) {
+      setFromIdx(biggestJump.fromIdx); setToIdx(biggestJump.toIdx); setScrub(1);
+    }
+  };
+
+  const onLockedClick = (e) => {
+    e.preventDefault();
+    if (onUnlock) onUnlock();
+  };
+
+  return (
+    <div data-testid="trajectory-compare-card" className="mt-6 bg-cream-card border border-gray-border p-5 md:p-8">
+      {/* Header */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-forest">
+            <ArrowLeftRight className="w-3.5 h-3.5" /> Compare moments
+          </div>
+          <h3 className="mt-2 font-barlow font-black uppercase text-2xl tracking-tighter">
+            Watch yourself improve
+          </h3>
+          <p className="mt-1 text-xs text-ink/55">
+            Two reports, side-by-side. Drag the slider to morph one into the other.
+          </p>
+        </div>
+        {!isPremium && (
+          <span className="bg-cream-soft border border-ink/15 text-ink/65 text-[10px] uppercase tracking-widest font-bold px-2 py-1 flex items-center gap-1">
+            <Lock className="w-3 h-3" /> Free preview — first ↔ latest only
+          </span>
+        )}
+      </div>
+
+      {/* Preset chips */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => applyPreset("first_latest")}
+          data-testid="compare-preset-first-latest"
+          className={`text-[10px] uppercase tracking-widest font-black px-3 py-1.5 transition-colors ${
+            aIdx === 0 && bIdx === sorted.length - 1
+              ? "bg-forest text-white"
+              : "bg-cream-soft text-ink/70 hover:bg-forest hover:text-white"
+          }`}
+        >
+          First ↔ Latest
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { if (!isPremium) return onLockedClick(e); applyPreset("biggest"); }}
+          disabled={!biggestJump}
+          data-testid="compare-preset-biggest"
+          aria-label={isPremium ? "Compare the biggest jump in scores" : "Unlock Progress Pass to use Biggest jump"}
+          className={`text-[10px] uppercase tracking-widest font-black px-3 py-1.5 transition-colors flex items-center gap-1.5 ${
+            !isPremium
+              ? "bg-cream-soft text-ink/55 hover:bg-forest hover:text-white border border-ink/15 cursor-pointer"
+              : biggestJump && aIdx === biggestJump.fromIdx && bIdx === biggestJump.toIdx
+              ? "bg-forest text-white"
+              : "bg-cream-soft text-ink/70 hover:bg-forest hover:text-white"
+          }`}
+        >
+          {!isPremium && <Lock className="w-3 h-3" />}
+          <Zap className="w-3 h-3" /> Biggest jump
+        </button>
+      </div>
+
+      {/* Date pickers */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-center">
+        <DatePicker
+          label="From"
+          value={aIdx}
+          options={sorted}
+          onChange={(i) => { setFromIdx(i); setScrub(1); }}
+          locked={!isPremium}
+          onLockedClick={onLockedClick}
+          testid="compare-from-select"
+        />
+        <ArrowRight className="hidden md:block w-5 h-5 text-forest mx-auto" />
+        <DatePicker
+          label="To"
+          value={bIdx}
+          options={sorted}
+          onChange={(i) => { setToIdx(i); setScrub(1); }}
+          locked={!isPremium}
+          onLockedClick={onLockedClick}
+          testid="compare-to-select"
+        />
+      </div>
+
+      {/* Radar pair + scrub slider */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-4 md:gap-6 items-center">
+        <RadarPanel
+          snapshot={A}
+          radarData={radarData}
+          which="a"
+          accent="#2D6B3D"
+          fmtDate={fmtDate}
+          testid="compare-radar-a"
+        />
+        <div className="hidden md:flex flex-col items-center gap-3 px-2">
+          <ArrowLeftRight className="w-5 h-5 text-forest" />
+        </div>
+        <RadarPanel
+          snapshot={B}
+          radarData={radarData}
+          which="b"
+          accent="#1F4F2F"
+          fmtDate={fmtDate}
+          testid="compare-radar-b"
+        />
+      </div>
+
+      {/* Scrub slider (single shared control) */}
+      <div className="mt-5">
+        <div className="flex items-baseline justify-between mb-2">
+          <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-forest">Morph slider</span>
+          <span className="text-[10px] uppercase tracking-widest text-ink/55 font-bold">
+            {scrub <= 0.05 ? `Showing ${fmtDate(A.date)}` : scrub >= 0.95 ? `Showing ${fmtDate(B.date)}` : `In-between ${Math.round(scrub * 100)}%`}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={scrub}
+          onChange={(e) => setScrub(Number(e.target.value))}
+          data-testid="compare-scrub"
+          aria-label="Morph between the two snapshots"
+          className="w-full accent-forest h-1.5 cursor-pointer"
+        />
+      </div>
+
+      {/* Pillar delta strip */}
+      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+        {PILLAR_KEYS.map((k) => {
+          const d = deltas[k];
+          if (d === undefined) return null;
+          const positive = d > 0;
+          const negative = d < 0;
+          const A_v = A.pillars?.[k];
+          const B_v = B.pillars?.[k];
+          return (
+            <div
+              key={k}
+              data-testid={`compare-pillar-${k}`}
+              className="border border-gray-border p-3 bg-white"
+            >
+              <div className="text-[10px] uppercase tracking-widest font-bold text-ink/65 truncate">
+                {PILLAR_LABEL[k] || k}
+              </div>
+              <div className={`mt-1 font-barlow font-black text-xl ${positive ? "text-forest" : negative ? "text-amber-700" : "text-ink/60"}`}>
+                {positive ? "+" : ""}{d}
+              </div>
+              <div className="mt-0.5 text-[10px] text-ink/55">
+                {A_v} → {B_v}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Side-by-side posters (if available on the timeline snapshots) */}
+      {(A.poster_url || B.poster_url) && (
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <ComparePoster snapshot={A} label="Before" fmtDate={fmtDate} />
+          <ComparePoster snapshot={B} label="After" fmtDate={fmtDate} />
+        </div>
+      )}
+
+      {/* Pass nudge for free users — single non-pushy line below the card */}
+      {!isPremium && (
+        <button
+          type="button"
+          onClick={onUnlock}
+          data-testid="compare-unlock-cta"
+          className="mt-6 w-full bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 transition-colors flex items-center justify-center gap-2"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Unlock to compare any two moments
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function DatePicker({ label, value, options, onChange, locked, onLockedClick, testid }) {
+  // For locked users we still let them USE the picker — the locking applies
+  // only to picking non-first / non-latest indexes. So both ends remain free.
+  // Concretely: locked users can pick "First" or "Latest" in either box. If
+  // they pick any other index, we route through onLockedClick.
+  const firstIdx = 0;
+  const lastIdx = options.length - 1;
+  const handleChange = (e) => {
+    const i = Number(e.target.value);
+    if (locked && i !== firstIdx && i !== lastIdx) {
+      onLockedClick(e);
+      return;
+    }
+    onChange(i);
+  };
+  return (
+    <div>
+      <label className="block text-[10px] uppercase tracking-[0.22em] font-bold text-forest mb-1">
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={handleChange}
+          data-testid={testid}
+          className="w-full appearance-none bg-white border border-gray-border text-ink font-bold text-sm px-3 py-2.5 pr-9 cursor-pointer hover:border-forest transition-colors"
+        >
+          {options.map((s, i) => {
+            const isLocked = locked && i !== firstIdx && i !== lastIdx;
+            const labelTxt = `${new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" })} · age ${s.age ?? "—"} · ovr ${s.overall ?? "—"}`;
+            return (
+              <option key={s.report_id || i} value={i}>
+                {isLocked ? "🔒 " : ""}{labelTxt}
+              </option>
+            );
+          })}
+        </select>
+        <ChevronDown className="w-4 h-4 text-forest absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </div>
+    </div>
+  );
+}
+
+function RadarPanel({ snapshot, radarData, which, accent, fmtDate, testid }) {
+  const dataKey = "live"; // the interpolated value driven by the scrub slider
+  return (
+    <div data-testid={testid} className="border border-gray-border bg-white p-3">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-[10px] uppercase tracking-widest font-black text-forest">
+          {which === "a" ? "Before" : "After"}
+        </span>
+        <span className="text-[10px] uppercase tracking-widest text-ink/55 font-bold">
+          age {snapshot.age ?? "—"} · ovr {snapshot.overall ?? "—"}
+        </span>
+      </div>
+      <div className="text-[10px] text-ink/70 font-bold mb-1">{fmtDate(snapshot.date)}</div>
+      <div className="aspect-square w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart data={radarData} margin={{ top: 6, right: 12, bottom: 6, left: 12 }}>
+            <PolarGrid stroke="#E5E7EB" />
+            <PolarAngleAxis dataKey="pillar" tick={{ fill: "#0A0F0D", fontSize: 9 }} />
+            <PolarRadiusAxis angle={90} domain={[0, 10]} tick={{ fill: "#0A0F0D", fontSize: 8 }} />
+            <Radar
+              name={which === "a" ? "Before" : "After"}
+              dataKey={dataKey}
+              stroke={accent}
+              fill={accent}
+              fillOpacity={0.28}
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function ComparePoster({ snapshot, label, fmtDate }) {
+  const src = snapshot.poster_url ? `${process.env.REACT_APP_BACKEND_URL}${snapshot.poster_url}` : null;
+  return (
+    <div className="relative border border-gray-border bg-ink/90 aspect-video overflow-hidden">
+      {src ? (
+        <img
+          src={src}
+          alt={label}
+          className="w-full h-full object-cover"
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-ink to-forest/40">
+          <Flame className="w-7 h-7 text-white/40" strokeWidth={1.5} />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-transparent" />
+      <span className="absolute top-2 left-2 bg-forest text-white text-[10px] uppercase tracking-widest font-black px-2 py-1">
+        {label}
+      </span>
+      <span className="absolute bottom-2 right-2 bg-ink/80 text-white text-[10px] font-bold px-2 py-1">
+        {fmtDate(snapshot.date)}
+      </span>
     </div>
   );
 }

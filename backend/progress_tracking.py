@@ -232,6 +232,10 @@ async def compute_trajectory(db, profile_doc: dict) -> dict:
             "age": _age_at(r),
             "overall": _overall(r),
             "pillars": _pillar_scores(r),
+            # poster_url is used by the frontend Compare Mode for the
+            # side-by-side "before / after" thumbnails. Cheap to include —
+            # it's a single string already stored on the report doc.
+            "poster_url": r.get("poster_url"),
         }
         snap["age_adjusted_pct"] = _age_adjusted_percentile(snap["overall"], snap["age"])
         timeline.append(snap)
