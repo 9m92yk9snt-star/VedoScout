@@ -107,25 +107,11 @@ export default function DashboardPage() {
                 onBuyClick={() => setPassModalOpen(true)}
               />
 
-              {/* PLAYERS / TRAJECTORIES */}
-              {players.length > 0 && (
-                <section className="mt-10" data-testid="dashboard-players-section">
-                  <SectionHeader
-                    eyebrow="Track progress"
-                    title="Your players"
-                    countLabel={`${players.length} tracked`}
-                  />
-                  <ul className="mt-3 bg-cream-card border border-ink/10 divide-y divide-ink/10">
-                    {players.map((p) => (
-                      <PlayerRow key={p.id} p={p} />
-                    ))}
-                  </ul>
-                </section>
-              )}
-
-              {/* REPORTS */}
-              <section className="mt-12">
+              {/* REPORTS (Library) — moved to top: this is the most-used
+                 part of the dashboard; users want to jump to a report. */}
+              <section className="mt-10">
                 <SectionHeader
+                  icon={Film}
                   eyebrow="Library"
                   title="Your reports"
                   countLabel={reports.length > 0 ? `${reports.length} ${reports.length === 1 ? "report" : "reports"}` : null}
@@ -201,6 +187,23 @@ export default function DashboardPage() {
                   </div>
                 )}
               </section>
+
+              {/* PLAYERS / TRAJECTORIES — moved BELOW reports. */}
+              {players.length > 0 && (
+                <section className="mt-12" data-testid="dashboard-players-section">
+                  <SectionHeader
+                    icon={Activity}
+                    eyebrow="Track progress"
+                    title="Your players"
+                    countLabel={`${players.length} tracked`}
+                  />
+                  <ul className="mt-3 bg-cream-card border border-ink/10 divide-y divide-ink/10">
+                    {players.map((p) => (
+                      <PlayerRow key={p.id} p={p} isPremium={!!passState?.active} />
+                    ))}
+                  </ul>
+                </section>
+              )}
             </>
           )}
         </div>
@@ -219,27 +222,41 @@ export default function DashboardPage() {
   );
 }
 
-/* ── Shared panel header used by both "Track progress · Your players"
- *    and "Library · Your reports" sections. Establishes a consistent,
- *    professional hierarchy: eyebrow label · vertical separator · title
- *    on the left, count chip on the right, then a hairline rule. */
-function SectionHeader({ eyebrow, title, countLabel }) {
+/* ── Shared panel header used by both "Library · Your reports" and
+ *    "Track progress · Your players" sections. Establishes a consistent,
+ *    premium hierarchy: section icon · eyebrow label · vertical separator
+ *    · title on the left, count chip on the right, then a 2-tone hairline
+ *    rule (small forest segment + ink/15) for a subtle premium accent. */
+function SectionHeader({ icon: Icon, eyebrow, title, countLabel }) {
   return (
-    <header className="flex items-end justify-between gap-3 pb-3 border-b border-ink/15">
-      <div className="flex items-baseline gap-3 min-w-0">
-        <span className="text-forest text-[10px] uppercase tracking-[0.3em] font-black flex-shrink-0">
-          {eyebrow}
-        </span>
-        <span className="h-3 w-px bg-ink/25 flex-shrink-0" aria-hidden="true" />
-        <h2 className="font-barlow font-black uppercase text-xl md:text-2xl tracking-tighter leading-none truncate">
-          {title}
-        </h2>
+    <header className="relative">
+      <div className="flex items-end justify-between gap-3 pb-3">
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          {Icon && (
+            <Icon
+              className="w-3.5 h-3.5 text-forest flex-shrink-0 self-center -mt-0.5"
+              strokeWidth={2.4}
+              aria-hidden="true"
+            />
+          )}
+          <span className="text-forest text-[10px] uppercase tracking-[0.3em] font-black flex-shrink-0">
+            {eyebrow}
+          </span>
+          <span className="h-3 w-px bg-ink/25 flex-shrink-0" aria-hidden="true" />
+          <h2 className="font-barlow font-black uppercase text-xl md:text-2xl tracking-tighter leading-none truncate">
+            {title}
+          </h2>
+        </div>
+        {countLabel && (
+          <span className="text-[10px] uppercase tracking-widest text-ink/55 font-bold flex-shrink-0">
+            {countLabel}
+          </span>
+        )}
       </div>
-      {countLabel && (
-        <span className="text-[10px] uppercase tracking-widest text-ink/55 font-bold flex-shrink-0">
-          {countLabel}
-        </span>
-      )}
+      {/* 2-tone hairline accent rule */}
+      <div className="relative h-px w-full bg-ink/15" aria-hidden="true">
+        <span className="absolute left-0 top-0 h-px w-12 bg-forest" />
+      </div>
     </header>
   );
 }
@@ -247,14 +264,25 @@ function SectionHeader({ eyebrow, title, countLabel }) {
 /* ── Compact row in the "Your players" list. Replaces the previous
  *    PlayerCard grid because a divided row-list reads as a scannable
  *    register (Linear / Stripe Express pattern) and uses screen real
- *    estate efficiently — especially on mobile. */
-function PlayerRow({ p }) {
+ *    estate efficiently — especially on mobile. The right-hand premium
+ *    pill mirrors the report cards so users have a consistent visual
+ *    language for "what's unlocked vs locked." */
+function PlayerRow({ p, isPremium }) {
   return (
-    <li>
+    <li className="relative">
+      {/* Left status stripe — forest when the user is on Premium / has the
+          Progress Pass active, soft ink otherwise. Mirrors the report-card
+          PREMIUM badge so users have a consistent visual cue. */}
+      <span
+        aria-hidden="true"
+        className={`absolute left-0 top-0 bottom-0 w-[3px] ${
+          isPremium ? "bg-forest" : "bg-ink/15"
+        }`}
+      />
       <Link
         to={`/trajectory/${p.id}`}
         data-testid={`player-card-${p.id}`}
-        className="group flex items-center gap-3 sm:gap-4 px-4 py-3.5 hover:bg-cream-soft/60 transition-colors"
+        className="group flex items-center gap-3 sm:gap-4 pl-5 pr-4 py-3.5 hover:bg-cream-soft/60 transition-colors"
       >
         {/* Left rail: position badge */}
         <div className="flex-shrink-0 min-w-[88px] sm:min-w-[124px]">
@@ -273,8 +301,25 @@ function PlayerRow({ p }) {
             {` · ${p.report_count} ${p.report_count === 1 ? "report" : "reports"}`}
           </p>
         </div>
-        {/* Right: arrow */}
-        <ArrowRight className="w-4 h-4 text-forest group-hover:translate-x-1 transition-transform flex-shrink-0" />
+        {/* Right: premium/preview pill + arrow */}
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          {isPremium ? (
+            <span className="hidden sm:flex items-center gap-1 bg-forest text-white text-[9px] uppercase tracking-widest font-black px-2 py-1">
+              <CheckCircle2 className="w-3 h-3" strokeWidth={2.4} /> Premium
+            </span>
+          ) : (
+            <span className="hidden sm:flex items-center gap-1 bg-cream-soft border border-ink/15 text-ink/65 text-[9px] uppercase tracking-widest font-bold px-2 py-1">
+              <Lock className="w-3 h-3" strokeWidth={2.4} /> Locked
+            </span>
+          )}
+          {/* Mobile-only compact icon (saves horizontal space) */}
+          {isPremium ? (
+            <CheckCircle2 className="sm:hidden w-4 h-4 text-forest" strokeWidth={2.4} aria-label="Premium" />
+          ) : (
+            <Lock className="sm:hidden w-3.5 h-3.5 text-ink/45" strokeWidth={2.4} aria-label="Locked" />
+          )}
+          <ArrowRight className="w-4 h-4 text-forest group-hover:translate-x-1 transition-transform" />
+        </div>
       </Link>
     </li>
   );

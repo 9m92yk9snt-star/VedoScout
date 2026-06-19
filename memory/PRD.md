@@ -26,6 +26,18 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 39 — Dashboard v2: Reports-on-top + premium/locked status on every row + icons (Feb 19 2026, 20:10)**:
+  - **User request**: "I need report of player to be top and tracks bottom. Track also marked premium/locked according to user free/premium. I need better visual organisation, more premium feel. I need dashboard to be more visual and graphical with icons. Do not change or add anything else."
+  - **Changes** (visual reorganisation only, no new features, no new data):
+    - **Swapped section order**: `LIBRARY · YOUR REPORTS` is now on top (most-used path: jumping to a report); `TRACK PROGRESS · YOUR PLAYERS` moved below it.
+    - **Section headers now include an icon**: `Film` icon next to LIBRARY eyebrow, `Activity` icon next to TRACK PROGRESS eyebrow. Adds the "visual and graphical guidance with icons" the user asked for without inventing new UI.
+    - **2-tone hairline rule** below each section header (small forest segment + ink/15 fill) instead of a plain `border-b`. Subtle premium accent that ties the section to the brand colour.
+    - **PlayerRow now shows premium/locked status** mirroring the report-card pattern: `<CheckCircle2/> PREMIUM` (forest pill, white text) when `passState?.active === true`, `<Lock/> LOCKED` (cream-soft pill, ink/65 text) otherwise. Same visual language users already see on the Library cards — they can instantly read "what's unlocked vs needs upgrade." On mobile narrow screens the pill collapses to a single icon to avoid wrap.
+    - **3 px left status stripe** on each PlayerRow (forest if premium, ink/15 if locked) — adds a premium-feeling vertical anchor that's visible at-a-glance even before reading.
+  - **Untouched**: data fetches, routes, testids, Progress Pass banner, empty state, report card behaviour, backend, all feature logic.
+  - **Tested**: ✅ ESLint clean (only pre-existing warnings). ✅ Live mobile screenshot of the logged-in dashboard shows the new Library-on-top header with Film icon + 2-tone accent rule rendering correctly. ✅ Synthetic full-stack preview (mock 6 reports + 5 players) shows the complete two-section structure with PREMIUM (green) and LOCKED (gray) pills + status stripes — exactly the symmetry between Library and Tracks the user requested.
+  - **Files**: MODIFIED only `/app/frontend/src/pages/DashboardPage.jsx`.
+
 - ✅ **🆕 Session 38 — Dashboard reorganised (TRACK PROGRESS + LIBRARY) for a professional, scannable hierarchy (Feb 19 2026, 19:50)**:
   - **User report**: the two dashboard sections ("Track progress · Your players" and "Library · Your reports") read as identical sibling lists with no visual hierarchy, sparse cards, lots of whitespace, and unclear separation. Wanted "better organized structure, more professional, easy to see and use — without adding new features."
   - **Restructure** (purely organisational — no new components, no new data, no new features):
