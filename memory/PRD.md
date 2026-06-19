@@ -26,6 +26,26 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 36 — Upload/Analyse loading-screen readability fix (Feb 19 2026, 19:10)**:
+  - **User report w/ mobile screenshot**: on the upload/analyse loader, the headline "SENDING YOUR VIDEO", body "This usually takes 10-60 seconds...", labels "UPLOADING…" / "WHILE YOU WAIT" / "ELAPSED · 02:55", and the KnowledgeCarousel card ("LEFT FOOT? YOU'RE RARER THAN YOU THINK" + body) were rendering as **white text on the cream `bg-deepnavy/95` background**, making them effectively invisible.
+  - **Root cause**: the Tailwind palette was remapped earlier in the project — `deepnavy` is now `#F4EFE6` (cream) while `cream-card` is `#FFFFFF` (white). The PrecisionScanOverlay + KnowledgeCarousel were still using the old dark-mode text classes (`text-cream-card`, `text-cream-card/60`, `text-cream-card/45`, `text-cream-card/40`, `text-cream-card/65`), so they collapsed to white-on-cream.
+  - **Fix** (scope-disciplined — text colour ONLY, no layout / background / structural change):
+    - `/app/frontend/src/components/PrecisionScanOverlay.jsx`:
+      - Headlines ("Sending your video" / step titles) `text-cream-card` → `text-ink` (near-black, premium feel)
+      - Body copy ("This usually takes 10-60 seconds…" / step captions) `text-cream-card/60` → `text-ink/70`
+      - Section labels ("Precision Scout · Uploading" / step badge) `text-volt` → `text-forest` (better contrast on cream)
+      - "Uploading…" / "Upload complete" / "While you wait" / "Elapsed · MM:SS" `text-cream-card/40-45` → `text-forest/70-80` (on-brand forest green)
+      - Big percentage ("9%") `text-volt` → `text-forest` (same hue family, slightly darker for legibility)
+      - Step-list inactive label/icon `text-cream-card/40` and `text-cream-card/35` → `text-ink/45` and `text-ink/35`
+      - Active step label `text-cream-card` → `text-ink`
+    - `/app/frontend/src/components/KnowledgeCarousel.jsx`:
+      - Headline `text-cream-card` → `text-ink`
+      - Body copy `text-cream-card/65` → `text-ink/75`
+      - Inactive dot indicator `bg-cream-card/20` → `bg-ink/15`
+  - **Untouched**: layout, background (`bg-deepnavy/95`), card structure, animations, borders, spacing, copy, icons.
+  - **Tested**: ✅ ESLint clean. ✅ Mobile screenshot of the loader (390×844 viewport) renders all text crisp and high-contrast on cream — "SENDING YOUR VIDEO" reads as bold near-black, body text as soft ink, badge/footer labels as confident forest-green.
+  - **Files**: MODIFIED only `/app/frontend/src/components/PrecisionScanOverlay.jsx` and `/app/frontend/src/components/KnowledgeCarousel.jsx`.
+
 - ✅ **🆕 Session 35 — Dormant Instant Roster code removed from MarkerStudio (Feb 19 2026, 18:55)**:
   - **Why**: After the v5.0 10-tap Scout Mode shipped, the Instant Roster path (which preceded Scout Mode) was completely dormant in MarkerStudio.jsx — state, callbacks, JSX, and the entire `RosterOverlay` + `RosterTile` sub-components were still in the file purely as dead code. Backlog item picked up by user request.
   - **Deletions** (all in `/app/frontend/src/components/MarkerStudio.jsx`):

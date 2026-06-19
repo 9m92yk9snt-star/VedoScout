@@ -98,19 +98,19 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
           {phase === "uploading" ? (
             <>
               <div className="text-center mb-6">
-                <p className="text-volt text-[10px] uppercase tracking-[0.3em] font-bold mb-3">
+                <p className="text-forest text-[10px] uppercase tracking-[0.3em] font-bold mb-3">
                   Precision Scout · Uploading
                 </p>
-                <h3 className="font-barlow font-black uppercase text-cream-card text-2xl md:text-3xl tracking-tight leading-tight">
+                <h3 className="font-barlow font-black uppercase text-ink text-2xl md:text-3xl tracking-tight leading-tight">
                   Sending your video
                 </h3>
-                <p className="mt-2 text-cream-card/60 text-sm">
+                <p className="mt-2 text-ink/70 text-sm">
                   This usually takes 10–60 seconds depending on your connection.
                 </p>
               </div>
 
               <div className="text-center mb-4">
-                <div className="font-barlow font-black text-volt text-6xl md:text-7xl tracking-tighter tabular-nums leading-none" data-testid="upload-pct">
+                <div className="font-barlow font-black text-forest text-6xl md:text-7xl tracking-tighter tabular-nums leading-none" data-testid="upload-pct">
                   {Math.round(uploadPct)}%
                 </div>
               </div>
@@ -123,7 +123,7 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
                   transition={{ duration: 0.3, ease: "easeOut" }}
                 />
               </div>
-              <p className="text-center text-cream-card/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-7">
+              <p className="text-center text-forest/80 text-[10px] uppercase tracking-[0.3em] font-bold mb-7">
                 {uploadPct < 100 ? "Uploading…" : "Upload complete — analysing"}
               </p>
             </>
@@ -138,13 +138,13 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
                   transition={{ duration: 0.3 }}
                   className="text-center mb-6"
                 >
-                  <p className="text-volt text-[10px] uppercase tracking-[0.3em] font-bold mb-3">
+                  <p className="text-forest text-[10px] uppercase tracking-[0.3em] font-bold mb-3">
                     Precision Scout · Step {ANALYSE_STEPS[stepIdx].id} of {ANALYSE_STEPS.length}
                   </p>
-                  <h3 className="font-barlow font-black uppercase text-cream-card text-2xl md:text-3xl tracking-tight leading-tight">
+                  <h3 className="font-barlow font-black uppercase text-ink text-2xl md:text-3xl tracking-tight leading-tight">
                     {ANALYSE_STEPS[stepIdx].title}
                   </h3>
-                  <p className="mt-2 text-cream-card/60 text-sm">
+                  <p className="mt-2 text-ink/70 text-sm">
                     {ANALYSE_STEPS[stepIdx].caption}
                   </p>
                 </motion.div>
@@ -168,13 +168,13 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
                     >
                       <Icon
                         className={`w-3.5 h-3.5 flex-shrink-0 ${
-                          isActive ? "text-volt" : isDone ? "text-forest-pop" : "text-cream-card/35"
+                          isActive ? "text-forest" : isDone ? "text-forest-pop" : "text-ink/35"
                         }`}
                         strokeWidth={1.6}
                       />
                       <span
                         className={`text-[11px] uppercase tracking-widest font-bold flex-1 ${
-                          isActive ? "text-cream-card" : isDone ? "text-forest-pop" : "text-cream-card/40"
+                          isActive ? "text-ink" : isDone ? "text-forest-pop" : "text-ink/45"
                         }`}
                       >
                         {s.title}
@@ -197,13 +197,13 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
           )}
 
           <div className="mt-2 pt-5 border-t border-cream-card/10">
-            <p className="text-center text-cream-card/40 text-[9px] uppercase tracking-[0.3em] font-bold mb-3">
+            <p className="text-center text-forest/75 text-[9px] uppercase tracking-[0.3em] font-bold mb-3">
               While you wait
             </p>
             <KnowledgeCarousel />
           </div>
 
-          <p className="mt-6 text-center text-cream-card/40 text-[10px] uppercase tracking-[0.3em] font-bold">
+          <p className="mt-6 text-center text-forest/70 text-[10px] uppercase tracking-[0.3em] font-bold">
             Elapsed · {Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}
           </p>
         </div>

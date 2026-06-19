@@ -68,10 +68,10 @@ export function KnowledgeCarousel({ paused = false }) {
           className="text-center px-4"
         >
           <div className="text-3xl mb-2">{fact.icon}</div>
-          <h4 className="font-barlow font-black uppercase text-cream-card tracking-tight text-base mb-2 leading-tight">
+          <h4 className="font-barlow font-black uppercase text-ink tracking-tight text-base mb-2 leading-tight">
             {fact.headline}
           </h4>
-          <p className="text-cream-card/65 text-[12px] leading-relaxed">
+          <p className="text-ink/75 text-[12px] leading-relaxed">
             {fact.body}
           </p>
         </motion.div>
@@ -80,7 +80,7 @@ export function KnowledgeCarousel({ paused = false }) {
         {FACTS.map((_, k) => (
           <span
             key={k}
-            className={`h-1 transition-all ${k === i ? "w-6 bg-volt" : "w-1.5 bg-cream-card/20"}`}
+            className={`h-1 transition-all ${k === i ? "w-6 bg-volt" : "w-1.5 bg-ink/15"}`}
           />
         ))}
       </div>
