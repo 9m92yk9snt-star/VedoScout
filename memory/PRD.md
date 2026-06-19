@@ -26,6 +26,25 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 34 — Scout Mode v5.0: 10-tap 100% manual marker workflow + premium boot (Feb 19 2026, 18:35)**:
+  - **User pivot**: explicitly discarded the previous "1-tap + AI track" approach. New spec: *after upload, auto-extract 10 screenshots, user taps the target player on each, can pan/zoom/adjust, skip non-visible frames, finish early once enough are marked. Plus premium loading screen with progress bar, status messages, and rotating scouting insights.*
+  - **Accuracy rationale** (presented to user and approved): the 10-tap manual flow materially improves identification, tracking continuity, and re-ID vs. the 1-tap AI approach because (a) zero AI drift in marking phase, (b) 10 user-verified anchors at scene-cut diverse timestamps give the fingerprint multi-pose / multi-lighting samples, (c) "Skip frame" prevents poisoning of the fingerprint with ambiguous samples.
+  - **Implementation** (`/app/frontend/src/components/marker-studio/ScoutMode.jsx` — complete rewrite, ~870 LOC):
+    - 3-phase state machine: BOOTING → MARKING → DONE
+    - BOOTING shows `PremiumBootOverlay`: circular SVG progress ring with live %, 3 rotating stage labels (Uploading video → Analysing footage → Generating player screenshots), "SCOUTING INSIGHT" ticker rotating every 4 s across 8 strings
+    - Internally drives `detectSceneCuts` → `distributeHints(dur, cuts, 10)` to pick the 10 timestamps, then seeks the `<video>` and captures each frame with `canvas.drawImage` at 1280-px max width / 0.82 JPEG quality
+    - MARKING shows each captured frame; tap places a default lime box, drag-to-move + resize handle, CSS-transform pinch zoom (zoom 1× → 3×), Zoom In / Out / Reset
+    - "Not visible · next frame" advances without incrementing the confirmed counter
+    - **NEW**: "Finish ({N} marked)" early-exit button appears once `confirmedCount >= 3` (MIN_REQUIRED)
+    - Counter UI: `{confirmedCount}/{totalFrames}` + `FRAME {pos+1}/{total}` + progress-dot strip
+    - Confirmed marks lock 350 ms for visual feedback then auto-advance
+    - DONE phase: anchors sorted by hint index, mapped to `{t, box, segment}`, plus the captured `markerImageDataUrl` from `frameCache[firstIdx]` passed up via `onConfirm({anchors, sceneCuts, markerImageDataUrl})`
+  - **Critical regression fix** (`/app/frontend/src/components/MarkerStudio.jsx` L1339-1372): rewrote `handleScoutConfirm`. The parent `<video>` is unmounted while Scout Mode is open (iOS Safari decoder-conflict fix from earlier session), so the old code that tried to grab the marker frame from `videoRef.current` would have crashed (`null` ref). New code converts the supplied data URL → Blob via `fetch().then(r=>r.blob())` and forwards `markerBlob + markerAnchors + sceneCuts + scoutMode:true` to the upload pipeline — backend contract unchanged.
+  - **Scope discipline**: NO backend changes, NO analysis-pipeline changes, NO Landing / pricing / payment changes. Touched only `ScoutMode.jsx` (rewrite) + `MarkerStudio.jsx` (1 callback rewrite).
+  - **All required testids present**: scout-mode-overlay, scout-stage, scout-draft-marker, scout-draft-resize, scout-skip-frame, scout-zoom-in/out/reset, scout-retap, scout-confirm-mark, scout-finish-early, scout-progress-counter, scout-close, scout-mode-title.
+  - **Tested**: ✅ ESLint clean. ✅ Webpack compile clean (only unrelated MediaPipe source-map warnings). ✅ Smoke screenshot of landing renders + 0 JS console errors. ✅ Testing agent (iter22) ran static review of full new code path + `handleScoutConfirm` rewrite — 100 % green, "no product fix required". Runtime exercise blocked by documented headless-Chromium codec gap (env-only, not a product bug).
+  - **⚠ LLM key budget exceeded** at session start ($8.08 / $8.00). The new manual-marking phase doesn't hit Gemini, but the final report-generation pipeline still does — user must top up via Profile → Universal Key → Add Balance.
+
 - ✅ **🆕 Session 33 — Scout Mode model upgrade: EfficientDet Lite 2 (Feb 19 2026, 06:30)**:
   - **Diagnostic** (this session): ran headless Chromium with real video upload, captured console + chip count. Found `Scout chip count: 0` and `Chips layer present: 0` — MediaPipe's EfficientDet Lite 0 + 0.20 threshold was still returning 0 detections on small (50-80 px) wide-shot players. Root cause: Lite 0 was trained on COCO where humans are 100-400 px tall; recall drops to ~30 % below 80 px regardless of threshold.
   - **Fix — single-line model swap** in `getScoutDetector`: `efficientdet_lite0.tflite` → `efficientdet_lite2.tflite`. Same MediaPipe API, same threshold (0.20), same maxResults (25). Model is hosted on `storage.googleapis.com/mediapipe-models/object_detector/...` (HTTP 200 verified) and cached by the browser after first load. One-time +5 MB download on first ScoutMode open.
