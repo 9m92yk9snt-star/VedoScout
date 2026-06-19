@@ -26,6 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 46 — Single-source-of-truth pricing across the whole site (Feb 19 2026, 23:45)**:
+  - **User request**: when the admin updates the Progress Pass / single-report price in the admin panel, the new price must show up everywhere — front page, dashboard, trajectory upgrade modal, FAQ. No hard-coded numbers.
+  - **Audit before fix**: 3 places were ignoring the admin price and showing the wrong number:
+    - `DashboardPage.jsx` ProgressPassBanner displayed hard-coded `$599` + `$199 per report` + the EmbeddedCheckoutModal charged `599` regardless of admin setting.
+    - `TrajectoryPage.jsx` Compare-Mode upgrade modal also hard-coded `599` (I introduced this in Session 43 — fixed now).
+    - `Landing.jsx` FAQ item hard-coded both `$159` and `$399` in the question + answer text.
+  - **Fix** — every place now reads the SAME `/api/settings/price` endpoint that PricingCards already used:
+    - `DashboardPage.jsx`: added `passPrice` state + an extra entry in `Promise.allSettled` that fetches `/settings/price` and stores `data.pass_price`. Threaded as a prop into `ProgressPassBanner`. Banner now renders `${passPrice ?? "—"}` (graceful loading state) + computed `≈ $${Math.round(passPrice / 3)} per report`. `EmbeddedCheckoutModal amount` is now `passPrice ?? 0`. Added `data-testid="progress-pass-price"` to the banner price for testability.
+    - `TrajectoryPage.jsx`: same pattern — added `passPrice` state + 3rd Promise.all branch fetching `/settings/price`. Compare-Mode modal `amount={passPrice ?? 0}`.
+    - `Landing.jsx` FAQ: the pricing-question's `a` text is now the placeholder `__PRICE_FAQ__`. The new `FAQSection` component (which uses `useEffect` to fetch `/settings/price`) detects the placeholder and renders a dynamic answer with the live `$${price}` and `$${passPrice}`. A graceful static fallback (no dollar amounts) renders if the endpoint is unreachable.
+  - **Defense-in-depth confirmed**: backend `/progress/pass/checkout` endpoint reads the canonical `pass_price` from `db.settings` on session creation. So even if a UI somehow displayed a stale number, the actual Stripe charge is always whatever the admin set. No risk of mis-charging.
+  - **Tested** (`/app/test_reports/iteration_25.json`): ✅ 10/10 price-wiring checks green. Round-trip verified end-to-end: admin set price to 449 → dashboard banner, landing page, modal title all changed to `$449` on the next nav, restored to 399 → all back to 399. No hard-coded `$599` / `$199 per report` visible anywhere. Stripe checkout modal correctly opens with `US$399.00` title.
+  - **Untouched**: backend (no new endpoints — the `/settings/price` endpoint existed already), Stripe checkout flow, payment processing, admin panel UI, all other features.
+  - **Files**: MODIFIED `/app/frontend/src/pages/DashboardPage.jsx`, `/app/frontend/src/pages/TrajectoryPage.jsx`, `/app/frontend/src/pages/Landing.jsx`.
+
 - ✅ **🆕 Session 45 — Global "AI" → "Pro Scout Intelligence" rewrite across all user-facing copy (Feb 19 2026, 23:15)**:
   - **User request**: change every visible mention of "AI" / "Gemini" / "multimodal AI" across the whole site to something cool. Users shouldn't be told the product is AI-powered; instead it should read as deep, premium football analysis.
   - **Chosen brand name**: **"Pro Scout Intelligence"** (the named engine). Strategy used: a hybrid — name the engine "Pro Scout Intelligence" where evoking a system adds value, and DROP the word "AI" entirely where it only added noise (mirrors how Apple, Stripe, Linear talk about their products — describe the output, not the tech).
