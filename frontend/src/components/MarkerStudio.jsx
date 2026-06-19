@@ -37,8 +37,6 @@ import {
   Loader2,
   Play,
   Pause,
-  Users,
-  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -168,20 +166,13 @@ export default function MarkerStudio({
   const [autoSuggesting, setAutoSuggesting] = useState(false);
   const [autoSuggestError, setAutoSuggestError] = useState("");
 
-  // ── Instant Roster mode — REMOVED (no longer in use) ─────────────
-  // The Instant Roster feature was removed: it could not reliably tell
-  // child players apart from coaches/parents/refs and frequently
-  // hallucinated jersey-colour matches. State + helpers below are kept
-  // dormant only to avoid touching working code paths elsewhere; the
-  // overlay JSX is no longer rendered and the auto-scan never fires.
-  //   "MANUAL"  → existing fullscreen mark/anchor flow (kept 100% intact as fallback)
-  //   "PREVIEW" → final review screen — anchors with confidence rings (Improvement #3)
+  // ── Studio modes ─────────────────────────────────────────────────
+  //   "MANUAL"  → fullscreen mark/anchor flow (fallback when the user
+  //               cancels Scout Mode and prefers to draw a box manually).
+  //   "PREVIEW" → final review screen — anchors with confidence rings.
+  // Scout Mode (the new 10-tap flow) is rendered as a separate overlay
+  // on top of MANUAL and is the default entry point.
   const [studioMode, setStudioMode] = useState("MANUAL");
-  const [rosterScanning, setRosterScanning] = useState(false);
-  const [rosterError, setRosterError] = useState("");
-  const [rosterProgress, setRosterProgress] = useState(0); // 0..1
-  const [rosterCandidates, setRosterCandidates] = useState([]); // [{id, color:[r,g,b], colorHex, appearances, bestT, bestBox, thumb}]
-  const rosterRanRef = useRef(false);
 
   // ── Trust Stack v1 — Improvements #1..#4 ─────────────────────────
   //   multiPoseRef    : enrollment fingerprint built from ±5s around the user's first tap
@@ -191,15 +182,13 @@ export default function MarkerStudio({
   //                     never replaced by AnchorPreview's Replace flow.
   //   suggestedTapT   : recommended timestamp for the "one more tap" hint
   //   replaceIdx      : when the user pressed Replace on a preview card, the index they want to redo
-  // ── Scout Mode v3.1 — additive high-precision flow ──────────────
-  // When opened (from the Roster screen via "Try Scout Mode"), this overlay
-  // takes over until the user either confirms 10 verified anchors or cancels.
-  // On confirm, we receive { anchors, sceneCuts } and feed them straight into
-  // the existing handleDone() pipeline so no upload-payload changes are
-  // required at the call-site. The existing Instant Roster + Manual + Preview
-  // flows remain 100% intact as fallbacks.
+  // ── Scout Mode v5.0 — 10-tap manual marker flow ──────────────
+  // Auto-opens when the studio mounts and the video is ready. Takes over
+  // until the user either confirms ≥ 3 anchors or cancels. On confirm we
+  // receive { anchors, sceneCuts, markerImageDataUrl } and feed it straight
+  // into the existing handleDone() pipeline — no upload-payload changes at
+  // the call-site. If the user cancels, MANUAL mode is the fallback.
   const [scoutOpen, setScoutOpen] = useState(false);
-  const [scoutSceneCuts, setScoutSceneCuts] = useState([]);
 
   const [multiPoseRef, setMultiPoseRef] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
@@ -245,11 +234,6 @@ export default function MarkerStudio({
       setAnchors([]);
       setAutoSuggesting(false);
       setAutoSuggestError("");
-      setRosterScanning(false);
-      setRosterError("");
-      setRosterProgress(0);
-      setRosterCandidates([]);
-      rosterRanRef.current = false;
       // Trust Stack v1
       setMultiPoseRef(null);
       setEnrolling(false);
@@ -258,7 +242,6 @@ export default function MarkerStudio({
       setSuggestedTapT(null);
       setReplaceIdx(null);
       setScoutOpen(false);
-      setScoutSceneCuts([]);
       if (enrollAbortRef.current) {
         enrollAbortRef.current.abort();
         enrollAbortRef.current = null;
@@ -1022,203 +1005,9 @@ export default function MarkerStudio({
     }
   }
 
-  /* ── Instant Roster scan — sample frames across the video,
-   *     detect every person, cluster by jersey colour into unique
-   *     identities. Renders a tile grid the user taps. ─────── */
-  const runRosterScan = useCallback(async () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.readyState < 2 || !v.videoWidth || !v.duration) {
-      // Not ready yet — caller will retry on metadata-ready
-      return;
-    }
-    if (rosterRanRef.current) return;
-    rosterRanRef.current = true;
-
-    setRosterScanning(true);
-    setRosterError("");
-    setRosterProgress(0);
-    setRosterCandidates([]);
-
-    try {
-      const det = await getDetector();
-      const dur = v.duration;
-      const N = Math.min(12, Math.max(8, Math.floor(dur / 2))); // 8-12 samples
-      const start = Math.min(0.6, dur * 0.05);
-      const end = Math.max(start + 1, dur - Math.min(0.6, dur * 0.05));
-      const ts = [];
-      for (let i = 0; i < N; i++) {
-        ts.push(start + ((end - start) * i) / Math.max(1, N - 1));
-      }
-
-      // Pre-create scratch canvases at video native size for sampling
-      const canvas = document.createElement("canvas");
-      canvas.width = v.videoWidth;
-      canvas.height = v.videoHeight;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
-      const sampleJerseyRGB = (bb) => {
-        // Upper torso: middle 50% wide, top 20-55% of height
-        const sx = Math.max(0, Math.floor(bb.originX + bb.width * 0.25));
-        const sy = Math.max(0, Math.floor(bb.originY + bb.height * 0.20));
-        const sw = Math.max(2, Math.floor(Math.min(canvas.width - sx, bb.width * 0.5)));
-        const sh = Math.max(2, Math.floor(Math.min(canvas.height - sy, bb.height * 0.35)));
-        if (sw < 4 || sh < 4) return null;
-        try {
-          const data = ctx.getImageData(sx, sy, sw, sh).data;
-          let r = 0, g = 0, b = 0, n = 0;
-          for (let i = 0; i < data.length; i += 20) {
-            r += data[i]; g += data[i + 1]; b += data[i + 2]; n++;
-          }
-          if (!n) return null;
-          return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
-        } catch { return null; }
-      };
-
-      const colorDist = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
-      const CLUSTER_THRESHOLD = 58; // RGB Euclidean — tight enough to separate jerseys
-      const clusters = []; // [{id, color, sumColor:[r,g,b], n, bestArea, bestT, bestBB}]
-
-      const wasPaused = v.paused;
-      v.pause();
-
-      for (let i = 0; i < ts.length; i++) {
-        const t = ts[i];
-        // Seek and wait
-        await new Promise((res) => {
-          let done = false;
-          const finish = () => { if (done) return; done = true; v.removeEventListener("seeked", finish); res(); };
-          v.addEventListener("seeked", finish);
-          try { v.currentTime = t; } catch { finish(); }
-          setTimeout(finish, 700);
-        });
-        // Draw frame
-        try {
-          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-        } catch { continue; }
-        // Detect
-        let result;
-        try { result = det.detect(canvas); } catch { result = null; }
-        if (!result?.detections?.length) {
-          setRosterProgress((i + 1) / ts.length);
-          continue;
-        }
-
-        for (const d of result.detections) {
-          const bb = d.boundingBox;
-          if (!bb || bb.width < 20 || bb.height < 40) continue;
-          const rgb = sampleJerseyRGB(bb);
-          if (!rgb) continue;
-          // Skip very washed-out / sky-coloured detections (likely partial / out of focus)
-          const minC = Math.min(...rgb); const maxC = Math.max(...rgb);
-          if (maxC < 25) continue; // pure dark = likely shadow/no info
-          // Find nearest cluster
-          let best = null;
-          for (const c of clusters) {
-            const dist = colorDist(rgb, c.color);
-            if (dist < CLUSTER_THRESHOLD && (!best || dist < best.dist)) {
-              best = { c, dist };
-            }
-          }
-          const area = bb.width * bb.height;
-          if (best) {
-            best.c.n += 1;
-            best.c.sumColor[0] += rgb[0];
-            best.c.sumColor[1] += rgb[1];
-            best.c.sumColor[2] += rgb[2];
-            best.c.color = [
-              Math.round(best.c.sumColor[0] / best.c.n),
-              Math.round(best.c.sumColor[1] / best.c.n),
-              Math.round(best.c.sumColor[2] / best.c.n),
-            ];
-            if (area > best.c.bestArea) {
-              best.c.bestArea = area;
-              best.c.bestT = t;
-              best.c.bestBB = { ...bb };
-              best.c.bestThumb = captureThumbFromBB(canvas, bb);
-            }
-          } else {
-            clusters.push({
-              id: `c${clusters.length + 1}`,
-              color: rgb.slice(),
-              sumColor: rgb.slice(),
-              n: 1,
-              bestArea: area,
-              bestT: t,
-              bestBB: { ...bb },
-              bestThumb: captureThumbFromBB(canvas, bb),
-            });
-          }
-        }
-        setRosterProgress((i + 1) / ts.length);
-      }
-
-      if (wasPaused) {
-        // already paused, leave it
-      }
-
-      // Keep clusters with ≥2 sightings AND a thumb. Sort by appearances desc, then area desc.
-      const candidates = clusters
-        .filter((c) => c.n >= 2 && c.bestThumb)
-        .sort((a, b) => (b.n - a.n) || (b.bestArea - a.bestArea))
-        .slice(0, 12)
-        .map((c, idx) => ({
-          id: c.id,
-          number: idx + 1,
-          color: c.color,
-          colorHex: `rgb(${c.color[0]}, ${c.color[1]}, ${c.color[2]})`,
-          appearances: c.n,
-          bestT: c.bestT,
-          bestBB: c.bestBB,
-          thumb: c.bestThumb,
-        }));
-
-      if (!candidates.length) {
-        setRosterError("No players auto-detected. Switch to manual mode and mark your player.");
-      }
-      setRosterCandidates(candidates);
-    } catch (err) {
-      console.error("Roster scan error", err);
-      setRosterError("Auto-scan failed. Switch to manual mode and mark your player.");
-    } finally {
-      setRosterScanning(false);
-      setRosterProgress(1);
-    }
-  }, []);
-
-  /** Crop a small thumbnail (data-URL JPEG) from the given canvas at a detection BB. */
-  function captureThumbFromBB(canvas, bb) {
-    const pad = 0.22;
-    const cx = Math.max(0, bb.originX - bb.width * pad);
-    const cy = Math.max(0, bb.originY - bb.height * pad);
-    const cw = Math.min(canvas.width - cx, bb.width * (1 + pad * 2));
-    const ch = Math.min(canvas.height - cy, bb.height * (1 + pad * 2));
-    if (cw < 8 || ch < 8) return null;
-    const out = document.createElement("canvas");
-    const W = 140;
-    const H = Math.round(W * (ch / cw));
-    out.width = W;
-    out.height = H;
-    const octx = out.getContext("2d");
-    try { octx.drawImage(canvas, cx, cy, cw, ch, 0, 0, W, H); } catch { return null; }
-    return out.toDataURL("image/jpeg", 0.78);
-  }
-
-  /* ── Auto-run roster scan as soon as the video is ready ───── */
-  useEffect(() => {
-    if (!open) return;
-    if (studioMode !== "ROSTER") return;
-    if (!videoReady) return;
-    if (rosterRanRef.current) return;
-    // Slight delay so the video has decoded frames
-    const t = setTimeout(() => { runRosterScan(); }, 250);
-    return () => clearTimeout(t);
-  }, [open, studioMode, videoReady, runRosterScan]);
-
-  /* ── Auto-open Scout Mode as soon as the video is ready ────────
-     Replaces the old Instant Roster auto-scan entry point. Scout Mode
-     was previously launched from the Roster screen via "Try Scout Mode";
-     now we take the user straight there since Roster has been removed. */
+  /* ── Auto-open Scout Mode as soon as the video is ready.  Scout Mode
+     (the 10-tap manual flow) is the default entry point — if the user
+     cancels it, they fall back to MANUAL mode below. */
   useEffect(() => {
     if (!open) return;
     if (!videoReady) return;
@@ -1227,53 +1016,6 @@ export default function MarkerStudio({
     const t = setTimeout(() => { setScoutOpen(true); }, 250);
     return () => clearTimeout(t);
   }, [open, videoReady, scoutOpen, anchors.length]);
-
-  /* ── User taps a roster tile → auto-fill first anchor + switch to MANUAL ─ */
-  const pickRosterPlayer = useCallback(async (cand) => {
-    const v = videoRef.current;
-    if (!v || !cand) return;
-    // Seek to that candidate's best frame
-    await new Promise((res) => {
-      let done = false;
-      const finish = () => { if (done) return; done = true; v.removeEventListener("seeked", finish); res(); };
-      v.addEventListener("seeked", finish);
-      try { v.currentTime = cand.bestT; } catch { finish(); }
-      setTimeout(finish, 700);
-    });
-
-    // Convert detection bbox (native video px) into wrapper-relative normalised 0..1
-    const bounds = renderedVideoBounds(v);
-    const wrapperW = wrapperRect.w || 1;
-    const wrapperH = wrapperRect.h || 1;
-    const bb = cand.bestBB;
-    const px = (bb.originX / v.videoWidth) * bounds.w + bounds.x;
-    const py = (bb.originY / v.videoHeight) * bounds.h + bounds.y;
-    const pw = (bb.width / v.videoWidth) * bounds.w;
-    const ph = (bb.height / v.videoHeight) * bounds.h;
-    const newBox = {
-      x: clamp(px / wrapperW, 0, 1),
-      y: clamp(py / wrapperH, 0, 1),
-      w: clamp(pw / wrapperW, MIN_BOX_FRAC, 1),
-      h: clamp(ph / wrapperH, MIN_BOX_FRAC, 1),
-    };
-
-    // Build thumb canvas for this anchor (use the candidate thumb directly)
-    const newAnchor = {
-      t: cand.bestT,
-      box: newBox,
-      thumb: cand.thumb,
-    };
-
-    setAnchors([newAnchor]);
-    setBox(null);
-    setMode("navigate");
-    setStudioMode("MANUAL");
-    setCurrentTime(cand.bestT);
-    setRefAnchorTime(newAnchor.t);
-    // Improvement #1 — kick off multi-pose enrollment from this tile pick
-    runEnrollmentInBackground(newAnchor);
-    toast.success(`Roster #${cand.number} locked. Tap ✨ Find player to lock 5 anchors, or ✓ Done.`);
-  }, [wrapperRect, runEnrollmentInBackground]);
 
   /* ── DONE button in MANUAL mode → route through the AnchorPreview screen
    *    instead of submitting directly. Improvement #3 of the Trust Stack.
@@ -1342,7 +1084,7 @@ export default function MarkerStudio({
       toast.error("Could not capture the frame — please try again.");
       return;
     }
-    setScoutSceneCuts(sceneCuts || []);
+    setScoutOpen(false);
     const first = scoutAnchors[0];
     // Convert data URL → Blob (we already have the JPEG, no re-encode).
     fetch(markerImageDataUrl)
@@ -1364,7 +1106,6 @@ export default function MarkerStudio({
           sceneCuts: sceneCuts || [],
           scoutMode: true,
         });
-        setScoutOpen(false);
       })
       .catch(() => {
         toast.error("Could not capture the frame — please try again.");
@@ -1556,11 +1297,9 @@ export default function MarkerStudio({
           <X className="w-5 h-5" />
         </button>
         <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-[#CCFF00]">
-          {studioMode === "ROSTER"
-            ? "Pick your player from the roster"
-            : anchors.length === 0
-              ? "Lock onto your player"
-              : `Anchor ${anchors.length} / ${MAX_ANCHORS} locked`}
+          {anchors.length === 0
+            ? "Lock onto your player"
+            : `Anchor ${anchors.length} / ${MAX_ANCHORS} locked`}
         </div>
         <div className="flex items-center gap-1.5">
           {studioMode === "MANUAL" && (
@@ -1602,11 +1341,6 @@ export default function MarkerStudio({
               {autoSuggesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {anchors.length || box ? "Review" : "Lock"}
             </button>
-          )}
-          {studioMode === "ROSTER" && (
-            <span className="px-3 h-10 flex items-center text-[10px] uppercase tracking-widest font-bold text-white/55">
-              {rosterScanning ? `${Math.round(rosterProgress * 100)}%` : `${rosterCandidates.length} found`}
-            </span>
           )}
         </div>
       </div>
@@ -1936,11 +1670,8 @@ export default function MarkerStudio({
           </div>
         )}
 
-        {/* Back-to-roster fallback — REMOVED (Instant Roster removed) */}
       </div>
       )}
-
-      {/* ── Roster overlay — REMOVED (Instant Roster removed) ─── */}
 
       {/* ── Anchor Preview overlay — Trust Stack Improvement #3 + #4 ── */}
       {studioMode === "PREVIEW" && (
@@ -1958,18 +1689,14 @@ export default function MarkerStudio({
         />
       )}
 
-      {/* ── Scout Mode v3.1 overlay — additive 10-tap high-precision path ── */}
+      {/* ── Scout Mode v5.0 overlay — 10-tap manual marker flow ── */}
       <ScoutMode
         open={scoutOpen}
         videoUrl={videoUrl}
         duration={videoRef.current?.duration || 0}
-        getDetector={getDetector}
         onConfirm={handleScoutConfirm}
         onCancel={() => setScoutOpen(false)}
       />
-      {/* Reference the unused state to satisfy linter — sceneCuts will be sent in payload */}
-      {/* eslint-disable-next-line no-unused-expressions */}
-      {scoutSceneCuts && null}
 
       {/* Local keyframes */}
       <style>{`
@@ -2024,190 +1751,5 @@ function BoxHandlesOverlay({ box, zoom, pan, wrapperRect }) {
         );
       })}
     </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────
- * RosterOverlay — the default fullscreen "tap your player" sheet.
- * MediaPipe scans the video, clusters by jersey colour, and renders a
- * numbered tile grid. The user simply taps their tile. A "Mark manually"
- * link falls back to the existing manual flow.
- * ─────────────────────────────────────────────────────────────────── */
-
-function RosterOverlay({ scanning, progress, candidates, error, onPick, onSwitchToManual, onOpenScout, onRescan }) {
-  return (
-    <div
-      className="absolute inset-0 z-[210] flex flex-col bg-ink/97 backdrop-blur-md"
-      style={{ paddingTop: 50 /* leave room for top bar */ }}
-      data-testid="ms-roster-overlay"
-    >
-      {/* Headline */}
-      <div className="px-4 pt-4 pb-3 text-center">
-        <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.32em] font-black text-[#CCFF00] mb-2">
-          <Users className="w-3.5 h-3.5" />
-          Instant roster
-        </div>
-        <h2 className="text-white text-2xl md:text-3xl font-black leading-tight">
-          Tap <span className="text-[#CCFF00]">your player</span> from the list
-        </h2>
-        <p className="text-white/75 text-sm mt-1.5 max-w-md mx-auto">
-          We scanned the clip and grouped every player by jersey colour. Pick yours &mdash; one tap and you&apos;re done.
-        </p>
-      </div>
-
-      {/* Body — scanning OR grid OR empty */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
-        {scanning && (
-          <div className="flex flex-col items-center justify-center min-h-[280px] gap-4" data-testid="ms-roster-scanning">
-            <div className="relative w-20 h-20">
-              <div className="absolute inset-0 rounded-full border-4 border-[#CCFF00]/15"></div>
-              <div
-                className="absolute inset-0 rounded-full border-4 border-[#CCFF00] border-t-transparent animate-spin"
-                style={{ animationDuration: "1.1s" }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center text-[#CCFF00] font-black text-base tabular-nums">
-                {Math.round((progress || 0) * 100)}%
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="text-white font-bold text-[15px]">Scanning the pitch…</div>
-              <div className="text-white/65 text-xs mt-1">Finding every player on the field</div>
-            </div>
-            {/* Live previews while scanning, if any candidates appear early */}
-            {candidates.length > 0 && (
-              <div className="grid grid-cols-3 gap-2 w-full max-w-sm mt-4">
-                {candidates.slice(0, 6).map((c) => (
-                  <RosterTile key={c.id} cand={c} onPick={onPick} compact />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {!scanning && candidates.length > 0 && (
-          <div
-            className="grid grid-cols-2 sm:grid-cols-3 gap-3"
-            data-testid="ms-roster-grid"
-          >
-            {candidates.map((c) => (
-              <RosterTile key={c.id} cand={c} onPick={onPick} />
-            ))}
-          </div>
-        )}
-
-        {!scanning && candidates.length === 0 && (
-          <div className="flex flex-col items-center justify-center min-h-[260px] text-center gap-3" data-testid="ms-roster-empty">
-            <div className="w-14 h-14 rounded-full bg-white/8 flex items-center justify-center">
-              <Users className="w-7 h-7 text-white/65" />
-            </div>
-            <div className="text-white font-bold text-[15px]">
-              {error || "No players auto-detected"}
-            </div>
-            <p className="text-white/65 text-sm max-w-xs">
-              The clip might be tightly cropped or low-light. Try scanning again or mark your player manually.
-            </p>
-            <button
-              type="button"
-              onClick={onRescan}
-              data-testid="ms-roster-rescan"
-              className="px-4 py-2 bg-white/12 hover:bg-white/22 text-white text-[11px] uppercase tracking-widest font-bold"
-            >
-              Try scan again
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Footer — Scout Mode (high precision) + manual fallback always visible */}
-      <div className="border-t border-white/12 px-4 py-3 bg-ink space-y-2">
-        {onOpenScout && (
-          <button
-            type="button"
-            onClick={onOpenScout}
-            data-testid="ms-roster-open-scout"
-            className="w-full flex items-center justify-center gap-2 py-3 text-[12px] uppercase tracking-widest font-black text-ink bg-[#CCFF00] hover:bg-[#CCFF00]/90 shadow-[0_0_18px_rgba(204,255,0,0.45)] transition-all"
-          >
-            <Sparkles className="w-4 h-4" />
-            Scout Mode · 10 taps · 100 % verified
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onSwitchToManual}
-          data-testid="ms-roster-manual"
-          className="w-full flex items-center justify-center gap-2 py-3 text-[12px] uppercase tracking-widest font-bold text-white/95 bg-white/10 hover:bg-white/18 transition-colors"
-        >
-          <Pencil className="w-4 h-4" />
-          Don&apos;t see your player? Mark manually
-        </button>
-        <p className="mt-1 text-[10px] text-white/50 text-center">
-          {onOpenScout
-            ? "Scout Mode = the new high-precision flow. Manual mode = draw a box around your kid and add up to 5 anchors."
-            : "Manual mode lets you drag a box around your player and add up to 5 timestamp anchors."}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RosterTile({ cand, onPick, compact = false }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onPick(cand)}
-      data-testid={`ms-roster-tile-${cand.number}`}
-      className={`relative overflow-hidden bg-white/8 hover:bg-white/14 border border-white/20 hover:border-[#CCFF00] active:scale-[0.97] transition-all text-left ${
-        compact ? "min-h-[110px]" : "min-h-[170px]"
-      }`}
-      style={{ boxShadow: "0 8px 20px rgba(0,0,0,0.35)" }}
-    >
-      {cand.thumb ? (
-        <img
-          src={cand.thumb}
-          alt={`Player ${cand.number}`}
-          className="w-full h-full object-cover absolute inset-0"
-          draggable={false}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-white/6" />
-      )}
-      {/* Dim overlay for readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/75 pointer-events-none" />
-
-      {/* Big number top-left */}
-      <div className="absolute top-2 left-2 flex items-center gap-1.5">
-        <span
-          className={`bg-[#CCFF00] text-ink font-black ${
-            compact ? "text-base px-2 py-0.5" : "text-xl px-2.5 py-0.5"
-          } leading-none`}
-          style={{ boxShadow: "0 0 14px rgba(204,255,0,0.55)" }}
-        >
-          #{cand.number}
-        </span>
-      </div>
-
-      {/* Jersey colour chip top-right */}
-      <div className="absolute top-2 right-2">
-        <span
-          className="block rounded-full border-2 border-white shadow-[0_0_8px_rgba(0,0,0,0.45)]"
-          style={{
-            width: compact ? 18 : 22,
-            height: compact ? 18 : 22,
-            backgroundColor: cand.colorHex,
-          }}
-          title={`Jersey ~${cand.colorHex}`}
-        />
-      </div>
-
-      {/* Footer copy */}
-      <div className="absolute bottom-1.5 left-2 right-2 text-white">
-        <div className={`font-bold ${compact ? "text-[11px]" : "text-[13px]"}`}>
-          Player #{cand.number}
-        </div>
-        <div className={`text-white/85 ${compact ? "text-[9px]" : "text-[10px]"} uppercase tracking-widest font-bold`}>
-          {cand.appearances} sighting{cand.appearances === 1 ? "" : "s"}
-        </div>
-      </div>
-    </button>
   );
 }

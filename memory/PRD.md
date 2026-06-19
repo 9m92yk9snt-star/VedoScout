@@ -26,6 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 35 — Dormant Instant Roster code removed from MarkerStudio (Feb 19 2026, 18:55)**:
+  - **Why**: After the v5.0 10-tap Scout Mode shipped, the Instant Roster path (which preceded Scout Mode) was completely dormant in MarkerStudio.jsx — state, callbacks, JSX, and the entire `RosterOverlay` + `RosterTile` sub-components were still in the file purely as dead code. Backlog item picked up by user request.
+  - **Deletions** (all in `/app/frontend/src/components/MarkerStudio.jsx`):
+    - State: `rosterScanning`, `rosterError`, `rosterProgress`, `rosterCandidates`, `rosterRanRef`, plus the unused `scoutSceneCuts` companion state.
+    - Callbacks: `runRosterScan` (~170 LOC including jersey-colour clustering / scene sampling), `captureThumbFromBB` helper, `pickRosterPlayer` (~45 LOC).
+    - Effects: the auto-run roster-scan effect (gated on `studioMode === "ROSTER"` which was never set).
+    - JSX: top-bar ROSTER branch + scanning-progress badge, stale "Back-to-roster fallback — REMOVED" + "Roster overlay — REMOVED" placeholder comments, the eslint-disable hack referencing the now-deleted `scoutSceneCuts`.
+    - Components: `RosterOverlay` (~115 LOC) and `RosterTile` (~60 LOC) at the bottom of the file — both unreferenced.
+    - Imports: `Users` and `Pencil` from `lucide-react` (only used inside RosterOverlay).
+    - Cosmetic: the stale Scout-Mode v3.1 header comment ("from the Roster screen via Try Scout Mode") updated to reflect the v5.0 auto-open behaviour.
+    - Cleaned the unused `getDetector={getDetector}` prop passed to ScoutMode (v5.0 doesn't use the prop — its own internal flow drives frame capture).
+  - **Result**: `MarkerStudio.jsx` shrunk from **2238 → 1755 lines (−483 LOC, −22%)**. Reduces cognitive load when reading the file, removes ~5 MB of MediaPipe-scanning code from the hot path, and eliminates a class of "why is this state being set but never read" confusion. **MANUAL mode + AnchorPreview path + Scout Mode v5.0 are 100% intact and behave identically.** No backend changes, no upload-payload changes, no UI-visible changes.
+  - **Tested**: ✅ ESLint clean (0 warnings, 0 errors on MarkerStudio.jsx). ✅ Webpack compile clean. ✅ Smoke screenshot of landing renders cleanly, no JS console errors (only pre-existing Recharts width=-1 warnings, unrelated).
+  - **Files**: MODIFIED only `/app/frontend/src/components/MarkerStudio.jsx`.
+
 - ✅ **🆕 Session 34 — Scout Mode v5.0: 10-tap 100% manual marker workflow + premium boot (Feb 19 2026, 18:35)**:
   - **User pivot**: explicitly discarded the previous "1-tap + AI track" approach. New spec: *after upload, auto-extract 10 screenshots, user taps the target player on each, can pan/zoom/adjust, skip non-visible frames, finish early once enough are marked. Plus premium loading screen with progress bar, status messages, and rotating scouting insights.*
   - **Accuracy rationale** (presented to user and approved): the 10-tap manual flow materially improves identification, tracking continuity, and re-ID vs. the 1-tap AI approach because (a) zero AI drift in marking phase, (b) 10 user-verified anchors at scene-cut diverse timestamps give the fingerprint multi-pose / multi-lighting samples, (c) "Skip frame" prevents poisoning of the fingerprint with ambiguous samples.
