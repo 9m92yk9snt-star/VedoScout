@@ -26,6 +26,27 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 49 — Walkthrough v2: max-wow rebuild + scout-review & PDF scenes (Feb 19 2026, 25:00)**:
+  - **User feedback after v1**: video felt boring at start; missing the BIG differentiator that real human scouts also review the clip; never mentioned the downloadable PDF; tracking/analytics felt static. "Make it look graphically and visually outstanding and professional."
+  - **Full rebuild** of `HowItWorksWalkthrough.jsx` from 5 scenes to **6 scenes (~43s total)**:
+    1. **Upload** (6.8s) — opens with a dramatic character-stagger title reveal "Phone clip → to scout report" against a dark radial gradient + spotlight cone, then the dropzone slides in with glow pulse, file card drops with bounce + green check, progress bar fills with linear-gradient, "Uploaded" badge with sparkle.
+    2. **Mark** (7.4s) — REC badge with pulsing red dot, scanning grid overlay, crosshair + 10 ripples + tap counter, frame strip lifted above caption, **success flash at 10/10** with `10 / 10` glowing title and cream-light explosion.
+    3. **Analyze** (7.6s) — desaturated player frame + scan-line sweep + radar-particles assembling, **two new side panels**: "6 pillars · 47 metrics" badge top-left (with count-up to 47), animated **Pillar Breakdown** panel right with 5 staggered animated bars (Technical 82, Tactical 88, Physical 68, Mentality 80, Vision 75), big score "78/100".
+    4. **🆕 Scouts** (6.8s) — addresses the missing differentiator: 3 stock-portrait anonymous scout cards (Senior Scout / Player Agent / Performance Coach) tumble in with spring physics and slight rotation, each card has a pulsing red **LIVE** badge, a scanning line sweeping across the portrait while "watching", and a "Reviewed" check that pops in. "Verdict signed 2 / 3 scouts" stat badge top-right with count-up. Eyebrow "Human review" + title "Real scouts watch your clip."
+    5. **🆕 Report PDF** (7.4s) — replaces the old Evidence scene: a **fan of 4 PDF pages** (Cover with player name → Radar page → Top Strengths → Growth Plan) tilted at different angles with staggered spring entrance. Each page has live mini-content: cover wordmark, animated radar, star-bulleted strengths, rising growth line chart. **PDF download badge** with `Download · 12 pages` icon and glow pulse. "Inside the PDF: Radar · Strengths · Growth Plan · Evidence" callout.
+    6. **Progress** (6.8s) — alive: **3-radar timeline** (Nov small → Dec medium → Feb highlighted full-size) with `→` arrow, growth-line **"+26 pts"** chart (animated stroke + dot pops + score label), delta banner with Vision +18 / Passing +17 / Decisions +12, all on cream backdrop with grid texture.
+  - **Global visual upgrades** shared across all scenes:
+    - `ParticleField` component — 14-26 floating dots with random durations and delays, color-toned light or dark per scene.
+    - `StaggerText` — character-by-character reveal with opacity + y + blur animations (Apple-style).
+    - `CountUp` — eased cubic count-up component used in 5 places (47 metrics, 78 score, 2/3 scouts, 26 pts, 3 scouts).
+    - Spring physics for entrances. AnimatePresence crossfades with blur exits. Multiple parallax layers per scene. Spotlight gradients. Glow pulses on key moments. Layered radial gradients in section background.
+  - **Right column copy refresh**: title "From phone clip → to scout-signed report.", new 3-stat grid (47 metrics · 3 scouts · 12 PDF pages), eyebrow "How it works · the full path".
+  - **All testids preserved**: `walkthrough-jump-{upload|mark|analyze|scout|report|progress}` (renamed `evidence`→`report`, added `scout`).
+  - **Mobile**: aspect-video constraint + `flex-col md:flex-row` for analyze + pages auto-shrink + size adjustments so scenes hold inside the frame on 414 px width.
+  - **Tested**: ESLint clean. Smoke screenshots show all 6 scenes rendering correctly, intro title reveal cinematic, scout cards landed with proper rotation, PDF fan tilted as designed, growth-line + delta banner readable.
+  - **Files**: REWROTE `/app/frontend/src/components/HowItWorksWalkthrough.jsx` (≈800 lines).
+  - **Untouched**: backend, every other page.
+
 - ✅ **🆕 Session 48 — "How It Works" animated walkthrough explainer (Feb 19 2026, 24:30)**:
   - **User request**: a cool video explaining how everything works so cold visitors can play/watch and see what they get — silent + captions, real stock footballer image, hosted in a dedicated How-It-Works section, professional graphic effects.
   - **Format chosen**: native React + Framer Motion animated walkthrough (no MP4 file, no external production needed; 5 auto-advancing scenes, silent autoplay paused when off-screen, scrub + play/pause + restart controls).
