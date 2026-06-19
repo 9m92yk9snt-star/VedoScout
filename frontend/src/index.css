@@ -274,6 +274,14 @@
     a, button { -webkit-tap-highlight-color: transparent; }
 
     html { scroll-behavior: smooth; }
+
+    /* ===== MOBILE BOTTOM-TAB SPACE RESERVATION =====
+       The fixed bottom-tab bar (MobileBottomTabs.jsx) is 56 px tall plus
+       the iOS safe-area inset. Reserve room at the bottom of every page
+       on mobile so the last content row isn't covered by the tabs. */
+    @media (max-width: 767px) {
+        body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+    }
 }
 
 @layer base {

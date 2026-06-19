@@ -105,7 +105,7 @@ function scoreColor(s) {
   return "text-red-400";
 }
 
-function SectionGrid({ title, section }) {
+function SectionGrid({ title, section, onSeek }) {
   if (!section) return null;
   return (
     <div className="bg-surface border border-gray-border p-6 md:p-8">
@@ -182,12 +182,30 @@ function SectionGrid({ title, section }) {
                     Show evidence ({evidence.length})
                   </summary>
                   <ul className="mt-2 space-y-1.5">
-                    {evidence.map((e, idx) => (
-                      <li key={idx} className="text-[11px] text-ink/70 flex gap-2">
-                        <span className="font-barlow font-black text-volt min-w-[42px] tabular-nums">{e.timestamp || "·"}</span>
-                        <span className="leading-snug">{e.what || e.note}</span>
-                      </li>
-                    ))}
+                    {evidence.map((e, idx) => {
+                      const ts = e.timestamp;
+                      const tsParsed = ts && /^\s*\d{1,2}:\d{2}/.test(ts);
+                      const isClickable = !!(onSeek && tsParsed);
+                      return (
+                        <li key={idx} className="text-[11px] text-ink/70 flex gap-2">
+                          {isClickable ? (
+                            <button
+                              type="button"
+                              onClick={() => onSeek(ts)}
+                              data-testid={`evidence-seek-${key}-${idx}`}
+                              aria-label={`Play this moment at ${ts}`}
+                              title={`Play this moment at ${ts}`}
+                              className="font-barlow font-black text-volt min-w-[42px] tabular-nums hover:text-forest-pop hover:underline underline-offset-2 transition-colors cursor-pointer text-left"
+                            >
+                              {ts}
+                            </button>
+                          ) : (
+                            <span className="font-barlow font-black text-volt min-w-[42px] tabular-nums">{ts || "·"}</span>
+                          )}
+                          <span className="leading-snug">{e.what || e.note}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </details>
               )}
@@ -1540,6 +1558,42 @@ export default function ReportPage() {
   const [generatingFull, setGeneratingFull] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const pollingRef = useRef(null);
+  // ── Timestamped video evidence ────────────────────────────────────
+  // Clicking any "0:23"-style timestamp in the report scrubs the player
+  // to that exact second and plays. Used by PillarCard's evidence lists
+  // and the inline Video Moments card.
+  const videoRef = useRef(null);
+  const parseTimestamp = useCallback((ts) => {
+    if (!ts) return null;
+    const m = String(ts).match(/^\s*(\d{1,2}):(\d{2})(?:\.\d+)?\s*$/);
+    if (!m) return null;
+    const seconds = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    return Number.isFinite(seconds) ? seconds : null;
+  }, []);
+  const seekVideoTo = useCallback((ts) => {
+    const seconds = parseTimestamp(ts);
+    const v = videoRef.current;
+    if (seconds == null || !v) return false;
+    try {
+      // Scroll the video into view first so the user sees the moment land.
+      v.scrollIntoView({ behavior: "smooth", block: "center" });
+      const apply = () => {
+        try { v.currentTime = seconds; } catch { /* ignore */ }
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => { /* autoplay block — leave paused */ });
+      };
+      if (v.readyState >= 1) apply();
+      else {
+        const once = () => { v.removeEventListener("loadedmetadata", once); apply(); };
+        v.addEventListener("loadedmetadata", once);
+        // safety fallback if metadata never fires
+        setTimeout(apply, 1200);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }, [parseTimestamp]);
 
   const fetchReport = useCallback(async () => {
     try {
@@ -1818,6 +1872,7 @@ export default function ReportPage() {
                 </div>
               ) : (
                 <video
+                  ref={videoRef}
                   src={`${ASSET_BASE}${video_url}`}
                   poster={poster_url ? `${ASSET_BASE}${poster_url}` : undefined}
                   controls
@@ -2323,10 +2378,10 @@ export default function ReportPage() {
                     </div>
                   )}
 
-                  <SectionGrid title="Technical Analysis" section={full_report.technical} />
-                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} />
-                  <SectionGrid title="Physical Analysis" section={full_report.physical} />
-                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} />
+                  <SectionGrid title="Technical Analysis" section={full_report.technical} onSeek={seekVideoTo} />
+                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} onSeek={seekVideoTo} />
+                  <SectionGrid title="Physical Analysis" section={full_report.physical} onSeek={seekVideoTo} />
+                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} onSeek={seekVideoTo} />
 
                   {/* European Academy reference profile — position priorities vs Pro Academy expectations */}
                   <AgeProfileCard ref={age_profile_reference} />
@@ -2487,33 +2542,49 @@ export default function ReportPage() {
                         Every observation is anchored to the exact frame it was seen at — so you can verify each note in the original clip.
                       </p>
                       <div className="mt-6 grid sm:grid-cols-2 gap-4">
-                        {full_report.video_comments.map((c, i) => (
-                          <div
-                            key={i}
-                            data-testid={`video-moment-${i}`}
-                            className="bg-cream-card overflow-hidden border-l-2 border-forest"
-                          >
-                            <div className="relative aspect-video bg-cream-soft">
-                              {c.frame_url ? (
-                                <img
-                                  data-testid={`video-moment-frame-${i}`}
-                                  src={`${ASSET_BASE}${c.frame_url}`}
-                                  alt={`Moment at ${c.timestamp}`}
-                                  className="absolute inset-0 w-full h-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <span className="text-ink/30 text-xs uppercase tracking-wider">no frame</span>
+                        {full_report.video_comments.map((c, i) => {
+                          const ts = c.timestamp;
+                          const tsParsed = ts && /^\s*\d{1,2}:\d{2}/.test(ts);
+                          const cardOnClick = (tsParsed && ts) ? () => seekVideoTo(ts) : undefined;
+                          return (
+                            <div
+                              key={i}
+                              data-testid={`video-moment-${i}`}
+                              role={cardOnClick ? "button" : undefined}
+                              tabIndex={cardOnClick ? 0 : undefined}
+                              onClick={cardOnClick}
+                              onKeyDown={cardOnClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cardOnClick(); } } : undefined}
+                              className={`bg-cream-card overflow-hidden border-l-2 border-forest ${cardOnClick ? "cursor-pointer hover:bg-white hover:border-forest-pop focus:outline-none focus:ring-2 focus:ring-forest" : ""} transition-colors`}
+                            >
+                              <div className="relative aspect-video bg-cream-soft group">
+                                {c.frame_url ? (
+                                  <img
+                                    data-testid={`video-moment-frame-${i}`}
+                                    src={`${ASSET_BASE}${c.frame_url}`}
+                                    alt={`Moment at ${c.timestamp}`}
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span className="text-ink/30 text-xs uppercase tracking-wider">no frame</span>
+                                  </div>
+                                )}
+                                {cardOnClick && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-ink/0 group-hover:bg-ink/30 transition-colors">
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1.5 bg-volt text-ink px-3 py-1.5 text-[11px] uppercase tracking-widest font-black">
+                                      ▶ Play moment
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="absolute bottom-2 left-2 bg-ink text-cream-base px-2 py-1 text-xs font-barlow font-black tracking-wide">
+                                  {c.timestamp || "—"}
                                 </div>
-                              )}
-                              <div className="absolute bottom-2 left-2 bg-ink text-cream-base px-2 py-1 text-xs font-barlow font-black tracking-wide">
-                                {c.timestamp || "—"}
                               </div>
+                              <p className="p-4 text-sm text-ink/85 leading-relaxed">{c.comment}</p>
                             </div>
-                            <p className="p-4 text-sm text-ink/85 leading-relaxed">{c.comment}</p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

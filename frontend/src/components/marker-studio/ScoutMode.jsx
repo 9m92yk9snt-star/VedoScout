@@ -557,6 +557,18 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
             onResetZoom={handleResetZoom}
           />
         )}
+
+        {/* Live frame strip — orientation aid during marking. Shows all
+            captured frames as small thumbs with status icons; tap to jump. */}
+        {phase === "MARKING" && (
+          <FrameStrip
+            queue={queue}
+            queuePos={queuePos}
+            frameCache={frameCache}
+            marks={marks}
+            onJumpTo={(pos) => { setQueuePos(pos); setDraftBox(null); handleResetZoom(); }}
+          />
+        )}
       </div>
     </div>,
     document.body,
@@ -863,5 +875,79 @@ function MarkingOverlay({
         )}
       </div>
     </>
+  );
+}
+
+/* ── Live frame strip — sticky to the bottom of the stage above the
+ *    MarkingOverlay. Renders a horizontal scrollable row of all queued
+ *    frame thumbs with a status overlay (✓ marked / 🔒 skipped / ▸ current
+ *    / · pending). Tapping a thumb jumps the queue cursor to that frame
+ *    so the user can return to a previously skipped frame or correct a
+ *    bad mark. */
+function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
+  if (!queue || queue.length === 0) return null;
+  return (
+    <div
+      className="absolute left-0 right-0 z-30 px-3 pb-2 pointer-events-none"
+      style={{ bottom: "calc(120px + env(safe-area-inset-bottom, 0px))" }}
+      data-testid="scout-frame-strip"
+    >
+      <div
+        className="mx-auto max-w-[640px] flex gap-1.5 overflow-x-auto px-2 py-2 bg-ink/65 backdrop-blur border border-white/12"
+        style={{ pointerEvents: "auto", WebkitOverflowScrolling: "touch" }}
+      >
+        {queue.map((hintIdx, pos) => {
+          const m = marks[hintIdx];
+          const isCurrent = pos === queuePos;
+          const isConfirmed = m && !m.skipped;
+          const isSkipped = m && m.skipped;
+          const thumb = frameCache[hintIdx]?.jpegDataUrl;
+          // Visual treatment per status:
+          //   current  → bright lime border + faint glow
+          //   marked   → forest-green border + check pip
+          //   skipped  → dim border + slash pip (50 % opacity)
+          //   pending  → soft white border
+          let borderCls = "border-white/22";
+          let opacityCls = "opacity-90";
+          if (isCurrent) borderCls = "border-[#CCFF00] shadow-[0_0_0_2px_rgba(204,255,0,0.35)]";
+          else if (isConfirmed) borderCls = "border-emerald-500/80";
+          else if (isSkipped) { borderCls = "border-white/15"; opacityCls = "opacity-45"; }
+          return (
+            <button
+              key={hintIdx}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onJumpTo(pos); }}
+              data-testid={`scout-frame-strip-${pos}`}
+              aria-label={`Frame ${pos + 1} of ${queue.length}${isConfirmed ? " (marked)" : isSkipped ? " (skipped)" : " (pending)"}`}
+              className={`relative flex-shrink-0 w-14 h-9 sm:w-16 sm:h-10 border-2 ${borderCls} ${opacityCls} transition-all`}
+              style={{ background: "#000" }}
+            >
+              {thumb ? (
+                <img
+                  src={thumb}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                />
+              ) : null}
+              {/* Status pip — bottom-right */}
+              {(isConfirmed || isSkipped) && (
+                <span
+                  className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black ${
+                    isConfirmed ? "bg-emerald-500 text-ink" : "bg-white/30 text-ink"
+                  }`}
+                >
+                  {isConfirmed ? "✓" : "−"}
+                </span>
+              )}
+              {/* Frame number — top-left */}
+              <span className="absolute top-0 left-0 px-1 py-0.5 text-[8px] font-black text-white bg-ink/70 leading-none">
+                {pos + 1}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
