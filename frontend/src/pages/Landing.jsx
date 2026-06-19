@@ -16,6 +16,7 @@ import {
 import PaymentBadges from "@/components/PaymentBadges";
 import PricingCards from "@/components/PricingCards";
 import SEO, { organizationJsonLd } from "@/components/SEO";
+import HowItWorksWalkthrough from "@/components/HowItWorksWalkthrough";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -718,6 +719,9 @@ export default function Landing() {
           </motion.div>
         </div>
       </section>
+
+      {/* ============ HOW IT WORKS — animated walkthrough (silent autoplay) ============ */}
+      <HowItWorksWalkthrough startHref={startHref} price={price} />
 
       {/* ============ HOW IT WORKS — clean section with scout-notepad framing ============ */}
       <section
