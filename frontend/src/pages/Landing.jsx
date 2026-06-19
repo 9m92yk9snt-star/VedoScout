@@ -16,6 +16,8 @@ import {
 import PaymentBadges from "@/components/PaymentBadges";
 import PricingCards from "@/components/PricingCards";
 import SEO, { organizationJsonLd } from "@/components/SEO";
+import CinematicHero from "@/components/CinematicHero";
+import HowItWorks3D from "@/components/HowItWorks3D";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -519,6 +521,12 @@ export default function Landing() {
       {/* Scroll progress bar */}
       <motion.div className="scroll-progress-bar" style={{ scaleX: scrollYProgress }} />
       <Navigation transparent />
+
+      {/* ============ CINEMATIC 3D HERO (NEW) ============ */}
+      <CinematicHero startHref={startHref} />
+
+      {/* ============ HOW IT WORKS — 4-STEP STORY (NEW) ============ */}
+      <HowItWorks3D startHref={startHref} priceLabel={`$${price}`} />
 
       {/* ============ HERO ============ */}
       <section data-testid="hero-section" className="relative min-h-screen flex items-center pt-24 pb-12">
