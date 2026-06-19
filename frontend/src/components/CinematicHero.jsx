@@ -42,59 +42,60 @@ function CinematicFootball() {
                 <stop offset="0%" stopColor="rgba(255,255,255,0.7)" />
                 <stop offset="100%" stopColor="rgba(255,255,255,0)" />
               </radialGradient>
+              {/* Clip the panels to stay inside the ball */}
+              <clipPath id="ballClip">
+                <circle cx="100" cy="100" r="92" />
+              </clipPath>
             </defs>
 
-            {/* Base sphere */}
+            {/* Base sphere — ALWAYS round, never rotates */}
             <circle cx="100" cy="100" r="92" fill="url(#ballGrad)" />
 
-            {/* Pentagon panels (dark forest) — arranged like a real football */}
-            {/* Center pentagon */}
-            <polygon
-              points="100,72 122,86 114,112 86,112 78,86"
-              fill="#0c2415"
-            />
-            {/* Top pentagon */}
-            <polygon
-              points="100,32 118,42 114,62 86,62 82,42"
-              fill="#0c2415"
-              opacity="0.92"
-            />
-            {/* Left pentagon */}
-            <polygon
-              points="40,98 58,86 70,108 56,128 38,118"
-              fill="#0c2415"
-              opacity="0.88"
-            />
-            {/* Right pentagon */}
-            <polygon
-              points="160,98 142,86 130,108 144,128 162,118"
-              fill="#0c2415"
-              opacity="0.88"
-            />
-            {/* Bottom pentagon */}
-            <polygon
-              points="100,156 84,148 88,128 112,128 116,148"
-              fill="#0c2415"
-              opacity="0.85"
-            />
+            {/* ROTATING PANELS — clipped to circle, rotates in-plane so the ball
+                stays perfectly round at every frame (no edge-on flattening) */}
+            <g clipPath="url(#ballClip)" className="football-panels">
+              {/* Pentagon panels (dark forest) — arranged like a real football */}
+              <polygon
+                points="100,72 122,86 114,112 86,112 78,86"
+                fill="#0c2415"
+              />
+              <polygon
+                points="100,32 118,42 114,62 86,62 82,42"
+                fill="#0c2415"
+                opacity="0.92"
+              />
+              <polygon
+                points="40,98 58,86 70,108 56,128 38,118"
+                fill="#0c2415"
+                opacity="0.88"
+              />
+              <polygon
+                points="160,98 142,86 130,108 144,128 162,118"
+                fill="#0c2415"
+                opacity="0.88"
+              />
+              <polygon
+                points="100,156 84,148 88,128 112,128 116,148"
+                fill="#0c2415"
+                opacity="0.85"
+              />
 
-            {/* Connecting volt-green seam lines (cinematic touch) */}
-            <g stroke="#ccff00" strokeWidth="0.6" opacity="0.45" fill="none">
-              {/* Star pattern lines from center pentagon outward */}
-              <line x1="100" y1="72" x2="100" y2="32" />
-              <line x1="78" y1="86" x2="40" y2="98" />
-              <line x1="122" y1="86" x2="160" y2="98" />
-              <line x1="86" y1="112" x2="84" y2="148" />
-              <line x1="114" y1="112" x2="116" y2="148" />
-              {/* Equator hint */}
-              <ellipse cx="100" cy="100" rx="92" ry="22" />
+              {/* Connecting volt-green seam lines */}
+              <g stroke="#ccff00" strokeWidth="0.6" opacity="0.45" fill="none">
+                <line x1="100" y1="72" x2="100" y2="32" />
+                <line x1="78" y1="86" x2="40" y2="98" />
+                <line x1="122" y1="86" x2="160" y2="98" />
+                <line x1="86" y1="112" x2="84" y2="148" />
+                <line x1="114" y1="112" x2="116" y2="148" />
+                <ellipse cx="100" cy="100" rx="92" ry="22" />
+              </g>
             </g>
 
-            {/* Glossy highlight */}
+            {/* Static glossy highlight (always front-facing) */}
             <circle cx="100" cy="100" r="92" fill="url(#ballGloss)" />
-            {/* Volt rim glow */}
+            {/* Static volt rim glow */}
             <circle cx="100" cy="100" r="92" fill="url(#ballRim)" />
-            {/* Sharp edge */}
+            {/* Static sharp edge */}
             <circle
               cx="100"
               cy="100"
@@ -183,13 +184,19 @@ function CinematicFootball() {
         .football-ball {
           width: 100%;
           height: 100%;
-          animation: ballSpin 14s linear infinite;
+          /* gentle 3D wobble — ±18deg, ball stays clearly round */
+          animation: ballWobble 9s ease-in-out infinite;
           transform-style: preserve-3d;
         }
         .football-svg {
           width: 100%;
           height: 100%;
           display: block;
+        }
+        /* Panels rotate in-plane (2D) so the ball outline stays a perfect circle */
+        .football-panels {
+          transform-origin: 100px 100px;
+          animation: panelsSpin 16s linear infinite;
         }
 
         /* Orbits */
@@ -240,9 +247,13 @@ function CinematicFootball() {
         }
 
         /* === Animations === */
-        @keyframes ballSpin {
-          from { transform: rotateY(0deg) rotateX(8deg); }
-          to   { transform: rotateY(360deg) rotateX(8deg); }
+        @keyframes panelsSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes ballWobble {
+          0%, 100% { transform: rotateY(-18deg) rotateX(6deg); }
+          50%      { transform: rotateY(18deg) rotateX(-4deg); }
         }
         @keyframes ballFloat {
           0%, 100% { transform: translateY(0); }
@@ -379,9 +390,9 @@ export default function CinematicHero({ startHref = "/signup" }) {
             data-testid="cinematic-hero-title"
             className="mt-8 font-barlow font-black uppercase text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[0.9] tracking-tighter text-ink"
           >
-            Upload Your Video.
+            Upload Your Video.{" "}
             <span className="block mt-2 text-gradient-volt">
-              Get a Deep Football
+              Get a Deep Football{" "}
             </span>
             <span className="block text-gradient-volt">
               Intelligence Report.

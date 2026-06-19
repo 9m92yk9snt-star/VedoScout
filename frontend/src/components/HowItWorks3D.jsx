@@ -437,7 +437,7 @@ function Step3Visual() {
 /* ===========================================================
    STEP 4 VISUAL — fanned report pages + Stripe unlock
    =========================================================== */
-function Step4Visual() {
+function Step4Visual({ priceLabel = "$1" }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-100px" });
 
@@ -510,7 +510,7 @@ function Step4Visual() {
         data-testid="how-it-works-stripe-pill"
       >
         <Lock className="w-4 h-4" />
-        Unlock for $159
+        Unlock for {priceLabel}
         <ArrowRight className="w-4 h-4" />
       </motion.div>
 
@@ -628,7 +628,7 @@ export default function HowItWorks3D({ startHref = "/signup", priceLabel = "$159
           stepNum="04"
           title={`Your academy-grade report. ${priceLabel}.`}
           copy="A premium multi-page PDF report — your strengths, your gaps, your development plan, scout view and pro benchmarks. One-time payment, yours forever."
-          visual={<Step4Visual />}
+          visual={<Step4Visual priceLabel={priceLabel} />}
           reverse
           testId="how-it-works-step-4"
         />
