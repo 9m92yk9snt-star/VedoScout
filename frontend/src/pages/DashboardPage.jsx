@@ -26,12 +26,17 @@ export default function DashboardPage() {
   const [passState, setPassState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passModalOpen, setPassModalOpen] = useState(false);
+  // Pass price loaded from /settings/price so it reflects whatever the
+  // admin has currently set (single source of truth — same endpoint
+  // PricingCards / Landing already use).
+  const [passPrice, setPassPrice] = useState(null);
 
   const fetchAll = () => {
     Promise.allSettled([
       api.get("/reports/mine").then(({ data }) => setReports(data)),
       api.get("/progress/players").then(({ data }) => setPlayers(data.items || [])),
       api.get("/progress/pass/status").then(({ data }) => setPassState(data)),
+      api.get("/settings/price").then(({ data }) => setPassPrice(data.pass_price)),
     ]).finally(() => setLoading(false));
   };
 
@@ -126,6 +131,7 @@ export default function DashboardPage() {
               {/* PROGRESS PASS BANNER */}
               <ProgressPassBanner
                 passState={passState}
+                passPrice={passPrice}
                 onBuyClick={() => setPassModalOpen(true)}
               />
 
@@ -241,7 +247,7 @@ export default function DashboardPage() {
         open={passModalOpen}
         onClose={() => setPassModalOpen(false)}
         sessionInit={startPassCheckout}
-        amount={599}
+        amount={passPrice ?? 0}
         currency="USD"
         product="Progress Pass — 3 reports / 12 months"
         onSuccess={onPassSuccess}
@@ -385,7 +391,7 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
   );
 }
 
-function ProgressPassBanner({ passState, onBuyClick }) {
+function ProgressPassBanner({ passState, passPrice, onBuyClick }) {
   if (passState?.active) {
     return (
       <div data-testid="progress-pass-active-banner" className="mt-10 bg-forest text-white p-5 md:p-6 grid md:grid-cols-3 gap-4 items-center border-l-8 border-forest-pop">
@@ -438,10 +444,14 @@ function ProgressPassBanner({ passState, onBuyClick }) {
         <div className="bg-white/5 border border-white/15 p-5 backdrop-blur-sm">
           <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/60">One-time</div>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="font-barlow font-black text-5xl tracking-tighter">$599</span>
+            <span data-testid="progress-pass-price" className="font-barlow font-black text-5xl tracking-tighter">
+              ${passPrice ?? "—"}
+            </span>
             <span className="text-xs text-white/55">USD</span>
           </div>
-          <div className="mt-1 text-xs text-white/55">≈ $199 per report · 3 reports / 12 mo</div>
+          <div className="mt-1 text-xs text-white/55">
+            {passPrice ? `≈ $${Math.round(passPrice / 3)} per report` : "≈ per-report cost"} · 3 reports / 12 mo
+          </div>
           <button
             data-testid="buy-progress-pass-btn"
             onClick={onBuyClick}

@@ -37,6 +37,10 @@ export default function TrajectoryPage() {
   const [error, setError] = useState(null);
   const [passState, setPassState] = useState(null);
   const [passModalOpen, setPassModalOpen] = useState(false);
+  // Same dynamic-pricing pattern used by DashboardPage / PricingCards /
+  // Landing — read pass price from /settings/price so admin updates flow
+  // through automatically.
+  const [passPrice, setPassPrice] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -44,6 +48,7 @@ export default function TrajectoryPage() {
     Promise.all([
       api.get(`/progress/players/${id}/trajectory`).then(({ data }) => { if (mounted) setData(data); }),
       api.get("/progress/pass/status").then(({ data }) => { if (mounted) setPassState(data); }).catch(() => {}),
+      api.get("/settings/price").then(({ data }) => { if (mounted) setPassPrice(data.pass_price); }).catch(() => {}),
     ])
       .catch((e) => { if (mounted) setError(e?.response?.data?.detail || "Failed to load trajectory"); })
       .finally(() => { if (mounted) setLoading(false); });
@@ -397,7 +402,7 @@ export default function TrajectoryPage() {
         open={passModalOpen}
         onClose={() => setPassModalOpen(false)}
         sessionInit={startPassCheckout}
-        amount={599}
+        amount={passPrice ?? 0}
         currency="USD"
         product="Progress Pass — 3 reports / 12 months"
         onSuccess={onPassSuccess}

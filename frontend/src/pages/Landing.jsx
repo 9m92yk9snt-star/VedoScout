@@ -2219,8 +2219,8 @@ const FAQ_ITEMS = [
     a: "Yes. Your video is used only to produce your report and is never published, sold, or shared outside the scout reviewing it. You retain full ownership of your video and your report. You can request deletion of your account and data at any time from your dashboard.",
   },
   {
-    q: "What's the difference between the $159 single report and the $399 plan?",
-    a: "The $159 is one complete report for one player. The $399 plan gives you 3 reports across 365 days for the same player — perfect if you want to track progress every few months and see how training translates into score improvements. The 12-month plan also includes a trajectory dashboard showing changes between reports.",
+    q: "What's the difference between the single report and the 12-month plan?",
+    a: "__PRICE_FAQ__",   // Dynamic — FAQSection fills this with live prices from /settings/price
   },
   {
     q: "Can I get reports for more than one player?",
@@ -2230,6 +2230,18 @@ const FAQ_ITEMS = [
 
 function FAQSection() {
   const [openIdx, setOpenIdx] = useState(0);
+  // Load live prices so the pricing FAQ always matches whatever the admin
+  // currently has set (same /settings/price endpoint PricingCards uses).
+  const [price, setPrice] = useState(null);
+  const [passPrice, setPassPrice] = useState(null);
+  useEffect(() => {
+    api.get("/settings/price")
+      .then(({ data }) => { setPrice(data.price); setPassPrice(data.pass_price); })
+      .catch(() => {});
+  }, []);
+  const priceFaqAnswer = (price && passPrice)
+    ? `The $${price} is one complete report for one player. The $${passPrice} plan gives you 3 reports across 365 days for the same player — perfect if you want to track progress every few months and see how training translates into score improvements. The 12-month plan also includes a trajectory dashboard showing changes between reports.`
+    : "One single report covers one player. The 12-month plan gives you 3 reports across 365 days for the same player — perfect if you want to track progress every few months and see how training translates into score improvements. The 12-month plan also includes a trajectory dashboard showing changes between reports.";
   return (
     <section
       data-testid="faq-section"
@@ -2288,7 +2300,7 @@ function FAQSection() {
                 {isOpen && (
                   <div className="px-5 pb-5 md:px-6 md:pb-6 -mt-1">
                     <p className="text-sm md:text-[15px] text-ink/70 leading-relaxed border-l-2 border-volt/40 pl-4">
-                      {item.a}
+                      {item.a === "__PRICE_FAQ__" ? priceFaqAnswer : item.a}
                     </p>
                   </div>
                 )}
