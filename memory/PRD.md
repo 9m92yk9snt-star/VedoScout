@@ -26,6 +26,26 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 45 — Global "AI" → "Pro Scout Intelligence" rewrite across all user-facing copy (Feb 19 2026, 23:15)**:
+  - **User request**: change every visible mention of "AI" / "Gemini" / "multimodal AI" across the whole site to something cool. Users shouldn't be told the product is AI-powered; instead it should read as deep, premium football analysis.
+  - **Chosen brand name**: **"Pro Scout Intelligence"** (the named engine). Strategy used: a hybrid — name the engine "Pro Scout Intelligence" where evoking a system adds value, and DROP the word "AI" entirely where it only added noise (mirrors how Apple, Stripe, Linear talk about their products — describe the output, not the tech).
+  - **18 user-facing rewrites across 9 files**:
+    - `HeroTeaser.jsx` — visible badge `AI Analysis Complete` → `Pro Scout Analysis Complete`.
+    - `PricingCards.jsx` — `AI between-the-lines narrative` → `Between-the-lines narrative`.
+    - `DashboardPage.jsx` (Progress Pass banner) — `AI delta narrative` → `growth narrative`; `AI between-the-lines narrative` → `Between-the-lines narrative`.
+    - `KnowledgeCarousel.jsx` — `Your AI report` → `Your Pro Scout report`; `Our AI tells you the role` → `Our Pro Scout Intelligence tells you the role`.
+    - `ReportPage.jsx` — `Each AI score is anchored` → `Each score is anchored`; `None of these numbers are AI prose — they are math over the AI's observed sub-skills` → `None of these numbers are written prose — they are math over the observed sub-skills`; `AI tracks only the player inside this box` → `Pro Scout Intelligence tracks only the player inside this box`.
+    - `UploadPage.jsx` — `The AI will track this exact player` → `Pro Scout Intelligence will track this exact player`; `Our AI locks onto their jersey` → `Our Pro Scout Intelligence locks onto their jersey`; `The AI locks onto the player in your box` → `Pro Scout Intelligence locks onto the player in your box`.
+    - `MethodologyPage.jsx` — `the player's AI scores are then anchored` → `the player's scores are then anchored`.
+    - `AboutPage.jsx` (the brand moment) — card title `Evidence-based AI analysis` → `Evidence-based Pro Scout Intelligence`; body `Multimodal AI watches the full clip` → `Our Pro Scout Intelligence watches the full clip`; `A real scout reads the AI output` → `A real scout reads the scout intelligence output`.
+    - `MarkerStudio.jsx` — toast `Added X AI-suggested anchor(s)` → `Added X suggested anchor(s)`; tooltip `AI scans the video and suggests up to 5 anchors` → `Pro Scout Intelligence scans the video and suggests up to 5 anchors`.
+  - **DELIBERATELY NOT TOUCHED**:
+    - `/app/frontend/src/pages/PrivacyPage.jsx` — GDPR Art. 6(1)(f) legally requires disclosing AI/automated-processing of personal data in the privacy notice. Hiding it would create lawsuit risk in the EU. (User did not push back on this.)
+    - `/app/frontend/src/components/BlogAdmin.jsx` — admin-only blog drafting tool, never seen by end users. Keeping "Draft Assist" label so YOU know which button calls Gemini.
+    - Internal code comments (JSDoc, dev-only) and `data-testid` / API-route names — invisible to users, renaming risks breaking tests + integrations.
+  - **Tested**: ✅ ESLint shows no new errors (only pre-existing unescaped-apostrophe lint warnings on UNTOUCHED text). ✅ Live screenshot of the rewritten `/about` page shows `EVIDENCE-BASED PRO SCOUT INTELLIGENCE` headline + `Our Pro Scout Intelligence watches the full clip` + `A real scout reads the scout intelligence output` all rendering correctly. ✅ Zero remaining `AI analysis` / `Multimodal AI` / `reads the AI output` / `Gemini` / `GPT` / `multimodal` mentions in user-facing pages.
+  - **Files**: MODIFIED `HeroTeaser.jsx`, `PricingCards.jsx`, `DashboardPage.jsx`, `KnowledgeCarousel.jsx`, `ReportPage.jsx`, `UploadPage.jsx`, `MethodologyPage.jsx`, `AboutPage.jsx`, `MarkerStudio.jsx`.
+
 - ✅ **🆕 Session 44 — "What Changed" delta banner at the top of trajectory pages (Feb 19 2026, 22:50)**:
   - **What**: at the top of every multi-report `/trajectory/:id`, immediately below the player header and above the verdict hero, a sticky-moment banner that auto-summarises pillar deltas first-vs-latest as a single punchy line: `WHAT CHANGED · SEP 15 → MAR 12 · 5.8 MO` + up to 4 colour-coded chips sorted by absolute magnitude — biggest movers first.
   - **How**: zero new compute. Reads the already-returned `traj.deltas.pillars` (first-vs-latest pillar deltas, already in the backend). Pure presentation layer.

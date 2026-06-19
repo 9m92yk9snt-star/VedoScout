@@ -80,13 +80,13 @@ export default function AboutPage() {
               },
               {
                 icon: Brain,
-                title: "Evidence-based AI analysis",
-                body: "Multimodal AI watches the full clip, scores 11 dimensions of your game, and gives you timestamped evidence — not generic praise.",
+                title: "Evidence-based Pro Scout Intelligence",
+                body: "Our Pro Scout Intelligence watches the full clip, scores 11 dimensions of your game, and gives you timestamped evidence — not generic praise.",
               },
               {
                 icon: Trophy,
                 title: "Human scout review",
-                body: "A real scout reads the AI output, watches your clip, and writes a personal review. Then you can chat with them about your game.",
+                body: "A real scout reads the scout intelligence output, watches your clip, and writes a personal review. Then you can chat with them about your game.",
               },
               {
                 icon: ShieldCheck,

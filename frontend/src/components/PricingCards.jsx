@@ -233,7 +233,7 @@ export default function PricingCards({
             <Feature dark>Growth chart vs pro-archetype path</Feature>
             <Feature dark>Development verdict + growth badges</Feature>
             <Feature dark>Shareable growth card image</Feature>
-            <Feature dark>AI between-the-lines narrative</Feature>
+            <Feature dark>Between-the-lines narrative</Feature>
           </div>
 
           <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">

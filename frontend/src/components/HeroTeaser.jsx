@@ -143,7 +143,7 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                   transition={{ duration: 1, repeat: Infinity }}
                 />
                 <span className="text-volt text-[10px] uppercase tracking-[0.4em] font-black">
-                  AI Analysis Complete
+                  Pro Scout Analysis Complete
                 </span>
                 <motion.span
                   className="w-1.5 h-1.5 bg-volt rounded-full"

@@ -14,12 +14,12 @@ const FACTS = [
   {
     icon: "🧠",
     headline: "Off-ball is half the game",
-    body: "From age 14, professional academies value off-ball movement as much as on-ball moments. Your AI report includes both.",
+    body: "From age 14, professional academies value off-ball movement as much as on-ball moments. Your Pro Scout report includes both.",
   },
   {
     icon: "🏃",
     headline: "U12 players change position 4× per match",
-    body: "Young players rarely play one role. Our AI tells you the role your child actually plays — based on heatmap evidence, not declarations.",
+    body: "Young players rarely play one role. Our Pro Scout Intelligence tells you the role your child actually plays — based on heatmap evidence, not declarations.",
   },
   {
     icon: "📏",

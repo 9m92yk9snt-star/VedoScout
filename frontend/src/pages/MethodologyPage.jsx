@@ -211,7 +211,7 @@ export default function MethodologyPage() {
                     Used to calibrate the &quot;Pro Calibration&quot; panel on every report. For each player position,
                     we pre-computed per-90 percentiles (p25 / p50 / p75 / p90) of: pass completion, progressive
                     passes, key passes, xG, goals, dribbles completed, duels won, pressures, interceptions, ball
-                    recoveries. The player&apos;s AI scores are then anchored to these distributions — so &quot;8/10
+                    recoveries. The player&apos;s scores are then anchored to these distributions — so &quot;8/10
                     passing&quot; literally means &quot;top 25% of Euro 2024 starters at this position.&quot;
                   </p>
                   <p className="mt-2 text-xs text-ink/55">

@@ -258,7 +258,7 @@ export default function UploadPage() {
     const count = anchors?.length || 1;
     toast.success(
       count > 1
-        ? `${count} anchors locked. The AI will track this exact player across the whole clip.`
+        ? `${count} anchors locked. Pro Scout Intelligence will track this exact player across the whole clip.`
         : "Player locked. We'll analyse only the player in the box.",
     );
   };
@@ -451,7 +451,7 @@ export default function UploadPage() {
               Upload your video & lock onto your player
             </h1>
             <p className="mt-3 text-ink/65 max-w-2xl text-sm md:text-base">
-              Upload the clip, scrub to the clearest moment, then drag a box around your player — head to feet. Our AI locks onto their jersey, shorts, and body, and follows only that player through the video.
+              Upload the clip, scrub to the clearest moment, then drag a box around your player — head to feet. Our Pro Scout Intelligence locks onto their jersey, shorts, and body, and follows only that player through the video.
             </p>
 
             {/* Eligibility status pill */}
@@ -865,7 +865,7 @@ export default function UploadPage() {
                 )}
               </button>
               <p className="text-xs text-ink/50 text-center">
-                The AI locks onto the player in your box and tracks <span className="text-volt font-bold">only them</span>. Other players are ignored.
+                Pro Scout Intelligence locks onto the player in your box and tracks <span className="text-volt font-bold">only them</span>. Other players are ignored.
               </p>
             </div>
           </form>

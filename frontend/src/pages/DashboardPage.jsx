@@ -425,12 +425,12 @@ function ProgressPassBanner({ passState, onBuyClick }) {
           <span className="text-forest">3 reports / 12 months.</span>
         </h2>
         <p className="mt-3 text-sm text-white/75 max-w-md">
-          One purchase. Three premium reports for the same player. Age-adjusted percentile tracking, archetype overlay, AI delta narrative — every 3–6 months.
+          One purchase. Three premium reports for the same player. Age-adjusted percentile tracking, archetype overlay, growth narrative — every 3–6 months.
         </p>
         <ul className="mt-4 space-y-1.5 text-sm text-white/85">
           <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Age-adjusted percentile shift (honest)</li>
           <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Trajectory vs archetype path</li>
-          <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> AI between-the-lines narrative</li>
+          <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Between-the-lines narrative</li>
           <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Watch yourself improve (video diff)</li>
         </ul>
       </div>

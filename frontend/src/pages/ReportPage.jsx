@@ -1034,7 +1034,7 @@ function StatsBombCalibrationPanel({ calibration }) {
             Where your scores sit vs Euro 2024 senior pros
           </h3>
           <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
-            Each AI score is anchored against the actual per-90 distribution of{" "}
+            Each score is anchored against the actual per-90 distribution of{" "}
             <span className="font-bold text-forest">{position_n} {position} starters</span>{" "}
             at the European Championship 2024 — extracted from public StatsBomb event-level data across{" "}
             <span className="font-bold text-forest">{matches} matches</span>.
@@ -1292,7 +1292,7 @@ function AgeIntelligenceScoreboard({ age_intelligence, position_hint }) {
           </h3>
           <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
             Each score is computed deterministically against the {stage.label?.toLowerCase()} rubric.
-            None of these numbers are AI prose — they are math over the AI's observed sub-skills, weighted by stage focus.
+            None of these numbers are written prose — they are math over the observed sub-skills, weighted by stage focus.
           </p>
         </div>
         <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45">
@@ -1896,7 +1896,7 @@ export default function ReportPage() {
                       </div>
                     )}
                     <p className="mt-2 text-[11px] text-ink/60">
-                      AI tracks only the player inside this box across every frame.
+                      Pro Scout Intelligence tracks only the player inside this box across every frame.
                     </p>
                   </div>
                 )}
