@@ -54,6 +54,28 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
 
+  // One-shot first-visit pulse on the locked Unlock pills, à la Linear /
+  // Stripe Express. Reads a localStorage flag once on mount; if absent,
+  // applies the pulse for ~1.6 s and then sets the flag so subsequent
+  // visits stay calm. The flag is namespaced per-user so a different
+  // free user on the same browser still gets their own first-touch hint.
+  const [unlockPulseOn, setUnlockPulseOn] = useState(false);
+  useEffect(() => {
+    if (passState?.active) return; // premium user — no upgrade hint needed
+    if (!players?.length) return;
+    const key = "dashboard_unlock_pulse_seen_v1";
+    try {
+      if (window.localStorage.getItem(key)) return;
+      setUnlockPulseOn(true);
+      window.localStorage.setItem(key, "1");
+      // turn the class off after the animation completes so the DOM stays clean
+      const t = setTimeout(() => setUnlockPulseOn(false), 1900);
+      return () => clearTimeout(t);
+    } catch {
+      // localStorage unavailable (private mode, etc.) — silently skip the hint
+    }
+  }, [passState?.active, players?.length]);
+
   const startPassCheckout = async () => ({
     ...(await api.post("/progress/pass/checkout", {
       origin_url: window.location.origin,
@@ -204,6 +226,7 @@ export default function DashboardPage() {
                         p={p}
                         isPremium={!!passState?.active}
                         onUpgradeClick={() => setPassModalOpen(true)}
+                        pulse={unlockPulseOn}
                       />
                     ))}
                   </ul>
@@ -223,6 +246,25 @@ export default function DashboardPage() {
         product="Progress Pass — 3 reports / 12 months"
         onSuccess={onPassSuccess}
       />
+
+      {/* One-shot first-visit pulse keyframe for the Unlock pills. Stripe
+          / Linear-style attention nudge — a soft forest-green ring that
+          expands once and fades. Runs only when the .scoutme-unlock-pulse
+          class is applied (gated by localStorage in DashboardPage). */}
+      <style>{`
+        @keyframes scoutme-unlock-pulse {
+          0%   { box-shadow: 0 0 0 0 rgba(45, 107, 61, 0.55); }
+          70%  { box-shadow: 0 0 0 9px rgba(45, 107, 61, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(45, 107, 61, 0); }
+        }
+        .scoutme-unlock-pulse {
+          animation: scoutme-unlock-pulse 1.6s ease-out 1 both;
+          animation-delay: 0.4s;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .scoutme-unlock-pulse { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -272,7 +314,7 @@ function SectionHeader({ icon: Icon, eyebrow, title, countLabel }) {
  *    estate efficiently — especially on mobile. The right-hand premium
  *    pill mirrors the report cards so users have a consistent visual
  *    language for "what's unlocked vs locked." */
-function PlayerRow({ p, isPremium, onUpgradeClick }) {
+function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
   return (
     <li className="relative">
       {/* Left status stripe — forest when the user is on Premium / has the
@@ -343,7 +385,7 @@ function PlayerRow({ p, isPremium, onUpgradeClick }) {
             data-testid={`player-row-upgrade-${p.id}`}
             aria-label={`Unlock Progress Pass to track ${p.name}`}
             title="Unlock Progress Pass"
-            className="hidden sm:flex absolute z-10 right-9 top-1/2 -translate-y-1/2 items-center gap-1 bg-cream-soft hover:bg-forest hover:text-white hover:border-forest border border-ink/15 text-ink/65 text-[9px] uppercase tracking-widest font-bold px-2 py-1 transition-colors cursor-pointer"
+            className={`${pulse ? "scoutme-unlock-pulse " : ""}hidden sm:flex absolute z-10 right-9 top-1/2 -translate-y-1/2 items-center gap-1 bg-cream-soft hover:bg-forest hover:text-white hover:border-forest border border-ink/15 text-ink/65 text-[9px] uppercase tracking-widest font-bold px-2 py-1 transition-colors cursor-pointer`}
           >
             <Lock className="w-3 h-3" strokeWidth={2.4} /> Unlock
           </button>
@@ -352,7 +394,7 @@ function PlayerRow({ p, isPremium, onUpgradeClick }) {
             onClick={onUpgradeClick}
             data-testid={`player-row-upgrade-mobile-${p.id}`}
             aria-label={`Unlock Progress Pass to track ${p.name}`}
-            className="sm:hidden absolute z-10 right-8 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-ink/45 hover:text-forest active:text-forest transition-colors cursor-pointer"
+            className={`${pulse ? "scoutme-unlock-pulse " : ""}sm:hidden absolute z-10 right-8 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-ink/45 hover:text-forest active:text-forest transition-colors cursor-pointer`}
           >
             <Lock className="w-3.5 h-3.5" strokeWidth={2.4} />
           </button>

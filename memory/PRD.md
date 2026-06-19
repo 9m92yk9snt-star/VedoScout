@@ -26,6 +26,19 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 41 — First-visit Unlock-pill pulse hint (Stripe / Linear pattern) (Feb 19 2026, 20:50)**:
+  - **Why**: free users now have an inline UNLOCK pill on every locked tracked-player row (Session 40), but on a busy dashboard the eye doesn't immediately register it as a tap-target. Premium SaaS apps use a one-shot pulse animation on first visit to draw attention to the upgrade path without being annoying.
+  - **Implementation** (zero new code paths — single CSS keyframe + `localStorage` flag):
+    - `/app/frontend/src/pages/DashboardPage.jsx`:
+      - New `unlockPulseOn` state, set to `true` on mount when `passState?.active !== true` AND `localStorage[dashboard_unlock_pulse_seen_v1]` is missing. After mounting, the flag is set and a `setTimeout(1900 ms)` clears the state so the DOM stays clean. Wrapped in `try/catch` for private-browsing safety.
+      - Pulse boolean threaded as `pulse={unlockPulseOn}` into each `<PlayerRow>`.
+      - `PlayerRow` conditionally adds `scoutme-unlock-pulse` className to BOTH the desktop and mobile upgrade buttons.
+      - Inline `<style>` block defines the `@keyframes scoutme-unlock-pulse` (a soft `box-shadow` ring expanding from 0 → 9 px in forest-green at 55 % opacity → 0 % over 1.6 s ease-out, `iteration-count: 1`, `0.4 s` delay so users notice it after the page settles).
+      - Respects `prefers-reduced-motion: reduce` — animation disabled for users who opt out.
+  - **Untouched**: backend, all data fetches, all routes, all testids, the Progress Pass banner, every other feature behaviour. Premium users see no pulse (the effect short-circuits on `passState?.active`).
+  - **Tested**: ✅ ESLint clean. ✅ Smoke test (free user, flag cleared): 10 buttons (5 desktop + 5 mobile responsive variants) gain `.scoutme-unlock-pulse` class on first visit, localStorage flag set to `"1"`, class persists through the animation then auto-removes, second visit (page reload) shows 0 pulsing buttons. Screenshot confirms the new TRACK PROGRESS panel renders cleanly with all 5 rows + UNLOCK pills.
+  - **Files**: MODIFIED only `/app/frontend/src/pages/DashboardPage.jsx`.
+
 - ✅ **🆕 Session 40 — PlayerRow LOCKED pill wired as one-tap entry to Progress Pass checkout (Feb 19 2026, 20:30)**:
   - **Why**: free users had to scroll back up to the Progress Pass banner to upgrade. The locked pill that already lives on every tracked-player row is the perfect inline entry point.
   - **Implementation** (zero new code paths, reuses the existing `passModalOpen` + `EmbeddedCheckoutModal`):
