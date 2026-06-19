@@ -26,6 +26,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 40 — PlayerRow LOCKED pill wired as one-tap entry to Progress Pass checkout (Feb 19 2026, 20:30)**:
+  - **Why**: free users had to scroll back up to the Progress Pass banner to upgrade. The locked pill that already lives on every tracked-player row is the perfect inline entry point.
+  - **Implementation** (zero new code paths, reuses the existing `passModalOpen` + `EmbeddedCheckoutModal`):
+    - `/app/frontend/src/pages/DashboardPage.jsx`: passed `onUpgradeClick={() => setPassModalOpen(true)}` into each `<PlayerRow>`. The locked-state pill is now a real `<button>` rendered as a **SIBLING** of the row's `<Link>` (absolutely positioned over the reserved space inside the row), not as a descendant — so HTML stays valid (no `<button>` in `<a>`) and tapping the pill doesn't trigger the row's navigation.
+    - Two responsive triggers: desktop pill (`data-testid="player-row-upgrade-<id>"`) shows full "🔒 UNLOCK" with `hover:bg-forest hover:text-white` invert effect; mobile compact tap-target (`data-testid="player-row-upgrade-mobile-<id>"`) shows a 28 px-tall lock icon.
+    - On a PREMIUM user (`passState?.active === true`) the upgrade button isn't rendered at all — just the green `✓ PREMIUM` badge — so the new flow is invisible to paid users.
+  - **Tested** (`/app/test_reports/iteration_23.json`): ✅ ESLint clean. ✅ Testing-agent ran 6/6 scenarios — 100% pass on both desktop (1280×800) and mobile (390×844). Confirmed (a) Stripe embedded checkout opens on pill tap, (b) URL stays on /dashboard (no trajectory navigation), (c) tapping the player name / arrow still navigates correctly, (d) premium users have zero upgrade buttons.
+  - **Files**: MODIFIED only `/app/frontend/src/pages/DashboardPage.jsx`.
+
 - ✅ **🆕 Session 39 — Dashboard v2: Reports-on-top + premium/locked status on every row + icons (Feb 19 2026, 20:10)**:
   - **User request**: "I need report of player to be top and tracks bottom. Track also marked premium/locked according to user free/premium. I need better visual organisation, more premium feel. I need dashboard to be more visual and graphical with icons. Do not change or add anything else."
   - **Changes** (visual reorganisation only, no new features, no new data):
