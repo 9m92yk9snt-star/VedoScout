@@ -1,57 +1,55 @@
 /**
- * ScoutMode.jsx — v4.0 "one-tap track" workflow.
+ * ScoutMode.jsx — v5.0 "10-tap precision marker" workflow.
  *
- * REPLACES the chip-based v3 flow entirely.
+ * Replaces the v4 "1-tap + AI track" approach.  Every anchor is now
+ * user-verified, which is the only reliable way to guarantee that the
+ * report thumbnails track the SAME player throughout the video.
  *
- * Pipeline:
- *   1. BOOTING       — detect scene cuts, distribute 10 keyframe timestamps,
- *                      pre-capture each keyframe as a JPEG (≤1920px @0.85).
- *   2. TAP_REFERENCE — show the first keyframe full-screen.  The user taps
- *                      DIRECTLY on the player they want to identify.  An
- *                      instant lime outline locks around the tap box.  If
- *                      the player isn't in this frame, user can scrub to a
- *                      different keyframe and tap there.
- *   3. TRACKING      — POST {reference, 9 targets} to /api/scout/track-player.
- *                      Gemini ReIDs the same player in parallel.  Progress
- *                      card shows elapsed time + rotating status messages.
- *                      Client-side `spatioTemporal.filterByMotion` rejects
- *                      any match implying >8 m/s player speed.
- *   4. REVIEW        — 2×5 grid of 10 thumbnails, each with the AI-tracked
- *                      player outlined in lime + a confidence badge.  Tap
- *                      any thumbnail to re-tap manually if AI got it wrong.
- *   5. CONFIRM       — calls onConfirm({anchors, sceneCuts}).  Contract
- *                      preserved — MarkerStudio.handleScoutConfirm gets the
- *                      same payload shape as before, so the rest of the
- *                      pipeline doesn't change.
+ * Phases:
+ *   1. BOOTING    — extract 10 keyframes from the video (scene-cut driven).
+ *                   Premium loading screen with status messages + rotating
+ *                   football-insights so the user never feels frozen.
+ *   2. MARKING    — show each keyframe full-screen.  User taps the target
+ *                   player, can pinch-zoom / pan / drag the marker for
+ *                   precision, then confirms.  Auto-advances to next frame.
+ *                   "Skip this frame" cycles to another keyframe if the
+ *                   player isn't visible (we then re-queue the skipped one
+ *                   at the end so the user can retry it).
+ *   3. CONFIRM    — anchors collected → onConfirm({anchors, sceneCuts}).
+ *                   At least 3 anchors are required; the rest can be skipped.
  *
- * Out of scope (per scope discipline):
- *   - Landing, pricing, payment, reports, top bar, scrubber styling,
- *     dormant Roster code, freeform tap fallback flow.
+ * NOT touched (per scope discipline):
+ *   - Backend pipeline, analysis endpoints, report generation.
+ *   - MarkerStudio's wrapper / auto-open / video-element competition fix.
+ *   - Landing page, pricing, payment, upload UI.
+ *   - Existing /api/scout/detect-players + /api/scout/track-player endpoints
+ *     remain in place (dormant for this workflow but unchanged).
  */
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, X, RotateCcw, Check, Hand } from "lucide-react";
+import { X, Check, RotateCcw, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { detectSceneCuts, distributeHints } from "./sceneDetect";
-import { filterByMotion } from "./spatioTemporal";
 
-const API_BASE = process.env.REACT_APP_BACKEND_URL || "";
 const TARGET_HINTS = 10;
-// Reduced from 1920/0.85 → 1280/0.78. ReID does NOT need pixel-perfect
-// detail (it needs jersey colour + body shape) and smaller payloads mean
-// faster Gemini round-trips. Empirically saves ~40-60 % per call.
+const MIN_REQUIRED = 3;
 const FRAME_MAX_W = 1280;
-const FRAME_JPEG_QUALITY = 0.78;
+const FRAME_JPEG_QUALITY = 0.82;
 
-// ── Helpers ─────────────────────────────────────────────────────────
+// ── Football / scouting insights — rotate every ~4 s during boot ────
+const SCOUT_INSIGHTS = [
+  "Pro scouts watch 15+ hours of footage per shortlisted player.",
+  "Top academies track over 30 metrics per player every match.",
+  "A youth player has only ~90 minutes of decisive moments per season.",
+  "Quality > quantity — 5 clean highlight clips beat 50 vague ones.",
+  "ScoutMePlay analyses every touch your kid takes on the ball.",
+  "Movement off the ball is what scouts watch first.",
+  "Composure under pressure is the #1 differentiator at U-14 level.",
+  "First-touch direction tells you 80 % of what you need to know.",
+];
 
-/** Seek the video and wait for the next painted frame (iOS-safe).
- *
- *  Uses a hard outer timeout of 1500 ms so the boot loop NEVER hangs even
- *  if the seek silently fails — on iOS Safari `requestVideoFrameCallback`
- *  can fail to fire on a freshly-mounted <video> element until the first
- *  successful paint, which would otherwise stall the entire pipeline.
- */
+// ── Pure helpers ────────────────────────────────────────────────────
+
 function seekTo(videoEl, t) {
   return new Promise((resolve) => {
     if (!videoEl) return resolve();
@@ -60,7 +58,6 @@ function seekTo(videoEl, t) {
       if (done) return;
       done = true;
       videoEl.removeEventListener("seeked", onSeeked);
-      // Wait one frame so the canvas captures the new pixels.
       let painted = false;
       const paintDone = () => { if (!painted) { painted = true; resolve(); } };
       if (typeof videoEl.requestVideoFrameCallback === "function") {
@@ -68,141 +65,103 @@ function seekTo(videoEl, t) {
       } else {
         requestAnimationFrame(() => requestAnimationFrame(paintDone));
       }
-      // Hard cap — never wait more than 400 ms for the paint callback.
       setTimeout(paintDone, 400);
     };
     const onSeeked = () => finish();
     videoEl.addEventListener("seeked", onSeeked);
     try { videoEl.currentTime = t; } catch { finish(); }
-    // Outer hard cap — never wait more than 1500 ms total for any one seek.
     setTimeout(finish, 1500);
   });
 }
 
-/** Snapshot the current video frame as a JPEG data-URL. */
 function captureFrame(videoEl) {
   if (!videoEl || !videoEl.videoWidth) return null;
-  const vw = videoEl.videoWidth;
-  const vh = videoEl.videoHeight;
-  const targetW = Math.min(FRAME_MAX_W, vw);
-  const targetH = Math.round(vh * (targetW / vw));
-  const c = document.createElement("canvas");
-  c.width = targetW;
-  c.height = targetH;
-  try {
-    c.getContext("2d").drawImage(videoEl, 0, 0, targetW, targetH);
-    return c.toDataURL("image/jpeg", FRAME_JPEG_QUALITY);
-  } catch {
-    return null;
-  }
-}
-
-/** Map a pointer/touch event in stage-screen coords → fractional video coords. */
-function eventToVideoFrac(event, stageEl, videoEl) {
-  if (!stageEl || !videoEl?.videoWidth) return null;
-  const r = stageEl.getBoundingClientRect();
-  const cx = event.touches?.[0]?.clientX ?? event.clientX;
-  const cy = event.touches?.[0]?.clientY ?? event.clientY;
-  if (cx == null || cy == null) return null;
-  const sx = cx - r.left;
-  const sy = cy - r.top;
-  // object-contain mapping inverse
   const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
-  const sw = r.width, sh = r.height;
-  const scale = Math.min(sw / vw, sh / vh);
-  const renderedW = vw * scale, renderedH = vh * scale;
-  const offX = (sw - renderedW) / 2, offY = (sh - renderedH) / 2;
-  const inX = sx - offX, inY = sy - offY;
-  if (inX < 0 || inY < 0 || inX > renderedW || inY > renderedH) return null;
-  return { fx: inX / renderedW, fy: inY / renderedH };
-}
-
-/** Build a default reference box around the user's tap point. */
-function tapToBox(fx, fy) {
-  // Roughly the size of a small player at typical sideline framing
-  const w = 0.06, h = 0.18;
-  return {
-    x: Math.max(0, Math.min(1 - w, fx - w / 2)),
-    y: Math.max(0, Math.min(1 - h, fy - h * 0.42)),
-    w,
-    h,
-  };
+  const tw = Math.min(FRAME_MAX_W, vw);
+  const th = Math.round(vh * (tw / vw));
+  const c = document.createElement("canvas");
+  c.width = tw; c.height = th;
+  try {
+    c.getContext("2d").drawImage(videoEl, 0, 0, tw, th);
+    return c.toDataURL("image/jpeg", FRAME_JPEG_QUALITY);
+  } catch { return null; }
 }
 
 // ── Component ───────────────────────────────────────────────────────
 
 export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duration }) {
-  /* Refs */
   const videoRef = useRef(null);
   const stageRef = useRef(null);
-  const cancelledRef = useRef(false);
 
   /* Video readiness */
   const [videoReady, setVideoReady] = useState(false);
   const [vidDur, setVidDur] = useState(duration || 0);
-  const [stageRect, setStageRect] = useState({ w: 0, h: 0 });
 
   /* Phase machine */
-  // BOOTING | TAP_REFERENCE | TRACKING | REVIEW
-  const [phase, setPhase] = useState("BOOTING");
+  const [phase, setPhase] = useState("BOOTING"); // BOOTING | MARKING | DONE
 
-  /* Boot phase */
+  /* Boot phase state */
+  const [bootStage, setBootStage] = useState("uploading"); // uploading | analysing | screenshots
   const [bootProgress, setBootProgress] = useState(0);
-  const [bootStage, setBootStage] = useState("scene"); // "scene" | "frames"
-  const [hints, setHints] = useState([]);             // [t1, t2, ..., t10]
+  const [hints, setHints] = useState([]);
   const [sceneCuts, setSceneCuts] = useState([]);
-  const [frameCache, setFrameCache] = useState([]);   // [{t, jpegDataUrl}]
+  const [frameCache, setFrameCache] = useState([]);
 
-  /* Tap reference phase */
-  const [activeHintIdx, setActiveHintIdx] = useState(0);
-  // refTap: { hintIdx, t, box:{x,y,w,h} } — locked once user is happy.
-  const [refTap, setRefTap] = useState(null);
+  /* Marking phase state */
+  // queue: ordered list of hint indices to present.  When user skips a
+  // frame we re-queue it at the END so they can retry once they've gone
+  // through the others.
+  const [queue, setQueue] = useState([]);
+  const [queuePos, setQueuePos] = useState(0); // pointer into queue[]
+  // marks[hintIdx] = { x, y, w, h, hintT, source: 'user', skipped?: bool }
+  const [marks, setMarks] = useState({});
 
-  /* Tracking phase */
-  const [trackingStartedAt, setTrackingStartedAt] = useState(null);
-  const [trackingError, setTrackingError] = useState(null);
+  /* Adjust-marker state for the CURRENT frame being marked */
+  // local box being edited — when the user taps, we set this; pinch/drag
+  // tweaks it; "Confirm" copies it into `marks`.
+  const [draftBox, setDraftBox] = useState(null);
+  // zoom & pan for precision marking
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  // dragging the marker box itself
+  const dragRef = useRef({ active: false, startX: 0, startY: 0, origBox: null, mode: null });
 
-  /* Review phase */
-  // matches: [{ hintIdx, t, box, confidence, source: 'user'|'gemini', missing?: bool }]
-  const [matches, setMatches] = useState([]);
-  const [reviewActiveIdx, setReviewActiveIdx] = useState(null); // when user is re-tapping a missed frame
-
-  // ── Reset on close ────────────────────────────────────────────────
+  /* ── Reset on close ────────────────────────────────────────────── */
   useEffect(() => {
     if (!open) {
-      cancelledRef.current = false;
       setVideoReady(false);
       setPhase("BOOTING");
+      setBootStage("uploading");
       setBootProgress(0);
-      setBootStage("scene");
       setHints([]);
       setSceneCuts([]);
       setFrameCache([]);
-      setActiveHintIdx(0);
-      setRefTap(null);
-      setTrackingStartedAt(null);
-      setTrackingError(null);
-      setMatches([]);
-      setReviewActiveIdx(null);
+      setQueue([]);
+      setQueuePos(0);
+      setMarks({});
+      setDraftBox(null);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
     }
   }, [open]);
 
-  // ── Track stage size ──────────────────────────────────────────────
+  /* ── Stage size observer ───────────────────────────────────────── */
+  const [stageRect, setStageRect] = useState({ w: 0, h: 0 });
   useEffect(() => {
     if (!open) return;
     if (!stageRef.current) return;
     const el = stageRef.current;
-    const initial = el.getBoundingClientRect();
-    setStageRect({ w: initial.width, h: initial.height });
+    const r = el.getBoundingClientRect();
+    setStageRect({ w: r.width, h: r.height });
     const ro = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      setStageRect({ w: r.width, h: r.height });
+      const rr = el.getBoundingClientRect();
+      setStageRect({ w: rr.width, h: rr.height });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, [open]);
 
-  // ── BOOT: scene-cut detect → distribute hints → pre-capture frames ─
+  /* ── BOOT: scene-cut + 10 keyframes ────────────────────────────── */
   useEffect(() => {
     if (!open) return;
     if (!videoReady) return;
@@ -212,14 +171,9 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       const v = videoRef.current;
       if (!v) return;
 
-      // 0. Wait until the video is TRULY playable (readyState >= 2 + frames
-      //    decoded). `loadedmetadata` fires with just the header, before any
-      //    pixels are available — on iOS Safari the first `seek` then hangs
-      //    silently waiting for a frame that doesn't exist yet.
-      //
-      //    If the wait drags past 4 s we force-reload the <video> element
-      //    via .load() — this "kicks" iOS Safari out of its sometimes-stuck
-      //    first-load state without the user having to close + reopen.
+      // Phase A: wait for the video to be truly ready
+      setBootStage("uploading");
+      setBootProgress(0.05);
       const waitReady = async () => {
         const start = Date.now();
         let reloaded = false;
@@ -229,26 +183,28 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
             reloaded = true;
             try {
               v.load();
-              // Some iOS versions need an explicit .play() then .pause()
-              // to populate the decoder.
               const pp = v.play();
               if (pp?.catch) pp.catch(() => {});
               setTimeout(() => { try { v.pause(); } catch { /* noop */ } }, 50);
             } catch { /* noop */ }
           }
-          await new Promise((r) => setTimeout(r, 100));
+          if (!cancelled) {
+            const t = (Date.now() - start) / 12000;
+            setBootProgress(0.05 + t * 0.10); // 5% → 15%
+          }
+          await new Promise((r) => setTimeout(r, 120));
         }
       };
       await waitReady();
       if (cancelled) return;
 
-      // 1. Scene-cut detection (~3 s)
-      setBootStage("scene");
-      setBootProgress(0);
+      // Phase B: scene-cut detection
+      setBootStage("analysing");
+      setBootProgress(0.15);
       let cuts = [];
       try {
         const result = await detectSceneCuts(v, {
-          onProgress: (p) => { if (!cancelled) setBootProgress(p * 0.4); },
+          onProgress: (p) => { if (!cancelled) setBootProgress(0.15 + p * 0.30); },
         });
         cuts = result.cuts || [];
       } catch (err) {
@@ -257,241 +213,250 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       if (cancelled) return;
       setSceneCuts(cuts);
 
-      // 2. Distribute 10 hint timestamps
+      // Phase C: distribute hints + capture frames
       const dur = v.duration || vidDur || 0;
-      const hs = distributeHints(dur, cuts, TARGET_HINTS);
-      if (cancelled || !hs.length) {
-        // Final safety net: if duration is unknown, just split [0..30s].
-        // Better to show something than hang at 0%.
-        const fallback = [];
+      let hs = distributeHints(dur, cuts, TARGET_HINTS);
+      if (!hs.length) {
         const fbDur = dur || 30;
-        for (let i = 0; i < TARGET_HINTS; i++) {
-          fallback.push((fbDur * (i + 0.5)) / TARGET_HINTS);
-        }
-        setHints(fallback);
-      } else {
-        setHints(hs);
+        hs = [];
+        for (let i = 0; i < TARGET_HINTS; i++) hs.push((fbDur * (i + 0.5)) / TARGET_HINTS);
       }
-      const finalHints = hs.length ? hs : (() => {
-        const fb = [];
-        const fbDur = dur || 30;
-        for (let i = 0; i < TARGET_HINTS; i++) fb.push((fbDur * (i + 0.5)) / TARGET_HINTS);
-        return fb;
-      })();
+      setHints(hs);
 
-      // 3. Pre-capture all 10 keyframes as JPEGs.
-      //    Each seekTo has a 1500 ms hard cap, so even if iOS Safari
-      //    refuses to seek, we'll move on rather than hang.
-      setBootStage("frames");
-      setBootProgress(0.4);
+      setBootStage("screenshots");
+      setBootProgress(0.45);
       const captured = [];
-      for (let i = 0; i < finalHints.length; i++) {
+      for (let i = 0; i < hs.length; i++) {
         if (cancelled) return;
         try {
-          await seekTo(v, finalHints[i]);
-          const dataUrl = captureFrame(v);
-          captured.push({ t: finalHints[i], jpegDataUrl: dataUrl });
-        } catch (err) {
-          console.warn("frame capture failed at t=", finalHints[i], err);
-          captured.push({ t: finalHints[i], jpegDataUrl: null });
+          await seekTo(v, hs[i]);
+          captured.push({ t: hs[i], jpegDataUrl: captureFrame(v) });
+        } catch {
+          captured.push({ t: hs[i], jpegDataUrl: null });
         }
-        if (!cancelled) setBootProgress(0.4 + 0.6 * ((i + 1) / finalHints.length));
+        if (!cancelled) setBootProgress(0.45 + 0.55 * ((i + 1) / hs.length));
       }
       if (cancelled) return;
       setFrameCache(captured);
 
-      // 4. Seek back to first hint and move to TAP_REFERENCE
-      try { await seekTo(v, finalHints[0]); } catch { /* noop */ }
+      // Phase D: seek back to first usable frame, enter MARKING
+      const firstViable = captured.findIndex((f) => f.jpegDataUrl);
+      const startIdx = firstViable >= 0 ? firstViable : 0;
+      try { await seekTo(v, hs[startIdx]); } catch { /* noop */ }
       if (cancelled) return;
-      setActiveHintIdx(0);
+      // Build initial queue — all frames in order
+      const q = captured.map((_, i) => i).filter((i) => captured[i].jpegDataUrl);
+      setQueue(q);
+      setQueuePos(0);
       setBootProgress(1);
-      setPhase("TAP_REFERENCE");
+      setPhase("MARKING");
     })();
     return () => { cancelled = true; };
   }, [open, videoReady, phase, vidDur]);
 
-  // ── Seek video when the user navigates to a different hint frame
+  /* ── Whenever queue position changes, seek the video ─────────── */
+  const currentHintIdx = queue[queuePos];
   useEffect(() => {
-    if (phase !== "TAP_REFERENCE" && phase !== "REVIEW") return;
+    if (phase !== "MARKING") return;
+    if (currentHintIdx == null) return;
     const v = videoRef.current;
-    if (!v) return;
-    const t = hints[activeHintIdx];
-    if (t == null) return;
-    if (Math.abs(v.currentTime - t) > 0.15) {
+    if (!v || !hints.length) return;
+    const t = hints[currentHintIdx];
+    if (t != null && Math.abs(v.currentTime - t) > 0.15) {
       try { v.currentTime = t; } catch { /* noop */ }
     }
-  }, [activeHintIdx, hints, phase]);
+    // Reset zoom/pan/draft for the new frame
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setDraftBox(marks[currentHintIdx] || null);
+  }, [phase, currentHintIdx, hints, marks]);
 
-  // ── TAP_REFERENCE: handle tap on the video stage ──────────────────
-  const handleReferenceTap = useCallback((e) => {
-    if (phase !== "TAP_REFERENCE") return;
-    const frac = eventToVideoFrac(e, stageRef.current, videoRef.current);
-    if (!frac) return;
-    const box = tapToBox(frac.fx, frac.fy);
-    const t = hints[activeHintIdx];
-    setRefTap({ hintIdx: activeHintIdx, t, box });
-    // Auto-advance after a short beat so the user sees the lock
-    setTimeout(() => {
-      if (!cancelledRef.current) setPhase("TRACKING");
-    }, 800);
-  }, [phase, hints, activeHintIdx]);
+  /* ── Tap on the stage to set the marker ──────────────────────── */
+  const handleStageTap = useCallback((e) => {
+    if (phase !== "MARKING") return;
+    if (currentHintIdx == null) return;
+    const stage = stageRef.current;
+    const v = videoRef.current;
+    if (!stage || !v?.videoWidth) return;
+    const r = stage.getBoundingClientRect();
+    const cx = e.touches?.[0]?.clientX ?? e.clientX;
+    const cy = e.touches?.[0]?.clientY ?? e.clientY;
+    if (cx == null || cy == null) return;
 
-  // ── REVIEW: tap a thumbnail to re-tap manually ────────────────────
-  const handleReviewThumbTap = useCallback((idx) => {
-    if (phase !== "REVIEW") return;
-    setReviewActiveIdx(idx);
-    setActiveHintIdx(idx);
-    setPhase("TAP_REFERENCE");
-  }, [phase]);
+    // Pointer in stage-screen coords
+    const sx = cx - r.left;
+    const sy = cy - r.top;
+    // Translate via current zoom/pan
+    const stageW = r.width, stageH = r.height;
+    const centreX = stageW / 2 + pan.x;
+    const centreY = stageH / 2 + pan.y;
+    const renderedX = (sx - centreX) / zoom + stageW / 2;
+    const renderedY = (sy - centreY) / zoom + stageH / 2;
+    // object-contain mapping → fractional video coords
+    const vw = v.videoWidth, vh = v.videoHeight;
+    const baseScale = Math.min(stageW / vw, stageH / vh);
+    const renderedW = vw * baseScale, renderedH = vh * baseScale;
+    const offX = (stageW - renderedW) / 2, offY = (stageH - renderedH) / 2;
+    const inX = renderedX - offX, inY = renderedY - offY;
+    if (inX < 0 || inY < 0 || inX > renderedW || inY > renderedH) return;
+    const fx = inX / renderedW;
+    const fy = inY / renderedH;
+    const w = 0.06, h = 0.18;
+    setDraftBox({
+      x: Math.max(0, Math.min(1 - w, fx - w / 2)),
+      y: Math.max(0, Math.min(1 - h, fy - h * 0.42)),
+      w, h,
+    });
+  }, [phase, currentHintIdx, zoom, pan]);
 
-  const handleReviewTap = useCallback((e) => {
-    // When the user is correcting a single frame (reviewActiveIdx !== null)
-    // we DON'T re-run tracking — we just update that one match.
-    if (phase !== "TAP_REFERENCE") return;
-    if (reviewActiveIdx == null) {
-      handleReferenceTap(e);
-      return;
+  /* ── Drag the marker box itself ──────────────────────────────── */
+  const handleBoxPointerDown = useCallback((e, mode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!draftBox) return;
+    const cx = e.touches?.[0]?.clientX ?? e.clientX;
+    const cy = e.touches?.[0]?.clientY ?? e.clientY;
+    dragRef.current = {
+      active: true, startX: cx, startY: cy,
+      origBox: { ...draftBox }, mode,
+    };
+  }, [draftBox]);
+
+  const handleBoxPointerMove = useCallback((e) => {
+    const d = dragRef.current;
+    if (!d.active || !d.origBox) return;
+    const v = videoRef.current;
+    const stage = stageRef.current;
+    if (!v?.videoWidth || !stage) return;
+    const cx = e.touches?.[0]?.clientX ?? e.clientX;
+    const cy = e.touches?.[0]?.clientY ?? e.clientY;
+    if (cx == null || cy == null) return;
+    const dxScreen = cx - d.startX;
+    const dyScreen = cy - d.startY;
+    const r = stage.getBoundingClientRect();
+    const vw = v.videoWidth, vh = v.videoHeight;
+    const baseScale = Math.min(r.width / vw, r.height / vh);
+    const renderedW = vw * baseScale, renderedH = vh * baseScale;
+    // Convert screen delta → fractional delta on the rendered video
+    const dxFrac = dxScreen / (renderedW * zoom);
+    const dyFrac = dyScreen / (renderedH * zoom);
+
+    let nb = { ...d.origBox };
+    if (d.mode === "move") {
+      nb.x = Math.max(0, Math.min(1 - nb.w, nb.x + dxFrac));
+      nb.y = Math.max(0, Math.min(1 - nb.h, nb.y + dyFrac));
+    } else if (d.mode === "resize") {
+      nb.w = Math.max(0.02, Math.min(1 - nb.x, nb.w + dxFrac));
+      nb.h = Math.max(0.04, Math.min(1 - nb.y, nb.h + dyFrac));
     }
-    const frac = eventToVideoFrac(e, stageRef.current, videoRef.current);
-    if (!frac) return;
-    const box = tapToBox(frac.fx, frac.fy);
-    setMatches((prev) => prev.map((m, i) =>
-      i === reviewActiveIdx
-        ? { ...m, box, confidence: 1.0, source: "user", missing: false }
-        : m,
-    ));
-    setReviewActiveIdx(null);
-    // small delay so the lime lock animation is visible
-    setTimeout(() => {
-      if (!cancelledRef.current) setPhase("REVIEW");
-    }, 600);
-  }, [phase, reviewActiveIdx, handleReferenceTap]);
+    setDraftBox(nb);
+  }, [zoom]);
 
-  // ── TRACKING: POST to backend, then transition to REVIEW ──────────
-  useEffect(() => {
-    if (phase !== "TRACKING") return;
-    if (!refTap) return;
-    let cancelled = false;
-    (async () => {
-      setTrackingStartedAt(Date.now());
-      setTrackingError(null);
-      const refFrame = frameCache[refTap.hintIdx];
-      if (!refFrame?.jpegDataUrl) {
-        setTrackingError("Reference frame missing — please retry.");
+  const handleBoxPointerUp = useCallback(() => {
+    dragRef.current.active = false;
+  }, []);
+
+  /* ── Zoom controls ──────────────────────────────────────────── */
+  const handleZoomIn = useCallback(() => setZoom((z) => Math.min(3, z * 1.4)), []);
+  const handleZoomOut = useCallback(() => {
+    setZoom((z) => {
+      const nz = Math.max(1, z / 1.4);
+      if (nz === 1) setPan({ x: 0, y: 0 });
+      return nz;
+    });
+  }, []);
+  const handleResetZoom = useCallback(() => {
+    setZoom(1); setPan({ x: 0, y: 0 });
+  }, []);
+
+  /* ── Confirm current marker → next frame ────────────────────── */
+  const confirmedCount = useMemo(
+    () => Object.values(marks).filter((m) => m && !m.skipped).length,
+    [marks],
+  );
+
+  const advance = useCallback(() => {
+    // Move to the next unmarked frame in the queue.  If we reach the end
+    // and there are still skipped frames, loop back to give the user another
+    // chance.  If all frames have been visited, transition to DONE.
+    const totalFrames = queue.length;
+    let next = queuePos + 1;
+    if (next >= totalFrames) {
+      // Check if all frames in queue have been either confirmed or are skipped
+      const remaining = queue.filter((i) => !marks[i] || marks[i].skipped);
+      if (remaining.length === 0) {
+        // All confirmed somehow — go directly to finalise
+        setPhase("DONE");
         return;
       }
-      // 9 target frames = every hint except the reference
-      const targets = frameCache
-        .map((f, i) => ({ i, t: f.t, image: f.jpegDataUrl }))
-        .filter((f) => f.i !== refTap.hintIdx && f.image);
-
-      try {
-        const res = await fetch(`${API_BASE}/api/scout/track-player`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reference: { image: refFrame.jpegDataUrl, box: refTap.box },
-            targets: targets.map((f) => ({ id: `hint-${f.i}`, image: f.image })),
-          }),
-        });
-        if (cancelled) return;
-        if (!res.ok) {
-          setTrackingError(`Tracking failed (${res.status}). Tap directly on each frame to continue.`);
-          return;
-        }
-        const json = await res.json();
-        const byId = new Map(
-          (json.matches || []).map((m) => [m.id, m]),
-        );
-        // Assemble final matches[] — 10 entries in hint order
-        let outMatches = frameCache.map((f, i) => {
-          if (i === refTap.hintIdx) {
-            return {
-              hintIdx: i, t: f.t, box: refTap.box,
-              confidence: 1.0, source: "user", missing: false,
-            };
-          }
-          const m = byId.get(`hint-${i}`);
-          if (m?.box) {
-            return {
-              hintIdx: i, t: f.t, box: m.box,
-              confidence: m.confidence ?? 0.5,
-              reason: m.reason || "",
-              source: "gemini", missing: false,
-            };
-          }
-          return {
-            hintIdx: i, t: f.t, box: null,
-            confidence: 0,
-            reason: m?.reason || "not found",
-            source: "gemini", missing: true,
-          };
-        });
-
-        // ── Safety net: reject physically impossible jumps ─────────
-        try {
-          const ref = { t: refTap.t, box: refTap.box };
-          const candidates = outMatches
-            .filter((m) => !m.missing && m.box && m.hintIdx !== refTap.hintIdx)
-            .map((m) => ({ t: m.t, box: m.box, confidence: m.confidence, _idx: m.hintIdx }));
-          const { rejected } = filterByMotion(candidates, ref);
-          const rejIdx = new Set(rejected.map((r) => r.anchor._idx));
-          if (rejIdx.size) {
-            outMatches = outMatches.map((m) =>
-              rejIdx.has(m.hintIdx)
-                ? { ...m, missing: true, box: null, confidence: 0, reason: "physics_reject" }
-                : m,
-            );
-          }
-        } catch (err) {
-          console.warn("spatioTemporal filter skipped:", err);
-        }
-
-        if (cancelled) return;
-        setMatches(outMatches);
-        setPhase("REVIEW");
-      } catch (err) {
-        console.warn("Track-player request failed:", err);
-        if (!cancelled) {
-          setTrackingError("Network error — please retry.");
-        }
+      // Otherwise, accept current state — at least MIN_REQUIRED confirmed
+      // means we're done.
+      if (confirmedCount + 1 >= MIN_REQUIRED) {
+        setPhase("DONE");
+        return;
       }
-    })();
-    return () => { cancelled = true; };
-  }, [phase, refTap, frameCache]);
+      // Loop back to retry the skipped ones
+      next = 0;
+    }
+    setQueuePos(next);
+  }, [queue, queuePos, marks, confirmedCount]);
 
-  // ── CONFIRM ───────────────────────────────────────────────────────
-  const handleConfirm = useCallback(() => {
-    // Build the anchors[] payload in the SHAPE the existing pipeline expects.
-    // We map each "match" (whether AI-found or user-corrected) into the same
-    // {t, box, segment} structure that handleScoutConfirm consumes today.
-    const anchors = matches
-      .filter((m) => m.box && !m.missing)
-      .map((m) => {
-        // Find which scene-cut segment this anchor belongs to (0-indexed)
-        let seg = 0;
-        for (let i = 0; i < sceneCuts.length; i++) {
-          if (m.t >= sceneCuts[i]) seg = i + 1;
-        }
-        return { t: m.t, box: m.box, segment: seg };
-      });
-    if (!anchors.length) return;
+  const handleConfirmMark = useCallback(() => {
+    if (!draftBox || currentHintIdx == null) return;
+    const hintT = hints[currentHintIdx];
+    setMarks((prev) => ({
+      ...prev,
+      [currentHintIdx]: {
+        x: draftBox.x, y: draftBox.y, w: draftBox.w, h: draftBox.h,
+        hintT, source: "user", skipped: false,
+      },
+    }));
+    setTimeout(advance, 350); // brief "locked" beat so user sees confirmation
+  }, [draftBox, currentHintIdx, hints, advance]);
+
+  const handleSkipFrame = useCallback(() => {
+    if (currentHintIdx == null) return;
+    const hintT = hints[currentHintIdx];
+    setMarks((prev) => ({
+      ...prev,
+      [currentHintIdx]: { skipped: true, hintT, source: "skipped" },
+    }));
+    advance();
+  }, [currentHintIdx, hints, advance]);
+
+  const handleRetap = useCallback(() => {
+    setDraftBox(null);
+  }, []);
+
+  /* ── DONE: build payload and call onConfirm ─────────────────── */
+  useEffect(() => {
+    if (phase !== "DONE") return;
+    const anchors = [];
+    for (const idxStr of Object.keys(marks)) {
+      const i = Number(idxStr);
+      const m = marks[i];
+      if (!m || m.skipped) continue;
+      let seg = 0;
+      for (let s = 0; s < sceneCuts.length; s++) if (m.hintT >= sceneCuts[s]) seg = s + 1;
+      anchors.push({ t: m.hintT, box: { x: m.x, y: m.y, w: m.w, h: m.h }, segment: seg });
+    }
+    if (anchors.length < MIN_REQUIRED) {
+      // not enough — fall back to MARKING for retry
+      setPhase("MARKING");
+      return;
+    }
     onConfirm({ anchors, sceneCuts });
-  }, [matches, sceneCuts, onConfirm]);
+  }, [phase, marks, sceneCuts, onConfirm]);
 
-  // ── Render ────────────────────────────────────────────────────────
+  /* ── Render ────────────────────────────────────────────────── */
   if (!open) return null;
-
-  const lockedFrameBackground = phase === "REVIEW" && reviewActiveIdx == null;
-  const showStageOverlay =
-    phase === "BOOTING" || phase === "TRACKING" || (phase === "TAP_REFERENCE" && !refTap);
 
   return createPortal(
     <div
       className="fixed inset-0 z-[230] bg-ink text-white flex flex-col"
       data-testid="scout-mode-overlay"
     >
-      {/* ── Top bar (compact, restrained) ───────────────────────── */}
+      {/* ── Top bar ──────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between h-12 px-3 border-b border-white/8 bg-ink/95 backdrop-blur">
         <button
           type="button"
@@ -502,175 +467,83 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
         >
           <X className="w-5 h-5" />
         </button>
-        <span
-          className="text-[11px] uppercase tracking-widest font-black text-white/85"
-          data-testid="scout-mode-title"
-        >
+        <span className="text-[11px] uppercase tracking-widest font-black text-white/85" data-testid="scout-mode-title">
           Scout Mode
         </span>
-        {phase === "REVIEW" && reviewActiveIdx == null ? (
-          <button
-            type="button"
-            onClick={() => {
-              // Re-run tracking from scratch — wipe matches, go back to TAP_REFERENCE
-              setMatches([]);
-              setRefTap(null);
-              setActiveHintIdx(0);
-              setPhase("TAP_REFERENCE");
-            }}
-            data-testid="scout-restart"
-            className="w-9 h-9 flex items-center justify-center text-white/85 hover:text-[#CCFF00] transition-colors"
-            aria-label="Start over"
-            title="Start over"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        ) : (
-          <span className="w-9" />
-        )}
+        <span className="w-9" />
       </div>
 
-      {/* ── Main stage ──────────────────────────────────────────── */}
-      {phase === "REVIEW" && reviewActiveIdx == null ? (
-        <ReviewGrid
-          matches={matches}
-          frameCache={frameCache}
-          onTapThumb={handleReviewThumbTap}
-        />
-      ) : (
-        <div
-          ref={stageRef}
-          className="relative flex-1 bg-black overflow-hidden flex items-center justify-center"
-          data-testid="scout-stage"
-          onClick={
-            phase === "TAP_REFERENCE" && reviewActiveIdx == null
-              ? handleReferenceTap
-              : phase === "TAP_REFERENCE" && reviewActiveIdx != null
-                ? handleReviewTap
-                : undefined
-          }
-          style={{
-            cursor:
-              phase === "TAP_REFERENCE" && !refTap ? "crosshair" : "default",
+      {/* ── Stage / phase content ───────────────────────────── */}
+      <div
+        ref={stageRef}
+        className="relative flex-1 bg-black overflow-hidden flex items-center justify-center"
+        data-testid="scout-stage"
+        onClick={phase === "MARKING" && !draftBox ? handleStageTap : undefined}
+        onMouseMove={handleBoxPointerMove}
+        onMouseUp={handleBoxPointerUp}
+        onMouseLeave={handleBoxPointerUp}
+        onTouchMove={handleBoxPointerMove}
+        onTouchEnd={handleBoxPointerUp}
+        style={{
+          cursor: phase === "MARKING" && !draftBox ? "crosshair" : "default",
+          touchAction: "none",
+        }}
+      >
+        <video
+          ref={videoRef}
+          src={videoUrl}
+          className="absolute inset-0 w-full h-full object-contain"
+          playsInline
+          preload="auto"
+          muted
+          onLoadedMetadata={(e) => setVidDur(e.target.duration || 0)}
+          onCanPlay={(e) => {
+            setVideoReady(true);
+            setVidDur(e.target.duration || 0);
           }}
-        >
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="w-full h-full object-contain"
-            playsInline
-            preload="auto"
-            muted
-            onLoadedMetadata={(e) => {
-              setVidDur(e.target.duration || 0);
-            }}
-            onCanPlay={(e) => {
-              // Wait for actual pixel data (readyState >= 3) before kicking
-              // off the boot pipeline. `loadedmetadata` is too early — only
-              // the header is decoded then and iOS Safari hangs on the first
-              // seek.
-              setVideoReady(true);
-              setVidDur(e.target.duration || 0);
-            }}
+          style={{
+            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            transformOrigin: "center center",
+            transition: dragRef.current.active ? "none" : "transform 0.18s ease-out",
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* Draft marker (lime, draggable) */}
+        {phase === "MARKING" && draftBox && videoRef.current?.videoWidth && stageRect.w > 0 && (
+          <DraftMarker
+            box={draftBox}
+            videoEl={videoRef.current}
+            stageRect={stageRect}
+            zoom={zoom}
+            pan={pan}
+            onPointerDown={(e, mode) => handleBoxPointerDown(e, mode)}
           />
+        )}
 
-          {/* Player-lock outline overlay — visible while the user has
-              tapped (TAP_REFERENCE) or while they are correcting a single
-              frame and have tapped (review-correct). */}
-          {((phase === "TAP_REFERENCE" && refTap && refTap.hintIdx === activeHintIdx) ||
-            (phase === "TAP_REFERENCE" && reviewActiveIdx != null && matches[reviewActiveIdx]?.box && matches[reviewActiveIdx]?.source === "user")) && (
-            <LockedPlayerBox
-              box={
-                refTap?.box ||
-                matches[reviewActiveIdx]?.box
-              }
-              videoEl={videoRef.current}
-              stageRect={stageRect}
-              accent="#22C55E"
-            />
-          )}
+        {/* Boot overlay */}
+        {phase === "BOOTING" && (
+          <PremiumBootOverlay progress={bootProgress} stage={bootStage} />
+        )}
 
-          {/* Boot overlay */}
-          {phase === "BOOTING" && (
-            <BootOverlay progress={bootProgress} stage={bootStage} />
-          )}
-
-          {/* Tap-to-identify overlay (only when no tap yet) */}
-          {phase === "TAP_REFERENCE" && !refTap && reviewActiveIdx == null && (
-            <TapHintOverlay
-              hintIdx={activeHintIdx}
-              total={hints.length}
-              onPrev={
-                activeHintIdx > 0
-                  ? () => setActiveHintIdx((i) => Math.max(0, i - 1))
-                  : null
-              }
-              onNext={
-                activeHintIdx < hints.length - 1
-                  ? () => setActiveHintIdx((i) => Math.min(hints.length - 1, i + 1))
-                  : null
-              }
-            />
-          )}
-
-          {/* Manual-correct overlay (when re-tapping a single review frame) */}
-          {phase === "TAP_REFERENCE" && reviewActiveIdx != null && (
-            <ManualCorrectOverlay
-              frameNumber={reviewActiveIdx + 1}
-              onCancel={() => {
-                setReviewActiveIdx(null);
-                setPhase("REVIEW");
-              }}
-            />
-          )}
-
-          {/* Tracking overlay — shows progress, never-frozen */}
-          {phase === "TRACKING" && (
-            <TrackingOverlay
-              startedAt={trackingStartedAt}
-              expectedMs={10000}
-              error={trackingError}
-              onRetry={() => {
-                setTrackingError(null);
-                // Force re-trigger by toggling phase
-                setPhase("REVIEW");
-                setTimeout(() => setPhase("TRACKING"), 50);
-              }}
-              onSkipToReview={() => {
-                // User wants to just review whatever we have; treat all 9 as missing
-                const fallback = frameCache.map((f, i) => {
-                  if (i === refTap.hintIdx) {
-                    return { hintIdx: i, t: f.t, box: refTap.box, confidence: 1, source: "user", missing: false };
-                  }
-                  return { hintIdx: i, t: f.t, box: null, confidence: 0, source: "gemini", missing: true };
-                });
-                setMatches(fallback);
-                setPhase("REVIEW");
-              }}
-            />
-          )}
-        </div>
-      )}
-
-      {/* ── Bottom action bar (only in REVIEW) ────────────────── */}
-      {phase === "REVIEW" && reviewActiveIdx == null && (
-        <div className="flex-shrink-0 bg-ink/95 border-t border-white/8 backdrop-blur px-4 py-3">
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={matches.filter((m) => !m.missing && m.box).length < 3}
-            data-testid="scout-confirm"
-            className="w-full h-12 flex items-center justify-center gap-2 bg-[#CCFF00] text-ink font-black text-[13px] uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white"
-            style={{ letterSpacing: "0.08em" }}
-          >
-            <Check className="w-5 h-5" />
-            Confirm {matches.filter((m) => !m.missing && m.box).length} player{matches.filter((m) => !m.missing && m.box).length === 1 ? "" : "s"}
-          </button>
-          <p className="mt-2 text-[10px] text-white/45 text-center" style={{ letterSpacing: "0.04em" }}>
-            Tap any frame to correct the AI{`'`}s pick.  Missing frames will be skipped.
-          </p>
-        </div>
-      )}
+        {/* Marking overlay (instructions + skip/zoom controls) */}
+        {phase === "MARKING" && (
+          <MarkingOverlay
+            hintIdx={currentHintIdx}
+            queue={queue}
+            queuePos={queuePos}
+            confirmedCount={confirmedCount}
+            hasDraft={!!draftBox}
+            zoom={zoom}
+            onSkip={handleSkipFrame}
+            onRetap={handleRetap}
+            onConfirm={handleConfirmMark}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onResetZoom={handleResetZoom}
+          />
+        )}
+      </div>
     </div>,
     document.body,
   );
@@ -678,416 +551,289 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
 
 ScoutMode.displayName = "ScoutMode";
 
-// ── Sub-components ──────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────
 
-/** Live lime outline locked over the user's tapped player. */
-function LockedPlayerBox({ box, videoEl, stageRect, accent }) {
-  if (!box || !videoEl?.videoWidth || !stageRect.w) return null;
+function DraftMarker({ box, videoEl, stageRect, zoom, pan, onPointerDown }) {
+  if (!box || !videoEl?.videoWidth) return null;
   const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
   const sw = stageRect.w, sh = stageRect.h;
-  const scale = Math.min(sw / vw, sh / vh);
-  const rW = vw * scale, rH = vh * scale;
+  const baseScale = Math.min(sw / vw, sh / vh);
+  const rW = vw * baseScale, rH = vh * baseScale;
   const offX = (sw - rW) / 2, offY = (sh - rH) / 2;
-  const x = box.x * rW + offX;
-  const y = box.y * rH + offY;
-  const w = box.w * rW;
-  const h = box.h * rH;
+  // Position in pre-zoom coords
+  const x0 = box.x * rW + offX;
+  const y0 = box.y * rH + offY;
+  const w0 = box.w * rW;
+  const h0 = box.h * rH;
+  // Apply CSS zoom & pan transform same as video
+  const centreX = sw / 2 + pan.x;
+  const centreY = sh / 2 + pan.y;
+  const x = (x0 - sw / 2) * zoom + centreX;
+  const y = (y0 - sh / 2) * zoom + centreY;
+  const w = w0 * zoom, h = h0 * zoom;
+
   return (
-    <div
-      data-testid="scout-locked-player"
-      style={{
-        position: "absolute",
-        left: x - 2,
-        top: y - 2,
-        width: w + 4,
-        height: h + 4,
-        border: `3px solid ${accent}`,
-        borderRadius: 6,
-        boxShadow: `0 0 0 1px rgba(0,0,0,0.7), 0 0 28px ${accent}80`,
-        pointerEvents: "none",
-        zIndex: 40,
-        animation: "scoutLockPop 0.55s ease-out forwards",
-      }}
-    >
-      <style>{`
-        @keyframes scoutLockPop {
-          0%   { transform: scale(1.15); opacity: 0; }
-          60%  { transform: scale(0.98); opacity: 1; }
-          100% { transform: scale(1.00); opacity: 1; }
-        }
-      `}</style>
+    <>
       <div
+        data-testid="scout-draft-marker"
+        onMouseDown={(e) => onPointerDown(e, "move")}
+        onTouchStart={(e) => onPointerDown(e, "move")}
         style={{
           position: "absolute",
-          bottom: -22,
-          left: "50%",
-          transform: "translateX(-50%)",
-          padding: "2px 6px",
-          background: accent,
-          color: "#0A0F0D",
-          fontSize: 10,
-          fontWeight: 900,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          whiteSpace: "nowrap",
+          left: x - 2,
+          top: y - 2,
+          width: w + 4,
+          height: h + 4,
+          border: "3px solid #CCFF00",
+          borderRadius: 6,
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.7), 0 0 24px rgba(204,255,0,0.55)",
+          background: "rgba(204,255,0,0.06)",
+          cursor: "move",
+          touchAction: "none",
+          zIndex: 30,
+        }}
+      />
+      {/* Resize handle (bottom-right) */}
+      <div
+        data-testid="scout-draft-resize"
+        onMouseDown={(e) => onPointerDown(e, "resize")}
+        onTouchStart={(e) => onPointerDown(e, "resize")}
+        style={{
+          position: "absolute",
+          left: x + w - 10,
+          top: y + h - 10,
+          width: 22,
+          height: 22,
+          background: "#CCFF00",
+          border: "2px solid #0A0F0D",
+          borderRadius: 4,
+          cursor: "nwse-resize",
+          touchAction: "none",
+          zIndex: 31,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.6)",
+        }}
+      />
+    </>
+  );
+}
+
+function PremiumBootOverlay({ progress, stage }) {
+  const [insightIdx, setInsightIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setInsightIdx((i) => (i + 1) % SCOUT_INSIGHTS.length), 4000);
+    return () => clearInterval(id);
+  }, []);
+  const pct = Math.round(progress * 100);
+  const stageLabel =
+    stage === "uploading" ? "Uploading video"
+    : stage === "analysing" ? "Analysing footage"
+    : "Generating player screenshots";
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink/97 backdrop-blur-md text-white px-8" style={{ zIndex: 50 }}>
+      {/* Crest / loading mark */}
+      <div className="relative w-24 h-24 mb-6">
+        <div className="absolute inset-0 rounded-full border-[3px] border-white/8" />
+        <svg
+          viewBox="0 0 100 100"
+          className="absolute inset-0 transition-all duration-300"
+          style={{ transform: "rotate(-90deg)" }}
+        >
+          <circle
+            cx="50" cy="50" r="46"
+            fill="none"
+            stroke="#CCFF00"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeDasharray={`${pct * 2.89} 289`}
+            style={{ transition: "stroke-dasharray 0.35s ease-out", filter: "drop-shadow(0 0 8px rgba(204,255,0,0.55))" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-[#CCFF00] font-black text-lg tabular-nums" style={{ letterSpacing: "-0.02em" }}>
+            {pct}%
+          </span>
+        </div>
+      </div>
+
+      {/* Stage label */}
+      <div className="text-white font-black text-[18px] mb-1 tracking-tight">
+        {stageLabel}
+      </div>
+      <div className="text-white/55 text-[12px] mb-8 text-center max-w-xs">
+        {stage === "uploading"
+          ? "Preparing your video for analysis…"
+          : stage === "analysing"
+          ? "Finding the natural breakpoints in the match…"
+          : "Capturing 10 key moments to mark your player."}
+      </div>
+
+      {/* Insights ticker */}
+      <div
+        className="w-full max-w-sm px-4 py-3 bg-white/3 border-l-2 border-[#CCFF00]"
+        style={{ minHeight: 64 }}
+      >
+        <div className="text-[#CCFF00] text-[9px] uppercase tracking-[0.2em] font-black mb-1">
+          Scouting Insight
+        </div>
+        <div className="text-white/85 text-[13px] leading-snug transition-opacity duration-500" key={insightIdx}>
+          {SCOUT_INSIGHTS[insightIdx]}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MarkingOverlay({
+  hintIdx,
+  queue,
+  queuePos,
+  confirmedCount,
+  hasDraft,
+  zoom,
+  onSkip,
+  onRetap,
+  onConfirm,
+  onZoomIn,
+  onZoomOut,
+  onResetZoom,
+}) {
+  const totalFrames = queue.length || 10;
+  const targetN = Math.max(confirmedCount + 1, queuePos + 1);
+
+  return (
+    <>
+      {/* Top instruction strip */}
+      <div
+        className="absolute left-0 right-0 flex items-center justify-between"
+        style={{
+          top: 0,
+          height: 56,
+          padding: "0 14px",
+          background: "linear-gradient(180deg, rgba(10,15,13,0.94) 0%, rgba(10,15,13,0.65) 75%, rgba(10,15,13,0) 100%)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          zIndex: 15,
+          pointerEvents: "none",
         }}
       >
-        ✓ Player locked
-      </div>
-    </div>
-  );
-}
-
-/** Boot screen — shows scene-cut detection & frame extraction progress. */
-function BootOverlay({ progress, stage }) {
-  const pct = Math.round(progress * 100);
-  return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink/95 backdrop-blur-md text-white px-6" style={{ zIndex: 50 }}>
-      <div className="relative w-20 h-20 mb-4">
-        <div className="absolute inset-0 rounded-full border-4 border-[#CCFF00]/15" />
-        <div
-          className="absolute inset-0 rounded-full border-4 border-[#CCFF00] border-t-transparent animate-spin"
-          style={{ animationDuration: "1.1s" }}
-        />
-        <div className="absolute inset-0 flex items-center justify-center text-[#CCFF00] font-black text-base tabular-nums">
-          {pct}%
-        </div>
-      </div>
-      <div className="text-white font-black text-[15px] mb-1 tracking-wide">
-        {stage === "scene" ? "Reading the match…" : "Preparing 10 keyframes…"}
-      </div>
-      <div className="text-white/65 text-[11px] text-center max-w-xs">
-        {stage === "scene"
-          ? "Finding the natural breakpoints in your video so the AI can analyse each segment correctly."
-          : "Capturing 10 distinct moments to identify your player from."}
-      </div>
-    </div>
-  );
-}
-
-/** "Tap the player you want to identify" — initial overlay. */
-function TapHintOverlay({ hintIdx, total, onPrev, onNext }) {
-  return (
-    <>
-      {/* Centred instruction */}
-      <div
-        className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none"
-        style={{ top: 24, zIndex: 20 }}
-      >
-        <div className="flex items-center gap-2 bg-ink/92 backdrop-blur px-3 py-1.5 border border-[#CCFF00]/45">
-          <Hand className="w-4 h-4 text-[#CCFF00]" />
-          <span className="text-[13px] font-black text-[#CCFF00] uppercase tracking-wide leading-none">
-            Tap the player you want to identify
-          </span>
-        </div>
-      </div>
-
-      {/* Soft pulsing crosshair near the centre — visual invitation to tap */}
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ zIndex: 15 }}
-      >
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            border: "2px dashed rgba(204,255,0,0.55)",
-            animation: "scoutPulse 1.6s ease-in-out infinite",
-          }}
-        />
-        <style>{`
-          @keyframes scoutPulse {
-            0%, 100% { opacity: 0.35; transform: scale(1); }
-            50%      { opacity: 0.85; transform: scale(1.15); }
-          }
-        `}</style>
-      </div>
-
-      {/* Frame navigation — "this frame isn't great" */}
-      <div
-        className="absolute left-0 right-0 flex items-center justify-between px-3"
-        style={{ bottom: 16, zIndex: 20 }}
-      >
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onPrev?.(); }}
-          disabled={!onPrev}
-          className="text-white/65 hover:text-[#CCFF00] disabled:opacity-30 transition-colors"
-          style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", pointerEvents: "auto", background: "transparent", border: "none" }}
-          data-testid="scout-prev-frame"
-        >
-          ← Other frame
-        </button>
-        <span className="text-white/60 tabular-nums" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", pointerEvents: "none" }}>
-          FRAME {hintIdx + 1} / {total}
-        </span>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onNext?.(); }}
-          disabled={!onNext}
-          className="text-white/65 hover:text-[#CCFF00] disabled:opacity-30 transition-colors"
-          style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", pointerEvents: "auto", background: "transparent", border: "none" }}
-          data-testid="scout-next-frame"
-        >
-          Other frame →
-        </button>
-      </div>
-    </>
-  );
-}
-
-/** Overlay when user is re-tapping a single review frame to correct AI. */
-function ManualCorrectOverlay({ frameNumber, onCancel }) {
-  return (
-    <>
-      <div
-        className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
-        style={{ top: 18, zIndex: 20 }}
-      >
-        <div className="flex items-center gap-2 bg-ink/95 backdrop-blur px-3 py-1.5 border border-amber-300/55">
-          <Hand className="w-4 h-4 text-amber-300" />
+        <div className="flex items-baseline gap-2">
           <span
-            className="text-amber-200 font-black uppercase leading-none"
-            style={{ fontSize: 13, letterSpacing: "0.04em" }}
+            className="text-white font-black tabular-nums leading-none"
+            style={{ fontSize: 26, letterSpacing: "-0.02em" }}
+            data-testid="scout-progress-counter"
           >
-            Correct frame {frameNumber} — tap the right player
+            {confirmedCount}<span className="text-white/35 font-bold text-[16px]">/{totalFrames}</span>
+          </span>
+          <span className="text-white/80 leading-none" style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.01em" }}>
+            {hasDraft ? "Adjust & confirm" : "Tap your player"}
           </span>
         </div>
+        <span
+          className="text-white/45 tabular-nums"
+          style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em" }}
+        >
+          FRAME {queuePos + 1}/{totalFrames}
+        </span>
       </div>
+
+      {/* Progress dots row (just under the strip) */}
       <div
-        className="absolute left-0 right-0 flex items-center justify-center px-3"
-        style={{ bottom: 16, zIndex: 20 }}
+        className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5"
+        style={{ top: 50, zIndex: 14, pointerEvents: "none" }}
       >
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onCancel?.(); }}
-          className="text-white/65 hover:text-[#CCFF00] transition-colors"
-          style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", pointerEvents: "auto", background: "transparent", border: "none" }}
-          data-testid="scout-cancel-correct"
-        >
-          ← Back to review
-        </button>
-      </div>
-    </>
-  );
-}
-
-/** Progress card during Gemini parallel tracking call. */
-function TrackingOverlay({ startedAt, expectedMs, error, onRetry, onSkipToReview }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!startedAt) return;
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, [startedAt]);
-  const elapsedMs = startedAt ? Math.max(0, now - startedAt) : 0;
-  const sec = Math.floor(elapsedMs / 1000);
-  const pct = Math.min(95, (elapsedMs / Math.max(1, expectedMs)) * 95);
-  const STAGES = [
-    "Reading your player's appearance…",
-    "Scanning the other 9 frames in parallel…",
-    "Matching jersey, shorts, body shape…",
-    "Cross-checking position and movement…",
-    "Almost ready…",
-  ];
-  const message = STAGES[Math.min(STAGES.length - 1, Math.floor(sec / 4))];
-  const elapsedLabel = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-  const expectedLabel = `${Math.floor(expectedMs / 60000)}:${String(Math.round((expectedMs % 60000) / 1000)).padStart(2, "0")}`;
-
-  return (
-    <div
-      className="absolute left-1/2 -translate-x-1/2"
-      style={{
-        top: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "min(82vw, 340px)",
-        padding: "16px 18px",
-        background: "rgba(10,15,13,0.94)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(204,255,0,0.45)",
-        boxShadow: "0 12px 36px rgba(0,0,0,0.6)",
-        zIndex: 30,
-      }}
-      data-testid="scout-tracking-card"
-    >
-      {error ? (
-        <>
-          <div className="flex items-center gap-2 mb-2">
-            <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 10px #EF4444" }} />
-            <span style={{ color: "#FFFFFF", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              Tracking failed
-            </span>
-          </div>
-          <p className="text-white/75 text-[12px] mb-3 leading-snug">{error}</p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onRetry}
-              className="flex-1 h-9 bg-[#CCFF00] text-ink font-black text-[11px] uppercase tracking-wider hover:bg-white"
-              data-testid="scout-track-retry"
-            >
-              Retry
-            </button>
-            <button
-              type="button"
-              onClick={onSkipToReview}
-              className="flex-1 h-9 border border-white/25 text-white/85 font-black text-[11px] uppercase tracking-wider hover:text-[#CCFF00] hover:border-[#CCFF00]"
-              data-testid="scout-track-skip"
-            >
-              Mark manually
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                style={{
-                  width: 9, height: 9, borderRadius: "50%",
-                  background: "#CCFF00",
-                  boxShadow: "0 0 10px #CCFF00",
-                  animation: "scoutPulse 1.1s ease-in-out infinite",
-                }}
-              />
-              <span style={{ color: "#FFFFFF", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Tracking your player
-              </span>
-            </div>
-            <span className="tabular-nums" style={{ color: "rgba(255,255,255,0.55)", fontSize: 11, fontWeight: 700 }}>
-              {elapsedLabel} <span style={{ color: "rgba(255,255,255,0.35)" }}>/ ~{expectedLabel}</span>
-            </span>
-          </div>
-          <div style={{ height: 3, background: "rgba(255,255,255,0.1)", overflow: "hidden", marginBottom: 8 }}>
-            <div
-              style={{
-                width: `${pct}%`,
-                height: "100%",
-                background: "linear-gradient(90deg, #CCFF00 0%, #22C55E 100%)",
-                transition: "width 0.25s ease-out",
-                boxShadow: "0 0 6px rgba(204,255,0,0.55)",
-              }}
-            />
-          </div>
-          <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 12, fontWeight: 500 }}>
-            {message}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/** Final 10-thumbnail review grid. */
-function ReviewGrid({ matches, frameCache, onTapThumb }) {
-  return (
-    <div
-      className="flex-1 bg-ink overflow-y-auto"
-      data-testid="scout-review-grid"
-    >
-      <div className="px-3 pt-3 pb-2">
-        <h2
-          className="text-white font-black tracking-wide leading-tight"
-          style={{ fontSize: 17, letterSpacing: "-0.005em" }}
-        >
-          Review your player
-        </h2>
-        <p className="mt-1 text-white/55 text-[11px] leading-snug">
-          The AI marked the same player across all 10 moments.  Tap any frame to correct it.
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-1.5 px-2 pb-3">
-        {matches.map((m, i) => {
-          const frame = frameCache[i];
+        {queue.map((qi, i) => {
+          const isPast = i < queuePos;
+          const isCur = i === queuePos;
           return (
-            <ReviewThumb
-              key={i}
-              index={i}
-              imageUrl={frame?.jpegDataUrl}
-              box={m.box}
-              source={m.source}
-              missing={m.missing}
-              confidence={m.confidence}
-              onTap={() => onTapThumb(i)}
+            <span
+              key={qi}
+              style={{
+                width: isCur ? 18 : 6,
+                height: 6,
+                borderRadius: 3,
+                background: isPast ? "#CCFF00" : isCur ? "#FFFFFF" : "rgba(255,255,255,0.2)",
+                transition: "all 0.25s ease",
+              }}
             />
           );
         })}
       </div>
-    </div>
-  );
-}
 
-/** One thumbnail in the review grid. */
-function ReviewThumb({ index, imageUrl, box, source, missing, confidence, onTap }) {
-  const accent = missing
-    ? "#EF4444"
-    : source === "user"
-      ? "#22C55E"
-      : confidence >= 0.7
-        ? "#CCFF00"
-        : "#FBBF24";
-  const label = missing
-    ? "Missing — tap to add"
-    : source === "user"
-      ? "You marked"
-      : confidence >= 0.7
-        ? "AI confident"
-        : "Low confidence";
-
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      data-testid={`scout-review-thumb-${index + 1}`}
-      className="relative bg-black overflow-hidden transition-transform active:scale-[0.98]"
-      style={{ aspectRatio: "16 / 9", border: "1px solid rgba(255,255,255,0.1)", padding: 0 }}
-      aria-label={`Frame ${index + 1} — ${label}`}
-    >
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={`Frame ${index + 1}`}
-          className="absolute inset-0 w-full h-full object-cover"
-          draggable={false}
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-white/40 text-[10px]">no frame</div>
-      )}
-      {box && !missing && (
-        <div
-          style={{
-            position: "absolute",
-            left: `${box.x * 100}%`,
-            top: `${box.y * 100}%`,
-            width: `${box.w * 100}%`,
-            height: `${box.h * 100}%`,
-            border: `2px solid ${accent}`,
-            borderRadius: 3,
-            boxShadow: `0 0 0 1px rgba(0,0,0,0.7), 0 0 10px ${accent}88`,
-            pointerEvents: "none",
-          }}
-        />
-      )}
-      {/* Top-left frame number */}
-      <span
-        className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-ink/85 backdrop-blur text-white text-[9px] font-black tabular-nums tracking-widest"
-        style={{ letterSpacing: "0.1em" }}
+      {/* Bottom action bar */}
+      <div
+        className="absolute left-0 right-0 px-3"
+        style={{ bottom: 14, zIndex: 20 }}
       >
-        {String(index + 1).padStart(2, "0")}
-      </span>
-      {/* Bottom-right status pill */}
-      <span
-        className="absolute bottom-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 backdrop-blur text-[9px] font-black uppercase"
-        style={{
-          background: missing ? "rgba(239,68,68,0.92)" : "rgba(10,15,13,0.85)",
-          color: missing ? "#FFFFFF" : accent,
-          letterSpacing: "0.08em",
-        }}
-      >
-        {missing ? "Add" : label}
-      </span>
-    </button>
+        {hasDraft ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRetap(); }}
+              data-testid="scout-retap"
+              className="h-12 px-4 flex items-center justify-center gap-1.5 bg-ink/85 backdrop-blur border border-white/22 text-white/85 font-black text-[11px] uppercase tracking-widest hover:text-[#CCFF00] hover:border-[#CCFF00] transition-colors"
+              style={{ pointerEvents: "auto" }}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Re-tap
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onConfirm(); }}
+              data-testid="scout-confirm-mark"
+              className="flex-1 h-12 flex items-center justify-center gap-2 bg-[#CCFF00] text-ink font-black text-[13px] uppercase tracking-wider hover:bg-white transition-colors"
+              style={{ pointerEvents: "auto", letterSpacing: "0.08em" }}
+            >
+              <Check className="w-5 h-5" />
+              Confirm Player {targetN}
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSkip(); }}
+              data-testid="scout-skip-frame"
+              className="h-11 px-3 flex items-center gap-1.5 text-white/55 hover:text-[#CCFF00] transition-colors"
+              style={{ pointerEvents: "auto", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", background: "transparent", border: "none" }}
+            >
+              Not visible · skip frame
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onZoomOut(); }}
+                disabled={zoom <= 1.01}
+                data-testid="scout-zoom-out"
+                className="w-10 h-10 flex items-center justify-center bg-ink/85 backdrop-blur border border-white/22 text-white/85 hover:text-[#CCFF00] hover:border-[#CCFF00] disabled:opacity-30 transition-colors"
+                style={{ pointerEvents: "auto" }}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onResetZoom(); }}
+                data-testid="scout-zoom-reset"
+                className="h-10 px-2.5 flex items-center justify-center bg-ink/85 backdrop-blur border border-white/22 text-white/75 hover:text-[#CCFF00] hover:border-[#CCFF00] transition-colors tabular-nums"
+                style={{ pointerEvents: "auto", fontSize: 10, fontWeight: 800, letterSpacing: "0.04em" }}
+              >
+                {zoom.toFixed(1)}×
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onZoomIn(); }}
+                disabled={zoom >= 2.99}
+                data-testid="scout-zoom-in"
+                className="w-10 h-10 flex items-center justify-center bg-ink/85 backdrop-blur border border-white/22 text-white/85 hover:text-[#CCFF00] hover:border-[#CCFF00] disabled:opacity-30 transition-colors"
+                style={{ pointerEvents: "auto" }}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
