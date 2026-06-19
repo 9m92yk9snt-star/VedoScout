@@ -1329,70 +1329,46 @@ export default function MarkerStudio({
     toast.info(`Re-mark your kid at ${formatTime(target.t)}.`);
   }, [anchors]);
 
-  /* ── Scout Mode v3.1 — confirm handler ─────────────────────────
-   *    ScoutMode emits anchors in VIDEO-NATIVE-normalised coords (matches
-   *    what the backend `extract_player_fingerprint` expects, since the
-   *    marker JPG is the full-resolution video frame). We seek our existing
-   *    videoRef to anchor 1's timestamp, draw the native-resolution frame
-   *    to a canvas, and submit blob + anchors via the existing onConfirm
-   *    contract — no upload/backend changes needed. */
-  const handleScoutConfirm = useCallback(({ anchors: scoutAnchors, sceneCuts }) => {
+  /* ── Scout Mode v5.0 — confirm handler ─────────────────────────
+   *    ScoutMode emits anchors in VIDEO-NATIVE-normalised coords plus a
+   *    `markerImageDataUrl` (data URL of the FIRST anchor's captured frame).
+   *    We can't rely on our own videoRef here because MarkerStudio unmounts
+   *    its <video> while Scout Mode is open (iOS Safari decoder fix).
+   *    So we convert the supplied data URL → Blob and submit via the
+   *    existing onConfirm contract — no upload/backend changes needed. */
+  const handleScoutConfirm = useCallback(({ anchors: scoutAnchors, sceneCuts, markerImageDataUrl }) => {
     if (!scoutAnchors?.length) return;
-    const v = videoRef.current;
-    if (!v) {
-      toast.error("Video element unavailable — please retry.");
+    if (!markerImageDataUrl) {
+      toast.error("Could not capture the frame — please try again.");
       return;
     }
     setScoutSceneCuts(sceneCuts || []);
     const first = scoutAnchors[0];
-    const finalise = () => {
-      const w = v.videoWidth, h = v.videoHeight;
-      if (!w || !h) {
-        toast.error("Could not capture the frame — try a different moment.");
-        return;
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      canvas.getContext("2d").drawImage(v, 0, 0, w, h);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            toast.error("Could not capture the frame — try a different moment.");
-            return;
-          }
-          onConfirm({
-            markerBlob: blob,
-            markerTimestamp: first.t,
-            markerBox: first.box,
-            markerAnchors: scoutAnchors.map((a) => ({
-              t: a.t,
-              box: a.box,
-              segment: a.segment ?? 0,
-            })),
-            sceneCuts: sceneCuts || [],
-            scoutMode: true,
-          });
-        },
-        "image/jpeg",
-        0.92,
-      );
-    };
-    if (Math.abs(v.currentTime - first.t) < 0.15) {
-      finalise();
-    } else {
-      const onSeeked = () => {
-        v.removeEventListener("seeked", onSeeked);
-        finalise();
-      };
-      v.addEventListener("seeked", onSeeked);
-      try { v.currentTime = first.t; } catch { finalise(); }
-      setTimeout(() => {
-        v.removeEventListener("seeked", onSeeked);
-        finalise();
-      }, 900);
-    }
-    setScoutOpen(false);
+    // Convert data URL → Blob (we already have the JPEG, no re-encode).
+    fetch(markerImageDataUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
+        if (!blob || blob.size === 0) {
+          toast.error("Could not capture the frame — please try again.");
+          return;
+        }
+        onConfirm({
+          markerBlob: blob,
+          markerTimestamp: first.t,
+          markerBox: first.box,
+          markerAnchors: scoutAnchors.map((a) => ({
+            t: a.t,
+            box: a.box,
+            segment: a.segment ?? 0,
+          })),
+          sceneCuts: sceneCuts || [],
+          scoutMode: true,
+        });
+        setScoutOpen(false);
+      })
+      .catch(() => {
+        toast.error("Could not capture the frame — please try again.");
+      });
   }, [onConfirm]);
 
   /* ── Final Done — submit all anchors plus the marker JPG ───── */

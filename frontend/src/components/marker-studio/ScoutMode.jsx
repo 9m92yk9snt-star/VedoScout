@@ -428,25 +428,38 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     setDraftBox(null);
   }, []);
 
+  const handleFinishEarly = useCallback(() => {
+    if (confirmedCount < MIN_REQUIRED) return;
+    setPhase("DONE");
+  }, [confirmedCount]);
+
   /* ── DONE: build payload and call onConfirm ─────────────────── */
   useEffect(() => {
     if (phase !== "DONE") return;
-    const anchors = [];
-    for (const idxStr of Object.keys(marks)) {
-      const i = Number(idxStr);
+    // Sort confirmed marks by frame index so anchor[0] is the earliest in time.
+    const indices = Object.keys(marks)
+      .map(Number)
+      .filter((i) => marks[i] && !marks[i].skipped)
+      .sort((a, b) => a - b);
+    const anchors = indices.map((i) => {
       const m = marks[i];
-      if (!m || m.skipped) continue;
       let seg = 0;
       for (let s = 0; s < sceneCuts.length; s++) if (m.hintT >= sceneCuts[s]) seg = s + 1;
-      anchors.push({ t: m.hintT, box: { x: m.x, y: m.y, w: m.w, h: m.h }, segment: seg });
-    }
+      return { t: m.hintT, box: { x: m.x, y: m.y, w: m.w, h: m.h }, segment: seg };
+    });
     if (anchors.length < MIN_REQUIRED) {
       // not enough — fall back to MARKING for retry
       setPhase("MARKING");
       return;
     }
-    onConfirm({ anchors, sceneCuts });
-  }, [phase, marks, sceneCuts, onConfirm]);
+    // Pass the first anchor's captured frame as the marker JPEG (data URL).
+    // The parent's <video> is unmounted while Scout Mode is open (decoder
+    // conflict fix) so we MUST supply the frame ourselves instead of asking
+    // the parent to grab it from a null videoRef.
+    const firstIdx = indices[0];
+    const markerImageDataUrl = frameCache[firstIdx]?.jpegDataUrl || null;
+    onConfirm({ anchors, sceneCuts, markerImageDataUrl });
+  }, [phase, marks, sceneCuts, frameCache, onConfirm]);
 
   /* ── Render ────────────────────────────────────────────────── */
   if (!open) return null;
@@ -538,6 +551,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
             onSkip={handleSkipFrame}
             onRetap={handleRetap}
             onConfirm={handleConfirmMark}
+            onFinishEarly={handleFinishEarly}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onResetZoom={handleResetZoom}
@@ -694,12 +708,14 @@ function MarkingOverlay({
   onSkip,
   onRetap,
   onConfirm,
+  onFinishEarly,
   onZoomIn,
   onZoomOut,
   onResetZoom,
 }) {
   const totalFrames = queue.length || 10;
   const targetN = Math.max(confirmedCount + 1, queuePos + 1);
+  const canFinish = confirmedCount >= MIN_REQUIRED;
 
   return (
     <>
@@ -789,7 +805,7 @@ function MarkingOverlay({
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onSkip(); }}
@@ -797,9 +813,21 @@ function MarkingOverlay({
               className="h-11 px-3 flex items-center gap-1.5 text-white/55 hover:text-[#CCFF00] transition-colors"
               style={{ pointerEvents: "auto", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", background: "transparent", border: "none" }}
             >
-              Not visible · skip frame
+              Not visible · next frame
               <ChevronRight className="w-4 h-4" />
             </button>
+            {canFinish && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onFinishEarly(); }}
+                data-testid="scout-finish-early"
+                className="h-11 px-4 flex items-center gap-1.5 bg-[#CCFF00]/12 border border-[#CCFF00]/55 text-[#CCFF00] hover:bg-[#CCFF00] hover:text-ink transition-colors"
+                style={{ pointerEvents: "auto", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}
+              >
+                <Check className="w-3.5 h-3.5" />
+                Finish ({confirmedCount} marked)
+              </button>
+            )}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
