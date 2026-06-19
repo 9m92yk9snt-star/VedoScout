@@ -26,6 +26,17 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 38 — Dashboard reorganised (TRACK PROGRESS + LIBRARY) for a professional, scannable hierarchy (Feb 19 2026, 19:50)**:
+  - **User report**: the two dashboard sections ("Track progress · Your players" and "Library · Your reports") read as identical sibling lists with no visual hierarchy, sparse cards, lots of whitespace, and unclear separation. Wanted "better organized structure, more professional, easy to see and use — without adding new features."
+  - **Restructure** (purely organisational — no new components, no new data, no new features):
+    - **Unified panel-header pattern** introduced (`SectionHeader` helper) used for BOTH zones: `EYEBROW · vertical separator · TITLE` on the left, count chip on the right, with a hairline `border-b border-ink/15` rule underneath. Makes the two sections clearly read as parallel categories.
+    - **Players: card-grid → professional row-list register.** Replaced the 3-column `PlayerCard` grid (sparse, mobile-wasteful) with a single bordered panel + divided rows (Linear / Stripe Express pattern). Each row: position chip (left rail, fixed width) · name + meta (age · foot · #-of-reports) · arrow (right). 5 players now fit above the fold on a phone vs ~1.7 before.
+    - **Reports: tightened card.** Date + PREMIUM/PREVIEW badge overlay kept on the thumbnail; the body block now has a single tight line — **name + position · age · video-type · VIEW →** — instead of the old two stacked text rows + wider footer. Padding reduced (`p-5` → `px-4 pt-3 pb-3.5`), border colour aligned to ink/10 to match the new panels.
+  - **Preserved**: every `data-testid` (`dashboard-players-section`, `player-card-{id}`, `dashboard-report-{r.id}`, etc.), all routes, all data fetches, all backend contracts, the Progress Pass banner, the empty state, every feature.
+  - **Removed**: dead `const Icon = Users;` from the old `PlayerCard` (icon never rendered) and now-unused `Users` import.
+  - **Tested**: ✅ ESLint clean (only 2 pre-existing eslint-disable-directive warnings on existing exhaustive-deps hooks). ✅ Live mobile screenshot (390×844, premium test account) shows the new `LIBRARY | YOUR REPORTS · 1 REPORT` panel header with hairline rule + tightened report card rendering cleanly. ✅ Synthetic players-panel preview (5 mock players) shows all 5 players visible above the fold with crisp typography and clear status hierarchy.
+  - **Files**: MODIFIED only `/app/frontend/src/pages/DashboardPage.jsx`.
+
 - ✅ **🆕 Session 37 — Post-analysis "Report Ready" celebratory done-state (Feb 19 2026, 19:30)**:
   - **User report**: when the upload/analysis hits 100 %, the loader vanishes abruptly and the user is left back on the upload form with no clear signal that a report was created. Only when they manually navigate to the dashboard do they discover the report exists. Feels broken.
   - **Fix** (scope-locked: only the post-100 % feedback path, nothing else):

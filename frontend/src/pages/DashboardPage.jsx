@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
   Plus, Lock, CheckCircle2, Film, Loader2, Rocket, TrendingUp, AlertCircle,
-  Users, Activity, ArrowRight, Sparkles, Zap,
+  Activity, ArrowRight, Sparkles, Zap,
 } from "lucide-react";
 
 const VERDICT_META = {
@@ -109,32 +109,29 @@ export default function DashboardPage() {
 
               {/* PLAYERS / TRAJECTORIES */}
               {players.length > 0 && (
-                <div className="mt-10" data-testid="dashboard-players-section">
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <span className="text-forest text-xs uppercase tracking-[0.25em] font-bold">Track progress</span>
-                      <h2 className="mt-1 font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter">Your players</h2>
-                    </div>
-                    <span className="text-xs text-ink/55">{players.length} tracked</span>
-                  </div>
-                  <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <section className="mt-10" data-testid="dashboard-players-section">
+                  <SectionHeader
+                    eyebrow="Track progress"
+                    title="Your players"
+                    countLabel={`${players.length} tracked`}
+                  />
+                  <ul className="mt-3 bg-cream-card border border-ink/10 divide-y divide-ink/10">
                     {players.map((p) => (
-                      <PlayerCard key={p.id} p={p} />
+                      <PlayerRow key={p.id} p={p} />
                     ))}
-                  </div>
-                </div>
+                  </ul>
+                </section>
               )}
 
               {/* REPORTS */}
-              <div className="mt-12">
-                <div className="flex items-baseline justify-between">
-                  <div>
-                    <span className="text-forest text-xs uppercase tracking-[0.25em] font-bold">Library</span>
-                    <h2 className="mt-1 font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter">Your reports</h2>
-                  </div>
-                </div>
+              <section className="mt-12">
+                <SectionHeader
+                  eyebrow="Library"
+                  title="Your reports"
+                  countLabel={reports.length > 0 ? `${reports.length} ${reports.length === 1 ? "report" : "reports"}` : null}
+                />
                 {reports.length === 0 ? (
-                  <div className="mt-5 border border-gray-border bg-cream-card p-12 text-center">
+                  <div className="mt-4 border border-ink/10 bg-cream-card p-12 text-center">
                     <Film className="w-12 h-12 text-forest mx-auto mb-4" strokeWidth={1.5} />
                     <h3 className="font-barlow font-black uppercase text-2xl">No uploads yet</h3>
                     <p className="mt-2 text-ink/65 text-sm">Upload your first football video and receive an instant free scout preview.</p>
@@ -147,7 +144,7 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                 ) : (
-                  <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-cream-soft/40 border border-gray-border">
+                  <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-ink/10 border border-ink/10">
                     {reports.map((r) => {
                       const unlocked = r.is_paid || r.manually_unlocked;
                       return (
@@ -180,30 +177,30 @@ export default function DashboardPage() {
                                   <CheckCircle2 className="w-3 h-3" /> Premium
                                 </span>
                               ) : (
-                                <span className="flex items-center gap-1 bg-cream-card/90 backdrop-blur border border-gray-border text-ink/80 text-[10px] uppercase tracking-widest font-bold px-2 py-1">
+                                <span className="flex items-center gap-1 bg-cream-card/90 backdrop-blur border border-ink/15 text-ink/80 text-[10px] uppercase tracking-widest font-bold px-2 py-1">
                                   <Lock className="w-3 h-3" /> Preview
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="p-5 flex-1 flex flex-col">
-                            <h3 className="font-barlow font-black uppercase text-xl text-ink group-hover:text-forest transition-colors leading-tight">
-                              {r.player_details?.player_name}
-                            </h3>
-                            <p className="mt-1 text-sm text-ink/65">
-                              {r.player_details?.position} · age {r.player_details?.age}
-                            </p>
-                            <div className="mt-auto pt-4 flex items-center justify-between">
-                              <span className="text-[10px] uppercase tracking-widest text-ink/50 font-bold">{r.player_details?.video_type}</span>
-                              <span className="text-forest text-[10px] uppercase tracking-widest font-bold">View →</span>
+                          <div className="px-4 pt-3 pb-3.5 flex-1 flex flex-col">
+                            <div className="flex items-start justify-between gap-3">
+                              <h3 className="font-barlow font-black uppercase text-lg text-ink group-hover:text-forest transition-colors leading-tight truncate">
+                                {r.player_details?.player_name}
+                              </h3>
+                              <span className="text-forest text-[10px] uppercase tracking-widest font-black flex-shrink-0 mt-1">View →</span>
                             </div>
+                            <p className="mt-0.5 text-[12px] text-ink/60 leading-snug">
+                              {r.player_details?.position} · age {r.player_details?.age}
+                              {r.player_details?.video_type ? <span className="text-ink/40"> · {r.player_details.video_type}</span> : null}
+                            </p>
                           </div>
                         </Link>
                       );
                     })}
                   </div>
                 )}
-              </div>
+              </section>
             </>
           )}
         </div>
@@ -222,31 +219,64 @@ export default function DashboardPage() {
   );
 }
 
-function PlayerCard({ p }) {
-  const Icon = Users;
+/* ── Shared panel header used by both "Track progress · Your players"
+ *    and "Library · Your reports" sections. Establishes a consistent,
+ *    professional hierarchy: eyebrow label · vertical separator · title
+ *    on the left, count chip on the right, then a hairline rule. */
+function SectionHeader({ eyebrow, title, countLabel }) {
   return (
-    <Link
-      to={`/trajectory/${p.id}`}
-      data-testid={`player-card-${p.id}`}
-      className="group bg-cream-card border border-gray-border hover:border-forest p-5 flex flex-col transition-colors"
-    >
-      <div className="flex items-center justify-between">
-        <span className="bg-forest/10 text-forest font-barlow font-black uppercase text-[10px] tracking-widest px-2 py-1">
-          {p.last_position || "Player"}
+    <header className="flex items-end justify-between gap-3 pb-3 border-b border-ink/15">
+      <div className="flex items-baseline gap-3 min-w-0">
+        <span className="text-forest text-[10px] uppercase tracking-[0.3em] font-black flex-shrink-0">
+          {eyebrow}
         </span>
-        <span className="text-xs text-ink/55">{p.report_count} {p.report_count === 1 ? "report" : "reports"}</span>
+        <span className="h-3 w-px bg-ink/25 flex-shrink-0" aria-hidden="true" />
+        <h2 className="font-barlow font-black uppercase text-xl md:text-2xl tracking-tighter leading-none truncate">
+          {title}
+        </h2>
       </div>
-      <h3 className="mt-4 font-barlow font-black uppercase text-2xl text-ink group-hover:text-forest transition-colors leading-tight">
-        {p.name}
-      </h3>
-      <p className="mt-1 text-xs text-ink/55">
-        {p.last_age ? `Age ${p.last_age}` : ""} {p.preferred_foot ? `· ${p.preferred_foot} foot` : ""}
-      </p>
-      <div className="mt-4 pt-4 border-t border-gray-border flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-ink/50 font-bold">View trajectory</span>
-        <ArrowRight className="w-4 h-4 text-forest group-hover:translate-x-1 transition-transform" />
-      </div>
-    </Link>
+      {countLabel && (
+        <span className="text-[10px] uppercase tracking-widest text-ink/55 font-bold flex-shrink-0">
+          {countLabel}
+        </span>
+      )}
+    </header>
+  );
+}
+
+/* ── Compact row in the "Your players" list. Replaces the previous
+ *    PlayerCard grid because a divided row-list reads as a scannable
+ *    register (Linear / Stripe Express pattern) and uses screen real
+ *    estate efficiently — especially on mobile. */
+function PlayerRow({ p }) {
+  return (
+    <li>
+      <Link
+        to={`/trajectory/${p.id}`}
+        data-testid={`player-card-${p.id}`}
+        className="group flex items-center gap-3 sm:gap-4 px-4 py-3.5 hover:bg-cream-soft/60 transition-colors"
+      >
+        {/* Left rail: position badge */}
+        <div className="flex-shrink-0 min-w-[88px] sm:min-w-[124px]">
+          <span className="inline-flex bg-forest/10 text-forest font-barlow font-black uppercase text-[10px] tracking-[0.18em] px-2 py-1 leading-none">
+            {p.last_position || "Player"}
+          </span>
+        </div>
+        {/* Centre: name + meta */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-barlow font-black uppercase text-base sm:text-lg text-ink group-hover:text-forest transition-colors leading-tight truncate">
+            {p.name}
+          </h3>
+          <p className="mt-0.5 text-[11px] text-ink/55 leading-tight truncate">
+            {p.last_age ? `Age ${p.last_age}` : ""}
+            {p.preferred_foot ? ` · ${p.preferred_foot} foot` : ""}
+            {` · ${p.report_count} ${p.report_count === 1 ? "report" : "reports"}`}
+          </p>
+        </div>
+        {/* Right: arrow */}
+        <ArrowRight className="w-4 h-4 text-forest group-hover:translate-x-1 transition-transform flex-shrink-0" />
+      </Link>
+    </li>
   );
 }
 
