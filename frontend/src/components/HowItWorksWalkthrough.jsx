@@ -279,10 +279,10 @@ const UploadScene = () => (
       initial={{ opacity: 0, y: 12, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay: 5.6, type: "spring", stiffness: 200, damping: 14 }}
-      className="absolute left-1/2 top-[72%] -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 bg-white text-[10px] uppercase tracking-[0.3em] font-bold"
+      className="absolute left-1/2 top-[72%] -translate-x-1/2 z-20 flex items-center gap-2 px-4 py-2 bg-white text-[13px] md:text-[15px] uppercase tracking-[0.3em] font-bold"
       style={{ color: FOREST }}
     >
-      <CheckCircle2 className="w-3.5 h-3.5" />
+      <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5" />
       All sources received
       <motion.span
         className="absolute -inset-1 pointer-events-none"
@@ -314,7 +314,7 @@ const MasterStatus = () => {
     return () => timers.forEach(clearTimeout);
   }, []);
   return (
-    <div className="text-[8px] md:text-[9px] uppercase tracking-[0.25em] font-bold text-white/85 leading-tight">
+    <div className="text-[10px] md:text-[12px] uppercase tracking-[0.25em] font-bold text-white/95 leading-tight">
       {labels[idx].msg}
     </div>
   );
@@ -339,9 +339,9 @@ const DeviceUploadCard = ({ device, index }) => {
       transition={{ delay: 0.8 + index * 0.12, type: "spring", stiffness: 180, damping: 14 }}
     >
       {/* device header */}
-      <div className="flex items-center gap-1.5 mb-1 bg-ink/65 backdrop-blur-md px-1.5 py-1">
-        <Icon className="w-3 h-3 md:w-3.5 md:h-3.5" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
-        <span className="text-[7px] md:text-[8px] uppercase tracking-[0.22em] font-bold text-white/90">{label}</span>
+      <div className="flex items-center gap-1.5 mb-1 bg-ink/65 backdrop-blur-md px-2 py-1">
+        <Icon className="w-3.5 h-3.5 md:w-4 md:h-4" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
+        <span className="text-[9px] md:text-[11px] uppercase tracking-[0.22em] font-bold text-white/95">{label}</span>
       </div>
       {/* video thumbnail */}
       <div className="relative aspect-video overflow-hidden border border-white/30 shadow-2xl">
@@ -400,7 +400,7 @@ const DevicePercent = ({ start, end }) => {
     return () => clearTimeout(t);
   }, [start, end]);
   return (
-    <span className="text-[7px] md:text-[8px] uppercase font-bold tracking-wider w-6 text-right" style={{ color: "#CCFF99" }}>
+    <span className="text-[10px] md:text-[12px] uppercase font-bold tracking-wider w-7 text-right" style={{ color: "#CCFF99" }}>
       {n}%
     </span>
   );
@@ -510,7 +510,7 @@ const MarkScene = () => (
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3 }}
-        className="font-barlow font-black text-white text-xl bg-ink/55 backdrop-blur-md px-3 py-1"
+        className="font-barlow font-black text-white text-2xl md:text-3xl bg-ink/55 backdrop-blur-md px-3.5 py-1"
       >
         <TapCounter />
       </motion.span>
@@ -532,7 +532,7 @@ const MarkScene = () => (
       transition={{ delay: 6.3, duration: 1.2, times: [0, 0.1, 0.4, 1] }}
     >
       <div className="absolute inset-0" style={{ background: `radial-gradient(circle at 50% 50%, ${CREAM}66 0%, transparent 60%)` }} />
-      <div className="font-barlow font-black text-white text-4xl tracking-widest" style={{ textShadow: `0 0 24px ${CREAM}` }}>
+      <div className="font-barlow font-black text-white text-5xl md:text-6xl tracking-widest" style={{ textShadow: `0 0 24px ${CREAM}` }}>
         LOCKED IN
       </div>
     </motion.div>
@@ -688,10 +688,10 @@ const AnalyzeScene = () => (
           transition={{ delay: 2.6, duration: 0.5 }}
           className="mt-2 text-center"
         >
-          <div className="text-[9px] uppercase tracking-[0.3em] font-bold text-ink/55">Scout Score</div>
-          <div className="font-barlow font-black text-5xl md:text-6xl mt-0.5 leading-none" style={{ color: FOREST }}>
+          <div className="text-[11px] md:text-[12px] uppercase tracking-[0.32em] font-bold text-ink/65">Scout Score</div>
+          <div className="font-barlow font-black text-6xl md:text-7xl mt-0.5 leading-none" style={{ color: FOREST }}>
             <CountUp from={0} to={78} delay={2.7} duration={1.5} />
-            <span className="text-ink/30 text-2xl md:text-3xl ml-1">/100</span>
+            <span className="text-ink/30 text-3xl md:text-4xl ml-1">/100</span>
           </div>
         </motion.div>
       </div>
@@ -838,10 +838,10 @@ const ScoutReviewScene = () => (
       transition={{ delay: 0.3 }}
       className="relative z-10 pt-5 px-6 text-center"
     >
-      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-bold text-white/75">
-        <Eye className="w-3 h-3" /> Tactical scout review
+      <div className="inline-flex items-center gap-2 text-[11px] md:text-[13px] uppercase tracking-[0.35em] font-bold text-white/85">
+        <Eye className="w-3.5 h-3.5" /> Tactical scout review
       </div>
-      <div className="mt-2 font-barlow font-black text-white text-2xl md:text-3xl leading-tight">
+      <div className="mt-2 font-barlow font-black text-white text-3xl md:text-4xl leading-tight">
         <StaggerText text="Reviewed by real scouts." delay={0.5} />
       </div>
     </motion.div>
@@ -956,7 +956,7 @@ const TacticsBoard = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 2.4 }}
-          className="text-[10px] uppercase tracking-[0.25em] font-bold"
+          className="text-[14px] md:text-[18px] uppercase tracking-[0.2em] font-barlow font-black"
           style={{ color: "#CCFF99" }}
         >
           4-3-3
@@ -1342,10 +1342,10 @@ const CompareScene = () => (
       initial={{ opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2 }}
-      className="relative z-10 pt-5 px-5 flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] font-bold"
+      className="relative z-10 pt-5 px-5 flex items-center gap-2 text-[11px] md:text-[13px] uppercase tracking-[0.3em] font-bold"
       style={{ color: FOREST }}
     >
-      <TrendingUp className="w-3 h-3" /> Trajectory · 3 months
+      <TrendingUp className="w-3.5 h-3.5" /> Trajectory · 3 months
     </motion.div>
 
     <div className="relative z-10 flex flex-col items-center w-full px-3 pb-24 mt-2">
@@ -1372,12 +1372,12 @@ const CompareScene = () => (
           className="flex-1 bg-white border border-ink/10 shadow-lg p-3 w-full"
         >
           <div className="flex items-center justify-between mb-1">
-            <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-ink/55">Overall score</div>
+            <div className="text-[10px] md:text-[12px] uppercase tracking-[0.22em] font-bold text-ink/55">Overall score</div>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 2.0 }}
-              className="text-[10px] font-barlow font-black"
+              className="text-base md:text-xl font-barlow font-black"
               style={{ color: FOREST }}
             >
               +<CountUp from={0} to={26} delay={2.1} duration={0.8} /> pts
@@ -1423,10 +1423,10 @@ const CompareScene = () => (
           className="px-3 py-2.5 bg-white border-2 shadow-lg w-full md:w-auto"
           style={{ borderColor: FOREST }}
         >
-          <div className="text-[9px] uppercase tracking-[0.3em] font-bold mb-1" style={{ color: FOREST }}>
+          <div className="text-[11px] md:text-[13px] uppercase tracking-[0.3em] font-bold mb-1.5" style={{ color: FOREST }}>
             What changed
           </div>
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {[
               { k: "Vision", v: "+18" },
               { k: "Passing", v: "+17" },
@@ -1437,10 +1437,10 @@ const CompareScene = () => (
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 2.3 + i * 0.12 }}
-                className="text-[9px] font-bold uppercase tracking-wider"
+                className="text-[10px] md:text-[12px] font-bold uppercase tracking-wider"
                 style={{ color: FOREST }}
               >
-                {d.k} <span className="font-barlow font-black text-[11px]">{d.v}</span>
+                {d.k} <span className="font-barlow font-black text-[13px] md:text-[16px]">{d.v}</span>
               </motion.span>
             ))}
           </div>
@@ -1502,7 +1502,9 @@ const CompareRadar = ({ values, label, delay = 0, highlight = false, mid = false
 ============================================================================ */
 
 // Royalty-free cinematic soundtrack (CC BY 4.0 — Kevin MacLeod · incompetech.com)
-const SOUNDTRACK_URL = "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hero%20Theme.mp3";
+// "Rite of Passage" — epic cinematic ~11 min, plays seamlessly through the whole walkthrough loop
+const SOUNDTRACK_URL = "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Rite%20of%20Passage.mp3";
+const SOUNDTRACK_NAME = "Rite of Passage";
 
 export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1 }) {
   const [sceneIdx, setSceneIdx] = useState(0);
@@ -1650,16 +1652,16 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.15 }}
-                  className="absolute bottom-0 left-0 right-0 z-30 px-4 md:px-6 py-3 md:py-4 bg-gradient-to-t from-ink/90 via-ink/65 to-transparent"
+                  className="absolute bottom-0 left-0 right-0 z-30 px-4 md:px-6 py-3 md:py-5 bg-gradient-to-t from-ink/95 via-ink/70 to-transparent"
                 >
-                  <div className="text-[10px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: CREAM, opacity: 0.85 }}>
-                    <scene.Icon className="w-3.5 h-3.5" />
+                  <div className="text-[11px] md:text-[13px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: CREAM, opacity: 0.9 }}>
+                    <scene.Icon className="w-4 h-4" />
                     Step {sceneIdx + 1} / {SCENES.length} · {scene.label}
                   </div>
-                  <div className="font-barlow font-black text-white text-xl md:text-3xl leading-tight mt-1">
+                  <div className="font-barlow font-black text-white text-2xl sm:text-3xl md:text-5xl leading-[1.0] tracking-tight mt-1.5">
                     {scene.title}
                   </div>
-                  <div className="text-white/75 text-sm md:text-base mt-1">{scene.caption}</div>
+                  <div className="text-white/85 text-base md:text-xl mt-1.5 leading-snug">{scene.caption}</div>
                 </motion.div>
               </div>
 
@@ -1764,7 +1766,7 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
             </div>
             {soundOn && (
               <div className="mt-2 text-[8px] uppercase tracking-[0.18em] font-bold text-ink/35">
-                Music: &ldquo;Hero Theme&rdquo; · Kevin MacLeod · incompetech.com · CC BY 4.0
+                Music: &ldquo;{SOUNDTRACK_NAME}&rdquo; · Kevin MacLeod · incompetech.com · CC BY 4.0
               </div>
             )}
           </div>
