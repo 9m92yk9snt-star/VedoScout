@@ -26,6 +26,20 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 54 — Walkthrough v7: Hollywood-trailer sound design cues (Feb 19 2026, 29:00)**:
+  - **User request**: layer subtle sound design cues over the Rite of Passage soundtrack at key beats — thunk on score reveal, ka-chunk on LOCKED IN, low whoosh on scene transitions — so the walkthrough plays like a film trailer when sound is on.
+  - **Built `useSFX` hook** powered by the Web Audio API (no external SFX files, no licensing risk, no extra download). Lazy-creates a single `AudioContext` on first use and resumes if suspended. All cues are programmatically synthesized:
+    - **`thunk()`** — sub-bass sine from 140 Hz → 45 Hz with linear attack + exponential decay, 0.5 s. Used at score reveal (Analyze, +3.1 s) and at the "+26 pts" pop (Progress, +2.2 s).
+    - **`kaChunk()`** — high-pass-filtered noise burst (1.5 kHz HPF, 0.04 s) for the transient click, layered with a low sine drop 80 → 35 Hz body (0.45 s). Used on the "LOCKED IN" flash in Mark (+6.3 s).
+    - **`whoosh()`** — band-pass-filtered white noise sweep (Q=0.9, 400 Hz → 3.5 kHz → 800 Hz), 0.6 s with fade in/out envelope. Used on every scene transition.
+    - **`tick()`** — short triangle wave 1.8 kHz → 900 Hz, 0.08 s exponential decay. Used on each of the 10 tap ripples in Mark.
+    - **`sparkle()`** — 4-note ascending arpeggio (C5 E5 G5 C6, 80 ms apart, 0.4 s decay each). Used on the "All sources received" pop in Upload (+5.6 s).
+  - **Scheduling**: a new `useEffect` watches `[sceneIdx, soundOn, isPlaying]` — schedules timed `setTimeout` cues per scene, fires the `whoosh()` on every scene change (gated via `prevSceneIdxRef` to skip initial mount). All timers cleared on cleanup so paused/scrolled-away states stop scheduled SFX too.
+  - **Memoization**: `useSFX` returns `useMemo`-wrapped object of `useCallback`-stabilised functions, with the `enabled` flag read via a ref so the function identities stay stable across renders — prevents the SFX-scheduling `useEffect` from re-triggering on every parent render.
+  - **All cues volume-balanced**: tick 0.18, sparkle 0.22, thunk 0.55, kaChunk 0.35 (click) + 0.5 (body), whoosh peak 0.28. Sits cleanly under the 0.35 music volume so they punch through without overpowering.
+  - **Tested**: ESLint clean. Music + Audio Context coexist (audio element playing while Web Audio synthesizes). Browser-verified Rite of Passage duration is 281 s (~4 min 41 s), so the walkthrough's ~43 s loops cleanly inside one music play-through.
+  - **Files**: MODIFIED `/app/frontend/src/components/HowItWorksWalkthrough.jsx` (~170 lines added: SFX hook + scheduling effect).
+
 - ✅ **🆕 Session 53 — Walkthrough v6: epic soundtrack swap + typography bump on key elements (Feb 19 2026, 28:30)**:
   - **User feedback**: wanted a LONGER soundtrack instead of the 18-second Hero Theme loop, and bigger fonts on the more important elements throughout the video.
   - **Soundtrack swap**: replaced "Hero Theme" (800 KB / 18 s loop) with **"Rite of Passage"** by Kevin MacLeod (CC BY 4.0, ~11 MB / ~11 min epic cinematic) — same URL pattern, same incompetech CDN, still opt-in via the sound toggle so no impact on page load. Added a `SOUNDTRACK_NAME` constant so the attribution line stays accurate automatically.

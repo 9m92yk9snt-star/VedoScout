@@ -1498,6 +1498,159 @@ const CompareRadar = ({ values, label, delay = 0, highlight = false, mid = false
 };
 
 /* ============================================================================
+   Sound design cues — Web Audio API synthesis (layered over the music)
+   Plays only when sound is on. No external SFX files.
+============================================================================ */
+const useSFX = (enabled) => {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const ctxRef = useRef(null);
+
+  const getCtx = React.useCallback(() => {
+    if (typeof window === "undefined") return null;
+    if (!ctxRef.current) {
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) ctxRef.current = new AC();
+      } catch (e) { /* noop */ }
+    }
+    if (ctxRef.current && ctxRef.current.state === "suspended") {
+      try { ctxRef.current.resume(); } catch (e) { /* noop */ }
+    }
+    return ctxRef.current;
+  }, []);
+
+  /** Low cinematic "thunk" — sub bass impact, ~0.5s. For the score reveal. */
+  const thunk = React.useCallback(() => {
+    if (!enabledRef.current) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.55, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.55);
+  }, [getCtx]);
+
+  /** Mechanical "ka-chunk" — sharp click + low body thud. For LOCKED IN. */
+  const kaChunk = React.useCallback(() => {
+    if (!enabledRef.current) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Transient click (noise burst, high-passed)
+    const bufferSize = Math.floor(ctx.sampleRate * 0.04);
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 1500;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.35, now);
+    ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    noise.connect(hp).connect(ng).connect(ctx.destination);
+    noise.start(now);
+
+    // Body — low sine drop 80 → 35 Hz
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(80, now);
+    osc.frequency.exponentialRampToValueAtTime(35, now + 0.2);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0, now);
+    og.gain.linearRampToValueAtTime(0.5, now + 0.015);
+    og.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+    osc.connect(og).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.5);
+  }, [getCtx]);
+
+  /** Soft "whoosh" — filtered noise sweep ~0.6s. For scene transitions. */
+  const whoosh = React.useCallback(() => {
+    if (!enabledRef.current) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const dur = 0.6;
+    const bufferSize = Math.floor(ctx.sampleRate * dur);
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = 0.9;
+    filter.frequency.setValueAtTime(400, now);
+    filter.frequency.exponentialRampToValueAtTime(3500, now + dur * 0.55);
+    filter.frequency.exponentialRampToValueAtTime(800, now + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.28, now + dur * 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.start(now);
+    noise.stop(now + dur);
+  }, [getCtx]);
+
+  /** Tiny UI tick — for each manual tap ripple. */
+  const tick = React.useCallback(() => {
+    if (!enabledRef.current) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(1800, now);
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.05);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }, [getCtx]);
+
+  /** Three-note ascending sparkle — for "All sources received". */
+  const sparkle = React.useCallback(() => {
+    if (!enabledRef.current) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.08;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.22, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.45);
+    });
+  }, [getCtx]);
+
+  return useMemo(
+    () => ({ thunk, kaChunk, whoosh, tick, sparkle }),
+    [thunk, kaChunk, whoosh, tick, sparkle]
+  );
+};
+
+/* ============================================================================
    Main
 ============================================================================ */
 
@@ -1513,9 +1666,11 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
   const [soundOn, setSoundOn] = useState(false);
   const reduceMotion = useReducedMotion();
 
+  const sfx = useSFX(soundOn);
   const audioRef = useRef(null);
   const wrapRef = useRef(null);
   const [inView, setInView] = useState(true);
+  const prevSceneIdxRef = useRef(0);
 
   useEffect(() => {
     if (!wrapRef.current || typeof IntersectionObserver === "undefined") return;
@@ -1561,6 +1716,40 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [sceneIdx, isPlaying]);
+
+  // SFX cues — schedule scene-specific sounds when scene changes and sound is on
+  useEffect(() => {
+    if (!soundOn || !isPlaying) return;
+
+    // Whoosh on every scene change (but not the very first render)
+    if (prevSceneIdxRef.current !== sceneIdx) {
+      sfx.whoosh();
+      prevSceneIdxRef.current = sceneIdx;
+    }
+
+    const timers = [];
+
+    if (sceneIdx === 0) {
+      // Upload — sparkle when "All sources received" pops at 5.6s
+      timers.push(setTimeout(() => sfx.sparkle(), 5600));
+    } else if (sceneIdx === 1) {
+      // Mark — soft ticks on each of 10 taps, then ka-chunk on LOCKED IN
+      const baseDelay = 800;
+      const gap = 550;
+      for (let i = 0; i < 10; i++) {
+        timers.push(setTimeout(() => sfx.tick(), baseDelay + i * gap));
+      }
+      timers.push(setTimeout(() => sfx.kaChunk(), 6300));
+    } else if (sceneIdx === 2) {
+      // Analyze — thunk when the 78/100 score lands
+      timers.push(setTimeout(() => sfx.thunk(), 3100));
+    } else if (sceneIdx === 5) {
+      // Progress — thunk when "+26 pts" appears
+      timers.push(setTimeout(() => sfx.thunk(), 2200));
+    }
+
+    return () => timers.forEach(clearTimeout);
+  }, [sceneIdx, soundOn, isPlaying, sfx]);
 
   const scene = SCENES[sceneIdx];
 
