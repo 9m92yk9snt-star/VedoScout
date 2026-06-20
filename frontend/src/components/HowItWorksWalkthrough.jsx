@@ -21,36 +21,19 @@ const CREAM = "#F4EFE6";
 const PLAYER_IMG =
   "https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=1400&q=85&auto=format&fit=crop";
 
-// scout scene assets — verified Unsplash IDs, no women, action contexts
-const SCOUT_CARDS = [
-  {
-    img: "https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=600&q=85&auto=format&fit=crop",
-    role: "Stadium scout",
-    leagues: "Premier League",
-    clubs: "Manchester · Liverpool",
-    icon: Eye,
-  },
-  {
-    img: "https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=600&q=85&auto=format&fit=crop",
-    role: "Signing agent",
-    leagues: "La Liga",
-    clubs: "Madrid · Barcelona",
-    icon: FileText,
-  },
-  {
-    img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=600&q=85&auto=format&fit=crop",
-    role: "Academy scout",
-    leagues: "Bundesliga",
-    clubs: "Bayern · Dortmund",
-    icon: Trophy,
-  },
-];
+// cinematic stadium-night background for the Upload scene — single floodlight in mist/rain
+const STADIUM_NIGHT_IMG =
+  "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1600&q=85&auto=format&fit=crop";
+
+// single male scout portrait (the only person in the Scout scene)
+const SCOUT_PORTRAIT_IMG =
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=900&q=85&auto=format&fit=crop";
 
 const SCENES = [
   { id: "upload",   duration: 7400, label: "Upload",  title: "Upload from anywhere",                       caption: "Phone, iPad, computer — or paste a Veo / YouTube link.",         Icon: Upload },
   { id: "mark",     duration: 7600, label: "Mark",    title: "Tap your player ten times",                  caption: "No AI guessing — you stay in control.",                          Icon: MousePointer2 },
   { id: "analyze",  duration: 7600, label: "Analyze", title: "Pro Scout Intelligence builds your report",  caption: "6 pillars · 47 metrics · one honest score.",                     Icon: Sparkles },
-  { id: "scout",    duration: 7000, label: "Scouts",  title: "Real scouts watch your clip",                caption: "Human eyes from real clubs. Not just data.",                     Icon: Eye },
+  { id: "scout",    duration: 7000, label: "Scouts",  title: "Real scouts watch your clip",                caption: "Human eyes on every movement — not just data.",                  Icon: Eye },
   { id: "report",   duration: 7600, label: "Report",  title: "Your professional PDF report",               caption: "Everything parents and players want to see — beautifully laid out.", Icon: FileText },
   { id: "progress", duration: 7000, label: "Progress",title: "Track your evolution",                       caption: "Upload again — watch exactly what improved.",                    Icon: TrendingUp },
 ];
@@ -162,126 +145,239 @@ const BrandMark = () => (
 );
 
 /* ============================================================================
-   Scene 1 — UPLOAD (multi-source: phone, iPad, computer, link)
+   Scene 1 — UPLOAD (cinematic stadium · flying clips · streaks)
 ============================================================================ */
+
+// Frame thumbnails that fly into the dropzone — using small crops of PLAYER_IMG
+const FLY_CLIPS = [
+  { from: { x: -20, y: -8 },  rot: -8,  delay: 2.8,  cropPos: "55% 45%" },
+  { from: { x: 120, y: -10 }, rot: 6,   delay: 3.05, cropPos: "52% 38%" },
+  { from: { x: -18, y: 110 }, rot: -3,  delay: 3.3,  cropPos: "50% 60%" },
+  { from: { x: 118, y: 108 }, rot: 9,   delay: 3.55, cropPos: "56% 52%" },
+];
+
 const UploadScene = () => (
   <motion.div
     key="upload"
-    className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
-    style={{ background: `radial-gradient(ellipse at 50% 30%, #163829 0%, #0A0F0D 70%)` }}
+    className="absolute inset-0 overflow-hidden"
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     exit={{ opacity: 0, filter: "blur(10px)" }}
     transition={{ duration: 0.6 }}
   >
-    <ParticleField tone="light" density={28} />
+    {/* CINEMATIC stadium-night backdrop */}
+    <div className="absolute inset-0">
+      <motion.img
+        src={STADIUM_NIGHT_IMG}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        initial={{ scale: 1.15 }}
+        animate={{ scale: 1.0 }}
+        transition={{ duration: 8, ease: "easeOut" }}
+      />
+      {/* dark vignette */}
+      <div className="absolute inset-0" style={{
+        background: `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.85) 100%)`,
+      }} />
+      {/* volt-green floodlight wash */}
+      <div className="absolute inset-0" style={{
+        background: `radial-gradient(ellipse at 50% 38%, rgba(204,255,200,0.18) 0%, transparent 55%)`,
+      }} />
+    </div>
 
-    {/* moving aurora */}
+    <ParticleField tone="light" density={36} />
+
+    {/* film-strip animated background (cinematic film roll effect) */}
     <motion.div
-      className="absolute inset-0 pointer-events-none"
-      style={{
-        background: `radial-gradient(circle at 50% 35%, rgba(204,255,200,0.18) 0%, transparent 55%)`,
-      }}
-      animate={{ scale: [1, 1.08, 1] }}
-      transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-    />
+      className="absolute inset-x-0 top-[12%] h-8 flex gap-2 pointer-events-none z-[1] opacity-25"
+      animate={{ x: [-120, 120] }}
+      transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+    >
+      {Array.from({ length: 18 }).map((_, i) => (
+        <span key={i} className="w-7 h-full border border-white/40" />
+      ))}
+    </motion.div>
+    <motion.div
+      className="absolute inset-x-0 bottom-[18%] h-8 flex gap-2 pointer-events-none z-[1] opacity-15"
+      animate={{ x: [80, -120] }}
+      transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+    >
+      {Array.from({ length: 20 }).map((_, i) => (
+        <span key={i} className="w-7 h-full border border-white/40" />
+      ))}
+    </motion.div>
 
-    <FloatingChips
-      tone="light"
-      items={[
-        { t: "PHONE", x: 10, y: 25 },
-        { t: ".MP4", x: 85, y: 22 },
-        { t: "VEO LINK", x: 8, y: 70 },
-        { t: "iPAD", x: 90, y: 75 },
-      ]}
-    />
+    {/* 4 floating device chips at corners with subtle hover bob */}
+    <DeviceChip Icon={Smartphone} pos="top-[18%] left-[8%]" label="PHONE" delay={1.6} drift={-2} />
+    <DeviceChip Icon={Tablet}     pos="top-[18%] right-[8%]" label="iPAD"  delay={1.75} drift={2} />
+    <DeviceChip Icon={Monitor}    pos="bottom-[28%] left-[8%]" label="COMPUTER" delay={1.9} drift={-3} />
+    <DeviceChip Icon={Youtube}    pos="bottom-[28%] right-[8%]" label="VEO LINK" delay={2.05} drift={3} />
+
+    {/* light streaks flying from each device to center */}
+    <svg className="absolute inset-0 w-full h-full pointer-events-none z-[2]" viewBox="0 0 100 56" preserveAspectRatio="none">
+      {[
+        { x1: 12, y1: 12, x2: 50, y2: 30 },
+        { x1: 88, y1: 12, x2: 50, y2: 30 },
+        { x1: 12, y1: 44, x2: 50, y2: 30 },
+        { x1: 88, y1: 44, x2: 50, y2: 30 },
+      ].map((s, i) => (
+        <motion.line
+          key={i}
+          x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2}
+          stroke="rgba(204,255,200,0.7)"
+          strokeWidth="0.18"
+          strokeDasharray="2 2"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: [0, 1, 0.6] }}
+          transition={{ delay: 2.4 + i * 0.15, duration: 1.2 }}
+        />
+      ))}
+    </svg>
 
     {/* opening title — character stagger */}
     <motion.div
-      className="relative z-10 mb-5 text-center px-6"
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center pointer-events-none"
       initial={{ opacity: 1 }}
       animate={{ opacity: [1, 1, 0] }}
-      transition={{ duration: 2.7, times: [0, 0.7, 1] }}
+      transition={{ duration: 2.5, times: [0, 0.7, 1] }}
     >
-      <div className="text-[10px] uppercase tracking-[0.4em] font-bold text-white/55 mb-3">
-        <StaggerText text="THE FULL PATH" delay={0.15} />
+      <div className="text-[10px] uppercase tracking-[0.4em] font-bold text-white/60 mb-3">
+        <StaggerText text="THE FULL PATH" delay={0.1} />
       </div>
-      <div className="font-barlow font-black text-white text-3xl md:text-5xl leading-[0.95] tracking-tight">
-        <StaggerText text="From any video," delay={0.5} />
+      <div className="font-barlow font-black text-white text-3xl md:text-6xl leading-[0.92] tracking-tight drop-shadow-2xl">
+        <StaggerText text="From any video" delay={0.4} />
         <br />
         <span className="font-serif-italic normal-case font-normal lowercase tracking-normal" style={{ color: "#CCFF99" }}>
-          <StaggerText text="to scout-ready truth." delay={1.0} />
+          <StaggerText text="to scout-ready truth." delay={0.9} charDelay={0.025} />
         </span>
       </div>
     </motion.div>
 
-    {/* dropzone slides in */}
+    {/* dropzone — appears mid-scene, becomes the magnet */}
     <motion.div
-      initial={{ scale: 0.85, opacity: 0, y: 40 }}
+      initial={{ scale: 0.78, opacity: 0, y: 30 }}
       animate={{ scale: 1, opacity: 1, y: 0 }}
-      transition={{ delay: 2.5, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className="relative w-[78%] max-w-[520px] aspect-[16/9] border-2 border-dashed flex flex-col items-center justify-center bg-white/92 backdrop-blur z-10"
-      style={{ borderColor: FOREST }}
+      transition={{ delay: 2.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-10 w-[60%] max-w-[420px] aspect-[16/9] border-2 border-dashed flex items-center justify-center backdrop-blur-md"
+      style={{
+        borderColor: "rgba(204,255,200,0.75)",
+        background: "rgba(20,57,35,0.55)",
+        boxShadow: `0 0 0 1px rgba(255,255,255,0.06) inset, 0 30px 80px -10px rgba(0,0,0,0.8)`,
+      }}
     >
+      {/* central pulse glow */}
       <motion.div
-        className="absolute -inset-1 pointer-events-none"
-        style={{ boxShadow: `0 0 70px ${FOREST}` }}
-        animate={{ opacity: [0, 0.55, 0.3] }}
-        transition={{ delay: 2.6, duration: 1.6 }}
+        className="absolute inset-0 pointer-events-none"
+        style={{ boxShadow: `0 0 80px rgba(204,255,200,0.6)` }}
+        animate={{ opacity: [0.2, 0.6, 0.2] }}
+        transition={{ delay: 2.3, duration: 2, repeat: Infinity }}
       />
 
       {/* corner brackets */}
       {["top-0 left-0 border-t-2 border-l-2","top-0 right-0 border-t-2 border-r-2","bottom-0 left-0 border-b-2 border-l-2","bottom-0 right-0 border-b-2 border-r-2"].map((p, i) => (
-        <span key={i} aria-hidden className={`absolute ${p} w-4 h-4`} style={{ borderColor: FOREST }} />
+        <span key={i} aria-hidden className={`absolute ${p} w-5 h-5`} style={{ borderColor: "rgba(204,255,200,0.9)" }} />
       ))}
 
-      {/* 4 source-method icons fly in */}
-      <div className="flex items-center gap-4 md:gap-5 mb-3">
-        {[Smartphone, Tablet, Monitor, Youtube].map((Icon, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, scale: 0, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ delay: 3.0 + i * 0.18, type: "spring", stiffness: 200, damping: 14 }}
-            className="relative w-9 h-9 md:w-10 md:h-10 flex items-center justify-center"
-            style={{ background: FOREST_SOFT, border: `1.5px solid ${FOREST}` }}
-          >
-            <Icon className="w-4 h-4" style={{ color: FOREST }} strokeWidth={1.8} />
-          </motion.div>
-        ))}
-      </div>
-
+      {/* upload icon */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 3.9, duration: 0.4 }}
-        className="text-[9px] uppercase tracking-[0.28em] font-bold text-ink/55"
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 2.5 }}
+        className="flex flex-col items-center gap-1.5"
       >
-        Phone · iPad · Computer · Veo link
-      </motion.div>
-
-      {/* progress bar */}
-      <div className="mt-4 w-[72%] h-1.5 bg-ink/10 overflow-hidden">
         <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: "100%" }}
-          transition={{ delay: 4.2, duration: 1.8, ease: "easeInOut" }}
-          className="h-full"
-          style={{ background: `linear-gradient(90deg, ${FOREST}, ${FOREST_DEEP})` }}
-        />
-      </div>
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 6.0, duration: 0.4 }}
-        className="mt-3 text-[10px] uppercase tracking-[0.3em] font-bold flex items-center gap-1.5"
-        style={{ color: FOREST }}
+          animate={{ y: [0, -4, 0] }}
+          transition={{ delay: 2.5, duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Upload className="w-7 h-7" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
+        </motion.div>
+        <div className="text-[9px] uppercase tracking-[0.32em] font-bold text-white/85">
+          Drop here
+        </div>
+      </motion.div>
+    </motion.div>
+
+    {/* flying clip thumbnails that converge into the dropzone */}
+    {FLY_CLIPS.map((c, i) => (
+      <motion.div
+        key={i}
+        className="absolute z-20 w-16 h-10 md:w-20 md:h-12 border-2 border-white shadow-2xl overflow-hidden"
+        initial={{
+          opacity: 0,
+          scale: 0.6,
+          left: `${c.from.x}%`,
+          top: `${c.from.y}%`,
+          rotate: c.rot,
+        }}
+        animate={{
+          opacity: [0, 1, 1, 0],
+          scale: [0.6, 1, 0.85, 0.65],
+          left: [`${c.from.x}%`, `${c.from.x}%`, "50%", "50%"],
+          top: [`${c.from.y}%`, `${c.from.y}%`, "44%", "44%"],
+          rotate: [c.rot, c.rot, 0, 0],
+        }}
+        transition={{ delay: c.delay, duration: 1.6, ease: [0.16, 1, 0.3, 1], times: [0, 0.18, 0.7, 1] }}
+        style={{ marginLeft: -40, marginTop: -24, boxShadow: "0 12px 32px rgba(0,0,0,0.7)" }}
       >
-        <CheckCircle2 className="w-3.5 h-3.5" /> Video accepted
-      </motion.span>
+        <div
+          className="w-full h-full bg-no-repeat"
+          style={{
+            backgroundImage: `url(${PLAYER_IMG})`,
+            backgroundPosition: c.cropPos,
+            backgroundSize: "200% auto",
+          }}
+        />
+      </motion.div>
+    ))}
+
+    {/* file accepted badge (appears late) */}
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: 5.6, type: "spring", stiffness: 200, damping: 14 }}
+      className="absolute left-1/2 top-[72%] -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 bg-white text-[10px] uppercase tracking-[0.3em] font-bold"
+      style={{ color: FOREST }}
+    >
+      <CheckCircle2 className="w-3.5 h-3.5" />
+      Video accepted
+      <motion.span
+        className="absolute -inset-1 pointer-events-none"
+        style={{ boxShadow: `0 0 36px rgba(204,255,200,0.9)` }}
+        animate={{ opacity: [0, 1, 0] }}
+        transition={{ delay: 5.7, duration: 1.4 }}
+      />
+    </motion.div>
+
+    {/* source-line subtitle below dropzone */}
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 4.6, duration: 0.5 }}
+      className="absolute left-0 right-0 top-[64%] z-10 text-center text-[10px] uppercase tracking-[0.32em] font-bold text-white/70"
+    >
+      Phone · iPad · Computer · Veo / YouTube link
     </motion.div>
 
     <BrandMark />
+  </motion.div>
+);
+
+const DeviceChip = ({ Icon, pos, label, delay, drift = 0 }) => (
+  <motion.div
+    className={`absolute ${pos} z-[15] flex flex-col items-center gap-1.5 pointer-events-none`}
+    initial={{ opacity: 0, scale: 0.6, y: 20 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    transition={{ delay, type: "spring", stiffness: 180, damping: 14 }}
+  >
+    <motion.div
+      animate={{ y: [0, drift, 0] }}
+      transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+      className="w-11 h-11 md:w-13 md:h-13 flex items-center justify-center bg-white/95 backdrop-blur shadow-2xl border"
+      style={{ borderColor: "rgba(204,255,200,0.55)" }}
+    >
+      <Icon className="w-5 h-5" style={{ color: FOREST }} strokeWidth={1.8} />
+    </motion.div>
+    <span className="text-[8px] uppercase tracking-[0.28em] font-bold text-white/80">{label}</span>
   </motion.div>
 );
 
@@ -636,36 +732,38 @@ const RadarAssemble = () => {
 };
 
 /* ============================================================================
-   Scene 4 — SCOUT REVIEW (action-context polaroid cards)
+   Scene 4 — SCOUT REVIEW (tactics board · one scout looking · no club names)
 ============================================================================ */
 const ScoutReviewScene = () => (
   <motion.div
     key="scout"
     className="absolute inset-0 overflow-hidden"
-    style={{ background: `linear-gradient(160deg, #0E2519 0%, #1A3A2A 50%, #060A08 100%)` }}
+    style={{ background: `linear-gradient(135deg, #061310 0%, #0E2519 50%, #050908 100%)` }}
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     exit={{ opacity: 0, filter: "blur(10px)" }}
     transition={{ duration: 0.6 }}
   >
-    <ParticleField tone="light" density={22} />
+    <ParticleField tone="light" density={26} />
+
+    {/* tactical floating chips — no clubs/leagues, just tactical concepts */}
     <FloatingChips
       tone="light"
       items={[
-        { t: "BUNDESLIGA", x: 5, y: 30 },
-        { t: "LA LIGA", x: 88, y: 32 },
-        { t: "PREMIER LEAGUE", x: 10, y: 80 },
-        { t: "EREDIVISIE", x: 80, y: 82 },
+        { t: "POSITIONING", x: 50, y: 10 },
+        { t: "MOVEMENT", x: 8, y: 90 },
+        { t: "DECISIONS", x: 85, y: 90 },
+        { t: "VISION", x: 30, y: 88 },
       ]}
     />
 
-    {/* spotlight */}
+    {/* moody spotlight from top */}
     <motion.div
       initial={{ opacity: 0 }}
-      animate={{ opacity: 0.5 }}
+      animate={{ opacity: 0.6 }}
       transition={{ duration: 1.2 }}
       className="absolute -top-10 left-1/2 -translate-x-1/2 w-[130%] h-[80%] pointer-events-none"
-      style={{ background: `radial-gradient(ellipse at top, rgba(204,255,200,0.18) 0%, transparent 70%)` }}
+      style={{ background: `radial-gradient(ellipse at top, rgba(204,255,200,0.16) 0%, transparent 70%)` }}
     />
 
     {/* eyebrow */}
@@ -673,103 +771,279 @@ const ScoutReviewScene = () => (
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
-      className="relative z-10 pt-7 px-6 text-center"
+      className="relative z-10 pt-5 px-6 text-center"
     >
       <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] font-bold text-white/75">
-        <Globe className="w-3 h-3" /> Real eyes · real clubs
+        <Eye className="w-3 h-3" /> Tactical scout review
       </div>
       <div className="mt-2 font-barlow font-black text-white text-2xl md:text-3xl leading-tight">
-        <StaggerText text="Scouts watch your clip." delay={0.5} />
+        <StaggerText text="Reviewed by real scouts." delay={0.5} />
       </div>
     </motion.div>
 
-    {/* polaroid scout cards */}
-    <div className="absolute inset-x-0 bottom-24 flex justify-center gap-2 md:gap-4 px-3 z-10">
-      {SCOUT_CARDS.map((s, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, y: 80, rotate: i === 0 ? -4 : i === 2 ? 4 : 0, scale: 0.82 }}
-          animate={{ opacity: 1, y: 0, rotate: i === 0 ? -3 : i === 2 ? 3 : 0, scale: 1 }}
-          transition={{ delay: 1.4 + i * 0.4, type: "spring", stiffness: 110, damping: 13 }}
-          className="relative bg-white shadow-2xl w-[120px] md:w-[180px] flex-shrink-0"
-          style={{ boxShadow: "0 20px 50px -10px rgba(0,0,0,0.55)" }}
-        >
-          {/* photo */}
-          <div className="relative aspect-[4/5] overflow-hidden">
-            <img src={s.img} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+    <div className="absolute inset-x-0 bottom-24 top-[28%] flex items-stretch z-10 px-3 md:px-6 gap-3 md:gap-6">
+      {/* LEFT — one scout, side profile, looking right at the board */}
+      <ScoutFigure />
 
-            {/* LIVE badge */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 2.4 + i * 0.4, type: "spring", stiffness: 200 }}
-              className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-ink/85 backdrop-blur-md text-white text-[8px] uppercase tracking-widest font-bold px-1.5 py-0.5"
-            >
-              <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
-              Watching
-            </motion.div>
-
-            {/* scan line */}
-            <motion.div
-              initial={{ top: "-100%" }}
-              animate={{ top: "100%" }}
-              transition={{ delay: 1.7 + i * 0.4, duration: 1.6, ease: "easeInOut" }}
-              className="absolute left-0 right-0 h-px z-10"
-              style={{ background: "rgba(204,255,200,0.9)", boxShadow: "0 0 16px rgba(204,255,200,0.9)" }}
-            />
-
-            {/* icon overlay */}
-            <div className="absolute bottom-1.5 left-1.5 w-6 h-6 flex items-center justify-center bg-white/90">
-              <s.icon className="w-3 h-3" style={{ color: FOREST }} strokeWidth={2} />
-            </div>
-          </div>
-
-          {/* caption */}
-          <div className="p-2 md:p-2.5">
-            <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-ink/85 leading-tight">{s.role}</div>
-            <div className="text-[8px] uppercase tracking-[0.18em] font-bold mt-1" style={{ color: FOREST }}>
-              {s.leagues}
-            </div>
-            <div className="text-[8px] text-ink/55 mt-0.5 leading-tight">{s.clubs}</div>
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: "100%" }}
-              transition={{ delay: 3.3 + i * 0.4, duration: 0.5 }}
-              className="h-0.5 mt-1.5"
-              style={{ background: FOREST }}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 3.5 + i * 0.4, type: "spring", stiffness: 220 }}
-              className="mt-1.5 flex items-center gap-1 text-[8px] uppercase tracking-wider font-bold"
-              style={{ color: FOREST }}
-            >
-              <CheckCircle2 className="w-2.5 h-2.5" /> Signed off
-            </motion.div>
-          </div>
-        </motion.div>
-      ))}
+      {/* RIGHT — glass tactics board */}
+      <TacticsBoard />
     </div>
-
-    {/* verdict signed counter */}
-    <motion.div
-      initial={{ opacity: 0, x: 30 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 4.4, duration: 0.55 }}
-      className="absolute top-4 right-4 z-10 bg-white/95 shadow-xl border-l-4 px-3 py-2"
-      style={{ borderColor: FOREST }}
-    >
-      <div className="text-[9px] uppercase tracking-[0.25em] font-bold text-ink/55">Verdicts signed</div>
-      <div className="font-barlow font-black text-ink text-lg">
-        <CountUp from={0} to={3} delay={4.5} duration={0.6} /> / 3
-      </div>
-    </motion.div>
 
     <BrandMark />
   </motion.div>
 );
+
+/* The single scout — one human looking at the players on the board */
+const ScoutFigure = () => (
+  <motion.div
+    initial={{ opacity: 0, x: -30 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay: 0.8, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+    className="relative flex-shrink-0 w-[34%] md:w-[260px] h-full"
+  >
+    {/* portrait — desaturated, dramatic side-light */}
+    <div className="relative w-full h-full overflow-hidden">
+      <img
+        src={SCOUT_PORTRAIT_IMG}
+        alt=""
+        className="w-full h-full object-cover"
+        style={{
+          objectPosition: "30% center",
+          filter: "grayscale(0.6) contrast(1.05) brightness(0.85)",
+        }}
+      />
+      {/* gradient overlay so scout fades into the dark background */}
+      <div className="absolute inset-0" style={{
+        background: "linear-gradient(90deg, transparent 0%, transparent 40%, rgba(6,19,16,0.9) 95%)",
+      }} />
+      {/* volt rim light from right */}
+      <div className="absolute inset-y-0 right-0 w-3" style={{
+        background: "linear-gradient(90deg, transparent 0%, rgba(204,255,200,0.45) 100%)",
+        filter: "blur(4px)",
+      }} />
+      {/* watching indicator */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 1.8, type: "spring", stiffness: 200 }}
+        className="absolute top-3 left-3 flex items-center gap-1.5 bg-ink/80 backdrop-blur text-white text-[8px] uppercase tracking-[0.25em] font-bold px-2 py-1"
+      >
+        <motion.span
+          className="w-1 h-1 rounded-full bg-red-500"
+          animate={{ opacity: [1, 0.3, 1] }}
+          transition={{ duration: 0.9, repeat: Infinity }}
+        />
+        Watching
+      </motion.div>
+    </div>
+
+    {/* gaze line — a subtle light ray from scout's eyes into the board */}
+    <svg className="absolute top-1/2 -right-2 w-12 h-px pointer-events-none z-10" viewBox="0 0 100 1" preserveAspectRatio="none">
+      <motion.line
+        x1="0" y1="0.5" x2="100" y2="0.5"
+        stroke="rgba(204,255,200,0.7)"
+        strokeWidth="0.6"
+        strokeDasharray="3 3"
+        initial={{ pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: 0.85 }}
+        transition={{ delay: 2.3, duration: 0.8 }}
+      />
+    </svg>
+  </motion.div>
+);
+
+/* Glass tactics board — animated half-pitch with player dots and arrows */
+const TacticsBoard = () => {
+  // 11 player positions on a half-pitch (right-attacking)
+  // coordinates in viewBox 0..100 x, 0..120 y (taller for full pitch)
+  const PLAYERS = [
+    { x: 50,  y: 110, role: "GK" },
+    { x: 18,  y: 88,  role: "LB" },
+    { x: 40,  y: 92,  role: "CB" },
+    { x: 60,  y: 92,  role: "CB" },
+    { x: 82,  y: 88,  role: "RB" },
+    { x: 30,  y: 62,  role: "LCM" },
+    { x: 50,  y: 70,  role: "CDM" },
+    { x: 70,  y: 62,  role: "RCM" },
+    { x: 22,  y: 32,  role: "LW",  highlight: true },
+    { x: 50,  y: 22,  role: "ST",  highlight: true },
+    { x: 78,  y: 32,  role: "RW" },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 30 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 1.3, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+      className="relative flex-1 backdrop-blur-md shadow-2xl"
+      style={{
+        background: "linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(31,79,47,0.18) 100%)",
+        border: "1px solid rgba(204,255,200,0.35)",
+        boxShadow: "0 30px 60px -10px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) inset",
+      }}
+    >
+      {/* top label */}
+      <div className="absolute top-2 left-3 right-3 flex items-center justify-between z-10">
+        <div className="text-[8px] uppercase tracking-[0.3em] font-bold text-white/80">
+          Tactics board · live
+        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2.4 }}
+          className="text-[10px] uppercase tracking-[0.25em] font-bold"
+          style={{ color: "#CCFF99" }}
+        >
+          4-3-3
+        </motion.div>
+      </div>
+
+      {/* glass pitch SVG */}
+      <svg viewBox="0 0 100 120" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+        {/* pitch outline */}
+        <motion.rect
+          x="6" y="6" width="88" height="108"
+          fill="none"
+          stroke="rgba(204,255,200,0.65)"
+          strokeWidth="0.35"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 1.5, duration: 0.9 }}
+        />
+        {/* midline */}
+        <motion.line
+          x1="6" y1="60" x2="94" y2="60"
+          stroke="rgba(204,255,200,0.55)"
+          strokeWidth="0.3"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 1.7, duration: 0.6 }}
+        />
+        {/* center circle */}
+        <motion.circle
+          cx="50" cy="60" r="9"
+          fill="none"
+          stroke="rgba(204,255,200,0.55)"
+          strokeWidth="0.3"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 1.8, duration: 0.7 }}
+        />
+        <circle cx="50" cy="60" r="0.6" fill="rgba(204,255,200,0.8)" />
+
+        {/* penalty boxes */}
+        <motion.rect
+          x="28" y="6" width="44" height="14" fill="none"
+          stroke="rgba(204,255,200,0.45)" strokeWidth="0.3"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 1.9, duration: 0.6 }}
+        />
+        <motion.rect
+          x="28" y="100" width="44" height="14" fill="none"
+          stroke="rgba(204,255,200,0.45)" strokeWidth="0.3"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ delay: 1.95, duration: 0.6 }}
+        />
+
+        {/* tactical arrows (movement) drawn after pitch */}
+        <motion.path
+          d="M 22 32 Q 35 24 50 22"
+          fill="none"
+          stroke="rgba(204,255,200,0.95)"
+          strokeWidth="0.5"
+          strokeLinecap="round"
+          strokeDasharray="2 1.5"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ delay: 3.0, duration: 0.9 }}
+        />
+        <motion.path
+          d="M 78 32 Q 65 24 50 22"
+          fill="none"
+          stroke="rgba(204,255,200,0.95)"
+          strokeWidth="0.5"
+          strokeLinecap="round"
+          strokeDasharray="2 1.5"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ delay: 3.1, duration: 0.9 }}
+        />
+        {/* run-in arrow into the box */}
+        <motion.path
+          d="M 30 62 Q 38 45 50 35"
+          fill="none"
+          stroke="rgba(255,255,255,0.7)"
+          strokeWidth="0.4"
+          strokeLinecap="round"
+          strokeDasharray="1.5 1"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ delay: 3.4, duration: 0.9 }}
+        />
+
+        {/* arrowheads */}
+        <motion.polygon
+          points="50,21 48,23 52,23"
+          fill="rgba(204,255,200,0.95)"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 3.95, type: "spring", stiffness: 200 }}
+        />
+
+        {/* players — animated in with stagger */}
+        {PLAYERS.map((p, i) => (
+          <motion.g key={i}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 2.1 + i * 0.06, type: "spring", stiffness: 200, damping: 14 }}
+          >
+            <circle
+              cx={p.x} cy={p.y}
+              r={p.highlight ? 2.2 : 1.8}
+              fill={p.highlight ? "#CCFF99" : "rgba(255,255,255,0.95)"}
+              stroke={p.highlight ? "#CCFF99" : "rgba(204,255,200,0.7)"}
+              strokeWidth="0.3"
+            />
+            {p.highlight && (
+              <motion.circle
+                cx={p.x} cy={p.y} r="2.4"
+                fill="none"
+                stroke="#CCFF99"
+                strokeWidth="0.3"
+                animate={{ r: [2.4, 5.5], opacity: [0.9, 0] }}
+                transition={{ delay: 3.6 + i * 0.1, duration: 1.6, repeat: Infinity, repeatDelay: 0.4 }}
+              />
+            )}
+            <text
+              x={p.x}
+              y={p.y + 0.7}
+              fontSize="1.4"
+              fill={p.highlight ? "#061310" : "#061310"}
+              textAnchor="middle"
+              fontWeight="900"
+              fontFamily="Barlow Condensed, sans-serif"
+            >
+              {p.highlight ? "✓" : ""}
+            </text>
+          </motion.g>
+        ))}
+      </svg>
+
+      {/* bottom info strip */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 4.2 }}
+        className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[8px] uppercase tracking-[0.25em] font-bold text-white/70"
+      >
+        <span>Frame · 01:12</span>
+        <span style={{ color: "#CCFF99" }}>✓ Reviewed</span>
+      </motion.div>
+    </motion.div>
+  );
+};
 
 /* ============================================================================
    Scene 5 — REPORT PDF (4-page fan + download)
