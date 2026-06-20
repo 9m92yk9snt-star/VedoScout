@@ -26,6 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 50 — Walkthrough v3: scout-action cards + clearer player + multi-source upload (Feb 19 2026, 26:00)**:
+  - **User feedback after v2**: scouts shouldn't show experience years and should look like real agents/scouts in action contexts (stadium, signing, watching) — connected to real clubs; no women. Upload caption shouldn't say "30-second clip" because the site also accepts long uploads from phone/iPad/computer and Veo/YouTube links. Frame-strip thumbnails were showing only grass instead of the player.
+  - **Scene 1 (Upload) rebuilt**: dramatic title now reads "From any video, to scout-ready truth." with character stagger. Added a 4-icon row (Smartphone · Tablet · Monitor · Youtube) staggering in with spring physics, and caption "Phone · iPad · Computer · Veo link". Final state confirms "Video accepted" with check. Floating brand-keyword chips (`.MP4`, `VEO LINK`, `iPAD`, `PHONE`) drift around the frame as ambient kinetic typography. Aurora gradient pulses in background.
+  - **Scene 2 (Mark) image swapped**: replaced `1574629810360-7efbbe195018` (which had only the player's legs at one edge) with `1517466787929-bc90951d0974` — a clear central male soccer player mid-leap (jersey #16). Updated TAP_POINTS to span the player body area (48-60% x, 36-72% y), and rewrote FRAME_CROPS with `background-size: 180% auto` and tight positions around the player so each frame-strip thumb actually shows the player (jersey, shorts, body) instead of grass. Final flash changed to "LOCKED IN".
+  - **🆕 Scene 4 (Scouts) action-context polaroids**: replaced the three generic portrait cards with 3 vetted action-context photos confirmed via image-analysis tool:
+    - Card 1 — `1522778119026-d647f0596c20` (stadium with crowd watching match): "Stadium scout · Premier League · Manchester · Liverpool", Eye icon overlay.
+    - Card 2 — `1517048676732-d65bc937f952` (man writing on legal pad in meeting): "Signing agent · La Liga · Madrid · Barcelona", FileText icon overlay.
+    - Card 3 — `1500648767791-00dcc994a43e` (confident older male portrait): "Academy scout · Bundesliga · Bayern · Dortmund", Trophy icon overlay.
+    - All men, no women, no years of experience, all linked to real top clubs around the world. Each card has a pulsing "Watching" badge, scanning line, icon overlay corner, forest underline draw, and "Signed off" check. Eyebrow updated to "Real eyes · real clubs". Floating chips show league names (BUNDESLIGA, LA LIGA, PREMIER LEAGUE, EREDIVISIE).
+  - **Global visual richness boosts** for all scenes: `FloatingChips` ambient kinetic-typography component drifting brand keywords; `BrandMark` watermark in corner; aurora pulse on Upload; layered gradients & scan lines preserved. More motion across the board.
+  - **Right column refreshed**: title "From any video, to scout-ready truth." Copy: "Upload from any device or paste a Veo / YouTube link. Pro Scout Intelligence + real human scouts. A full PDF and a living progress chart any coach respects."
+  - **Image-tool verification flow**: used analyze_file_tool to confirm each Unsplash photo content before using (avoided burning time on broken or wrong-subject IDs).
+  - **Tested**: ESLint clean. Smoke screenshots show all 6 scenes rendering crisply — frame strip now shows actual player thumbnails, scout cards are male-only with real-club affiliations, upload scene shows multi-device sourcing including Veo/YouTube.
+  - **Files**: REWROTE `/app/frontend/src/components/HowItWorksWalkthrough.jsx` (≈900 lines).
+
 - ✅ **🆕 Session 49 — Walkthrough v2: max-wow rebuild + scout-review & PDF scenes (Feb 19 2026, 25:00)**:
   - **User feedback after v1**: video felt boring at start; missing the BIG differentiator that real human scouts also review the clip; never mentioned the downloadable PDF; tracking/analytics felt static. "Make it look graphically and visually outstanding and professional."
   - **Full rebuild** of `HowItWorksWalkthrough.jsx` from 5 scenes to **6 scenes (~43s total)**:
