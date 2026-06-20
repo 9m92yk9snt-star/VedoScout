@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Play, Pause, RotateCcw, Upload, MousePointer2, Sparkles,
-  Eye, FileText, TrendingUp, ArrowRight, Volume2, CheckCircle2,
+  Eye, FileText, TrendingUp, ArrowRight, Volume2, VolumeX, CheckCircle2,
   Download, Star, Smartphone, Monitor, Tablet, Link2, Youtube,
   Trophy, Quote, Globe,
 } from "lucide-react";
@@ -145,15 +145,15 @@ const BrandMark = () => (
 );
 
 /* ============================================================================
-   Scene 1 — UPLOAD (cinematic stadium · flying clips · streaks)
+   Scene 1 — UPLOAD (real upload-in-progress: 4 devices uploading in parallel)
 ============================================================================ */
 
-// Frame thumbnails that fly into the dropzone — using small crops of PLAYER_IMG
-const FLY_CLIPS = [
-  { from: { x: -20, y: -8 },  rot: -8,  delay: 2.8,  cropPos: "55% 45%" },
-  { from: { x: 120, y: -10 }, rot: 6,   delay: 3.05, cropPos: "52% 38%" },
-  { from: { x: -18, y: 110 }, rot: -3,  delay: 3.3,  cropPos: "50% 60%" },
-  { from: { x: 118, y: 108 }, rot: 9,   delay: 3.55, cropPos: "56% 52%" },
+// Each device has its own video thumbnail + upload progress timing
+const DEVICES = [
+  { id: "phone",    Icon: Smartphone, label: "PHONE",    crop: "52% 40%", barStart: 1.6, barEnd: 4.4 },
+  { id: "ipad",     Icon: Tablet,     label: "iPAD",     crop: "54% 50%", barStart: 1.9, barEnd: 4.7 },
+  { id: "computer", Icon: Monitor,    label: "COMPUTER", crop: "56% 55%", barStart: 2.2, barEnd: 5.0 },
+  { id: "veo",      Icon: Youtube,    label: "VEO LINK", crop: "50% 45%", barStart: 2.5, barEnd: 5.3 },
 ];
 
 const UploadScene = () => (
@@ -165,61 +165,50 @@ const UploadScene = () => (
     exit={{ opacity: 0, filter: "blur(10px)" }}
     transition={{ duration: 0.6 }}
   >
-    {/* CINEMATIC stadium-night backdrop */}
+    {/* cinematic stadium night backdrop */}
     <div className="absolute inset-0">
       <motion.img
         src={STADIUM_NIGHT_IMG}
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
-        initial={{ scale: 1.15 }}
+        initial={{ scale: 1.18 }}
         animate={{ scale: 1.0 }}
         transition={{ duration: 8, ease: "easeOut" }}
       />
-      {/* dark vignette */}
       <div className="absolute inset-0" style={{
-        background: `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.85) 100%)`,
+        background: `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.88) 100%)`,
       }} />
-      {/* volt-green floodlight wash */}
       <div className="absolute inset-0" style={{
-        background: `radial-gradient(ellipse at 50% 38%, rgba(204,255,200,0.18) 0%, transparent 55%)`,
+        background: `radial-gradient(ellipse at 50% 38%, rgba(204,255,200,0.16) 0%, transparent 55%)`,
       }} />
     </div>
 
     <ParticleField tone="light" density={36} />
 
-    {/* film-strip animated background (cinematic film roll effect) */}
+    {/* opening title (briefly) */}
     <motion.div
-      className="absolute inset-x-0 top-[12%] h-8 flex gap-2 pointer-events-none z-[1] opacity-25"
-      animate={{ x: [-120, 120] }}
-      transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center pointer-events-none"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: [1, 1, 0] }}
+      transition={{ duration: 1.6, times: [0, 0.7, 1] }}
     >
-      {Array.from({ length: 18 }).map((_, i) => (
-        <span key={i} className="w-7 h-full border border-white/40" />
-      ))}
-    </motion.div>
-    <motion.div
-      className="absolute inset-x-0 bottom-[18%] h-8 flex gap-2 pointer-events-none z-[1] opacity-15"
-      animate={{ x: [80, -120] }}
-      transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
-    >
-      {Array.from({ length: 20 }).map((_, i) => (
-        <span key={i} className="w-7 h-full border border-white/40" />
-      ))}
+      <div className="font-barlow font-black text-white text-2xl sm:text-3xl md:text-5xl leading-[0.92] tracking-tight drop-shadow-2xl">
+        <StaggerText text="Uploading from anywhere" delay={0.1} charDelay={0.02} />
+      </div>
     </motion.div>
 
-    {/* 4 floating device chips at corners with subtle hover bob */}
-    <DeviceChip Icon={Smartphone} pos="top-[18%] left-[8%]" label="PHONE" delay={1.6} drift={-2} />
-    <DeviceChip Icon={Tablet}     pos="top-[18%] right-[8%]" label="iPAD"  delay={1.75} drift={2} />
-    <DeviceChip Icon={Monitor}    pos="bottom-[28%] left-[8%]" label="COMPUTER" delay={1.9} drift={-3} />
-    <DeviceChip Icon={Youtube}    pos="bottom-[28%] right-[8%]" label="VEO LINK" delay={2.05} drift={3} />
+    {/* 4 device cards — each showing a video preview + upload progress */}
+    {DEVICES.map((d, i) => (
+      <DeviceUploadCard key={d.id} device={d} index={i} />
+    ))}
 
-    {/* light streaks flying from each device to center */}
+    {/* light streaks flying from each device card into the central dropzone */}
     <svg className="absolute inset-0 w-full h-full pointer-events-none z-[2]" viewBox="0 0 100 56" preserveAspectRatio="none">
       {[
-        { x1: 12, y1: 12, x2: 50, y2: 30 },
-        { x1: 88, y1: 12, x2: 50, y2: 30 },
-        { x1: 12, y1: 44, x2: 50, y2: 30 },
-        { x1: 88, y1: 44, x2: 50, y2: 30 },
+        { x1: 18, y1: 14, x2: 50, y2: 30 },
+        { x1: 82, y1: 14, x2: 50, y2: 30 },
+        { x1: 18, y1: 46, x2: 50, y2: 30 },
+        { x1: 82, y1: 46, x2: 50, y2: 30 },
       ].map((s, i) => (
         <motion.line
           key={i}
@@ -228,109 +217,64 @@ const UploadScene = () => (
           strokeWidth="0.18"
           strokeDasharray="2 2"
           initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: [0, 1, 0.6] }}
-          transition={{ delay: 2.4 + i * 0.15, duration: 1.2 }}
+          animate={{ pathLength: 1, opacity: [0, 1, 0.7, 1, 0.7, 1] }}
+          transition={{ delay: 2.0 + i * 0.12, duration: 4 }}
         />
       ))}
     </svg>
 
-    {/* opening title — character stagger */}
-    <motion.div
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center pointer-events-none"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: [1, 1, 0] }}
-      transition={{ duration: 2.5, times: [0, 0.7, 1] }}
-    >
-      <div className="text-[10px] uppercase tracking-[0.4em] font-bold text-white/60 mb-3">
-        <StaggerText text="THE FULL PATH" delay={0.1} />
-      </div>
-      <div className="font-barlow font-black text-white text-3xl md:text-6xl leading-[0.92] tracking-tight drop-shadow-2xl">
-        <StaggerText text="From any video" delay={0.4} />
-        <br />
-        <span className="font-serif-italic normal-case font-normal lowercase tracking-normal" style={{ color: "#CCFF99" }}>
-          <StaggerText text="to scout-ready truth." delay={0.9} charDelay={0.025} />
-        </span>
-      </div>
-    </motion.div>
+    {/* streams of small data dots flowing along the connector lines */}
+    {[0, 1, 2, 3].map((i) => (
+      <DataStream key={i} index={i} />
+    ))}
 
-    {/* dropzone — appears mid-scene, becomes the magnet */}
+    {/* CENTER — receiving dropzone with master progress */}
     <motion.div
-      initial={{ scale: 0.78, opacity: 0, y: 30 }}
-      animate={{ scale: 1, opacity: 1, y: 0 }}
-      transition={{ delay: 2.2, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-10 w-[60%] max-w-[420px] aspect-[16/9] border-2 border-dashed flex items-center justify-center backdrop-blur-md"
+      initial={{ scale: 0.88, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ delay: 1.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+      className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-10 w-[42%] md:w-[34%] max-w-[280px] aspect-[16/9] flex items-center justify-center backdrop-blur-md"
       style={{
-        borderColor: "rgba(204,255,200,0.75)",
-        background: "rgba(20,57,35,0.55)",
-        boxShadow: `0 0 0 1px rgba(255,255,255,0.06) inset, 0 30px 80px -10px rgba(0,0,0,0.8)`,
+        background: "rgba(20,57,35,0.6)",
+        border: "1.5px dashed rgba(204,255,200,0.8)",
+        boxShadow: `0 30px 80px -10px rgba(0,0,0,0.85), 0 0 50px rgba(204,255,200,0.15) inset`,
       }}
     >
-      {/* central pulse glow */}
+      {/* pulse */}
       <motion.div
         className="absolute inset-0 pointer-events-none"
-        style={{ boxShadow: `0 0 80px rgba(204,255,200,0.6)` }}
+        style={{ boxShadow: `0 0 60px rgba(204,255,200,0.55)` }}
         animate={{ opacity: [0.2, 0.6, 0.2] }}
-        transition={{ delay: 2.3, duration: 2, repeat: Infinity }}
+        transition={{ delay: 1.6, duration: 2, repeat: Infinity }}
       />
 
       {/* corner brackets */}
       {["top-0 left-0 border-t-2 border-l-2","top-0 right-0 border-t-2 border-r-2","bottom-0 left-0 border-b-2 border-l-2","bottom-0 right-0 border-b-2 border-r-2"].map((p, i) => (
-        <span key={i} aria-hidden className={`absolute ${p} w-5 h-5`} style={{ borderColor: "rgba(204,255,200,0.9)" }} />
+        <span key={i} aria-hidden className={`absolute ${p} w-4 h-4`} style={{ borderColor: "rgba(204,255,200,0.95)" }} />
       ))}
 
-      {/* upload icon */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 2.5 }}
-        className="flex flex-col items-center gap-1.5"
-      >
+      <div className="relative z-10 flex flex-col items-center gap-1.5 px-2">
         <motion.div
           animate={{ y: [0, -4, 0] }}
-          transition={{ delay: 2.5, duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ delay: 1.6, duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Upload className="w-7 h-7" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
+          <Upload className="w-5 h-5 md:w-7 md:h-7" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
         </motion.div>
-        <div className="text-[9px] uppercase tracking-[0.32em] font-bold text-white/85">
-          Drop here
+        <MasterStatus />
+        {/* master progress bar */}
+        <div className="w-full h-1 bg-white/15 overflow-hidden mt-1.5">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: "100%" }}
+            transition={{ delay: 1.8, duration: 3.6, ease: "linear" }}
+            className="h-full"
+            style={{ background: "linear-gradient(90deg, rgba(204,255,200,1), #1F4F2F)" }}
+          />
         </div>
-      </motion.div>
+      </div>
     </motion.div>
 
-    {/* flying clip thumbnails that converge into the dropzone */}
-    {FLY_CLIPS.map((c, i) => (
-      <motion.div
-        key={i}
-        className="absolute z-20 w-16 h-10 md:w-20 md:h-12 border-2 border-white shadow-2xl overflow-hidden"
-        initial={{
-          opacity: 0,
-          scale: 0.6,
-          left: `${c.from.x}%`,
-          top: `${c.from.y}%`,
-          rotate: c.rot,
-        }}
-        animate={{
-          opacity: [0, 1, 1, 0],
-          scale: [0.6, 1, 0.85, 0.65],
-          left: [`${c.from.x}%`, `${c.from.x}%`, "50%", "50%"],
-          top: [`${c.from.y}%`, `${c.from.y}%`, "44%", "44%"],
-          rotate: [c.rot, c.rot, 0, 0],
-        }}
-        transition={{ delay: c.delay, duration: 1.6, ease: [0.16, 1, 0.3, 1], times: [0, 0.18, 0.7, 1] }}
-        style={{ marginLeft: -40, marginTop: -24, boxShadow: "0 12px 32px rgba(0,0,0,0.7)" }}
-      >
-        <div
-          className="w-full h-full bg-no-repeat"
-          style={{
-            backgroundImage: `url(${PLAYER_IMG})`,
-            backgroundPosition: c.cropPos,
-            backgroundSize: "200% auto",
-          }}
-        />
-      </motion.div>
-    ))}
-
-    {/* file accepted badge (appears late) */}
+    {/* VIDEO ACCEPTED badge */}
     <motion.div
       initial={{ opacity: 0, y: 12, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -339,7 +283,7 @@ const UploadScene = () => (
       style={{ color: FOREST }}
     >
       <CheckCircle2 className="w-3.5 h-3.5" />
-      Video accepted
+      All sources received
       <motion.span
         className="absolute -inset-1 pointer-events-none"
         style={{ boxShadow: `0 0 36px rgba(204,255,200,0.9)` }}
@@ -348,38 +292,159 @@ const UploadScene = () => (
       />
     </motion.div>
 
-    {/* source-line subtitle below dropzone */}
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 4.6, duration: 0.5 }}
-      className="absolute left-0 right-0 top-[64%] z-10 text-center text-[10px] uppercase tracking-[0.32em] font-bold text-white/70"
-    >
-      Phone · iPad · Computer · Veo / YouTube link
-    </motion.div>
-
     <BrandMark />
   </motion.div>
 );
 
-const DeviceChip = ({ Icon, pos, label, delay, drift = 0 }) => (
-  <motion.div
-    className={`absolute ${pos} z-[15] flex flex-col items-center gap-1.5 pointer-events-none`}
-    initial={{ opacity: 0, scale: 0.6, y: 20 }}
-    animate={{ opacity: 1, scale: 1, y: 0 }}
-    transition={{ delay, type: "spring", stiffness: 180, damping: 14 }}
-  >
+/* Live master upload status text that rotates through devices */
+const MasterStatus = () => {
+  const labels = [
+    { t: 1.9, msg: "Uploading from PHONE..." },
+    { t: 2.6, msg: "Uploading from iPAD..." },
+    { t: 3.3, msg: "Uploading from COMPUTER..." },
+    { t: 4.0, msg: "Pulling from VEO LINK..." },
+    { t: 4.8, msg: "Merging sources..." },
+    { t: 5.4, msg: "Ready ✓" },
+  ];
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const timers = labels.map((l, i) =>
+      setTimeout(() => setIdx(i), l.t * 1000)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
+  return (
+    <div className="text-[8px] md:text-[9px] uppercase tracking-[0.25em] font-bold text-white/85 leading-tight">
+      {labels[idx].msg}
+    </div>
+  );
+};
+
+/* Card showing one source device "uploading" its clip */
+const DeviceUploadCard = ({ device, index }) => {
+  // Position in corners — mobile keeps them at corners but tighter
+  const positions = [
+    "top-[8%] left-[4%] md:top-[12%] md:left-[8%]",
+    "top-[8%] right-[4%] md:top-[12%] md:right-[8%]",
+    "bottom-[24%] left-[4%] md:bottom-[26%] md:left-[8%]",
+    "bottom-[24%] right-[4%] md:bottom-[26%] md:right-[8%]",
+  ];
+  const { Icon, label, crop, barStart, barEnd } = device;
+
+  return (
     <motion.div
-      animate={{ y: [0, drift, 0] }}
-      transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-      className="w-11 h-11 md:w-13 md:h-13 flex items-center justify-center bg-white/95 backdrop-blur shadow-2xl border"
-      style={{ borderColor: "rgba(204,255,200,0.55)" }}
+      className={`absolute ${positions[index]} z-[15] w-[80px] md:w-[110px] pointer-events-none`}
+      initial={{ opacity: 0, y: 30, scale: 0.7 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: 0.8 + index * 0.12, type: "spring", stiffness: 180, damping: 14 }}
     >
-      <Icon className="w-5 h-5" style={{ color: FOREST }} strokeWidth={1.8} />
+      {/* device header */}
+      <div className="flex items-center gap-1.5 mb-1 bg-ink/65 backdrop-blur-md px-1.5 py-1">
+        <Icon className="w-3 h-3 md:w-3.5 md:h-3.5" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
+        <span className="text-[7px] md:text-[8px] uppercase tracking-[0.22em] font-bold text-white/90">{label}</span>
+      </div>
+      {/* video thumbnail */}
+      <div className="relative aspect-video overflow-hidden border border-white/30 shadow-2xl">
+        <div className="w-full h-full bg-no-repeat" style={{
+          backgroundImage: `url(${PLAYER_IMG})`,
+          backgroundPosition: crop,
+          backgroundSize: "240% auto",
+        }} />
+        {/* scanning sweep while uploading */}
+        <motion.div
+          initial={{ top: "-100%" }}
+          animate={{ top: "100%" }}
+          transition={{ delay: barStart, duration: barEnd - barStart, ease: "linear", repeat: 1 }}
+          className="absolute left-0 right-0 h-px z-10"
+          style={{ background: "rgba(204,255,200,0.9)", boxShadow: "0 0 10px rgba(204,255,200,0.9)" }}
+        />
+        {/* live dot */}
+        <motion.div
+          className="absolute top-1 left-1 w-1.5 h-1.5 rounded-full bg-red-500"
+          animate={{ opacity: [1, 0.3, 1] }}
+          transition={{ duration: 0.8, repeat: Infinity }}
+        />
+      </div>
+      {/* mini progress bar + percentage */}
+      <div className="mt-1 flex items-center gap-1.5">
+        <div className="flex-1 h-0.5 bg-white/15">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: "100%" }}
+            transition={{ delay: barStart, duration: barEnd - barStart, ease: "easeInOut" }}
+            className="h-full"
+            style={{ background: "#CCFF99" }}
+          />
+        </div>
+        <DevicePercent start={barStart} end={barEnd} />
+      </div>
     </motion.div>
-    <span className="text-[8px] uppercase tracking-[0.28em] font-bold text-white/80">{label}</span>
-  </motion.div>
-);
+  );
+};
+
+/* Live count-up percentage matching the progress bar */
+const DevicePercent = ({ start, end }) => {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const startMs = start * 1000;
+    const durMs = (end - start) * 1000;
+    const t = setTimeout(() => {
+      const t0 = performance.now();
+      const tick = (now) => {
+        const p = Math.min((now - t0) / durMs, 1);
+        setN(Math.round(p * 100));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, startMs);
+    return () => clearTimeout(t);
+  }, [start, end]);
+  return (
+    <span className="text-[7px] md:text-[8px] uppercase font-bold tracking-wider w-6 text-right" style={{ color: "#CCFF99" }}>
+      {n}%
+    </span>
+  );
+};
+
+/* Stream of small data dots flowing along the connector line from a device to dropzone */
+const DataStream = ({ index }) => {
+  const corners = [
+    { fromX: 18, fromY: 14 },
+    { fromX: 82, fromY: 14 },
+    { fromX: 18, fromY: 46 },
+    { fromX: 82, fromY: 46 },
+  ];
+  const c = corners[index];
+  const targetX = 50, targetY = 30;
+  return (
+    <div className="absolute inset-0 pointer-events-none z-[3]">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <motion.span
+          key={i}
+          className="absolute rounded-full"
+          style={{ width: 4, height: 4, background: "#CCFF99", boxShadow: "0 0 8px #CCFF99" }}
+          initial={{
+            left: `${c.fromX}%`,
+            top: `${c.fromY}%`,
+            opacity: 0,
+          }}
+          animate={{
+            left: [`${c.fromX}%`, `${targetX}%`],
+            top: [`${c.fromY}%`, `${targetY}%`],
+            opacity: [0, 0.9, 0.9, 0],
+            scale: [0.6, 1, 1, 0.5],
+          }}
+          transition={{
+            delay: 2.0 + index * 0.2 + i * 0.45,
+            duration: 1.4,
+            repeat: 2,
+            ease: "easeIn",
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 /* ============================================================================
    Scene 2 — MARK (10-tap, player image actually contains the player)
@@ -781,7 +846,7 @@ const ScoutReviewScene = () => (
       </div>
     </motion.div>
 
-    <div className="absolute inset-x-0 bottom-24 top-[28%] flex items-stretch z-10 px-3 md:px-6 gap-3 md:gap-6">
+    <div className="absolute inset-x-0 bottom-20 md:bottom-24 top-[30%] flex items-stretch z-10 px-2 md:px-6 gap-2 md:gap-6">
       {/* LEFT — one scout, side profile, looking right at the board */}
       <ScoutFigure />
 
@@ -799,7 +864,7 @@ const ScoutFigure = () => (
     initial={{ opacity: 0, x: -30 }}
     animate={{ opacity: 1, x: 0 }}
     transition={{ delay: 0.8, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-    className="relative flex-shrink-0 w-[34%] md:w-[260px] h-full"
+    className="relative flex-shrink-0 w-[28%] md:w-[260px] h-full"
   >
     {/* portrait — desaturated, dramatic side-light */}
     <div className="relative w-full h-full overflow-hidden">
@@ -1075,12 +1140,12 @@ const ReportPdfScene = () => (
     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-[260px] pointer-events-none"
          style={{ background: `radial-gradient(ellipse at bottom, ${FOREST_SOFT} 0%, transparent 70%)`, filter: "blur(20px)" }} />
 
-    {/* fan of PDF pages */}
+    {/* fan of PDF pages — tighter on mobile */}
     <div className="relative z-10 flex items-center justify-center w-full pb-24" style={{ perspective: 1400 }}>
-      <PdfPage delay={0.3} rotate={-12} translateX={-170} z={0} pageType="cover" />
-      <PdfPage delay={0.55} rotate={-5} translateX={-72} z={1} pageType="radar" />
-      <PdfPage delay={0.8} rotate={3} translateX={28} z={2} pageType="strengths" />
-      <PdfPage delay={1.05} rotate={11} translateX={128} z={3} pageType="growth" />
+      <PdfPage delay={0.3} rotate={-12} translateX={-118} translateXMobile={-72} z={0} pageType="cover" />
+      <PdfPage delay={0.55} rotate={-5} translateX={-50} translateXMobile={-26} z={1} pageType="radar" />
+      <PdfPage delay={0.8} rotate={3} translateX={26} translateXMobile={16} z={2} pageType="strengths" />
+      <PdfPage delay={1.05} rotate={11} translateX={94} translateXMobile={56} z={3} pageType="growth" />
     </div>
 
     {/* download badge */}
@@ -1114,19 +1179,29 @@ const ReportPdfScene = () => (
   </motion.div>
 );
 
-const PdfPage = ({ delay, rotate, translateX, z, pageType }) => (
-  <motion.div
-    className="absolute"
-    initial={{ opacity: 0, y: 80, rotate: rotate - 6, x: translateX, scale: 0.7 }}
-    animate={{ opacity: 1, y: 0, rotate, x: translateX, scale: 1 }}
-    transition={{ delay, type: "spring", stiffness: 110, damping: 14 }}
-    style={{ zIndex: z }}
-  >
-    <div className="w-[150px] md:w-[185px] aspect-[3/4] bg-white shadow-2xl border border-ink/12 overflow-hidden relative">
-      <PdfPageContent type={pageType} delay={delay + 0.5} />
-    </div>
-  </motion.div>
-);
+const PdfPage = ({ delay, rotate, translateX, translateXMobile, z, pageType }) => {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  const tx = isMobile ? (translateXMobile ?? translateX) : translateX;
+  return (
+    <motion.div
+      className="absolute"
+      initial={{ opacity: 0, y: 80, rotate: rotate - 6, x: tx, scale: 0.7 }}
+      animate={{ opacity: 1, y: 0, rotate, x: tx, scale: 1 }}
+      transition={{ delay, type: "spring", stiffness: 110, damping: 14 }}
+      style={{ zIndex: z }}
+    >
+      <div className="w-[100px] sm:w-[130px] md:w-[180px] aspect-[3/4] bg-white shadow-2xl border border-ink/12 overflow-hidden relative">
+        <PdfPageContent type={pageType} delay={delay + 0.5} />
+      </div>
+    </motion.div>
+  );
+};
 
 const PdfPageContent = ({ type, delay }) => {
   if (type === "cover") {
@@ -1425,22 +1500,47 @@ const CompareRadar = ({ values, label, delay = 0, highlight = false, mid = false
 /* ============================================================================
    Main
 ============================================================================ */
+
+// Royalty-free cinematic soundtrack (CC BY 4.0 — Kevin MacLeod · incompetech.com)
+const SOUNDTRACK_URL = "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hero%20Theme.mp3";
+
 export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1 }) {
   const [sceneIdx, setSceneIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
+  const [soundOn, setSoundOn] = useState(false);
   const reduceMotion = useReducedMotion();
 
+  const audioRef = useRef(null);
   const wrapRef = useRef(null);
+  const [inView, setInView] = useState(true);
+
   useEffect(() => {
     if (!wrapRef.current || typeof IntersectionObserver === "undefined") return;
     const obs = new IntersectionObserver(
-      ([e]) => setIsPlaying(e.isIntersecting && !reduceMotion),
+      ([e]) => setInView(e.isIntersecting),
       { threshold: 0.3 }
     );
     obs.observe(wrapRef.current);
     return () => obs.disconnect();
-  }, [reduceMotion]);
+  }, []);
+
+  // pause animation when off-screen or motion is reduced
+  useEffect(() => {
+    setIsPlaying(inView && !reduceMotion);
+  }, [inView, reduceMotion]);
+
+  // sound: only play when sound is on AND in view AND visual is playing
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (soundOn && inView && isPlaying) {
+      audio.volume = 0.35;
+      audio.play().catch(() => { /* autoplay blocked — user already opted-in via toggle so silently ignore */ });
+    } else {
+      audio.pause();
+    }
+  }, [soundOn, inView, isPlaying]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -1461,6 +1561,14 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
   }, [sceneIdx, isPlaying]);
 
   const scene = SCENES[sceneIdx];
+
+  const handleSoundToggle = () => {
+    setSoundOn((s) => !s);
+    // ensure load on first enable (preload="none" means file isn't fetched until play)
+    if (!soundOn && audioRef.current) {
+      try { audioRef.current.load(); } catch (e) { /* noop */ }
+    }
+  };
 
   const sceneNode = (
     <AnimatePresence mode="wait">
@@ -1499,9 +1607,43 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
                 <div className="absolute inset-2 border z-[1] pointer-events-none" style={{ borderColor: `${CREAM}22` }} />
                 {sceneNode}
 
-                <div className="absolute top-3 left-3 z-30 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.25em] font-bold text-white/65 bg-ink/40 backdrop-blur-md px-2 py-1">
-                  <Volume2 className="w-3 h-3" /> Silent
-                </div>
+                {/* hidden audio element — fetched lazily after first sound-on click */}
+                <audio
+                  ref={audioRef}
+                  src={SOUNDTRACK_URL}
+                  loop
+                  preload="none"
+                />
+
+                {/* Sound toggle — clickable, replaces silent badge */}
+                <button
+                  data-testid="walkthrough-sound-toggle"
+                  onClick={handleSoundToggle}
+                  className="absolute top-3 left-3 z-30 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.25em] font-bold px-2 py-1 backdrop-blur-md transition-colors"
+                  style={{
+                    background: soundOn ? "rgba(204,255,200,0.95)" : "rgba(20,57,35,0.45)",
+                    color: soundOn ? "#0A0F0D" : "rgba(255,255,255,0.7)",
+                  }}
+                  aria-label={soundOn ? "Sound on — click to mute" : "Click to enable cinematic sound"}
+                >
+                  {soundOn ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />}
+                  {soundOn ? "Sound on" : "Push for sound"}
+                </button>
+
+                {/* Pulse hint ring around the sound button on first scene load (when off) */}
+                {!soundOn && (
+                  <motion.span
+                    className="absolute top-2.5 left-2.5 z-20 pointer-events-none"
+                    style={{
+                      width: 138, height: 28,
+                      border: "2px solid rgba(204,255,200,0.9)",
+                      borderRadius: 2,
+                    }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 1.6, delay: 1.2, repeat: 1 }}
+                  />
+                )}
 
                 <motion.div
                   key={scene.id}
@@ -1616,10 +1758,15 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
               <ArrowRight className="w-3.5 h-3.5" />
             </a>
 
-            <div className="mt-6 pt-5 border-t border-ink/10 flex items-center justify-between text-[10px] uppercase tracking-[0.22em] font-bold text-ink/45">
+            <div className="mt-6 pt-5 border-t border-ink/10 flex flex-wrap items-center justify-between gap-y-2 text-[10px] uppercase tracking-[0.22em] font-bold text-ink/45">
               <span>Full report · ${price}</span>
               <span>No subscription</span>
             </div>
+            {soundOn && (
+              <div className="mt-2 text-[8px] uppercase tracking-[0.18em] font-bold text-ink/35">
+                Music: &ldquo;Hero Theme&rdquo; · Kevin MacLeod · incompetech.com · CC BY 4.0
+              </div>
+            )}
           </div>
         </div>
       </div>
