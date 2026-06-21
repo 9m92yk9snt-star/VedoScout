@@ -1123,7 +1123,11 @@ export default function Landing() {
           {/* Header */}
           <div className="mb-12 md:mb-16">
             <div className="flex items-center gap-4 mb-6">
-              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold whitespace-nowrap">Inside your report</span>
+              <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+              </span>
+              <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold whitespace-nowrap">Inside your report</span>
               <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/60 via-volt/20 to-transparent max-w-[260px]" />
             </div>
 
@@ -1958,8 +1962,15 @@ export default function Landing() {
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
           <div className="text-center max-w-3xl mx-auto">
-            <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Pricing</span>
-            <h2 className="mt-3 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
+            <div className="inline-flex items-center gap-2.5 mb-4">
+              <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+              </span>
+              <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold">Pricing</span>
+              <span aria-hidden className="h-px w-12 bg-gradient-to-r from-volt/55 to-transparent" />
+            </div>
+            <h2 className="font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
               Where does your player stand —
               <span className="block text-volt mt-2">and where will they be in a year?</span>
             </h2>

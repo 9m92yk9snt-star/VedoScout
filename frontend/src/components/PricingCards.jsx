@@ -100,8 +100,24 @@ export default function PricingCards({
               "0 22px 48px -20px rgba(10, 15, 13, 0.18), 0 12px 24px -10px rgba(31, 79, 47, 0.14), 0 4px 8px -2px rgba(10, 15, 13, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
           }}
         >
-          <div className="flex items-center gap-2 mb-2">
-            <FileCheck2 className={`w-4 h-4 ${isDark ? "text-volt" : "text-forest"}`} />
+          <div className="flex items-center gap-3 mb-3">
+            <motion.div
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className={`relative w-10 h-10 flex items-center justify-center shrink-0 ${
+                isDark ? "bg-volt/15 border border-volt/45" : "bg-forest/8 border border-forest/30"
+              }`}
+            >
+              <FileCheck2 className={`w-4 h-4 ${isDark ? "text-volt" : "text-forest"}`} strokeWidth={1.7} />
+              <motion.span
+                aria-hidden
+                className={`absolute inset-0 border pointer-events-none ${
+                  isDark ? "border-volt" : "border-forest"
+                }`}
+                animate={{ scale: [1, 1.3], opacity: [0.45, 0] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+              />
+            </motion.div>
             <span className={`text-[10px] uppercase tracking-[0.25em] font-bold ${isDark ? "text-volt" : "text-forest"}`}>
               Single report
             </span>
@@ -199,9 +215,58 @@ export default function PricingCards({
             Most parents pick this
           </div>
 
-          <div className="flex items-center gap-2 mb-2 md:mt-3">
-            <BarChart3 className="w-4 h-4 text-volt" />
+          <div className="flex items-center gap-3 mb-3 md:mt-3">
+            <motion.div
+              animate={{ y: [0, -2, 0] }}
+              transition={{ duration: 3, delay: 0.4, repeat: Infinity, ease: "easeInOut" }}
+              className="relative w-10 h-10 flex items-center justify-center shrink-0 bg-volt/15 border border-volt/55"
+            >
+              <BarChart3 className="w-4 h-4 text-volt" strokeWidth={1.7} />
+              <motion.span
+                aria-hidden
+                className="absolute inset-0 border border-volt pointer-events-none"
+                animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
+                transition={{ duration: 2.4, delay: 0.4, repeat: Infinity, ease: "easeOut" }}
+              />
+            </motion.div>
             <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">12 months · 3 reports</span>
+          </div>
+
+          {/* mini 12-month timeline visualisation — instantly conveys "3 reports across 12 months" */}
+          <div className="mt-2 mb-3 max-w-[280px]" aria-hidden>
+            <svg viewBox="0 0 100 14" className="w-full h-3.5">
+              {/* baseline */}
+              <line x1="6" y1="7" x2="94" y2="7" stroke="rgba(255,255,255,0.25)" strokeWidth="0.5" />
+              <motion.line
+                x1="6" y1="7" x2="94" y2="7" stroke="#CCFF00" strokeWidth="0.6"
+                initial={{ pathLength: 0 }}
+                whileInView={{ pathLength: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1.1, delay: 0.4 }}
+              />
+              {/* tick marks for every 3 months */}
+              {[6, 28, 50, 72, 94].map((x, i) => (
+                <line key={i} x1={x} y1="5.5" x2={x} y2="8.5" stroke="rgba(255,255,255,0.35)" strokeWidth="0.4" />
+              ))}
+              {/* 3 report drops at M0, M6, M12 */}
+              {[6, 50, 94].map((x, i) => (
+                <motion.g
+                  key={i}
+                  initial={{ scale: 0, opacity: 0 }}
+                  whileInView={{ scale: 1, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.6 + i * 0.18, type: "spring", stiffness: 220, damping: 14 }}
+                  style={{ transformOrigin: `${x}px 7px`, transformBox: "fill-box" }}
+                >
+                  <circle cx={x} cy="7" r="3" fill="#CCFF00" />
+                  <circle cx={x} cy="7" r="1.2" fill="#0E3D2E" />
+                </motion.g>
+              ))}
+              {/* month labels */}
+              <text x="6"  y="13.5" fontSize="2.4" fill="white" opacity="0.55" textAnchor="middle" fontWeight="700">M0</text>
+              <text x="50" y="13.5" fontSize="2.4" fill="white" opacity="0.55" textAnchor="middle" fontWeight="700">M6</text>
+              <text x="94" y="13.5" fontSize="2.4" fill="white" opacity="0.55" textAnchor="middle" fontWeight="700">M12</text>
+            </svg>
           </div>
           <h3 className="font-barlow font-black uppercase text-3xl md:text-5xl tracking-tighter leading-[0.95]">
             Track The Full Year
