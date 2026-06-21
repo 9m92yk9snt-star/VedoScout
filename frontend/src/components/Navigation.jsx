@@ -8,7 +8,7 @@ const LIME = "#ccff00";
 
 const NAV_LINKS = [
   { label: "Home", testid: "hero-section", isHome: true },
-  { label: "How it works", testid: "how-it-works" },
+  { label: "How it works", testid: "how-it-works-walkthrough" },
   { label: "What's inside", testid: "what-you-get" },
   { label: "Sample", testid: "example-report" },
   { label: "Pricing", testid: "pricing-section" },
@@ -19,7 +19,7 @@ const NAV_LINKS = [
 // Sections shown on the right-edge scroll-spy rail (desktop, landing page only)
 const RAIL_SECTIONS = [
   { id: "hero-section", label: "Top" },
-  { id: "how-it-works", label: "How it works" },
+  { id: "how-it-works-walkthrough", label: "How it works" },
   { id: "what-you-get", label: "Inside" },
   { id: "example-report", label: "Sample" },
   { id: "pricing-section", label: "Pricing" },

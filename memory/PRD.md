@@ -26,6 +26,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 59 — Landing polish: 3-line title fixed, empty Bento cell removed, duplicate "3 Steps" section deleted (Feb 21 2026)**:
+  - **Fix #1 — "WHAT DOES A REAL SCOUT SEE / THAT you DON'T?" title was breaking into 3 lines** on desktop because `text-7xl` (96px) didn't fit in the 8-col title column (~640px wide at 1440px viewport, with the right "10" badge taking 4 cols). The forced `<br className="hidden md:block" />` made it worse by inserting an artificial break after "see", leaving "WHAT DOES A REAL SCOUT", "SEE", "THAT you DON'T?" stacked. Fix: dropped `lg:text-7xl` → uniform `md:text-6xl`, replaced `<br/>` with a `<span className="block">` wrapper around "that you don't?" so the whole title reads on **2 clean lines**.
+  - **Fix #2 — Empty cell in the Bento grid between PREMIUM PDF (#10) and the green 100% PERSONAL highlight (#12)**. The closer card was `col-span-4 row-span-2` (cols 9-12, rows 4-5) and PDF was only `col-span-4` (cols 1-4 row 5), leaving cols 5-8 row 5 completely empty. Widened PDF to `sm:col-span-2 lg:col-span-8` (cols 1-8) with `variant: "wide"` so it now sits flush next to the highlight — no more dead space.
+  - **Fix #3 — Deleted the duplicate "HOW IT WORKS · 3 STEPS" section** (lines 874-1121 in `Landing.jsx`, 248 lines). It had its own SIGN UP / UPLOAD / GET PREVIEW stepper + a giant "START FREE PREVIEW →" button + an INCLUDES strip + a "SEE AN EXAMPLE REPORT BELOW" link, all of which duplicated the CTAs already present in the Hero, the walkthrough's "START FREE PREVIEW" button, and the Pricing/Final-CTA sections. User explicitly flagged "too many start preview" duplicates. Landing.jsx shrunk 2861 → 2614 lines.
+  - **Side-effect fix**: Updated `/app/frontend/src/components/Navigation.jsx` — the nav menu link "How it works" and the right-edge scroll-spy rail both used to scroll to `testid="how-it-works"` / `id="how-it-works"`, which no longer exist. Rewired both to `how-it-works-walkthrough` (the silent-autoplay walkthrough component) and added `id="how-it-works-walkthrough"` to that `<section>` so the scroll anchor works.
+  - **Verified** via desktop + mobile screenshots: title clean on 2 lines, Bento grid has zero empty cells, walkthrough flows directly into "Inside Your Report" (no duplicate "3 STEPS" panel between them), nav "How it works" smoothly scrolls to the walkthrough.
+  - **Files**: MODIFIED `/app/frontend/src/pages/Landing.jsx`, `/app/frontend/src/components/Navigation.jsx`, `/app/frontend/src/components/HowItWorksWalkthrough.jsx`.
+
+
 - ✅ **🆕 Session 58 — URL video fetch (Veo/Vimeo/YouTube) repair + 2026 TLS impersonation (Feb 21 2026)**:
   - **User complaint**: "uploading link youtube veo dont work when you want to fetch video file in user dashboard"
   - **Root causes identified** by direct yt-dlp testing:

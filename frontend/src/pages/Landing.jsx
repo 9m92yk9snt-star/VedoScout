@@ -871,254 +871,7 @@ export default function Landing() {
       {/* ============ HOW IT WORKS — animated walkthrough (silent autoplay) ============ */}
       <HowItWorksWalkthrough startHref={startHref} price={price} />
 
-      {/* ============ HOW IT WORKS — clean section with scout-notepad framing ============ */}
-      <section
-        data-testid="how-it-works"
-        className="relative py-16 md:py-20 border-t border-gray-border bg-deepnavy overflow-hidden"
-      >
-        {/* Subtle football turf SVG texture — tiles uniformly, no seam issues */}
-        <div
-          aria-hidden
-          className="absolute inset-0 pointer-events-none opacity-[0.05]"
-          style={{
-            backgroundImage:
-              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><path d='M24 0v48M0 24h48' stroke='%231F4F2F' stroke-width='0.4' opacity='0.6'/><circle cx='24' cy='24' r='1' fill='%231F4F2F' opacity='0.4'/></svg>\")",
-            backgroundSize: "48px 48px",
-          }}
-        />
-        {/* Single lime accent strip on the left edge — scout's playbook spine */}
-        <div aria-hidden className="absolute left-0 top-12 bottom-12 w-[3px] bg-gradient-to-b from-transparent via-volt/40 to-transparent pointer-events-none" />
-        {/* Scout-notepad corner brackets — kept (these are not photos, they're identity marks) */}
-        <span aria-hidden className="absolute top-8 left-8 w-6 h-6 border-t-2 border-l-2 border-forest/40" />
-        <span aria-hidden className="absolute top-8 right-8 w-6 h-6 border-t-2 border-r-2 border-forest/40" />
-        <span aria-hidden className="absolute bottom-8 left-8 w-6 h-6 border-b-2 border-l-2 border-forest/40" />
-        <span aria-hidden className="absolute bottom-8 right-8 w-6 h-6 border-b-2 border-r-2 border-forest/40" />
-
-        <div className="relative z-10 max-w-3xl mx-auto px-6 md:px-10">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="card-premium border border-gray-border bg-surface/85 backdrop-blur-xl p-6 md:p-12"
-          >
-            {/* Eyebrow row — center divider line for visual rhythm */}
-            <div className="flex items-center gap-4 mb-10">
-              <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold whitespace-nowrap">How it works · 3 steps</span>
-              <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/40 via-volt/15 to-transparent" />
-              <span className="text-ink/50 text-xs uppercase tracking-widest font-bold whitespace-nowrap">~ 2 min</span>
-            </div>
-
-            {/* Horizontal stepper with animated icon halos + dashed connector line */}
-            <div className="relative">
-              {/* Desktop connector — dashed volt line drawing across the icon centerline */}
-              <svg
-                aria-hidden
-                className="hidden md:block absolute left-0 right-0 pointer-events-none"
-                style={{ top: 36 }}
-                width="100%" height="2" viewBox="0 0 100 1" preserveAspectRatio="none"
-              >
-                <motion.line
-                  x1="14" y1="0.5" x2="86" y2="0.5"
-                  stroke="#1F4F2F" strokeOpacity="0.45"
-                  strokeWidth="0.4" strokeDasharray="1.5 1.5"
-                  initial={{ pathLength: 0 }}
-                  whileInView={{ pathLength: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.2, delay: 0.3 }}
-                />
-              </svg>
-
-              <div className="grid md:grid-cols-3 gap-7 md:gap-4">
-                {[
-                  { n: "01", t: "Sign up", d: "Free account. No card required to start.", Icon: ShieldCheck },
-                  { n: "02", t: "Upload video & details", d: "Highlight, match or training clip.", Icon: Upload },
-                  { n: "03", t: "Get instant free preview", d: `Unlock full report for $${price} USD.`, Icon: Zap },
-                ].map((s, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.4 }}
-                    transition={{ delay: i * 0.12, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                    className="relative flex md:flex-col items-start md:items-center gap-4 md:gap-3 text-left md:text-center"
-                  >
-                    {/* Icon disc with pulse rings */}
-                    <div className="relative flex-shrink-0 z-10">
-                      <motion.div
-                        animate={{ y: [0, -3, 0] }}
-                        transition={{ duration: 3, delay: i * 0.4, repeat: Infinity, ease: "easeInOut" }}
-                        className="relative w-[72px] h-[72px] md:w-[72px] md:h-[72px] rounded-full border-2 border-volt/35 bg-cream-base flex items-center justify-center shadow-[0_8px_24px_-8px_rgba(31,79,47,0.3)]"
-                      >
-                        <s.Icon className="w-7 h-7 md:w-8 md:h-8 text-volt" strokeWidth={1.6} />
-                        {/* outward pulse */}
-                        <motion.span
-                          className="absolute inset-0 rounded-full border-2 border-volt pointer-events-none"
-                          animate={{ scale: [1, 1.4], opacity: [0.45, 0] }}
-                          transition={{ duration: 2.4, delay: i * 0.4, repeat: Infinity, ease: "easeOut" }}
-                        />
-                      </motion.div>
-                      {/* Step number chip */}
-                      <span className="absolute -top-1.5 -right-1.5 md:-right-2 bg-ink text-cream-base font-barlow font-black text-[10px] tracking-wider px-1.5 py-0.5 leading-none border-2 border-cream-base">
-                        {s.n}
-                      </span>
-                    </div>
-
-                    {/* Title + description */}
-                    <div className="flex-1 md:flex-none md:max-w-[200px]">
-                      <div className="font-barlow font-black uppercase text-ink text-base md:text-lg leading-tight">{s.t}</div>
-                      <div className="text-xs md:text-sm text-ink/65 mt-1.5 leading-snug">{s.d}</div>
-                    </div>
-
-                    {/* Mobile vertical connector */}
-                    {i < 2 && (
-                      <span aria-hidden className="md:hidden absolute left-[34px] top-[72px] w-px h-7 bg-volt/30" />
-                    )}
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            <Link
-              to={startHref}
-              data-testid="card-cta"
-              className="relative mt-10 md:mt-12 w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm py-4 flex items-center justify-center gap-2 transition-colors group"
-            >
-              <span aria-hidden className="absolute left-0 top-0 bottom-0 w-1 bg-cream-base/30" />
-              Start free preview
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              <span aria-hidden className="absolute right-0 top-0 bottom-0 w-1 bg-cream-base/30" />
-            </Link>
-
-            {/* What you get — creative mini "spec sheet" with inline SVG previews */}
-            <div className="mt-8 pt-7 border-t border-gray-border">
-              <div className="text-[10px] uppercase tracking-[0.3em] font-bold text-ink/40 mb-3 flex items-center gap-3">
-                <span aria-hidden className="w-6 h-px bg-current opacity-40" />
-                Includes
-              </div>
-              <div className="grid grid-cols-3 gap-2 md:gap-3">
-                {[
-                  {
-                    i: Brain, l: "Report",
-                    viz: (
-                      <svg viewBox="0 0 60 44" className="w-full h-10 md:h-12 text-volt" aria-hidden>
-                        <polygon points="30,4 52,16 52,36 30,44 8,36 8,16" fill="none" stroke="currentColor" strokeWidth="0.7" opacity="0.25" />
-                        <polygon points="30,10 46,18 46,34 30,40 14,34 14,18" fill="none" stroke="currentColor" strokeWidth="0.7" opacity="0.45" />
-                        <motion.polygon
-                          initial={{ pathLength: 0, fillOpacity: 0 }}
-                          whileInView={{ pathLength: 1, fillOpacity: 0.22 }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.9, delay: 0.4 }}
-                          points="30,14 42,21 42,32 30,37 18,32 18,21"
-                          fill="currentColor" stroke="currentColor" strokeWidth="0.9"
-                        />
-                        {[
-                          [30,14],[42,21],[42,32],[30,37],[18,32],[18,21],
-                        ].map(([x,y], idx) => (
-                          <motion.circle
-                            key={idx}
-                            cx={x} cy={y} r="1.4" fill="currentColor"
-                            initial={{ opacity: 0 }}
-                            whileInView={{ opacity: 1 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: 0.6 + idx * 0.06 }}
-                          />
-                        ))}
-                      </svg>
-                    ),
-                  },
-                  {
-                    i: Target, l: "Scout View",
-                    viz: (
-                      <svg viewBox="0 0 60 44" className="w-full h-10 md:h-12 text-volt" aria-hidden>
-                        <motion.circle
-                          cx="30" cy="22" r="18" fill="none" stroke="currentColor" strokeWidth="0.7" opacity="0.25"
-                          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }}
-                          transition={{ duration: 0.7, delay: 0.4 }}
-                        />
-                        <motion.circle
-                          cx="30" cy="22" r="12" fill="none" stroke="currentColor" strokeWidth="0.7" opacity="0.4"
-                          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }}
-                          transition={{ duration: 0.7, delay: 0.55 }}
-                        />
-                        <motion.circle
-                          cx="30" cy="22" r="6" fill="none" stroke="currentColor" strokeWidth="0.7" opacity="0.65"
-                          initial={{ pathLength: 0 }} whileInView={{ pathLength: 1 }} viewport={{ once: true }}
-                          transition={{ duration: 0.7, delay: 0.7 }}
-                        />
-                        {/* crosshair */}
-                        <line x1="30" y1="2" x2="30" y2="9" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
-                        <line x1="30" y1="35" x2="30" y2="42" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
-                        <line x1="2" y1="22" x2="9" y2="22" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
-                        <line x1="51" y1="22" x2="58" y2="22" stroke="currentColor" strokeWidth="0.7" opacity="0.4" />
-                        {/* locked dot */}
-                        <motion.circle
-                          cx="30" cy="22" r="2" fill="currentColor"
-                          initial={{ opacity: 0, scale: 0 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}
-                          transition={{ delay: 1.05, type: "spring", stiffness: 220 }}
-                        />
-                      </svg>
-                    ),
-                  },
-                  {
-                    i: FileText, l: "PDF",
-                    viz: (
-                      <svg viewBox="0 0 60 44" className="w-full h-10 md:h-12 text-volt" aria-hidden>
-                        {/* back page */}
-                        <motion.g
-                          initial={{ opacity: 0, x: -4 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
-                          transition={{ delay: 0.4, duration: 0.5 }}
-                        >
-                          <rect x="14" y="6" width="22" height="32" fill="white" stroke="currentColor" strokeWidth="0.6" opacity="0.45" transform="rotate(-6 25 22)" />
-                        </motion.g>
-                        {/* front page */}
-                        <motion.g
-                          initial={{ opacity: 0, y: 4 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                          transition={{ delay: 0.55, duration: 0.5 }}
-                        >
-                          <rect x="20" y="4" width="22" height="32" fill="white" stroke="currentColor" strokeWidth="0.7" />
-                          <line x1="23" y1="10" x2="39" y2="10" stroke="currentColor" strokeWidth="0.6" opacity="0.55" />
-                          <line x1="23" y1="13" x2="37" y2="13" stroke="currentColor" strokeWidth="0.6" opacity="0.55" />
-                          <line x1="23" y1="16" x2="39" y2="16" stroke="currentColor" strokeWidth="0.6" opacity="0.55" />
-                          <line x1="23" y1="19" x2="34" y2="19" stroke="currentColor" strokeWidth="0.6" opacity="0.55" />
-                          {/* mini chart */}
-                          <polyline points="23,30 27,28 31,25 35,22 39,20" fill="none" stroke="currentColor" strokeWidth="0.9" />
-                          <circle cx="39" cy="20" r="1.2" fill="currentColor" />
-                        </motion.g>
-                      </svg>
-                    ),
-                  },
-                ].map(({ i: Icon, l, viz }, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, y: 12 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.3 }}
-                    transition={{ delay: idx * 0.08, duration: 0.5 }}
-                    whileHover={{ y: -2 }}
-                    className="relative border border-gray-border bg-cream-base/40 hover:border-volt/40 hover:bg-cream-base/70 transition-colors p-2.5 md:p-3.5"
-                  >
-                    {viz}
-                    <div className="mt-2 flex items-center gap-1.5 justify-center">
-                      <Icon className="w-3.5 h-3.5 text-volt" strokeWidth={1.7} />
-                      <span className="text-[9px] md:text-[10px] uppercase tracking-[0.18em] font-bold text-ink/70 whitespace-nowrap">{l}</span>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            <a
-              href="#what-you-get"
-              className="mt-7 flex items-center justify-center gap-3 text-[11px] uppercase tracking-[0.25em] font-bold text-ink/50 hover:text-volt transition-colors group"
-            >
-              <span aria-hidden className="w-10 h-px bg-current opacity-40 transition-all group-hover:w-14" />
-              See an example report below
-              <span aria-hidden className="w-10 h-px bg-current opacity-40 transition-all group-hover:w-14" />
-            </a>
-          </motion.div>
-        </div>
-      </section>
+      {/* ============ HOW IT WORKS · 3 STEPS section removed (consolidated CTAs to reduce duplicates) ============ */}
 
       {/* ============ WHAT YOU RECEIVE — rich feature cards ============ */}
       <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-16 md:py-20 border-t border-gray-border overflow-hidden">
@@ -1148,13 +901,14 @@ export default function Landing() {
                 </div>
                 <h2
                   data-testid="report-section-title"
-                  className="font-barlow font-black uppercase text-4xl sm:text-5xl md:text-6xl lg:text-7xl tracking-tighter leading-[0.95]"
+                  className="font-barlow font-black uppercase text-4xl sm:text-5xl md:text-6xl tracking-tighter leading-[0.92]"
                 >
                   What does a real scout see{" "}
-                  <br className="hidden md:block" />
-                  that{" "}
-                  <span className="font-serif-italic normal-case font-normal lowercase tracking-normal text-volt">you</span>{" "}
-                  don't?
+                  <span className="block">
+                    that{" "}
+                    <span className="font-serif-italic normal-case font-normal lowercase tracking-normal text-volt">you</span>{" "}
+                    don't?
+                  </span>
                 </h2>
                 <p className="mt-5 text-ink/75 text-base md:text-lg max-w-xl leading-relaxed">
                   Professional analysis. Honest insights. Built to help you grow.
@@ -1202,7 +956,7 @@ export default function Landing() {
                 { cls: "sm:col-span-2 lg:col-span-8", variant: "wide" },                       // 6 Training Plan
                 { cls: "lg:col-span-4", variant: "tint" },                                     // 7 Potential
                 { cls: "lg:col-span-4", variant: "default" },                                  // 8 Comparison
-                { cls: "lg:col-span-4", variant: "default" },                                  // 9 PDF
+                { cls: "sm:col-span-2 lg:col-span-8", variant: "wide" },                       // 9 PDF (widened to remove empty cell next to closer)
                 { cls: "sm:col-span-2 lg:col-span-12", variant: "default" },                   // 10 Private (full-width finale)
               ];
 

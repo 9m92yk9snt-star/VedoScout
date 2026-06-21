@@ -1775,6 +1775,7 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
   return (
     <section
       ref={wrapRef}
+      id="how-it-works-walkthrough"
       data-testid="how-it-works-walkthrough"
       className="relative py-16 md:py-20 border-t border-gray-border bg-cream-base overflow-hidden"
     >
