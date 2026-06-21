@@ -1107,7 +1107,7 @@ export default function Landing() {
       </section>
 
       {/* ============ WHAT YOU RECEIVE — rich feature cards ============ */}
-      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-16 md:py-24 border-t border-gray-border overflow-hidden">
+      <section id="what-you-get" data-testid="what-you-get" className="section-accent-top relative py-16 md:py-20 border-t border-gray-border overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-15">
           <img
             src="https://images.pexels.com/photos/16826135/pexels-photo-16826135.jpeg"
@@ -1121,18 +1121,17 @@ export default function Landing() {
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
           {/* Header */}
-          <div className="mb-12 md:mb-16">
-            <div className="flex items-center gap-4 mb-6">
-              <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
-                <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
-                <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
-              </span>
-              <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold whitespace-nowrap">Inside your report</span>
-              <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/60 via-volt/20 to-transparent max-w-[260px]" />
-            </div>
-
-            <div className="grid lg:grid-cols-12 gap-8 items-end">
+          <div className="mb-10 md:mb-14">
+            <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-center">
               <div className="lg:col-span-8">
+                <div className="flex items-center gap-4 mb-5">
+                  <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                    <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                    <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+                  </span>
+                  <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold whitespace-nowrap">Inside your report</span>
+                  <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/60 via-volt/20 to-transparent max-w-[200px]" />
+                </div>
                 <h2
                   data-testid="report-section-title"
                   className="font-barlow font-black uppercase text-4xl sm:text-5xl md:text-6xl lg:text-7xl tracking-tighter leading-[0.95]"
@@ -1143,14 +1142,14 @@ export default function Landing() {
                   <span className="font-serif-italic normal-case font-normal lowercase tracking-normal text-volt">you</span>{" "}
                   don't?
                 </h2>
-                <p className="mt-6 text-ink/70 text-base md:text-lg max-w-xl leading-relaxed">
+                <p className="mt-5 text-ink/75 text-base md:text-lg max-w-xl leading-relaxed">
                   Professional analysis. Honest insights. Built to help you grow.
                 </p>
               </div>
 
               {/* Decorative jersey badge — visually echoes the reference */}
               <div className="hidden lg:flex lg:col-span-4 justify-end">
-                <div className="relative w-full max-w-[260px] aspect-[3/4]">
+                <div className="relative w-full max-w-[180px] aspect-[3/4]">
                   <div className="absolute inset-0 border border-volt/30 bg-cream-card/90 backdrop-blur-sm">
                     {/* corner brackets */}
                     <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-volt" />
@@ -1159,14 +1158,14 @@ export default function Landing() {
                     <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-volt" />
 
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-                      <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt/80 mb-2">Your name</span>
+                      <span className="text-[9px] uppercase tracking-[0.25em] font-bold text-volt/80 mb-1.5">Your name</span>
                       <span
                         className="font-barlow font-black text-volt leading-none"
-                        style={{ fontSize: "7rem", textShadow: "0 6px 30px rgba(204,255,0,0.35)" }}
+                        style={{ fontSize: "5rem", textShadow: "0 6px 30px rgba(204,255,0,0.35)" }}
                       >
                         10
                       </span>
-                      <span className="mt-3 text-[10px] uppercase tracking-[0.2em] font-bold text-ink/55">
+                      <span className="mt-2.5 text-[9px] uppercase tracking-[0.2em] font-bold text-ink/55">
                         Built for the next level
                       </span>
                     </div>
@@ -1535,18 +1534,18 @@ export default function Landing() {
           {/* ===== Bottom trust bar ===== */}
           <div
             data-testid="report-trust-bar"
-            className="mt-12 md:mt-16 border border-gray-border bg-surface/40 backdrop-blur-sm divide-y md:divide-y-0 md:divide-x divide-white/10 grid md:grid-cols-3"
+            className="mt-10 md:mt-14 border border-gray-border bg-surface/60 backdrop-blur-sm divide-y md:divide-y-0 md:divide-x divide-gray-border/60 grid md:grid-cols-3"
           >
             {[
               { Icon: Clock, t: "5–10 Minutes", s: "To complete" },
               { Icon: Zap, t: "Instant access", s: "To your free preview" },
               { Icon: ShieldCheck, t: "Real scouts", s: "Real reports" },
             ].map(({ Icon, t, s }, i) => (
-              <div key={i} className="flex items-center gap-3 px-6 py-5">
+              <div key={i} className="flex items-center gap-3.5 px-6 py-5">
                 <Icon className="w-5 h-5 text-volt shrink-0" strokeWidth={1.8} />
                 <div className="flex flex-col leading-tight">
                   <span className="font-barlow font-black uppercase text-ink text-sm tracking-wider">{t}</span>
-                  <span className="text-ink/60 text-[11px] uppercase tracking-[0.18em] font-bold mt-0.5">{s}</span>
+                  <span className="text-ink/65 text-[11px] uppercase tracking-[0.18em] font-bold mt-0.5">{s}</span>
                 </div>
               </div>
             ))}
@@ -1557,7 +1556,7 @@ export default function Landing() {
       {/* ============ SAMPLE REPORT — RICH, COMPELLING, WOW ============ */}
       <section
         data-testid="example-report"
-        className="section-accent-top relative py-16 md:py-24 border-t border-gray-border overflow-hidden"
+        className="section-accent-top relative py-16 md:py-20 border-t border-gray-border overflow-hidden"
       >
         {/* Soft background */}
         <div className="absolute inset-0 z-0 pointer-events-none">
@@ -1566,14 +1565,21 @@ export default function Landing() {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-10">
-          <div className="mb-12 relative flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div className="mb-10 md:mb-14 relative">
             <span aria-hidden className="section-num-bg">02</span>
             <div className="max-w-3xl relative">
-              <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">A real example</span>
-              <h2 className="mt-4 font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
+              <div className="flex items-center gap-4 mb-5">
+                <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                  <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                  <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+                </span>
+                <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold whitespace-nowrap">A real example</span>
+                <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/60 via-volt/20 to-transparent max-w-[200px]" />
+              </div>
+              <h2 className="font-barlow font-black uppercase text-4xl md:text-6xl tracking-tighter leading-[0.95]">
                 This is what you get.
               </h2>
-              <p className="mt-4 text-ink/70 max-w-2xl">
+              <p className="mt-5 text-ink/75 max-w-2xl text-base md:text-lg leading-relaxed">
                 Below is a real example. The first box is the free preview — like the one you'll see right after you
                 upload. Everything else is what our scouts unlock for <span className="text-volt font-bold">${price} USD</span>.
               </p>
@@ -1602,7 +1608,7 @@ export default function Landing() {
                 {/* Position tab switcher (4 positions) */}
                 <div
                   data-testid="sample-position-switcher"
-                  className="flex items-stretch gap-px bg-gray-border border border-gray-border"
+                  className="flex items-stretch gap-px bg-gray-border border border-gray-border shadow-[0_1px_0_rgba(0,0,0,0.04)]"
                 >
                   {POSITIONS.map((p) => {
                     const isActive = activePosition === p.id;
@@ -1613,10 +1619,10 @@ export default function Landing() {
                         onClick={() => setActivePosition(p.id)}
                         data-testid={`sample-position-${p.id.toLowerCase()}`}
                         aria-pressed={isActive}
-                        className={`px-2.5 sm:px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] font-bold transition-colors ${
+                        className={`px-3 sm:px-3.5 py-1.5 text-[10px] uppercase tracking-[0.2em] font-black transition-all ${
                           isActive
-                            ? "bg-forest text-white"
-                            : "bg-cream-card text-ink/55 hover:text-ink hover:bg-cream-soft/60"
+                            ? "bg-forest text-white shadow-inner"
+                            : "bg-cream-card text-ink/60 hover:text-ink hover:bg-cream-soft/60"
                         }`}
                       >
                         {p.label}
@@ -1624,7 +1630,7 @@ export default function Landing() {
                     );
                   })}
                 </div>
-                <span className="text-ink/50 text-[10px] uppercase tracking-[0.2em] font-bold hidden sm:inline whitespace-nowrap">{current.player.videoType}</span>
+                <span className="text-ink/55 text-[10px] uppercase tracking-[0.2em] font-bold hidden sm:inline whitespace-nowrap">{current.player.videoType}</span>
               </div>
 
               <motion.div
@@ -1656,29 +1662,29 @@ export default function Landing() {
                 </div>
 
                 {/* Meta row */}
-                <div className="mt-6 grid grid-cols-3 gap-px bg-cream-soft/20 border border-gray-border">
-                  <div className="bg-cream-card/90 p-3">
-                    <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Age</div>
-                    <div className="font-barlow font-black text-ink text-2xl leading-none mt-1">{current.player.age}</div>
+                <div className="mt-6 grid grid-cols-3 gap-px bg-forest/15 border border-forest/20">
+                  <div className="bg-cream-card/95 p-3.5">
+                    <div className="text-[9px] uppercase tracking-[0.22em] text-ink/55 font-black">Age</div>
+                    <div className="font-barlow font-black text-ink text-2xl leading-none mt-1.5">{current.player.age}</div>
                   </div>
-                  <div className="bg-cream-card/90 p-3">
-                    <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Foot</div>
-                    <div className="font-barlow font-black text-ink text-lg leading-none mt-1.5">{current.player.foot}</div>
+                  <div className="bg-cream-card/95 p-3.5">
+                    <div className="text-[9px] uppercase tracking-[0.22em] text-ink/55 font-black">Foot</div>
+                    <div className="font-barlow font-black text-ink text-lg leading-none mt-2">{current.player.foot}</div>
                   </div>
-                  <div className="bg-cream-card/90 p-3">
-                    <div className="text-[9px] uppercase tracking-widest text-ink/50 font-bold">Team</div>
-                    <div className="font-barlow font-black text-ink text-sm leading-none mt-1.5 truncate">{current.player.club}</div>
+                  <div className="bg-cream-card/95 p-3.5">
+                    <div className="text-[9px] uppercase tracking-[0.22em] text-ink/55 font-black">Team</div>
+                    <div className="font-barlow font-black text-ink text-sm leading-none mt-2 truncate">{current.player.club}</div>
                   </div>
                 </div>
 
                 {/* Style tag */}
-                <div className="mt-4 flex items-center gap-2 text-xs text-ink/70">
+                <div className="mt-4 flex items-center gap-2 text-xs text-ink/75">
                   <Star className="w-3.5 h-3.5 text-volt flex-shrink-0" fill="currentColor" />
                   <span className="font-bold">{current.player.type}</span>
                 </div>
 
-                {/* Score row — pillar pitch-zone heatmap + animated bar (A) */}
-                <div className="mt-5 grid grid-cols-4 gap-px bg-cream-soft/40 border border-volt/20">
+                {/* Score row — premium 4-pillar scoreboard */}
+                <div className="mt-6 grid grid-cols-4 gap-px bg-volt/15 border border-volt/30 overflow-hidden">
                   {[
                     { k: "TECH", v: current.scores.technical, Icon: Footprints },
                     { k: "TACT", v: current.scores.tactical,  Icon: Target },
@@ -1689,7 +1695,7 @@ export default function Landing() {
                     const intensity = Math.max(0.06, Math.min(0.32, (s.v - 5) * 0.06));
                     const pct = Math.max(5, Math.min(100, s.v * 10));
                     return (
-                      <div key={`${activePosition}-${i}`} data-testid={`sample-score-${s.k.toLowerCase()}`} className="relative bg-cream-card py-3 text-center overflow-hidden">
+                      <div key={`${activePosition}-${i}`} data-testid={`sample-score-${s.k.toLowerCase()}`} className="relative bg-cream-card py-4 px-2 text-center overflow-hidden">
                         {/* Pitch-zone heatmap behind */}
                         <div
                           aria-hidden
@@ -1698,22 +1704,23 @@ export default function Landing() {
                             background: `radial-gradient(ellipse at center bottom, rgba(31, 79, 47, ${intensity}) 0%, rgba(31, 79, 47, 0) 70%)`,
                           }}
                         />
-                        <div className="relative flex items-center justify-center gap-1 text-[9px] uppercase tracking-widest text-ink/55 font-bold">
-                          <s.Icon className="w-2.5 h-2.5 text-forest" strokeWidth={2} />
+                        <div className="relative flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-[0.18em] text-ink/65 font-black">
+                          <s.Icon className="w-3 h-3 text-forest" strokeWidth={2.2} />
                           {s.k}
                         </div>
-                        <div className="relative font-barlow font-black text-3xl text-volt mt-0.5 leading-none">
+                        <div className="relative font-barlow font-black text-4xl text-volt mt-1 leading-none" style={{ textShadow: "0 2px 14px rgba(204,255,0,0.25)" }}>
                           <AnimatedNumber value={s.v} duration={1.4} />
+                          <span className="text-ink/40 text-base font-bold align-top ml-0.5">/10</span>
                         </div>
-                        {/* Animated horizontal bar (A) */}
-                        <div className="relative mt-2 mx-3 h-[3px] bg-cream-soft/60 overflow-hidden">
+                        {/* Animated horizontal bar — thicker for premium feel */}
+                        <div className="relative mt-2.5 mx-2 h-1.5 bg-cream-soft/70 overflow-hidden rounded-full">
                           <motion.div
                             key={`${activePosition}-${i}-bar`}
                             initial={{ width: 0 }}
                             whileInView={{ width: `${pct}%` }}
                             viewport={{ once: false, margin: "-30px" }}
                             transition={{ duration: 1.3, delay: 0.1 + i * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                            className="h-full bg-gradient-to-r from-forest via-forest-pop to-volt"
+                            className="h-full bg-gradient-to-r from-forest via-forest-pop to-volt rounded-full"
                           />
                         </div>
                       </div>
@@ -1726,14 +1733,19 @@ export default function Landing() {
             {/* Brief summary card */}
             <div className="bg-surface p-6 md:p-8 lg:col-span-3">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">What our scouts saw</span>
-                <span className="text-ink/40 text-[10px] uppercase tracking-widest font-bold">Free preview</span>
+                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-volt rounded-full" /> What our scouts saw
+                </span>
+                <span className="text-ink/50 text-[10px] uppercase tracking-[0.22em] font-bold">Free preview</span>
               </div>
               <p className="text-ink text-base md:text-[17px] leading-[1.65]">{current.summary}</p>
 
               <div className="mt-7 grid sm:grid-cols-2 gap-6 pt-6 border-t border-gray-border">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">What he does well</div>
+                  <div className="text-xs uppercase tracking-[0.22em] font-black text-forest mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    What he does well
+                  </div>
                   <ul className="space-y-2.5">
                     {current.strengths.map((s, i) => (
                       <li key={`${activePosition}-${i}`} className="flex items-start gap-2.5 text-sm text-ink leading-snug">
@@ -1744,7 +1756,10 @@ export default function Landing() {
                   </ul>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-[0.2em] font-bold text-ink/50 mb-3">What to work on</div>
+                  <div className="text-xs uppercase tracking-[0.22em] font-black text-amber-600 mb-3 flex items-center gap-2">
+                    <Target className="w-3.5 h-3.5" />
+                    What to work on
+                  </div>
                   <p className="text-sm text-ink/85 leading-relaxed">{current.improvement}</p>
                 </div>
               </div>
@@ -2004,7 +2019,7 @@ export default function Landing() {
       <FAQSection />
 
       {/* ============ TRUST — 2-column with football photo plate ============ */}
-      <section id="trust" data-testid="trust-section" className="section-accent-top relative py-20 border-t border-gray-border">
+      <section id="trust" data-testid="trust-section" className="section-accent-top relative py-16 md:py-20 border-t border-gray-border">
         <div className="max-w-7xl mx-auto px-6 md:px-10">
           {/* ── Refund Guarantee — premium graphic banner ── */}
           <div
@@ -2343,7 +2358,7 @@ export default function Landing() {
       </section>
 
       {/* ============ FINAL CTA ============ */}
-      <section data-testid="final-cta" className="section-accent-top relative py-16 md:py-24 border-t border-gray-border overflow-hidden">
+      <section data-testid="final-cta" className="section-accent-top relative py-16 md:py-20 border-t border-gray-border overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
             src="https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg"

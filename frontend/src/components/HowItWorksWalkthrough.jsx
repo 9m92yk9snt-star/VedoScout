@@ -1776,7 +1776,7 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
     <section
       ref={wrapRef}
       data-testid="how-it-works-walkthrough"
-      className="relative py-20 md:py-28 border-t border-gray-border bg-cream-base overflow-hidden"
+      className="relative py-16 md:py-20 border-t border-gray-border bg-cream-base overflow-hidden"
     >
       <div className="absolute -top-32 -right-32 w-[480px] h-[480px] rounded-full pointer-events-none"
            style={{ background: `radial-gradient(circle, ${FOREST_SOFT} 0%, transparent 70%)`, filter: "blur(40px)" }} />
