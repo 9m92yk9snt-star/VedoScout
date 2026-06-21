@@ -2174,11 +2174,92 @@ export default function Landing() {
                 }}
               />
               <div className="relative">
-                <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter leading-[1.02]">
-                  Your report in <span className="text-forest">48 hours</span>,<br />
-                  or we refund you.<br />
-                  <span className="text-forest">Automatically.</span>
-                </h3>
+                <div className="flex items-start gap-4 md:gap-5">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter leading-[1.02]">
+                      Your report in <span className="text-forest">48 hours</span>,<br />
+                      or we refund you.<br />
+                      <span className="text-forest">Automatically.</span>
+                    </h3>
+                  </div>
+                  {/* 48h countdown arc visualisation — animated SVG */}
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    whileInView={{ scale: 1, opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative shrink-0 w-[88px] h-[88px] md:w-[104px] md:h-[104px]"
+                    aria-hidden
+                  >
+                    <svg viewBox="0 0 110 110" className="w-full h-full">
+                      <defs>
+                        <linearGradient id="countdown-grad" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#CCFF00" />
+                          <stop offset="100%" stopColor="#1F4F2F" />
+                        </linearGradient>
+                      </defs>
+                      {/* track */}
+                      <circle cx="55" cy="55" r="44" fill="none" stroke="rgba(31,79,47,0.15)" strokeWidth="6" />
+                      {/* hour ticks */}
+                      {Array.from({ length: 12 }).map((_, i) => {
+                        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+                        const r1 = 50, r2 = 53;
+                        return (
+                          <line
+                            key={i}
+                            x1={55 + r1 * Math.cos(a)} y1={55 + r1 * Math.sin(a)}
+                            x2={55 + r2 * Math.cos(a)} y2={55 + r2 * Math.sin(a)}
+                            stroke="rgba(31,79,47,0.35)" strokeWidth="1"
+                          />
+                        );
+                      })}
+                      {/* main 48h progress sweep — sweeps 80% of the dial */}
+                      <motion.circle
+                        cx="55" cy="55" r="44" fill="none"
+                        stroke="url(#countdown-grad)" strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray="276.46"
+                        transform="rotate(-90 55 55)"
+                        initial={{ strokeDashoffset: 276.46 }}
+                        whileInView={{ strokeDashoffset: 55 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 1.6, delay: 0.35, ease: "easeOut" }}
+                      />
+                      {/* sweeping highlight */}
+                      <motion.line
+                        x1="55" y1="55" x2="55" y2="14"
+                        stroke="#CCFF00" strokeWidth="1.6" strokeLinecap="round"
+                        style={{ transformOrigin: "55px 55px" }}
+                        animate={{ rotate: [0, 360] }}
+                        transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+                        opacity="0.55"
+                      />
+                      {/* center label "48h" */}
+                      <text
+                        x="55" y="56"
+                        textAnchor="middle" dominantBaseline="middle"
+                        fontFamily="Barlow Condensed, sans-serif"
+                        fontWeight="900"
+                        fontSize="28"
+                        fill="#1F4F2F"
+                      >
+                        48h
+                      </text>
+                      <text
+                        x="55" y="72"
+                        textAnchor="middle"
+                        fontFamily="Barlow Condensed, sans-serif"
+                        fontWeight="700"
+                        fontSize="6.5"
+                        fill="#1F4F2F"
+                        opacity="0.55"
+                        letterSpacing="0.5"
+                      >
+                        DELIVERY
+                      </text>
+                    </svg>
+                  </motion.div>
+                </div>
 
                 {/* 3-step visual journey */}
                 <ol className="mt-6 grid grid-cols-3 gap-0 relative">
@@ -2238,9 +2319,15 @@ export default function Landing() {
             </div>
             {/* Right: copy (7/12) */}
             <div className="md:col-span-7 p-8 md:p-12 flex flex-col justify-center">
-              <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold mb-3">
-                Our promise
-              </span>
+              <div className="inline-flex items-center gap-2.5 mb-3">
+                <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                  <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                  <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+                </span>
+                <span className="text-volt text-[10px] uppercase tracking-[0.25em] font-bold">
+                  Our promise
+                </span>
+              </div>
               <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter leading-[0.95]">
                 Honest scouting feedback.
                 <span className="block text-forest mt-1">Built for growth.</span>
@@ -2571,13 +2658,49 @@ function FAQSection() {
       />
       <div className="relative max-w-3xl mx-auto px-6 md:px-10">
         <div className="text-center mb-10">
-          <span className="text-volt text-[10px] uppercase tracking-[0.28em] font-bold">
-            Common questions
-          </span>
-          <h2 className="mt-3 font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95]">
+          <div className="inline-flex items-center gap-2.5 mb-3">
+            <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+              <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+              <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+            </span>
+            <span className="text-volt text-[10px] uppercase tracking-[0.28em] font-bold">
+              Common questions
+            </span>
+            <span aria-hidden className="h-px w-8 bg-volt/35" />
+          </div>
+          <h2 className="font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95]">
             Honest answers.<br />
             <span className="text-forest">No fluff.</span>
           </h2>
+
+          {/* "answered in 30 seconds" mini header viz — small clock with sweeping arc */}
+          <div className="mt-5 inline-flex items-center gap-2.5 px-3 py-1.5 border border-volt/25 bg-volt/5">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-volt shrink-0" aria-hidden>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.3" />
+              <motion.circle
+                cx="12" cy="12" r="10"
+                fill="none" stroke="currentColor" strokeWidth="1.4"
+                strokeDasharray="62.83" strokeDashoffset="62.83"
+                transform="rotate(-90 12 12)" strokeLinecap="round"
+                initial={{ strokeDashoffset: 62.83 }}
+                whileInView={{ strokeDashoffset: 5 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1.6, delay: 0.3, ease: "easeOut" }}
+              />
+              <line x1="12" y1="12" x2="12" y2="6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <motion.line
+                x1="12" y1="12" x2="16" y2="12"
+                stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+                style={{ transformOrigin: "12px 12px" }}
+                animate={{ rotate: [0, 360] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              />
+              <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+            </svg>
+            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt/85">
+              Answered in 30 seconds
+            </span>
+          </div>
         </div>
 
         <div className="space-y-2">
