@@ -1995,7 +1995,7 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
                 </motion.div>
               </div>
 
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mt-3 flex items-center gap-2 sm:gap-3">
                 <button
                   data-testid="walkthrough-play-pause"
                   onClick={() => setIsPlaying((p) => !p)}
@@ -2012,13 +2012,13 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
-                <div className="flex-1 flex gap-1">
+                <div className="flex-1 min-w-0 flex gap-1">
                   {SCENES.map((s, i) => (
                     <button
                       key={s.id}
                       data-testid={`walkthrough-jump-${s.id}`}
                       onClick={() => { setSceneIdx(i); setProgress(0); setIsPlaying(true); }}
-                      className="flex-1 group relative"
+                      className="flex-1 min-w-0 group relative"
                       aria-label={`Jump to ${s.label}`}
                     >
                       <div className="h-1 bg-ink/10 overflow-hidden">
@@ -2029,7 +2029,8 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
                           transition={{ duration: 0.1 }}
                         />
                       </div>
-                      <div className="mt-1.5 text-[9px] uppercase tracking-[0.18em] font-bold text-ink/45 group-hover:text-ink/85 transition-colors text-left">
+                      {/* Label hidden on mobile (chip rail overflow); visible from sm: up. */}
+                      <div className="hidden sm:block mt-1.5 text-[9px] uppercase tracking-[0.18em] font-bold text-ink/45 group-hover:text-ink/85 transition-colors text-left truncate">
                         {s.label}
                       </div>
                     </button>

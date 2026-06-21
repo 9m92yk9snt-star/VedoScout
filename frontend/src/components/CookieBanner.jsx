@@ -190,10 +190,16 @@ export default function CookieBanner() {
   return (
     <div
       data-testid="cookie-banner"
-      className="fixed bottom-0 left-0 right-0 z-50 px-3 sm:px-6 pb-3 sm:pb-5 pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 z-[70] px-2 sm:px-6 pointer-events-none"
+      style={{
+        // Lift the banner ABOVE the mobile bottom tabs (~64px tall) on mobile,
+        // and respect iPhone safe-area. Desktop: just a normal bottom margin.
+        paddingBottom:
+          "calc(env(safe-area-inset-bottom, 0px) + 76px)",
+      }}
     >
       <div
-        className="max-w-5xl mx-auto bg-deepnavy border-2 border-volt p-5 sm:p-6 grid sm:grid-cols-[auto,1fr,auto] gap-4 sm:gap-6 items-center pointer-events-auto shadow-2xl"
+        className="max-w-5xl mx-auto bg-deepnavy border-2 border-volt p-3 sm:p-6 grid sm:grid-cols-[auto,1fr,auto] gap-3 sm:gap-6 items-center pointer-events-auto shadow-2xl"
         style={{
           boxShadow:
             "0 28px 60px -22px rgba(10,15,13,0.45), 0 12px 24px -8px rgba(31,79,47,0.18)",
@@ -205,29 +211,28 @@ export default function CookieBanner() {
 
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-3.5 h-3.5 text-volt sm:hidden" />
-            <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt">
+            <Shield className="w-3 h-3 text-volt sm:hidden" />
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.22em] sm:tracking-[0.25em] font-bold text-volt">
               Your privacy
             </span>
           </div>
-          <h3 className="font-barlow font-black uppercase text-lg sm:text-xl tracking-tight leading-tight text-ink">
-            We use cookies — you choose which.
+          <h3 className="font-barlow font-black uppercase text-[15px] sm:text-xl tracking-tight leading-tight text-ink">
+            Cookies — you choose.
           </h3>
-          <p className="mt-1.5 text-[13px] sm:text-sm text-ink/65 leading-relaxed">
-            We use strictly necessary cookies to keep ScoutMePlay running. Analytics and marketing
-            cookies are optional. You can change your choice anytime.{" "}
+          <p className="mt-1 text-[11px] sm:text-sm text-ink/65 leading-snug">
+            Strictly necessary cookies keep ScoutMePlay running. Analytics + marketing are optional.{" "}
             <Link
               to="/privacy"
               data-testid="cookie-link-privacy"
               className="text-forest hover:text-forest-pop underline underline-offset-2 font-bold"
             >
-              Privacy Policy
+              Privacy
             </Link>
             .
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+        <div className="grid grid-cols-3 sm:flex sm:flex-row gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -235,7 +240,7 @@ export default function CookieBanner() {
               setCustomising(true);
             }}
             data-testid="cookie-customise-open"
-            className="px-4 py-2.5 border border-gray-border bg-transparent text-ink/70 hover:text-ink hover:border-forest text-[11px] uppercase tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
+            className="px-2 sm:px-4 py-2 sm:py-2.5 border border-gray-border bg-transparent text-ink/70 hover:text-ink hover:border-forest text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
           >
             Customise
           </button>
@@ -243,17 +248,17 @@ export default function CookieBanner() {
             type="button"
             onClick={rejectAll}
             data-testid="cookie-reject-all"
-            className="px-4 py-2.5 border border-gray-border bg-transparent text-ink/70 hover:text-ink hover:border-forest text-[11px] uppercase tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
+            className="px-2 sm:px-4 py-2 sm:py-2.5 border border-gray-border bg-transparent text-ink/70 hover:text-ink hover:border-forest text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
           >
-            Reject all
+            Reject
           </button>
           <button
             type="button"
             onClick={acceptAll}
             data-testid="cookie-accept-all"
-            className="px-5 py-2.5 bg-volt hover:bg-forest-pop text-white text-[11px] uppercase tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
+            className="px-2 sm:px-5 py-2 sm:py-2.5 bg-volt hover:bg-forest-pop text-white text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
           >
-            Accept all
+            Accept
           </button>
         </div>
       </div>

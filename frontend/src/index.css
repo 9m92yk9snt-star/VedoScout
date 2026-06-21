@@ -44,6 +44,7 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         scroll-behavior: smooth;
+        overflow-x: clip;
     }
     /* Sticky-nav offset so scroll-to-section never hides content under the top bar. */
     section[data-testid] {

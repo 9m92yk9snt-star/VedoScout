@@ -26,6 +26,28 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 62 — Mobile fixes: walkthrough horizontal overflow + cookie banner blocked by bottom tabs (Feb 21 2026)**:
+  - **User feedback (mobile preview)**: "1. Video and section it not sit centered on mobile there is much more space on one site fix it · 2. privacy box's it to much down hard to click on green button it hiding to much under bottom navigation take box's more up and make it less smaller"
+  - **Root cause for #1** — the 6-segment chip rail under the walkthrough video (UPLOAD · MARK · ANALYZE · SCOUTS · REPORT · PROGRESS) used `flex-1` per button + label text with `tracking-[0.18em]`. The longest label "PROGRESS" needs ≈70px with that letter-spacing, but each flex slot only had ≈42px on a 390px viewport. Default `min-width: auto` made the flex items refuse to shrink below content width → entire rail forced the body width past the viewport → horizontal scroll → everything looked off-center / cropped.
+  - **Fix for #1**:
+    - Added `min-w-0` to the chip-rail container + every chip button so flex items can shrink properly
+    - Added `truncate` to the label div (hard ellipsis if it ever overflows)
+    - Hidden the label entirely on mobile via `hidden sm:block` — keeps the 6 progress bars only (the active scene is already named inside the video as "STEP 1 / 6 · UPLOAD", so the label below is duplicate noise on small screens)
+    - Tightened the control row gap on mobile: `gap-3` → `gap-2 sm:gap-3`
+    - Added `overflow-x: clip` to `html, body` in `index.css` as a belt-and-braces guard against any future horizontal overflow regression
+  - **Root cause for #2** — `CookieBanner` was `fixed bottom-0 z-50` while `MobileBottomTabs` is `fixed bottom-0 z-[60]`. Higher z-index won, so the cookie banner was rendered *behind* the tabs and its bottom row of buttons (including the green "Accept all") was completely hidden under HOME/REPORTS/UPLOAD/PROFILE.
+  - **Fix for #2**:
+    - Bumped CookieBanner z-index `z-50` → `z-[70]` (above mobile tabs)
+    - Replaced the static `pb-3 sm:pb-5` with `paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 76px)"` so the banner always floats above the bottom tabs on mobile AND respects iPhone's home-indicator safe area
+    - Tightened banner padding on mobile: `p-5` → `p-3` (less screen real estate eaten)
+    - Tightened text sizes: title `text-lg` → `text-[15px]`, body `text-[13px]` → `text-[11px]`, eyebrow `text-[10px]` → `text-[9px]`
+    - Shorter copy on mobile: title "We use cookies — you choose which." → "Cookies — you choose."; body shortened; "Privacy Policy" → "Privacy"
+    - Button labels shortened on mobile: "Reject all" → "Reject", "Accept all" → "Accept" (full-length copy kept on desktop)
+    - Buttons restructured: `flex-col sm:flex-row` → `grid grid-cols-3 sm:flex` (3 buttons in a tight row on mobile, breathing horizontal layout on desktop)
+  - **Verified**: `document.body.scrollWidth === window.innerWidth === 390` after fix → no horizontal scroll. Visual: walkthrough centered properly, cookie banner sits above the mobile tabs with the green ACCEPT button fully visible & clickable.
+  - **Files**: MODIFIED `/app/frontend/src/components/HowItWorksWalkthrough.jsx`, `/app/frontend/src/components/CookieBanner.jsx`, `/app/frontend/src/index.css`. *Note*: changes are PREVIEW-only — user needs to redeploy to push them to production at `https://scout-ai-pro-1.emergent.host`.
+
+
 - ✅ **🆕 Session 61 — Sample report overlay: dark premium panel, animated scout-scope emblem, Download Sample PDF removed (Feb 21 2026)**:
   - **User feedback**: "download sample pdf delete it from box also make box look outstanding now it look flat and icon looks boring and flat make something cool"
   - **Removed** the entire `<a data-testid="sample-pdf-download-cta">` button from the "See what a scout sees" showcase overlay. Now exactly one primary action: "See plans" → smooth-scrolls to the pricing section.
