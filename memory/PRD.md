@@ -26,6 +26,19 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 60 — Walkthrough Upload scene: football identity + typographic hierarchy (Feb 21 2026)**:
+  - **User feedback**: "i need my video to be more clean better structure using fonts with important things and upload snippet look not like football no good background picture too much empty"
+  - **Background swap**: `STADIUM_NIGHT_IMG` was a moody dark floodlight (`photo-1431324155629-1a6deb1dec8d`) that didn't read as football. Replaced with a real pitch + ball + players image (`photo-1551958219-acbc608c6377`). Darkening gradient softened (rgba 0.88→0.55 in middle) so the football scene actually shows through.
+  - **Tactics-board pitch overlay**: Added a faint SVG pitch (touchlines, halfway line, center circle, both penalty boxes) at 18% opacity across the entire Upload scene. The walkthrough now has unmistakable football identity even in motion.
+  - **Center dropzone enlarged**: was `w-[42%] md:w-[34%] max-w-[280px]` → now `w-[54%] md:w-[42%] max-w-[360px]`. Filled the empty interior with a mini-pitch motif (rect + halfway line + center circle at 22% opacity) so the middle of the scene no longer reads as dead space.
+  - **Caption typography rebuilt**:
+    - New `titleLead` + `titleTail` fields on every scene → renders as `<big barlow black>` + `<smaller serif italic>` for clean hierarchy ("Upload" dominates · "from anywhere" plays support).
+    - New `captionParts` array (chip / text / sep) → replaces the flat sentence with a structured row of bordered uppercase pills. Most-important option (Veo / YouTube on Upload scene, "10 taps" on Mark, "one honest score" on Analyze, etc.) gets the `accent: true` flag which renders as a solid volt chip — the user's eye lands on it instantly.
+    - Applied across all 6 scenes (Upload / Mark / Analyze / Scouts / Report / Progress), each with its own optimised lead word and accent chip.
+  - **Renderer updated** at `HowItWorksWalkthrough.jsx` line ~1840 — backward-compatible (falls back to the old flat `title` + `caption` if a scene doesn't define the new fields, but every scene has them now). Bottom gradient darkened (ink/70 → ink/80) for better contrast against the new structured chip layout.
+  - **Files**: MODIFIED `/app/frontend/src/components/HowItWorksWalkthrough.jsx`. Verified on desktop (1440px) + mobile (390px) — chips wrap correctly, the volt accent chip remains the visual anchor of the caption on both viewports.
+
+
 - ✅ **🆕 Session 59 — Landing polish: 3-line title fixed, empty Bento cell removed, duplicate "3 Steps" section deleted (Feb 21 2026)**:
   - **Fix #1 — "WHAT DOES A REAL SCOUT SEE / THAT you DON'T?" title was breaking into 3 lines** on desktop because `text-7xl` (96px) didn't fit in the 8-col title column (~640px wide at 1440px viewport, with the right "10" badge taking 4 cols). The forced `<br className="hidden md:block" />` made it worse by inserting an artificial break after "see", leaving "WHAT DOES A REAL SCOUT", "SEE", "THAT you DON'T?" stacked. Fix: dropped `lg:text-7xl` → uniform `md:text-6xl`, replaced `<br/>` with a `<span className="block">` wrapper around "that you don't?" so the whole title reads on **2 clean lines**.
   - **Fix #2 — Empty cell in the Bento grid between PREMIUM PDF (#10) and the green 100% PERSONAL highlight (#12)**. The closer card was `col-span-4 row-span-2` (cols 9-12, rows 4-5) and PDF was only `col-span-4` (cols 1-4 row 5), leaving cols 5-8 row 5 completely empty. Widened PDF to `sm:col-span-2 lg:col-span-8` (cols 1-8) with `variant: "wide"` so it now sits flush next to the highlight — no more dead space.

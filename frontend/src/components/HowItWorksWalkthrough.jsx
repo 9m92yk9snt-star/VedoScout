@@ -21,21 +21,71 @@ const CREAM = "#F4EFE6";
 const PLAYER_IMG =
   "https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=1400&q=85&auto=format&fit=crop";
 
-// cinematic stadium-night background for the Upload scene — single floodlight in mist/rain
+// REAL football pitch overhead — green grass + visible pitch lines for the Upload scene.
+// Replaces the dim stadium-floodlight shot that didn't read as "football" to users.
 const STADIUM_NIGHT_IMG =
-  "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=1600&q=85&auto=format&fit=crop";
+  "https://images.unsplash.com/photo-1551958219-acbc608c6377?w=1600&q=85&auto=format&fit=crop";
 
 // single male scout portrait (the only person in the Scout scene)
 const SCOUT_PORTRAIT_IMG =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=900&q=85&auto=format&fit=crop";
 
 const SCENES = [
-  { id: "upload",   duration: 7400, label: "Upload",  title: "Upload from anywhere",                       caption: "Phone, iPad, computer — or paste a Veo / YouTube link.",         Icon: Upload },
-  { id: "mark",     duration: 7600, label: "Mark",    title: "Tap your player ten times",                  caption: "No AI guessing — you stay in control.",                          Icon: MousePointer2 },
-  { id: "analyze",  duration: 7600, label: "Analyze", title: "Pro Scout Intelligence builds your report",  caption: "6 pillars · 47 metrics · one honest score.",                     Icon: Sparkles },
-  { id: "scout",    duration: 7000, label: "Scouts",  title: "Real scouts watch your clip",                caption: "Human eyes on every movement — not just data.",                  Icon: Eye },
-  { id: "report",   duration: 7600, label: "Report",  title: "Your professional PDF report",               caption: "Everything parents and players want to see — beautifully laid out.", Icon: FileText },
-  { id: "progress", duration: 7000, label: "Progress",title: "Track your evolution",                       caption: "Upload again — watch exactly what improved.",                    Icon: TrendingUp },
+  // Each scene's persistent caption now uses richer structure:
+  //   • `titleLead`     — the dominant action word (rendered massive + tight)
+  //   • `titleTail`     — the smaller subordinate clause (rendered serif italic, lighter)
+  //   • `captionParts`  — an ordered array of {label, kind} chunks rendered as a structured row
+  //                       instead of one flat sentence. `kind: "chip"` = volt-bordered pill;
+  //                       `kind: "text"` = regular muted text; `kind: "sep"` = subtle divider.
+  { id: "upload",   duration: 7400, label: "Upload",  title: "Upload from anywhere",                       caption: "Phone, iPad, computer — or paste a Veo / YouTube link.",         Icon: Upload,
+    titleLead: "Upload",     titleTail: "from anywhere",
+    captionParts: [
+      { kind: "chip", label: "Phone" },
+      { kind: "chip", label: "iPad" },
+      { kind: "chip", label: "Computer" },
+      { kind: "sep" },
+      { kind: "text", label: "or paste a" },
+      { kind: "chip", label: "Veo / YouTube", accent: true },
+      { kind: "text", label: "link." },
+    ] },
+  { id: "mark",     duration: 7600, label: "Mark",    title: "Tap your player ten times",                  caption: "No AI guessing — you stay in control.",                          Icon: MousePointer2,
+    titleLead: "Tap",        titleTail: "your player ten times",
+    captionParts: [
+      { kind: "chip", label: "10 taps", accent: true },
+      { kind: "text", label: "·" },
+      { kind: "text", label: "No AI guessing —" },
+      { kind: "text", label: "you stay in control." },
+    ] },
+  { id: "analyze",  duration: 7600, label: "Analyze", title: "Pro Scout Intelligence builds your report",  caption: "6 pillars · 47 metrics · one honest score.",                     Icon: Sparkles,
+    titleLead: "Analyze.",   titleTail: "Pro Scout Intelligence builds your report",
+    captionParts: [
+      { kind: "chip", label: "6 pillars" },
+      { kind: "chip", label: "47 metrics" },
+      { kind: "sep" },
+      { kind: "chip", label: "one honest score", accent: true },
+    ] },
+  { id: "scout",    duration: 7000, label: "Scouts",  title: "Real scouts watch your clip",                caption: "Human eyes on every movement — not just data.",                  Icon: Eye,
+    titleLead: "Real scouts.",titleTail: "watch your clip",
+    captionParts: [
+      { kind: "chip", label: "Human eyes", accent: true },
+      { kind: "text", label: "·" },
+      { kind: "text", label: "every movement —" },
+      { kind: "text", label: "not just data." },
+    ] },
+  { id: "report",   duration: 7600, label: "Report",  title: "Your professional PDF report",               caption: "Everything parents and players want to see — beautifully laid out.", Icon: FileText,
+    titleLead: "Your report.",titleTail: "professional PDF",
+    captionParts: [
+      { kind: "chip", label: "Premium PDF", accent: true },
+      { kind: "text", label: "·" },
+      { kind: "text", label: "for parents, coaches & scouts." },
+    ] },
+  { id: "progress", duration: 7000, label: "Progress",title: "Track your evolution",                       caption: "Upload again — watch exactly what improved.",                    Icon: TrendingUp,
+    titleLead: "Track.",     titleTail: "your evolution",
+    captionParts: [
+      { kind: "chip", label: "Upload again" },
+      { kind: "text", label: "·" },
+      { kind: "chip", label: "see what improved", accent: true },
+    ] },
 ];
 
 /* ============================================================================
@@ -165,7 +215,7 @@ const UploadScene = () => (
     exit={{ opacity: 0, filter: "blur(10px)" }}
     transition={{ duration: 0.6 }}
   >
-    {/* cinematic stadium night backdrop */}
+    {/* real football pitch backdrop — grass + visible lines */}
     <div className="absolute inset-0">
       <motion.img
         src={STADIUM_NIGHT_IMG}
@@ -175,13 +225,37 @@ const UploadScene = () => (
         animate={{ scale: 1.0 }}
         transition={{ duration: 8, ease: "easeOut" }}
       />
+      {/* darken & shape the pitch behind the action */}
       <div className="absolute inset-0" style={{
-        background: `radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.88) 100%)`,
+        background: `linear-gradient(180deg, rgba(8,18,12,0.82) 0%, rgba(8,18,12,0.55) 35%, rgba(8,18,12,0.78) 100%)`,
       }} />
       <div className="absolute inset-0" style={{
-        background: `radial-gradient(ellipse at 50% 38%, rgba(204,255,200,0.16) 0%, transparent 55%)`,
+        background: `radial-gradient(ellipse at 50% 42%, rgba(204,255,200,0.10) 0%, transparent 55%)`,
       }} />
     </div>
+
+    {/* Subtle tactics-board pitch-line overlay — gives the whole scene unmistakable football identity */}
+    <svg
+      aria-hidden
+      className="absolute inset-0 w-full h-full z-[1] pointer-events-none"
+      viewBox="0 0 100 56"
+      preserveAspectRatio="none"
+      style={{ opacity: 0.18 }}
+    >
+      {/* outer touchline */}
+      <rect x="2" y="3" width="96" height="50" fill="none" stroke="#CCFF99" strokeWidth="0.18" />
+      {/* halfway line */}
+      <line x1="50" y1="3" x2="50" y2="53" stroke="#CCFF99" strokeWidth="0.18" />
+      {/* center circle */}
+      <circle cx="50" cy="28" r="6.5" fill="none" stroke="#CCFF99" strokeWidth="0.18" />
+      <circle cx="50" cy="28" r="0.4" fill="#CCFF99" />
+      {/* left penalty box */}
+      <rect x="2" y="15" width="11" height="26" fill="none" stroke="#CCFF99" strokeWidth="0.18" />
+      <rect x="2" y="22" width="4" height="12" fill="none" stroke="#CCFF99" strokeWidth="0.18" />
+      {/* right penalty box */}
+      <rect x="87" y="15" width="11" height="26" fill="none" stroke="#CCFF99" strokeWidth="0.18" />
+      <rect x="94" y="22" width="4" height="12" fill="none" stroke="#CCFF99" strokeWidth="0.18" />
+    </svg>
 
     <ParticleField tone="light" density={36} />
 
@@ -214,7 +288,7 @@ const UploadScene = () => (
           key={i}
           x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2}
           stroke="rgba(204,255,200,0.7)"
-          strokeWidth="0.18"
+          strokeWidth="0.22"
           strokeDasharray="2 2"
           initial={{ pathLength: 0, opacity: 0 }}
           animate={{ pathLength: 1, opacity: [0, 1, 0.7, 1, 0.7, 1] }}
@@ -228,41 +302,54 @@ const UploadScene = () => (
       <DataStream key={i} index={i} />
     ))}
 
-    {/* CENTER — receiving dropzone with master progress */}
+    {/* CENTER — receiving dropzone (larger, with a tactical mini-pitch fill so the middle no longer reads as empty) */}
     <motion.div
       initial={{ scale: 0.88, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ delay: 1.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-10 w-[42%] md:w-[34%] max-w-[280px] aspect-[16/9] flex items-center justify-center backdrop-blur-md"
+      className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-10 w-[54%] md:w-[42%] max-w-[360px] aspect-[16/9] flex items-center justify-center backdrop-blur-md"
       style={{
-        background: "rgba(20,57,35,0.6)",
-        border: "1.5px dashed rgba(204,255,200,0.8)",
-        boxShadow: `0 30px 80px -10px rgba(0,0,0,0.85), 0 0 50px rgba(204,255,200,0.15) inset`,
+        background: "rgba(20,57,35,0.72)",
+        border: "1.5px dashed rgba(204,255,200,0.85)",
+        boxShadow: `0 30px 80px -10px rgba(0,0,0,0.85), 0 0 60px rgba(204,255,200,0.18) inset`,
       }}
     >
+      {/* tactical mini-pitch motif inside the dropzone — replaces the empty interior */}
+      <svg
+        aria-hidden
+        className="absolute inset-2 w-[calc(100%-1rem)] h-[calc(100%-1rem)] pointer-events-none"
+        viewBox="0 0 100 56"
+        preserveAspectRatio="none"
+        style={{ opacity: 0.22 }}
+      >
+        <rect x="2" y="2" width="96" height="52" fill="none" stroke="#CCFF99" strokeWidth="0.4" />
+        <line x1="50" y1="2" x2="50" y2="54" stroke="#CCFF99" strokeWidth="0.4" />
+        <circle cx="50" cy="28" r="7" fill="none" stroke="#CCFF99" strokeWidth="0.4" />
+      </svg>
+
       {/* pulse */}
       <motion.div
         className="absolute inset-0 pointer-events-none"
-        style={{ boxShadow: `0 0 60px rgba(204,255,200,0.55)` }}
+        style={{ boxShadow: `0 0 80px rgba(204,255,200,0.55)` }}
         animate={{ opacity: [0.2, 0.6, 0.2] }}
         transition={{ delay: 1.6, duration: 2, repeat: Infinity }}
       />
 
       {/* corner brackets */}
       {["top-0 left-0 border-t-2 border-l-2","top-0 right-0 border-t-2 border-r-2","bottom-0 left-0 border-b-2 border-l-2","bottom-0 right-0 border-b-2 border-r-2"].map((p, i) => (
-        <span key={i} aria-hidden className={`absolute ${p} w-4 h-4`} style={{ borderColor: "rgba(204,255,200,0.95)" }} />
+        <span key={i} aria-hidden className={`absolute ${p} w-5 h-5`} style={{ borderColor: "rgba(204,255,200,0.95)" }} />
       ))}
 
-      <div className="relative z-10 flex flex-col items-center gap-1.5 px-2">
+      <div className="relative z-10 flex flex-col items-center gap-2 px-3 text-center">
         <motion.div
-          animate={{ y: [0, -4, 0] }}
+          animate={{ y: [0, -5, 0] }}
           transition={{ delay: 1.6, duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Upload className="w-5 h-5 md:w-7 md:h-7" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
+          <Upload className="w-7 h-7 md:w-9 md:h-9" style={{ color: "#CCFF99" }} strokeWidth={1.8} />
         </motion.div>
         <MasterStatus />
         {/* master progress bar */}
-        <div className="w-full h-1 bg-white/15 overflow-hidden mt-1.5">
+        <div className="w-full h-1 bg-white/15 overflow-hidden mt-1">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: "100%" }}
@@ -1842,16 +1929,69 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
                   initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.15 }}
-                  className="absolute bottom-0 left-0 right-0 z-30 px-4 md:px-6 py-3 md:py-5 bg-gradient-to-t from-ink/95 via-ink/70 to-transparent"
+                  className="absolute bottom-0 left-0 right-0 z-30 px-4 md:px-6 py-3 md:py-5 bg-gradient-to-t from-ink/95 via-ink/80 to-transparent"
                 >
                   <div className="text-[11px] md:text-[13px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: CREAM, opacity: 0.9 }}>
                     <scene.Icon className="w-4 h-4" />
                     Step {sceneIdx + 1} / {SCENES.length} · {scene.label}
                   </div>
-                  <div className="font-barlow font-black text-white text-2xl sm:text-3xl md:text-5xl leading-[1.0] tracking-tight mt-1.5">
-                    {scene.title}
+                  {/* Title: dominant lead word in barlow black, smaller serif italic tail for hierarchy */}
+                  <div className="mt-1.5 leading-[0.95] flex flex-wrap items-baseline gap-x-3 gap-y-0">
+                    <span className="font-barlow font-black text-white text-3xl sm:text-4xl md:text-6xl tracking-tight">
+                      {scene.titleLead || scene.title}
+                    </span>
+                    {scene.titleTail && (
+                      <span
+                        className="text-white/70 text-lg sm:text-xl md:text-3xl tracking-tight"
+                        style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontStyle: "italic", fontWeight: 400 }}
+                      >
+                        {scene.titleTail}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-white/85 text-base md:text-xl mt-1.5 leading-snug">{scene.caption}</div>
+                  {/* Caption: structured row of chips + text instead of one flat sentence */}
+                  {scene.captionParts ? (
+                    <div className="mt-2 md:mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[11px] md:text-[13px]">
+                      {scene.captionParts.map((p, i) => {
+                        if (p.kind === "sep") {
+                          return (
+                            <span key={i} aria-hidden className="inline-block w-3 h-px"
+                                  style={{ background: "rgba(204,255,200,0.45)" }} />
+                          );
+                        }
+                        if (p.kind === "text") {
+                          return (
+                            <span key={i} className="text-white/70 font-medium tracking-normal normal-case">
+                              {p.label}
+                            </span>
+                          );
+                        }
+                        // chip
+                        return (
+                          <span
+                            key={i}
+                            className={`inline-flex items-center px-2.5 py-1 uppercase tracking-[0.2em] font-bold whitespace-nowrap ${
+                              p.accent
+                                ? "text-ink"
+                                : "text-white/95"
+                            }`}
+                            style={{
+                              background: p.accent ? "#CCFF99" : "rgba(255,255,255,0.08)",
+                              border: p.accent
+                                ? "1px solid #CCFF99"
+                                : "1px solid rgba(204,255,200,0.45)",
+                              letterSpacing: "0.18em",
+                              fontSize: "10px",
+                            }}
+                          >
+                            {p.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-white/85 text-base md:text-xl mt-1.5 leading-snug">{scene.caption}</div>
+                  )}
                 </motion.div>
               </div>
 
