@@ -2044,6 +2044,31 @@ Return only the JSON."""
 
 PREVIEW_PROMPT = """You are an experienced football coach giving a SHORT, evidence-based FREE PREVIEW based on a 15-second clip and a reference frame.
 
+🚫 ABSOLUTE ANTI-HALLUCINATION RULE
+You MUST describe ONLY what literally happens in the 15-second video — frame by frame.
+NEVER invent match-style actions (e.g. "beating defenders", "powerful strike on goal",
+"finishing a counter-attack", "shoots past the keeper", "winning a header") unless you
+actually SEE opposition defenders, a goalkeeper, a goal, or a real match situation in
+the footage. If the clip shows ONLY a kid working with cones, then describe ONLY cone
+work (ball-touches on cones, body shape during the dribble pattern, weight transfer,
+repetition consistency). If you cannot see something, say so explicitly — never guess.
+
+Treat the user-provided "VIDEO_TYPE" as an INTENT label, not as ground truth. The
+content_type field below is what we ACTUALLY detected in the clip — always defer to
+the detected reality, never to the user's selected label.
+
+🎯 CONTENT-TYPE-LOCKED VOCABULARY (HARD CONSTRAINT)
+- If CONTENT_TYPE is "drill", "training", "technical_drills", or "freestyle":
+    ✅ Allowed phrases: "cone work", "ball mastery", "first touch on the cone", "body shape
+       through the gate", "weight transfer", "repetition rhythm", "scanning before each
+       touch", "two-footed control during the drill", "speed of the drill", "fluency between cones".
+    ❌ FORBIDDEN phrases: "beats a defender", "finishes on goal", "powerful strike",
+       "1v1 with the keeper", "match-winning run", "scores", "tackles", "passes a teammate
+       in tight space" (unless you literally see a teammate receiving the ball).
+- If CONTENT_TYPE is "full_match" / "small_sided" / "mixed":
+    Match-action vocabulary IS allowed — but only describe moments you literally see.
+- If CONTENT_TYPE is "fitness": describe physical work only (sprint, change of direction).
+
 🎯 GROUND RULE — EVIDENCE OR SILENCE
 Every observation must come from what you actually SAW in the clip. If you can't see it, say so — never invent.
 
@@ -2053,7 +2078,7 @@ Plain, natural football coach language. AVOID jargon like "press-resistant", "sc
 🎯 PLAYER IDENTIFICATION
 A reference frame is attached. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER". Track ONLY that player. Note their jersey colour, number, body type, hair, distinguishing features. Ignore everyone else.
 
-🎯 CONTENT CONTEXT (from pre-analysis)
+🎯 CONTENT CONTEXT (from pre-analysis — THIS IS THE TRUTH OF WHAT'S IN THE VIDEO)
 CONTENT_TYPE: {content_type}
 PLAYER_VISIBILITY: {player_visible}
 CAMERA_DISTANCE: {camera_distance}
@@ -2065,7 +2090,7 @@ Produce a JSON object EXACTLY in this format:
 
 {
   "player_type": "<short, friendly label e.g. 'Smart playmaker with a strong left foot' — based on observation>",
-  "brief_summary": "<2-3 sentences about how THE CIRCLED PLAYER plays based ONLY on what you saw>",
+  "brief_summary": "<2-3 sentences about how THE CIRCLED PLAYER plays based ONLY on what you literally saw — if the clip is cone work, talk about cone work, NOT match action>",
   "top_strengths": ["<observed strength 1>", "<observed strength 2>", "<observed strength 3>"],
   "area_for_improvement": "<one specific area, only if visible in the clip — otherwise 'Need more footage to spot an improvement area'>",
   "evidence_note": "<one short sentence about what kind of moments you observed (e.g., 'Saw 5 clear touches and 2 passes in the clip')>",
@@ -2073,13 +2098,14 @@ Produce a JSON object EXACTLY in this format:
   "confidence_reason": "<one sentence — e.g. 'Player visible for most of the clip with multiple touches' or 'Only 2 brief on-ball moments visible'>",
   "sample_section": {
     "title": "Sample: Technical Snapshot",
-    "content": "<3-4 sentence teaser of the deeper technical breakdown — still in natural football language, still evidence-based>"
+    "content": "<3-4 sentence teaser of the deeper technical breakdown — still in natural football language, still evidence-based — DRILL-ONLY language if content_type is drill/training/freestyle>"
   }
 }
 
 CRITICAL:
 - Independent developmental feedback — do NOT imply trials, contracts, selection
 - Evidence-only — never invent or guess
+- If content_type is drill/training/freestyle, NEVER use match-game vocabulary (defenders, goal, keeper, finishing) — this is a HARD CONSTRAINT, not a suggestion
 - Return ONLY valid JSON, no markdown, no commentary
 """
 

@@ -1983,53 +1983,99 @@ export default function ReportPage() {
                 )}
 
                 {/* ===== FREE-PREVIEW content block (non-unlocked users) =====
-                    Shows the actual preview data — brief summary, top strengths, one
-                    area to improve — so the page feels rich and personal even before
-                    the user pays. Without this, free users see only the locked-player
-                    card + a name and the page feels empty. */}
+                    The HeroTeaser overlay right after upload is the FULL reveal —
+                    we don't want to duplicate the same wall of text here. Instead,
+                    the dashboard view shows a TEASING short snippet + blurred /
+                    locked stubs that drive the user to the unlock CTA. */}
                 {!unlocked && preview && (
                   <div className="mt-6 space-y-4" data-testid="free-preview-content">
-                    {(preview.brief_summary || preview.summary) && (
-                      <div className="bg-cream-card border border-gray-border p-4 md:p-5 rounded-sm shadow-sm">
-                        <p className="text-ink/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-2">
-                          What the scout saw
-                        </p>
-                        <p className="text-ink text-sm md:text-base leading-relaxed">
-                          {preview.brief_summary || preview.summary}
-                        </p>
-                      </div>
-                    )}
+                    {(preview.brief_summary || preview.summary) && (() => {
+                      const full = preview.brief_summary || preview.summary;
+                      const teaser = String(full).slice(0, 90).replace(/\s+\S*$/, "");
+                      const hasMore = String(full).length > teaser.length;
+                      return (
+                        <div className="relative bg-cream-card border border-gray-border p-4 md:p-5 rounded-sm shadow-sm overflow-hidden">
+                          <p className="text-ink/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-2">
+                            What the scout saw — preview
+                          </p>
+                          <p className="text-ink text-sm md:text-base leading-relaxed">
+                            {teaser}
+                            {hasMore && (
+                              <>
+                                <span aria-hidden className="text-ink/85">…</span>
+                                {/* Blurred fake continuation so the user feels the cut-off */}
+                                <span
+                                  aria-hidden
+                                  className="ml-1 text-ink/55 select-none"
+                                  style={{ filter: "blur(5px)" }}
+                                >
+                                  the rest of the scout&apos;s observation is unlocked in the full report
+                                </span>
+                              </>
+                            )}
+                          </p>
+                          {hasMore && (
+                            <div className="mt-3 inline-flex items-center gap-1.5 text-forest text-[10px] uppercase tracking-[0.25em] font-black">
+                              <Lock className="w-3 h-3" />
+                              Unlock to read the full breakdown
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {Array.isArray(preview.top_strengths) && preview.top_strengths.length > 0 && (
                       <div className="bg-cream-soft/70 border border-forest/15 p-4 md:p-5 rounded-sm">
                         <p className="text-forest text-[10px] uppercase tracking-[0.3em] font-black mb-3 flex items-center gap-1.5">
                           <Star className="w-3 h-3" fill="currentColor" />
-                          Top observed strengths
+                          1 of 3 top strengths revealed
                         </p>
                         <ul className="space-y-2">
-                          {preview.top_strengths.slice(0, 3).map((s, i) => (
+                          {/* Only the FIRST strength is shown — the other two are
+                              blurred so the user sees there's more behind the unlock. */}
+                          {preview.top_strengths.slice(0, 1).map((s, i) => (
                             <li key={i} className="flex items-start gap-2 text-ink text-[13px] md:text-sm leading-snug">
                               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-forest text-cream-card text-[10px] font-black flex-shrink-0">{i + 1}</span>
                               <span className="font-semibold">{s}</span>
                             </li>
                           ))}
+                          {preview.top_strengths.slice(1, 3).map((s, i) => (
+                            <li
+                              key={`lock-${i}`}
+                              className="flex items-start gap-2 text-ink/65 text-[13px] md:text-sm leading-snug select-none"
+                              style={{ filter: "blur(4px)" }}
+                              aria-hidden
+                            >
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-forest/40 text-cream-card text-[10px] font-black flex-shrink-0">{i + 2}</span>
+                              <span className="font-semibold">{s}</span>
+                            </li>
+                          ))}
                         </ul>
+                        {preview.top_strengths.length > 1 && (
+                          <p className="mt-3 inline-flex items-center gap-1.5 text-forest text-[10px] uppercase tracking-[0.25em] font-black">
+                            <Lock className="w-3 h-3" />
+                            Unlock to reveal {preview.top_strengths.length - 1} more
+                          </p>
+                        )}
                       </div>
                     )}
 
+                    {/* "One area to improve" + evidence note moved BEHIND the paywall
+                        — these are real observations and should drive the purchase. */}
                     {preview.area_for_improvement && (
-                      <div className="bg-cream-card border border-gray-border p-3 md:p-4 rounded-sm">
-                        <p className="text-ink/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-1">
-                          One area to improve
+                      <div className="relative bg-cream-card border border-gray-border p-3 md:p-4 rounded-sm overflow-hidden">
+                        <p className="text-ink/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-1 flex items-center gap-1.5">
+                          <Lock className="w-3 h-3 text-forest" />
+                          One area to improve · locked
                         </p>
-                        <p className="text-ink/85 text-[13px] leading-snug">
+                        <p
+                          className="text-ink/85 text-[13px] leading-snug select-none"
+                          style={{ filter: "blur(5px)" }}
+                          aria-hidden
+                        >
                           {preview.area_for_improvement}
                         </p>
                       </div>
-                    )}
-
-                    {preview.evidence_note && (
-                      <p className="text-ink/55 text-[11px] italic">{preview.evidence_note}</p>
                     )}
                   </div>
                 )}

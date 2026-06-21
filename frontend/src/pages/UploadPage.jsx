@@ -883,10 +883,20 @@ export default function UploadPage() {
                     data-testid="upload-video-type"
                     className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                   >
-                    <option value="highlight">Highlight reel</option>
-                    <option value="match">Match clip</option>
-                    <option value="training">Training clip</option>
+                    <option value="highlight">Highlight reel — best moments from real games</option>
+                    <option value="match">Match clip — live game footage (1v1 / 5v5 / full game)</option>
+                    <option value="training">Training clip — passing rondos, possession drills</option>
+                    <option value="drill">Drills — cones, agility, ball-mastery, technical work</option>
+                    <option value="freestyle">Freestyle — solo ball-juggling / tricks</option>
                   </select>
+                  {/* Tiny helper so the user understands how this affects the scout report. */}
+                  <p className="mt-1.5 text-[10.5px] text-ink/55 leading-snug">
+                    {form.video_type === "highlight" && "We'll judge game IQ + finishing — best moments only, expect short evidence."}
+                    {form.video_type === "match" && "We'll judge tactical decisions, duels, off-ball runs and game-pace technique."}
+                    {form.video_type === "training" && "We'll judge passing weight, body shape and decision-making vs teammates."}
+                    {form.video_type === "drill" && "We'll judge ball mastery, body shape and rep consistency — NO match-action commentary."}
+                    {form.video_type === "freestyle" && "We'll judge ball control and creativity only — no tactical scoring."}
+                  </p>
                 </div>
               </div>
 

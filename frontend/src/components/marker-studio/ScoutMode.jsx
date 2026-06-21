@@ -975,6 +975,23 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
                   draggable={false}
                 />
               ) : null}
+              {/* Tap-position overlay — proves to the user that THEIR mark on
+               *  this frame was registered. Renders a small lime square exactly
+               *  where they tapped (normalised box coords → percentage), so the
+               *  full strip becomes a visual proof of tracking continuity. */}
+              {isConfirmed && m?.box && (
+                <span
+                  className="absolute border border-emerald-300/95 bg-emerald-300/15 pointer-events-none"
+                  style={{
+                    left: `${Math.max(0, Math.min(0.96, m.box.x)) * 100}%`,
+                    top: `${Math.max(0, Math.min(0.96, m.box.y)) * 100}%`,
+                    width: `${Math.max(0.04, Math.min(1, m.box.w)) * 100}%`,
+                    height: `${Math.max(0.04, Math.min(1, m.box.h)) * 100}%`,
+                    boxShadow: "0 0 6px rgba(110,231,183,0.85)",
+                  }}
+                  aria-hidden
+                />
+              )}
               {/* Status pip — bottom-right */}
               {(isConfirmed || isSkipped) && (
                 <span
