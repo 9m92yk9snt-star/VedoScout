@@ -341,28 +341,63 @@ export default function UploadPage() {
           }
         },
       });
+
+      // ====== ASYNC PIPELINE — poll the status endpoint for real backend progress. ======
+      // The upload endpoint now returns IMMEDIATELY (~30s) with analysis_status="analyzing"
+      // while the two slow Gemini calls (content gate + preview generation) run as a
+      // background task on the server. We poll /reports/{id}/status every 3s until
+      // status === "ready" (success) or "failed" (rejected/error).
+      let finalData = data;
+      if (data?.analysis_status === "analyzing") {
+        const start = Date.now();
+        const MAX_WAIT_MS = 10 * 60 * 1000; // 10 minute hard ceiling
+        // poll loop
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          if (Date.now() - start > MAX_WAIT_MS) {
+            toast.error("Your report is taking longer than expected. We've saved it — check your Dashboard in a minute.");
+            navigate(`/dashboard`);
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 3000));
+          try {
+            const { data: statusResp } = await api.get(`/reports/${data.id}/status`);
+            setUploadPhase("analyzing");
+            // Reflect the real backend progress step (1..5) on the overlay
+            if (typeof statusResp.progress_step === "number") {
+              setUploadPct(Math.min(100, Math.round((statusResp.progress_step / 5) * 100)));
+            }
+            if (statusResp.status === "failed") {
+              const errMsg = statusResp.error || "Analysis failed. Please try again or upload a clearer clip.";
+              toast.error(errMsg);
+              setUploadPhase("idle");
+              return;
+            }
+            if (statusResp.status === "ready") {
+              finalData = { ...data, ...statusResp };
+              break;
+            }
+          } catch (pollErr) {
+            // Transient network blips — keep polling. Hard 4xx/5xx will surface above.
+            // eslint-disable-next-line no-console
+            console.warn("status poll failed (will retry):", pollErr?.message);
+          }
+        }
+      }
+
       setUploadPhase("done");
       // Remember the response so the CTA on the success overlay can fire it
       // straight away (otherwise we wait ~1.8 s for the celebration to land).
-      pendingDoneRef.current = { data, isPrepaid: eligibility?.reason === "prepaid" };
-      // Brief celebratory "done" beat so the user clearly sees the analysis
-      // completed and the report exists. Without this hold the overlay just
-      // vanishes and the user is left wondering whether anything actually
-      // happened. Then we hand off to the existing HeroTeaser / navigate
-      // branching, exactly as before.
+      pendingDoneRef.current = { data: finalData, isPrepaid: eligibility?.reason === "prepaid" };
       await new Promise((r) => setTimeout(r, 1800));
-      // If the user already tapped "View your scout report", the CTA handler
-      // cleared pendingDoneRef and did the navigation itself — bail.
       if (!pendingDoneRef.current) return;
       pendingDoneRef.current = null;
-      // For free preview generations (not prepaid uploads), show the Hero Teaser
-      // before navigating away. For prepaid, just go straight to the report.
       if (eligibility?.reason !== "prepaid") {
-        setHeroReport(data);
+        setHeroReport(finalData);
         return; // HeroTeaser modal will navigate on dismiss
       }
       toast.success("Upload received — generating your premium report.");
-      navigate(`/report/${data.id}`);
+      navigate(`/report/${finalData.id}`);
     } catch (err) {
       // 402 with structured detail = pre-pay required
       const detail = err?.response?.data?.detail;

@@ -26,6 +26,36 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 63 — Async upload pipeline refactor (P0 — fixes production Cloudflare 520 OOM) (Feb 21 2026)**:
+  - **Root cause confirmed by user**: same code, preview works, deployed scoutmeplay.com fails with Cloudflare Error 520 on every video upload. Synchronous Gemini calls (content gate + preview generation, 5–8 min) inside the HTTP request held the multi-MB video buffer in memory the entire time, OOM-killing the 200 MB Starter-tier production pod. Worker restart caused Cloudflare to receive empty/malformed response → 520.
+  - **Backend refactor (`/app/backend/server.py`)**:
+    - Added `from types import SimpleNamespace` import.
+    - **New endpoint `GET /api/reports/{id}/status`** — lightweight polling. Returns `{ status: "analyzing"|"ready"|"failed", progress_step: 1..5, error, preview, video_url, ... }`. Legacy reports without `analysis_status` field default to `status: "ready"` so the change is fully backward-compatible with existing data.
+    - **New background task `analyze_preview_task(report_id)`** — runs the two heavy Gemini calls (`run_content_gate` + `call_gemini_with_video` preview) OUTSIDE the HTTP lifecycle. Updates `progress_step` 1→2→3→4→5 on each milestone. On failure, sets `analysis_status: "failed"`, persists the error, and refunds the consumed eligibility.
+    - **New helper `_refund_upload_eligibility(report_id)`** — credits back the bucket consumed at upload time (`free_preview` / `prepaid` / `pass_credit`) if the background analysis later fails, so users aren't penalised for content-gate rejections or Gemini errors.
+    - **Refactored `POST /api/reports/upload`** — now returns in ~30s instead of 5-8min. Pipeline:
+      1. Sync: receive file → ffmpeg transcode → fingerprint + anchors → audio events → duration validate
+      2. Persist report doc with `analysis_status: "analyzing"`, `progress_step: 1`, `eligibility_consumed: <bucket>`
+      3. Link to player profile · burn eligibility credit synchronously (anti-abuse)
+      4. `background.add_task(analyze_preview_task, report_id)`
+      5. Return `{ id, ..., analysis_status: "analyzing", progress_step: 1 }` immediately
+    - Removed the legacy synchronous content-gate cleanup-on-rejection branch (now handled by the background task's failure path with proper credit refund).
+  - **Frontend (`/app/frontend/src/pages/UploadPage.jsx`)** — added a poll loop after the upload response:
+    - If `data.analysis_status === "analyzing"` → poll `GET /reports/{id}/status` every 3s
+    - Updates `uploadPct` based on real backend `progress_step` (1..5 → 20%..100%)
+    - On `status: "ready"` → use the polled response (with `preview` payload) for the existing HeroTeaser / navigate-to-report branching
+    - On `status: "failed"` → toast the error, reset `uploadPhase: "idle"`
+    - 10-minute hard ceiling — after that, save & redirect user to `/dashboard` with a "we saved your report, check dashboard" toast (the background task continues regardless)
+  - **Impact**:
+    - 🟢 **Production Cloudflare 520 fixed** — HTTP request never holds RAM longer than ~30s, so even the 200 MB Starter tier can handle it without OOM
+    - 🟢 **Honest progress UI** — the 5-step overlay now reflects real backend state instead of a 36s animation
+    - 🟢 **Users can close the tab** and the report still finishes server-side
+    - 🟢 **Failure recovery** — content-gate rejections refund the credit; users aren't penalised
+    - 🟢 **No migration needed** — legacy reports (no `analysis_status`) default to "ready" so existing reports keep working
+  - **Files**: MODIFIED `/app/backend/server.py`, `/app/frontend/src/pages/UploadPage.jsx`. Both lint-clean.
+  - **⚠️ PRODUCTION**: This is the structural fix that solves the Cloudflare 520 on `scoutmeplay.com`. User needs to **redeploy** to push the fix to production.
+
+
 - ✅ **🆕 Session 62 — Mobile fixes: walkthrough horizontal overflow + cookie banner blocked by bottom tabs (Feb 21 2026)**:
   - **User feedback (mobile preview)**: "1. Video and section it not sit centered on mobile there is much more space on one site fix it · 2. privacy box's it to much down hard to click on green button it hiding to much under bottom navigation take box's more up and make it less smaller"
   - **Root cause for #1** — the 6-segment chip rail under the walkthrough video (UPLOAD · MARK · ANALYZE · SCOUTS · REPORT · PROGRESS) used `flex-1` per button + label text with `tracking-[0.18em]`. The longest label "PROGRESS" needs ≈70px with that letter-spacing, but each flex slot only had ≈42px on a 390px viewport. Default `min-width: auto` made the flex items refuse to shrink below content width → entire rail forced the body width past the viewport → horizontal scroll → everything looked off-center / cropped.

@@ -11,6 +11,7 @@ import re
 import base64
 import tempfile
 import asyncio
+from types import SimpleNamespace
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Tuple
@@ -3196,7 +3197,6 @@ async def upload_video_and_create_preview(
         "video_type": video_type,
         "description": description,
     }
-    details_str = json.dumps(details, ensure_ascii=False)
 
     # Build a short preview clip (15s window around the marker) for the FREE preview
     preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
@@ -3210,82 +3210,16 @@ async def upload_video_and_create_preview(
         logger.warning(f"Audio extraction failed (preview) for {report_id}: {e}")
         audio_events_preview = []
 
-    # ============== CONTENT GATE ==============
-    # Validate the clip is actually football and the player is visible. Rejects
-    # non-football videos, unwatchable footage, or clips where the marked player
-    # never appears. This protects users from spending tokens / paying for noise.
-    gate = await run_content_gate(report_id, preview_clip_path, marker_path)
-    rejection = gate_rejection_message(gate)
-    if rejection:
-        for p in {file_path, web_path, marker_path, preview_clip_path}:
-            try:
-                p.unlink()
-            except Exception:
-                pass
-        if poster_path:
-            try:
-                poster_path.unlink()
-            except Exception:
-                pass
-        raise HTTPException(status_code=400, detail=rejection)
+    # ============== CONTENT GATE + PREVIEW (moved to background task — see below) ==============
+    # These two Gemini calls (content_gate + preview generation) used to run synchronously
+    # here. On a Starter-tier production instance (200 MB RAM) they OOM-killed the worker
+    # because the multi-minute calls held the buffered video in memory while other
+    # requests piled up. They are now deferred to `analyze_preview_task` which runs as
+    # a FastAPI BackgroundTask after this endpoint returns. The frontend polls
+    # `GET /api/reports/{id}/status` every ~3 s to track progress.
 
-    # Generate FREE preview synchronously (Gemini receives marker image + short clip).
-    # The prompt is content-aware: it adapts to the gate's content_type and visibility findings.
-    # When a fingerprint was extracted, the prompt also injects the locked player's jersey/shorts
-    # colours + body ratio + audio event timeline → much tighter player tracking and confident voice.
-    try:
-        if fp is not None:
-            preview_prompt = precision_build_preview_prompt(
-                base_prompt=PREVIEW_PROMPT,
-                fingerprint=fp,
-                audio_events=audio_events_preview,
-                player_details=details,
-                content_type=str(gate.get("content_type", "other")),
-                player_visible=str(gate.get("player_visible", "clear")),
-                camera_distance=str(gate.get("camera_distance", "medium")),
-                anchors=extra_anchors_payload,
-            )
-        else:
-            preview_prompt = (
-                PREVIEW_PROMPT
-                .replace("{player_details}", details_str)
-                .replace("{content_type}", str(gate.get("content_type", "other")))
-                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-            )
-        preview = await call_gemini_with_video(
-            session_id=f"preview-{report_id}",
-            prompt=preview_prompt,
-            video_path=str(preview_clip_path),
-            marker_path=str(marker_path),
-            crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
-            anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
-        )
-        # Strip any residual hedging language from the model output
-        preview = scrub_hedging(preview)
-    except HTTPException:
-        # Cleanup on failure
-        for p in {file_path, web_path, marker_path, preview_clip_path}:
-            try:
-                p.unlink()
-            except Exception:
-                pass
-        if poster_path:
-            try:
-                poster_path.unlink()
-            except Exception:
-                pass
-        raise
-    except Exception as e:
-        logger.exception("Preview generation failed")
-        for p in {file_path, web_path, marker_path, preview_clip_path}:
-            try:
-                p.unlink()
-            except Exception:
-                pass
-        raise HTTPException(status_code=500, detail=f"AI preview generation failed: {str(e)}")
-
-    # Persist report
+    # Persist the report doc EARLY with `analysis_status: "analyzing"` so the frontend
+    # gets a valid report_id back in ~30s instead of waiting 5-8 min.
     report_doc = {
         "id": report_id,
         "user_id": user["id"],
@@ -3298,20 +3232,28 @@ async def upload_video_and_create_preview(
         "marker_timestamp": float(marker_timestamp),
         "video_duration_sec": duration_sec,
         "video_size_bytes": file_size,
-        "content_gate": gate,
-        "preview": preview,
+        "content_gate": None,                          # populated by background task
+        "preview": None,                               # populated by background task
         "full_report": None,
         "is_paid": bool(upload_will_be_paid),
         "manually_unlocked": False,
         "created_at": now_iso(),
         "paid_at": now_iso() if upload_will_be_paid else None,
-        # ── Precision Scout artefacts (auto-detected, never edited by user) ──
         "fingerprint": fingerprint_payload,
         "subject_crop_filename": crop_filename,
         "anchors": extra_anchors_payload,
         "audio_events_preview": [
             {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_preview
         ],
+        # ----- async pipeline state (NEW) -----
+        "analysis_status": "analyzing",                # analyzing | ready | failed
+        "progress_step": 1,                            # 1..5 — matches PrecisionScanOverlay steps
+        "analysis_error": None,
+        "eligibility_consumed": (                      # so the background task can refund on failure
+            "pass_credit" if used_pass_credit
+            else ("prepaid" if upload_will_be_paid
+                  else ("free_preview" if not is_admin else "admin"))
+        ),
     }
     await db.reports.insert_one(report_doc)
 
@@ -3325,40 +3267,270 @@ async def upload_video_and_create_preview(
         profile_id = None
 
     # ============== CONSUME ELIGIBILITY ==============
+    # Burn the credit NOW (synchronously) so users can't game the system by spamming
+    # uploads while the background task runs. The background task will refund this
+    # credit if the analysis ultimately fails (content gate rejection or Gemini error).
     if not is_admin:
         if used_pass_credit:
-            # Burn one Progress Pass credit and trigger full report generation
             await consume_pass_credit(db, user["id"])
             await db.users.update_one(
                 {"id": user["id"]},
                 {"$set": {"last_upload_at": now_iso()}},
             )
-            background.add_task(generate_full_report_task, report_id)
         elif upload_will_be_paid:
-            # Pre-paid upload — consume one credit; full report will be auto-generated below
             await db.users.update_one(
                 {"id": user["id"]},
                 {"$inc": {"prepaid_uploads": -1}, "$set": {"last_upload_at": now_iso()}},
             )
-            # Schedule full premium report generation (same path as paid checkout flow)
-            background.add_task(generate_full_report_task, report_id)
         elif not free_used:
-            # First free preview consumed
             await db.users.update_one(
                 {"id": user["id"]},
                 {"$set": {"free_preview_used": True, "last_upload_at": now_iso()}},
             )
 
+    # ============== KICK OFF THE BACKGROUND TASK ==============
+    background.add_task(analyze_preview_task, report_id)
+
+    # Return immediately so the HTTP request never holds RAM longer than ~30 s.
     return {
         "id": report_id,
         "player_details": details,
         "video_url": f"/api/uploads/{web_filename}",
         "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
         "marker_url": f"/api/uploads/{marker_filename}",
-        "preview": preview,
-        "is_paid": False,
+        "preview": None,                       # frontend polls /status for this
+        "is_paid": bool(upload_will_be_paid),
         "created_at": report_doc["created_at"],
+        "analysis_status": "analyzing",        # signal to the frontend to start polling
+        "progress_step": 1,
     }
+
+
+@api_router.get("/reports/{report_id}/status")
+async def get_report_status(report_id: str, user=Depends(get_current_user)):
+    """Lightweight polling endpoint used by the frontend during async preview generation.
+
+    Returns the current `analysis_status` (analyzing | ready | failed), an integer
+    `progress_step` (1..5) the UI overlay can render honestly, and — once ready —
+    the preview payload itself plus the URLs needed to render the report. Polled
+    every ~3 seconds by `UploadPage.jsx` while the heavy Gemini work runs in the
+    background task `analyze_preview_task`.
+    """
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    # Allow the owner or admin to poll
+    if doc.get("user_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not your report.")
+
+    analysis_status = doc.get("analysis_status", "ready")  # legacy reports default to ready
+    step = int(doc.get("progress_step", 5 if analysis_status == "ready" else 1) or 1)
+    error = doc.get("analysis_error")
+
+    out = {
+        "id": report_id,
+        "status": analysis_status,
+        "progress_step": step,
+        "error": error,
+    }
+    if analysis_status == "ready":
+        poster_filename = doc.get("poster_filename")
+        marker_filename = doc.get("marker_filename")
+        out.update({
+            "preview": doc.get("preview"),
+            "player_details": doc.get("player_details"),
+            "video_url": f"/api/uploads/{doc['video_filename']}",
+            "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
+            "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
+            "is_paid": bool(doc.get("is_paid")),
+            "created_at": doc.get("created_at"),
+        })
+    return out
+
+
+async def analyze_preview_task(report_id: str):
+    """Background task — runs the two heavy Gemini calls (content gate + preview)
+    OUTSIDE the HTTP request lifecycle.
+
+    This is the structural fix for the production OOM that was killing the Starter-tier
+    worker on every upload: keeping the multi-minute Gemini calls inside the HTTP
+    request held the video buffer in memory for 5–10 min and starved the 200 MB pod.
+    """
+    try:
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"analysis_status": "analyzing", "progress_step": 1}},
+        )
+        doc = await db.reports.find_one({"id": report_id})
+        if not doc:
+            logger.error(f"analyze_preview_task: report {report_id} vanished")
+            return
+
+        details = doc.get("player_details") or {}
+        details_str = json.dumps(details, ensure_ascii=False)
+        marker_filename = doc.get("marker_filename")
+        video_filename = doc.get("video_filename")
+        crop_filename = doc.get("subject_crop_filename")
+        anchors = doc.get("anchors") or []
+        audio_events_preview_raw = doc.get("audio_events_preview") or []
+        marker_timestamp = float(doc.get("marker_timestamp") or 0.0)
+        fingerprint_payload = doc.get("fingerprint")
+
+        marker_path = UPLOAD_DIR / marker_filename if marker_filename else None
+        web_path = UPLOAD_DIR / video_filename if video_filename else None
+        crop_path = UPLOAD_DIR / crop_filename if crop_filename else None
+        if not (marker_path and marker_path.exists() and web_path and web_path.exists()):
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {
+                    "analysis_status": "failed",
+                    "analysis_error": "Source files missing after upload.",
+                    "progress_step": 5,
+                }},
+            )
+            return
+
+        # Rebuild the lightweight FingerPrint-like object the precision prompt needs
+        fp = None
+        if fingerprint_payload:
+            try:
+                fp = SimpleNamespace(
+                    jersey_hex=fingerprint_payload.get("jersey_hex"),
+                    jersey_name=fingerprint_payload.get("jersey_name"),
+                    shorts_hex=fingerprint_payload.get("shorts_hex"),
+                    shorts_name=fingerprint_payload.get("shorts_name"),
+                    body_ratio=fingerprint_payload.get("body_ratio"),
+                    box=fingerprint_payload.get("box"),
+                    crop_path=str(crop_path) if crop_path and crop_path.exists() else None,
+                )
+            except Exception:
+                fp = None
+
+        # Rebuild the short preview clip we generated synchronously and recover its path.
+        # (Path convention: see make_preview_clip — it returns the trimmed mp4 next to the source.)
+        preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
+
+        # Reassemble anchor crop paths for the multi-anchor Gemini prompt
+        anchor_crop_paths: list[str] = []
+        for a in anchors:
+            cf = a.get("crop_filename")
+            if cf:
+                cp = UPLOAD_DIR / cf
+                if cp.exists():
+                    anchor_crop_paths.append(str(cp))
+
+        # Convert the persisted audio event dicts back into the lightweight namedtuple-ish
+        # objects the precision prompt builder expects (only the attrs it reads).
+        audio_events_preview = [
+            SimpleNamespace(t=float(e.get("t", 0)), peak_db=float(e.get("peak_db", 0)), kind=str(e.get("kind", "")))
+            for e in audio_events_preview_raw
+        ]
+
+        # ============== CONTENT GATE (Gemini call #1) ==============
+        await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 2}})
+        gate = await run_content_gate(report_id, preview_clip_path, marker_path)
+        rejection = gate_rejection_message(gate)
+        if rejection:
+            # Soft-reject: persist the error so the user sees a friendly message
+            # AND refund the eligibility that was consumed at upload time.
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {
+                    "analysis_status": "failed",
+                    "analysis_error": rejection,
+                    "content_gate": gate,
+                    "progress_step": 5,
+                }},
+            )
+            try:
+                await _refund_upload_eligibility(report_id)
+            except Exception as e:
+                logger.warning(f"Eligibility refund failed for {report_id}: {e}")
+            return
+        await db.reports.update_one({"id": report_id}, {"$set": {"content_gate": gate, "progress_step": 3}})
+
+        # ============== PREVIEW PROMPT BUILD ==============
+        if fp is not None:
+            preview_prompt = precision_build_preview_prompt(
+                base_prompt=PREVIEW_PROMPT,
+                fingerprint=fp,
+                audio_events=audio_events_preview,
+                player_details=details,
+                content_type=str(gate.get("content_type", "other")),
+                player_visible=str(gate.get("player_visible", "clear")),
+                camera_distance=str(gate.get("camera_distance", "medium")),
+                anchors=anchors,
+            )
+        else:
+            preview_prompt = (
+                PREVIEW_PROMPT
+                .replace("{player_details}", details_str)
+                .replace("{content_type}", str(gate.get("content_type", "other")))
+                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+            )
+
+        # ============== PREVIEW GEMINI CALL (#2) ==============
+        await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 4}})
+        preview = await call_gemini_with_video(
+            session_id=f"preview-{report_id}",
+            prompt=preview_prompt,
+            video_path=str(preview_clip_path),
+            marker_path=str(marker_path),
+            crop_path=str(crop_path) if crop_path and crop_path.exists() else None,
+            anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
+        )
+        preview = scrub_hedging(preview)
+
+        # ============== PERSIST ==============
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {
+                "preview": preview,
+                "analysis_status": "ready",
+                "progress_step": 5,
+                "analysis_error": None,
+            }},
+        )
+
+        # If the upload was prepaid / pass-credit, kick off the full premium report too.
+        doc = await db.reports.find_one({"id": report_id})
+        if doc and doc.get("is_paid"):
+            asyncio.create_task(generate_full_report_task(report_id))
+    except Exception as e:
+        logger.exception(f"analyze_preview_task failed for {report_id}")
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {
+                "analysis_status": "failed",
+                "analysis_error": f"AI preview generation failed: {str(e)[:200]}",
+                "progress_step": 5,
+            }},
+        )
+        try:
+            await _refund_upload_eligibility(report_id)
+        except Exception as re:
+            logger.warning(f"Eligibility refund failed for {report_id}: {re}")
+
+
+async def _refund_upload_eligibility(report_id: str):
+    """Give back the credit consumed at upload time when the background analysis fails.
+    Looks at the report doc's `eligibility_consumed` field (set by the upload endpoint)
+    to decide which bucket to credit back."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        return
+    consumed = doc.get("eligibility_consumed") or "none"
+    user_id = doc.get("user_id")
+    if not user_id:
+        return
+    if consumed == "free_preview":
+        await db.users.update_one({"id": user_id}, {"$set": {"free_preview_used": False}})
+    elif consumed == "prepaid":
+        await db.users.update_one({"id": user_id}, {"$inc": {"prepaid_uploads": 1}})
+    elif consumed == "pass_credit":
+        # restore one progress pass credit
+        await db.users.update_one({"id": user_id}, {"$inc": {"progress_pass.credits": 1}})
 
 
 @api_router.get("/reports/mine")
