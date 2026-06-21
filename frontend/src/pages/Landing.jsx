@@ -551,7 +551,11 @@ export default function Landing() {
           <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-start">
             <div className="lg:col-span-6">
               <motion.div initial="hidden" animate="visible" variants={fadeUp} custom={0}>
-                <div className="inline-flex items-center gap-2 border border-volt/30 bg-volt/10 px-4 py-2">
+                <div className="inline-flex items-center gap-2.5 border border-volt/30 bg-volt/10 backdrop-blur-sm px-4 py-2 relative overflow-hidden">
+                  <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+                    <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                    <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+                  </span>
                   <Target className="w-3.5 h-3.5 text-volt shrink-0" />
                   <span className="text-volt text-[10px] sm:text-xs uppercase tracking-[0.22em] sm:tracking-[0.25em] font-bold whitespace-nowrap">
                     ScoutMePlay · Football Scouting Service
@@ -614,28 +618,41 @@ export default function Landing() {
               <motion.div
                 initial="hidden" animate="visible" variants={fadeUp} custom={5}
                 data-testid="hero-trust-bar"
-                className="mt-7 max-w-xl grid grid-cols-2 gap-px bg-volt/15 border border-volt/15 text-[10px] sm:text-[11px] uppercase tracking-[0.16em] font-bold text-ink/70"
+                className="mt-7 max-w-xl"
               >
-                {[
-                  { Icon: Trophy,      label: "Pro player benchmarks" },
-                  { Icon: Brain,       label: "Football intelligence" },
-                  { Icon: Users,       label: "Real scouts & agents" },
-                  { Icon: FileText,    label: "Premium PDF report" },
-                  { Icon: ShieldCheck, label: "Secure Stripe payment" },
-                  { Icon: Star,        label: "One-time · no subscription" },
-                ].map(({ Icon, label }, i) => (
-                  <span
-                    key={i}
-                    className="flex items-center gap-2 bg-deepnavy px-3 py-2.5 min-w-0"
-                  >
-                    <Icon className="w-3.5 h-3.5 text-volt shrink-0" strokeWidth={2} />
-                    <span className="truncate">{label}</span>
-                  </span>
-                ))}
+                <div className="flex items-center gap-3 mb-2">
+                  <span aria-hidden className="h-px w-6 bg-volt/50" />
+                  <span className="text-[9px] uppercase tracking-[0.32em] font-bold text-volt/80">Verified</span>
+                  <span aria-hidden className="flex-1 h-px bg-gradient-to-r from-volt/30 to-transparent" />
+                </div>
+                <div className="grid grid-cols-2 gap-px bg-volt/20 border border-volt/25">
+                  {[
+                    { Icon: Trophy,      label: "Pro player benchmarks" },
+                    { Icon: Brain,       label: "Football intelligence" },
+                    { Icon: Users,       label: "Real scouts & agents" },
+                    { Icon: FileText,    label: "Premium PDF report" },
+                    { Icon: ShieldCheck, label: "Secure Stripe payment" },
+                    { Icon: Star,        label: "One-time · no subscription" },
+                  ].map(({ Icon, label }, i) => (
+                    <motion.span
+                      key={i}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.6 + i * 0.05, duration: 0.4 }}
+                      whileHover={{ x: 2 }}
+                      className="group relative flex items-center gap-2.5 bg-deepnavy px-3 py-2.5 min-w-0 cursor-default transition-colors hover:bg-deepnavy/70"
+                    >
+                      <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[2px] bg-volt opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <span aria-hidden className="w-1 h-1 rounded-full bg-volt shrink-0" />
+                      <Icon className="w-3.5 h-3.5 text-volt shrink-0" strokeWidth={2} />
+                      <span className="truncate text-[10px] sm:text-[11px] uppercase tracking-[0.16em] font-bold text-ink/75">{label}</span>
+                    </motion.span>
+                  ))}
+                </div>
               </motion.div>
             </div>
 
-            {/* ===== RIGHT: Icon-bulleted feature stack ===== */}
+            {/* ===== RIGHT: Icon-bulleted feature stack with mini visualizations ===== */}
             <motion.div
               initial={{ opacity: 0, x: 24 }}
               animate={{ opacity: 1, x: 0 }}
@@ -643,45 +660,162 @@ export default function Landing() {
               className="lg:col-span-6 lg:pt-4 relative z-10"
               data-testid="hero-feature-bullets"
             >
-              <div className="relative pl-8 sm:pl-10 space-y-9 md:space-y-11">
-                {/* Vertical guide line (volt) */}
-                <div aria-hidden className="absolute left-0 top-2 bottom-2 w-px bg-gradient-to-b from-volt/10 via-volt/40 to-volt/10" />
+              <div className="relative pl-10 sm:pl-12 space-y-10 md:space-y-12">
+                {/* Vertical guide line (animated draw) */}
+                <motion.div
+                  aria-hidden
+                  initial={{ scaleY: 0 }}
+                  animate={{ scaleY: 1 }}
+                  transition={{ delay: 0.5, duration: 1.0, ease: "easeOut" }}
+                  className="absolute left-0 top-2 bottom-2 w-px bg-gradient-to-b from-volt/10 via-volt/50 to-volt/10 origin-top"
+                />
 
                 {[
                   {
                     Icon: Trophy,
+                    n: "01",
                     body: (
                       <>
                         <span className="text-volt font-semibold">Pro player benchmarked</span> — your performance compared to professional profiles and position-specific standards used at the highest level of the game.
                       </>
                     ),
+                    viz: (
+                      <svg viewBox="0 0 110 28" className="w-32 md:w-36 h-7 md:h-8 text-volt" aria-hidden>
+                        <text x="0" y="7" fontSize="5" fill="currentColor" opacity="0.6" fontWeight="700" letterSpacing="0.5">YOU</text>
+                        <rect x="22" y="2" width="80" height="5" fill="currentColor" opacity="0.15" />
+                        <motion.rect
+                          x="22" y="2" height="5" fill="currentColor"
+                          initial={{ width: 0 }}
+                          whileInView={{ width: 56 }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 1.0, delay: 0.7, ease: "easeOut" }}
+                        />
+                        <text x="0" y="24" fontSize="5" fill="currentColor" opacity="0.6" fontWeight="700" letterSpacing="0.5">PRO</text>
+                        <rect x="22" y="19" width="80" height="5" fill="currentColor" opacity="0.15" />
+                        <motion.rect
+                          x="22" y="19" height="5" fill="currentColor"
+                          initial={{ width: 0 }}
+                          whileInView={{ width: 80 }}
+                          viewport={{ once: true }}
+                          transition={{ duration: 1.0, delay: 0.95, ease: "easeOut" }}
+                        />
+                      </svg>
+                    ),
                   },
                   {
                     Icon: ClipboardList,
+                    n: "02",
                     body: (
                       <>
                         <span className="text-volt font-semibold">Detailed football analysis</span> — technical, tactical, physical and mental scores with strengths, weaknesses, evidence and a personal development plan.
                       </>
                     ),
+                    viz: (
+                      <svg viewBox="0 0 110 28" className="w-32 md:w-36 h-7 md:h-8 text-volt" aria-hidden>
+                        {[
+                          { x: 6, h: 22, label: "TEC" },
+                          { x: 30, h: 17, label: "TAC" },
+                          { x: 54, h: 19, label: "PHY" },
+                          { x: 78, h: 24, label: "MEN" },
+                        ].map((b, i) => (
+                          <g key={i}>
+                            <rect x={b.x} y="2" width="16" height="20" fill="currentColor" opacity="0.1" />
+                            <motion.rect
+                              x={b.x} width="16" fill="currentColor"
+                              initial={{ height: 0, y: 22 }}
+                              whileInView={{ height: b.h, y: 22 - b.h }}
+                              viewport={{ once: true }}
+                              transition={{ delay: 0.7 + i * 0.12, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                            />
+                            <text x={b.x + 8} y="27" fontSize="3.2" fill="currentColor" opacity="0.55" fontWeight="700" textAnchor="middle" letterSpacing="0.3">{b.label}</text>
+                          </g>
+                        ))}
+                      </svg>
+                    ),
                   },
                   {
                     Icon: Users,
+                    n: "03",
                     body: (
                       <>
                         <span className="text-volt font-semibold">Real scouts &amp; agents</span> connected to clubs worldwide — guidance on trials, club changes, contracts and finding the right academy for your next step.
                       </>
                     ),
+                    viz: (
+                      <svg viewBox="0 0 110 28" className="w-32 md:w-36 h-7 md:h-8 text-volt" aria-hidden>
+                        {/* central player node */}
+                        <circle cx="18" cy="14" r="3.4" fill="currentColor" />
+                        <motion.circle
+                          cx="18" cy="14" r="3.4" fill="none" stroke="currentColor" strokeWidth="0.5"
+                          animate={{ r: [3.4, 7], opacity: [0.7, 0] }}
+                          transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+                        />
+                        {/* scout/agent nodes */}
+                        {[
+                          { x: 46, y: 4,  d: 0.5 },
+                          { x: 64, y: 12, d: 0.7 },
+                          { x: 86, y: 8,  d: 0.9 },
+                          { x: 102,y: 14, d: 1.1 },
+                          { x: 86, y: 22, d: 1.3 },
+                          { x: 56, y: 24, d: 1.5 },
+                        ].map((p, i) => (
+                          <g key={i}>
+                            <motion.line
+                              x1="18" y1="14" x2={p.x} y2={p.y}
+                              stroke="currentColor" strokeWidth="0.45" opacity="0.45"
+                              initial={{ pathLength: 0 }}
+                              whileInView={{ pathLength: 1 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: p.d, duration: 0.4 }}
+                            />
+                            <motion.circle
+                              cx={p.x} cy={p.y} r="2"
+                              fill="currentColor" opacity="0.85"
+                              initial={{ opacity: 0, scale: 0 }}
+                              whileInView={{ opacity: 0.85, scale: 1 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: p.d + 0.3, type: "spring", stiffness: 220 }}
+                            />
+                          </g>
+                        ))}
+                      </svg>
+                    ),
                   },
-                ].map(({ Icon, body }, i) => (
-                  <div key={i} className="relative flex items-start gap-5">
-                    {/* Icon disk */}
-                    <div className="absolute -left-8 sm:-left-10 top-0 w-12 h-12 sm:w-14 sm:h-14 -translate-x-1/2 flex items-center justify-center bg-deepnavy border border-volt/40 shrink-0">
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-volt" strokeWidth={1.5} />
+                ].map(({ Icon, n, body, viz }, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 18 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.45 + i * 0.18, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative flex items-start gap-5"
+                  >
+                    {/* Icon disk with pulse halo + step number */}
+                    <div className="absolute -left-10 sm:-left-12 top-0 w-14 h-14 sm:w-16 sm:h-16 -translate-x-1/2 z-10">
+                      <motion.div
+                        animate={{ y: [0, -2, 0] }}
+                        transition={{ duration: 3, delay: i * 0.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative w-full h-full flex items-center justify-center bg-deepnavy border border-volt/50 shadow-[0_8px_24px_-8px_rgba(204,255,0,0.35)]"
+                      >
+                        <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-volt" strokeWidth={1.5} />
+                        <motion.span
+                          aria-hidden
+                          className="absolute inset-0 border border-volt pointer-events-none"
+                          animate={{ scale: [1, 1.35], opacity: [0.45, 0] }}
+                          transition={{ duration: 2.4, delay: i * 0.4, repeat: Infinity, ease: "easeOut" }}
+                        />
+                      </motion.div>
+                      <span className="absolute -top-1.5 -right-1.5 bg-volt text-deepnavy font-barlow font-black text-[10px] tracking-wider px-1.5 py-0.5 leading-none border-2 border-deepnavy">
+                        {n}
+                      </span>
                     </div>
-                    <p className="text-sm md:text-base text-ink/75 leading-relaxed pt-2.5 sm:pt-3.5">
-                      {body}
-                    </p>
-                  </div>
+
+                    <div className="flex-1 min-w-0 pt-2.5 sm:pt-3.5">
+                      <p className="text-sm md:text-base text-ink/80 leading-relaxed">
+                        {body}
+                      </p>
+                      <div className="mt-3 opacity-90">{viz}</div>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
