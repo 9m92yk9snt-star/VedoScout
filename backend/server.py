@@ -69,7 +69,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 9  # v9 = 60-Second Scout Summary page + footer report ID
+PDF_RENDER_VERSION = 12  # v12 = 60-Second Scout Summary score now uses baseline-aligned _big_score
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -3939,9 +3939,89 @@ def _pdf_styles():
     ))
     styles.add(ParagraphStyle(
         name="ForestBullet", fontName="Helvetica", fontSize=10, leading=14.5,
-        textColor=_PDF_INK, leftIndent=12, bulletIndent=0, spaceAfter=4,
+        textColor=_PDF_INK, leftIndent=16, bulletIndent=2, spaceAfter=4,
+        bulletFontName="Helvetica-Bold", bulletColor=_PDF_FOREST, bulletFontSize=9,
+    ))
+    # NEW — clean styles used by the redesigned components below
+    styles.add(ParagraphStyle(
+        name="Caption", fontName="Helvetica-Bold", fontSize=7, leading=9,
+        textColor=_PDF_MUTED, letterSpacing=1.8, spaceAfter=2,
+    ))
+    styles.add(ParagraphStyle(
+        name="CaptionForest", fontName="Helvetica-Bold", fontSize=7, leading=9,
+        textColor=_PDF_FOREST, letterSpacing=1.8, spaceAfter=2,
+    ))
+    styles.add(ParagraphStyle(
+        name="Body", fontName="Helvetica", fontSize=10, leading=14.5,
+        textColor=_PDF_INK, spaceAfter=4,
     ))
     return styles
+
+
+def _big_score(value, big_size=40, unit_size=12, big_color="#1F4F2F", unit_color="#9CA3AF", unit="/ 10", align="LEFT"):
+    """Returns a Table flowable with a perfectly baseline-aligned big number + small unit suffix.
+
+    Solves the "5 /10" overlap/floating problem by putting each part in its own cell with VALIGN=BOTTOM."""
+    val_str = "—" if value is None or value == "" else str(value)
+    big_para = Paragraph(
+        f'<font color="{big_color}" size="{big_size}"><b>{val_str}</b></font>',
+        ParagraphStyle(
+            "_bs", fontName="Helvetica-Bold", fontSize=big_size,
+            leading=big_size * 1.0, textColor=HexColor(big_color),
+            spaceAfter=0, spaceBefore=0,
+        ),
+    )
+    unit_para = Paragraph(
+        f'<font color="{unit_color}" size="{unit_size}"><b>{unit}</b></font>',
+        ParagraphStyle(
+            "_us", fontName="Helvetica-Bold", fontSize=unit_size,
+            leading=unit_size * 1.1, textColor=HexColor(unit_color),
+            spaceAfter=0, spaceBefore=0,
+        ),
+    )
+    # Approximate width for the big number cell (Helvetica-Bold avg char width ~ 0.58 * size)
+    big_w = max(0.7, len(val_str) * big_size * 0.62 / 28.35)  # cm
+    t = Table(
+        [[big_para, unit_para]],
+        colWidths=[big_w * cm, 2.0 * cm],
+        hAlign=align,
+    )
+    t.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "BOTTOM"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (0, 0),    0),
+        # Nudge the unit up so its baseline sits roughly on the big number's baseline
+        ("BOTTOMPADDING", (1, 0), (1, 0),    max(2, big_size * 0.12)),
+        ("LEFTPADDING",   (1, 0), (1, 0),    4),
+    ]))
+    return t
+
+
+def _callout(text: str, color="#B45309", bg="#FEF3C7", icon="●"):
+    """Premium inline callout pill — used for 'NEED MORE FOOTAGE' and similar status flags.
+    Designed with: thick left accent rail, amber-cream gradient feel, generous padding,
+    uppercase tracked text to read as a deliberate design element rather than a placeholder."""
+    para = Paragraph(
+        f'<font color="{color}" size="8"><b>{icon}&nbsp;&nbsp;{text}</b></font>',
+        ParagraphStyle(
+            "_cl", fontName="Helvetica-Bold", fontSize=8, leading=11,
+            textColor=HexColor(color), spaceAfter=0, spaceBefore=0,
+            letterSpacing=1.4, alignment=TA_LEFT,
+        ),
+    )
+    t = Table([[para]], colWidths=[4.6 * cm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), HexColor(bg)),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LINEBEFORE",    (0, 0), (0, -1), 3.0, HexColor(color)),
+        ("BOX",           (0, 0), (-1, -1), 0.5, HexColor("#FDE68A")),
+    ]))
+    return t
 
 
 def _draw_background(canv, doc):
@@ -3964,7 +4044,7 @@ def _draw_background(canv, doc):
     canv.setFillColor(_PDF_FOREST)
     canv.drawRightString(w - 0.65 * cm, h - 1.0 * cm, "·")
 
-    # Footer line + brand + page number
+    # Footer line + brand + page number — improved contrast
     canv.setStrokeColor(_PDF_BORDER)
     canv.setLineWidth(0.4)
     canv.line(1.6 * cm, 1.55 * cm, w - 1.6 * cm, 1.55 * cm)
@@ -3972,9 +4052,11 @@ def _draw_background(canv, doc):
     canv.setFillColor(_PDF_FOREST)
     canv.setFont("Helvetica-Bold", 7.5)
     canv.drawString(1.6 * cm, 1.05 * cm, "SCOUTMEPLAY · MENTALKIDS")
-    canv.setFillColor(_PDF_MUTED)
+    canv.setFillColor(HexColor("#374151"))  # darker than _PDF_MUTED for legibility
     canv.setFont("Helvetica", 7.5)
     canv.drawString(5.4 * cm, 1.05 * cm, "Professional player development report")
+    canv.setFillColor(_PDF_INK)
+    canv.setFont("Helvetica-Bold", 7.5)
     canv.drawRightString(w - 1.6 * cm, 1.05 * cm, f"Page {doc.page}")
 
     canv.restoreState()
@@ -4017,11 +4099,12 @@ def _draw_cover_background(canv, doc):
     canv.drawString(0, 0, "PROFESSIONAL · INDEPENDENT · EVIDENCE-BASED")
     canv.restoreState()
 
-    # Bottom-left footer on the green panel
-    canv.setFillColor(HexColor("#FFFFFFAA"))
-    canv.setFont("Helvetica", 7)
+    # Bottom-left footer on the green panel — increased contrast
+    canv.setFillColor(HexColor("#FFFFFFCC"))
+    canv.setFont("Helvetica", 7.5)
     canv.drawString(1.6 * cm, 1.0 * cm, "MENTALKIDS / Denmark")
-    canv.setFont("Helvetica-Bold", 7)
+    canv.setFillColor(HexColor("#FFFFFF"))
+    canv.setFont("Helvetica-Bold", 7.5)
     canv.drawString(1.6 * cm, 0.55 * cm, "SCOUTMEPLAY.COM")
 
     canv.restoreState()
@@ -4030,14 +4113,14 @@ def _draw_cover_background(canv, doc):
 # ---- Reusable visual primitives ----
 
 def _section_header(title: str, styles, idx: int = None):
-    """Forest eyebrow + big ink title + thin forest underline.
+    """Forest eyebrow + big ink title + thicker forest underline.
     Returned as a Table so the underline visually 'hangs' under the title."""
     eyebrow_text = f"SECTION {idx:02d}" if idx else "ANALYSIS"
     eyebrow = Paragraph(eyebrow_text, styles["SectionEyebrow"])
     head = Paragraph(title, styles["SectionTitle"])
 
-    # underline accent (thin green line)
-    line = Table([[""]], colWidths=[2.4 * cm], rowHeights=[0.07 * cm])
+    # Underline accent — wider + thicker for stronger hierarchy
+    line = Table([[""]], colWidths=[3.2 * cm], rowHeights=[0.12 * cm])
     line.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), _PDF_FOREST),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
@@ -4045,20 +4128,23 @@ def _section_header(title: str, styles, idx: int = None):
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
-    return [eyebrow, head, line, Spacer(1, 0.35 * cm)]
+    return [eyebrow, head, line, Spacer(1, 0.45 * cm)]
 
 
 def _score_pill(score) -> str:
-    """Inline score formatting for table cells."""
+    """Inline score formatting for table cells — clean, consistent baseline."""
     try:
         s = float(score)
-        return f"<font color='#1F4F2F'><b>{s:g}</b></font><font color='#9CA3AF'> / 10</font>"
+        # Use single-size paragraph: bold forest number, lighter gray suffix at same size
+        return f"<font color='#1F4F2F'><b>{s:g}</b></font><font color='#9CA3AF'>&nbsp;/&nbsp;10</font>"
     except Exception:
         return "<font color='#9CA3AF'>—</font>"
 
 
 def _score_table(rows, styles):
-    """Premium attribute table with alternating cream rows + forest accents."""
+    """Premium attribute table with alternating cream rows + forest accents.
+
+    Uses generous padding and a wider SCORE column so numbers never crowd the NOTES text."""
     data = [["ATTRIBUTE", "SCORE", "NOTES"]]
     for label, score, notes in rows:
         data.append([
@@ -4066,41 +4152,44 @@ def _score_table(rows, styles):
             Paragraph(_score_pill(score), styles["BodyW"]),
             Paragraph(notes or "—", styles["BodyMuted"]),
         ])
-    t = Table(data, colWidths=[4.5 * cm, 2.5 * cm, 9 * cm], repeatRows=1)
+    # Wider SCORE column + slightly narrower NOTES so values get breathing room
+    t = Table(data, colWidths=[4.4 * cm, 3.2 * cm, 8.4 * cm], repeatRows=1)
     style = [
-        # Header row
-        ("BACKGROUND", (0, 0), (-1, 0), _PDF_FOREST),
-        ("TEXTCOLOR",  (0, 0), (-1, 0), HexColor("#FFFFFF")),
-        ("FONTNAME",   (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE",   (0, 0), (-1, 0), 8),
-        ("ALIGN",      (0, 0), (-1, 0), "LEFT"),
-        ("ALIGN",      (1, 0), (1, 0),  "CENTER"),
+        # Header row — forest band
+        ("BACKGROUND",    (0, 0), (-1, 0), _PDF_FOREST),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), HexColor("#FFFFFF")),
+        ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",      (0, 0), (-1, 0), 8),
+        ("ALIGN",         (0, 0), (-1, 0), "LEFT"),
+        ("ALIGN",         (1, 0), (1, 0),  "CENTER"),
+        ("LEFTPADDING",   (0, 0), (-1, 0), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, 0), 12),
+        ("TOPPADDING",    (0, 0), (-1, 0), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 9),
         # Body
-        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
-        ("TOPPADDING",    (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ("LINEBELOW",     (0, 0), (-1, -1), 0.25, _PDF_BORDER),
+        ("VALIGN",        (0, 1), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 1), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 1), (-1, -1), 12),
+        ("TOPPADDING",    (0, 1), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 10),
+        # subtle dividers
+        ("LINEBELOW",     (0, 1), (-1, -1), 0.25, _PDF_BORDER),
+        # Score column always centered
+        ("ALIGN",         (1, 1), (1, -1),  "CENTER"),
     ]
     # Alternate row backgrounds
     for i in range(1, len(data)):
         bg = _PDF_CARD if i % 2 == 1 else _PDF_CREAM_S
         style.append(("BACKGROUND", (0, i), (-1, i), bg))
-    # Score column right-accent
-    style.append(("ALIGN", (1, 1), (1, -1), "CENTER"))
     t.setStyle(TableStyle(style))
     return t
 
 
 def _list_bullets(items, styles):
-    """Forest-bulleted list."""
+    """Forest-bulleted list with proper baseline alignment."""
     flow = []
     for s in items or []:
-        flow.append(Paragraph(
-            f"<font color='#1F4F2F'><b>▸</b></font>&nbsp;&nbsp;{s}",
-            styles["BodyW"],
-        ))
+        flow.append(Paragraph(s, styles["ForestBullet"], bulletText="▸"))
     if not flow:
         flow.append(Paragraph("<font color='#9CA3AF'>No items recorded.</font>", styles["BodyMuted"]))
     return flow
@@ -4132,25 +4221,26 @@ def _kv_card(items, styles):
 
 
 def _cover_summary_box(overall: str, player_type: str, body: str, styles):
-    """Big quoted highlight on the cover page."""
+    """Big quoted highlight on the cover page — uses _big_score for proper baseline alignment."""
     rows = [
         [Paragraph("OVERALL DEVELOPMENT", styles["Label"]),
          Paragraph("PLAYER TYPE", styles["Label"])],
-        [Paragraph(f"<font color='#1F4F2F' size='28'><b>{overall}</b></font>"
-                   f"<font color='#9CA3AF' size='14'> /10</font>", styles["BodyW"]),
-         Paragraph(f"<font size='13'><b>{player_type or 'Independent'}</b></font>", styles["BodyW"])],
+        [_big_score(overall, big_size=32, unit_size=12, unit="/ 10"),
+         Paragraph(f'<font size="13" color="#0A0F0D"><b>{player_type or "Independent"}</b></font>', styles["BodyW"])],
     ]
     t = Table(rows, colWidths=[5.6 * cm, 5.6 * cm])
     t.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
-        ("TOPPADDING",    (0, 0), (0, 0),   12),
-        ("TOPPADDING",    (0, 1), (-1, 1),  4),
-        ("BOTTOMPADDING", (0, 1), (-1, 1),  14),
-        ("BOTTOMPADDING", (0, 0), (-1, 0),  0),
-        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 16),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 16),
+        ("TOPPADDING",    (0, 0), (-1, 0),   14),
+        ("BOTTOMPADDING", (0, 0), (-1, 0),   4),
+        ("TOPPADDING",    (0, 1), (-1, 1),   2),
+        ("BOTTOMPADDING", (0, 1), (-1, 1),   16),
+        ("VALIGN",        (0, 0), (-1, -1), "BOTTOM"),
+        ("VALIGN",        (1, 1), (1, 1),   "BOTTOM"),
         ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+        ("LINEBEFORE",    (0, 0), (0, -1),  2.2, _PDF_FOREST),
     ]))
     return t
 
@@ -4255,16 +4345,9 @@ def _skill_card(key: str, value: dict, styles):
 
     # ----- Top row: name + score pill + tier chip -----
     if cannot_eval:
-        score_para = Paragraph(
-            "<font color='#D97706' size='8'><b>NEED MORE FOOTAGE</b></font>",
-            styles["BodyW"],
-        )
+        score_para = _callout("NEED MORE FOOTAGE", color="#B45309", bg="#FEF3C7", icon="▲")
     else:
-        score_para = Paragraph(
-            f"<font color='#1F4F2F' size='22'><b>{score if score is not None else '—'}</b></font>"
-            f"<font color='#9CA3AF' size='10'> / 10</font>",
-            styles["BodyW"],
-        )
+        score_para = _big_score(score, big_size=22, unit_size=9, unit="/ 10", align="RIGHT")
     tier_html = f"<br/>{_tier_chip(tier, styles)}" if tier and not cannot_eval else ""
     name_para = Paragraph(
         f"<font color='#0A0F0D' size='13'><b>{label}</b></font>{tier_html}",
@@ -4312,12 +4395,12 @@ def _skill_card(key: str, value: dict, styles):
 
     card.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
-        ("TOPPADDING",    (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-        ("VALIGN",        (0, 0), (0, 0),   "TOP"),
-        ("VALIGN",        (1, 0), (1, 0),   "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN",        (0, 0), (0, 0),   "MIDDLE"),
+        ("VALIGN",        (1, 0), (1, 0),   "MIDDLE"),
         ("ALIGN",         (1, 0), (1, 0),   "RIGHT"),
         ("LINEBEFORE",    (0, 0), (0, -1),  2.0, _PDF_FOREST),
         ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
@@ -4376,13 +4459,25 @@ def _scout_summary_page(report_doc: dict, styles):
     ))
     flow.append(Spacer(1, 0.5 * cm))
 
-    # Score + Archetype card (2 cols)
-    score_block = Paragraph(
-        f"<font color='#1F4F2F' size='8'><b>SCOUT SCORE</b></font><br/>"
-        f"<font color='#0A0F0D' size='36'><b>{overall_str}</b></font>"
-        f"<font color='#0A0F0D' size='14'> / 10</font>",
-        styles["BodyW"],
+    # Score + Archetype card (2 cols) — score uses baseline-aligned _big_score helper
+    score_inner = Table(
+        [
+            [Paragraph('<font color="#1F4F2F" size="8"><b>SCOUT SCORE</b></font>',
+                       ParagraphStyle("_ss_l", fontName="Helvetica-Bold", fontSize=8, leading=11,
+                                      textColor=_PDF_FOREST, spaceAfter=4, letterSpacing=1.2))],
+            [_big_score(overall_str, big_size=36, unit_size=13,
+                        big_color="#0A0F0D", unit_color="#9CA3AF", unit="/ 10", align="LEFT")],
+        ],
+        colWidths=[4.5 * cm],
     )
+    score_inner.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    score_block = score_inner
     if arch_oneliner:
         arch_block = Paragraph(
             f"<font color='#1F4F2F' size='8'><b>ARCHETYPE MATCH</b></font><br/>"
@@ -4405,10 +4500,10 @@ def _scout_summary_page(report_doc: dict, styles):
             ("BACKGROUND", (1, 0), (1, 0), HexColor("#FBFAF6")),
             ("BOX", (0, 0), (-1, -1), 0.6, _PDF_BORDER),
             ("LINEBEFORE", (1, 0), (1, 0), 0.6, _PDF_BORDER),
-            ("LEFTPADDING", (0, 0), (-1, -1), 14),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
-            ("TOPPADDING", (0, 0), (-1, -1), 14),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+            ("LEFTPADDING", (0, 0), (-1, -1), 16),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 16),
+            ("TOPPADDING", (0, 0), (-1, -1), 16),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
         ]),
     )
     flow.append(summary_card)
@@ -4475,42 +4570,79 @@ def _overall_benchmark_page(ob: dict, overall_score, styles):
     bracket = (ob.get("age_bracket_used") or "").replace("_", " ")
 
     # Hero card: dark forest panel with the big score + tier
-    hero_left = Paragraph(
-        f"<font color='#FFFFFF' size='7.5'><b>HOW YOU COMPARE</b></font><br/>"
-        f"<font color='#FFFFFF' size='40'><b>{overall_score if overall_score is not None else '—'}</b></font>"
-        f"<font color='#FFFFFF99' size='14'> /10</font><br/>"
-        f"<font color='#FFFFFF' size='9'><b>{tier_label.upper()}</b></font>"
-        + (f"<br/><font color='#FFFFFF80' size='7'><b>CALIBRATED FOR {bracket.upper()}</b></font>" if bracket else ""),
-        styles["BodyW"],
+    # Use a 3-row vertical Table inside the left cell so eyebrow / big score / tier label
+    # sit cleanly stacked with proper baselines — instead of one Paragraph that mixes sizes.
+    big_score_table = _big_score(
+        overall_score, big_size=44, unit_size=14,
+        big_color="#FFFFFF", unit_color="#FFFFFF99", unit="/ 10", align="LEFT",
     )
+    left_rows = [
+        [Paragraph('<font color="#FFFFFF" size="7.5"><b>HOW YOU COMPARE</b></font>',
+                   ParagraphStyle("_hyc", fontName="Helvetica-Bold", fontSize=7.5, leading=10,
+                                  textColor=HexColor("#FFFFFF"), spaceAfter=2))],
+        [big_score_table],
+        [Paragraph(f'<font color="#FFFFFF" size="10"><b>{tier_label.upper()}</b></font>',
+                   ParagraphStyle("_tl", fontName="Helvetica-Bold", fontSize=10, leading=13,
+                                  textColor=HexColor("#FFFFFF"), spaceBefore=6, spaceAfter=0))],
+    ]
+    if bracket:
+        left_rows.append([
+            Paragraph(f'<font color="#FFFFFF80" size="7"><b>CALIBRATED FOR {bracket.upper()}</b></font>',
+                      ParagraphStyle("_cb", fontName="Helvetica-Bold", fontSize=7, leading=9,
+                                     textColor=HexColor("#FFFFFF80"), spaceBefore=3, spaceAfter=0))
+        ])
+    hero_left = Table(left_rows, colWidths=[5.0 * cm])
+    hero_left.setStyle(TableStyle([
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
 
-    hero_right_html = ""
+    # Right side — stacked label/value pairs, each one in its own Paragraph (single font size each)
+    right_rows = []
     if pct:
-        hero_right_html += f"<font color='#FFFFFF' size='11'>{pct}</font><br/><br/>"
+        right_rows.append([Paragraph(f'<font color="#FFFFFF" size="11">{pct}</font>',
+                                     ParagraphStyle("_pct", fontName="Helvetica", fontSize=11, leading=15,
+                                                    textColor=HexColor("#FFFFFF"), spaceAfter=8))])
     if nxt:
-        hero_right_html += (
-            f"<font color='#FFFFFF99' size='7'><b>REALISTIC NEXT STEP</b></font><br/>"
-            f"<font color='#FFFFFF' size='9.5'>{nxt}</font><br/><br/>"
-        )
+        right_rows.append([Paragraph('<font color="#FFFFFF99" size="7"><b>REALISTIC NEXT STEP</b></font>',
+                                     ParagraphStyle("_rns_l", fontName="Helvetica-Bold", fontSize=7, leading=9,
+                                                    textColor=HexColor("#FFFFFF99"), spaceAfter=2))])
+        right_rows.append([Paragraph(f'<font color="#FFFFFF" size="9.5">{nxt}</font>',
+                                     ParagraphStyle("_rns_v", fontName="Helvetica", fontSize=9.5, leading=13,
+                                                    textColor=HexColor("#FFFFFF"), spaceAfter=8))])
     if sep:
-        hero_right_html += (
-            f"<font color='#FFFFFF99' size='7'><b>TO REACH THE NEXT TIER</b></font><br/>"
-            f"<font color='#FFFFFF' size='9.5'>{sep}</font>"
-        )
-    hero_right = Paragraph(hero_right_html or "—", styles["BodyW"])
+        right_rows.append([Paragraph('<font color="#FFFFFF99" size="7"><b>TO REACH THE NEXT TIER</b></font>',
+                                     ParagraphStyle("_sep_l", fontName="Helvetica-Bold", fontSize=7, leading=9,
+                                                    textColor=HexColor("#FFFFFF99"), spaceAfter=2))])
+        right_rows.append([Paragraph(f'<font color="#FFFFFF" size="9.5">{sep}</font>',
+                                     ParagraphStyle("_sep_v", fontName="Helvetica", fontSize=9.5, leading=13,
+                                                    textColor=HexColor("#FFFFFF"), spaceAfter=0))])
+    if not right_rows:
+        right_rows = [[Paragraph('<font color="#FFFFFF80" size="9">—</font>', styles["BodyW"])]]
+    hero_right = Table(right_rows, colWidths=[9.5 * cm])
+    hero_right.setStyle(TableStyle([
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
 
     hero = Table([[hero_left, hero_right]], colWidths=[5.4 * cm, 10.1 * cm])
     hero.setStyle(TableStyle([
         ("BACKGROUND",    (0, 0), (-1, -1), _PDF_FOREST),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
-        ("TOPPADDING",    (0, 0), (-1, -1), 18),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 18),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 18),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 18),
+        ("TOPPADDING",    (0, 0), (-1, -1), 20),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 20),
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
         ("LINEAFTER",     (0, 0), (0, 0),   0.4, HexColor("#FFFFFF22")),
     ]))
     flow.append(hero)
-    flow.append(Spacer(1, 0.45 * cm))
+    flow.append(Spacer(1, 0.5 * cm))
 
     # Tier landscape (4 cells)
     cells = []
@@ -4529,19 +4661,22 @@ def _overall_benchmark_page(ob: dict, overall_score, styles):
     landscape = Table([cells], colWidths=[3.7 * cm] * 4)
     landscape_style = [
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
-        ("TOPPADDING",    (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+        ("TOPPADDING",    (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
         ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
         ("BOX",           (0, 0), (-1, -1), 0.4, _PDF_BORDER),
+        ("LINEAFTER",     (0, 0), (-2, 0),  0.4, _PDF_BORDER),
     ]
     for i, k in enumerate(_TIER_ORDER):
         if k == tier_key:
             landscape_style.append(("BACKGROUND", (i, 0), (i, 0), _PDF_CREAM_S))
-            landscape_style.append(("LINEBELOW", (i, 0), (i, 0), 2.5, _PDF_FOREST))
+            landscape_style.append(("LINEBELOW", (i, 0), (i, 0), 3.0, _PDF_FOREST))
+            landscape_style.append(("LINEABOVE", (i, 0), (i, 0), 3.0, _PDF_FOREST))
     landscape.setStyle(TableStyle(landscape_style))
     flow.append(Paragraph("TIER LANDSCAPE", styles["Label"]))
+    flow.append(Spacer(1, 0.15 * cm))
     flow.append(landscape)
 
     return flow
@@ -4994,11 +5129,11 @@ def _age_profile_page(profile: dict, styles):
     flow.append(Spacer(1, 0.35 * cm))
 
     head = [
-        Paragraph("<font color='#9CA3AF' size='6.5'><b>ATTRIBUTE</b></font>", styles["BodyW"]),
-        Paragraph("<font color='#9CA3AF' size='6.5'><b>IMPORTANCE</b></font>", styles["BodyW"]),
-        Paragraph("<font color='#9CA3AF' size='6.5'><b>PRO RANGE</b></font>", styles["BodyW"]),
-        Paragraph("<font color='#9CA3AF' size='6.5'><b>PLAYER</b></font>", styles["BodyW"]),
-        Paragraph("<font color='#9CA3AF' size='6.5'><b>STATE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='7'><b>ATTRIBUTE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='7'><b>IMPORTANCE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='7'><b>PRO RANGE</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='7'><b>PLAYER</b></font>", styles["BodyW"]),
+        Paragraph("<font color='#9CA3AF' size='7'><b>STATE</b></font>", styles["BodyW"]),
     ]
     rows = [head]
     for it in profile["items"]:
@@ -5013,34 +5148,43 @@ def _age_profile_page(profile: dict, styles):
         weight = it.get("weight", 3)
         dots = ""
         for i in range(5):
-            color = "#1F4F2F" if i < weight else "#E5E7EB"
-            dots += f"<font color='{color}'>●</font> "
+            color = "#1F4F2F" if i < weight else "#D6D3D1"
+            dots += f"<font color='{color}' size='12'>●</font> "
 
         attr_p = Paragraph(
             f"<font color='#0A0F0D' size='10'><b>{it.get('label', '')}</b></font><br/>"
             f"<font color='#6B7280' size='7.5'>{it.get('why_matters', '')}</font>",
             styles["BodyW"],
         )
+        player_val = it.get('player_score')
+        if player_val is None:
+            player_cell = Paragraph("<font color='#9CA3AF' size='16'><b>—</b></font>", styles["BodyW"])
+        else:
+            player_cell = Paragraph(
+                f"<font color='#1F4F2F' size='15'><b>{player_val}</b></font>"
+                f"<font color='#9CA3AF' size='8'>&nbsp;/10</font>",
+                ParagraphStyle("_apc", fontName="Helvetica-Bold", fontSize=15, leading=18,
+                               textColor=_PDF_FOREST, spaceAfter=0, alignment=TA_CENTER),
+            )
         rows.append([
             attr_p,
-            Paragraph(f"<font size='9'>{dots}</font>", styles["BodyW"]),
+            Paragraph(f"<font size='10'>{dots}</font>", styles["BodyW"]),
             Paragraph(f"<font color='#0A0F0D' size='10'><b>{it.get('pro_academy_range', '—')}</b></font>", styles["BodyW"]),
-            Paragraph(
-                f"<font color='#1F4F2F' size='18'><b>{it.get('player_score') if it.get('player_score') is not None else '—'}</b></font>",
-                styles["BodyW"],
-            ),
+            player_cell,
             Paragraph(state_html, styles["BodyW"]),
         ])
 
-    table = Table(rows, colWidths=[6.5 * cm, 2.4 * cm, 2.0 * cm, 1.6 * cm, 3.0 * cm])
+    # Widen PLAYER + STATE columns for breathing room; tighten ATTRIBUTE slightly
+    table = Table(rows, colWidths=[6.0 * cm, 2.6 * cm, 2.2 * cm, 1.9 * cm, 2.8 * cm])
     style = [
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
-        ("TOPPADDING",    (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ("ALIGN",         (3, 1), (3, -1),  "CENTER"),
         ("ALIGN",         (2, 1), (2, -1),  "CENTER"),
+        ("ALIGN",         (1, 1), (1, -1),  "LEFT"),
         ("ALIGN",         (4, 1), (4, -1),  "RIGHT"),
         ("BACKGROUND",    (0, 0), (-1, 0),  HexColor("#F0EAE0")),
         ("LINEBELOW",     (0, 0), (-1, 0),  0.4, _PDF_FOREST),
@@ -5577,25 +5721,48 @@ def build_pdf(report_doc: dict, output_path: str):
         if exercises:
             ex_rows = []
             for i, ex in enumerate(exercises, 1):
+                # Numbered chip cell — a forest box with white digit (Table inside table)
+                num_chip = Table(
+                    [[Paragraph(
+                        f'<font color="#FFFFFF" size="11"><b>{i:02d}</b></font>',
+                        ParagraphStyle("_xn", fontName="Helvetica-Bold", fontSize=11, leading=13,
+                                       textColor=HexColor("#FFFFFF"), alignment=TA_CENTER,
+                                       spaceBefore=0, spaceAfter=0),
+                    )]],
+                    colWidths=[0.95 * cm], rowHeights=[0.95 * cm],
+                )
+                num_chip.setStyle(TableStyle([
+                    ("BACKGROUND",    (0, 0), (-1, -1), _PDF_FOREST),
+                    ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
+                    ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]))
+                duration = ex.get('duration', '')
+                duration_html = (
+                    f'<font color="#1F4F2F" size="9"><b>&nbsp;·&nbsp;{duration}</b></font>'
+                    if duration else ""
+                )
                 ex_rows.append([
-                    Paragraph(f"<font color='#1F4F2F'><b>{i:02d}</b></font>", styles["BodyW"]),
+                    num_chip,
                     Paragraph(
-                        f"<b>{ex.get('name', '—')}</b> &nbsp;·&nbsp; "
-                        f"<font color='#6B7280'>{ex.get('duration', '')}</font><br/>"
-                        f"{ex.get('description', '')}",
+                        f'<font color="#0A0F0D" size="11"><b>{ex.get("name", "—")}</b></font>{duration_html}<br/>'
+                        f'<font color="#4B5563" size="9.5">{ex.get("description", "")}</font>',
                         styles["BodyW"],
                     ),
                 ])
-            et = Table(ex_rows, colWidths=[1.0 * cm, 14.5 * cm])
+            et = Table(ex_rows, colWidths=[1.4 * cm, 14.1 * cm])
             et.setStyle(TableStyle([
                 ("BACKGROUND",    (0, 0), (-1, -1), _PDF_CARD),
-                ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-                ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
-                ("TOPPADDING",    (0, 0), (-1, -1), 9),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+                ("TOPPADDING",    (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+                ("VALIGN",        (0, 0), (0, -1),  "TOP"),
+                ("VALIGN",        (1, 0), (1, -1),  "TOP"),
                 ("LINEBELOW",     (0, 0), (-1, -1), 0.4, _PDF_BORDER),
-                ("LINEBEFORE",    (0, 0), (0, -1), 2.0, _PDF_FOREST),
             ]))
             story.append(et)
         else:

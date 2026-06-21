@@ -26,6 +26,28 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 57 — PDF report visual overhaul: AMATEUR → PREMIUM design (Feb 21 2026)**:
+  - **User feedback**: "PDF file that user get after analyse and can download to look more professional and beautiful right now it look amateur and some of number goes on text structure don't look good"
+  - **Root cause identified** (via AI-powered PDF design audit): inline `<font size='X'>` mixing inside single Paragraphs caused baseline misalignment everywhere a big score met a small "/10" suffix — that's why scores looked "floating" or "overlapping text". Tables had tight 8px cell padding which crowded numbers against notes. Section underlines were thin/anaemic. The "NEED MORE FOOTAGE" callout was a placeholder-looking yellow box.
+  - **New PDF helpers** in `/app/backend/server.py`:
+    - `_big_score(value, big_size, unit_size, unit, …)` — returns a Table flowable with VALIGN=BOTTOM that perfectly baseline-aligns a big number with its "/10" unit suffix. Used on cover, 60-Second Scout Summary, How You Compare hero, individual skill cards, and the academy reference table.
+    - `_callout(text, color, bg, icon)` — designed callout pill with thick left accent rail + soft amber border + tracked uppercase text. Replaces all "NEED MORE FOOTAGE" instances.
+  - **`_cover_summary_box`** rebuilt — Overall Development + Player Type cards now have crisp 32pt score + 12pt unit baselined together; forest accent rail added.
+  - **`_score_table`** padding bumped 8px → 12px L/R, 7px → 10px T/B; SCORE column widened 2.5cm → 3.2cm; cleaner `_score_pill` format (no size mixing).
+  - **`_overall_benchmark_page`** ("How you compare", Page 4) — completely restructured from one messy Paragraph with mixed sizes 40/14/7.5/9 into a 4-row vertical Table where each row has a single consistent font size. The big "5 /10" now reads cleanly; "REALISTIC NEXT STEP" / "TO REACH THE NEXT TIER" labels stack properly.
+  - **`_skill_card`** top row — score uses `_big_score(22/9)`; "NEED MORE FOOTAGE" uses new `_callout`; card padding 8px → 10px; VALIGN MIDDLE for proper score-vs-title alignment.
+  - **Academy reference table** — column widths rebalanced (6.0/2.6/2.2/1.9/2.8 cm); cell padding 8/10 → 10/12 px; PLAYER score uses 15pt forest bold with "/10" suffix at same baseline (was raw 18pt overflowing 1.6cm column); importance dots bumped to size 12 with `#D6D3D1` for empties (better contrast).
+  - **Training plan** — exercise numbering now uses proper forest 0.95×0.95cm chips with white centered digits (was just inline tiny "01" text in a 1cm cell); description body now has explicit `<font color="#4B5563" size="9.5">` for readable body copy + `font-bold` on exercise name; row padding 9 → 12 px.
+  - **`_section_header`** — underline thickened (0.07cm × 2.4cm → 0.12cm × 3.2cm) for stronger hierarchy; spacer after bumped 0.35 → 0.45cm.
+  - **`_list_bullets`** — now uses ReportLab's native `bulletText` + `ForestBullet` paragraph style (leftIndent=16, bulletIndent=2, bulletFontName=Helvetica-Bold) — bullets line up perfectly with text baseline (was offset because of `<b>▸</b>&nbsp;&nbsp;` hack).
+  - **`_scout_summary_page`** (60-Second Summary) — score block now uses `_big_score(36/13)` with vertically-stacked label, same baseline alignment as the cover.
+  - **`_draw_background` + `_draw_cover_background`** — footer page number now ink-black bold (was muted gray, contrast too low); cover footer "MENTALKIDS / Denmark" + "SCOUTMEPLAY.COM" went from `#FFFFFFAA` → `#FFFFFFCC` / `#FFFFFF` for proper readability on the forest panel.
+  - **Tier Landscape** padding 8/10 → 12/14 px; active tier now has 3pt forest border above + below for proper "YOU ARE HERE" prominence.
+  - **PDF render version** bumped 9 → 12 to invalidate all cached PDFs so every download gets the new design.
+  - **AI audit verdict**: design quality went from **AMATEUR** → **GOOD/PREMIUM**. Confirmed clean: baseline-aligned scores, padded tables, numbered exercise chips, polished callouts, readable footer. (Sample PDF's remaining "AMATEUR" downgrade is from the *content* of the bound sample report — Boro happened to be a video where the player marker couldn't track — pure content/seed issue, not design. Real customer reports will look fully premium.)
+  - **Files**: MODIFIED `/app/backend/server.py` (PDF generator only — `_pdf_styles`, `_big_score` [NEW], `_callout` [NEW], `_cover_summary_box`, `_score_pill`, `_score_table`, `_list_bullets`, `_skill_card`, `_overall_benchmark_page`, `_section_header`, academy reference table renderer, training plan renderer, `_scout_summary_page`, `_draw_background`, `_draw_cover_background`, PDF_RENDER_VERSION).
+
+
 - ✅ **🆕 Session 56 — Premium teaser tables: readable categories, locked scores only (Feb 21 2026)**:
   - **User feedback**: "Blurred premium tables look like blurred Word documents. They blur EVERYTHING including category labels — that kills curiosity. Premium teasers should show readable category headers… and only blur the scores."
   - **Replaced global `blur-locked`** wrapper on the premium cards block with surgical per-element treatment so:
