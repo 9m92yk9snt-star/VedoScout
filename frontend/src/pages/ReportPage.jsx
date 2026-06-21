@@ -1557,6 +1557,7 @@ export default function ReportPage() {
   const [embeddedOpen, setEmbeddedOpen] = useState(false);
   const [generatingFull, setGeneratingFull] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);  // graceful fallback when the uploaded clip can't be decoded on this device
   const pollingRef = useRef(null);
   // ── Timestamped video evidence ────────────────────────────────────
   // Clicking any "0:23"-style timestamp in the report scrubs the player
@@ -1871,16 +1872,41 @@ export default function ReportPage() {
                   </div>
                 </div>
               ) : (
-                <video
-                  ref={videoRef}
-                  src={`${ASSET_BASE}${video_url}`}
-                  poster={poster_url ? `${ASSET_BASE}${poster_url}` : undefined}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  data-testid="report-video"
-                  className="w-full bg-black aspect-video"
-                />
+                <div className="relative w-full bg-black aspect-video overflow-hidden" data-testid="report-video-shell">
+                  {!videoFailed && (
+                    <video
+                      ref={videoRef}
+                      src={`${ASSET_BASE}${video_url}`}
+                      poster={poster_url ? `${ASSET_BASE}${poster_url}` : (marker_url ? `${ASSET_BASE}${marker_url}` : undefined)}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      onError={() => setVideoFailed(true)}
+                      data-testid="report-video"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  )}
+                  {/* Friendly fallback if the uploaded clip can't be decoded on this device (iOS HEVC etc.) */}
+                  {videoFailed && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6" data-testid="report-video-fallback">
+                      {marker_url && (
+                        <img
+                          src={`${ASSET_BASE}${marker_url}`}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover opacity-60"
+                          aria-hidden
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-cream-base via-cream-base/85 to-cream-base/40" />
+                      <div className="relative">
+                        <div className="text-forest text-[10px] uppercase tracking-[0.3em] font-black mb-1">Video preview unavailable on this device</div>
+                        <p className="text-ink/65 text-xs max-w-[260px] mx-auto">
+                          Your clip was analysed successfully — the locked-player frame and full report are below.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               <div className="mt-4 grid grid-cols-3 gap-px bg-cream-soft/20">
                 <div className="bg-surface p-3">
@@ -1953,6 +1979,58 @@ export default function ReportPage() {
                     <p className="mt-2 text-[11px] text-ink/60">
                       Pro Scout Intelligence tracks only the player inside this box across every frame.
                     </p>
+                  </div>
+                )}
+
+                {/* ===== FREE-PREVIEW content block (non-unlocked users) =====
+                    Shows the actual preview data — brief summary, top strengths, one
+                    area to improve — so the page feels rich and personal even before
+                    the user pays. Without this, free users see only the locked-player
+                    card + a name and the page feels empty. */}
+                {!unlocked && preview && (
+                  <div className="mt-6 space-y-4" data-testid="free-preview-content">
+                    {(preview.brief_summary || preview.summary) && (
+                      <div className="bg-cream-card border border-gray-border p-4 md:p-5 rounded-sm shadow-sm">
+                        <p className="text-ink/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-2">
+                          What the scout saw
+                        </p>
+                        <p className="text-ink text-sm md:text-base leading-relaxed">
+                          {preview.brief_summary || preview.summary}
+                        </p>
+                      </div>
+                    )}
+
+                    {Array.isArray(preview.top_strengths) && preview.top_strengths.length > 0 && (
+                      <div className="bg-cream-soft/70 border border-forest/15 p-4 md:p-5 rounded-sm">
+                        <p className="text-forest text-[10px] uppercase tracking-[0.3em] font-black mb-3 flex items-center gap-1.5">
+                          <Star className="w-3 h-3" fill="currentColor" />
+                          Top observed strengths
+                        </p>
+                        <ul className="space-y-2">
+                          {preview.top_strengths.slice(0, 3).map((s, i) => (
+                            <li key={i} className="flex items-start gap-2 text-ink text-[13px] md:text-sm leading-snug">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-forest text-cream-card text-[10px] font-black flex-shrink-0">{i + 1}</span>
+                              <span className="font-semibold">{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {preview.area_for_improvement && (
+                      <div className="bg-cream-card border border-gray-border p-3 md:p-4 rounded-sm">
+                        <p className="text-ink/45 text-[10px] uppercase tracking-[0.3em] font-bold mb-1">
+                          One area to improve
+                        </p>
+                        <p className="text-ink/85 text-[13px] leading-snug">
+                          {preview.area_for_improvement}
+                        </p>
+                      </div>
+                    )}
+
+                    {preview.evidence_note && (
+                      <p className="text-ink/55 text-[11px] italic">{preview.evidence_note}</p>
+                    )}
                   </div>
                 )}
               </div>

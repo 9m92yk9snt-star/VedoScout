@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Crown, Sparkles, ArrowRight, X, Star } from "lucide-react";
+import { Lock, Crown, Sparkles, ArrowRight, X, Star, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 /**
  * HeroTeaser — the "must-buy" reveal shown to free users right after the AI finishes.
  *
- * What it does:
- *   • Shows the user's locked-player marker frame with a pulsing volt halo
- *   • Reveals the AI's findings in staggered animations:
- *       AI ANALYSIS COMPLETE → name/age → overall score → top trait
- *   • Lists 4 locked sections with blurred placeholders behind 🔒 icons
- *   • A loud, pulsing volt CTA opens the embedded Stripe checkout
- *   • A subtle "Take me to dashboard" link beneath for users not ready to buy
+ * Cream/forest theme (premium):
+ *   - Cream base background with a soft forest radial vignette
+ *   - The locked-player marker frame sits inside a forest-green halo
+ *   - Real preview data is revealed in stages: name → score → top traits → snippet → locks
+ *   - 4 locked sections shown with blurred placeholders behind 🔒 icons
+ *   - A loud, forest CTA opens the embedded Stripe checkout
+ *   - Subtle "Take me to dashboard" link beneath for users not ready to buy
  *
  * Props
  *   open        — boolean
@@ -28,11 +28,11 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
   /* eslint-disable */
   useEffect(() => {
     if (!open) { setStage(0); return; }
-    const t1 = setTimeout(() => setStage(1), 600);  // headline
-    const t2 = setTimeout(() => setStage(2), 1500); // name + role
-    const t3 = setTimeout(() => setStage(3), 2400); // overall score
-    const t4 = setTimeout(() => setStage(4), 3300); // detected stats
-    const t5 = setTimeout(() => setStage(5), 4200); // top trait + locked sections
+    const t1 = setTimeout(() => setStage(1), 500);  // headline
+    const t2 = setTimeout(() => setStage(2), 1200); // name + role
+    const t3 = setTimeout(() => setStage(3), 1900); // overall score
+    const t4 = setTimeout(() => setStage(4), 2600); // brief summary + strengths
+    const t5 = setTimeout(() => setStage(5), 3400); // locked sections + CTA
     return () => { [t1,t2,t3,t4,t5].forEach(clearTimeout); };
   }, [open]);
   /* eslint-enable */
@@ -44,19 +44,20 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
   const fingerprint = report.fingerprint || {};
   const markerUrl = report.marker_url ? `${assetBase}${report.marker_url}` : null;
 
-  // Pull the most evocative numbers / lines from the preview. Falls back gracefully
-  // if any field is missing.
+  // Pull real preview content with graceful fallbacks
   const overall = preview.overall_score
     || preview.scores?.overall_development
     || preview.scores?.overall
     || 76;
-  const topStrength =
-    preview.top_strengths?.[0]
-    || preview.summary?.split(".")?.[0]
-    || "ELITE FINISHER UNDER PRESSURE";
-  const detected = preview.detected_actions
-    || preview.action_counts
-    || { goals: preview.goals, assists: preview.assists, dribbles_past: preview.dribbles_past };
+  const strengths = Array.isArray(preview.top_strengths) && preview.top_strengths.length
+    ? preview.top_strengths.slice(0, 3)
+    : ["Confident on the ball under pressure"];
+  const briefSummary = preview.brief_summary || preview.summary
+    || preview.sample_section?.content
+    || "";
+  const playerType = preview.player_type || "";
+  const improvement = preview.area_for_improvement || "";
+  const confidence = String(preview.confidence || "medium").toLowerCase();
 
   return (
     <AnimatePresence>
@@ -66,87 +67,87 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.4 }}
-        className="fixed inset-0 z-[150] bg-deepnavy overflow-y-auto"
+        className="fixed inset-0 z-[150] bg-cream-base overflow-y-auto"
         data-testid="hero-teaser"
       >
-        {/* Background field of soft volt particles */}
+        {/* Soft forest radial vignette to set the premium mood */}
         <div className="absolute inset-0 pointer-events-none" aria-hidden>
           <div
             className="absolute inset-0"
             style={{
-              background: "radial-gradient(circle at 50% 30%, rgba(204,255,0,0.18), transparent 65%)",
+              background: "radial-gradient(circle at 50% 0%, rgba(31,79,47,0.15), transparent 55%), radial-gradient(circle at 50% 100%, rgba(31,79,47,0.08), transparent 60%)",
             }}
           />
-          {[...Array(18)].map((_, i) => (
+          {/* Sparse forest specks */}
+          {[...Array(14)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-1 h-1 bg-volt/40 rounded-full"
+              className="absolute w-1 h-1 bg-forest/25 rounded-full"
               style={{ left: `${(i * 53) % 100}%`, top: `${(i * 37) % 100}%` }}
-              animate={{ opacity: [0.2, 0.8, 0.2] }}
+              animate={{ opacity: [0.2, 0.6, 0.2] }}
               transition={{ duration: 3 + (i % 4), repeat: Infinity, delay: i * 0.13 }}
             />
           ))}
         </div>
 
-        <div className="relative max-w-md mx-auto px-6 py-8 min-h-screen flex flex-col">
-          {/* Subtle close-X corner so user is never trapped */}
+        <div className="relative max-w-md mx-auto px-6 pt-10 pb-8 min-h-screen flex flex-col">
+          {/* Close-X corner so user is never trapped */}
           <button
             type="button"
             onClick={onDismiss}
             data-testid="hero-teaser-close"
-            className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center text-cream-card/45 hover:text-cream-card"
+            className="absolute top-3 right-3 w-9 h-9 flex items-center justify-center text-ink/50 hover:text-ink rounded-full"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
 
-          {/* Marker frame with pulsing halo */}
+          {/* Marker frame with forest halo + Pro Scout badge */}
           {markerUrl && (
-            <div className="relative mx-auto mb-5 mt-4" style={{ width: 220 }}>
+            <div className="relative mx-auto mb-5" style={{ width: 200 }}>
               <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{ boxShadow: "0 0 60px rgba(204,255,0,0.45)" }}
-                animate={{ opacity: [0.4, 0.85, 0.4] }}
+                className="absolute -inset-3 rounded-full"
+                style={{ boxShadow: "0 0 60px rgba(31,79,47,0.35), 0 0 0 6px rgba(31,79,47,0.08)" }}
+                animate={{ opacity: [0.5, 0.95, 0.5] }}
                 transition={{ duration: 2.2, repeat: Infinity }}
               />
-              <div className="relative border-2 border-volt overflow-hidden">
+              <div className="relative border-2 border-forest overflow-hidden rounded-sm bg-white shadow-xl">
                 <img
                   src={markerUrl}
                   alt="Your player"
                   className="w-full aspect-square object-cover"
                   data-testid="hero-teaser-marker"
                 />
-                {/* Pulse ring overlay */}
-                <motion.div
-                  className="absolute inset-0 border-2 border-volt pointer-events-none"
-                  animate={{ opacity: [0, 0.6, 0], scale: [1, 1.08, 1] }}
-                  transition={{ duration: 2.2, repeat: Infinity }}
-                />
+                {/* corner ribbon — PRO SCOUT VERIFIED */}
+                <div className="absolute bottom-0 left-0 right-0 bg-forest text-white text-[9px] uppercase tracking-[0.2em] font-black py-1 text-center flex items-center justify-center gap-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  Pro Scout Locked
+                </div>
               </div>
             </div>
           )}
 
-          {/* AI ANALYSIS COMPLETE */}
+          {/* "Analysis complete" tag */}
           <AnimatePresence>
             {stage >= 1 && (
               <motion.div
                 key="ac"
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.45 }}
-                className="flex items-center justify-center gap-2 mb-4"
+                className="flex items-center justify-center gap-2 mb-3"
               >
                 <motion.span
-                  className="w-1.5 h-1.5 bg-volt rounded-full"
+                  className="w-1.5 h-1.5 bg-forest rounded-full"
                   animate={{ opacity: [1, 0.3, 1] }}
                   transition={{ duration: 1, repeat: Infinity }}
                 />
-                <span className="text-volt text-[10px] uppercase tracking-[0.4em] font-black">
+                <span className="text-forest text-[10px] uppercase tracking-[0.4em] font-black">
                   Pro Scout Analysis Complete
                 </span>
                 <motion.span
-                  className="w-1.5 h-1.5 bg-volt rounded-full"
+                  className="w-1.5 h-1.5 bg-forest rounded-full"
                   animate={{ opacity: [1, 0.3, 1] }}
                   transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
                 />
@@ -165,13 +166,24 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                 transition={{ duration: 0.45 }}
                 className="text-center mb-5"
               >
-                <h1 className="font-barlow font-black uppercase text-cream-card tracking-tighter text-4xl md:text-5xl leading-none">
+                <h1
+                  className="font-barlow font-black uppercase text-ink tracking-tighter text-4xl md:text-5xl leading-none"
+                  data-testid="hero-teaser-player-name"
+                >
                   {player.player_name || "Your Player"}
                 </h1>
-                <p className="mt-2 text-cream-card/65 text-[11px] uppercase tracking-[0.25em] font-bold">
-                  {[player.age && `age ${player.age}`, player.position, fingerprint.jersey_name && `${fingerprint.jersey_name} jersey`]
-                    .filter(Boolean).join(" · ")}
+                <p className="mt-2 text-ink/65 text-[11px] uppercase tracking-[0.25em] font-bold">
+                  {[
+                    player.age && `Age ${player.age}`,
+                    player.position,
+                    fingerprint.jersey_name && `${fingerprint.jersey_name} jersey`,
+                  ].filter(Boolean).join(" · ")}
                 </p>
+                {playerType && (
+                  <p className="mt-3 text-forest text-sm font-bold italic px-2">
+                    &ldquo;{playerType}&rdquo;
+                  </p>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -188,18 +200,21 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                 className="text-center mb-6"
                 data-testid="hero-teaser-score"
               >
-                <p className="text-cream-card/55 text-[9px] uppercase tracking-[0.4em] font-bold mb-1">
+                <p className="text-ink/55 text-[9px] uppercase tracking-[0.4em] font-bold mb-1">
                   Overall potential
                 </p>
-                <div className="font-barlow font-black text-volt text-7xl md:text-8xl tracking-tighter tabular-nums leading-none">
+                <div className="font-barlow font-black text-forest text-7xl md:text-8xl tracking-tighter tabular-nums leading-none">
                   {overall}
-                  <span className="text-cream-card/30 text-3xl">/100</span>
+                  <span className="text-ink/35 text-3xl">/100</span>
                 </div>
+                <p className="mt-2 text-ink/55 text-[10px] uppercase tracking-[0.2em] font-bold">
+                  Confidence: <span className="text-forest font-black">{confidence}</span>
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Detected action stats — quick punchy row */}
+          {/* Brief summary + Top strengths */}
           <AnimatePresence>
             {stage >= 4 && (
               <motion.div
@@ -208,32 +223,56 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.45 }}
-                className="mb-6 px-2"
+                className="mb-6 space-y-3"
               >
-                <p className="text-cream-card/55 text-[9px] uppercase tracking-[0.3em] font-bold text-center mb-2">
-                  Detected on the locked player
-                </p>
-                <div className="grid grid-cols-3 gap-px bg-cream-card/8 border border-cream-card/15">
-                  {[
-                    { k: "Touches", v: detected?.touches ?? detected?.ball_touches ?? "—" },
-                    { k: "Key actions", v: detected?.key_actions ?? detected?.actions ?? "—" },
-                    { k: "Sprints", v: detected?.sprints ?? "—" },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-deepnavy px-2 py-2 text-center">
-                      <div className="font-barlow font-black text-volt text-2xl tabular-nums leading-none">
-                        {s.v}
-                      </div>
-                      <div className="text-cream-card/45 text-[9px] uppercase tracking-widest font-bold mt-1">
-                        {s.k}
-                      </div>
-                    </div>
-                  ))}
+                {briefSummary && (
+                  <div className="bg-white border border-gray-border p-4 rounded-sm shadow-sm">
+                    <p className="text-ink/45 text-[9px] uppercase tracking-[0.3em] font-bold mb-2">
+                      What the scout saw
+                    </p>
+                    <p className="text-ink text-sm leading-relaxed">
+                      {String(briefSummary).slice(0, 240)}
+                      {briefSummary.length > 240 && "…"}
+                    </p>
+                  </div>
+                )}
+
+                <div className="bg-cream-soft/60 border border-forest/15 p-4 rounded-sm">
+                  <p className="text-forest text-[9px] uppercase tracking-[0.3em] font-black mb-3 flex items-center gap-1.5">
+                    <Star className="w-3 h-3" fill="currentColor" />
+                    Top observed strengths
+                  </p>
+                  <ul className="space-y-2">
+                    {strengths.map((s, i) => (
+                      <motion.li
+                        key={i}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 * i, duration: 0.35 }}
+                        className="flex items-start gap-2 text-ink text-[13px] leading-snug"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-forest flex-shrink-0 mt-px" />
+                        <span className="font-semibold">{s}</span>
+                      </motion.li>
+                    ))}
+                  </ul>
                 </div>
+
+                {improvement && (
+                  <div className="bg-white border border-gray-border p-3 rounded-sm">
+                    <p className="text-ink/45 text-[9px] uppercase tracking-[0.3em] font-bold mb-1">
+                      One area to improve
+                    </p>
+                    <p className="text-ink/85 text-[12px] leading-snug">
+                      {String(improvement).slice(0, 160)}
+                    </p>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Top trait + LOCKED sections */}
+          {/* Locked sections */}
           <AnimatePresence>
             {stage >= 5 && (
               <motion.div
@@ -242,40 +281,34 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.45 }}
-                className="space-y-1.5 mb-7"
+                className="space-y-1.5 mb-6"
               >
-                <div className="flex items-center gap-2 px-3 py-2.5 bg-volt/[0.08] border border-volt/40">
-                  <Star className="w-3.5 h-3.5 text-volt flex-shrink-0" fill="currentColor" />
-                  <span className="text-volt text-[9px] uppercase tracking-widest font-black w-20 flex-shrink-0">
-                    Top trait
-                  </span>
-                  <span className="text-cream-card text-[12px] uppercase tracking-tight font-black leading-tight">
-                    {String(topStrength).slice(0, 55)}
-                  </span>
-                </div>
+                <p className="text-ink/55 text-[9px] uppercase tracking-[0.3em] font-bold mb-2">
+                  Unlocked in the full report
+                </p>
                 {[
-                  "Detailed scout view",
+                  "Detailed scout view (12 sub-scores)",
                   "12-week training plan",
                   "Agent / academy review",
-                  "Archetype + trajectory",
+                  "Archetype + 5-year trajectory",
                 ].map((label, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, x: -6 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * i, duration: 0.35 }}
-                    className="flex items-center gap-3 px-3 py-2.5 border border-cream-card/10 bg-cream-card/[0.03] relative overflow-hidden"
+                    transition={{ delay: 0.08 * i, duration: 0.3 }}
+                    className="flex items-center gap-3 px-3 py-2.5 border border-gray-border bg-white rounded-sm relative overflow-hidden"
                   >
                     {/* blurred placeholder text underneath the lock */}
                     <div
                       aria-hidden
-                      className="absolute inset-y-1.5 left-32 right-12 text-cream-card/40 text-[11px] uppercase tracking-tight font-bold select-none"
-                      style={{ filter: "blur(5px)", letterSpacing: "0.1em" }}
+                      className="absolute inset-y-1.5 left-44 right-3 text-ink/40 text-[11px] uppercase tracking-tight font-bold select-none truncate"
+                      style={{ filter: "blur(5px)" }}
                     >
-                      Reveals once you unlock the full premium report
+                      Reveals on unlock
                     </div>
-                    <Lock className="w-3.5 h-3.5 text-cream-card/45 flex-shrink-0 relative" />
-                    <span className="text-cream-card/55 text-[9px] uppercase tracking-widest font-black w-24 flex-shrink-0 relative">
+                    <Lock className="w-3.5 h-3.5 text-forest/65 flex-shrink-0 relative" />
+                    <span className="text-ink/85 text-[10px] uppercase tracking-widest font-black w-40 flex-shrink-0 relative">
                       {label}
                     </span>
                   </motion.div>
@@ -284,7 +317,7 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
             )}
           </AnimatePresence>
 
-          {/* The volt CTA */}
+          {/* The forest CTA */}
           {stage >= 5 && (
             <motion.button
               type="button"
@@ -293,12 +326,12 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="w-full relative bg-volt text-deepnavy py-4 px-5 mb-2 group overflow-hidden"
-              style={{ boxShadow: "0 0 40px rgba(204,255,0,0.4)" }}
+              className="w-full relative bg-forest text-white py-4 px-5 mb-2 group overflow-hidden rounded-sm shadow-xl active:scale-[0.99] transition-transform"
+              style={{ boxShadow: "0 14px 30px -10px rgba(31,79,47,0.55), 0 0 0 1px rgba(31,79,47,0.5)" }}
             >
               <motion.span
                 aria-hidden
-                className="absolute inset-0 bg-white/25"
+                className="absolute inset-0 bg-white/15"
                 animate={{ x: ["-100%", "200%"] }}
                 transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut" }}
                 style={{ width: "50%", skewX: "-20deg" }}
@@ -310,7 +343,7 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                 </span>
                 <ArrowRight className="w-5 h-5" />
               </span>
-              <span className="relative block mt-1 text-[10px] uppercase tracking-widest font-black text-deepnavy/70">
+              <span className="relative block mt-1 text-[10px] uppercase tracking-widest font-black text-white/80">
                 <Sparkles className="inline w-3 h-3 -mt-0.5" /> 48-hour refund guarantee · One-time payment
               </span>
             </motion.button>
@@ -325,7 +358,7 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.4, delay: 0.5 }}
-              className="text-center text-cream-card/45 hover:text-cream-card/70 text-[11px] uppercase tracking-widest font-bold py-2"
+              className="text-center text-ink/55 hover:text-ink/85 text-[11px] uppercase tracking-widest font-bold py-2"
             >
               Take me to dashboard instead
             </motion.button>
