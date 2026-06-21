@@ -443,29 +443,43 @@ function ScoreBar({ label, value, locked = false, benchmark = 65 }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-20%" });
   return (
-    <div ref={ref} className={locked ? "opacity-70" : ""}>
+    <div ref={ref} className="group">
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-ink/70">{label}</span>
-        <span className="font-barlow font-black text-volt text-base">
-          {locked ? "—" : <AnimatedNumber value={value} />}<span className="text-ink/40 text-xs">/10</span>
+        <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-ink/85 flex items-center gap-1.5">
+          {label}
+          {locked && (
+            <Lock aria-hidden className="w-2.5 h-2.5 text-forest/60 shrink-0" strokeWidth={2.2} />
+          )}
         </span>
+        {locked ? (
+          <span className="font-barlow font-black text-ink/35 text-base flex items-center gap-1 select-none" aria-hidden>
+            <span className="score-blur">{value}</span>
+            <span className="text-ink/30 text-xs">/10</span>
+          </span>
+        ) : (
+          <span className="font-barlow font-black text-volt text-base">
+            <AnimatedNumber value={value} /><span className="text-ink/40 text-xs">/10</span>
+          </span>
+        )}
       </div>
-      <div className="h-1 bg-cream-soft/40 overflow-hidden relative">
-        <div
-          className="absolute top-0 left-0 h-full bg-volt"
-          style={{
-            width: inView && !locked ? `${value * 10}%` : "0%",
-            transition: "width 1.6s cubic-bezier(0.16, 1, 0.3, 1)",
-            boxShadow: "0 0 8px rgba(204, 255, 0, 0.5)",
-          }}
-        />
+      <div className={`h-1.5 overflow-hidden relative rounded-full ${locked ? "bg-cream-soft/50 locked-bar" : "bg-cream-soft/40"}`}>
+        {!locked && (
+          <div
+            className="absolute top-0 left-0 h-full bg-gradient-to-r from-forest via-forest-pop to-volt"
+            style={{
+              width: inView ? `${value * 10}%` : "0%",
+              transition: "width 1.6s cubic-bezier(0.16, 1, 0.3, 1)",
+              boxShadow: "0 0 8px rgba(204, 255, 0, 0.5)",
+            }}
+          />
+        )}
         {/* peer benchmark line */}
         <div
           className="absolute top-0 h-full"
           style={{
             left: `${benchmark}%`,
             width: "1px",
-            borderLeft: "1px dashed rgba(255,255,255,0.3)",
+            borderLeft: "1px dashed rgba(31,79,47,0.35)",
             height: "100%",
           }}
         />
@@ -1766,103 +1780,169 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* === PREMIUM SECTIONS — blurred but visually rich === */}
+          {/* === PREMIUM SECTIONS — headers/labels CRISP, only the values are locked === */}
           <div className="relative">
-            {/* The actual content (blurred) */}
-            <div className="blur-locked grid lg:grid-cols-3 gap-px bg-cream-soft/40 border border-gray-border">
+            {/* The actual content (labels readable, scores teased) */}
+            <div className="relative grid lg:grid-cols-3 gap-px bg-cream-soft/40 border border-gray-border">
               {/* Radar chart card */}
-              <div className="bg-surface p-6 md:p-8">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Performance Radar</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Performance map</h3>
-                <div className="mt-4 h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={dynamicRadar}>
-                      <PolarGrid stroke="rgba(255,255,255,0.15)" />
-                      <PolarAngleAxis dataKey="axis" tick={{ fill: "#94A3B8", fontSize: 10 }} />
-                      <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
-                      <Radar dataKey="v" stroke="#CCFF00" fill="#CCFF00" fillOpacity={0.4} />
-                    </RadarChart>
-                  </ResponsiveContainer>
+              <div className="bg-surface p-6 md:p-8 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-volt rounded-full" /> Premium · Performance Radar
+                  </span>
+                  <span className="locked-pill"><Lock className="w-2.5 h-2.5" strokeWidth={2.2} />Locked</span>
+                </div>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl text-ink">Performance map</h3>
+                <p className="mt-1.5 text-xs text-ink/65 leading-snug">Five-axis profile vs position benchmark.</p>
+                <div className="mt-4 h-56 relative">
+                  {/* Crisp axis labels overlay (peeking through) */}
+                  <div className="absolute inset-0 pointer-events-none z-10">
+                    {[
+                      { label: "Technical", x: "50%", y: "8%" },
+                      { label: "Tactical", x: "92%", y: "38%" },
+                      { label: "Physical", x: "78%", y: "88%" },
+                      { label: "Mentality", x: "22%", y: "88%" },
+                      { label: "Decision", x: "8%", y: "38%" },
+                    ].map((a) => (
+                      <span
+                        key={a.label}
+                        className="absolute -translate-x-1/2 -translate-y-1/2 text-[10px] uppercase tracking-[0.22em] font-black text-ink/85 bg-cream-card/85 backdrop-blur-sm px-1.5 py-0.5 border border-ink/10 whitespace-nowrap"
+                        style={{ left: a.x, top: a.y }}
+                      >
+                        {a.label}
+                      </span>
+                    ))}
+                  </div>
+                  {/* Blurred polygon underneath */}
+                  <div className="score-blur absolute inset-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={dynamicRadar}>
+                        <PolarGrid stroke="rgba(31,79,47,0.18)" />
+                        <PolarAngleAxis dataKey="axis" tick={false} />
+                        <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />
+                        <Radar dataKey="v" stroke="#CCFF00" fill="#CCFF00" fillOpacity={0.45} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
 
               {/* Technical scores card */}
-              <div className="bg-surface p-6 md:p-8">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Technical</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Technical analysis</h3>
+              <div className="bg-surface p-6 md:p-8 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-volt rounded-full" /> Premium · Technical
+                  </span>
+                  <span className="locked-pill"><Lock className="w-2.5 h-2.5" strokeWidth={2.2} />Locked</span>
+                </div>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl text-ink">Technical analysis</h3>
+                <p className="mt-1.5 text-xs text-ink/65 leading-snug">7 metrics — vs peers at the same age & position.</p>
                 <div className="mt-5 space-y-3">
                   {sample.technical.slice(0, 5).map((t, i) => (
-                    <ScoreBar key={i} label={t.k} value={t.v} />
+                    <ScoreBar key={i} label={t.k} value={t.v} locked />
                   ))}
                 </div>
               </div>
 
               {/* Tactical scores card */}
-              <div className="bg-surface p-6 md:p-8">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Tactical</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Tactical analysis</h3>
+              <div className="bg-surface p-6 md:p-8 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-volt rounded-full" /> Premium · Tactical
+                  </span>
+                  <span className="locked-pill"><Lock className="w-2.5 h-2.5" strokeWidth={2.2} />Locked</span>
+                </div>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl text-ink">Tactical analysis</h3>
+                <p className="mt-1.5 text-xs text-ink/65 leading-snug">Positioning, off-ball runs, game awareness, decision making.</p>
                 <div className="mt-5 space-y-3">
                   {sample.tactical.slice(0, 5).map((t, i) => (
-                    <ScoreBar key={i} label={t.k} value={t.v} />
+                    <ScoreBar key={i} label={t.k} value={t.v} locked />
                   ))}
                 </div>
               </div>
 
               {/* Scout view */}
-              <div className="bg-surface p-6 md:p-8 lg:col-span-2">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Scout View</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">How a scout would see this player</h3>
+              <div className="bg-surface p-6 md:p-8 lg:col-span-2 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-volt rounded-full" /> Premium · Scout View
+                  </span>
+                  <span className="locked-pill"><Lock className="w-2.5 h-2.5" strokeWidth={2.2} />Locked</span>
+                </div>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl text-ink">How a scout would see this player</h3>
                 <div className="mt-5 grid sm:grid-cols-2 gap-6">
                   <div>
-                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-volt mb-2">What he'd love</div>
+                    <div className="text-xs uppercase tracking-[0.2em] font-black text-forest mb-2 flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> What he'd love
+                    </div>
                     <ul className="space-y-2 text-sm text-ink/85">
                       {sample.scoutStrengths.map((s, i) => (
-                        <li key={i} className="flex gap-2"><span className="text-volt mt-1">▶</span>{s}</li>
+                        <li key={i} className="flex gap-2">
+                          <span className="text-volt mt-1 shrink-0">▶</span>
+                          <span className="score-blur">{s}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-[0.2em] font-bold text-yellow-400 mb-2">What he'd worry about</div>
+                    <div className="text-xs uppercase tracking-[0.2em] font-black text-amber-600 mb-2 flex items-center gap-2">
+                      <Target className="w-3.5 h-3.5" /> What he'd worry about
+                    </div>
                     <ul className="space-y-2 text-sm text-ink/85">
                       {sample.scoutConcerns.map((s, i) => (
-                        <li key={i} className="flex gap-2"><span className="text-yellow-400 mt-1">▶</span>{s}</li>
+                        <li key={i} className="flex gap-2">
+                          <span className="text-amber-600 mt-1 shrink-0">▶</span>
+                          <span className="score-blur">{s}</span>
+                        </li>
                       ))}
                     </ul>
                   </div>
                 </div>
                 <div className="mt-6 pt-6 border-t border-gray-border grid sm:grid-cols-2 gap-4">
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50 mb-1">Next level to aim for</div>
-                    <div className="text-sm text-ink">{sample.nextLevel}</div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-black text-ink/70 mb-1">Next level to aim for</div>
+                    <div className="text-sm text-ink/90 score-blur">{sample.nextLevel}</div>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50 mb-1">Best position</div>
-                    <div className="text-sm text-ink">{sample.bestPosition}</div>
+                    <div className="text-[10px] uppercase tracking-[0.22em] font-black text-ink/70 mb-1">Best position</div>
+                    <div className="text-sm text-ink/90 score-blur">{sample.bestPosition}</div>
                   </div>
                 </div>
               </div>
 
               {/* Training exercise card */}
-              <div className="bg-surface p-6 md:p-8">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Training Plan</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Drill of the week</h3>
+              <div className="bg-surface p-6 md:p-8 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-volt rounded-full" /> Premium · Training Plan
+                  </span>
+                  <span className="locked-pill"><Lock className="w-2.5 h-2.5" strokeWidth={2.2} />Locked</span>
+                </div>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl text-ink">Drill of the week</h3>
+                <p className="mt-1.5 text-xs text-ink/65 leading-snug">Custom drill tailored to your player's biggest weak spot.</p>
                 <div className="mt-5 border border-volt/30 bg-deepnavy p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-barlow font-black uppercase text-ink text-base">{sample.exercise.name}</span>
-                    <span className="flex items-center gap-1 text-xs text-volt font-bold"><Clock className="w-3 h-3" />{sample.exercise.duration}</span>
+                    <span className="font-barlow font-black uppercase text-ink text-base score-blur">{sample.exercise.name}</span>
+                    <span className="flex items-center gap-1 text-xs text-volt font-bold"><Clock className="w-3 h-3" />15 min</span>
                   </div>
-                  <p className="text-xs text-ink/70 leading-relaxed">{sample.exercise.desc}</p>
+                  <p className="text-xs text-ink/70 leading-relaxed score-blur">{sample.exercise.desc}</p>
                 </div>
-                <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-ink/50">
-                  <span className="flex items-center gap-1"><Award className="w-3 h-3 text-volt" />4 more drills</span>
-                  <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3 text-volt" />30 & 90-day plan</span>
+                <div className="mt-4 flex items-center justify-between text-[10px] uppercase tracking-[0.18em] font-black text-ink/65">
+                  <span className="flex items-center gap-1.5"><Award className="w-3 h-3 text-volt" />4 more drills</span>
+                  <span className="flex items-center gap-1.5"><TrendingUp className="w-3 h-3 text-volt" />30 & 90-day plan</span>
                 </div>
               </div>
 
               {/* Video timeline */}
-              <div className="bg-surface p-6 md:p-8 lg:col-span-3">
-                <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Premium · Video Comments</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-2xl">Timestamped feedback</h3>
+              <div className="bg-surface p-6 md:p-8 lg:col-span-3 relative">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-volt rounded-full" /> Premium · Video Comments
+                  </span>
+                  <span className="locked-pill"><Lock className="w-2.5 h-2.5" strokeWidth={2.2} />Locked</span>
+                </div>
+                <h3 className="mt-3 font-barlow font-black uppercase text-2xl text-ink">Timestamped feedback</h3>
+                <p className="mt-1.5 text-xs text-ink/65 leading-snug">Every key moment on your clip, marked with a comment.</p>
                 <div className="mt-5 space-y-2">
                   {sample.timeline.map((c, i) => (
                     <div key={i} className="flex items-start gap-4 bg-cream-card/90 border border-gray-border px-4 py-3">
@@ -1870,7 +1950,7 @@ export default function Landing() {
                         <Play className="w-3 h-3 text-volt" fill="currentColor" />
                         <span className="font-barlow font-black text-volt text-base min-w-[44px]">{c.t}</span>
                       </div>
-                      <p className="text-sm text-ink/85">{c.c}</p>
+                      <p className="text-sm text-ink/85 score-blur">{c.c}</p>
                     </div>
                   ))}
                 </div>

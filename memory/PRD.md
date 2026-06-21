@@ -26,6 +26,22 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 56 — Premium teaser tables: readable categories, locked scores only (Feb 21 2026)**:
+  - **User feedback**: "Blurred premium tables look like blurred Word documents. They blur EVERYTHING including category labels — that kills curiosity. Premium teasers should show readable category headers… and only blur the scores."
+  - **Replaced global `blur-locked`** wrapper on the premium cards block with surgical per-element treatment so:
+    - Section eyebrows (`Premium · Technical`, `Premium · Tactical`, `Premium · Scout View`, `Premium · Training Plan`, `Premium · Video Comments`, `Premium · Performance Radar`) — CRISP
+    - Card titles (Performance Map, Technical Analysis, Tactical Analysis, etc.) — CRISP
+    - Each card now has a new explainer subtitle ("Five-axis profile vs position benchmark", "7 metrics — vs peers at the same age & position", etc.) — CRISP
+    - **All category names readable**: First touch, Ball control, Dribbling, Passing, Positioning, Off-ball runs, Game awareness, Decision making, Timing of runs — CRISP with tiny `Lock` icons inline
+    - Score values + bar fills replaced with a striped `locked-bar` pattern + blurred `/10` value — only the actual scores are hidden
+    - Radar chart: axis labels rendered as crisp pill badges (TECHNICAL/TACTICAL/PHYSICAL/MENTALITY/DECISION); only the polygon shape is blurred
+    - Scout view bullet text, drill name + description, and timeline comment text use `.score-blur` (text-only blur, kept clickable structure); bullet markers, drill duration ("15 min"), and timecodes (00:24, 01:12, …) remain CRISP
+  - **New ScoreBar `locked` state**: lock icon next to label, blurred `value/10` pill, striped diagonal bar pattern + benchmark dashed line still visible — premium "this is what you're missing" feel
+  - **Each card now displays a `LOCKED` pill** (lock icon + linear cream→volt gradient) in the top-right corner of every premium card for instant scannability
+  - **New CSS utilities** in `index.css`: `.score-blur` (7px filter), `.score-blur-strong` (9px), `.locked-pill` (cream-to-volt gradient lock badge), `.locked-bar` (-45° repeating diagonal stripes)
+  - **Files**: MODIFIED `/app/frontend/src/pages/Landing.jsx` (ScoreBar + premium teaser block), `/app/frontend/src/index.css` (new utility classes). No text content changes.
+
+
 - ✅ **🆕 Session 55 — Landing page spacing, title alignment & premium table readability (Feb 21 2026)**:
   - **User complaint**: "much space between sections… some title needs to be adjusted perfectly… table needs some premium look and not all text can be read… illogical space here, design looks unprofessional and not structured"
   - **Section padding normalized** — every section now follows uniform `py-16 md:py-20` rhythm (80px desktop) to eliminate the "much space" feel:

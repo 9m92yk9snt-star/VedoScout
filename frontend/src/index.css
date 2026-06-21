@@ -102,6 +102,41 @@
         user-select: none;
         pointer-events: none;
     }
+    /* ===== PREMIUM TEASER — keep category labels CRISP, blur only the score values ===== */
+    .score-blur {
+        filter: blur(7px);
+        user-select: none;
+        pointer-events: none;
+    }
+    .score-blur-strong {
+        filter: blur(9px);
+        user-select: none;
+        pointer-events: none;
+    }
+    .locked-pill {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.2rem 0.55rem 0.2rem 0.45rem;
+        background: linear-gradient(135deg, rgba(204,255,0,0.10) 0%, rgba(31,79,47,0.06) 100%);
+        border: 1px solid rgba(31,79,47,0.18);
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #1F4F2F;
+    }
+    .locked-bar {
+        background-image: repeating-linear-gradient(
+            -45deg,
+            rgba(31, 79, 47, 0.25),
+            rgba(31, 79, 47, 0.25) 4px,
+            rgba(31, 79, 47, 0.08) 4px,
+            rgba(31, 79, 47, 0.08) 8px
+        );
+    }
     .scoreline-grid {
         background-image:
             linear-gradient(rgba(31, 79, 47, 0.06) 1px, transparent 1px),
