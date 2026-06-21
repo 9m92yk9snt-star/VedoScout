@@ -195,37 +195,47 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
                   return (
                     <div
                       key={s.id}
-                      className={`flex items-center gap-2.5 px-3 py-1.5 border transition-colors ${
+                      className={`flex items-start gap-2.5 px-3 py-2 border transition-colors ${
                         isActive
-                          ? "border-volt/60 bg-volt/[0.06]"
+                          ? "border-forest/40 bg-forest/[0.06]"
                           : isDone
                           ? "border-forest-pop/40 bg-forest-pop/[0.04]"
-                          : "border-cream-card/10 bg-cream-card/[0.02]"
+                          : "border-gray-border/70 bg-cream-card/60"
                       }`}
                     >
                       <Icon
-                        className={`w-3.5 h-3.5 flex-shrink-0 ${
-                          isActive ? "text-forest" : isDone ? "text-forest-pop" : "text-ink/35"
+                        className={`w-3.5 h-3.5 flex-shrink-0 mt-0.5 ${
+                          isActive ? "text-forest" : isDone ? "text-forest-pop" : "text-ink/45"
                         }`}
                         strokeWidth={1.6}
                       />
-                      <span
-                        className={`text-[11px] uppercase tracking-widest font-bold flex-1 ${
-                          isActive ? "text-ink" : isDone ? "text-forest-pop" : "text-ink/45"
-                        }`}
-                      >
-                        {s.title}
-                      </span>
-                      {isActive && (
-                        <motion.span
-                          className="w-1.5 h-1.5 rounded-full bg-volt"
-                          animate={{ opacity: [1, 0.3, 1] }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                        />
-                      )}
-                      {isDone && (
-                        <span className="text-forest-pop text-[10px] uppercase tracking-widest font-bold">✓</span>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[11px] uppercase tracking-widest font-bold ${
+                              isActive ? "text-ink" : isDone ? "text-forest-pop" : "text-ink/65"
+                            }`}
+                          >
+                            {s.title}
+                          </span>
+                          {isActive && (
+                            <motion.span
+                              className="w-1.5 h-1.5 rounded-full bg-forest"
+                              animate={{ opacity: [1, 0.3, 1] }}
+                              transition={{ duration: 1, repeat: Infinity }}
+                            />
+                          )}
+                          {isDone && (
+                            <span className="text-forest-pop text-[10px] font-bold ml-auto">✓</span>
+                          )}
+                        </div>
+                        {/* Always-visible caption so the user understands what each step actually does. */}
+                        <p className={`mt-0.5 text-[10.5px] leading-snug ${
+                          isActive ? "text-ink/75" : isDone ? "text-forest-pop/80" : "text-ink/50"
+                        }`}>
+                          {s.caption}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}
@@ -235,7 +245,7 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
 
           {phase !== "done" && (
             <>
-              <div className="mt-2 pt-5 border-t border-cream-card/10">
+              <div className="mt-2 pt-5 border-t border-forest/15">
                 <p className="text-center text-forest/75 text-[9px] uppercase tracking-[0.3em] font-bold mb-3">
                   While you wait
                 </p>
@@ -255,7 +265,7 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
                   type="button"
                   data-testid="overlay-continue-in-background"
                   onClick={onContinueInBackground}
-                  className="mt-4 mx-auto block text-cream-card/70 hover:text-volt text-[11px] uppercase tracking-[0.22em] font-bold underline underline-offset-4 decoration-cream-card/30 hover:decoration-volt transition-colors"
+                  className="mt-4 mx-auto block text-forest/85 hover:text-forest text-[11px] uppercase tracking-[0.22em] font-bold underline underline-offset-4 decoration-forest/40 hover:decoration-forest transition-colors"
                 >
                   Continue in background →
                 </button>

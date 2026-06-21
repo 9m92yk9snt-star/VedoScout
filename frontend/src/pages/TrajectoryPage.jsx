@@ -188,20 +188,20 @@ export default function TrajectoryPage() {
             className={`mt-8 border-2 border-forest/30 ${vmeta.bg} ${vmeta.color} p-6 md:p-8 grid md:grid-cols-3 gap-6`}
           >
             <div className="md:col-span-2 flex items-start gap-4">
-              <div className="w-12 h-12 bg-white/10 border border-white/30 flex items-center justify-center shrink-0">
-                <VerdictIcon className="w-6 h-6" />
+              <div className="w-12 h-12 bg-cream-card/80 border border-forest/25 flex items-center justify-center shrink-0">
+                <VerdictIcon className="w-6 h-6 text-ink" />
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-[0.22em] font-bold opacity-80">Trajectory verdict</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/65">Trajectory verdict</div>
                 <h2 data-testid="trajectory-verdict-label" className="mt-1 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter">
                   {vmeta.label}
                 </h2>
                 {oneReport ? (
-                  <p className="mt-2 text-sm opacity-90 max-w-xl">
+                  <p className="mt-2 text-sm text-ink/80 max-w-xl">
                     First report locked in. Upload the next video in 3–6 months to see how {profile.name?.split(" ")[0] || "your player"} actually progresses against age-typical pace and the matched archetype.
                   </p>
                 ) : (
-                  <p className="mt-2 text-sm opacity-90 max-w-xl">
+                  <p className="mt-2 text-sm text-ink/80 max-w-xl">
                     {verdict === "ahead" && "Improving faster than age-typical pace. This is the curve every academy wants to see."}
                     {verdict === "on_track" && "Improving at age-typical pace. Steady, consistent development."}
                     {verdict === "plateau" && "Growth has slowed across reports. Time to check focus & repetition load."}
@@ -421,11 +421,11 @@ function DeltaPill({ label, value, suffix }) {
   const positive = typeof value === "string" && value.startsWith("+");
   const negative = typeof value === "string" && value.startsWith("-");
   return (
-    <div className="bg-white/10 border border-white/20 p-3">
-      <div className="text-[9px] uppercase tracking-[0.22em] font-bold opacity-80">{label}</div>
-      <div className={`mt-0.5 font-barlow font-black text-2xl ${positive ? "text-white" : negative ? "text-amber-200" : "text-white/80"}`}>
+    <div className="bg-cream-card border border-forest/20 p-3">
+      <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/55">{label}</div>
+      <div className={`mt-0.5 font-barlow font-black text-2xl ${positive ? "text-forest" : negative ? "text-amber-700" : "text-ink/75"}`}>
         {value}
-        <span className="text-xs opacity-70 ml-1">{suffix}</span>
+        <span className="text-xs text-ink/55 ml-1">{suffix}</span>
       </div>
     </div>
   );
