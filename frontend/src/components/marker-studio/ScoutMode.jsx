@@ -145,6 +145,39 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     }
   }, [open]);
 
+  /* ── iOS Safari rescue: poll readyState while the boot overlay is up
+   *    `canplay` and `loadeddata` are unreliable on blob URLs on iOS, so
+   *    we additionally poll `videoEl.readyState` every 250ms while we're
+   *    still waiting. The moment we see `readyState >= 1 (HAVE_METADATA)`
+   *    AND a non-zero videoWidth, we know it's safe to start the boot
+   *    pipeline. Without this, large mobile uploads sometimes get stuck
+   *    on the "Uploading video 0%" screen indefinitely.
+   *
+   *    We also call `videoEl.load()` once explicitly when the overlay
+   *    opens so the network/decoder pipeline starts immediately even if
+   *    the <video> mount was preempted by another tab/render.
+   */
+  useEffect(() => {
+    if (!open) return;
+    if (videoReady) return;
+    const v = videoRef.current;
+    if (!v) return;
+    try { v.load(); } catch { /* noop */ }
+    let id;
+    const tick = () => {
+      const ve = videoRef.current;
+      if (!ve) return;
+      if (ve.readyState >= 1 && (ve.videoWidth || 0) > 0) {
+        setVideoReady(true);
+        setVidDur(ve.duration || 0);
+        return;
+      }
+      id = setTimeout(tick, 250);
+    };
+    id = setTimeout(tick, 250);
+    return () => { if (id) clearTimeout(id); };
+  }, [open, videoReady]);
+
   /* ── Stage size observer ───────────────────────────────────────── */
   const [stageRect, setStageRect] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -509,7 +542,19 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
           playsInline
           preload="auto"
           muted
-          onLoadedMetadata={(e) => setVidDur(e.target.duration || 0)}
+          onLoadedMetadata={(e) => {
+            setVidDur(e.target.duration || 0);
+            // Fallback for iOS Safari: `canplay` is unreliable on blob URLs.
+            // If we already have metadata + a non-zero readyState, we can safely
+            // proceed — `readyState >= 1 (HAVE_METADATA)` is enough to seek + draw.
+            if (e.target.readyState >= 1 && (e.target.videoWidth || 0) > 0) {
+              setVideoReady(true);
+            }
+          }}
+          onLoadedData={(e) => {
+            setVideoReady(true);
+            setVidDur(e.target.duration || 0);
+          }}
           onCanPlay={(e) => {
             setVideoReady(true);
             setVidDur(e.target.duration || 0);

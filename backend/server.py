@@ -3060,132 +3060,16 @@ async def upload_video_and_create_preview(
     with marker_path.open("wb") as buffer:
         shutil.copyfileobj(marker_image.file, buffer)
 
-    # ============== PRECISION SCOUT — VISUAL FINGERPRINT (anchor 1 only here) ==============
-    # We extract the FIRST anchor's fingerprint synchronously from the marker image so we
-    # can populate jersey/shorts colours before the AI sees anything. Additional anchor
-    # crops are extracted AFTER the web-friendly MP4 is transcoded (so we can pull frames
-    # at any timestamp via ffmpeg).
-    fingerprint_payload = None
-    crop_filename = None
-    crop_path = None
-    primary_box_data = None
-    try:
-        if marker_box:
-            primary_box_data = json.loads(marker_box)
-        elif marker_anchors:
-            anchors_seed = json.loads(marker_anchors)
-            if isinstance(anchors_seed, list) and anchors_seed:
-                primary_box_data = anchors_seed[0].get("box")
-        if primary_box_data is None:
-            # Legacy fallback — assume a centered box
-            primary_box_data = {"x": 0.40, "y": 0.30, "w": 0.20, "h": 0.50}
-
-        crop_filename = f"{report_id}-subject.jpg"
-        crop_path = UPLOAD_DIR / crop_filename
-        fp = extract_player_fingerprint(
-            marker_image_path=str(marker_path),
-            box=primary_box_data,
-            crop_save_path=str(crop_path),
-        )
-        fingerprint_payload = {
-            "jersey_hex": fp.jersey_hex,
-            "jersey_name": fp.jersey_name,
-            "shorts_hex": fp.shorts_hex,
-            "shorts_name": fp.shorts_name,
-            "body_ratio": fp.body_ratio,
-            "box": fp.box,
-        }
-        if not fp.crop_path:
-            crop_filename = None
-            crop_path = None
-    except Exception as e:
-        logger.warning(f"Precision fingerprint failed for {report_id}: {e}")
-        fp = None
-        fingerprint_payload = None
-
-    # Convert video to a web-friendly MP4 (H.264) so it plays in every browser.
-    web_path = transcode_to_web_mp4(file_path)
-    web_filename = web_path.name
-
-    # ============== PRECISION SCOUT — EXTRA ANCHOR CROPS ==============
-    # If the user (or auto-find) provided more than one anchor, extract the same-player
-    # crop from the actual video at each additional timestamp. These become the multi-
-    # anchor ensemble Gemini sees first.
-    extra_anchors_payload: list[dict] = []
-    anchor_crop_paths: list[str] = []
-    # Anchor 1 = the one we already cropped above
-    if fp is not None and crop_path and Path(crop_path).exists():
-        anchor_crop_paths.append(str(crop_path))
-        extra_anchors_payload.append({
-            "i": 1,
-            "t": float(marker_timestamp or 0.0),
-            "box": fp.box,
-            "jersey_name": fp.jersey_name,
-            "shorts_name": fp.shorts_name,
-            "body_ratio": fp.body_ratio,
-            "crop_filename": crop_filename,
-        })
-    if marker_anchors:
-        try:
-            all_anchors = json.loads(marker_anchors)
-            if not isinstance(all_anchors, list):
-                all_anchors = []
-        except Exception:
-            all_anchors = []
-        # Skip the FIRST anchor — already processed above as the marker.
-        for idx, a in enumerate(all_anchors[1:6], start=2):  # cap at 5 total
-            try:
-                t_anchor = float(a.get("t", 0.0))
-                box_anchor = a.get("box") or {}
-                if not box_anchor:
-                    continue
-                frame_filename = f"{report_id}-anchor-frame-{idx}.jpg"
-                frame_path = UPLOAD_DIR / frame_filename
-                if not extract_frame_at(web_path, t_anchor, frame_path):
-                    continue
-                crop_filename_a = f"{report_id}-anchor-{idx}.jpg"
-                crop_path_a = UPLOAD_DIR / crop_filename_a
-                fp_a = extract_player_fingerprint(
-                    marker_image_path=str(frame_path),
-                    box=box_anchor,
-                    crop_save_path=str(crop_path_a),
-                )
-                # The full-size anchor frame is no longer needed — only the crop matters.
-                try:
-                    frame_path.unlink(missing_ok=True)
-                except Exception:
-                    pass
-                if fp_a.crop_path and Path(fp_a.crop_path).exists():
-                    anchor_crop_paths.append(str(crop_path_a))
-                    extra_anchors_payload.append({
-                        "i": idx,
-                        "t": t_anchor,
-                        "box": fp_a.box,
-                        "jersey_name": fp_a.jersey_name,
-                        "shorts_name": fp_a.shorts_name,
-                        "body_ratio": fp_a.body_ratio,
-                        "crop_filename": crop_filename_a,
-                    })
-            except Exception as e:
-                logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
-
-    # Enforce 5-minute (300 sec) cap server-side
-    duration_sec = get_video_duration_seconds(web_path)
-    if duration_sec > 305:  # tiny buffer for rounding
-        # cleanup
-        for p in {file_path, web_path, marker_path}:
-            try:
-                p.unlink()
-            except Exception:
-                pass
-        raise HTTPException(
-            status_code=400,
-            detail=f"Video is {duration_sec / 60:.1f} minutes. Maximum is 5 minutes — please trim and try again.",
-        )
-
-    # Generate poster thumbnail from the playable video
-    poster_path = generate_poster(web_path)
-    poster_filename = poster_path.name if poster_path else None
+    # ============== CACHE RAW MARKER DATA FOR BACKGROUND TASK ==============
+    # Heavy work (ffmpeg transcoding, fingerprinting, poster, preview clip, audio
+    # peaks, duration validation) used to run inline here. On Cloudflare-fronted
+    # production deployments this blew the 100-second edge timeout on larger
+    # uploads. EVERYTHING after file save is now deferred to `analyze_preview_task`.
+    #
+    # The upload endpoint must return in ≲ 10 s — the time it takes the browser
+    # to PUT the raw bytes plus a single Mongo insert.
+    raw_marker_box = marker_box  # JSON string or None
+    raw_marker_anchors = marker_anchors  # JSON string or None
 
     # Build player details summary
     details = {
@@ -3198,58 +3082,44 @@ async def upload_video_and_create_preview(
         "description": description,
     }
 
-    # Build a short preview clip (15s window around the marker) for the FREE preview
-    preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
-
-    # ============== PRECISION SCOUT — AUDIO TIMELINE ==============
-    # Detect loud peaks (crowd, whistle, shouts) on the SHORT preview clip — they
-    # become independent evidence for goals / big plays the AI can cross-check.
-    try:
-        audio_events_preview = extract_audio_events(preview_clip_path, top_n=5)
-    except Exception as e:
-        logger.warning(f"Audio extraction failed (preview) for {report_id}: {e}")
-        audio_events_preview = []
-
-    # ============== CONTENT GATE + PREVIEW (moved to background task — see below) ==============
-    # These two Gemini calls (content_gate + preview generation) used to run synchronously
-    # here. On a Starter-tier production instance (200 MB RAM) they OOM-killed the worker
-    # because the multi-minute calls held the buffered video in memory while other
-    # requests piled up. They are now deferred to `analyze_preview_task` which runs as
-    # a FastAPI BackgroundTask after this endpoint returns. The frontend polls
-    # `GET /api/reports/{id}/status` every ~3 s to track progress.
-
-    # Persist the report doc EARLY with `analysis_status: "analyzing"` so the frontend
-    # gets a valid report_id back in ~30s instead of waiting 5-8 min.
+    # Persist the report doc with `analysis_status: "analyzing"` so the frontend
+    # gets a valid report_id back IMMEDIATELY. The background task will fill in
+    # `video_filename` (transcoded), `poster_filename`, `fingerprint`, `anchors`,
+    # `audio_events_preview`, `content_gate`, and finally `preview`.
     report_doc = {
         "id": report_id,
         "user_id": user["id"],
         "user_email": user["email"],
         "player_details": details,
-        "video_filename": web_filename,
-        "original_video_filename": stored_name if stored_name != web_filename else None,
-        "poster_filename": poster_filename,
+        # Until the background task transcodes the file, `video_filename` points
+        # at the raw upload so the frontend status endpoint can fall back safely.
+        "video_filename": stored_name,
+        "original_video_filename": stored_name,
+        "raw_upload_filename": stored_name,         # explicit handle for the bg task
+        "poster_filename": None,                    # populated by background task
         "marker_filename": marker_filename,
         "marker_timestamp": float(marker_timestamp),
-        "video_duration_sec": duration_sec,
+        # Raw JSON strings — parsed inside the bg task so we never crash the upload
+        "raw_marker_box": raw_marker_box,
+        "raw_marker_anchors": raw_marker_anchors,
+        "video_duration_sec": None,                 # populated by background task
         "video_size_bytes": file_size,
-        "content_gate": None,                          # populated by background task
-        "preview": None,                               # populated by background task
+        "content_gate": None,                       # populated by background task
+        "preview": None,                            # populated by background task
         "full_report": None,
         "is_paid": bool(upload_will_be_paid),
         "manually_unlocked": False,
         "created_at": now_iso(),
         "paid_at": now_iso() if upload_will_be_paid else None,
-        "fingerprint": fingerprint_payload,
-        "subject_crop_filename": crop_filename,
-        "anchors": extra_anchors_payload,
-        "audio_events_preview": [
-            {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_preview
-        ],
-        # ----- async pipeline state (NEW) -----
-        "analysis_status": "analyzing",                # analyzing | ready | failed
-        "progress_step": 1,                            # 1..5 — matches PrecisionScanOverlay steps
+        "fingerprint": None,                        # populated by background task
+        "subject_crop_filename": None,
+        "anchors": [],
+        "audio_events_preview": [],
+        # ----- async pipeline state -----
+        "analysis_status": "analyzing",             # analyzing | ready | failed
+        "progress_step": 1,                         # 1..5 — see analyze_preview_task
         "analysis_error": None,
-        "eligibility_consumed": (                      # so the background task can refund on failure
+        "eligibility_consumed": (                   # so the bg task can refund on failure
             "pass_credit" if used_pass_credit
             else ("prepaid" if upload_will_be_paid
                   else ("free_preview" if not is_admin else "admin"))
@@ -3291,13 +3161,13 @@ async def upload_video_and_create_preview(
     # ============== KICK OFF THE BACKGROUND TASK ==============
     background.add_task(analyze_preview_task, report_id)
 
-    # Return immediately so the HTTP request never holds RAM longer than ~30 s.
+    # Return IMMEDIATELY so the HTTP request never holds RAM longer than ~10 s
+    # (just enough to save the file). This is the structural fix for Cloudflare
+    # 524/520 timeouts on production: ffmpeg transcoding + Gemini calls now run
+    # entirely outside the request lifecycle.
     return {
         "id": report_id,
         "player_details": details,
-        "video_url": f"/api/uploads/{web_filename}",
-        "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
-        "marker_url": f"/api/uploads/{marker_filename}",
         "preview": None,                       # frontend polls /status for this
         "is_paid": bool(upload_will_be_paid),
         "created_at": report_doc["created_at"],
@@ -3349,17 +3219,29 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
 
 
 async def analyze_preview_task(report_id: str):
-    """Background task — runs the two heavy Gemini calls (content gate + preview)
-    OUTSIDE the HTTP request lifecycle.
+    """Background task — runs ALL heavy work (ffmpeg transcoding, fingerprinting,
+    poster, preview clip, audio peaks, content gate, preview generation) OUTSIDE
+    the HTTP request lifecycle.
 
-    This is the structural fix for the production OOM that was killing the Starter-tier
-    worker on every upload: keeping the multi-minute Gemini calls inside the HTTP
-    request held the video buffer in memory for 5–10 min and starved the 200 MB pod.
+    This is the structural fix for the Cloudflare 524/520 timeouts on production:
+    keeping `ffmpeg -i video.mp4 -c:v libx264 …` inside the HTTP request blew the
+    100-second Cloudflare edge timeout on larger uploads. Everything below now
+    runs after the upload endpoint has already returned `{status: 'analyzing'}`.
+
+    Step map (must align with the frontend PrecisionScanOverlay):
+      1 = received & queued
+      2 = preparing video (transcode + fingerprint + anchors + audio)
+      3 = content gate verifying clip
+      4 = building preview report
+      5 = ready
     """
     try:
+        # ------------------------------------------------------------------
+        # Step 1 → Step 2: preparing video
+        # ------------------------------------------------------------------
         await db.reports.update_one(
             {"id": report_id},
-            {"$set": {"analysis_status": "analyzing", "progress_step": 1}},
+            {"$set": {"analysis_status": "analyzing", "progress_step": 2}},
         )
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
@@ -3369,17 +3251,14 @@ async def analyze_preview_task(report_id: str):
         details = doc.get("player_details") or {}
         details_str = json.dumps(details, ensure_ascii=False)
         marker_filename = doc.get("marker_filename")
-        video_filename = doc.get("video_filename")
-        crop_filename = doc.get("subject_crop_filename")
-        anchors = doc.get("anchors") or []
-        audio_events_preview_raw = doc.get("audio_events_preview") or []
+        raw_filename = doc.get("raw_upload_filename") or doc.get("video_filename")
         marker_timestamp = float(doc.get("marker_timestamp") or 0.0)
-        fingerprint_payload = doc.get("fingerprint")
+        raw_marker_box = doc.get("raw_marker_box")
+        raw_marker_anchors = doc.get("raw_marker_anchors")
 
         marker_path = UPLOAD_DIR / marker_filename if marker_filename else None
-        web_path = UPLOAD_DIR / video_filename if video_filename else None
-        crop_path = UPLOAD_DIR / crop_filename if crop_filename else None
-        if not (marker_path and marker_path.exists() and web_path and web_path.exists()):
+        raw_path = UPLOAD_DIR / raw_filename if raw_filename else None
+        if not (marker_path and marker_path.exists() and raw_path and raw_path.exists()):
             await db.reports.update_one(
                 {"id": report_id},
                 {"$set": {
@@ -3388,36 +3267,209 @@ async def analyze_preview_task(report_id: str):
                     "progress_step": 5,
                 }},
             )
+            try:
+                await _refund_upload_eligibility(report_id)
+            except Exception:
+                pass
             return
 
-        # Rebuild the lightweight FingerPrint-like object the precision prompt needs
+        # ============== TRANSCODE TO WEB-FRIENDLY MP4 ==============
+        # Convert to H.264/AAC so the clip plays in every browser. Heavy ffmpeg —
+        # was the #1 contributor to the Cloudflare 100 s timeout on production.
+        web_path = transcode_to_web_mp4(raw_path)
+        web_filename = web_path.name
+        # If the transcode produced a NEW file (different name), update the doc so
+        # the status endpoint can serve the playable file. If transcoding fell
+        # back to the original, video_filename stays as-is.
+        if web_filename != raw_filename:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"video_filename": web_filename}},
+            )
+
+        # ============== DURATION VALIDATION (5-min cap) ==============
+        duration_sec = get_video_duration_seconds(web_path)
+        if duration_sec > 305:  # buffer for rounding
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {
+                    "analysis_status": "failed",
+                    "analysis_error": (
+                        f"Video is {duration_sec / 60:.1f} minutes. Maximum is 5 "
+                        "minutes — please trim and re-upload."
+                    ),
+                    "video_duration_sec": duration_sec,
+                    "progress_step": 5,
+                }},
+            )
+            try:
+                await _refund_upload_eligibility(report_id)
+            except Exception as re:
+                logger.warning(f"Eligibility refund failed for {report_id}: {re}")
+            # Best-effort cleanup of the giant clip
+            for p in {raw_path, web_path, marker_path}:
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+            return
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"video_duration_sec": duration_sec}},
+        )
+
+        # ============== POSTER THUMBNAIL ==============
+        poster_path = generate_poster(web_path)
+        poster_filename = poster_path.name if poster_path else None
+        if poster_filename:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"poster_filename": poster_filename}},
+            )
+
+        # ============== PRECISION SCOUT — VISUAL FINGERPRINT (anchor 1) ==============
+        fingerprint_payload = None
+        crop_filename = None
+        crop_path = None
+        primary_box_data = None
         fp = None
+        try:
+            if raw_marker_box:
+                primary_box_data = json.loads(raw_marker_box)
+            elif raw_marker_anchors:
+                anchors_seed = json.loads(raw_marker_anchors)
+                if isinstance(anchors_seed, list) and anchors_seed:
+                    primary_box_data = anchors_seed[0].get("box")
+            if primary_box_data is None:
+                primary_box_data = {"x": 0.40, "y": 0.30, "w": 0.20, "h": 0.50}
+
+            crop_filename = f"{report_id}-subject.jpg"
+            crop_path = UPLOAD_DIR / crop_filename
+            fp = extract_player_fingerprint(
+                marker_image_path=str(marker_path),
+                box=primary_box_data,
+                crop_save_path=str(crop_path),
+            )
+            fingerprint_payload = {
+                "jersey_hex": fp.jersey_hex,
+                "jersey_name": fp.jersey_name,
+                "shorts_hex": fp.shorts_hex,
+                "shorts_name": fp.shorts_name,
+                "body_ratio": fp.body_ratio,
+                "box": fp.box,
+            }
+            if not fp.crop_path:
+                crop_filename = None
+                crop_path = None
+        except Exception as e:
+            logger.warning(f"Precision fingerprint failed for {report_id}: {e}")
+            fp = None
+            fingerprint_payload = None
+
+        # ============== EXTRA ANCHOR CROPS (anchors 2..5) ==============
+        extra_anchors_payload: list[dict] = []
+        anchor_crop_paths: list[str] = []
+        if fp is not None and crop_path and Path(crop_path).exists():
+            anchor_crop_paths.append(str(crop_path))
+            extra_anchors_payload.append({
+                "i": 1,
+                "t": float(marker_timestamp or 0.0),
+                "box": fp.box,
+                "jersey_name": fp.jersey_name,
+                "shorts_name": fp.shorts_name,
+                "body_ratio": fp.body_ratio,
+                "crop_filename": crop_filename,
+            })
+        if raw_marker_anchors:
+            try:
+                all_anchors = json.loads(raw_marker_anchors)
+                if not isinstance(all_anchors, list):
+                    all_anchors = []
+            except Exception:
+                all_anchors = []
+            for idx, a in enumerate(all_anchors[1:6], start=2):
+                try:
+                    t_anchor = float(a.get("t", 0.0))
+                    box_anchor = a.get("box") or {}
+                    if not box_anchor:
+                        continue
+                    frame_filename = f"{report_id}-anchor-frame-{idx}.jpg"
+                    frame_path = UPLOAD_DIR / frame_filename
+                    if not extract_frame_at(web_path, t_anchor, frame_path):
+                        continue
+                    crop_filename_a = f"{report_id}-anchor-{idx}.jpg"
+                    crop_path_a = UPLOAD_DIR / crop_filename_a
+                    fp_a = extract_player_fingerprint(
+                        marker_image_path=str(frame_path),
+                        box=box_anchor,
+                        crop_save_path=str(crop_path_a),
+                    )
+                    try:
+                        frame_path.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    if fp_a.crop_path and Path(fp_a.crop_path).exists():
+                        anchor_crop_paths.append(str(crop_path_a))
+                        extra_anchors_payload.append({
+                            "i": idx,
+                            "t": t_anchor,
+                            "box": fp_a.box,
+                            "jersey_name": fp_a.jersey_name,
+                            "shorts_name": fp_a.shorts_name,
+                            "body_ratio": fp_a.body_ratio,
+                            "crop_filename": crop_filename_a,
+                        })
+                except Exception as e:
+                    logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
+
+        # Persist fingerprint + anchors
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {
+                "fingerprint": fingerprint_payload,
+                "subject_crop_filename": crop_filename,
+                "anchors": extra_anchors_payload,
+            }},
+        )
+
+        # ============== PREVIEW CLIP + AUDIO PEAKS ==============
+        preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
+        try:
+            audio_events_preview = extract_audio_events(preview_clip_path, top_n=5)
+        except Exception as e:
+            logger.warning(f"Audio extraction failed (preview) for {report_id}: {e}")
+            audio_events_preview = []
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {
+                "audio_events_preview": [
+                    {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_preview
+                ],
+            }},
+        )
+
+        # Re-load the doc so downstream code sees the freshly persisted state.
+        doc = await db.reports.find_one({"id": report_id})
+        anchors = doc.get("anchors") or []
+        audio_events_preview_raw = doc.get("audio_events_preview") or []
+        fingerprint_payload = doc.get("fingerprint")
+
+        # Rebuild the lightweight FingerPrint-like object the precision prompt needs
+        fp_obj = None
         if fingerprint_payload:
             try:
-                fp = SimpleNamespace(
-                    jersey_hex=fingerprint_payload.get("jersey_hex"),
-                    jersey_name=fingerprint_payload.get("jersey_name"),
-                    shorts_hex=fingerprint_payload.get("shorts_hex"),
-                    shorts_name=fingerprint_payload.get("shorts_name"),
-                    body_ratio=fingerprint_payload.get("body_ratio"),
-                    box=fingerprint_payload.get("box"),
-                    crop_path=str(crop_path) if crop_path and crop_path.exists() else None,
+                fp_obj = PlayerFingerprint(
+                    jersey_hex=fingerprint_payload.get("jersey_hex", "#888888"),
+                    jersey_name=fingerprint_payload.get("jersey_name", "unclear"),
+                    shorts_hex=fingerprint_payload.get("shorts_hex", "#888888"),
+                    shorts_name=fingerprint_payload.get("shorts_name", "unclear"),
+                    body_ratio=float(fingerprint_payload.get("body_ratio", 2.0)),
+                    crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
+                    box=fingerprint_payload.get("box", {}),
+                    confidence="ok",
                 )
             except Exception:
-                fp = None
-
-        # Rebuild the short preview clip we generated synchronously and recover its path.
-        # (Path convention: see make_preview_clip — it returns the trimmed mp4 next to the source.)
-        preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
-
-        # Reassemble anchor crop paths for the multi-anchor Gemini prompt
-        anchor_crop_paths: list[str] = []
-        for a in anchors:
-            cf = a.get("crop_filename")
-            if cf:
-                cp = UPLOAD_DIR / cf
-                if cp.exists():
-                    anchor_crop_paths.append(str(cp))
+                fp_obj = None
 
         # Convert the persisted audio event dicts back into the lightweight namedtuple-ish
         # objects the precision prompt builder expects (only the attrs it reads).
@@ -3427,7 +3479,8 @@ async def analyze_preview_task(report_id: str):
         ]
 
         # ============== CONTENT GATE (Gemini call #1) ==============
-        await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 2}})
+        # Step 2 → 3: content gate verifying clip
+        await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 3}})
         gate = await run_content_gate(report_id, preview_clip_path, marker_path)
         rejection = gate_rejection_message(gate)
         if rejection:
@@ -3447,13 +3500,13 @@ async def analyze_preview_task(report_id: str):
             except Exception as e:
                 logger.warning(f"Eligibility refund failed for {report_id}: {e}")
             return
-        await db.reports.update_one({"id": report_id}, {"$set": {"content_gate": gate, "progress_step": 3}})
+        await db.reports.update_one({"id": report_id}, {"$set": {"content_gate": gate}})
 
         # ============== PREVIEW PROMPT BUILD ==============
-        if fp is not None:
+        if fp_obj is not None:
             preview_prompt = precision_build_preview_prompt(
                 base_prompt=PREVIEW_PROMPT,
-                fingerprint=fp,
+                fingerprint=fp_obj,
                 audio_events=audio_events_preview,
                 player_details=details,
                 content_type=str(gate.get("content_type", "other")),
@@ -3471,13 +3524,14 @@ async def analyze_preview_task(report_id: str):
             )
 
         # ============== PREVIEW GEMINI CALL (#2) ==============
+        # Step 3 → 4: building preview report
         await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 4}})
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=preview_prompt,
             video_path=str(preview_clip_path),
             marker_path=str(marker_path),
-            crop_path=str(crop_path) if crop_path and crop_path.exists() else None,
+            crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
             anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
         )
         preview = scrub_hedging(preview)
@@ -7012,8 +7066,8 @@ async def admin_delete_user(user_id: str, admin=Depends(get_current_admin)):
 
     # Cascade-delete the user's reports + files
     reports_deleted = 0
-    async for r in db.reports.find({"user_id": user_id}, {"_id": 0, "id": 1, "video_filename": 1, "poster_filename": 1, "marker_filename": 1, "subject_crop_filename": 1}):
-        for fname_key in ("video_filename", "poster_filename", "marker_filename", "subject_crop_filename"):
+    async for r in db.reports.find({"user_id": user_id}, {"_id": 0, "id": 1, "video_filename": 1, "raw_upload_filename": 1, "poster_filename": 1, "marker_filename": 1, "subject_crop_filename": 1}):
+        for fname_key in ("video_filename", "raw_upload_filename", "poster_filename", "marker_filename", "subject_crop_filename"):
             fname = r.get(fname_key)
             if fname:
                 try:

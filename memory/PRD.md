@@ -26,6 +26,17 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 66 — Cloudflare 524 fix: ALL ffmpeg + fingerprinting moved to background task (Feb 21 2026)**:
+  - User reports: (1) Mobile "Uploading video 0%" black screen FROZEN at boot — tapping X closes it, then second attempt succeeds; (2) Production `scoutmeplay.com` returns Cloudflare 520/524 timeout on larger video uploads.
+  - **Root cause #1**: `<video>` boot loop in `ScoutMode.jsx` only set `videoReady=true` via `onCanPlay` — iOS Safari fires this unreliably for blob URLs, so the boot effect never started, freezing the overlay.
+  - **Root cause #2**: `/api/reports/upload` ran ffmpeg transcoding + fingerprinting + poster + preview clip + audio extraction SYNCHRONOUSLY inside the HTTP request. On larger uploads this blew Cloudflare's 100-second edge timeout.
+  - **Fix #1 — `ScoutMode.jsx`**: Added `onLoadedData` + `onLoadedMetadata` ready triggers, plus a 250 ms `setTimeout` polling loop that checks `videoEl.readyState >= HAVE_METADATA` while waiting. Also call `video.load()` explicitly when the overlay opens to kick the decoder pipeline. Result: iOS Safari can no longer get stuck on the 0% screen.
+  - **Fix #2 — `server.py`**: Upload endpoint now persists raw video + marker, stores `raw_marker_box`/`raw_marker_anchors` JSON strings on the doc, inserts the report with `analysis_status:"analyzing"`, kicks off `background.add_task(analyze_preview_task, …)`, and **returns in ≲ 500 ms**. ALL heavy work moved into `analyze_preview_task`: ffmpeg transcode → duration validation → poster → fingerprint extraction → extra-anchor crops → preview clip → audio peaks → content gate → preview Gemini call. The 5-min duration cap is now enforced inside the background task with eligibility refund on rejection.
+  - **Progress step semantics rewritten**: 1=queued · 2=preparing video · 3=content gate · 4=preview generation · 5=ready. Frontend already maps `(step / 5) * 100` so no change needed.
+  - **Verified end-to-end with curl**: upload returns in 432 ms; status polling shows `analyzing step=3 → failed step=5` (content gate correctly rejected a synthetic marker); `.web.mp4` + `.web.poster.jpg` + `-subject.jpg` all generated asynchronously.
+  - **Also caught & fixed**: `ffmpeg` binary was missing from the container (8th recurrence of the known drop-out). Reinstalled via `apt-get install -y ffmpeg`.
+  - **Hotfix (same session)**: Initial refactor used `SimpleNamespace` to rebuild the fingerprint in the bg task — this lacked the `to_prompt_block()` method that `precision_build_preview_prompt` calls, so production threw `'types.SimpleNamespace' object has no attribute 'to_prompt_block'` on every upload. Replaced with real `PlayerFingerprint(...)` dataclass instantiation (same pattern as `generate_full_report_task`). Verified pipeline now runs cleanly: step 2 (preparing) → step 3 (content gate) → step 5 (ready/failed).
+
 - ✅ **🆕 Session 64 — "Continue in background" + global analysis tracker (Feb 21 2026)**:
   - User feedback / build request: "want me to add a tiny 'Continue in background' link" → user said yes.
   - **New component `/app/frontend/src/components/BackgroundAnalysisTracker.jsx`** — globally-mounted floating pill that:
