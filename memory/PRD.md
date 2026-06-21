@@ -26,6 +26,34 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 64 — "Continue in background" + global analysis tracker (Feb 21 2026)**:
+  - User feedback / build request: "want me to add a tiny 'Continue in background' link" → user said yes.
+  - **New component `/app/frontend/src/components/BackgroundAnalysisTracker.jsx`** — globally-mounted floating pill that:
+    - Reads `localStorage["scoutmeplay.activeAnalysis"]` on mount + listens for the custom `scoutmeplay:bg-analysis-start` window event
+    - Polls `GET /api/reports/{id}/status` every 5 s
+    - Reflects real backend progress (1..5 → step label + animated forest→volt gradient bar)
+    - Floating panel positioned `right:12, bottom: calc(safe-area + 84px)` so it sits above the mobile bottom tabs and respects iPhone home-indicator
+    - Dark forest panel with 2px volt border + multi-stacked shadow + volt halo glow (matches the brand "scout-scope" identity)
+    - Dismiss button (×) closes the panel but the analysis keeps running server-side
+    - "Open dashboard" button at the bottom for quick navigation
+    - **Auto-suppressed on `/upload` route** (the in-page PrecisionScanOverlay already shows progress there)
+    - Self-expires after 30 min (stale entries) to avoid haunting the user forever
+    - Auto-clears on 4xx responses (report deleted / unauthorized)
+    - Fires success toast with "View" action when status reaches `ready`
+    - Fires error toast when status reaches `failed`
+    - Exports `startBackgroundAnalysis(reportId, meta)` — public API any page can call
+  - **Mounted globally in `/app/frontend/src/App.js`** inside the `<BrowserRouter>` so it survives every navigation.
+  - **PrecisionScanOverlay** — new `onContinueInBackground` prop renders an underlined link "Continue in background →" below the elapsed timer (only during the `analyzing` phase, only if the callback is supplied).
+  - **UploadPage** — added `backgroundedRef` ref + wired the callback. When user clicks the link:
+    1. Sets `backgroundedRef.current = true`
+    2. The poll loop catches it on its next tick → calls `startBackgroundAnalysis(reportId)`
+    3. Closes the overlay, toasts "We'll let you know when your report is ready."
+    4. Navigates to `/dashboard` — the global tracker takes over from there
+  - **10-min hard ceiling** in the poll loop now *also* hands off to the background tracker before redirecting to dashboard, so even an unusually slow analysis stays trackable.
+  - **Resilience**: localStorage entry survives page reload, tab close + reopen (within 30 min), navigation between pages. User can close the tab entirely and find the report in `/dashboard` whenever they return.
+  - **Files**: CREATED `/app/frontend/src/components/BackgroundAnalysisTracker.jsx`. MODIFIED `/app/frontend/src/App.js`, `/app/frontend/src/components/PrecisionScanOverlay.jsx`, `/app/frontend/src/pages/UploadPage.jsx`. All lint-clean.
+
+
 - ✅ **🆕 Session 63 — Async upload pipeline refactor (P0 — fixes production Cloudflare 520 OOM) (Feb 21 2026)**:
   - **Root cause confirmed by user**: same code, preview works, deployed scoutmeplay.com fails with Cloudflare Error 520 on every video upload. Synchronous Gemini calls (content gate + preview generation, 5–8 min) inside the HTTP request held the multi-MB video buffer in memory the entire time, OOM-killing the 200 MB Starter-tier production pod. Worker restart caused Cloudflare to receive empty/malformed response → 520.
   - **Backend refactor (`/app/backend/server.py`)**:

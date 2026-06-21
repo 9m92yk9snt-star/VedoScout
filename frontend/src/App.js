@@ -22,6 +22,7 @@ import BlogArticlePage from "@/pages/BlogArticlePage";
 import TrajectoryPage from "@/pages/TrajectoryPage";
 import CookieBanner from "@/components/CookieBanner";
 import MobileBottomTabs from "@/components/MobileBottomTabs";
+import BackgroundAnalysisTracker from "@/components/BackgroundAnalysisTracker";
 
 function RequireAuth({ children, adminOnly = false }) {
   const { user } = useAuth();
@@ -101,6 +102,7 @@ function App() {
             <AnimatedRoutes />
             <CookieBanner />
             <MobileBottomTabs />
+            <BackgroundAnalysisTracker />
           </BrowserRouter>
         </AuthProvider>
       </HelmetProvider>

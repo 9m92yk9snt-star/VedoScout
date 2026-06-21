@@ -25,7 +25,7 @@ const ANALYSE_STEPS = [
   { id: 5, title: "Writing your scout report", caption: "Confident voice — no guesses, no hedging", icon: Brain, dur: 8 },
 ];
 
-export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, onViewReport }) {
+export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, onViewReport, onContinueInBackground }) {
   const [stepIdx, setStepIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -245,6 +245,21 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
               <p className="mt-6 text-center text-forest/70 text-[10px] uppercase tracking-[0.3em] font-bold">
                 Elapsed · {Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}
               </p>
+
+              {/* "Continue in background" — appears for the analysing phase only,
+                  and only after the upload itself is done. Lets the user dismiss
+                  the overlay & keep browsing while the report cooks server-side.
+                  They get a floating tracker pill + a toast when it's ready. */}
+              {phase === "analyzing" && onContinueInBackground && (
+                <button
+                  type="button"
+                  data-testid="overlay-continue-in-background"
+                  onClick={onContinueInBackground}
+                  className="mt-4 mx-auto block text-cream-card/70 hover:text-volt text-[11px] uppercase tracking-[0.22em] font-bold underline underline-offset-4 decoration-cream-card/30 hover:decoration-volt transition-colors"
+                >
+                  Continue in background →
+                </button>
+              )}
             </>
           )}
         </div>

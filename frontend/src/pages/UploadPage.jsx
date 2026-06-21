@@ -6,6 +6,7 @@ import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
 import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
+import { startBackgroundAnalysis } from "@/components/BackgroundAnalysisTracker";
 import MarkerStudio from "@/components/MarkerStudio";
 import HeroTeaser from "@/components/HeroTeaser";
 
@@ -58,6 +59,10 @@ export default function UploadPage() {
   // Holds the completed upload response while the "done" celebration is on
   // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
   const pendingDoneRef = useRef(null);
+  // Flag set when the user clicks "Continue in background" — breaks the local
+  // poll loop in handleSubmit so the global BackgroundAnalysisTracker can take
+  // over and the user is free to navigate away.
+  const backgroundedRef = useRef(false);
 
   const fileRef = useRef(null);
   const videoRef = useRef(null);
@@ -351,10 +356,23 @@ export default function UploadPage() {
       if (data?.analysis_status === "analyzing") {
         const start = Date.now();
         const MAX_WAIT_MS = 10 * 60 * 1000; // 10 minute hard ceiling
+        backgroundedRef.current = false;
         // poll loop
         // eslint-disable-next-line no-constant-condition
         while (true) {
+          // User clicked "Continue in background" → hand off to the global tracker.
+          if (backgroundedRef.current) {
+            startBackgroundAnalysis(data.id);
+            setSubmitting(false);
+            setUploadPhase("idle");
+            toast.success("We'll let you know when your report is ready.", {
+              duration: 4500,
+            });
+            navigate("/dashboard");
+            return;
+          }
           if (Date.now() - start > MAX_WAIT_MS) {
+            startBackgroundAnalysis(data.id);
             toast.error("Your report is taking longer than expected. We've saved it — check your Dashboard in a minute.");
             navigate(`/dashboard`);
             return;
@@ -440,6 +458,12 @@ export default function UploadPage() {
         open={submitting && !heroReport}
         phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
+        onContinueInBackground={() => {
+          // Set the flag — the poll loop in handleSubmit will detect it on its next
+          // tick, hand off to startBackgroundAnalysis(), close the overlay, and
+          // navigate the user to /dashboard.
+          backgroundedRef.current = true;
+        }}
         onViewReport={() => {
           const pending = pendingDoneRef.current;
           if (!pending) return;
