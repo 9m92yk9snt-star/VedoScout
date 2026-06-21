@@ -579,7 +579,7 @@ export default function UploadPage() {
                         data-testid="upload-url-input"
                         value={pasteUrl}
                         onChange={(e) => setPasteUrl(e.target.value)}
-                        placeholder="YouTube · Vimeo · Veo · Google Drive · .mp4 link"
+                        placeholder="Veo · Vimeo · Google Drive · .mp4 link"
                         className="flex-1 px-3 py-2.5 bg-cream-soft border border-gray-border focus:border-volt outline-none text-sm font-mono"
                         disabled={urlFetching}
                       />
@@ -595,7 +595,9 @@ export default function UploadPage() {
                       </button>
                     </div>
                     <p className="text-[10px] text-ink/55 leading-relaxed">
-                      Works with public YouTube, Vimeo, Veo and direct MP4/MOV links. Max 200 MB · max 5 min.
+                      Best with Veo, Vimeo, Google Drive shared links or any direct .mp4 / .mov URL.
+                      YouTube downloads are currently blocked by YouTube — please upload the file directly instead.
+                      Max 200 MB · max 5 min.
                     </p>
                   </div>
                 )}

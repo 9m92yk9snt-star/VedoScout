@@ -31,13 +31,59 @@ MAX_BYTES = 200 * 1024 * 1024  # 200 MB
 DOWNLOAD_TIMEOUT_SEC = 120
 
 ALLOWED_DOMAINS_HINT = (
-    "Most public video URLs work: YouTube, Vimeo, Veo, Hudl public shares, "
-    "Google Drive shared links, or any direct .mp4 / .mov / .webm URL."
+    "Most public video URLs work: Veo, Vimeo, Hudl public shares, "
+    "Google Drive shared links, or any direct .mp4 / .mov / .webm URL. "
+    "YouTube downloads from our servers are currently blocked by YouTube — "
+    "please use one of the alternatives above or upload the file directly."
 )
 
 
 class UrlFetchRequest(BaseModel):
-    url: AnyHttpUrl = Field(description="Public URL to a video (YouTube, Vimeo, Veo, direct MP4, …).")
+    url: AnyHttpUrl = Field(description="Public URL to a video (Veo, Vimeo, Google Drive, direct MP4, …).")
+
+
+# ---- Domain detection -----------------------------------------------------
+_YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "m.youtube.com", "music.youtube.com")
+
+
+def _is_youtube(url: str) -> bool:
+    u = url.lower()
+    return any(h in u for h in _YOUTUBE_HOSTS)
+
+
+def _friendly_error(url: str, raw_msg: str) -> str:
+    """Translate a raw yt-dlp error into a user-friendly message.
+    YouTube's cloud-IP block is the most common failure in 2026."""
+    msg = (raw_msg or "").lower()
+    if _is_youtube(url) and (
+        "sign in to confirm" in msg
+        or "not a bot" in msg
+        or "http error 403" in msg
+        or "cookies" in msg
+        or "no video formats" in msg
+        or "drm protected" in msg
+    ):
+        return (
+            "YouTube is currently blocking downloads from our servers (this is a "
+            "YouTube-wide issue, not your account). "
+            "Please use one of these instead: a Veo or Vimeo link, a Google Drive "
+            "shared link (anyone-with-link), a direct .mp4 / .mov URL, or simply "
+            "upload the file from your phone or computer."
+        )
+    if "drm" in msg:
+        return "This video is DRM-protected and can't be downloaded. Please upload the file directly."
+    if "private" in msg or "login required" in msg or "members" in msg:
+        return "This video is private or members-only. Make it public or share a direct download link."
+    if "404" in msg or "not found" in msg:
+        return "We couldn't find a video at that URL. Check the link is public and complete."
+    if "geo" in msg or "country" in msg:
+        return "This video is geo-restricted and can't be downloaded from our region."
+    if "too large" in msg or "max_filesize" in msg or "filesize" in msg:
+        return "That video is larger than our 200 MB limit. Please upload a shorter clip."
+    if not raw_msg:
+        return "Could not download that video."
+    # Generic — keep first 180 chars of yt-dlp's own message
+    return f"Could not download that video: {raw_msg[:180]}"
 
 
 def _safe_size(p: Path) -> int:
@@ -58,32 +104,55 @@ def _ensure_below_cap(p: Path):
 
 
 def _download_with_ytdlp(url: str, target_dir: Path, token: str) -> Path:
-    """Use yt-dlp to download to target_dir. Returns final path."""
+    """Use yt-dlp to download to target_dir. Returns final path.
+
+    2026 notes:
+      - Uses an `ImpersonateTarget('chrome')` (via curl_cffi) so Vimeo / Veo /
+        Google Drive / direct MP4 hosts that fingerprint TLS still serve us.
+      - Adds a YouTube player_client fallback chain — the more clients tried, the
+        higher chance one of them yields a non-blocked format URL. (YouTube is
+        actively blocking server-side IPs from receiving the actual video bytes;
+        if every client fails we surface a friendly error pointing to alternatives.)"""
     import yt_dlp  # local import — keeps server start cheap
+    from yt_dlp.networking.impersonate import ImpersonateTarget
 
     outtmpl = str(target_dir / f"url-fetch-{token}.%(ext)s")
-    # Prefer mp4 ≤720p for size, fall back to best single-file
+    youtube_clients = ["default", "web_safari", "mweb", "android", "ios", "tv"]
+
+    # Prefer mp4 ≤720p; allow DASH (video+audio merge); fall back to anything
     ydl_opts = {
         "outtmpl": outtmpl,
-        "format": "best[ext=mp4][height<=720]/best[height<=720]/best",
+        "format": (
+            "bv*[height<=720][protocol!*=m3u8]+ba/"
+            "b[ext=mp4][height<=720]/"
+            "b[height<=720]/"
+            "b"
+        ),
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
         "max_filesize": MAX_BYTES,
-        "retries": 1,
-        "fragment_retries": 1,
+        "retries": 2,
+        "fragment_retries": 2,
         "socket_timeout": 30,
         "merge_output_format": "mp4",
         "concurrent_fragment_downloads": 1,
+        # ImpersonateTarget — curl_cffi-backed TLS fingerprint spoofing
+        "impersonate": ImpersonateTarget("chrome"),
+        "extractor_args": {
+            "youtube": {
+                "player_client": youtube_clients,
+            },
+        },
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             candidate = ydl.prepare_filename(info)
     except yt_dlp.utils.DownloadError as e:
-        raise HTTPException(400, f"Could not download video: {str(e)[:200]}")
+        raise HTTPException(400, _friendly_error(url, str(e)))
     except Exception as e:
-        raise HTTPException(500, f"Video fetch failed: {str(e)[:200]}")
+        raise HTTPException(500, _friendly_error(url, str(e)))
 
     final = Path(candidate)
     if not final.exists():

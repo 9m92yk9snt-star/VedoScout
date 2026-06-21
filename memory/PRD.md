@@ -26,6 +26,37 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 58 — URL video fetch (Veo/Vimeo/YouTube) repair + 2026 TLS impersonation (Feb 21 2026)**:
+  - **User complaint**: "uploading link youtube veo dont work when you want to fetch video file in user dashboard"
+  - **Root causes identified** by direct yt-dlp testing:
+    1. **`ffmpeg` binary missing** from container (recurring issue per handoff) — every DASH stream merge was aborting with "ffmpeg is not installed"
+    2. **`curl_cffi` not installed** — yt-dlp's modern TLS-impersonation feature was unavailable, so Vimeo/Veo/Google Drive TLS-fingerprint checks rejected our requests
+    3. **YouTube cloud-IP block** — YouTube hardened anti-bot in 2025-2026, returns HTTP 403 + "Sign in to confirm you're not a bot" to every cloud datacenter IP. No format/client combo bypasses it without paid residential proxy or user-supplied cookies.
+    4. **Inline `'impersonate': 'chrome'` string** in ydl_opts was raising `AssertionError` — Python API requires `ImpersonateTarget('chrome')` object, not the CLI string
+  - **Fixes applied**:
+    - Installed `ffmpeg 5.1.9` system package + persisted note in PRD (this binary keeps disappearing on container rebuilds — known recurring issue)
+    - Installed `curl_cffi==0.15.0` + added to `/app/backend/requirements.txt`
+    - Rewrote `/app/backend/url_video_fetch.py` `_download_with_ytdlp`:
+      - Uses `ImpersonateTarget('chrome')` (proper Python API)
+      - Multi-client YouTube fallback chain (`default,web_safari,mweb,android,ios,tv`)
+      - DASH-aware format selector (`bv*[height<=720][protocol!*=m3u8]+ba/b[ext=mp4][height<=720]/b[height<=720]/b`)
+      - Retries bumped 1→2
+    - New `_friendly_error()` helper translates raw yt-dlp errors to user-friendly messages:
+      - YouTube cloud-IP block → "YouTube is currently blocking downloads from our servers (this is a YouTube-wide issue, not your account). Please use Veo, Vimeo, Google Drive shared link, direct .mp4/.mov URL, or upload directly."
+      - DRM-protected → "This video is DRM-protected and can't be downloaded."
+      - 404 → "We couldn't find a video at that URL."
+      - private/login → "This video is private or members-only."
+      - geo → "Geo-restricted."
+      - too-large → "Larger than our 200 MB limit."
+    - Updated frontend `UploadPage.jsx` URL paste placeholder + helper text to reflect new reality ("Best with Veo, Vimeo, Google Drive shared links or any direct .mp4/.mov URL. YouTube downloads are currently blocked by YouTube — please upload the file directly instead.")
+  - **Verification (curl tests against `/api/me/url-fetch`)**:
+    - ✅ Direct MP4 (W3C sample): 0.8s, 0.75 MB, HTTP 200, token returned
+    - ✅ Vimeo (`https://vimeo.com/76979871`): 2.2s, 19.36 MB, HTTP 200, token returned
+    - ✅ YouTube: HTTP 400 with the friendly explanation (not 500)
+    - ✅ Veo invalid URL: HTTP 400 with "couldn't find a video at that URL"
+  - **Files**: MODIFIED `/app/backend/url_video_fetch.py`, `/app/frontend/src/pages/UploadPage.jsx`. ADDED `curl_cffi` to `/app/backend/requirements.txt`. Installed `ffmpeg` system package.
+
+
 - ✅ **🆕 Session 57 — PDF report visual overhaul: AMATEUR → PREMIUM design (Feb 21 2026)**:
   - **User feedback**: "PDF file that user get after analyse and can download to look more professional and beautiful right now it look amateur and some of number goes on text structure don't look good"
   - **Root cause identified** (via AI-powered PDF design audit): inline `<font size='X'>` mixing inside single Paragraphs caused baseline misalignment everywhere a big score met a small "/10" suffix — that's why scores looked "floating" or "overlapping text". Tables had tight 8px cell padding which crowded numbers against notes. Section underlines were thin/anaemic. The "NEED MORE FOOTAGE" callout was a placeholder-looking yellow box.
