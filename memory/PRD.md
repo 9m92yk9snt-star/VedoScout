@@ -26,6 +26,34 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 61 — Sample report overlay: dark premium panel, animated scout-scope emblem, Download Sample PDF removed (Feb 21 2026)**:
+  - **User feedback**: "download sample pdf delete it from box also make box look outstanding now it look flat and icon looks boring and flat make something cool"
+  - **Removed** the entire `<a data-testid="sample-pdf-download-cta">` button from the "See what a scout sees" showcase overlay. Now exactly one primary action: "See plans" → smooth-scrolls to the pricing section.
+  - **Box transformed flat → outstanding**:
+    - Background swapped from `bg-cream-card` (cream beige) → `bg-forest text-cream-card` (deep dark forest) so it now commands the eye
+    - **Triple-stacked shadow** for genuine premium depth: `0 30px 100px -10px rgba(8,18,12,0.65)` (drop shadow) + `0 0 0 6px rgba(31,79,47,0.18)` (outer forest ring) + `0 0 80px rgba(204,255,0,0.22)` (volt glow)
+    - **2px volt border** instead of the previous 1px forest/20 line
+    - **Animated outer volt halo** — `motion.div` with a radial volt gradient that pulses opacity 0.55↔0.95 and scale 0.96↔1.03 on a 3.6s loop. Creates a "spotlight on premium" radiating effect that draws the eye from across the entire example-report section.
+    - **Four volt corner brackets** — matching the cover page jersey badge identity
+    - Subtle radial volt glow inside the top of the card (radial-gradient + blur)
+    - **Hover lift**: `whileHover={{ y: -3 }}` on the wrapper
+  - **Boring flat eye → animated scout-scope emblem** (custom SVG, ~80×80 px):
+    - Outer 360°-rotating dashed volt ring (26s loop)
+    - Mid concentric solid ring at 40% opacity
+    - 4 crosshair tick marks at N/S/E/W
+    - A volt-tinted radar sweep arc (3 8% opacity) rotating 360° on a 4s loop — this is the "live scanning" effect
+    - Inner solid volt ring at 85% opacity
+    - **Pulsing center dot** — volt fill, animating `r: 5.5↔7.5` and opacity `0.85↔1` on a 1.8s loop, with a forest-colored 2.4px inner core (creates a real "scope reticle" look)
+    - Result: the emblem feels like it's actively scanning the player's footage — perfectly on-brand for "Pro Scout Intelligence"
+  - **Other polish**:
+    - Eyebrow "THE FULL BREAKDOWN" now flanked by two short volt rules for chip-like rhythm
+    - Title rebuilt to 2 explicit lines: "SEE WHAT A" / "*scout* SEES" with `scout` in serif-italic lowercase volt color (was a flat 1-line wrap with awkward break)
+    - "SEE PLANS" button upgraded from solid forest → solid **volt yellow** with a hover shimmer sweep (`translate-x-full` gradient sweep on 700ms ease-out) and a glowing `boxShadow: 0 6px 24px rgba(204,255,0,0.4)` halo — now reads as the unmistakable primary action
+    - "Free preview · No card to start" caption upgraded to uppercase tracked typography with volt shield icon
+    - Payment badges divider line now `border-cream-card/15` (was `border-gray-border`) for proper dark-mode contrast
+  - **Files**: MODIFIED `/app/frontend/src/pages/Landing.jsx` only. Verified visually — the new overlay is the unmistakable visual anchor of the example-report section and reads as a deliberate premium teaser, not a flat fallback card.
+
+
 - ✅ **🆕 Session 60 — Walkthrough Upload scene: football identity + typographic hierarchy (Feb 21 2026)**:
   - **User feedback**: "i need my video to be more clean better structure using fonts with important things and upload snippet look not like football no good background picture too much empty"
   - **Background swap**: `STADIUM_NIGHT_IMG` was a moody dark floodlight (`photo-1431324155629-1a6deb1dec8d`) that didn't read as football. Replaced with a real pitch + ball + players image (`photo-1551958219-acbc608c6377`). Darkening gradient softened (rgba 0.88→0.55 in middle) so the football scene actually shows through.

@@ -1711,54 +1711,142 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* The sample-report SHOWCASE overlay (price-free — directs to /pricing) */}
+            {/* The sample-report SHOWCASE overlay — premium "scout scope" treatment */}
             <div className="absolute inset-0 z-10 pointer-events-none flex items-center justify-center">
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                whileInView={{ opacity: 1, scale: 1, y: 0 }}
                 viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.5 }}
-                className="pointer-events-auto border border-forest/20 bg-cream-card backdrop-blur-2xl p-8 md:p-10 max-w-md mx-6 text-center shadow-2xl"
-                style={{ boxShadow: "0 20px 80px rgba(31, 79, 47, 0.15)" }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -3 }}
+                className="pointer-events-auto relative max-w-md mx-6 text-center"
               >
-                <div className="inline-flex items-center justify-center w-14 h-14 bg-forest/10 border border-forest/25 mb-5">
-                  <Eye className="w-6 h-6 text-forest" strokeWidth={1.5} />
-                </div>
-                <span className="text-forest text-[11px] uppercase tracking-[0.3em] font-bold">The full breakdown</span>
-                <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
-                  See what a<br />scout sees
-                </h3>
-                <p className="mt-4 text-sm text-ink/70 leading-relaxed">
-                  Where your player stands today. What separates them from the next level. The 5 drills that will actually move the needle. Reviewed by a real scout — not just a number on a page.
-                </p>
-
-                <button
-                  type="button"
-                  data-testid="sample-see-plans-cta"
-                  onClick={() => {
-                    const el = document.getElementById("pricing");
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                {/* Outer pulsing volt halo */}
+                <motion.div
+                  aria-hidden
+                  className="absolute -inset-6 pointer-events-none -z-10"
+                  style={{
+                    background: "radial-gradient(circle at center, rgba(204,255,0,0.28) 0%, rgba(204,255,0,0.0) 70%)",
+                    filter: "blur(28px)",
                   }}
-                  className="mt-7 w-full bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm py-3.5 flex items-center justify-center gap-2 transition-colors"
+                  animate={{ opacity: [0.55, 0.95, 0.55], scale: [0.96, 1.03, 0.96] }}
+                  transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+                />
+
+                {/* The card itself — dark forest with volt double border */}
+                <div
+                  className="relative bg-forest text-cream-card border-2 border-volt p-8 md:p-10 overflow-hidden"
+                  style={{
+                    boxShadow:
+                      "0 30px 100px -10px rgba(8,18,12,0.65), 0 0 0 6px rgba(31,79,47,0.18), 0 0 80px rgba(204,255,0,0.22)",
+                  }}
                 >
-                  See plans
-                  <ArrowDown className="w-4 h-4" />
-                </button>
-                <a
-                  href={`${process.env.REACT_APP_BACKEND_URL}/api/sample/scoutmeplay-report.pdf`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-testid="sample-pdf-download-cta"
-                  className="mt-2 w-full bg-white hover:bg-cream-soft text-forest border-2 border-forest font-barlow font-black uppercase tracking-widest text-sm py-3 flex items-center justify-center gap-2 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  Download sample PDF
-                </a>
-                <p className="mt-3 text-[10px] text-ink/55 flex items-center justify-center gap-1.5">
-                  <ShieldCheck className="w-3 h-3" /> Free preview · No card to start
-                </p>
-                <div className="mt-4 pt-4 border-t border-gray-border flex justify-center">
-                  <PaymentBadges variant="compact" />
+                  {/* Volt corner brackets — like the cover page jersey */}
+                  <span aria-hidden className="absolute top-3 left-3 w-5 h-5 border-t-2 border-l-2 border-volt" />
+                  <span aria-hidden className="absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-volt" />
+                  <span aria-hidden className="absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-volt" />
+                  <span aria-hidden className="absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-volt" />
+
+                  {/* Subtle radial volt glow inside top */}
+                  <div
+                    aria-hidden
+                    className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 pointer-events-none"
+                    style={{
+                      background: "radial-gradient(circle, rgba(204,255,0,0.25) 0%, transparent 70%)",
+                      filter: "blur(20px)",
+                    }}
+                  />
+
+                  {/* === SCOUT SCOPE emblem (replaces the flat eye box) === */}
+                  <div className="relative mx-auto mb-6 w-20 h-20 md:w-24 md:h-24">
+                    <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full" aria-hidden>
+                      {/* outer rotating dashed ring */}
+                      <motion.g
+                        style={{ transformOrigin: "50px 50px" }}
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
+                      >
+                        <circle cx="50" cy="50" r="46" fill="none" stroke="#CCFF00" strokeWidth="1.2"
+                                strokeDasharray="3 4" opacity="0.55" />
+                      </motion.g>
+                      {/* mid concentric ring */}
+                      <circle cx="50" cy="50" r="36" fill="none" stroke="#CCFF00" strokeWidth="1" opacity="0.4" />
+                      {/* crosshair lines */}
+                      <line x1="50" y1="6"  x2="50" y2="20" stroke="#CCFF00" strokeWidth="1.2" opacity="0.7" />
+                      <line x1="50" y1="80" x2="50" y2="94" stroke="#CCFF00" strokeWidth="1.2" opacity="0.7" />
+                      <line x1="6"  y1="50" x2="20" y2="50" stroke="#CCFF00" strokeWidth="1.2" opacity="0.7" />
+                      <line x1="80" y1="50" x2="94" y2="50" stroke="#CCFF00" strokeWidth="1.2" opacity="0.7" />
+                      {/* inner scanning sweep arc */}
+                      <motion.g
+                        style={{ transformOrigin: "50px 50px" }}
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                      >
+                        <path
+                          d="M50 50 L50 18 A32 32 0 0 1 78 44 Z"
+                          fill="#CCFF00"
+                          opacity="0.18"
+                        />
+                      </motion.g>
+                      {/* inner solid ring */}
+                      <circle cx="50" cy="50" r="24" fill="none" stroke="#CCFF00" strokeWidth="1.4" opacity="0.85" />
+                      {/* center pulsing dot */}
+                      <motion.circle
+                        cx="50" cy="50" r="6"
+                        fill="#CCFF00"
+                        animate={{ r: [5.5, 7.5, 5.5], opacity: [0.85, 1, 0.85] }}
+                        transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                      <circle cx="50" cy="50" r="2.4" fill="#1F4F2F" />
+                    </svg>
+                  </div>
+
+                  <span className="text-volt text-[11px] uppercase tracking-[0.3em] font-bold flex items-center justify-center gap-2">
+                    <span aria-hidden className="w-6 h-px bg-volt/60" />
+                    The full breakdown
+                    <span aria-hidden className="w-6 h-px bg-volt/60" />
+                  </span>
+
+                  <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95] text-cream-card">
+                    See what a
+                    <span className="block mt-1">
+                      <span className="font-serif-italic normal-case font-normal lowercase tracking-normal text-volt">scout</span>
+                      <span>{" "}sees</span>
+                    </span>
+                  </h3>
+
+                  <p className="mt-4 text-sm text-cream-card/85 leading-relaxed">
+                    Where your player stands today. What separates them from the next level. The 5 drills that will actually move the needle. Reviewed by a real scout — not just a number on a page.
+                  </p>
+
+                  <button
+                    type="button"
+                    data-testid="sample-see-plans-cta"
+                    onClick={() => {
+                      const el = document.getElementById("pricing");
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className="mt-7 group relative w-full bg-volt hover:bg-volt-hover text-ink font-barlow font-black uppercase tracking-[0.2em] text-sm py-4 flex items-center justify-center gap-2 transition-all duration-300 overflow-hidden"
+                    style={{ boxShadow: "0 6px 24px rgba(204,255,0,0.4)" }}
+                  >
+                    {/* shimmer sweep on hover */}
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out pointer-events-none"
+                      style={{
+                        background: "linear-gradient(120deg, transparent 35%, rgba(255,255,255,0.45) 50%, transparent 65%)",
+                      }}
+                    />
+                    <span className="relative">See plans</span>
+                    <ArrowDown className="relative w-4 h-4 group-hover:translate-y-1 transition-transform" />
+                  </button>
+
+                  <p className="mt-4 text-[10px] text-cream-card/65 flex items-center justify-center gap-1.5 uppercase tracking-[0.2em] font-bold">
+                    <ShieldCheck className="w-3 h-3 text-volt" /> Free preview · No card to start
+                  </p>
+                  <div className="mt-5 pt-5 border-t border-cream-card/15 flex justify-center">
+                    <PaymentBadges variant="compact" />
+                  </div>
                 </div>
               </motion.div>
             </div>
