@@ -931,12 +931,38 @@ function MarkingOverlay({
  *    bad mark. */
 function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
   if (!queue || queue.length === 0) return null;
+  // Count how many frames in the current queue have a non-skipped mark — when
+  // every position in the queue is confirmed we surface a small trust badge so
+  // the user feels confident before tapping "Upload & analyse".
+  const confirmedCount = queue.reduce(
+    (n, hintIdx) => (marks[hintIdx] && !marks[hintIdx].skipped ? n + 1 : n),
+    0
+  );
+  const allDone = confirmedCount === queue.length;
   return (
     <div
       className="absolute left-0 right-0 z-30 px-3 pb-2 pointer-events-none"
       style={{ bottom: "calc(120px + env(safe-area-inset-bottom, 0px))" }}
       data-testid="scout-frame-strip"
     >
+      {/* Trust badge appears the instant every frame in the queue is locked.
+          Sits above the thumbnail strip and fades in with a pulse. */}
+      {allDone && (
+        <div
+          className="mx-auto mb-2 max-w-fit pointer-events-auto"
+          data-testid="scout-frame-strip-verified-badge"
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/15 border border-[#CCFF00]/70 rounded-full backdrop-blur-md shadow-[0_0_18px_rgba(204,255,0,0.35)]">
+            <span className="relative flex w-2 h-2">
+              <span className="absolute inset-0 rounded-full bg-[#CCFF00] animate-ping opacity-75" />
+              <span className="relative rounded-full w-2 h-2 bg-[#CCFF00]" />
+            </span>
+            <span className="text-[10.5px] uppercase tracking-[0.22em] font-black text-[#CCFF00]">
+              Verified by Pro Scout Intelligence ✓
+            </span>
+          </div>
+        </div>
+      )}
       <div
         className="mx-auto max-w-[640px] flex gap-1.5 overflow-x-auto px-2 py-2 bg-ink/65 backdrop-blur border border-white/12"
         style={{ pointerEvents: "auto", WebkitOverflowScrolling: "touch" }}
