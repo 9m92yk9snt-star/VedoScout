@@ -106,10 +106,16 @@ function scoreColor(s) {
   return "text-red-400";
 }
 
-function SectionGrid({ title, section, onSeek }) {
+function SectionGrid({ title, section, onSeek, chapter }) {
   if (!section) return null;
   return (
-    <div className="bg-surface border border-gray-border p-6 md:p-8">
+    <div className="bg-surface border border-gray-border p-6 md:p-8" id={`report-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+      {chapter && (
+        <div className="flex items-center gap-2 mb-2">
+          <PitchLineDivider className="w-10 h-2 text-forest/55" />
+          <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">{chapter}</span>
+        </div>
+      )}
       <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">{title}</h3>
       <div className="mt-6 grid sm:grid-cols-2 gap-4">
         {Object.entries(section).map(([key, val]) => {
@@ -1943,7 +1949,43 @@ export default function ReportPage() {
                     {player_details.position} · {player_details.current_club || "Independent"}
                   </p>
                 </div>
-                <div className="mt-6 inline-flex items-center gap-2 bg-deepnavy border border-volt/30 px-4 py-2">
+
+                {/* ===== Premium scout badges row =====
+                    Compact pills that surface key player-profile facts at a glance —
+                    foot, age and selected archetype. Uses existing data only. */}
+                <div className="mt-5 flex flex-wrap gap-2" data-testid="report-scout-badges">
+                  {player_details.preferred_foot && (
+                    <span className="inline-flex items-center gap-1.5 bg-cream-card border border-forest/20 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-[0.18em] font-black text-forest">
+                      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <path d="M8 4 L12 4 L13 16 L8 16 Z M9 18 L9 22 L12 22 L12 18 Z" />
+                      </svg>
+                      {player_details.preferred_foot} foot
+                    </span>
+                  )}
+                  {player_details.age && (
+                    <span className="inline-flex items-center gap-1.5 bg-cream-card border border-forest/20 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-[0.18em] font-black text-forest">
+                      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7 L12 12 L15 14" />
+                      </svg>
+                      Age {player_details.age}
+                    </span>
+                  )}
+                  {player_details.video_type && (
+                    <span className="inline-flex items-center gap-1.5 bg-cream-card border border-forest/20 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-[0.18em] font-black text-forest">
+                      <FootballIcon className="w-3 h-3" />
+                      {String(player_details.video_type).replace(/^./, c => c.toUpperCase())}
+                    </span>
+                  )}
+                  {(full_report?.player_type || preview?.player_type) && (
+                    <span className="inline-flex items-center gap-1.5 bg-forest text-cream-card border border-forest px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-[0.18em] font-black">
+                      <FootballIcon className="w-3 h-3" />
+                      Archetype
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-4 inline-flex items-center gap-2 bg-deepnavy border border-volt/30 px-4 py-2">
                   <FootballIcon className="w-4 h-4 text-volt" />
                   <span className="font-barlow font-bold uppercase text-sm" data-testid="report-player-type">
                     {(full_report?.player_type) || preview?.player_type || "Player Analysis"}
@@ -2089,19 +2131,33 @@ export default function ReportPage() {
               </div>
 
               {unlocked && full_report && (
-                <div className="mt-8 grid grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
+                <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border" data-testid="report-scores-grid">
                   {[
                     { key: "technical", label: "Technical", v: full_report.scores?.technical },
                     { key: "tactical", label: "Tactical", v: full_report.scores?.tactical },
                     { key: "physical", label: "Physical", v: full_report.scores?.physical },
                     { key: "mentality", label: "Mentality", v: full_report.scores?.mentality },
                     { key: "overall_development", label: "Overall", v: full_report.scores?.overall_development },
-                  ].map((s, i) => (
-                    <div key={i} className="bg-surface p-3 text-center">
-                      <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">{s.label}</div>
-                      <div className={`font-barlow font-black text-3xl mt-1 ${scoreColor(s.v)}`}>{s.v ?? "-"}</div>
-                    </div>
-                  ))}
+                  ].map((s, i) => {
+                    const pct = typeof s.v === "number" ? Math.max(0, Math.min(100, (s.v / 10) * 100)) : 0;
+                    const barColor = (s.v ?? 0) >= 8 ? "bg-forest-pop" : (s.v ?? 0) >= 6 ? "bg-volt" : (s.v ?? 0) >= 4 ? "bg-amber-500" : "bg-rose-500";
+                    return (
+                      <div key={i} className="bg-surface p-3 text-center flex flex-col items-center justify-between">
+                        <div className="text-[9.5px] md:text-[10px] uppercase tracking-[0.14em] text-ink/55 font-bold leading-tight">
+                          {s.label}
+                        </div>
+                        <div className={`font-barlow font-black text-3xl mt-1.5 tabular-nums ${scoreColor(s.v)}`}>
+                          {s.v ?? "-"}
+                          <span className="text-[10px] text-ink/35 align-top ml-0.5">/10</span>
+                        </div>
+                        {/* Mini progress bar visualises the rating at a glance —
+                            colour matches the score band (red < 4 / amber 4-5 / volt 6-7 / forest-pop 8+). */}
+                        <div className="mt-2 w-full h-1 bg-ink/8 rounded-full overflow-hidden">
+                          <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -2315,7 +2371,11 @@ export default function ReportPage() {
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
               {/* Executive Summary */}
               {(unlocked && full_report) && (
-                <div className="bg-surface border border-gray-border p-6 md:p-8">
+                <div className="bg-surface border border-gray-border p-6 md:p-8" id="report-executive">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PitchLineDivider className="w-10 h-2 text-forest/55" />
+                    <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 01</span>
+                  </div>
                   <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Executive Summary</h3>
                   <p className="mt-4 text-ink/85 leading-relaxed">{full_report.executive_summary}</p>
                 </div>
@@ -2509,10 +2569,10 @@ export default function ReportPage() {
                     </div>
                   )}
 
-                  <SectionGrid title="Technical Analysis" section={full_report.technical} onSeek={seekVideoTo} />
-                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} onSeek={seekVideoTo} />
-                  <SectionGrid title="Physical Analysis" section={full_report.physical} onSeek={seekVideoTo} />
-                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} onSeek={seekVideoTo} />
+                  <SectionGrid title="Technical Analysis" section={full_report.technical} onSeek={seekVideoTo} chapter="Chapter · 02 · Technical" />
+                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} onSeek={seekVideoTo} chapter="Chapter · 02 · Tactical" />
+                  <SectionGrid title="Physical Analysis" section={full_report.physical} onSeek={seekVideoTo} chapter="Chapter · 02 · Physical" />
+                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} onSeek={seekVideoTo} chapter="Chapter · 02 · Mentality" />
 
                   {/* European Academy reference profile — position priorities vs Pro Academy expectations */}
                   <AgeProfileCard ref={age_profile_reference} />
@@ -2666,13 +2726,34 @@ export default function ReportPage() {
 
                   {/* Video Moments — frame-stamped evidence */}
                   {full_report.video_comments && full_report.video_comments.length > 0 && (
-                    <div data-testid="video-moments-card" className="bg-surface border border-gray-border p-6 md:p-8">
+                    <div data-testid="video-moments-card" id="report-video-moments" className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <PitchLineDivider className="w-10 h-2 text-forest/55" />
+                        <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 04</span>
+                      </div>
                       <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Frame-stamped evidence</div>
                       <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">Video moments</h3>
                       <p className="mt-2 text-sm text-ink/65 max-w-xl">
                         Every observation is anchored to the exact frame it was seen at — so you can verify each note in the original clip.
                       </p>
-                      <div className="mt-6 grid sm:grid-cols-2 gap-4">
+                      {/* Mini timeline ribbon — visualises WHEN in the clip each moment occurred. */}
+                      <div className="mt-5 relative h-1.5 bg-cream-soft border border-forest/15 rounded-full overflow-visible" aria-hidden>
+                        {full_report.video_comments.map((c, i) => {
+                          const t = c.timestamp || "";
+                          const m = t.match(/(\d{1,2}):(\d{2})/);
+                          const seconds = m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : null;
+                          const total = videoRef.current?.duration || 30;
+                          const pct = seconds != null && total ? Math.max(0, Math.min(100, (seconds / total) * 100)) : ((i + 1) / (full_report.video_comments.length + 1)) * 100;
+                          return (
+                            <span
+                              key={`tl-${i}`}
+                              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-forest border-2 border-cream-base shadow-[0_0_6px_rgba(31,79,47,0.4)]"
+                              style={{ left: `${pct}%` }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="mt-7 grid sm:grid-cols-2 gap-5">
                         {full_report.video_comments.map((c, i) => {
                           const ts = c.timestamp;
                           const tsParsed = ts && /^\s*\d{1,2}:\d{2}/.test(ts);
@@ -2685,8 +2766,12 @@ export default function ReportPage() {
                               tabIndex={cardOnClick ? 0 : undefined}
                               onClick={cardOnClick}
                               onKeyDown={cardOnClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cardOnClick(); } } : undefined}
-                              className={`bg-cream-card overflow-hidden border-l-2 border-forest ${cardOnClick ? "cursor-pointer hover:bg-white hover:border-forest-pop focus:outline-none focus:ring-2 focus:ring-forest" : ""} transition-colors`}
+                              className={`relative bg-cream-card overflow-hidden border-l-[3px] border-forest ${cardOnClick ? "cursor-pointer hover:shadow-lg hover:border-forest-pop focus:outline-none focus:ring-2 focus:ring-forest" : ""} transition-shadow shadow-sm`}
                             >
+                              {/* Moment number chip — top-left corner */}
+                              <span className="absolute top-2 left-2 z-20 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 bg-forest text-cream-card text-[10px] font-black tabular-nums rounded-sm">
+                                {String(i + 1).padStart(2, "0")}
+                              </span>
                               <div className="relative aspect-video bg-cream-soft group">
                                 {c.frame_url ? (
                                   <img
@@ -2698,17 +2783,33 @@ export default function ReportPage() {
                                   />
                                 ) : (
                                   <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-ink/30 text-xs uppercase tracking-wider">no frame</span>
+                                    <FootballIcon className="w-8 h-8 text-ink/15" />
                                   </div>
                                 )}
+                                {/* Film-strip top/bottom edge — pure decoration, gives a cinematic feel */}
+                                <div className="absolute top-0 left-0 right-0 h-1.5 bg-ink/85 flex items-center gap-1 px-1" aria-hidden>
+                                  {Array.from({ length: 14 }).map((_, k) => (
+                                    <span key={k} className="w-1 h-0.5 bg-cream-base/55" />
+                                  ))}
+                                </div>
+                                <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-ink/85 flex items-center gap-1 px-1" aria-hidden>
+                                  {Array.from({ length: 14 }).map((_, k) => (
+                                    <span key={k} className="w-1 h-0.5 bg-cream-base/55" />
+                                  ))}
+                                </div>
                                 {cardOnClick && (
                                   <div className="absolute inset-0 flex items-center justify-center bg-ink/0 group-hover:bg-ink/30 transition-colors">
-                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1.5 bg-volt text-ink px-3 py-1.5 text-[11px] uppercase tracking-widest font-black">
+                                    <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1.5 bg-volt text-ink px-3 py-1.5 text-[11px] uppercase tracking-widest font-black shadow-lg">
                                       ▶ Play moment
                                     </span>
                                   </div>
                                 )}
-                                <div className="absolute bottom-2 left-2 bg-ink text-cream-base px-2 py-1 text-xs font-barlow font-black tracking-wide">
+                                {/* Timestamp pill — bottom-right, premium look */}
+                                <div className="absolute bottom-3 right-2 bg-ink/90 backdrop-blur-sm text-volt px-2.5 py-1 text-[11px] font-barlow font-black tracking-wide rounded-sm inline-flex items-center gap-1.5 border border-volt/40">
+                                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
+                                    <circle cx="12" cy="12" r="9" />
+                                    <path d="M12 7 L12 12 L15 14" />
+                                  </svg>
                                   {c.timestamp || "—"}
                                 </div>
                               </div>
@@ -2722,13 +2823,17 @@ export default function ReportPage() {
 
                   {/* Final summary */}
                   {full_report.final_summary && (
-                    <div className="bg-surface border border-gray-border p-6 md:p-8">
-                      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Final Summary</h3>
-                      <p className="mt-4 text-ink/85 leading-relaxed">{full_report.final_summary}</p>
-                      <p className="mt-6 text-xs text-ink/50 italic">
-                        Scores presented as developmental guidance, not definitive scouting evaluations.
-                      </p>
+                  <div className="bg-surface border border-gray-border p-6 md:p-8" id="report-final-summary">
+                    <div className="flex items-center gap-2 mb-2">
+                      <PitchLineDivider className="w-10 h-2 text-forest/55" />
+                      <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 05</span>
                     </div>
+                    <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Final Summary</h3>
+                    <p className="mt-4 text-ink/85 leading-relaxed">{full_report.final_summary}</p>
+                    <p className="mt-6 text-xs text-ink/50 italic">
+                      Scores presented as developmental guidance, not definitive scouting evaluations.
+                    </p>
+                  </div>
                   )}
                 </>
               )}
