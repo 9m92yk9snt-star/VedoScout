@@ -981,7 +981,7 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
           let borderCls = "border-white/22";
           let opacityCls = "opacity-90";
           if (isCurrent) borderCls = "border-[#CCFF00] shadow-[0_0_0_2px_rgba(204,255,0,0.35)]";
-          else if (isConfirmed) borderCls = "border-emerald-500/80";
+          else if (isConfirmed) borderCls = "border-[#CCFF00] shadow-[0_0_0_1.5px_rgba(204,255,0,0.55)]";
           else if (isSkipped) { borderCls = "border-white/15"; opacityCls = "opacity-45"; }
           return (
             <button
@@ -1004,9 +1004,12 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
                     const bh = Math.max(0.18, Math.min(1, m.box.h));
                     const cx = (m.box.x + m.box.w / 2) * 100;
                     const cy = (m.box.y + m.box.h / 2) * 100;
-                    // Scale so the smaller axis of the box fills the thumb;
-                    // capped at 3.5× to avoid extreme pixelation on small boxes.
-                    const scale = Math.min(3.5, 1 / Math.max(bw, bh));
+                    // Force a minimum 1.9× zoom even when the bounding box is large,
+                    // so the thumbnail ALWAYS visibly transforms after confirmation —
+                    // no doubt that the mark was registered. Capped at 4.5× to avoid
+                    // pixelation on very tiny boxes (distant player).
+                    const rawScale = 1 / Math.max(bw, bh);
+                    const scale = Math.min(4.5, Math.max(1.9, rawScale));
                     return (
                       <div className="absolute inset-0 overflow-hidden">
                         <img
@@ -1016,9 +1019,17 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
                           style={{
                             transform: `scale(${scale})`,
                             transformOrigin: `${Math.max(8, Math.min(92, cx))}% ${Math.max(8, Math.min(92, cy))}%`,
+                            // Slight saturation/contrast boost so the confirmed
+                            // thumbnails visually pop next to the unconfirmed ones.
+                            filter: "saturate(1.25) contrast(1.08)",
                           }}
                           draggable={false}
                         />
+                        {/* Tiny "TRACKED" pill across the bottom — extra reassurance
+                            that THIS specific frame's mark was locked in. */}
+                        <span className="absolute bottom-0 left-0 right-0 bg-[#CCFF00] text-ink text-[7px] uppercase tracking-[0.18em] font-black text-center py-[1px] leading-none">
+                          Tracked
+                        </span>
                       </div>
                     );
                   })()
