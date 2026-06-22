@@ -1660,14 +1660,16 @@ export default function ReportPage() {
           np.delete("session_id");
           setSearchParams(np, { replace: true });
           await fetchReport();
-          // trigger full report generation
+          // trigger full report generation (async + polled — backend returns
+          // immediately so we never hit Cloudflare's 100s edge timeout).
           setGeneratingFull(true);
           try {
             await api.post(`/reports/${id}/generate-full`);
+            await pollFullReportReady();
             await fetchReport();
             toast.success("Full premium report ready");
           } catch (e) {
-            toast.error(e?.response?.data?.detail || "Failed to generate full report");
+            toast.error(e?.message || e?.response?.data?.detail || "Failed to generate full report");
           } finally {
             setGeneratingFull(false);
           }
@@ -1737,10 +1739,13 @@ export default function ReportPage() {
 
   const handleEmbeddedSuccess = async () => {
     await fetchReport();
-    // Trigger full report generation
+    // Trigger full report generation — backend now returns immediately and the
+    // heavy Gemini work runs in a background task. We poll until ready so the
+    // request never hits the Cloudflare 100s edge timeout.
     setGeneratingFull(true);
     try {
       await api.post(`/reports/${id}/generate-full`);
+      await pollFullReportReady();
       await fetchReport();
       toast.success("Full premium report unlocked");
     } catch (err) {
@@ -1750,14 +1755,37 @@ export default function ReportPage() {
     }
   };
 
+  // Polls the report-status endpoint until the full report finishes generating
+  // (or fails). Backend caps generation at ~5 min, we wait up to 7 min just in
+  // case of slow Gemini responses, then surface a friendly toast either way.
+  const pollFullReportReady = async () => {
+    const start = Date.now();
+    const HARD_TIMEOUT_MS = 7 * 60 * 1000;
+    while (Date.now() - start < HARD_TIMEOUT_MS) {
+      try {
+        const { data } = await api.get(`/reports/${id}/status`);
+        if (data?.full_report_status === "ready" || data?.has_full_report) return data;
+        if (data?.full_report_status === "failed") {
+          throw new Error(data?.full_report_error || "Full report generation failed");
+        }
+      } catch (e) {
+        if (e?.response?.status === 404) throw e;
+        // transient network blips — keep polling
+      }
+      await new Promise((r) => setTimeout(r, 4500));
+    }
+    throw new Error("Full report is taking longer than usual. Please refresh the page in a minute.");
+  };
+
   const handleGenerateFull = async () => {
     setGeneratingFull(true);
     try {
       await api.post(`/reports/${id}/generate-full`);
+      await pollFullReportReady();
       await fetchReport();
       toast.success("Full report ready");
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed to generate full report");
+      toast.error(err?.message || err?.response?.data?.detail || "Failed to generate full report");
     } finally {
       setGeneratingFull(false);
     }

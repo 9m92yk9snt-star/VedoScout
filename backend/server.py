@@ -3228,6 +3228,12 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         "status": analysis_status,
         "progress_step": step,
         "error": error,
+        # Full-report generation runs as its own background task after the
+        # preview is ready; the frontend polls this same endpoint and just
+        # reads `full_report_status` so it can show the right loading state.
+        "full_report_status": doc.get("full_report_status") or ("ready" if doc.get("full_report") else None),
+        "full_report_error": doc.get("full_report_error"),
+        "has_full_report": bool(doc.get("full_report")),
     }
     if analysis_status == "ready":
         poster_filename = doc.get("poster_filename")
@@ -3785,8 +3791,14 @@ async def get_report(report_id: str, user=Depends(get_current_user)):
 
 
 @api_router.post("/reports/{report_id}/generate-full")
-async def generate_full_report(report_id: str, user=Depends(get_current_user)):
-    """Generate the full premium report (called after payment confirmed or by admin)."""
+async def generate_full_report(report_id: str, background: BackgroundTasks, user=Depends(get_current_user)):
+    """Kick off the full premium report generation in the background.
+
+    The Gemini full-report call takes 3-5 minutes — way past Cloudflare's 100 s
+    edge timeout. To avoid a 524 we return immediately with `{status: "generating"}`
+    and the heavy work runs in `generate_full_report_task`. The frontend polls
+    `GET /reports/{id}/status` to know when it's done.
+    """
     doc = await db.reports.find_one({"id": report_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -3797,122 +3809,54 @@ async def generate_full_report(report_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=402, detail="Payment required")
 
     if doc.get("full_report"):
-        return {"status": "exists", "report_id": report_id}
+        return {"status": "exists", "report_id": report_id, "full_report_status": "ready"}
+
+    # Idempotency — if a task is already running for this report, no-op.
+    current = doc.get("full_report_status")
+    if current == "generating":
+        return {"status": "already_generating", "report_id": report_id, "full_report_status": "generating"}
 
     file_path = UPLOAD_DIR / doc["video_filename"]
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Video file missing")
 
-    marker_path = None
-    if doc.get("marker_filename"):
-        mp = UPLOAD_DIR / doc["marker_filename"]
-        if mp.exists():
-            marker_path = str(mp)
-
-    crop_path_str = None
-    if doc.get("subject_crop_filename"):
-        cp = UPLOAD_DIR / doc["subject_crop_filename"]
-        if cp.exists():
-            crop_path_str = str(cp)
-
-    # Multi-anchor crops (in order) — pass them all to Gemini as the locked-player ensemble
-    anchor_payload_list = doc.get("anchors") or []
-    anchor_crops_full: list[str] = []
-    for a in anchor_payload_list:
-        cf = a.get("crop_filename") if isinstance(a, dict) else None
-        if not cf:
-            continue
-        p = UPLOAD_DIR / cf
-        if p.exists():
-            anchor_crops_full.append(str(p))
-
-    details_str = json.dumps(doc["player_details"], ensure_ascii=False)
-    # Pull the gate info captured at upload time so the full report adapts to content type.
-    gate = doc.get("content_gate") or {}
-
-    # ── Precision priors: rebuild fingerprint object + extract audio peaks on the FULL clip ──
-    fp_obj = None
-    fp_payload = doc.get("fingerprint")
-    if fp_payload:
-        try:
-            fp_obj = PlayerFingerprint(
-                jersey_hex=fp_payload.get("jersey_hex", "#888888"),
-                jersey_name=fp_payload.get("jersey_name", "unclear"),
-                shorts_hex=fp_payload.get("shorts_hex", "#888888"),
-                shorts_name=fp_payload.get("shorts_name", "unclear"),
-                body_ratio=float(fp_payload.get("body_ratio", 2.0)),
-                crop_path=crop_path_str,
-                box=fp_payload.get("box", {}),
-                confidence="ok",
-            )
-        except Exception:
-            fp_obj = None
-    try:
-        audio_events_full = extract_audio_events(file_path, top_n=10)
-    except Exception:
-        audio_events_full = []
-
-    try:
-        if fp_obj is not None:
-            full_prompt = precision_build_full_prompt(
-                base_prompt=FULL_REPORT_PROMPT,
-                fingerprint=fp_obj,
-                audio_events=audio_events_full,
-                player_details=doc["player_details"],
-                content_type=str(gate.get("content_type", "other")),
-                quality=str(gate.get("quality", "good")),
-                player_visible=str(gate.get("player_visible", "clear")),
-                camera_distance=str(gate.get("camera_distance", "medium")),
-                games_detected=int(gate.get("games_detected", 1) or 1),
-                anchors=anchor_payload_list,
-            )
-        else:
-            full_prompt = (
-                FULL_REPORT_PROMPT
-                .replace("{player_details}", details_str)
-                .replace("{content_type}", str(gate.get("content_type", "other")))
-                .replace("{quality}", str(gate.get("quality", "good")))
-                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-                .replace("{games_detected}", str(gate.get("games_detected", 1)))
-            )
-        full = await call_gemini_with_video(
-            session_id=f"full-{report_id}",
-            prompt=full_prompt,
-            video_path=str(file_path),
-            marker_path=marker_path,
-            crop_path=crop_path_str,
-            anchor_crops=anchor_crops_full if anchor_crops_full else None,
-        )
-        full = scrub_hedging(full)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Full report generation failed")
-        raise HTTPException(status_code=500, detail=f"AI full report failed: {str(e)}")
-
+    # Mark as queued + clear any previous error and kick off the bg task.
     await db.reports.update_one(
         {"id": report_id},
-        {"$set": {
-            "full_report": full,
-            "full_generated_at": now_iso(),
-            "audio_events_full": [
-                {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_full
-            ],
-        }},
+        {"$set": {"full_report_status": "generating", "full_report_error": None}},
     )
-    return {"status": "generated", "report_id": report_id}
+    background.add_task(generate_full_report_task, report_id)
+    return {"status": "generating", "report_id": report_id, "full_report_status": "generating"}
 
 
 async def generate_full_report_task(report_id: str) -> None:
-    """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads)."""
+    """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads).
+
+    Sets `full_report_status` on the report doc so the frontend can poll
+    `/reports/{id}/status` to know when generation is done. Status values:
+    `generating` | `ready` | `failed`.
+    """
     try:
         doc = await db.reports.find_one({"id": report_id})
         if not doc or doc.get("full_report"):
+            # Already done — make sure status reflects that for any concurrent poller.
+            if doc and doc.get("full_report") and doc.get("full_report_status") != "ready":
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"full_report_status": "ready"}},
+                )
             return
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "generating", "full_report_error": None}},
+        )
         file_path = UPLOAD_DIR / doc["video_filename"]
         if not file_path.exists():
             logger.warning(f"generate_full_report_task: video missing for {report_id}")
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"full_report_status": "failed", "full_report_error": "Source video file missing on server."}},
+            )
             return
 
         marker_path = None
@@ -3999,6 +3943,8 @@ async def generate_full_report_task(report_id: str) -> None:
             {"$set": {
                 "full_report": full,
                 "full_generated_at": now_iso(),
+                "full_report_status": "ready",
+                "full_report_error": None,
                 "audio_events_full": [
                     {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_full
                 ],
@@ -4015,8 +3961,19 @@ async def generate_full_report_task(report_id: str) -> None:
                 )
         except Exception:
             logger.exception(f"Failed to queue agent_review for {report_id}")
-    except Exception:
+    except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
+        # Persist a friendly failure marker so the frontend can surface "Try again".
+        try:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {
+                    "full_report_status": "failed",
+                    "full_report_error": str(e)[:240] or "Pro Scout Intelligence couldn't finish this report. Tap Regenerate to retry.",
+                }},
+            )
+        except Exception:
+            pass
 
 
 # ============== AGENT REVIEW (user side) ==============

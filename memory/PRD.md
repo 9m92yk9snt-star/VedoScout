@@ -26,6 +26,16 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 75 — Cloudflare 524 fix on full-report generation (Feb 22 2026)**:
+  - User report from preview: clicking "REPORT UNLOCKED · Generate your premium analysis now" produced a Cloudflare 524 ("The origin web server returned an invalid or incomplete response… origin overloaded or misconfigured") banner. The page LOOKED fine but the Gemini full-report call was failing every time.
+  - **Root cause**: `POST /api/reports/{id}/generate-full` ran the full Gemini call (3-5 min) SYNCHRONOUSLY inside the HTTP request. Same structural issue we fixed for the upload pipeline in Session 66 — Cloudflare cuts the request at 100 s and returns a 524. The fire-and-forget `generate_full_report_task` already existed (used after Stripe payment) but the manual generate-full endpoint wasn't wired to use it.
+  - **Backend fix (`server.py`)**:
+    - `/reports/{id}/generate-full` now takes a `BackgroundTasks` dep, marks the doc as `full_report_status="generating"`, kicks off `generate_full_report_task` and returns immediately. Idempotent — if a task is already running it returns `{status: "already_generating"}` without spawning a duplicate.
+    - `generate_full_report_task` updated to write `full_report_status: generating → ready` on success, and `failed` + a friendly `full_report_error` string on exception, so the frontend can show "Try again" rather than a silent failure.
+    - `/reports/{id}/status` now exposes `full_report_status`, `full_report_error`, and `has_full_report` so the same polling endpoint used by upload progress can also drive full-report progress.
+  - **Frontend fix (`ReportPage.jsx`)**: New `pollFullReportReady()` helper polls `/reports/{id}/status` every 4.5 s (7 min hard timeout, friendly toast on timeout). All three call sites updated — `handleGenerateFull`, `handleEmbeddedSuccess` (Stripe checkout success), and the recovery branch inside `useEffect` after Stripe redirect.
+  - **Verified live**: `POST /reports/{id}/generate-full` returns in **152 ms** (was 3-5 min). `GET /reports/{id}/status` correctly returns `full_report_status: ready` + `has_full_report: true` for completed reports. Cloudflare 524 is now structurally impossible on this endpoint.
+
 - ✅ **🆕 Session 74 — Premium report UI/UX upgrade (no content/logic changed) (Feb 22 2026)**:
   - User feedback: report feels functional but not premium. Requested stronger football identity, clearer hierarchy, better data presentation, premium scout feel — explicitly NO removal of any existing data, scores, benchmarks, or analysis.
   - **Score grid truncation fix (production bug visible in screenshots)**: mobile was clipping the 5-column score-grid labels to "TECHNIC / TACTICA / PHYSICA / MENTALI" because `grid-cols-5` forced each cell to ~20% width. Switched to `grid-cols-2 md:grid-cols-5`, dropped the tracking from 0.18em → 0.14em, added a `/10` suffix on each score number, and inserted a colour-graded mini progress bar under every score (red < 4 / amber 4-5 / volt 6-7 / forest-pop 8+). Glanceable rating visualisation.
