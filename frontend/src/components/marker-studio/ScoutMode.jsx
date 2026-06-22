@@ -994,16 +994,19 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
               style={{ background: "#000" }}
             >
               {thumb ? (
-                isConfirmed && m?.box ? (
+                isConfirmed && typeof m?.x === "number" ? (
                   /*  CONFIRMED VIEW — the thumbnail visually transforms into a portrait
                    *  of the marked region so the user can see EXACTLY what they marked.
                    *  We zoom the underlying frame so the bounding box fills the thumb
-                   *  (with a sensible cap so very tiny boxes don't pixelate hard). */
+                   *  (with a sensible cap so very tiny boxes don't pixelate hard).
+                   *  NOTE: marks are stored as a FLAT shape ({x,y,w,h,…}) — NOT under
+                   *  an `m.box` sub-key — that's why the earlier `m?.box` check kept
+                   *  failing and the thumbnails never visibly changed in production. */
                   (() => {
-                    const bw = Math.max(0.18, Math.min(1, m.box.w));
-                    const bh = Math.max(0.18, Math.min(1, m.box.h));
-                    const cx = (m.box.x + m.box.w / 2) * 100;
-                    const cy = (m.box.y + m.box.h / 2) * 100;
+                    const bw = Math.max(0.18, Math.min(1, m.w));
+                    const bh = Math.max(0.18, Math.min(1, m.h));
+                    const cx = (m.x + m.w / 2) * 100;
+                    const cy = (m.y + m.h / 2) * 100;
                     // Force a minimum 1.9× zoom even when the bounding box is large,
                     // so the thumbnail ALWAYS visibly transforms after confirmation —
                     // no doubt that the mark was registered. Capped at 4.5× to avoid
