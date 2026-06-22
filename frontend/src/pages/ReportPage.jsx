@@ -1908,54 +1908,82 @@ export default function ReportPage() {
                   </div>
                 </div>
               ) : (
-                <div className="relative w-full bg-black aspect-video overflow-hidden" data-testid="report-video-shell">
-                  {!videoFailed && (
-                    <video
-                      ref={videoRef}
-                      src={`${ASSET_BASE}${video_url}`}
-                      poster={poster_url ? `${ASSET_BASE}${poster_url}` : (marker_url ? `${ASSET_BASE}${marker_url}` : undefined)}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      onError={() => setVideoFailed(true)}
-                      data-testid="report-video"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  )}
-                  {/* Friendly fallback if the uploaded clip can't be decoded on this device (iOS HEVC etc.) */}
-                  {videoFailed && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6" data-testid="report-video-fallback">
-                      {marker_url && (
-                        <img
-                          src={`${ASSET_BASE}${marker_url}`}
-                          alt=""
-                          className="absolute inset-0 w-full h-full object-cover opacity-60"
-                          aria-hidden
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-cream-base via-cream-base/85 to-cream-base/40" />
-                      <div className="relative">
-                        <div className="text-forest text-[10px] uppercase tracking-[0.3em] font-black mb-1">Video preview unavailable on this device</div>
-                        <p className="text-ink/65 text-xs max-w-[260px] mx-auto">
-                          Your clip was analysed successfully — the locked-player frame and full report are below.
-                        </p>
-                      </div>
+                <div className="relative" data-testid="report-video-frame">
+                  {/* MATCH FOOTAGE header strip — sits flush above the clip and
+                      gives the embed broadcast-style chrome instead of looking
+                      like a bare HTML5 video. */}
+                  <div className="flex items-center justify-between bg-forest text-cream-card px-3 py-1.5 border border-forest">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex w-1.5 h-1.5">
+                        <span className="absolute inset-0 rounded-full bg-[#CCFF00] animate-ping opacity-75" />
+                        <span className="relative rounded-full w-1.5 h-1.5 bg-[#CCFF00]" />
+                      </span>
+                      <span className="text-[9.5px] uppercase tracking-[0.28em] font-black">Match footage · analysed</span>
                     </div>
-                  )}
+                    <span className="text-[9.5px] uppercase tracking-[0.2em] font-black text-cream-card/70 tabular-nums">
+                      30s clip
+                    </span>
+                  </div>
+                  <div className="relative w-full bg-black aspect-video overflow-hidden border-x border-b-2 border-forest" data-testid="report-video-shell">
+                    {!videoFailed && (
+                      <video
+                        ref={videoRef}
+                        src={`${ASSET_BASE}${video_url}`}
+                        poster={poster_url ? `${ASSET_BASE}${poster_url}` : (marker_url ? `${ASSET_BASE}${marker_url}` : undefined)}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        onError={() => setVideoFailed(true)}
+                        data-testid="report-video"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                    {/* Premium broadcast corner brackets — fully decorative; the
+                        controls remain clickable because the corner divs are tiny. */}
+                    <span aria-hidden className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 border-volt/80" />
+                    <span aria-hidden className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 border-volt/80" />
+                    <span aria-hidden className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 border-volt/80" />
+                    <span aria-hidden className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 border-volt/80" />
+                    {/* Friendly fallback if the uploaded clip can't be decoded on this device (iOS HEVC etc.) */}
+                    {videoFailed && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6" data-testid="report-video-fallback">
+                        {marker_url && (
+                          <img
+                            src={`${ASSET_BASE}${marker_url}`}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover opacity-60"
+                            aria-hidden
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-cream-base via-cream-base/85 to-cream-base/40" />
+                        <div className="relative">
+                          <div className="text-forest text-[10px] uppercase tracking-[0.3em] font-black mb-1">Video preview unavailable on this device</div>
+                          <p className="text-ink/65 text-xs max-w-[260px] mx-auto">
+                            Your clip was analysed successfully — the locked-player frame and full report are below.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-              <div className="mt-4 grid grid-cols-3 gap-px bg-cream-soft/20">
-                <div className="bg-surface p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">Type</div>
-                  <div className="text-sm text-ink font-bold mt-1 capitalize">{player_details.video_type}</div>
+              {/* ===== Match-stat scoreboard =====
+                  Replaces the old flat 3-cell Type/Foot/Age strip with a TV-broadcast
+                  scoreboard-style display: a dark ink banner with monospace stats and
+                  vertical separators. Feels like a match-info ticker instead of a
+                  generic 3-column data table. */}
+              <div className="mt-4 grid grid-cols-3 bg-ink text-cream-card border border-forest/60 divide-x divide-cream-card/15 overflow-hidden">
+                <div className="px-2 py-2 text-center">
+                  <div className="text-[8.5px] uppercase tracking-[0.22em] text-cream-card/55 font-bold leading-tight">Type</div>
+                  <div className="font-barlow font-black uppercase text-base text-volt mt-0.5 tracking-tight">{player_details.video_type}</div>
                 </div>
-                <div className="bg-surface p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">Foot</div>
-                  <div className="text-sm text-ink font-bold mt-1 capitalize">{player_details.preferred_foot}</div>
+                <div className="px-2 py-2 text-center">
+                  <div className="text-[8.5px] uppercase tracking-[0.22em] text-cream-card/55 font-bold leading-tight">Foot</div>
+                  <div className="font-barlow font-black uppercase text-base text-volt mt-0.5 tracking-tight">{player_details.preferred_foot}</div>
                 </div>
-                <div className="bg-surface p-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink/50 font-bold">Age</div>
-                  <div className="text-sm text-ink font-bold mt-1">{player_details.age}</div>
+                <div className="px-2 py-2 text-center">
+                  <div className="text-[8.5px] uppercase tracking-[0.22em] text-cream-card/55 font-bold leading-tight">Age</div>
+                  <div className="font-barlow font-black uppercase text-base text-volt mt-0.5 tabular-nums tracking-tight">{player_details.age}</div>
                 </div>
               </div>
             </div>
@@ -2022,31 +2050,91 @@ export default function ReportPage() {
                 </div>
 
                 {marker_url && (
-                  <div className="mt-5 border border-gray-border bg-cream-card/90 p-3 max-w-md" data-testid="marker-card">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Star className="w-3 h-3 text-volt" fill="currentColor" />
-                      <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-volt">Locked player</span>
+                  <div className="mt-5 border border-forest/30 bg-cream-card/90 p-3 max-w-md shadow-sm" data-testid="marker-card">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <FootballIcon className="w-3.5 h-3.5 text-forest" />
+                        <span className="text-[10px] uppercase tracking-[0.22em] font-black text-forest">Locked player · tracked</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#CCFF00] text-ink text-[8px] uppercase tracking-[0.18em] font-black rounded-sm">
+                        <span className="w-1 h-1 rounded-full bg-ink" /> Auto-lock
+                      </span>
                     </div>
-                    <img
-                      src={`${ASSET_BASE}${marker_url}`}
-                      alt="Locked player"
-                      className="w-full aspect-video object-cover border border-gray-border"
-                    />
-                    {fingerprint && (fingerprint.jersey_name || fingerprint.shorts_name) && (
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="player-fingerprint">
-                        {fingerprint.jersey_hex && (
-                          <span className="inline-flex items-center gap-1.5 border border-gray-border bg-surface px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-ink/75">
+                    <div className="relative w-full aspect-video border border-forest/25 overflow-hidden bg-black">
+                      <img
+                        src={`${ASSET_BASE}${marker_url}`}
+                        alt="Locked player frame"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      {/* Marker-box overlay — proves to the user that THIS specific
+                          player (not anyone else in the frame) is what gets tracked. */}
+                      {fingerprint?.box && typeof fingerprint.box.x === "number" && (
+                        <>
+                          {/* Subtle vignette around the box so the marked player pops. */}
+                          <span
+                            aria-hidden
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              background: `radial-gradient(ellipse at ${(fingerprint.box.x + fingerprint.box.w / 2) * 100}% ${(fingerprint.box.y + fingerprint.box.h / 2) * 100}%, transparent 0%, transparent 22%, rgba(0,0,0,0.55) 75%)`,
+                            }}
+                          />
+                          <span
+                            className="absolute border-[2.5px] border-[#CCFF00] pointer-events-none"
+                            style={{
+                              left: `${Math.max(0, Math.min(0.96, fingerprint.box.x)) * 100}%`,
+                              top: `${Math.max(0, Math.min(0.96, fingerprint.box.y)) * 100}%`,
+                              width: `${Math.max(0.04, Math.min(1, fingerprint.box.w)) * 100}%`,
+                              height: `${Math.max(0.04, Math.min(1, fingerprint.box.h)) * 100}%`,
+                              boxShadow: "0 0 10px rgba(204,255,0,0.85), inset 0 0 0 1px rgba(0,0,0,0.55)",
+                            }}
+                          />
+                          {/* Corner brackets for a "scope lock" feel */}
+                          {[
+                            { c: "top-0 left-0", w: "border-l-[3px] border-t-[3px]" },
+                            { c: "top-0 right-0", w: "border-r-[3px] border-t-[3px]" },
+                            { c: "bottom-0 left-0", w: "border-l-[3px] border-b-[3px]" },
+                            { c: "bottom-0 right-0", w: "border-r-[3px] border-b-[3px]" },
+                          ].map((b, i) => (
                             <span
-                              className="w-3 h-3 inline-block border border-ink/20"
+                              key={i}
+                              aria-hidden
+                              className={`absolute w-2 h-2 ${b.c} ${b.w} border-[#CCFF00] pointer-events-none`}
+                              style={{
+                                ...(b.c.includes("top") ? { top: `calc(${fingerprint.box.y * 100}% - 1px)` } : { top: `calc(${(fingerprint.box.y + fingerprint.box.h) * 100}% - 7px)` }),
+                                ...(b.c.includes("left") ? { left: `calc(${fingerprint.box.x * 100}% - 1px)` } : { left: `calc(${(fingerprint.box.x + fingerprint.box.w) * 100}% - 7px)` }),
+                                position: "absolute",
+                              }}
+                            />
+                          ))}
+                          {/* "THIS PLAYER" label hovering above the box. */}
+                          <span
+                            className="absolute bg-[#CCFF00] text-ink text-[8.5px] uppercase tracking-[0.16em] font-black px-1.5 py-0.5 rounded-sm pointer-events-none whitespace-nowrap"
+                            style={{
+                              left: `${Math.max(0.02, Math.min(0.72, fingerprint.box.x)) * 100}%`,
+                              top: `calc(${Math.max(0, fingerprint.box.y) * 100}% - 16px)`,
+                              boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                            }}
+                          >
+                            ⬤ This player
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {fingerprint && (fingerprint.jersey_name || fingerprint.shorts_name) && (
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5" data-testid="player-fingerprint">
+                        {fingerprint.jersey_hex && (
+                          <span className="inline-flex items-center gap-1.5 border border-forest/20 bg-cream-card px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-ink/75">
+                            <span
+                              className="w-3 h-3 inline-block border border-ink/20 rounded-sm"
                               style={{ background: fingerprint.jersey_hex }}
                             />
                             {fingerprint.jersey_name || "jersey"}
                           </span>
                         )}
                         {fingerprint.shorts_hex && (
-                          <span className="inline-flex items-center gap-1.5 border border-gray-border bg-surface px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-ink/75">
+                          <span className="inline-flex items-center gap-1.5 border border-forest/20 bg-cream-card px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-ink/75">
                             <span
-                              className="w-3 h-3 inline-block border border-ink/20"
+                              className="w-3 h-3 inline-block border border-ink/20 rounded-sm"
                               style={{ background: fingerprint.shorts_hex }}
                             />
                             {fingerprint.shorts_name || "shorts"}
@@ -2054,8 +2142,8 @@ export default function ReportPage() {
                         )}
                       </div>
                     )}
-                    <p className="mt-2 text-[11px] text-ink/60">
-                      Pro Scout Intelligence tracks only the player inside this box across every frame.
+                    <p className="mt-2.5 text-[11px] text-ink/60 leading-snug">
+                      Every observation in this report is anchored to the player inside the lime box — no one else.
                     </p>
                   </div>
                 )}
