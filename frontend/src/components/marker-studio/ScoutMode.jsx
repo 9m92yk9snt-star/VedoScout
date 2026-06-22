@@ -994,43 +994,48 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
               style={{ background: "#000" }}
             >
               {thumb ? (
-                <img
-                  src={thumb}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  draggable={false}
-                />
+                isConfirmed && m?.box ? (
+                  /*  CONFIRMED VIEW — the thumbnail visually transforms into a portrait
+                   *  of the marked region so the user can see EXACTLY what they marked.
+                   *  We zoom the underlying frame so the bounding box fills the thumb
+                   *  (with a sensible cap so very tiny boxes don't pixelate hard). */
+                  (() => {
+                    const bw = Math.max(0.18, Math.min(1, m.box.w));
+                    const bh = Math.max(0.18, Math.min(1, m.box.h));
+                    const cx = (m.box.x + m.box.w / 2) * 100;
+                    const cy = (m.box.y + m.box.h / 2) * 100;
+                    // Scale so the smaller axis of the box fills the thumb;
+                    // capped at 3.5× to avoid extreme pixelation on small boxes.
+                    const scale = Math.min(3.5, 1 / Math.max(bw, bh));
+                    return (
+                      <div className="absolute inset-0 overflow-hidden">
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300"
+                          style={{
+                            transform: `scale(${scale})`,
+                            transformOrigin: `${Math.max(8, Math.min(92, cx))}% ${Math.max(8, Math.min(92, cy))}%`,
+                          }}
+                          draggable={false}
+                        />
+                      </div>
+                    );
+                  })()
+                ) : (
+                  /* PENDING / CURRENT / SKIPPED — show the full frame as before. */
+                  <img
+                    src={thumb}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    draggable={false}
+                  />
+                )
               ) : null}
-              {/* Tap-position overlay — proves to the user that THEIR mark on
-               *  this frame was registered. Renders a LIME-YELLOW square exactly
-               *  where they tapped (normalised box coords → percentage), so the
-               *  full strip becomes a visual proof of tracking continuity. */}
-              {isConfirmed && m?.box && (
-                <>
-                  <span
-                    className="absolute border-[2.5px] border-[#CCFF00] bg-[#CCFF00]/25 pointer-events-none"
-                    style={{
-                      left: `${Math.max(0, Math.min(0.96, m.box.x)) * 100}%`,
-                      top: `${Math.max(0, Math.min(0.96, m.box.y)) * 100}%`,
-                      width: `${Math.max(0.06, Math.min(1, m.box.w)) * 100}%`,
-                      height: `${Math.max(0.06, Math.min(1, m.box.h)) * 100}%`,
-                      boxShadow: "0 0 8px rgba(204,255,0,0.95), inset 0 0 0 1px rgba(0,0,0,0.4)",
-                    }}
-                    aria-hidden
-                  />
-                  {/* Centre dot — guarantees visibility even when the box is tiny in the thumbnail. */}
-                  <span
-                    className="absolute w-2 h-2 rounded-full bg-[#CCFF00] pointer-events-none"
-                    style={{
-                      left: `${(Math.max(0, Math.min(0.96, m.box.x)) + Math.max(0.06, Math.min(1, m.box.w)) / 2) * 100}%`,
-                      top: `${(Math.max(0, Math.min(0.96, m.box.y)) + Math.max(0.06, Math.min(1, m.box.h)) / 2) * 100}%`,
-                      transform: "translate(-50%, -50%)",
-                      boxShadow: "0 0 6px rgba(204,255,0,1), 0 0 0 1.5px rgba(0,0,0,0.6)",
-                    }}
-                    aria-hidden
-                  />
-                </>
-              )}
+              {/* Tap-position overlay — only useful BEFORE we've zoomed into the
+                  marked region. Once confirmed, the zoomed image itself IS the
+                  proof of what was marked, so this overlay is intentionally
+                  skipped on confirmed thumbnails. */}
               {/* Status pip — bottom-right */}
               {(isConfirmed || isSkipped) && (
                 <span
