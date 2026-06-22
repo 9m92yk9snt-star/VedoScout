@@ -7192,8 +7192,11 @@ async def _forward_contact_to_email(msg: Dict[str, Any]):
     if not CONTACT_NOTIFY_EMAIL:
         return
     try:
-        # The Origin/Referer must look like a real browser submission for FormSubmit to accept it
-        origin = "https://scout-ai-pro-1.preview.emergentagent.com"
+        # The Origin/Referer must look like a real browser submission for FormSubmit to accept it.
+        # Read from APP_PUBLIC_URL env so the same code works across preview, production
+        # (scoutmeplay.com) and any future custom domain. Falls back to the public production
+        # domain so contact-form posts on un-configured pods still succeed.
+        origin = os.environ.get("APP_PUBLIC_URL", "https://scoutmeplay.com")
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 f"https://formsubmit.co/ajax/{CONTACT_NOTIFY_EMAIL}",
