@@ -2057,6 +2057,31 @@ Treat the user-provided "VIDEO_TYPE" as an INTENT label, not as ground truth. Th
 content_type field below is what we ACTUALLY detected in the clip — always defer to
 the detected reality, never to the user's selected label.
 
+🚫 OUTCOME-CLAIM GUARDRAILS (HARD CONSTRAINT)
+You MUST NOT claim ANY of the following unless the action is **visibly completed**
+in the actual video frames you analysed:
+  - "scores", "finishes", "puts the ball in the net", "powerful strike on goal",
+    "shoots past the keeper", "scores past the goalkeeper" — only if the ball
+    visibly crosses the goal-line or enters the net on screen.
+  - "wins the tackle", "wins the duel", "blocks the shot" — only if the visible
+    outcome is the marked player ending up with the ball after a contested action.
+  - "saves the shot" — only for goalkeepers, and only when a shot is visibly stopped.
+  - "creates the chance", "assists the goal", "lays the ball off" — only if the
+    marked player visibly passes/crosses to a teammate AND that teammate visibly
+    shoots/scores in the SAME continuous sequence.
+
+✅ SAFE LANGUAGE WHEN YOU AREN'T SURE WHAT HAPPENED NEXT
+If the marked player passes the ball but the camera follows OR cuts before you see
+the next action, describe the PASS itself ("plays a sharp diagonal ball into the
+box", "lays it off first-time", "puts the ball back into space") — NOT the outcome
+("assist", "goal-scoring chance"). Same for shots that go off-screen: describe the
+strike ("rasps a low drive towards the bottom corner"), NOT the result ("scores",
+"hits the post") unless you literally see the impact.
+
+Confusing a goal with an assist (or vice versa) is the #1 trust-killer for parents
+and academy scouts reading this report. When in doubt, describe the player's
+ACTION, not the OUTCOME.
+
 🎯 CONTENT-TYPE-LOCKED VOCABULARY (HARD CONSTRAINT)
 - If CONTENT_TYPE is "drill", "training", "technical_drills", or "freestyle":
     ✅ Allowed phrases: "cone work", "ball mastery", "first touch on the cone", "body shape
@@ -2066,7 +2091,8 @@ the detected reality, never to the user's selected label.
        "1v1 with the keeper", "match-winning run", "scores", "tackles", "passes a teammate
        in tight space" (unless you literally see a teammate receiving the ball).
 - If CONTENT_TYPE is "full_match" / "small_sided" / "mixed":
-    Match-action vocabulary IS allowed — but only describe moments you literally see.
+    Match-action vocabulary IS allowed — but only describe moments you literally see,
+    and the OUTCOME-CLAIM GUARDRAILS above ALWAYS apply (no inventing goals/assists).
 - If CONTENT_TYPE is "fitness": describe physical work only (sprint, change of direction).
 
 🎯 GROUND RULE — EVIDENCE OR SILENCE
@@ -2114,6 +2140,32 @@ FULL_REPORT_PROMPT = """You are an experienced football scout writing a PREMIUM,
 
 🎯 GROUND RULE — EVIDENCE OR SILENCE
 Every score and every claim must come from something you actually OBSERVED in the video. If you cannot see it, set "cannot_evaluate": true with a reason. NEVER guess.
+
+🚫 OUTCOME-CLAIM GUARDRAILS (HARD CONSTRAINT — TRUST-CRITICAL)
+You MUST NOT claim ANY of the following unless the action is **visibly completed**
+in the actual video frames you analysed:
+  - "scores a goal", "finishes", "puts the ball in the net", "powerful strike on goal",
+    "shoots past the keeper" — only if the ball visibly crosses the goal-line or
+    enters the net ON SCREEN.
+  - "wins the tackle", "wins the duel", "blocks the shot" — only if the marked player
+    visibly ends up with the ball after the contested action.
+  - "saves the shot" — only for goalkeepers, and only when a shot is visibly stopped.
+  - "creates the chance", "assists the goal", "lays the ball off for the finish" — only
+    if the marked player visibly passes/crosses to a teammate AND that teammate visibly
+    shoots/scores in the SAME continuous sequence (same frames, no cut).
+
+✅ SAFE LANGUAGE WHEN YOU AREN'T SURE WHAT HAPPENED NEXT
+If the marked player passes the ball but the camera follows OR cuts before you see
+the next action, describe the PASS itself ("plays a sharp diagonal ball into the
+box", "lays it off first-time", "puts the ball back into space") — NOT the outcome
+("assist", "goal-scoring chance"). Same for shots that go off-screen: describe the
+strike ("rasps a low drive towards the bottom corner"), NOT the result.
+
+Confusing a goal with an assist (or vice versa) is the #1 trust-killer for parents
+and academy scouts reading this report. When in doubt, describe the player's
+ACTION, not the OUTCOME. This applies to EVERY section: executive_summary,
+final_summary, video_comments, scout_view, and every evidence_string in every
+scored sub-skill.
 
 🎯 LANGUAGE
 Plain, natural football coach language. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking passes", "half-turn", "high-intensity transitions", "vertical progression", "false-9 in possession systems". Use plain phrases: "stays calm when defenders close him down", "always looks around before getting the ball", "his left foot can find any pass", "gets tired late in matches", "ready to step up to a stronger team".
