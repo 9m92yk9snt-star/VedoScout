@@ -66,11 +66,11 @@ export default function Navigation() {
       if (window.localStorage.getItem(key)) return;
     } catch { return; }
     // Lazy-fetch report count only when the flag is missing (cost: one call
-    // per browser per user, ever). The /reports endpoint is what the
+    // per browser per user, ever). The /reports/mine endpoint is what the
     // Dashboard already calls — backed by the same handler.
     (async () => {
       try {
-        const { data } = await api.get("/reports");
+        const { data } = await api.get("/reports/mine");
         if (cancelled) return;
         const count = Array.isArray(data) ? data.length : (data?.reports?.length || 0);
         if (count > 0) {
