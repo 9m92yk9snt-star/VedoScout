@@ -26,6 +26,14 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 76 — Sticky chapter-nav on premium reports (Feb 22 2026)**:
+  - User requested the sticky table-of-contents nav-bar to complete the report-UX upgrade started in Session 74 (which added the section IDs but not the actual nav-bar).
+  - **New component `/app/frontend/src/components/ReportChapterNav.jsx`**: Sticky horizontal nav-bar that sits at the top of an unlocked report. Uses `IntersectionObserver` with `rootMargin: "-15% 0px -65% 0px"` to detect which section is currently in the top third of the viewport — that becomes the active chapter. Clicking any chapter chip smooth-scrolls to the matching `<section>` via `scrollIntoView({block:"start"})`. Renders horizontally scrollable on mobile (`overflow-x-auto`) so all 7 chapters fit on phones.
+  - **Mounted in `ReportPage.jsx`** with 7 chapters: 01 Summary → `#report-executive` · 02 Technical · 03 Tactical · 04 Physical · 05 Mentality · 06 Moments · 07 Final. Only shown for unlocked reports with a `full_report`.
+  - **`scroll-mt-20` added** to every section anchor (Executive Summary, SectionGrid wrapper, Video Moments, Final Summary) so that scrollIntoView doesn't hide the heading behind the sticky nav.
+  - **Chapter labels renumbered** to a sequential 01..07 scheme inside `SectionGrid` calls + Video Moments + Final Summary headers — matches the nav-bar numbering exactly.
+  - Lint clean. Bundle verified to include `IntersectionObserver`, `ReportChapterNav`, `report-chapter-nav`.
+
 - ✅ **🆕 Session 75 — Cloudflare 524 fix on full-report generation (Feb 22 2026)**:
   - User report from preview: clicking "REPORT UNLOCKED · Generate your premium analysis now" produced a Cloudflare 524 ("The origin web server returned an invalid or incomplete response… origin overloaded or misconfigured") banner. The page LOOKED fine but the Gemini full-report call was failing every time.
   - **Root cause**: `POST /api/reports/{id}/generate-full` ran the full Gemini call (3-5 min) SYNCHRONOUSLY inside the HTTP request. Same structural issue we fixed for the upload pipeline in Session 66 — Cloudflare cuts the request at 100 s and returns a 524. The fire-and-forget `generate_full_report_task` already existed (used after Stripe payment) but the manual generate-full endpoint wasn't wired to use it.

@@ -6,6 +6,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from "recharts";
 import Navigation from "@/components/Navigation";
+import ReportChapterNav from "@/components/ReportChapterNav";
 import { FootballIcon, MiniPitch, JerseyChip, PitchLineDivider } from "@/components/FootballAccents";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -109,7 +110,7 @@ function scoreColor(s) {
 function SectionGrid({ title, section, onSeek, chapter }) {
   if (!section) return null;
   return (
-    <div className="bg-surface border border-gray-border p-6 md:p-8" id={`report-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+    <div className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20" id={`report-${title.toLowerCase().replace(/\s+/g, "-")}`}>
       {chapter && (
         <div className="flex items-center gap-2 mb-2">
           <PitchLineDivider className="w-10 h-2 text-forest/55" />
@@ -2387,6 +2388,19 @@ export default function ReportPage() {
           </motion.div>
 
           {/* ===== Premium Sections ===== */}
+          {unlocked && full_report && (
+            <ReportChapterNav
+              chapters={[
+                { id: "report-executive", num: "01", label: "Summary" },
+                { id: "report-technical-analysis", num: "02", label: "Technical" },
+                { id: "report-tactical-analysis", num: "03", label: "Tactical" },
+                { id: "report-physical-analysis", num: "04", label: "Physical" },
+                { id: "report-mentality-analysis", num: "05", label: "Mentality" },
+                { id: "report-video-moments", num: "06", label: "Moments" },
+                { id: "report-final-summary", num: "07", label: "Final" },
+              ]}
+            />
+          )}
           <div className="mt-10 relative">
             {!unlocked && (
               <LockedOverlay
@@ -2399,7 +2413,7 @@ export default function ReportPage() {
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
               {/* Executive Summary */}
               {(unlocked && full_report) && (
-                <div className="bg-surface border border-gray-border p-6 md:p-8" id="report-executive">
+                <div className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20" id="report-executive">
                   <div className="flex items-center gap-2 mb-2">
                     <PitchLineDivider className="w-10 h-2 text-forest/55" />
                     <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 01</span>
@@ -2598,9 +2612,9 @@ export default function ReportPage() {
                   )}
 
                   <SectionGrid title="Technical Analysis" section={full_report.technical} onSeek={seekVideoTo} chapter="Chapter · 02 · Technical" />
-                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} onSeek={seekVideoTo} chapter="Chapter · 02 · Tactical" />
-                  <SectionGrid title="Physical Analysis" section={full_report.physical} onSeek={seekVideoTo} chapter="Chapter · 02 · Physical" />
-                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} onSeek={seekVideoTo} chapter="Chapter · 02 · Mentality" />
+                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} onSeek={seekVideoTo} chapter="Chapter · 03 · Tactical" />
+                  <SectionGrid title="Physical Analysis" section={full_report.physical} onSeek={seekVideoTo} chapter="Chapter · 04 · Physical" />
+                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} onSeek={seekVideoTo} chapter="Chapter · 05 · Mentality" />
 
                   {/* European Academy reference profile — position priorities vs Pro Academy expectations */}
                   <AgeProfileCard ref={age_profile_reference} />
@@ -2757,7 +2771,7 @@ export default function ReportPage() {
                     <div data-testid="video-moments-card" id="report-video-moments" className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20">
                       <div className="flex items-center gap-2 mb-2">
                         <PitchLineDivider className="w-10 h-2 text-forest/55" />
-                        <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 04</span>
+                        <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 06</span>
                       </div>
                       <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Frame-stamped evidence</div>
                       <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">Video moments</h3>
@@ -2851,10 +2865,10 @@ export default function ReportPage() {
 
                   {/* Final summary */}
                   {full_report.final_summary && (
-                  <div className="bg-surface border border-gray-border p-6 md:p-8" id="report-final-summary">
+                  <div className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20" id="report-final-summary">
                     <div className="flex items-center gap-2 mb-2">
                       <PitchLineDivider className="w-10 h-2 text-forest/55" />
-                      <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 05</span>
+                      <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 07</span>
                     </div>
                     <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Final Summary</h3>
                     <p className="mt-4 text-ink/85 leading-relaxed">{full_report.final_summary}</p>
