@@ -929,6 +929,77 @@ function MarkingOverlay({
  *    / · pending). Tapping a thumb jumps the queue cursor to that frame
  *    so the user can return to a previously skipped frame or correct a
  *    bad mark. */
+
+/**
+ * MarkedCropCanvas — renders ONLY the marked region of a frame using a canvas.
+ *
+ * We tried CSS-based zoom (transform: scale + transform-origin on an <img> with
+ * object-cover) but that ignores the source image's native aspect ratio, so a
+ * portrait 9:16 phone video shown inside a wide 14:9 thumbnail picks the wrong
+ * vertical band — the user marks the whole player but only sees their feet.
+ *
+ * Canvas gives us pixel-perfect control: we sample the EXACT marked rectangle
+ * from the source frame and draw it into the thumbnail using "contain" fit so
+ * the entire marked region is visible without distortion (letterboxed if the
+ * box aspect ratio doesn't match the thumbnail's).
+ */
+function MarkedCropCanvas({ frameDataUrl, box, className }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    if (!frameDataUrl || !box) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let cancelled = false;
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => {
+      if (cancelled) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const cw = canvas.width;
+      const ch = canvas.height;
+      // Pixel-space source rectangle, clamped to image bounds for safety.
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+      const sx = Math.max(0, Math.min(iw - 1, box.x * iw));
+      const sy = Math.max(0, Math.min(ih - 1, box.y * ih));
+      const sw = Math.max(1, Math.min(iw - sx, box.w * iw));
+      const sh = Math.max(1, Math.min(ih - sy, box.h * ih));
+      // Contain-fit so the whole marked region is visible; letterbox the rest.
+      const srcAspect = sw / sh;
+      const dstAspect = cw / ch;
+      let dx, dy, dw, dh;
+      if (srcAspect > dstAspect) {
+        dw = cw;
+        dh = cw / srcAspect;
+        dx = 0;
+        dy = (ch - dh) / 2;
+      } else {
+        dh = ch;
+        dw = ch * srcAspect;
+        dx = (cw - dw) / 2;
+        dy = 0;
+      }
+      ctx.fillStyle = "#0A0F0D";
+      ctx.fillRect(0, 0, cw, ch);
+      // Slightly punch up the crop so the player pops from the surrounding grass.
+      ctx.filter = "saturate(1.25) contrast(1.08)";
+      ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+      ctx.filter = "none";
+    };
+    img.src = frameDataUrl;
+    return () => { cancelled = true; };
+  }, [frameDataUrl, box?.x, box?.y, box?.w, box?.h]);
+  return (
+    <canvas
+      ref={canvasRef}
+      width={168}
+      height={108}
+      className={className}
+    />
+  );
+}
+
 function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
   if (!queue || queue.length === 0) return null;
   // Count how many frames in the current queue have a non-skipped mark — when
@@ -995,47 +1066,23 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
             >
               {thumb ? (
                 isConfirmed && typeof m?.x === "number" ? (
-                  /*  CONFIRMED VIEW — the thumbnail visually transforms into a portrait
-                   *  of the marked region so the user can see EXACTLY what they marked.
-                   *  We zoom the underlying frame so the bounding box fills the thumb
-                   *  (with a sensible cap so very tiny boxes don't pixelate hard).
-                   *  NOTE: marks are stored as a FLAT shape ({x,y,w,h,…}) — NOT under
-                   *  an `m.box` sub-key — that's why the earlier `m?.box` check kept
-                   *  failing and the thumbnails never visibly changed in production. */
-                  (() => {
-                    const bw = Math.max(0.18, Math.min(1, m.w));
-                    const bh = Math.max(0.18, Math.min(1, m.h));
-                    const cx = (m.x + m.w / 2) * 100;
-                    const cy = (m.y + m.h / 2) * 100;
-                    // Force a minimum 1.9× zoom even when the bounding box is large,
-                    // so the thumbnail ALWAYS visibly transforms after confirmation —
-                    // no doubt that the mark was registered. Capped at 4.5× to avoid
-                    // pixelation on very tiny boxes (distant player).
-                    const rawScale = 1 / Math.max(bw, bh);
-                    const scale = Math.min(4.5, Math.max(1.9, rawScale));
-                    return (
-                      <div className="absolute inset-0 overflow-hidden">
-                        <img
-                          src={thumb}
-                          alt=""
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300"
-                          style={{
-                            transform: `scale(${scale})`,
-                            transformOrigin: `${Math.max(8, Math.min(92, cx))}% ${Math.max(8, Math.min(92, cy))}%`,
-                            // Slight saturation/contrast boost so the confirmed
-                            // thumbnails visually pop next to the unconfirmed ones.
-                            filter: "saturate(1.25) contrast(1.08)",
-                          }}
-                          draggable={false}
-                        />
-                        {/* Tiny "TRACKED" pill across the bottom — extra reassurance
-                            that THIS specific frame's mark was locked in. */}
-                        <span className="absolute bottom-0 left-0 right-0 bg-[#CCFF00] text-ink text-[7px] uppercase tracking-[0.18em] font-black text-center py-[1px] leading-none">
-                          Tracked
-                        </span>
-                      </div>
-                    );
-                  })()
+                  /*  CONFIRMED VIEW — render the marked region with a canvas so
+                   *  the displayed crop is ALWAYS the exact rectangle the user
+                   *  drew, regardless of the source video's aspect ratio.
+                   *  Background overlay (TRACKED pill) is rendered separately
+                   *  below. */
+                  <div className="absolute inset-0 overflow-hidden">
+                    <MarkedCropCanvas
+                      frameDataUrl={thumb}
+                      box={{ x: m.x, y: m.y, w: m.w, h: m.h }}
+                      className="absolute inset-0 w-full h-full"
+                    />
+                    {/* Tiny "TRACKED" pill across the bottom — extra reassurance
+                        that THIS specific frame's mark was locked in. */}
+                    <span className="absolute bottom-0 left-0 right-0 bg-[#CCFF00] text-ink text-[7px] uppercase tracking-[0.18em] font-black text-center py-[1px] leading-none">
+                      Tracked
+                    </span>
+                  </div>
                 ) : (
                   /* PENDING / CURRENT / SKIPPED — show the full frame as before. */
                   <img
