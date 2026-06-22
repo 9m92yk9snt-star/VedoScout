@@ -6983,7 +6983,17 @@ async def admin_stats(_=Depends(get_current_admin)):
     total_uploads = await db.reports.count_documents({})
     total_paid = await db.reports.count_documents({"$or": [{"is_paid": True}, {"manually_unlocked": True}]})
 
-    cursor = db.payment_transactions.find({"payment_status": "paid"}, {"_id": 0, "amount": 1, "currency": 1})
+    # Bounded scan (5,000 most recent paid transactions) so the admin dashboard
+    # stays snappy as the production payment_transactions collection grows.
+    # Production deployment health check flagged the unbounded `async for` here
+    # as a P0 perf risk; once a Mongo aggregation pipeline is wired in this can
+    # become unbounded again with a $group/$sum.
+    cursor = (
+        db.payment_transactions
+        .find({"payment_status": "paid"}, {"_id": 0, "amount": 1, "currency": 1})
+        .sort("created_at", -1)
+        .limit(5000)
+    )
     revenue_usd = 0.0
     revenue_dkk = 0.0
     async for tx in cursor:
@@ -7012,17 +7022,20 @@ async def admin_users(_=Depends(get_current_admin)):
     - free      : role == user AND none of the above
     """
     docs = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
-    # collect emails with paid reports in a single pass
+    # Bounded scans (1,000 most recent reports) so /admin/users stays responsive
+    # as the production reports collection grows past ~50k docs. The data shown
+    # in admin UI is dominated by recent activity anyway; older bulk-paid users
+    # are still surfaced via their `prepaid_uploads` counter on the user doc.
     paid_emails = set()
     async for r in db.reports.find(
         {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
         {"_id": 0, "user_email": 1},
-    ):
+    ).sort("created_at", -1).limit(1000):
         if r.get("user_email"):
             paid_emails.add(r["user_email"].lower())
     # paid-report counts per user_id for richer display
     report_counts: Dict[str, int] = {}
-    async for r in db.reports.find({}, {"_id": 0, "user_id": 1}):
+    async for r in db.reports.find({}, {"_id": 0, "user_id": 1}).sort("created_at", -1).limit(1000):
         if r.get("user_id"):
             report_counts[r["user_id"]] = report_counts.get(r["user_id"], 0) + 1
     out = []
