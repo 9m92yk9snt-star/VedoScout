@@ -976,21 +976,34 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
                 />
               ) : null}
               {/* Tap-position overlay — proves to the user that THEIR mark on
-               *  this frame was registered. Renders a small lime square exactly
+               *  this frame was registered. Renders a LIME-YELLOW square exactly
                *  where they tapped (normalised box coords → percentage), so the
                *  full strip becomes a visual proof of tracking continuity. */}
               {isConfirmed && m?.box && (
-                <span
-                  className="absolute border border-emerald-300/95 bg-emerald-300/15 pointer-events-none"
-                  style={{
-                    left: `${Math.max(0, Math.min(0.96, m.box.x)) * 100}%`,
-                    top: `${Math.max(0, Math.min(0.96, m.box.y)) * 100}%`,
-                    width: `${Math.max(0.04, Math.min(1, m.box.w)) * 100}%`,
-                    height: `${Math.max(0.04, Math.min(1, m.box.h)) * 100}%`,
-                    boxShadow: "0 0 6px rgba(110,231,183,0.85)",
-                  }}
-                  aria-hidden
-                />
+                <>
+                  <span
+                    className="absolute border-[2.5px] border-[#CCFF00] bg-[#CCFF00]/25 pointer-events-none"
+                    style={{
+                      left: `${Math.max(0, Math.min(0.96, m.box.x)) * 100}%`,
+                      top: `${Math.max(0, Math.min(0.96, m.box.y)) * 100}%`,
+                      width: `${Math.max(0.06, Math.min(1, m.box.w)) * 100}%`,
+                      height: `${Math.max(0.06, Math.min(1, m.box.h)) * 100}%`,
+                      boxShadow: "0 0 8px rgba(204,255,0,0.95), inset 0 0 0 1px rgba(0,0,0,0.4)",
+                    }}
+                    aria-hidden
+                  />
+                  {/* Centre dot — guarantees visibility even when the box is tiny in the thumbnail. */}
+                  <span
+                    className="absolute w-2 h-2 rounded-full bg-[#CCFF00] pointer-events-none"
+                    style={{
+                      left: `${(Math.max(0, Math.min(0.96, m.box.x)) + Math.max(0.06, Math.min(1, m.box.w)) / 2) * 100}%`,
+                      top: `${(Math.max(0, Math.min(0.96, m.box.y)) + Math.max(0.06, Math.min(1, m.box.h)) / 2) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      boxShadow: "0 0 6px rgba(204,255,0,1), 0 0 0 1.5px rgba(0,0,0,0.6)",
+                    }}
+                    aria-hidden
+                  />
+                </>
               )}
               {/* Status pip — bottom-right */}
               {(isConfirmed || isSkipped) && (

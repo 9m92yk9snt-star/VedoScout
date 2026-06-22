@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Crown, Sparkles, ArrowRight, X, Star, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Lock, Crown, Sparkles, ArrowRight, X, Star, ShieldCheck } from "lucide-react";
 
 /**
  * HeroTeaser — the "must-buy" reveal shown to free users right after the AI finishes.
@@ -225,25 +225,47 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                 transition={{ duration: 0.45 }}
                 className="mb-6 space-y-3"
               >
-                {briefSummary && (
-                  <div className="bg-white border border-gray-border p-4 rounded-sm shadow-sm">
-                    <p className="text-ink/45 text-[9px] uppercase tracking-[0.3em] font-bold mb-2">
-                      What the scout saw
-                    </p>
-                    <p className="text-ink text-sm leading-relaxed">
-                      {String(briefSummary).slice(0, 240)}
-                      {briefSummary.length > 240 && "…"}
-                    </p>
-                  </div>
-                )}
+                {briefSummary && (() => {
+                  const teaser = String(briefSummary).slice(0, 90).replace(/\s+\S*$/, "");
+                  const hasMore = String(briefSummary).length > teaser.length;
+                  return (
+                    <div className="bg-white border border-gray-border p-4 rounded-sm shadow-sm">
+                      <p className="text-ink/45 text-[9px] uppercase tracking-[0.3em] font-bold mb-2">
+                        What the scout saw — preview
+                      </p>
+                      <p className="text-ink text-sm leading-relaxed">
+                        {teaser}
+                        {hasMore && (
+                          <>
+                            <span aria-hidden className="text-ink/85">…</span>
+                            <span
+                              aria-hidden
+                              className="ml-1 text-ink/55 select-none"
+                              style={{ filter: "blur(5px)" }}
+                            >
+                              the rest of the scout&apos;s observation is unlocked in the full report
+                            </span>
+                          </>
+                        )}
+                      </p>
+                      {hasMore && (
+                        <div className="mt-3 inline-flex items-center gap-1.5 text-forest text-[10px] uppercase tracking-[0.25em] font-black">
+                          <Lock className="w-3 h-3" />
+                          Unlock to read the full breakdown
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="bg-cream-soft/60 border border-forest/15 p-4 rounded-sm">
                   <p className="text-forest text-[9px] uppercase tracking-[0.3em] font-black mb-3 flex items-center gap-1.5">
                     <Star className="w-3 h-3" fill="currentColor" />
-                    Top observed strengths
+                    1 of {Math.max(strengths.length, 3)} top strengths revealed
                   </p>
                   <ul className="space-y-2">
-                    {strengths.map((s, i) => (
+                    {/* Only the FIRST strength is fully visible. */}
+                    {strengths.slice(0, 1).map((s, i) => (
                       <motion.li
                         key={i}
                         initial={{ opacity: 0, x: -6 }}
@@ -251,19 +273,44 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
                         transition={{ delay: 0.1 * i, duration: 0.35 }}
                         className="flex items-start gap-2 text-ink text-[13px] leading-snug"
                       >
-                        <CheckCircle2 className="w-4 h-4 text-forest flex-shrink-0 mt-px" />
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-forest text-cream-card text-[10px] font-black flex-shrink-0">{i + 1}</span>
                         <span className="font-semibold">{s}</span>
                       </motion.li>
                     ))}
+                    {/* Strengths 2 and 3: blurred. If we have fewer real strengths,
+                        we still render two blurred placeholders so the lock feels real. */}
+                    {[1, 2].map((idx) => {
+                      const s = strengths[idx] || "Strong second-touch consistency in tight spaces";
+                      return (
+                        <li
+                          key={`lock-${idx}`}
+                          className="flex items-start gap-2 text-ink/65 text-[13px] leading-snug select-none"
+                          style={{ filter: "blur(4px)" }}
+                          aria-hidden
+                        >
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-forest/40 text-cream-card text-[10px] font-black flex-shrink-0">{idx + 1}</span>
+                          <span className="font-semibold">{s}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
+                  <p className="mt-3 inline-flex items-center gap-1.5 text-forest text-[10px] uppercase tracking-[0.25em] font-black">
+                    <Lock className="w-3 h-3" />
+                    Unlock to reveal 2 more
+                  </p>
                 </div>
 
                 {improvement && (
-                  <div className="bg-white border border-gray-border p-3 rounded-sm">
-                    <p className="text-ink/45 text-[9px] uppercase tracking-[0.3em] font-bold mb-1">
-                      One area to improve
+                  <div className="relative bg-white border border-gray-border p-3 rounded-sm overflow-hidden">
+                    <p className="text-ink/45 text-[9px] uppercase tracking-[0.3em] font-bold mb-1 flex items-center gap-1.5">
+                      <Lock className="w-3 h-3 text-forest" />
+                      One area to improve · locked
                     </p>
-                    <p className="text-ink/85 text-[12px] leading-snug">
+                    <p
+                      className="text-ink/85 text-[12px] leading-snug select-none"
+                      style={{ filter: "blur(5px)" }}
+                      aria-hidden
+                    >
                       {String(improvement).slice(0, 160)}
                     </p>
                   </div>
