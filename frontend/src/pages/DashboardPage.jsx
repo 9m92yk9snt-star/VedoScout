@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
+import { MiniPitch } from "@/components/FootballAccents";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -204,10 +205,13 @@ export default function DashboardPage() {
                               </h3>
                               <span className="text-forest text-[10px] uppercase tracking-widest font-black flex-shrink-0 mt-1">View →</span>
                             </div>
-                            <p className="mt-0.5 text-[12px] text-ink/60 leading-snug">
-                              {r.player_details?.position} · age {r.player_details?.age}
-                              {r.player_details?.video_type ? <span className="text-ink/40"> · {r.player_details.video_type}</span> : null}
-                            </p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <MiniPitch position={r.player_details?.position} className="w-5 h-7 flex-shrink-0" />
+                              <p className="text-[12px] text-ink/60 leading-snug">
+                                {r.player_details?.position} · age {r.player_details?.age}
+                                {r.player_details?.video_type ? <span className="text-ink/40"> · {r.player_details.video_type}</span> : null}
+                              </p>
+                            </div>
                           </div>
                         </Link>
                       );

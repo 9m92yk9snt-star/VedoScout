@@ -26,6 +26,18 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 73 — Subtle football accents on Report + Dashboard (Feb 22 2026)**:
+  - User feedback: "I want the report + dashboard pages to feel more like football, but without changing what's already there — just add visual football elements."
+  - **New file `/app/frontend/src/components/FootballAccents.jsx`**: A purely-additive library of small SVG decorations that slot into the existing JSX like emoji. No layout / state / measurement — sized via `className`. Exports:
+    - `FootballIcon` — clean monoline football used in place of generic `<Star>` icons (e.g. "Top observed strengths" header, "Player Analysis" badge).
+    - `MiniPitch position="..."` — 28×40 portrait-pitch SVG with goal boxes + halfway line + centre circle + a glowing lime dot at the matched position. Includes a `positionToCoord` helper that maps loose strings like "Attacking Midfielder", "CAM", "Left-back", "ST", "Striker", "GK" etc. to normalised x/y coordinates. Used next to every position label.
+    - `PitchLineDivider` — three-segment chalk-line decoration used as a small ornament before section eyebrows.
+    - `JerseyChip number={n} muted={bool}` — numbered shirt-silhouette chip used to brand the top-strength bullets (replaces the plain numbered circle without touching the surrounding text).
+    - `GrassStripes` — barely-visible repeating-linear-gradient grass-stripe pattern available as a background decoration for future cards.
+  - **Report page (`ReportPage.jsx`)**: (a) Added `PitchLineDivider` before "Premium report" / "Free preview" eyebrow; (b) `MiniPitch` rendered next to the player's position + club line so every report visually shows WHERE on the pitch the player operates; (c) `<Star>` replaced with `FootballIcon` in the "Player Analysis" badge AND the "X of 3 top strengths revealed" header; (d) `JerseyChip` replaces the numbered-circle chips for top strengths (full forest jersey silhouette for revealed, muted-forest for locked).
+  - **Dashboard page (`DashboardPage.jsx`)**: `MiniPitch` rendered alongside each report card's "position · age · type" footer line, so the user can scan their report library and instantly see the player roles at a glance (GK / CB / CAM / ST visualised).
+  - Surrounding JSX, layout, animations, spacing, copy and CTAs completely untouched — purely visual football accents inserted into existing markup.
+
 - ✅ **🆕 Session 72 — Pixel-perfect canvas-cropped thumbnails (Feb 21 2026)**:
   - User report from production after redeploy: the TRACKED pill + lime border + zoom-into-marked-area shipped successfully — BUT the cropped image only showed the player's FEET + lower legs, not the whole body that was marked. User wanted to see the full marked region.
   - **Root cause**: My previous CSS-based approach used `<img>` with `object-fit: cover` + `transform: scale()` + `transform-origin: cx% cy%`. With phone-shot portrait videos (9:16) displayed inside wide landscape thumbnails (14:9), `object-cover` first crops the image to the container aspect ratio (cropping top + bottom of the portrait video), THEN `transform-origin` is applied to the cropped element, NOT the original image. The percentage coordinates land on a completely different region than what the user marked.
