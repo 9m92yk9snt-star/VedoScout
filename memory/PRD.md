@@ -26,6 +26,26 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 81 — Veo URL fetch pre-check + clear error UX (Feb 23 2026)**:
+  - User-reported (Danish): "Jeg kan ikke uploade eller fetche veo link i upload" — pasting a Veo link returned a cryptic `Could not download that video: ERROR: Unsupported URL: https://app.veo.co/clubs/broendby-if-pige-talent/clips/8af91277.../`.
+  - **Root cause (two stacked issues)**:
+    - yt-dlp 2026.06.09's `Veo` extractor only matches `https?://app\.veo\.co/matches/<slug>` — Veo CLIP URLs (`/clubs/<club>/clips/<uuid>/`) fall through to the generic extractor and raise `Unsupported URL`.
+    - Even when the matches URL IS recognised, the panorama version Veo serves is multi-GB (verified: ≈4.5 GB for the user's match) — far above our 200 MB cap. yt-dlp aborts the download with a confusing "file not found on disk" downstream message. And our analysis pipeline caps at 5 min anyway, so 90-min full match recordings can never run end-to-end.
+  - **Fix** (`/app/backend/url_video_fetch.py`):
+    - Added `_VEO_CLIP_RX` (`^https?://app\.veo\.co/clubs/[^/]+/clips/`) and `_VEO_MATCH_RX` (`^https?://app\.veo\.co/matches/`) regex pre-checks.
+    - Added `_veo_help_message()` — short, actionable user-facing copy: *"Veo links can't be fetched directly — full matches are several GB. On Veo, open the clip → ⋯ → Download to save the MP4 to your device, then use the 'Upload File' tab here. Max 5 min / 200 MB."*
+    - `fetch_video_by_url` raises `HTTPException(400, _veo_help_message())` BEFORE calling yt-dlp when either Veo URL pattern matches. Rejects in <10 s (no more 2-min yt-dlp download attempts that ultimately abort on filesize).
+  - **Frontend** (`/app/frontend/src/pages/UploadPage.jsx`):
+    - Toast `duration` ramps from 5 s → 12 s when `detail.length > 80` so users have time to read the longer Veo message.
+    - Placeholder updated to `Vimeo · Google Drive · .mp4 link` (Veo removed from suggested list).
+    - Help copy beneath the URL input now states *"Veo & YouTube links can't be fetched directly — download the clip to your device, then use 'Upload File' above."* in forest-bold so it's the first thing the eye catches.
+  - **Verified by testing agent (iteration_30.json — 100% pass, 3/3 backend pytest + frontend UI)**:
+    - Veo `/clubs/.../clips/` URL → HTTP 400 with friendly Veo message
+    - Veo `/matches/` URL → HTTP 400 with same friendly Veo message
+    - Direct MP4 regression (w3schools `mov_bbb.mp4` ≈1 MB) → HTTP 200 + token + preview_url + size_mb (URL-fetch path intact for non-Veo URLs)
+    - UI: toast surfaces the full message at 12 s duration; help copy renders correctly with no escape artefacts; Upload File tab dropzone regression passes
+  - **Files**: MODIFIED `/app/backend/url_video_fetch.py`, `/app/frontend/src/pages/UploadPage.jsx`. ADDED `/app/backend/tests/test_url_fetch_veo.py` (by testing agent).
+
 - ✅ **🆕 Session 80 — Locked-Player Tracked image pixel-perfect canvas fix (Feb 23 2026)**:
   - User-reported bug: on the report page (`Dashboard → open report`), the big **LOCKED PLAYER · TRACKED** image at the top showed the lime "THIS PLAYER" box floating in the sky / pointing at buildings while the small ZOOMED CROP below correctly showed the player on grass. Visual mismatch broke user trust.
   - **Root cause (verified by testing agent)**: previous renderer used `<img className="block max-w-full max-h-full h-auto w-auto">` inside `<div className="relative inline-block max-h-full max-w-full">` with the lime locator box overlaid via percentage CSS on the wrapper. On iOS-captured portrait frames with EXIF rotation, the rendered image rect was smaller than the inline-block wrapper rect (inline baseline padding + letterboxing), so percentage coordinates computed against the wrapper landed off the actual image content — manifesting as "box floating in the sky".
