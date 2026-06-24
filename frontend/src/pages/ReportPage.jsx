@@ -8,6 +8,7 @@ import {
 import Navigation from "@/components/Navigation";
 import ReportChapterNav from "@/components/ReportChapterNav";
 import MarkedCropCanvas from "@/components/MarkedCropCanvas";
+import FullFrameWithBoxCanvas from "@/components/FullFrameWithBoxCanvas";
 import { FootballIcon, MiniPitch, JerseyChip, PitchLineDivider } from "@/components/FootballAccents";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -2061,54 +2062,16 @@ export default function ReportPage() {
                         <span className="w-1 h-1 rounded-full bg-ink" /> Auto-lock
                       </span>
                     </div>
-                    <div className="relative w-full aspect-video border border-forest/25 overflow-hidden bg-ink flex items-center justify-center">
-                      {/* Wrap the img + overlay in a single block-sized parent so the
-                          overlay's percentage coordinates align with the IMAGE pixels,
-                          not the container (which may be a different aspect ratio).
-                          Without this, portrait phone-video frames get letterboxed and
-                          the lime box lands on empty grass instead of the player. */}
-                      <div className="relative inline-block max-h-full max-w-full">
-                        <img
-                          src={`${ASSET_BASE}${marker_url}`}
-                          alt="Locked player frame"
-                          className="block max-w-full max-h-full h-auto w-auto"
-                        />
-                        {/* Marker-box overlay — proves to the user that THIS specific
-                            player (not anyone else in the frame) is what gets tracked. */}
-                        {fingerprint?.box && typeof fingerprint.box.x === "number" && (
-                          <>
-                            {/* Subtle vignette around the box so the marked player pops. */}
-                            <span
-                              aria-hidden
-                              className="absolute inset-0 pointer-events-none"
-                              style={{
-                                background: `radial-gradient(ellipse at ${(fingerprint.box.x + fingerprint.box.w / 2) * 100}% ${(fingerprint.box.y + fingerprint.box.h / 2) * 100}%, transparent 0%, transparent 22%, rgba(0,0,0,0.55) 75%)`,
-                              }}
-                            />
-                            <span
-                              className="absolute border-[2.5px] border-[#CCFF00] pointer-events-none"
-                              style={{
-                                left: `${Math.max(0, Math.min(0.96, fingerprint.box.x)) * 100}%`,
-                                top: `${Math.max(0, Math.min(0.96, fingerprint.box.y)) * 100}%`,
-                                width: `${Math.max(0.04, Math.min(1, fingerprint.box.w)) * 100}%`,
-                                height: `${Math.max(0.04, Math.min(1, fingerprint.box.h)) * 100}%`,
-                                boxShadow: "0 0 10px rgba(204,255,0,0.85), inset 0 0 0 1px rgba(0,0,0,0.55)",
-                              }}
-                            />
-                            {/* "THIS PLAYER" label hovering above the box. */}
-                            <span
-                              className="absolute bg-[#CCFF00] text-ink text-[8.5px] uppercase tracking-[0.16em] font-black px-1.5 py-0.5 rounded-sm pointer-events-none whitespace-nowrap"
-                              style={{
-                                left: `${Math.max(0.02, Math.min(0.72, fingerprint.box.x)) * 100}%`,
-                                top: `calc(${Math.max(0, fingerprint.box.y) * 100}% - 16px)`,
-                                boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-                              }}
-                            >
-                              ⬤ This player
-                            </span>
-                          </>
-                        )}
-                      </div>
+                    <div className="relative w-full aspect-video border border-forest/25 overflow-hidden bg-ink">
+                      {/* Canvas-based renderer guarantees the lime box
+                          lands on the same pixels the zoomed crop below
+                          already shows correctly — no CSS aspect-ratio
+                          drift, no EXIF rotation surprises. */}
+                      <FullFrameWithBoxCanvas
+                        frameDataUrl={`${ASSET_BASE}${marker_url}`}
+                        box={fingerprint?.box && typeof fingerprint.box.x === "number" ? fingerprint.box : null}
+                        className="w-full h-full"
+                      />
                     </div>
                     {/* Pixel-perfect cropped close-up so the user can SEE who is
                         being tracked — proves the box is on the right player. */}
