@@ -3021,9 +3021,9 @@ async def public_price():
     pass_doc = await db.settings.find_one({"key": "pass_price"}, {"_id": 0})
     pass_value = pass_doc.get("value", DEFAULT_PASS_PRICE) if pass_doc else DEFAULT_PASS_PRICE
     landing_doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
-    landing_value = landing_doc.get("value", "full") if landing_doc else "full"
+    landing_value = landing_doc.get("value", "minimal") if landing_doc else "minimal"
     if landing_value not in ("full", "minimal"):
-        landing_value = "full"
+        landing_value = "minimal"
     # `price_dkk` is kept only as a legacy alias for older frontend builds
     return {
         "price": float(value),
@@ -3040,9 +3040,9 @@ async def public_active_landing():
     """Lightweight endpoint used by the Landing route to decide which
     variant to render. Avoids waiting for the full /settings/price payload."""
     doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
-    value = doc.get("value", "full") if doc else "full"
+    value = doc.get("value", "minimal") if doc else "minimal"
     if value not in ("full", "minimal"):
-        value = "full"
+        value = "minimal"
     return {"active_landing": value}
 
 
@@ -7358,11 +7358,11 @@ async def admin_update_social_links(payload: SocialLinksUpdate, _=Depends(get_cu
 
 @api_router.get("/admin/active-landing")
 async def admin_get_active_landing(_=Depends(get_current_admin)):
-    """Return the currently active landing variant. Defaults to 'full'."""
+    """Return the currently active landing variant. Defaults to 'minimal'."""
     doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
-    value = doc.get("value", "full") if doc else "full"
+    value = doc.get("value", "minimal") if doc else "minimal"
     if value not in ("full", "minimal"):
-        value = "full"
+        value = "minimal"
     return {"active_landing": value}
 
 

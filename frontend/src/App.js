@@ -36,31 +36,30 @@ function RequireAuth({ children, adminOnly = false }) {
 /* ── LandingRoute — chooses between the long-form <Landing /> and the
    short conversion-focused <LandingMinimal /> based on the admin-set
    `active_landing` value pulled from /api/settings/landing. Defaults to
-   the existing full landing if the call fails. The decision is cached
-   in localStorage so subsequent navigations render instantly. */
+   the minimal landing if the call fails or no value is set yet. The
+   decision is cached in localStorage so subsequent navigations render
+   instantly. */
 function LandingRoute() {
   const cached = (() => {
     try { return window.localStorage.getItem("scoutmeplay.active_landing"); } catch { return null; }
   })();
-  const [variant, setVariant] = useState(cached === "minimal" || cached === "full" ? cached : null);
+  const [variant, setVariant] = useState(cached === "minimal" || cached === "full" ? cached : "minimal");
 
   useEffect(() => {
     let cancelled = false;
     api.get("/settings/landing")
       .then(({ data }) => {
         if (cancelled) return;
-        const v = data?.active_landing === "minimal" ? "minimal" : "full";
+        const v = data?.active_landing === "full" ? "full" : "minimal";
         setVariant(v);
         try { window.localStorage.setItem("scoutmeplay.active_landing", v); } catch { /* private mode */ }
       })
-      .catch(() => { if (!cancelled) setVariant((prev) => prev || "full"); });
+      .catch(() => { if (!cancelled) setVariant((prev) => prev || "minimal"); });
     return () => { cancelled = true; };
   }, []);
 
-  // While loading and no cache, render the full landing immediately (zero
-  // visible flicker for the common case — admin only flips this rarely).
-  if (variant === "minimal") return <LandingMinimal />;
-  return <Landing />;
+  if (variant === "full") return <Landing />;
+  return <LandingMinimal />;
 }
 
 /* ── Page transition wrapper — Framer Motion slide+fade between routes.
