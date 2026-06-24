@@ -1,12 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { HelmetProvider } from "react-helmet-async";
 import { AnimatePresence, motion } from "framer-motion";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import api from "@/lib/api";
 
 import Landing from "@/pages/Landing";
+import LandingMinimal from "@/pages/LandingMinimal";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import UploadPage from "@/pages/UploadPage";
@@ -31,6 +33,36 @@ function RequireAuth({ children, adminOnly = false }) {
   return children;
 }
 
+/* ── LandingRoute — chooses between the long-form <Landing /> and the
+   short conversion-focused <LandingMinimal /> based on the admin-set
+   `active_landing` value pulled from /api/settings/landing. Defaults to
+   the existing full landing if the call fails. The decision is cached
+   in localStorage so subsequent navigations render instantly. */
+function LandingRoute() {
+  const cached = (() => {
+    try { return window.localStorage.getItem("scoutmeplay.active_landing"); } catch { return null; }
+  })();
+  const [variant, setVariant] = useState(cached === "minimal" || cached === "full" ? cached : null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/settings/landing")
+      .then(({ data }) => {
+        if (cancelled) return;
+        const v = data?.active_landing === "minimal" ? "minimal" : "full";
+        setVariant(v);
+        try { window.localStorage.setItem("scoutmeplay.active_landing", v); } catch { /* private mode */ }
+      })
+      .catch(() => { if (!cancelled) setVariant((prev) => prev || "full"); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // While loading and no cache, render the full landing immediately (zero
+  // visible flicker for the common case — admin only flips this rarely).
+  if (variant === "minimal") return <LandingMinimal />;
+  return <Landing />;
+}
+
 /* ── Page transition wrapper — Framer Motion slide+fade between routes.
    AnimatePresence's mode="wait" ensures the outgoing page finishes its
    exit animation before the incoming one begins, so the user sees a
@@ -41,7 +73,7 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<PageTransition><Landing /></PageTransition>} />
+        <Route path="/" element={<PageTransition><LandingRoute /></PageTransition>} />
         <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
         <Route path="/signup" element={<PageTransition><Signup /></PageTransition>} />
         <Route path="/upload" element={<PageTransition><RequireAuth><UploadPage /></RequireAuth></PageTransition>} />

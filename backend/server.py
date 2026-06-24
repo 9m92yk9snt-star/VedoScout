@@ -3020,6 +3020,10 @@ async def public_price():
     value = doc.get("value", DEFAULT_PRICE) if doc else DEFAULT_PRICE
     pass_doc = await db.settings.find_one({"key": "pass_price"}, {"_id": 0})
     pass_value = pass_doc.get("value", DEFAULT_PASS_PRICE) if pass_doc else DEFAULT_PASS_PRICE
+    landing_doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
+    landing_value = landing_doc.get("value", "full") if landing_doc else "full"
+    if landing_value not in ("full", "minimal"):
+        landing_value = "full"
     # `price_dkk` is kept only as a legacy alias for older frontend builds
     return {
         "price": float(value),
@@ -3027,7 +3031,19 @@ async def public_price():
         "currency": PRICE_CURRENCY,
         "price_dkk": float(value),
         "social": await get_social_links(),
+        "active_landing": landing_value,
     }
+
+
+@api_router.get("/settings/landing")
+async def public_active_landing():
+    """Lightweight endpoint used by the Landing route to decide which
+    variant to render. Avoids waiting for the full /settings/price payload."""
+    doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
+    value = doc.get("value", "full") if doc else "full"
+    if value not in ("full", "minimal"):
+        value = "full"
+    return {"active_landing": value}
 
 
 async def get_social_links() -> dict:
@@ -7338,6 +7354,31 @@ async def admin_update_social_links(payload: SocialLinksUpdate, _=Depends(get_cu
         upsert=True,
     )
     return {"social": merged}
+
+
+@api_router.get("/admin/active-landing")
+async def admin_get_active_landing(_=Depends(get_current_admin)):
+    """Return the currently active landing variant. Defaults to 'full'."""
+    doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
+    value = doc.get("value", "full") if doc else "full"
+    if value not in ("full", "minimal"):
+        value = "full"
+    return {"active_landing": value}
+
+
+@api_router.put("/admin/active-landing")
+async def admin_update_active_landing(payload: dict, _=Depends(get_current_admin)):
+    """Switch the public landing page between the long 'full' marketing
+    page and the short 'minimal' conversion-focused variant."""
+    value = (payload or {}).get("active_landing")
+    if value not in ("full", "minimal"):
+        raise HTTPException(status_code=400, detail="active_landing must be 'full' or 'minimal'")
+    await db.settings.update_one(
+        {"key": "active_landing"},
+        {"$set": {"key": "active_landing", "value": value, "updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"active_landing": value}
 
 
 @api_router.post("/admin/reports/{report_id}/unlock")

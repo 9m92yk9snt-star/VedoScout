@@ -26,6 +26,28 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 79 — Minimal landing variant + admin toggle (Feb 23 2026)**:
+  - User request: build a second short, conversion-focused landing page alongside the existing long-form `Landing.jsx`, plus an admin toggle to switch between them. User-confirmed layout via screenshots: **Top bar · Hero (Upload + Sign-in) · Pricing · FAQ · Footer**.
+  - **New page `/app/frontend/src/pages/LandingMinimal.jsx`** (~340 lines):
+    - 1. Top bar — reuses the existing `<Navigation />` (sign-in / sign-up / Upload-video CTAs already built in).
+    - 2. Hero — eyebrow ("Pro Scout Intelligence · 48h delivery"), 2-line headline ("Ready to discover / **your true level?**" with the second line in forest), subtitle, single solid-forest **Upload your video →** CTA, a "Sign in" nudge for non-logged-in users, and the "Free preview · No card to start" trust line. Cream background with a faint dotted scout-notebook pattern + ghosted football silhouette behind the text.
+    - 3. Pricing — section header ("One honest price. **No hidden costs.**") + reuses the existing `<PricingCards variant="landing" />` (Single $159 + 12-Month $399), so prices stay admin-controlled from a single source.
+    - 4. FAQ — duplicates the 8-item FAQ from `Landing.jsx` (kept in sync) with the same "Common questions / **Honest answers. No fluff.** / Answered in 30 seconds" header. Pricing question fills dynamically from `/settings/price`.
+    - 5. Footer — lightweight dark footer with logo, About/Methodology/Blog/Privacy/Terms links, copyright, and Stripe trust line. (`MobileBottomTabs` already mounts globally for the mobile HOME/REPORTS/UPLOAD/PROFILE rail.)
+  - **Backend (`server.py`)**:
+    - New setting `active_landing` (string `"full"` | `"minimal"`, default `"full"`) stored in `db.settings`.
+    - `GET /api/settings/price` now ALSO returns `active_landing` (no breaking change — just an extra field).
+    - **New** `GET /api/settings/landing` — lightweight public endpoint used by the React router to decide which variant to render.
+    - **New** `GET /api/admin/active-landing` + `PUT /api/admin/active-landing` — admin-only, validates value ∈ {full, minimal}.
+  - **Routing (`App.js`)**:
+    - New `<LandingRoute />` wrapper around the `"/"` route. On mount it reads `localStorage["scoutmeplay.active_landing"]` for an instant render, then fetches `/api/settings/landing` to update if the admin flipped it. Defaults to `"full"` on any failure.
+    - `<LandingMinimal />` imported and rendered when the value is `"minimal"`; the existing `<Landing />` continues to render for the default `"full"` value — zero risk to the live full-form page.
+  - **Admin UI (`AdminPage.jsx` Settings tab)**:
+    - New "Active landing variant" card under "12-month plan price". Two side-by-side buttons (Full / Minimal), the active one has a volt border + an "Active" badge, the inactive one is dark. Clicking instantly fires `PUT /api/admin/active-landing` and toasts the result. Optimistic — reverts on failure.
+    - Cache-busts `localStorage["scoutmeplay.active_landing"]` on success so the admin's own next visit reflects the new variant immediately.
+  - **Verified end-to-end**: backend toggle round-trip works (GET/PUT/GET cycle returns the saved value); minimal-variant screenshots confirmed the hero, pricing cards, FAQ accordion, and footer all render correctly on cream background; admin Settings tab shows the new "Public homepage / Active landing variant" card with "FULL" highlighted. Default reset to `"full"` after testing so production behavior is unchanged.
+  - **Files**: CREATED `/app/frontend/src/pages/LandingMinimal.jsx`. MODIFIED `/app/backend/server.py`, `/app/frontend/src/App.js`, `/app/frontend/src/pages/AdminPage.jsx`. Lint clean (only pre-existing unused-eslint-disable warning in AdminPage).
+
 - ✅ **🆕 Session 78 — Anti-hallucination outcome guardrails + pixel-perfect marker overlay (Feb 22 2026)**:
   - User reported two TRUST-KILLING bugs: (1) "Brief summary said he scored a goal but in the video he made an ASSIST — Pro Scout Intelligence is hallucinating outcomes." (2) "On the Locked Player picture the lime box is on empty grass, not on the white-jersey player — my AI doesn't even know who it's tracking, just random guessing."
   - **Fix #1 — Outcome-claim hard guardrails in BOTH `PREVIEW_PROMPT` and `FULL_REPORT_PROMPT`**: Added an explicit "OUTCOME-CLAIM GUARDRAILS" block that forbids the AI from claiming "scores / finishes / shoots past the keeper", "wins the tackle / blocks the shot", "saves the shot", or "creates the chance / assists the goal" UNLESS the action is visibly completed in the actual video frames. The block calls out that "Confusing a goal with an assist is the #1 trust-killer for parents and academy scouts reading this report — when in doubt, describe the player's ACTION, not the OUTCOME." Applies to executive_summary, final_summary, every video_comment, every scout_view note, and every evidence_string in every scored sub-skill.

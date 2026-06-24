@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
   ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
-  Share2, Twitter, Facebook, Linkedin, Instagram,
+  Share2, Twitter, Facebook, Linkedin, Instagram, Layout,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
@@ -69,6 +69,10 @@ export default function AdminPage() {
   // Blog draft count — surfaced as a badge on the Blog tab
   const [blogDraftCount, setBlogDraftCount] = useState(0);
 
+  // Active landing variant — admin toggles between long-form and minimal landing pages
+  const [activeLanding, setActiveLanding] = useState("full"); // "full" | "minimal"
+  const [savingLanding, setSavingLanding] = useState(false);
+
   // Users tab — segment filter + scout creation modal
   const [userSegment, setUserSegment] = useState("all");   // all | free | premium | scout | admin
   const [showCreateScout, setShowCreateScout] = useState(false);
@@ -107,6 +111,9 @@ export default function AdminPage() {
         if (pr.data.social) {
           setSocial(pr.data.social);
           setSocialInput(pr.data.social);
+        }
+        if (pr.data.active_landing) {
+          setActiveLanding(pr.data.active_landing === "minimal" ? "minimal" : "full");
         }
       }
     } catch (err) {
@@ -152,6 +159,30 @@ export default function AdminPage() {
       toast.error("Failed to update 12-month plan price");
     } finally {
       setSavingPassPrice(false);
+    }
+  };
+
+  const handleLandingChange = async (next) => {
+    if (next !== "full" && next !== "minimal") return;
+    if (next === activeLanding) return;
+    const prev = activeLanding;
+    setActiveLanding(next);
+    setSavingLanding(true);
+    try {
+      await api.put("/admin/active-landing", { active_landing: next });
+      // Bust the cached copy so the public landing immediately reflects the
+      // new variant on the admin's next visit too.
+      try { window.localStorage.setItem("scoutmeplay.active_landing", next); } catch { /* private mode */ }
+      toast.success(
+        next === "minimal"
+          ? "Minimal landing is now live"
+          : "Full landing is now live",
+      );
+    } catch (err) {
+      setActiveLanding(prev);
+      toast.error(err?.response?.data?.detail || "Failed to switch landing variant");
+    } finally {
+      setSavingLanding(false);
     }
   };
 
@@ -684,6 +715,71 @@ export default function AdminPage() {
                       </div>
                       <p className="mt-3 text-xs text-ink/50">Currently active: <span className="text-volt font-bold">${passPrice} USD</span></p>
                     </div>
+                  </div>
+
+                  {/* ── Landing variant toggle ── */}
+                  <div className="bg-surface border border-gray-border p-6 md:p-8" data-testid="admin-landing-card">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Layout className="w-4 h-4 text-volt" />
+                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">Public homepage</span>
+                    </div>
+                    <h2 className="font-barlow font-black uppercase text-2xl text-ink">Active landing variant</h2>
+                    <p className="mt-2 text-ink/65 text-sm">
+                      Choose which landing page non-logged-in visitors see on{" "}
+                      <span className="font-bold text-ink">scoutmeplay.com</span>.
+                      The Full variant is the long-form marketing page; the Minimal variant is a short conversion-focused page (Hero → Pricing → FAQ → Footer).
+                    </p>
+
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        {
+                          id: "full",
+                          label: "Full",
+                          desc: "Long-form marketing page (Hero, Walkthrough, What you get, Sample, Pricing, FAQ, Final CTA).",
+                        },
+                        {
+                          id: "minimal",
+                          label: "Minimal",
+                          desc: "Short, conversion-focused page (Hero, Pricing, FAQ, Footer).",
+                        },
+                      ].map(({ id, label, desc }) => {
+                        const isActive = activeLanding === id;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            disabled={savingLanding}
+                            onClick={() => handleLandingChange(id)}
+                            data-testid={`admin-landing-${id}-btn`}
+                            className={`text-left p-4 border-2 transition-all relative ${
+                              isActive
+                                ? "border-volt bg-volt/10"
+                                : "border-gray-border bg-deepnavy hover:border-forest/60"
+                            } disabled:opacity-60 disabled:cursor-wait`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-barlow font-black uppercase tracking-widest text-base text-ink">
+                                {label}
+                              </span>
+                              {isActive && (
+                                <span className="text-[9px] uppercase tracking-[0.22em] font-bold bg-volt text-ink px-2 py-0.5">
+                                  Active
+                                </span>
+                              )}
+                              {!isActive && savingLanding && (
+                                <Loader2 className="w-4 h-4 animate-spin text-volt" />
+                              )}
+                            </div>
+                            <p className="mt-2 text-xs text-ink/65 leading-relaxed">{desc}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-4 text-xs text-ink/50">
+                      Currently live: <span className="text-volt font-bold uppercase tracking-widest">{activeLanding}</span>
+                      {" · "}
+                      <span className="text-ink/40">Changes apply instantly to new visitors. Existing tabs may need a refresh.</span>
+                    </p>
                   </div>
 
                   {/* ── Social Links card ── */}
