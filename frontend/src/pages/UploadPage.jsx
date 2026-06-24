@@ -233,7 +233,11 @@ export default function UploadPage() {
       toast.success(`Video fetched (${(data.size_mb || 0).toFixed(1)} MB) — now mark your player.`);
     } catch (err) {
       const msg = err?.response?.data?.detail || err.message || "URL fetch failed.";
-      toast.error(typeof msg === "string" ? msg : "Could not download that video.");
+      // Veo errors are longer than usual — give the user enough time to read.
+      const isLongMsg = typeof msg === "string" && msg.length > 80;
+      toast.error(typeof msg === "string" ? msg : "Could not download that video.", {
+        duration: isLongMsg ? 12000 : 5000,
+      });
     } finally {
       setUrlFetching(false);
     }
@@ -638,7 +642,7 @@ export default function UploadPage() {
                         data-testid="upload-url-input"
                         value={pasteUrl}
                         onChange={(e) => setPasteUrl(e.target.value)}
-                        placeholder="Veo · Vimeo · Google Drive · .mp4 link"
+                        placeholder="Vimeo · Google Drive · .mp4 link"
                         className="flex-1 px-3 py-2.5 bg-cream-soft border border-gray-border focus:border-volt outline-none text-sm font-mono"
                         disabled={urlFetching}
                       />
@@ -654,8 +658,10 @@ export default function UploadPage() {
                       </button>
                     </div>
                     <p className="text-[10px] text-ink/55 leading-relaxed">
-                      Best with Veo, Vimeo, Google Drive shared links or any direct .mp4 / .mov URL.
-                      YouTube downloads are currently blocked by YouTube — please upload the file directly instead.
+                      Best with Vimeo, Google Drive shared links or any direct .mp4 / .mov URL.
+                      <span className="block mt-1 text-forest font-bold">
+                        Veo &amp; YouTube links can&apos;t be fetched directly — download the clip to your device, then use &ldquo;Upload File&rdquo; above.
+                      </span>
                       Max 200 MB · max 5 min.
                     </p>
                   </div>

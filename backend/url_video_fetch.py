@@ -31,24 +31,44 @@ MAX_BYTES = 200 * 1024 * 1024  # 200 MB
 DOWNLOAD_TIMEOUT_SEC = 120
 
 ALLOWED_DOMAINS_HINT = (
-    "Most public video URLs work: Veo, Vimeo, Hudl public shares, "
+    "Most public video URLs work: Vimeo, Hudl public shares, "
     "Google Drive shared links, or any direct .mp4 / .mov / .webm URL. "
     "YouTube downloads from our servers are currently blocked by YouTube — "
-    "please use one of the alternatives above or upload the file directly."
+    "please use one of the alternatives above or upload the file directly. "
+    "Veo match recordings are typically several GB and longer than our "
+    "5-minute analysis window — please download a short clip from Veo "
+    "(Open clip → ⋯ → Download) and upload the MP4 directly."
 )
 
 
 class UrlFetchRequest(BaseModel):
-    url: AnyHttpUrl = Field(description="Public URL to a video (Veo, Vimeo, Google Drive, direct MP4, …).")
+    url: AnyHttpUrl = Field(description="Public URL to a video (Vimeo, Google Drive, direct MP4, …).")
 
 
 # ---- Domain detection -----------------------------------------------------
 _YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "m.youtube.com", "music.youtube.com")
+# Veo clip URLs (`app.veo.co/clubs/<club>/clips/<uuid>/`) are NOT supported by
+# yt-dlp's Veo extractor (only `/matches/<slug>/`). Veo match recordings are
+# also typically 4+ GB / 90-min long — well above our 200 MB / 5-min caps.
+# Detect both patterns up-front so we can give a precise, actionable error
+# instead of a cryptic yt-dlp "Unsupported URL" or "file not found on disk".
+_VEO_CLIP_RX = re.compile(r"^https?://app\.veo\.co/clubs/[^/]+/clips/", re.IGNORECASE)
+_VEO_MATCH_RX = re.compile(r"^https?://app\.veo\.co/matches/", re.IGNORECASE)
 
 
 def _is_youtube(url: str) -> bool:
     u = url.lower()
     return any(h in u for h in _YOUTUBE_HOSTS)
+
+
+def _veo_help_message() -> str:
+    """The one piece of copy users see when they paste a Veo URL we can't
+    actually deliver through the pipeline. Keep it concrete and actionable."""
+    return (
+        "Veo links can't be fetched directly — full matches are several GB. "
+        "On Veo, open the clip → ⋯ → Download to save the MP4 to your device, "
+        "then use the 'Upload File' tab here. Max 5 min / 200 MB."
+    )
 
 
 def _friendly_error(url: str, raw_msg: str) -> str:
@@ -186,6 +206,16 @@ def build_url_fetch_router(*, upload_dir: Path, get_current_user) -> APIRouter:
         url = str(payload.url).strip()
         if len(url) > 1200:
             raise HTTPException(400, "URL is too long.")
+
+        # ── Veo-specific pre-check ───────────────────────────────────────
+        # Both Veo URL variants (clip share URLs and full match URLs) end
+        # up un-deliverable through our pipeline — clip URLs aren't in the
+        # yt-dlp extractor at all, and match URLs resolve to multi-GB
+        # 90-minute panoramic recordings that always exceed our 200 MB /
+        # 5-min caps. Tell the user exactly what to do instead of
+        # exposing the cryptic upstream error.
+        if _VEO_CLIP_RX.match(url) or _VEO_MATCH_RX.match(url):
+            raise HTTPException(400, _veo_help_message())
 
         # Per-user temp namespace so we can clean up later if we want
         token = uuid.uuid4().hex
