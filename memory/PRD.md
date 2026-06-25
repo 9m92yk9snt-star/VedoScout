@@ -26,6 +26,27 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 83 — Stripe subscriptions wired end-to-end (Feb 23 2026)**:
+  - User decisions: keep $159 single-report one-time, REMOVE $399 12-month plan, NO trial, full feature-gating from day 1, self-serve cancel/upgrade from dashboard (not Stripe Customer Portal).
+  - **New Stripe products** (auto-provisioned idempotently in LIVE Stripe at backend startup):
+    - Premium — `prod_Ulgp7BkJgA47VE` / `price_1Tm9RePyHKLMizP3A9KbZHiz` ($29.99/mo recurring, 5 uploads/mo)
+    - VIP Premium — `prod_Ulgpp7kNFTMeTL` / `price_1Tm9RePyHKLMizP3v0Si2CZi` ($49.99/mo recurring, unlimited uploads)
+    - Product+price IDs cached in `db.settings` under `stripe_subscription_premium` / `_vip` so subsequent boots are no-ops.
+  - **Backend (`/app/backend/server.py`)**:
+    - `SUBSCRIPTION_TIERS` catalog (single source of truth for tier name/desc/amount/monthly_upload_limit).
+    - `SubscribeInit` pydantic model (`tier` + `origin_url` — backend looks up price from Stripe to prevent client-side price manipulation).
+    - Helpers: `_ensure_subscription_products()`, `_get_subscription_price_id()`, `_subscription_state_from_stripe()`, `_has_active_subscription()`.
+    - Endpoints: `POST /api/payments/subscribe` (creates hosted Stripe Checkout in `mode=subscription`, reuses existing `stripe_customer_id` if present), `GET /api/payments/subscribe/status/{session_id}` (polls + idempotently writes `users.subscription`), `GET /api/me/subscription` (returns current sub + tier catalog), `POST /api/me/subscription/cancel` (sets `cancel_at_period_end=true`), `POST /api/me/subscription/resume` (un-cancels), `POST /api/me/subscription/change-tier` (Premium ↔ VIP with proration via `Subscription.modify(items=[...], proration_behavior='create_prorations')`).
+    - Extended `/api/me/upload-eligibility` to honor active subscriptions: Premium = 5 uploads/billing-period (counts `db.reports` created since `current_period_start`), VIP = unlimited. Subscription takes priority over prepaid/free credits.
+    - Extended `/api/webhook/stripe-embedded` with `kind='subscription'` activation branch + new event types `customer.subscription.created/updated/deleted` + `invoice.payment_succeeded/_failed` — webhook is the source of truth for renewal/cancel state, persists into `users.subscription`.
+  - **Frontend (`PricingTiers.jsx`)**: `goPremium`/`goVip` now call `POST /api/payments/subscribe` and full-redirect to the returned Stripe-hosted checkout URL. Cards show a Loader2 spinner while initialising. Anonymous users are routed to `/signup?plan=<tier>&next=/?subscribe=<tier>` so they finish account creation first.
+  - **Frontend (`DashboardPage.jsx`)**: NEW `SubscriptionCard` component (bottom of file) renders ONLY when user has an active subscription — shows tier name, monthly price, billing/cancellation date, and 3 self-serve actions: `subscription-change-tier-btn` (Upgrade to VIP / Switch to Premium with proration), `subscription-cancel-btn` (cancel at period end), `subscription-resume-btn` (un-cancel). Card colour-matches the tier (forest for Premium, ink for VIP with gold Crown). Also added a `?subscribe_session=<cs_>` URL poll on dashboard mount that fires after Stripe redirects back: polls `/payments/subscribe/status/{id}` up to 5×2s and toasts success when `payment_status='paid'`.
+  - **Verified by testing agent (iteration_32.json — 15/15 backend + 4/4 frontend pass)**:
+    - Backend: product+price provisioned at startup (verified in mongo settings); `/api/payments/subscribe` returns live Stripe checkout URL + creates `payment_transactions` row with `kind:'subscription'`; `/api/me/subscription/{cancel,resume,change-tier}` all return 400 cleanly when no active sub; webhook signature validation intact.
+    - Frontend: anonymous users routed to `/signup?plan=...`; logged-in users hit live Stripe checkout URL (test stopped before payment); SubscriptionCard correctly hidden when no subscription.
+  - **Stripe LIVE mode**: no test payment completed — the post-payment branch (`users.subscription` populated) is exercised by webhook + status-poll which were code-reviewed and unit-tested.
+  - **Files**: MODIFIED `/app/backend/server.py` (+~340 lines), `/app/frontend/src/components/PricingTiers.jsx` (+~30 lines), `/app/frontend/src/pages/DashboardPage.jsx` (+~140 lines incl. SubscriptionCard). NEW test `/app/backend/tests/test_subscriptions_iter32.py` (15 tests).
+
 - ✅ **🆕 Session 82 — Three-tier Pricing section on landing (Feb 23 2026) — UPDATED for mobile side-by-side carousel**:
   - User-supplied screenshot of a 3-tier pricing comparison (Free $0 / Premium $29.99 mo / VIP Premium $49.99 mo) — must be added **100% visually identical** on the minimal landing page directly below the upload hero. All 3 CTA buttons must be clickable.
   - **New component `/app/frontend/src/components/PricingTiers.jsx`** (~464 lines, self-contained):
