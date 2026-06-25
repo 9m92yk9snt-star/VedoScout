@@ -14,13 +14,15 @@
  * model ($159 single / $399 12-month). When the subscription backend
  * is built, only the `onClick` handlers below need to change.
  */
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Check, X, Crown, Star, Trophy, TrendingUp,
-  Shield, Users, BarChart3, Lock, ArrowRight, CreditCard,
+  Shield, Users, BarChart3, Lock, ArrowRight, CreditCard, Loader2,
 } from "lucide-react";
 
+import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 /* ── Plan data ───────────────────────────────────────────────────────── */
@@ -86,13 +88,41 @@ function CleatIcon({ className = "w-12 h-12", stroke = "#1F4F2F" }) {
 export default function PricingTiers() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [busyTier, setBusyTier] = useState(null);  // "premium" | "vip" | null
 
+  /* Free tier — no payment, just route to signup / upload */
   const goFree = () => {
     if (user) navigate("/upload");
     else navigate("/signup?plan=free");
   };
-  const goPremium = () => navigate(user ? "/upload?plan=premium" : "/signup?plan=premium");
-  const goVip = () => navigate(user ? "/upload?plan=vip" : "/signup?plan=vip");
+
+  /* Paid tiers — start a Stripe Checkout subscription session.
+     If the user isn't logged in yet, we send them to signup first
+     with `next` set so they land back here after creating an account. */
+  const startSubscription = async (tier) => {
+    if (!user) {
+      navigate(`/signup?plan=${tier}&next=/?subscribe=${tier}`);
+      return;
+    }
+    if (busyTier) return;
+    setBusyTier(tier);
+    try {
+      const { data } = await api.post("/payments/subscribe", {
+        tier,
+        origin_url: window.location.origin,
+      });
+      if (!data?.url) throw new Error("No checkout URL received");
+      // Full redirect to Stripe-hosted checkout
+      window.location.href = data.url;
+    } catch (err) {
+      const detail = err?.response?.data?.detail || err.message || "Could not start checkout.";
+      toast.error(detail, { duration: 8000 });
+      setBusyTier(null);
+    }
+  };
+
+  const goPremium = () => startSubscription("premium");
+  const goVip = () => startSubscription("vip");
 
   return (
     <section
@@ -112,8 +142,8 @@ export default function PricingTiers() {
         data-testid="pricing-tiers-cards"
       >
         <FreeCard onCta={goFree} />
-        <PremiumCard onCta={goPremium} />
-        <VipCard onCta={goVip} />
+        <PremiumCard onCta={goPremium} loading={busyTier === "premium"} disabled={!!busyTier && busyTier !== "premium"} />
+        <VipCard onCta={goVip} loading={busyTier === "vip"} disabled={!!busyTier && busyTier !== "vip"} />
       </div>
 
       {/* Trust badges row */}
@@ -212,7 +242,7 @@ function FreeCard({ onCta }) {
 /* ============================================================ */
 /*  PREMIUM CARD                                                 */
 /* ============================================================ */
-function PremiumCard({ onCta }) {
+function PremiumCard({ onCta, loading = false, disabled = false }) {
   return (
     <div
       data-testid="pricing-card-premium"
@@ -258,11 +288,11 @@ function PremiumCard({ onCta }) {
       <button
         type="button"
         onClick={onCta}
+        disabled={loading || disabled}
         data-testid="pricing-cta-premium"
-        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full bg-[#A5DD5F] hover:bg-[#B9E97A] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all"
+        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full bg-[#A5DD5F] hover:bg-[#B9E97A] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all disabled:opacity-60 disabled:cursor-wait"
       >
-        Start Premium
-        <ArrowRight className="hidden sm:inline w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Start Premium <ArrowRight className="hidden sm:inline w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>}
       </button>
     </div>
   );
@@ -271,7 +301,7 @@ function PremiumCard({ onCta }) {
 /* ============================================================ */
 /*  VIP CARD                                                     */
 /* ============================================================ */
-function VipCard({ onCta }) {
+function VipCard({ onCta, loading = false, disabled = false }) {
   return (
     <div
       data-testid="pricing-card-vip"
@@ -318,11 +348,11 @@ function VipCard({ onCta }) {
       <button
         type="button"
         onClick={onCta}
+        disabled={loading || disabled}
         data-testid="pricing-cta-vip"
-        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all"
+        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all disabled:opacity-60 disabled:cursor-wait"
       >
-        Go VIP
-        <ArrowRight className="hidden sm:inline w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Go VIP <ArrowRight className="hidden sm:inline w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>}
       </button>
     </div>
   );

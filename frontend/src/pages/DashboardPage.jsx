@@ -8,7 +8,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
   Plus, Lock, CheckCircle2, Film, Loader2, Rocket, TrendingUp, AlertCircle,
-  Activity, ArrowRight, Sparkles, Zap,
+  Activity, ArrowRight, Sparkles, Zap, Crown, Calendar, XCircle, RefreshCw,
 } from "lucide-react";
 
 const VERDICT_META = {
@@ -32,12 +32,17 @@ export default function DashboardPage() {
   // PricingCards / Landing already use).
   const [passPrice, setPassPrice] = useState(null);
 
+  // Subscription state — { subscription: {...}, tiers: {...} } from /api/me/subscription
+  const [subscription, setSubscription] = useState(null);
+  const [tiers, setTiers] = useState({});
+
   const fetchAll = () => {
     Promise.allSettled([
       api.get("/reports/mine").then(({ data }) => setReports(data)),
       api.get("/progress/players").then(({ data }) => setPlayers(data.items || [])),
       api.get("/progress/pass/status").then(({ data }) => setPassState(data)),
       api.get("/settings/price").then(({ data }) => setPassPrice(data.pass_price)),
+      api.get("/me/subscription").then(({ data }) => { setSubscription(data.subscription); setTiers(data.tiers || {}); }),
     ]).finally(() => setLoading(false));
   };
 
@@ -56,6 +61,36 @@ export default function DashboardPage() {
       params.delete("open_pass");
       const newSearch = params.toString();
       navigate({ pathname: location.pathname, search: newSearch ? `?${newSearch}` : "" }, { replace: true });
+    }
+
+    // Subscription return handler — Stripe redirects back here after
+    // checkout success with `?subscribe_session=cs_xxx`. We poll the
+    // status endpoint (max ~10s) which idempotently persists the
+    // subscription on the user record and surfaces a success toast.
+    const subSession = params.get("subscribe_session");
+    if (subSession) {
+      params.delete("subscribe_session");
+      const newSearch = params.toString();
+      navigate({ pathname: location.pathname, search: newSearch ? `?${newSearch}` : "" }, { replace: true });
+
+      const poll = async (attempts = 0) => {
+        if (attempts > 5) {
+          toast.info("Subscription confirmation taking a bit longer — refresh in a moment.", { duration: 8000 });
+          return;
+        }
+        try {
+          const { data } = await api.get(`/payments/subscribe/status/${subSession}`);
+          if (data.payment_status === "paid") {
+            setSubscription(data.subscription);
+            toast.success(`Welcome to ${data.tier === "vip" ? "VIP Premium" : "Premium"}! Your subscription is now active.`, { duration: 9000 });
+            return;
+          }
+          setTimeout(() => poll(attempts + 1), 2000);
+        } catch (err) {
+          toast.error(err?.response?.data?.detail || "Couldn't confirm subscription.");
+        }
+      };
+      poll();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search]);
@@ -134,6 +169,13 @@ export default function DashboardPage() {
                 passState={passState}
                 passPrice={passPrice}
                 onBuyClick={() => setPassModalOpen(true)}
+              />
+
+              {/* SUBSCRIPTION CARD (Premium / VIP) */}
+              <SubscriptionCard
+                subscription={subscription}
+                tiers={tiers}
+                onChange={(s) => setSubscription(s)}
               />
 
               {/* REPORTS (Library) — moved to top: this is the most-used
@@ -465,6 +507,141 @@ function ProgressPassBanner({ passState, passPrice, onBuyClick }) {
           </button>
           <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-white/50 text-center">Secure · Stripe · No subscription</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ────────────────────────────────────────────────────────────────────────
+ *  SUBSCRIPTION CARD — surfaces the user's active monthly plan (Premium /
+ *  VIP) with self-serve Cancel / Resume / Upgrade actions. Hidden entirely
+ *  for users without a subscription so the dashboard stays uncluttered for
+ *  one-time-purchase customers and free users.
+ * ──────────────────────────────────────────────────────────────────────── */
+function SubscriptionCard({ subscription, tiers, onChange }) {
+  const [busy, setBusy] = useState(null); // "cancel" | "resume" | "change" | null
+
+  if (!subscription || !subscription.tier) return null;
+
+  const tier = subscription.tier;
+  const conf = tiers[tier] || {};
+  const isVip = tier === "vip";
+  const otherTier = isVip ? "premium" : "vip";
+  const otherConf = tiers[otherTier] || {};
+  const willCancel = !!subscription.cancel_at_period_end;
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : null;
+  const isActive = ["active", "trialing", "past_due"].includes(subscription.status);
+
+  const doAction = async (action) => {
+    if (busy) return;
+    setBusy(action);
+    try {
+      let res;
+      if (action === "cancel") res = await api.post("/me/subscription/cancel");
+      else if (action === "resume") res = await api.post("/me/subscription/resume");
+      else if (action === "change") res = await api.post("/me/subscription/change-tier", { tier: otherTier, origin_url: window.location.origin });
+      onChange(res.data.subscription);
+      toast.success(
+        action === "cancel" ? `Cancellation scheduled. Access continues until ${periodEnd}.` :
+        action === "resume" ? "Subscription reactivated." :
+        `Plan changed to ${otherTier === "vip" ? "VIP Premium" : "Premium"} — proration applied on next invoice.`,
+        { duration: 8000 }
+      );
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Action failed.", { duration: 7000 });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div
+      data-testid="dashboard-subscription-card"
+      className={`mt-10 relative overflow-hidden border p-5 md:p-7 grid md:grid-cols-3 gap-5 items-center ${
+        isVip ? "bg-[#0A0F0D] border-[#1F2724] text-white" : "bg-[#0F3A22] border-forest text-white"
+      }`}
+    >
+      <div className="md:col-span-2">
+        <div className="flex items-center gap-2 mb-1">
+          {isVip ? <Crown className="w-4 h-4 text-[#F5C443]" fill="#F5C443" /> : <TrendingUp className="w-4 h-4 text-[#CCFF00]" />}
+          <span className={`text-[10px] uppercase tracking-[0.22em] font-bold ${isVip ? "text-[#F5C443]" : "text-[#CCFF00]"}`}>
+            Your subscription · {subscription.status}
+          </span>
+        </div>
+        <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tight">
+          {isVip ? "VIP Premium" : "Premium"}
+        </h3>
+        <p className="mt-1 text-sm text-white/70">
+          ${conf.amount?.toFixed(2) ?? "—"} / month ·{" "}
+          {isVip
+            ? "Unlimited uploads, scout review, direct contact"
+            : `${conf.monthly_upload_limit ?? "—"} uploads per month, advanced AI analysis`}
+        </p>
+        {periodEnd && (
+          <p className={`mt-3 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] font-bold px-2.5 py-1 ${
+            willCancel ? "bg-amber-500/20 text-amber-200" : "bg-white/10 text-white/85"
+          }`}>
+            <Calendar className="w-3 h-3" />
+            {willCancel ? `Ends on ${periodEnd}` : `Next billing ${periodEnd}`}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2 md:items-end">
+        {isActive && !willCancel && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => doAction("change")}
+            data-testid="subscription-change-tier-btn"
+            className={`group w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 font-barlow font-black uppercase tracking-[0.16em] text-xs transition-all disabled:opacity-60 disabled:cursor-wait ${
+              isVip
+                ? "bg-white/10 hover:bg-white/15 text-white border border-white/20"
+                : "bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D]"
+            }`}
+          >
+            {busy === "change" ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+              <>
+                {isVip ? "Switch to Premium" : "Upgrade to VIP"}
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+        )}
+        {isActive && !willCancel && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => doAction("cancel")}
+            data-testid="subscription-cancel-btn"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 text-white/70 hover:text-white text-xs uppercase tracking-[0.18em] font-bold transition-colors disabled:opacity-60"
+          >
+            {busy === "cancel" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (
+              <><XCircle className="w-3.5 h-3.5" /> Cancel subscription</>
+            )}
+          </button>
+        )}
+        {willCancel && isActive && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => doAction("resume")}
+            data-testid="subscription-resume-btn"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 bg-[#CCFF00] hover:bg-[#D8FF33] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.16em] text-xs transition-all disabled:opacity-60 disabled:cursor-wait"
+          >
+            {busy === "resume" ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+              <><RefreshCw className="w-4 h-4" /> Reactivate</>
+            )}
+          </button>
+        )}
+        {otherConf?.amount && isActive && !willCancel && (
+          <p className="text-[10px] uppercase tracking-[0.18em] text-white/45 font-bold md:text-right">
+            ${otherConf.amount.toFixed(2)}/mo · proration applied
+          </p>
+        )}
       </div>
     </div>
   );

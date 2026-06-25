@@ -122,6 +122,28 @@ DEFAULT_SOCIAL_LINKS = {
 }
 PRICE_CURRENCY = os.environ.get("DEFAULT_REPORT_CURRENCY", "usd").lower()
 
+# ---- Subscription tier catalog ----
+# Single source of truth for the monthly subscription tiers shown on
+# the landing page. The actual Stripe Product + Price objects are
+# created idempotently on backend startup (see `_ensure_subscription_products`).
+# Upload limits gate the /api/me/upload-eligibility endpoint.
+SUBSCRIPTION_TIERS = {
+    "premium": {
+        "name": "ScoutMePlay Premium",
+        "description": "5 video reports per month · Advanced AI analysis · Progress tracking · PDF downloads · Scout database visibility",
+        "amount": 29.99,
+        "monthly_upload_limit": 5,
+    },
+    "vip": {
+        "name": "ScoutMePlay VIP Premium",
+        "description": "Unlimited reports · Elite AI analysis · Real scout review · Direct scout contact · Personalised scout feedback",
+        "amount": 49.99,
+        "monthly_upload_limit": None,   # None = unlimited
+    },
+}
+# A user record's `subscription.tier` will be one of {"free", "premium", "vip"}.
+# Free is implicit (no Stripe price/product); paid tiers are the keys above.
+
 # ---- App ----
 app = FastAPI(title="Elite Football AI Scout API")
 api_router = APIRouter(prefix="/api")
@@ -1944,6 +1966,14 @@ class CheckoutInit(BaseModel):
 
 
 class PrepayUploadInit(BaseModel):
+    origin_url: str
+
+
+class SubscribeInit(BaseModel):
+    """Frontend posts only the tier id + the originating window URL.
+    The actual price is looked up on the backend from SUBSCRIPTION_TIERS to
+    prevent any client-side price manipulation."""
+    tier: str = Field(description="'premium' or 'vip'")
     origin_url: str
 
 
@@ -6396,26 +6426,178 @@ async def download_public_sample_pdf():
 
 # ============== PAYMENTS (STRIPE) ==============
 
+# ---- Subscription helpers (recurring billing) ---------------------------
+#
+# Subscriptions use the raw Stripe SDK (mode="subscription") because
+# emergentintegrations.StripeCheckout only models one-time payments.
+# Product + Price objects are created idempotently on backend startup;
+# the resulting Stripe IDs are cached in `db.settings` keyed by
+# `stripe_subscription_<tier>` so we never duplicate products on
+# subsequent restarts.
+
+async def _ensure_subscription_products():
+    """At-startup: create (once) a Stripe Product + recurring monthly Price
+    for each tier in SUBSCRIPTION_TIERS. Stores the resulting price_id in
+    `db.settings` so subsequent boots are a no-op. Safe to call on every boot.
+    No-ops if Stripe keys are missing — the subscribe endpoint will fail
+    cleanly in that case with a 503."""
+    if not _embedded_ready():
+        logger.warning("Stripe live keys missing — subscription products NOT created. Add STRIPE_SECRET_KEY + STRIPE_PUBLISHABLE_KEY.")
+        return
+
+    _arm_real_stripe()
+    for tier_id, conf in SUBSCRIPTION_TIERS.items():
+        settings_key = f"stripe_subscription_{tier_id}"
+        existing = await db.settings.find_one({"key": settings_key}, {"_id": 0})
+        if existing and existing.get("value", {}).get("price_id"):
+            continue  # already provisioned
+
+        try:
+            product = stripe_sdk.Product.create(
+                name=conf["name"],
+                description=conf["description"],
+                metadata={
+                    **_SCOUTMEPLAY_METADATA,
+                    "tier": tier_id,
+                    "tier_kind": "subscription",
+                },
+            )
+            price = stripe_sdk.Price.create(
+                unit_amount=int(round(conf["amount"] * 100)),
+                currency=PRICE_CURRENCY,
+                recurring={"interval": "month"},
+                product=product.id,
+                metadata={"tier": tier_id},
+            )
+        except Exception:
+            logger.exception(f"Failed to provision Stripe product+price for tier '{tier_id}'")
+            continue
+
+        await db.settings.update_one(
+            {"key": settings_key},
+            {"$set": {
+                "key": settings_key,
+                "value": {
+                    "product_id": product.id,
+                    "price_id": price.id,
+                    "amount": conf["amount"],
+                    "currency": PRICE_CURRENCY,
+                },
+                "updated_at": now_iso(),
+            }},
+            upsert=True,
+        )
+        logger.info(f"Stripe provisioned tier '{tier_id}' → product {product.id} / price {price.id} (${conf['amount']}/mo)")
+
+
+async def _get_subscription_price_id(tier: str) -> Optional[str]:
+    doc = await db.settings.find_one({"key": f"stripe_subscription_{tier}"}, {"_id": 0})
+    return ((doc or {}).get("value") or {}).get("price_id")
+
+
+def _subscription_state_from_stripe(sub) -> Dict[str, Any]:
+    """Translate a Stripe Subscription object into the shape we persist on `users.subscription`.
+    Accepts either a SDK object or a webhook event dict."""
+    def g(k, default=None):
+        return sub.get(k, default) if isinstance(sub, dict) else getattr(sub, k, default)
+    items = g("items") or {}
+    items_data = (items.get("data") if isinstance(items, dict) else getattr(items, "data", None)) or []
+    first_item = items_data[0] if items_data else None
+    price_obj = (first_item.get("price") if isinstance(first_item, dict) else getattr(first_item, "price", None)) if first_item else None
+    price_id = (price_obj.get("id") if isinstance(price_obj, dict) else getattr(price_obj, "id", None)) if price_obj else None
+    md = g("metadata") or {}
+    tier = (md.get("tier") if isinstance(md, dict) else getattr(md, "tier", None))
+
+    def _ts_to_iso(ts):
+        if not ts:
+            return None
+        try:
+            return datetime.fromtimestamp(int(ts), tz=timezone.utc).isoformat()
+        except Exception:
+            return None
+
+    return {
+        "tier": tier,
+        "status": g("status"),
+        "stripe_customer_id": g("customer"),
+        "stripe_subscription_id": g("id"),
+        "stripe_price_id": price_id,
+        "current_period_end": _ts_to_iso(g("current_period_end")),
+        "current_period_start": _ts_to_iso(g("current_period_start")),
+        "cancel_at_period_end": bool(g("cancel_at_period_end")),
+        "canceled_at": _ts_to_iso(g("canceled_at")),
+        "ended_at": _ts_to_iso(g("ended_at")),
+        "updated_at": now_iso(),
+    }
+
+
+def _has_active_subscription(user: dict) -> Optional[str]:
+    """Return the active subscription tier ('premium'/'vip') if the user has one, else None."""
+    sub = (user or {}).get("subscription") or {}
+    sub_status = sub.get("status")
+    if sub_status in ("active", "trialing", "past_due"):  # past_due still gives access — Stripe retries before downgrading
+        return sub.get("tier")
+    return None
+
+
 @api_router.get("/me/upload-eligibility")
 async def get_upload_eligibility(user=Depends(get_current_user)):
-    """Tells the frontend whether the user can upload for free, must pre-pay, or is admin."""
+    """Tells the frontend whether the user can upload for free, must pre-pay, or is admin.
+
+    Subscription tiers (Premium / VIP) take precedence over prepaid credits —
+    if a user has both an active subscription AND prepaid uploads, the
+    subscription is used first so they preserve their one-off credits."""
     if user.get("role") == "admin":
         return {"eligible": True, "reason": "admin", "free_preview_used": True, "prepaid_uploads": 999,
-                "progress_pass": {"active": False, "credits_remaining": 0}}
+                "progress_pass": {"active": False, "credits_remaining": 0}, "subscription": None}
+
+    # Subscription check (Premium / VIP)
+    sub_tier = _has_active_subscription(user)
+    if sub_tier:
+        tier_conf = SUBSCRIPTION_TIERS.get(sub_tier, {})
+        limit = tier_conf.get("monthly_upload_limit")  # None = unlimited
+        # Count how many uploads in the current billing period
+        period_start = (user.get("subscription") or {}).get("current_period_start") or now_iso()
+        used = await db.reports.count_documents({
+            "user_id": user["id"],
+            "created_at": {"$gte": period_start},
+        })
+        remaining = None if limit is None else max(0, limit - used)
+        if limit is None or remaining > 0:
+            return {
+                "eligible": True,
+                "reason": "subscription",
+                "free_preview_used": bool(user.get("free_preview_used")),
+                "prepaid_uploads": int(user.get("prepaid_uploads", 0) or 0),
+                "progress_pass": _progress_pass_active(user),
+                "subscription": {"tier": sub_tier, "monthly_limit": limit, "used_this_period": used, "remaining": remaining},
+            }
+        # Subscription exhausted for this billing cycle — fall through to other reasons (prepaid/free still ok)
+
     free_used = bool(user.get("free_preview_used"))
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
     pass_state = _progress_pass_active(user)
+    subscription_block = None
+    if sub_tier:
+        # Communicate the cap so the frontend can show "5/5 used — resets at <date>"
+        tier_conf = SUBSCRIPTION_TIERS.get(sub_tier, {})
+        subscription_block = {
+            "tier": sub_tier,
+            "monthly_limit": tier_conf.get("monthly_upload_limit"),
+            "remaining": 0,
+            "exhausted": True,
+        }
     if not free_used:
         return {"eligible": True, "reason": "free_preview", "free_preview_used": False,
-                "prepaid_uploads": prepaid, "progress_pass": pass_state}
+                "prepaid_uploads": prepaid, "progress_pass": pass_state, "subscription": subscription_block}
     if prepaid > 0:
         return {"eligible": True, "reason": "prepaid", "free_preview_used": True,
-                "prepaid_uploads": prepaid, "progress_pass": pass_state}
+                "prepaid_uploads": prepaid, "progress_pass": pass_state, "subscription": subscription_block}
     if pass_state.get("active"):
         return {"eligible": True, "reason": "progress_pass", "free_preview_used": True,
-                "prepaid_uploads": 0, "progress_pass": pass_state}
+                "prepaid_uploads": 0, "progress_pass": pass_state, "subscription": subscription_block}
     return {"eligible": False, "reason": "prepay_required", "free_preview_used": True,
-            "prepaid_uploads": 0, "progress_pass": pass_state}
+            "prepaid_uploads": 0, "progress_pass": pass_state, "subscription": subscription_block}
 
 
 @api_router.post("/payments/prepay-upload")
@@ -6472,6 +6654,244 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
     await db.payment_transactions.insert_one(txn)
 
     return {"url": session.url, "session_id": session.session_id}
+
+
+# ============== SUBSCRIPTIONS (Premium / VIP) ==============
+
+@api_router.post("/payments/subscribe")
+async def create_subscription_checkout(payload: SubscribeInit, user=Depends(get_current_user)):
+    """Create a Stripe Checkout Session in `mode=subscription` for the chosen tier.
+
+    Only the tier id ('premium'|'vip') is accepted from the client — the price
+    is looked up from Stripe via the cached price_id, preventing client-side
+    price manipulation. Redirects through the hosted Stripe Checkout page.
+    """
+    tier = (payload.tier or "").lower().strip()
+    if tier not in SUBSCRIPTION_TIERS:
+        raise HTTPException(400, "Unknown subscription tier")
+    if not _embedded_ready():
+        raise HTTPException(503, "Subscription checkout not configured. Add Stripe live keys to enable.")
+    if _has_active_subscription(user):
+        raise HTTPException(409, "You already have an active subscription. Use the dashboard to change tier instead.")
+
+    price_id = await _get_subscription_price_id(tier)
+    if not price_id:
+        # Lazy-provision in case the startup hook hadn't completed yet
+        await _ensure_subscription_products()
+        price_id = await _get_subscription_price_id(tier)
+        if not price_id:
+            raise HTTPException(503, f"Stripe price for tier '{tier}' is not provisioned yet — try again in a moment.")
+
+    origin = payload.origin_url.rstrip("/")
+    success_url = f"{origin}/dashboard?subscribe_session={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/?subscribe_canceled=1"
+
+    metadata = _build_embedded_metadata({
+        "kind": "subscription",
+        "tier": tier,
+        "user_id": user["id"],
+        "user_email": user["email"],
+    })
+
+    try:
+        _arm_real_stripe()
+        # Reuse the user's existing Stripe customer if they have one (so all
+        # their invoices live under one customer in the Stripe dashboard).
+        existing_sub = (user.get("subscription") or {})
+        customer_id = existing_sub.get("stripe_customer_id")
+        session_kwargs = dict(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata=metadata,
+            subscription_data={"metadata": metadata},
+            allow_promotion_codes=True,
+        )
+        if customer_id:
+            session_kwargs["customer"] = customer_id
+        else:
+            session_kwargs["customer_email"] = user["email"]
+        session = stripe_sdk.checkout.Session.create(**session_kwargs)
+    except Exception as e:
+        logger.exception("Stripe subscription session create failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "report_id": None,
+        "kind": "subscription",
+        "tier": tier,
+        "ui_mode": "hosted",
+        "brand": "ScoutMePlay",
+        "amount": SUBSCRIPTION_TIERS[tier]["amount"],
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    })
+
+    return {"url": session.url, "session_id": session.id}
+
+
+@api_router.get("/payments/subscribe/status/{session_id}")
+async def get_subscription_status(session_id: str, user=Depends(get_current_user)):
+    """Poll endpoint — frontend calls this after Stripe redirects back. Verifies
+    the checkout session is paid and copies the subscription state to `users.subscription`.
+    Idempotent: side-effects only fire once per session via `txn.credited`."""
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not txn:
+        raise HTTPException(404, "Subscription session not found")
+    if txn["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(403, "Not authorized")
+
+    if txn.get("payment_status") == "paid" and txn.get("credited"):
+        # Re-fetch user to return current subscription state
+        u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+        return {"payment_status": "paid", "status": "complete", "kind": "subscription",
+                "tier": txn.get("tier"), "subscription": (u or {}).get("subscription")}
+
+    if not _embedded_ready():
+        raise HTTPException(503, "Stripe not configured.")
+
+    try:
+        _arm_real_stripe()
+        session = stripe_sdk.checkout.Session.retrieve(session_id, expand=["subscription"])
+    except Exception as e:
+        logger.exception("Stripe subscription status retrieve failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    new_payment_status = session.payment_status or "unpaid"
+    new_status = session.status or "open"
+
+    update = {"payment_status": new_payment_status, "status": new_status, "updated_at": now_iso()}
+    if new_payment_status == "paid" and not txn.get("credited") and session.subscription:
+        # Persist the subscription state onto the user record (single source of truth)
+        sub_state = _subscription_state_from_stripe(session.subscription)
+        # Tier from session metadata is authoritative (Stripe Price metadata may not be expanded)
+        sub_state["tier"] = txn.get("tier") or sub_state.get("tier")
+        sub_state["started_at"] = now_iso()
+        await db.users.update_one(
+            {"id": txn["user_id"]},
+            {"$set": {"subscription": sub_state}},
+        )
+        update["credited"] = True
+
+    await db.payment_transactions.update_one({"session_id": session_id}, {"$set": update})
+
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return {
+        "payment_status": new_payment_status,
+        "status": new_status,
+        "kind": "subscription",
+        "tier": txn.get("tier"),
+        "subscription": (u or {}).get("subscription"),
+    }
+
+
+@api_router.get("/me/subscription")
+async def get_my_subscription(user=Depends(get_current_user)):
+    """Return the user's current subscription block (or null if none)."""
+    return {"subscription": user.get("subscription"), "tiers": SUBSCRIPTION_TIERS}
+
+
+@api_router.post("/me/subscription/cancel")
+async def cancel_my_subscription(user=Depends(get_current_user)):
+    """Self-serve cancel — sets `cancel_at_period_end=True` so the user keeps access
+    until the end of their paid period. Stripe webhook will mark it `canceled` when
+    the period ends."""
+    sub = user.get("subscription") or {}
+    sub_id = sub.get("stripe_subscription_id")
+    if not sub_id or sub.get("status") not in ("active", "trialing", "past_due"):
+        raise HTTPException(400, "No active subscription to cancel")
+    if sub.get("cancel_at_period_end"):
+        raise HTTPException(400, "Subscription already scheduled for cancellation")
+    if not _embedded_ready():
+        raise HTTPException(503, "Stripe not configured")
+
+    try:
+        _arm_real_stripe()
+        updated = stripe_sdk.Subscription.modify(sub_id, cancel_at_period_end=True)
+    except Exception as e:
+        logger.exception("Stripe subscription cancel failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    state = {**sub, **_subscription_state_from_stripe(updated)}
+    state["tier"] = sub.get("tier")  # preserve canonical tier (metadata may be empty after modify)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"subscription": state}})
+    return {"subscription": state}
+
+
+@api_router.post("/me/subscription/resume")
+async def resume_my_subscription(user=Depends(get_current_user)):
+    """Un-cancel — clears `cancel_at_period_end` so billing continues."""
+    sub = user.get("subscription") or {}
+    sub_id = sub.get("stripe_subscription_id")
+    if not sub_id or not sub.get("cancel_at_period_end"):
+        raise HTTPException(400, "Subscription is not scheduled for cancellation")
+    if not _embedded_ready():
+        raise HTTPException(503, "Stripe not configured")
+
+    try:
+        _arm_real_stripe()
+        updated = stripe_sdk.Subscription.modify(sub_id, cancel_at_period_end=False)
+    except Exception as e:
+        logger.exception("Stripe subscription resume failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    state = {**sub, **_subscription_state_from_stripe(updated)}
+    state["tier"] = sub.get("tier")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"subscription": state}})
+    return {"subscription": state}
+
+
+@api_router.post("/me/subscription/change-tier")
+async def change_subscription_tier(payload: SubscribeInit, user=Depends(get_current_user)):
+    """Self-serve upgrade/downgrade between Premium ↔ VIP with proration.
+    Re-uses the SubscribeInit schema but only the `tier` field is read."""
+    new_tier = (payload.tier or "").lower().strip()
+    if new_tier not in SUBSCRIPTION_TIERS:
+        raise HTTPException(400, "Unknown subscription tier")
+    sub = user.get("subscription") or {}
+    sub_id = sub.get("stripe_subscription_id")
+    if not sub_id or sub.get("status") not in ("active", "trialing", "past_due"):
+        raise HTTPException(400, "No active subscription to change. Subscribe first.")
+    if sub.get("tier") == new_tier:
+        raise HTTPException(400, f"You are already on the {new_tier} plan")
+    if not _embedded_ready():
+        raise HTTPException(503, "Stripe not configured")
+
+    new_price = await _get_subscription_price_id(new_tier)
+    if not new_price:
+        raise HTTPException(503, f"Stripe price for '{new_tier}' not provisioned yet")
+
+    try:
+        _arm_real_stripe()
+        live = stripe_sdk.Subscription.retrieve(sub_id)
+        item_id = live["items"]["data"][0]["id"]
+        updated = stripe_sdk.Subscription.modify(
+            sub_id,
+            items=[{"id": item_id, "price": new_price}],
+            proration_behavior="create_prorations",
+            metadata={**(sub.get("metadata") or {}), "tier": new_tier},
+        )
+    except Exception as e:
+        logger.exception("Stripe subscription change-tier failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    state = {**sub, **_subscription_state_from_stripe(updated)}
+    state["tier"] = new_tier
+    state["changed_at"] = now_iso()
+    await db.users.update_one({"id": user["id"]}, {"$set": {"subscription": state}})
+    return {"subscription": state}
+
+
+# ============== PAYMENTS (legacy one-time) ==============
 
 
 @api_router.post("/payments/checkout")
@@ -6993,6 +7413,91 @@ async def stripe_webhook_embedded(request: Request):
                             "updated_at": now_iso(),
                         }},
                     )
+        elif kind == "subscription":
+            # First-time subscription activation. The Stripe Subscription
+            # object is referenced via `session.subscription` (str id). We
+            # already persist most state in /payments/subscribe/status, but
+            # the webhook is the source-of-truth in case the user closes the
+            # tab before the success poll runs.
+            user_id = metadata.get("user_id") or (txn or {}).get("user_id")
+            sub_id = session.get("subscription")
+            if user_id and sub_id and not (txn or {}).get("credited"):
+                try:
+                    _arm_real_stripe()
+                    live = stripe_sdk.Subscription.retrieve(sub_id)
+                    sub_state = _subscription_state_from_stripe(live)
+                    sub_state["tier"] = metadata.get("tier") or sub_state.get("tier")
+                    sub_state["started_at"] = now_iso()
+                    await db.users.update_one(
+                        {"id": user_id},
+                        {"$set": {"subscription": sub_state}},
+                    )
+                except Exception:
+                    logger.exception("Webhook subscription activation failed")
+            if txn:
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {
+                        "payment_status": "paid",
+                        "status": "complete",
+                        "credited": True,
+                        "updated_at": now_iso(),
+                    }},
+                )
+
+    # --- Recurring subscription lifecycle (renewal, cancel, downgrade) ---
+    elif event["type"] in (
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
+        "customer.subscription.created",
+    ):
+        sub_obj = event["data"]["object"]
+        sub_id = sub_obj.get("id")
+        md = sub_obj.get("metadata") or {}
+        # Find the user — first via metadata.user_id (set when we created the
+        # checkout session), fall back to looking up by stripe_customer_id.
+        user_id = md.get("user_id")
+        target = None
+        if user_id:
+            target = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+        if not target:
+            target = await db.users.find_one(
+                {"subscription.stripe_subscription_id": sub_id},
+                {"_id": 0, "password_hash": 0},
+            )
+        if target:
+            existing = target.get("subscription") or {}
+            new_state = _subscription_state_from_stripe(sub_obj)
+            # Preserve our canonical tier — Stripe metadata might be stripped on some events.
+            new_state["tier"] = md.get("tier") or existing.get("tier") or new_state.get("tier")
+            # Preserve started_at across updates
+            if existing.get("started_at"):
+                new_state["started_at"] = existing.get("started_at")
+            await db.users.update_one({"id": target["id"]}, {"$set": {"subscription": new_state}})
+            logger.info(f"Subscription event {event['type']} → user {target['id']} status={new_state.get('status')} tier={new_state.get('tier')}")
+
+    # Invoice events — useful for analytics + handling payment failures.
+    elif event["type"] in ("invoice.payment_succeeded", "invoice.payment_failed"):
+        inv = event["data"]["object"]
+        sub_id = inv.get("subscription")
+        if sub_id:
+            # Mirror the resulting subscription state so the user record stays current.
+            try:
+                _arm_real_stripe()
+                live = stripe_sdk.Subscription.retrieve(sub_id)
+                tier_pre = await db.users.find_one(
+                    {"subscription.stripe_subscription_id": sub_id},
+                    {"_id": 0, "subscription.tier": 1, "id": 1},
+                )
+                if tier_pre:
+                    new_state = _subscription_state_from_stripe(live)
+                    new_state["tier"] = (tier_pre.get("subscription") or {}).get("tier") or new_state.get("tier")
+                    await db.users.update_one(
+                        {"id": tier_pre["id"]},
+                        {"$set": {"subscription": new_state}},
+                    )
+            except Exception:
+                logger.exception("Webhook invoice handling failed")
 
     return {"received": True}
 
@@ -7484,6 +7989,14 @@ async def on_startup():
     pr = await db.settings.find_one({"key": "report_price"})
     if not pr:
         await db.settings.insert_one({"key": "report_price", "value": DEFAULT_PRICE, "updated_at": now_iso()})
+
+    # Provision Stripe subscription products + recurring prices (idempotent).
+    # Safe no-op if Stripe live keys are missing; only writes to Stripe on the
+    # first call after either tier was added or settings were cleared.
+    try:
+        await _ensure_subscription_products()
+    except Exception:
+        logger.exception("Subscription product provisioning failed on startup (will retry lazily)")
 
 
 @app.on_event("shutdown")
