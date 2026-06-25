@@ -14,7 +14,7 @@
  * model ($159 single / $399 12-month). When the subscription backend
  * is built, only the `onClick` handlers below need to change.
  */
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Check, X, Crown, Star, Trophy, TrendingUp,
@@ -86,46 +86,6 @@ function CleatIcon({ className = "w-12 h-12", stroke = "#1F4F2F" }) {
 export default function PricingTiers() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const railRef = useRef(null);
-  const [activeIdx, setActiveIdx] = useState(1); // Premium is the default focus on mobile (matches the "MOST POPULAR" tier)
-
-  // On mobile, center the Premium card (idx 1) on first paint so the user
-  // immediately sees the recommended tier — they can swipe left for Free
-  // or right for VIP.
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    if (window.matchMedia("(min-width: 768px)").matches) return;
-    const card = rail.children[1];
-    if (!card) return;
-    const offset = card.offsetLeft - (rail.clientWidth - card.clientWidth) / 2;
-    rail.scrollTo({ left: offset, behavior: "auto" });
-  }, []);
-
-  // Track which card is centered to power the dot indicator.
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const centre = rail.scrollLeft + rail.clientWidth / 2;
-        let best = 0, bestDist = Infinity;
-        for (let i = 0; i < rail.children.length; i++) {
-          const c = rail.children[i];
-          if (!c.offsetWidth) continue;
-          const cCentre = c.offsetLeft + c.offsetWidth / 2;
-          const d = Math.abs(cCentre - centre);
-          if (d < bestDist) { bestDist = d; best = i; }
-        }
-        // Only first 3 children are pricing cards (rest are hint dots etc., but they're outside this rail).
-        if (best <= 2) setActiveIdx(best);
-      });
-    };
-    rail.addEventListener("scroll", onScroll, { passive: true });
-    return () => { rail.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
-  }, []);
 
   const goFree = () => {
     if (user) navigate("/upload");
@@ -137,56 +97,23 @@ export default function PricingTiers() {
   return (
     <section
       data-testid="pricing-tiers"
-      className="relative px-6 md:px-10 py-16 md:py-24 border-b border-gray-border bg-cream-base overflow-hidden"
+      className="relative px-3 sm:px-6 md:px-10 py-10 sm:py-16 md:py-24 border-b border-gray-border bg-cream-base overflow-hidden"
     >
       {/* Section heading + player silhouette */}
       <Header />
 
-      {/* Three pricing cards.
-          ── Mobile (< md): horizontal scroll-snap carousel. All three cards
-             sit side-by-side in a flex row; the user swipes to reveal each
-             one. ~88vw per card so the next card peeks in from the edge as
-             a visual hint that more content is to the right.
-          ── md+ : regular 3-column grid as before. */}
+      {/* Three pricing cards — always 3 columns side-by-side, even on mobile.
+          Compressed paddings and font sizes on mobile make the content fit
+          on a 360–400 px-wide phone screen while keeping the design intent
+          from the user-provided screenshot (all plans visible at a glance,
+          no swiping required). */}
       <div
-        ref={railRef}
-        className="mt-12 md:mt-14 max-w-6xl mx-auto relative
-                   flex md:grid md:grid-cols-3
-                   gap-4 md:gap-6
-                   overflow-x-auto md:overflow-visible
-                   snap-x snap-mandatory md:snap-none
-                   -mx-6 px-6 md:mx-0 md:px-0
-                   pb-3 md:pb-0
-                   [scrollbar-width:none] [-ms-overflow-style:none]
-                   [&::-webkit-scrollbar]:hidden"
+        className="mt-8 sm:mt-12 md:mt-14 max-w-6xl mx-auto grid grid-cols-3 gap-1.5 sm:gap-4 md:gap-6"
         data-testid="pricing-tiers-cards"
       >
-        <div className="snap-center shrink-0 w-[88vw] sm:w-[60vw] md:w-auto flex">
-          <FreeCard onCta={goFree} />
-        </div>
-        <div className="snap-center shrink-0 w-[88vw] sm:w-[60vw] md:w-auto flex">
-          <PremiumCard onCta={goPremium} />
-        </div>
-        <div className="snap-center shrink-0 w-[88vw] sm:w-[60vw] md:w-auto flex">
-          <VipCard onCta={goVip} />
-        </div>
-      </div>
-
-      {/* Mobile swipe hint dots — visible only when horizontal scroll is in play */}
-      <div
-        aria-hidden
-        data-testid="pricing-tiers-swipe-hint"
-        className="md:hidden mt-3 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50"
-      >
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className={`inline-block rounded-full transition-all duration-200 ${
-              activeIdx === i ? "w-4 h-1.5 bg-forest" : "w-1.5 h-1.5 bg-forest/30"
-            }`}
-          />
-        ))}
-        <span className="ml-1.5">Swipe to compare plans</span>
+        <FreeCard onCta={goFree} />
+        <PremiumCard onCta={goPremium} />
+        <VipCard onCta={goVip} />
       </div>
 
       {/* Trust badges row */}
@@ -211,7 +138,7 @@ function Header() {
         <div className="md:max-w-[68%]">
           <h2
             data-testid="pricing-tiers-title"
-            className="font-barlow font-black uppercase tracking-tighter leading-[0.92] text-4xl sm:text-5xl md:text-6xl"
+            className="font-barlow font-black uppercase tracking-tighter leading-[0.92] text-2xl sm:text-4xl md:text-6xl"
           >
             <span className="text-ink">Compare </span>
             <span className="text-forest">Plans</span><br />
@@ -241,29 +168,30 @@ function FreeCard({ onCta }) {
   return (
     <div
       data-testid="pricing-card-free"
-      className="relative bg-cream-card border border-gray-border p-6 md:p-7 flex flex-col w-full"
+      className="relative bg-cream-card border border-gray-border p-2 sm:p-5 md:p-7 flex flex-col w-full"
     >
-      <div className="flex justify-center mb-4">
-        <CleatIcon />
+      <div className="flex justify-center mb-2 sm:mb-4">
+        <CleatIcon className="w-7 h-7 sm:w-10 sm:h-10 md:w-12 md:h-12" />
       </div>
 
-      <h3 className="text-center font-barlow font-black uppercase text-2xl text-ink tracking-tight">
+      <h3 className="text-center font-barlow font-black uppercase text-sm sm:text-xl md:text-2xl text-ink tracking-tight">
         Free
       </h3>
-      <div className="text-center mt-1">
-        <span className="font-barlow font-black text-4xl text-ink">$0</span>
-        <span className="block text-[11px] uppercase tracking-[0.22em] text-ink/60 font-bold">
+      <div className="text-center mt-0.5 sm:mt-1">
+        <span className="font-barlow font-black text-xl sm:text-3xl md:text-4xl text-ink">$0</span>
+        <span className="block text-[8px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.22em] text-ink/60 font-bold">
           / month
         </span>
       </div>
 
-      <p className="mt-3 text-center text-sm text-ink/65 leading-snug">
-        Perfect for getting started<br />and exploring.
+      <p className="mt-2 sm:mt-3 text-center text-[10px] sm:text-sm text-ink/65 leading-snug">
+        <span className="hidden sm:inline">Perfect for getting started<br />and exploring.</span>
+        <span className="sm:hidden">Start here.</span>
       </p>
 
-      <div className="my-5 h-px bg-gray-border" />
+      <div className="my-3 sm:my-5 h-px bg-gray-border" />
 
-      <ul className="space-y-2.5 flex-1">
+      <ul className="space-y-1.5 sm:space-y-2.5 flex-1">
         {FREE_FEATURES.map((f, i) => (
           <FeatureItem key={i} {...f} tone="forest" />
         ))}
@@ -273,7 +201,7 @@ function FreeCard({ onCta }) {
         type="button"
         onClick={onCta}
         data-testid="pricing-cta-free"
-        className="mt-6 group inline-flex items-center justify-center gap-2 w-full border-2 border-ink/85 text-ink hover:bg-ink hover:text-cream-base font-barlow font-black uppercase tracking-[0.2em] text-sm py-3.5 transition-all"
+        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full border-2 border-ink/85 text-ink hover:bg-ink hover:text-cream-base font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all"
       >
         Get Started
       </button>
@@ -288,39 +216,40 @@ function PremiumCard({ onCta }) {
   return (
     <div
       data-testid="pricing-card-premium"
-      className="relative bg-[#0F3A22] border border-forest p-6 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(15,58,34,0.55)] w-full"
+      className="relative bg-[#0F3A22] border border-forest p-2 sm:p-5 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(15,58,34,0.55)] w-full"
     >
       {/* MOST POPULAR badge — half-overlapping the top edge */}
       <span
         aria-hidden
-        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#A5DD5F] text-[#0F3A22] text-[10px] uppercase tracking-[0.18em] font-black shadow-md whitespace-nowrap"
+        className="absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-[#A5DD5F] text-[#0F3A22] text-[7px] sm:text-[10px] uppercase tracking-[0.1em] sm:tracking-[0.18em] font-black shadow-md whitespace-nowrap"
       >
-        <Star className="w-3 h-3 fill-current" /> Most popular
+        <Star className="w-2 h-2 sm:w-3 sm:h-3 fill-current" /> Most popular
       </span>
 
-      <div className="flex justify-center mb-3 mt-2">
-        <span className="w-14 h-14 rounded-full bg-white flex items-center justify-center">
-          <TrendingUp className="w-7 h-7 text-[#0F3A22]" strokeWidth={2.6} />
+      <div className="flex justify-center mb-2 sm:mb-3 mt-1 sm:mt-2">
+        <span className="w-8 h-8 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full bg-white flex items-center justify-center">
+          <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#0F3A22]" strokeWidth={2.6} />
         </span>
       </div>
 
-      <h3 className="text-center font-barlow font-black uppercase text-2xl tracking-tight">
+      <h3 className="text-center font-barlow font-black uppercase text-sm sm:text-xl md:text-2xl tracking-tight">
         Premium
       </h3>
-      <div className="text-center mt-1">
-        <span className="font-barlow font-black text-5xl text-[#CCFF00]">$29.99</span>
-        <span className="block text-[11px] uppercase tracking-[0.22em] text-white/70 font-bold mt-1">
+      <div className="text-center mt-0.5 sm:mt-1">
+        <span className="font-barlow font-black text-xl sm:text-3xl md:text-5xl text-[#CCFF00]">$29.99</span>
+        <span className="block text-[8px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.22em] text-white/70 font-bold mt-0.5 sm:mt-1">
           / month
         </span>
       </div>
 
-      <p className="mt-3 text-center text-sm text-white/75 leading-snug">
-        Take your development<br />seriously.
+      <p className="mt-2 sm:mt-3 text-center text-[10px] sm:text-sm text-white/75 leading-snug">
+        <span className="hidden sm:inline">Take your development<br />seriously.</span>
+        <span className="sm:hidden">Develop seriously.</span>
       </p>
 
-      <div className="my-5 h-px bg-white/15" />
+      <div className="my-3 sm:my-5 h-px bg-white/15" />
 
-      <ul className="space-y-2.5 flex-1">
+      <ul className="space-y-1.5 sm:space-y-2.5 flex-1">
         {PREMIUM_FEATURES.map((f, i) => (
           <FeatureItem key={i} {...f} tone="lime" dark />
         ))}
@@ -330,10 +259,10 @@ function PremiumCard({ onCta }) {
         type="button"
         onClick={onCta}
         data-testid="pricing-cta-premium"
-        className="mt-6 group inline-flex items-center justify-center gap-2 w-full bg-[#A5DD5F] hover:bg-[#B9E97A] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.2em] text-sm py-3.5 transition-all"
+        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full bg-[#A5DD5F] hover:bg-[#B9E97A] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all"
       >
         Start Premium
-        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+        <ArrowRight className="hidden sm:inline w-4 h-4 transition-transform group-hover:translate-x-0.5" />
       </button>
     </div>
   );
@@ -346,39 +275,41 @@ function VipCard({ onCta }) {
   return (
     <div
       data-testid="pricing-card-vip"
-      className="relative bg-[#0A0F0D] border border-[#1F2724] p-6 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(0,0,0,0.65)] w-full"
+      className="relative bg-[#0A0F0D] border border-[#1F2724] p-2 sm:p-5 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(0,0,0,0.65)] w-full"
     >
       {/* BEST VALUE badge */}
       <span
         aria-hidden
-        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F5C443] text-[#0A0F0D] text-[10px] uppercase tracking-[0.18em] font-black shadow-md whitespace-nowrap"
+        className="absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-[#F5C443] text-[#0A0F0D] text-[7px] sm:text-[10px] uppercase tracking-[0.1em] sm:tracking-[0.18em] font-black shadow-md whitespace-nowrap"
       >
-        <Trophy className="w-3 h-3 fill-current" /> Best value
+        <Trophy className="w-2 h-2 sm:w-3 sm:h-3 fill-current" /> Best value
       </span>
 
-      <div className="flex justify-center mb-3 mt-2">
-        <span className="w-14 h-14 rounded-full bg-transparent border border-[#F5C443]/35 flex items-center justify-center">
-          <Crown className="w-7 h-7 text-[#F5C443]" strokeWidth={2.2} fill="#F5C443" />
+      <div className="flex justify-center mb-2 sm:mb-3 mt-1 sm:mt-2">
+        <span className="w-8 h-8 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full bg-transparent border border-[#F5C443]/35 flex items-center justify-center">
+          <Crown className="w-4 h-4 sm:w-6 sm:h-6 md:w-7 md:h-7 text-[#F5C443]" strokeWidth={2.2} fill="#F5C443" />
         </span>
       </div>
 
-      <h3 className="text-center font-barlow font-black uppercase text-2xl tracking-tight">
-        VIP Premium
+      <h3 className="text-center font-barlow font-black uppercase text-sm sm:text-xl md:text-2xl tracking-tight">
+        <span className="hidden sm:inline">VIP Premium</span>
+        <span className="sm:hidden">VIP</span>
       </h3>
-      <div className="text-center mt-1">
-        <span className="font-barlow font-black text-5xl text-[#F5C443]">$49.99</span>
-        <span className="block text-[11px] uppercase tracking-[0.22em] text-white/70 font-bold mt-1">
+      <div className="text-center mt-0.5 sm:mt-1">
+        <span className="font-barlow font-black text-xl sm:text-3xl md:text-5xl text-[#F5C443]">$49.99</span>
+        <span className="block text-[8px] sm:text-[11px] uppercase tracking-[0.15em] sm:tracking-[0.22em] text-white/70 font-bold mt-0.5 sm:mt-1">
           / month
         </span>
       </div>
 
-      <p className="mt-3 text-center text-sm text-white/75 leading-snug">
-        Maximum exposure.<br />Maximum opportunities.
+      <p className="mt-2 sm:mt-3 text-center text-[10px] sm:text-sm text-white/75 leading-snug">
+        <span className="hidden sm:inline">Maximum exposure.<br />Maximum opportunities.</span>
+        <span className="sm:hidden">Max exposure.</span>
       </p>
 
-      <div className="my-5 h-px bg-white/15" />
+      <div className="my-3 sm:my-5 h-px bg-white/15" />
 
-      <ul className="space-y-2.5 flex-1">
+      <ul className="space-y-1.5 sm:space-y-2.5 flex-1">
         {VIP_FEATURES.map((f, i) => (
           <FeatureItem key={i} {...f} tone="gold" dark />
         ))}
@@ -388,10 +319,10 @@ function VipCard({ onCta }) {
         type="button"
         onClick={onCta}
         data-testid="pricing-cta-vip"
-        className="mt-6 group inline-flex items-center justify-center gap-2 w-full bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.2em] text-sm py-3.5 transition-all"
+        className="mt-3 sm:mt-6 group inline-flex items-center justify-center gap-1 sm:gap-2 w-full bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.12em] sm:tracking-[0.2em] text-[10px] sm:text-sm py-2 sm:py-3.5 transition-all"
       >
         Go VIP
-        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+        <ArrowRight className="hidden sm:inline w-4 h-4 transition-transform group-hover:translate-x-0.5" />
       </button>
     </div>
   );
@@ -412,17 +343,17 @@ function FeatureItem({ label, included, tone = "forest", dark = false }) {
     : included ? "text-ink" : "text-ink/45";
 
   return (
-    <li className="flex items-start gap-2.5">
+    <li className="flex items-start gap-1 sm:gap-2.5">
       <span
         aria-hidden
-        className={`shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center ${included ? t.bg : t.off}`}
+        className={`shrink-0 mt-0.5 w-3 h-3 sm:w-5 sm:h-5 rounded-full flex items-center justify-center ${included ? t.bg : t.off}`}
       >
         {included
-          ? <Check className={`w-3 h-3 ${dark ? "text-[#0F3A22]" : "text-white"}`} strokeWidth={3.5} />
-          : <X className={`w-3 h-3 ${dark ? "text-white/60" : "text-ink/55"}`} strokeWidth={3} />
+          ? <Check className={`w-2 h-2 sm:w-3 sm:h-3 ${dark ? "text-[#0F3A22]" : "text-white"}`} strokeWidth={3.5} />
+          : <X className={`w-2 h-2 sm:w-3 sm:h-3 ${dark ? "text-white/60" : "text-ink/55"}`} strokeWidth={3} />
         }
       </span>
-      <span className={`text-[13px] leading-snug ${textCls}`}>
+      <span className={`text-[9px] sm:text-[13px] leading-tight sm:leading-snug ${textCls}`}>
         {label}
       </span>
     </li>
