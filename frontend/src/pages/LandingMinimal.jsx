@@ -17,7 +17,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck, Send } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
-import PricingCards from "@/components/PricingCards";
+import PricingTiers from "@/components/PricingTiers";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -85,8 +85,8 @@ export default function LandingMinimal() {
       {/* ─────────── 2. HERO (USER UPLOAD + SIGN) ─────────── */}
       <HeroSection onPrimaryCta={handlePrimaryCta} isLoggedIn={!!user} />
 
-      {/* ─────────── 3. PRICING ─────────── */}
-      <PricingSection isLoggedIn={!!user} />
+      {/* ─────────── 3. PRICING (Free · Premium · VIP Premium) ─────────── */}
+      <PricingTiers />
 
       {/* ─────────── 4. FAQ ─────────── */}
       <FAQSection />
@@ -213,41 +213,6 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             Free preview · No card to start
           </p>
         </motion.div>
-      </div>
-    </section>
-  );
-}
-
-/* ============================================================ */
-/*  PRICING                                                      */
-/* ============================================================ */
-function PricingSection({ isLoggedIn }) {
-  return (
-    <section
-      data-testid="pricing-minimal"
-      className="relative px-6 md:px-10 py-16 md:py-24 border-b border-gray-border bg-cream-base"
-    >
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-10 md:mb-14">
-          <div className="inline-flex items-center gap-2.5 mb-3">
-            <span aria-hidden className="h-px w-8 bg-forest/35" />
-            <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
-              Simple pricing · No subscription
-            </span>
-            <span aria-hidden className="h-px w-8 bg-forest/35" />
-          </div>
-          <h2 className="font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95] text-ink">
-            One honest price.<br />
-            <span className="text-forest">No hidden costs.</span>
-          </h2>
-        </div>
-
-        <PricingCards
-          variant="landing"
-          ctaSingle="Get My Report"
-          ctaPass="Start The 12-Month Plan"
-          isLoggedIn={isLoggedIn}
-        />
       </div>
     </section>
   );
