@@ -14,7 +14,7 @@
  * model ($159 single / $399 12-month). When the subscription backend
  * is built, only the `onClick` handlers below need to change.
  */
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Check, X, Crown, Star, Trophy, TrendingUp,
@@ -86,6 +86,46 @@ function CleatIcon({ className = "w-12 h-12", stroke = "#1F4F2F" }) {
 export default function PricingTiers() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const railRef = useRef(null);
+  const [activeIdx, setActiveIdx] = useState(1); // Premium is the default focus on mobile (matches the "MOST POPULAR" tier)
+
+  // On mobile, center the Premium card (idx 1) on first paint so the user
+  // immediately sees the recommended tier — they can swipe left for Free
+  // or right for VIP.
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+    const card = rail.children[1];
+    if (!card) return;
+    const offset = card.offsetLeft - (rail.clientWidth - card.clientWidth) / 2;
+    rail.scrollTo({ left: offset, behavior: "auto" });
+  }, []);
+
+  // Track which card is centered to power the dot indicator.
+  useEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const centre = rail.scrollLeft + rail.clientWidth / 2;
+        let best = 0, bestDist = Infinity;
+        for (let i = 0; i < rail.children.length; i++) {
+          const c = rail.children[i];
+          if (!c.offsetWidth) continue;
+          const cCentre = c.offsetLeft + c.offsetWidth / 2;
+          const d = Math.abs(cCentre - centre);
+          if (d < bestDist) { bestDist = d; best = i; }
+        }
+        // Only first 3 children are pricing cards (rest are hint dots etc., but they're outside this rail).
+        if (best <= 2) setActiveIdx(best);
+      });
+    };
+    rail.addEventListener("scroll", onScroll, { passive: true });
+    return () => { rail.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
+  }, []);
 
   const goFree = () => {
     if (user) navigate("/upload");
@@ -102,14 +142,51 @@ export default function PricingTiers() {
       {/* Section heading + player silhouette */}
       <Header />
 
-      {/* Three pricing cards */}
+      {/* Three pricing cards.
+          ── Mobile (< md): horizontal scroll-snap carousel. All three cards
+             sit side-by-side in a flex row; the user swipes to reveal each
+             one. ~88vw per card so the next card peeks in from the edge as
+             a visual hint that more content is to the right.
+          ── md+ : regular 3-column grid as before. */}
       <div
-        className="mt-12 md:mt-14 max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6 relative"
+        ref={railRef}
+        className="mt-12 md:mt-14 max-w-6xl mx-auto relative
+                   flex md:grid md:grid-cols-3
+                   gap-4 md:gap-6
+                   overflow-x-auto md:overflow-visible
+                   snap-x snap-mandatory md:snap-none
+                   -mx-6 px-6 md:mx-0 md:px-0
+                   pb-3 md:pb-0
+                   [scrollbar-width:none] [-ms-overflow-style:none]
+                   [&::-webkit-scrollbar]:hidden"
         data-testid="pricing-tiers-cards"
       >
-        <FreeCard onCta={goFree} />
-        <PremiumCard onCta={goPremium} />
-        <VipCard onCta={goVip} />
+        <div className="snap-center shrink-0 w-[88vw] sm:w-[60vw] md:w-auto flex">
+          <FreeCard onCta={goFree} />
+        </div>
+        <div className="snap-center shrink-0 w-[88vw] sm:w-[60vw] md:w-auto flex">
+          <PremiumCard onCta={goPremium} />
+        </div>
+        <div className="snap-center shrink-0 w-[88vw] sm:w-[60vw] md:w-auto flex">
+          <VipCard onCta={goVip} />
+        </div>
+      </div>
+
+      {/* Mobile swipe hint dots — visible only when horizontal scroll is in play */}
+      <div
+        aria-hidden
+        data-testid="pricing-tiers-swipe-hint"
+        className="md:hidden mt-3 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/50"
+      >
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className={`inline-block rounded-full transition-all duration-200 ${
+              activeIdx === i ? "w-4 h-1.5 bg-forest" : "w-1.5 h-1.5 bg-forest/30"
+            }`}
+          />
+        ))}
+        <span className="ml-1.5">Swipe to compare plans</span>
       </div>
 
       {/* Trust badges row */}
@@ -164,7 +241,7 @@ function FreeCard({ onCta }) {
   return (
     <div
       data-testid="pricing-card-free"
-      className="relative bg-cream-card border border-gray-border p-6 md:p-7 flex flex-col"
+      className="relative bg-cream-card border border-gray-border p-6 md:p-7 flex flex-col w-full"
     >
       <div className="flex justify-center mb-4">
         <CleatIcon />
@@ -211,7 +288,7 @@ function PremiumCard({ onCta }) {
   return (
     <div
       data-testid="pricing-card-premium"
-      className="relative bg-[#0F3A22] border border-forest p-6 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(15,58,34,0.55)]"
+      className="relative bg-[#0F3A22] border border-forest p-6 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(15,58,34,0.55)] w-full"
     >
       {/* MOST POPULAR badge — half-overlapping the top edge */}
       <span
@@ -269,7 +346,7 @@ function VipCard({ onCta }) {
   return (
     <div
       data-testid="pricing-card-vip"
-      className="relative bg-[#0A0F0D] border border-[#1F2724] p-6 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(0,0,0,0.65)]"
+      className="relative bg-[#0A0F0D] border border-[#1F2724] p-6 md:p-7 flex flex-col text-white shadow-[0_24px_48px_-16px_rgba(0,0,0,0.65)] w-full"
     >
       {/* BEST VALUE badge */}
       <span
