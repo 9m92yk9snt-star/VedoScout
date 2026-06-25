@@ -26,6 +26,29 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 82 — Three-tier Pricing section on landing (Feb 23 2026)**:
+  - User-supplied screenshot of a 3-tier pricing comparison (Free $0 / Premium $29.99 mo / VIP Premium $49.99 mo) — must be added **100% visually identical** on the minimal landing page directly below the upload hero. All 3 CTA buttons must be clickable.
+  - **New component `/app/frontend/src/components/PricingTiers.jsx`** (~464 lines, self-contained):
+    - **Header**: "Compare **Plans** / Choose **your path** / to the next level" headline with selective forest accents, "Powerful tools. Professional insights." subtitle, "Built for U7–U21 players" forest pill.
+    - **Free card** (cream, `pricing-card-free`): inline-SVG cleat icon, "$0/month", "Perfect for getting started and exploring.", 11-item feature list (4 checked + 7 unchecked), "Get Started" outline CTA (`pricing-cta-free`).
+    - **Premium card** (`#0F3A22` dark forest, `pricing-card-premium`): "★ Most popular" lime pill half-overlapping the top edge, `TrendingUp` icon in white circle, "$29.99/month" in lime, "Take your development seriously.", 10-item list (7 checked + 3 unchecked), "Start Premium" lime CTA (`pricing-cta-premium`).
+    - **VIP card** (`#0A0F0D` ink, `pricing-card-vip`): "🏆 Best value" gold pill, gold Crown icon in bordered circle, "$49.99/month" in gold, "Maximum exposure. Maximum opportunities.", 7-item list (all checked, gold), "Go VIP" gold CTA (`pricing-cta-vip`).
+    - **Trust row** (`pricing-trust-row`, 4 columns): Shield/Trusted, Users/Connected, BarChart3/Data-driven, Lock/Secure.
+    - **Journey strip** (`pricing-journey-strip`, dark forest with lime accents): "Your journey · Our mission." + "Upload your video" lime outline CTA (`pricing-journey-cta`).
+    - **Payment footer** (`pricing-payment-footer`): "No credit card required to start" + Apple Pay + Google Pay + Card icons.
+  - **CTA routing** (placeholder for future subscription checkout):
+    - Anonymous user → `/signup?plan=<free|premium|vip>` (signup page can later read the `plan` query param and pre-select)
+    - Logged-in user → `/upload?plan=<premium|vip>` (Free CTA → `/upload`)
+  - **Wired into landing**: `LandingMinimal.jsx` now renders `<PricingTiers />` between the hero and the FAQ; the old simple `<PricingSection />` (with `<PricingCards />`) was removed since the new tiers replace it.
+  - **No backend changes** — current one-time-purchase model ($159 single / $399 12-month plan) is untouched. When the subscription backend is built, only the CTA handlers in `PricingTiers.jsx` need to call the new checkout endpoint.
+  - **Verified by testing agent (iteration_31.json — 15/15 pass)**:
+    - DOM order: hero → pricing-tiers → faq (correct)
+    - All cards/CTAs/badges/feature counts exact ($0 / $29.99 / $49.99; 11 / 10 / 7 features; MOST POPULAR + BEST VALUE labels)
+    - CTA routing for both anonymous (`/signup?plan=…`) and logged-in (`/upload?plan=…`) flows
+    - Mobile (375×812): cards stack vertically, all CTAs ≥44px tap target
+    - Regression: FAQ accordion + footer + login flow unaffected
+  - **Files**: CREATED `/app/frontend/src/components/PricingTiers.jsx`. MODIFIED `/app/frontend/src/pages/LandingMinimal.jsx` (swapped pricing section).
+
 - ✅ **🆕 Session 81 — Veo URL fetch pre-check + clear error UX (Feb 23 2026)**:
   - User-reported (Danish): "Jeg kan ikke uploade eller fetche veo link i upload" — pasting a Veo link returned a cryptic `Could not download that video: ERROR: Unsupported URL: https://app.veo.co/clubs/broendby-if-pige-talent/clips/8af91277.../`.
   - **Root cause (two stacked issues)**:
