@@ -26,6 +26,34 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 84 — Retire $399 12-month plan + native UpgradeBanner on dashboard (Feb 23 2026)**:
+  - User decisions: keep ONLY legacy active pass holders (they retain their 365-day window + remaining credits), retire the buy flow everywhere else, replace the dashboard's old marketing banner with a **native upgrade section** for Free users — most professional, non-confusing, well-integrated into the dashboard layout.
+  - **Dashboard (`DashboardPage.jsx`)**:
+    - **REMOVED**: `EmbeddedCheckoutModal` import + usage, `passModalOpen` state, `passPrice` state, `startPassCheckout` helper, `onPassSuccess` handler, `?open_pass=1` URL handler, the marketing/buy `ProgressPassBanner` variant.
+    - **RENAMED → split**: old `ProgressPassBanner` is now `LegacyPassActiveBanner` — renders only when `passState?.active === true` (preserves the experience for users who already purchased the $399 pass; they keep their remaining credits + expiry display).
+    - **NEW `UpgradeBanner`** component: renders only when user has NO subscription AND NO active legacy pass. Cream card with eyebrow "Unlock your full potential", headline "Ready for more? Upgrade your plan.", and two side-by-side mini-cards: forest-green Premium $29.99/mo (MOST POPULAR pill + Start Premium lime CTA) + black VIP $49.99/mo (BEST VALUE pill + Go VIP gold CTA). Both buttons call `POST /api/payments/subscribe` and full-redirect to Stripe Checkout (same flow as landing PricingTiers). Includes Loader2 spinner per-button + "Secure Stripe · Cancel anytime from your dashboard" trust line.
+    - **PlayerRow `onUpgradeClick`** changed from opening a modal to `scrollIntoView({behavior:'smooth'})` on the UpgradeBanner — the user sees all plan options in their dashboard context instead of a single-modal upsell.
+    - **Conditional gate**: `SubscriptionCard` shows when user has a sub; `LegacyPassActiveBanner` shows when they have an active pass; `UpgradeBanner` shows when they have NEITHER. Mutually exclusive — never double-promote.
+    - **`isPremium` flag** now true if user has EITHER a subscription OR an active pass — PlayerRow lock icons disappear correctly for both.
+  - **Admin (`AdminPage.jsx`)**:
+    - **REMOVED**: the entire "12-month plan price" settings card (input + save button + display label).
+    - **REMOVED dead code**: `passPrice`/`passPriceInput`/`savingPassPrice` state, `setPassPrice`/`setPassPriceInput` calls in fetch, `handlePassPriceSave` handler. Settings tab now contains: Single Report Price ($159), Active Landing Variant toggle, Social Links — clean.
+  - **Landing FAQ (`LandingMinimal.jsx`)**:
+    - FAQ question updated: "What's the difference between the single report and the 12-month plan?" → **"What's the difference between the single report and the monthly plans?"**.
+    - FAQ answer rewritten to compare `$${price} single report` (one-off) vs Premium $29.99/mo + VIP $49.99/mo subscriptions. No mention of $399 or "3 reports across 365 days".
+    - Removed `passPrice` state + setter from FAQ section (no longer needed).
+  - **Backwards-compat preserved**:
+    - `GET /api/settings/price` still returns `pass_price` field (kept for any client cache that hasn't been refreshed).
+    - `/api/progress/pass/*` backend endpoints unchanged → existing pass holders continue working seamlessly.
+    - `PUT /api/admin/pass-price` endpoint unchanged on backend (admin no longer has UI to call it, but no breakage).
+  - **Verified by testing agent (iteration_33.json — 100% pass: 7/7 backend + 14/14 frontend)**:
+    - Free user dashboard: old $399 promo banner GONE; new dashboard-upgrade-banner visible with $29.99 + $49.99 cards and MOST POPULAR / BEST VALUE chips. Premium CTA → POST /api/payments/subscribe → redirect to checkout.stripe.com. Same for VIP.
+    - Admin Settings tab: no 12-month price card; Single Report Price ($159) + Active Landing Variant + Social Links still functional. Zero console errors.
+    - Landing FAQ: new wording verified, $29.99 + $49.99 in answer, no $399.
+    - Mobile (390×844): cards stack vertically in upgrade banner (sm:grid-cols-2 on larger screens).
+    - Regression: GET /api/me/subscription still returns {subscription:null, tiers:{...}} for free users; /api/settings/price still returns pass_price for backward-compat; legacy /progress/pass/* endpoints untouched.
+  - **Files MODIFIED**: `/app/frontend/src/pages/DashboardPage.jsx`, `/app/frontend/src/pages/AdminPage.jsx`, `/app/frontend/src/pages/LandingMinimal.jsx`. NEW test `/app/backend/tests/test_iter33_upgrade_banner.py`.
+
 - ✅ **🆕 Session 83 — Stripe subscriptions wired end-to-end (Feb 23 2026)**:
   - User decisions: keep $159 single-report one-time, REMOVE $399 12-month plan, NO trial, full feature-gating from day 1, self-serve cancel/upgrade from dashboard (not Stripe Customer Portal).
   - **New Stripe products** (auto-provisioned idempotently in LIVE Stripe at backend startup):

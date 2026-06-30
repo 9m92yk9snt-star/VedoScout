@@ -49,10 +49,7 @@ export default function AdminPage() {
   const [messages, setMessages] = useState([]);
   const [price, setPrice] = useState(1);
   const [priceInput, setPriceInput] = useState("");
-  const [passPrice, setPassPrice] = useState(1);
-  const [passPriceInput, setPassPriceInput] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
-  const [savingPassPrice, setSavingPassPrice] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Social links (admin-editable)
@@ -86,8 +83,6 @@ export default function AdminPage() {
         const [pr] = await Promise.all([api.get("/settings/price")]);
         setPrice(pr.data.price);
         setPriceInput(String(pr.data.price));
-        setPassPrice(pr.data.pass_price ?? 399);
-        setPassPriceInput(String(pr.data.pass_price ?? 399));
       } else {
         const [s, r, u, p, pr, m, bd] = await Promise.all([
           api.get("/admin/stats"),
@@ -104,8 +99,6 @@ export default function AdminPage() {
         setPayments(p.data);
         setPrice(pr.data.price);
         setPriceInput(String(pr.data.price));
-        setPassPrice(pr.data.pass_price ?? 399);
-        setPassPriceInput(String(pr.data.pass_price ?? 399));
         setMessages(m.data);
         setBlogDraftCount((bd.data?.items || []).length);
         if (pr.data.social) {
@@ -141,24 +134,6 @@ export default function AdminPage() {
       toast.error("Failed to update price");
     } finally {
       setSavingPrice(false);
-    }
-  };
-
-  const handlePassPriceSave = async () => {
-    const v = parseFloat(passPriceInput);
-    if (!v || v <= 0) {
-      toast.error("Enter a valid positive price");
-      return;
-    }
-    setSavingPassPrice(true);
-    try {
-      await api.put("/admin/pass-price", { price: v });
-      setPassPrice(v);
-      toast.success(`12-month plan price updated to $${v} USD`);
-    } catch (err) {
-      toast.error("Failed to update 12-month plan price");
-    } finally {
-      setSavingPassPrice(false);
     }
   };
 
