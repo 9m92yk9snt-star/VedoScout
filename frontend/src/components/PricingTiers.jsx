@@ -302,10 +302,12 @@ function MobileCarousel({ cards }) {
     <div className="md:hidden mt-8" data-testid="pricing-tiers-cards-mobile">
       {/* Edge-bleed swipe track. Each card is sized so 2 cards + a peek of
           the next are visible on a 390 px viewport — telegraphs swipeability
-          (per user spec "se 2 og lidt af 3"). */}
+          (per user spec "se 2 og lidt af 3"). The `pt-5` reserves vertical
+          space above the card body so floating top badges (-top-3) don't get
+          clipped by the overflow-x-auto scroll container. */}
       <div
         ref={trackRef}
-        className="-mx-6 px-6 flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4"
+        className="-mx-6 px-6 flex gap-3 overflow-x-auto snap-x snap-mandatory scroll-smooth pt-5 pb-4"
         style={{ scrollbarWidth: "none" }}
       >
         {cards.map((c, i) => (
@@ -375,7 +377,7 @@ function FreeCard({ onCta }) {
   return (
     <article
       data-testid="pricing-card-free"
-      className="relative bg-cream-card border border-gray-border p-3 md:p-6 flex flex-col w-full overflow-hidden"
+      className="relative bg-cream-card border border-gray-border p-3 md:p-6 flex flex-col w-full"
     >
       {/* Subtle dotted pattern on mobile */}
       <div
@@ -427,7 +429,7 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-single"
-      className="relative bg-cream-base border-2 border-ink p-3 md:p-6 flex flex-col w-full overflow-hidden"
+      className="relative bg-cream-base border-2 border-ink p-3 md:p-6 flex flex-col w-full"
       style={{ boxShadow: "8px 8px 0 0 rgba(10,26,18,0.95)" }}
     >
       {/* Diagonal stripe pattern */}
@@ -501,7 +503,7 @@ function PremiumCard({ price, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-premium"
-      className="relative bg-[#0F3A22] border border-forest p-3 md:p-6 flex flex-col text-white w-full overflow-hidden"
+      className="relative bg-[#0F3A22] border border-forest p-3 md:p-6 flex flex-col text-white w-full"
       style={{ boxShadow: "0 24px 48px -16px rgba(15,58,34,0.55)" }}
     >
       {/* Radial glow pattern on mobile */}
@@ -558,7 +560,7 @@ function VipCard({ price, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-vip"
-      className="relative bg-[#0A0F0D] border border-[#1F2724] p-3 md:p-6 flex flex-col text-white w-full overflow-hidden"
+      className="relative bg-[#0A0F0D] border border-[#1F2724] p-3 md:p-6 flex flex-col text-white w-full"
       style={{ boxShadow: "0 24px 48px -16px rgba(0,0,0,0.65)" }}
     >
       {/* Sparkle dot pattern on mobile */}
