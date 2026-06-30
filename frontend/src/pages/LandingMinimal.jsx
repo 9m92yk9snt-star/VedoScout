@@ -326,7 +326,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             initial={{ opacity: 0, y: 20, rotate: -8 }}
             animate={{ opacity: 1, y: 0, rotate: -4 }}
             transition={{ duration: 0.75, delay: 0.4, ease: "easeOut" }}
-            className="hidden md:block absolute -bottom-8 -left-10 w-[44%] z-10"
+            className="absolute -bottom-6 md:-bottom-8 -left-4 md:-left-10 w-[55%] md:w-[44%] z-10"
             data-testid="hero-floating-report"
           >
             <div
@@ -345,9 +345,9 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
                 className="block w-full h-auto"
               />
               {/* Bottom strip with score */}
-              <div className="bg-forest text-white px-3 py-2 flex items-center justify-between border-t border-ink">
-                <span className="text-[9px] uppercase tracking-[0.22em] font-bold">Scout report</span>
-                <span className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt">
+              <div className="bg-forest text-white px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-between border-t border-ink">
+                <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold">Scout report</span>
+                <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold text-volt">
                   4-pillar · 48h
                 </span>
               </div>
@@ -359,25 +359,25 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.55 }}
-            className="hidden md:flex absolute -top-4 -right-3 z-10 bg-ink text-cream-base px-4 py-3 items-center gap-3 border border-ink"
+            className="absolute -top-3 md:-top-4 -right-2 md:-right-3 z-10 bg-ink text-cream-base px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 border border-ink"
             style={{
               boxShadow:
                 "0 18px 36px -10px rgba(10,26,18,0.4)",
             }}
           >
-            <span className="w-9 h-9 bg-volt text-ink flex items-center justify-center font-barlow font-black text-base leading-none">
+            <span className="w-7 md:w-9 h-7 md:h-9 bg-volt text-ink flex items-center justify-center font-barlow font-black text-sm md:text-base leading-none">
               7.8
             </span>
             <div className="text-left">
-              <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt">Overall score</div>
-              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-cream-base/80">U14 · AMF</div>
+              <div className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold text-volt">Overall</div>
+              <div className="text-[9px] md:text-[11px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-bold text-cream-base/80">U14 · AMF</div>
             </div>
           </motion.div>
         </motion.div>
       </div>
 
       {/* HERO LIVE-TICKER — below the composition, full width */}
-      <div className="relative max-w-6xl mx-auto mt-12 md:mt-16 pt-6 border-t border-forest/15 flex flex-wrap items-center justify-center md:justify-between gap-x-8 gap-y-3">
+      <div className="relative max-w-6xl mx-auto mt-16 md:mt-16 pt-6 border-t border-forest/15 flex flex-wrap items-center justify-center md:justify-between gap-x-6 md:gap-x-8 gap-y-3">
         <span className="text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold text-ink/45 flex items-center gap-2">
           <span aria-hidden className="relative flex items-center justify-center w-1.5 h-1.5 shrink-0">
             <span className="absolute inset-0 rounded-full bg-forest animate-ping opacity-60" />
@@ -385,10 +385,10 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
           </span>
           Live · scouting now
         </span>
-        <div className="flex items-center gap-6 md:gap-10 text-[10px] md:text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55">
-          <span><span className="text-forest font-black">+128</span> reports this month</span>
-          <span className="hidden sm:inline"><span className="text-forest font-black">12 countries</span></span>
-          <span><span className="text-forest font-black">98%</span> 48h delivery</span>
+        <div className="flex items-center gap-4 md:gap-10 text-[9px] md:text-[11px] uppercase tracking-[0.2em] md:tracking-[0.22em] font-bold text-ink/55 flex-wrap justify-center">
+          <span><span className="text-forest font-black">+128</span> reports / mo</span>
+          <span><span className="text-forest font-black">12</span> countries</span>
+          <span><span className="text-forest font-black">98%</span> 48h</span>
         </div>
       </div>
     </section>

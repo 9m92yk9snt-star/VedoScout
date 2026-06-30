@@ -167,7 +167,12 @@ export function HowItWorks() {
       sub="From phone-footage to a real scout report in under five minutes of your time."
       tight
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+      <div className="relative grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+        {/* Vertical timeline line — only visible on mobile (stacked layout) */}
+        <span
+          aria-hidden
+          className="md:hidden absolute left-7 top-12 bottom-12 w-[2px] bg-gradient-to-b from-forest via-forest/30 to-forest"
+        />
         {steps.map((s, idx) => (
           <motion.div
             key={s.n}
@@ -176,9 +181,17 @@ export function HowItWorks() {
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
             data-testid={`how-step-${s.n}`}
-            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300"
+            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 md:ml-0 ml-0"
           >
-            {/* Image tile (16:9) */}
+            {/* Mobile step circle marker — sits on the vertical timeline */}
+            <span
+              aria-hidden
+              className="md:hidden absolute top-4 left-4 z-10 w-7 h-7 rounded-full bg-forest text-white border-2 border-cream-base flex items-center justify-center font-barlow font-black text-[11px]"
+            >
+              {s.n}
+            </span>
+
+            {/* Image tile (16:10 ratio) */}
             <div className="relative aspect-[16/10] bg-ink overflow-hidden">
               <img
                 src={s.img}
@@ -192,13 +205,13 @@ export function HowItWorks() {
               {/* Forest tint overlay for cohesion */}
               <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-forest/30 via-transparent to-transparent" />
               {/* Eyebrow chip */}
-              <span className="absolute top-3 left-3 bg-volt text-ink text-[9px] uppercase tracking-[0.22em] font-black px-2 py-1">
+              <span className="absolute top-3 right-3 md:right-auto md:left-3 bg-volt text-ink text-[9px] uppercase tracking-[0.22em] font-black px-2 py-1">
                 {s.eyebrow}
               </span>
-              {/* Giant numeral, bottom right */}
+              {/* Giant numeral, bottom right (desktop only — mobile uses the timeline dot) */}
               <span
                 aria-hidden
-                className="absolute bottom-1 right-3 font-barlow font-black text-[88px] leading-none text-cream-base/35 select-none"
+                className="hidden md:block absolute bottom-1 right-3 font-barlow font-black text-[88px] leading-none text-cream-base/35 select-none"
                 style={{ WebkitTextStroke: "1px rgba(204,255,0,0.55)" }}
               >
                 {s.n}
@@ -265,19 +278,31 @@ export function WhatsInside() {
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.45, delay: idx * 0.06 }}
               data-testid={`feature-${idx}`}
-              className="group relative bg-cream-card border border-gray-border p-5 md:p-6 hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 flex gap-4 md:gap-5"
+              className="group relative bg-cream-card border border-gray-border p-5 md:p-6 hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 flex gap-4 md:gap-5 overflow-hidden"
             >
-              {/* Vertical accent strip */}
+              {/* Subtle dotted background pattern (mobile + desktop) */}
+              <div
+                aria-hidden
+                className="absolute inset-0 opacity-[0.04] pointer-events-none"
+                style={{
+                  backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+                  backgroundSize: "16px 16px",
+                }}
+              />
+              {/* Vertical accent strip — visible on every breakpoint */}
               <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px] bg-forest/10 group-hover:bg-forest transition-colors" />
-              <span className="shrink-0 w-12 h-12 bg-forest text-white border border-forest flex items-center justify-center">
+              {/* Top-right corner bracket */}
+              <span aria-hidden className="absolute top-2 right-2 w-3 h-3 border-r border-t border-forest/30 group-hover:border-forest transition-colors" />
+
+              <span className="relative shrink-0 w-12 h-12 bg-forest text-white border border-forest flex items-center justify-center">
                 <Icon className="w-5 h-5" strokeWidth={2.1} />
               </span>
-              <div className="min-w-0 flex-1">
+              <div className="relative min-w-0 flex-1">
                 <div className="flex items-baseline gap-3">
                   <h3 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink leading-tight">
                     {f.title}
                   </h3>
-                  <span aria-hidden className="hidden md:block flex-1 h-px bg-forest/15" />
+                  <span aria-hidden className="flex-1 h-px bg-forest/15" />
                 </div>
                 <p className="mt-1.5 text-sm md:text-[15px] text-ink/65 leading-relaxed">{f.body}</p>
               </div>
@@ -301,31 +326,43 @@ export function ImageStrip() {
       data-testid="image-strip"
       className="relative bg-ink overflow-hidden border-b border-gray-border"
     >
-      <div className="relative aspect-[21/9] md:aspect-[21/8] w-full">
-        <img
-          src={IMG("feature-strip.png")}
-          alt="Training session at dusk"
-          loading="lazy"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/40 to-transparent" />
-        <div className="absolute inset-0 flex items-center px-6 md:px-12">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 mb-3">
-              <span className="w-8 h-px bg-volt" />
+      {/* Mobile: 5:6 portrait aspect so the headline gets real estate.
+          Desktop: 21:8 cinematic strip. */}
+      <div className="relative aspect-[5/6] md:aspect-[21/8] w-full">
+        <picture>
+          {/* Square crop optimised for mobile */}
+          <source media="(max-width: 767px)" srcSet={IMG("imagestrip-mobile.png")} />
+          <img
+            src={IMG("feature-strip.png")}
+            alt="Training session at dusk"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </picture>
+        {/* Mobile uses a bottom-to-top dark scrim so text is at the bottom; desktop keeps the left-to-right scrim */}
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-ink/90 md:from-ink/85 via-ink/35 md:via-ink/40 to-transparent" />
+        {/* Mobile decorative corner brackets */}
+        <span aria-hidden className="md:hidden absolute top-4 left-4 w-5 h-5 border-l-2 border-t-2 border-volt" />
+        <span aria-hidden className="md:hidden absolute top-4 right-4 w-5 h-5 border-r-2 border-t-2 border-volt" />
+
+        <div className="absolute inset-0 flex items-end md:items-center px-6 pb-8 md:pb-0 md:px-12">
+          <div className="max-w-2xl text-center md:text-left mx-auto md:mx-0">
+            <div className="inline-flex items-center gap-2 mb-3 justify-center md:justify-start">
+              <span className="w-6 md:w-8 h-px bg-volt" />
               <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
                 Real scouts · Real evidence
               </span>
+              <span className="md:hidden w-6 h-px bg-volt" />
             </div>
             <h3 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl text-cream-base leading-[0.9]">
               Built for the<br />
               <span className="text-volt">next level.</span>
             </h3>
-            <p className="mt-4 text-cream-base/75 text-sm md:text-base max-w-md leading-relaxed">
-              Pro Scout Intelligence reviews every frame — then a real scout signs off on every premium report.
+            <p className="mt-4 text-cream-base/75 text-sm md:text-base max-w-md mx-auto md:mx-0 leading-relaxed">
+              Pro Scout Intelligence reviews every frame &mdash; then a real scout signs off on every premium report.
             </p>
           </div>
         </div>

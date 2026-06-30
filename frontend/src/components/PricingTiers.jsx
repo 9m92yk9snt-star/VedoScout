@@ -375,18 +375,46 @@ function FreeCard({ onCta }) {
   return (
     <article
       data-testid="pricing-card-free"
-      className="relative bg-cream-card border border-gray-border p-3 md:p-6 flex flex-col w-full"
+      className="relative bg-cream-card border border-gray-border p-3 md:p-6 flex flex-col w-full overflow-hidden"
     >
+      {/* Subtle dotted pattern on mobile */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.05] pointer-events-none md:hidden"
+        style={{
+          backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+          backgroundSize: "14px 14px",
+        }}
+      />
+      {/* Corner brackets */}
+      <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-forest/30 md:hidden" />
+      <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-forest/30 md:hidden" />
+      {/* Live-pulse dot */}
+      <span aria-hidden className="absolute top-2 right-2 hidden md:hidden">
+        <span className="relative flex items-center justify-center w-1.5 h-1.5">
+          <span className="absolute inset-0 rounded-full bg-forest animate-ping opacity-60" />
+          <span className="relative rounded-full w-1 h-1 bg-forest" />
+        </span>
+      </span>
+      {/* Tier badge image (mobile only - shown above title) */}
+      <img
+        src={IMG("badge-free.png")}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="md:hidden mx-auto w-12 h-12 object-contain mt-1 -mb-1"
+      />
       <BadgeHeader tone="ghost" icon={Sparkles} label="Start" />
       <Title size="md" className="text-ink">Free</Title>
       <Price amount="$0" suffix="/ month" tone="ink" />
-      <SubLine className="text-ink/65">Try a free preview. No card required.</SubLine>
+      <SubLine className="text-ink/65 hidden md:block">Try a free preview. No card required.</SubLine>
       <Divider />
       <FeatureList items={FREE_FEATURES} tone="forest" />
       <Cta
         onClick={onCta}
         data-testid="pricing-cta-free"
-        className="mt-4 w-full border-2 border-ink/85 text-ink hover:bg-ink hover:text-cream-base"
+        className="relative mt-4 w-full border-2 border-ink/85 text-ink hover:bg-ink hover:text-cream-base"
       >
         Get started
       </Cta>
@@ -399,15 +427,36 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-single"
-      className="relative bg-cream-base border-2 border-ink p-3 md:p-6 flex flex-col w-full"
+      className="relative bg-cream-base border-2 border-ink p-3 md:p-6 flex flex-col w-full overflow-hidden"
       style={{ boxShadow: "8px 8px 0 0 rgba(10,26,18,0.95)" }}
     >
+      {/* Diagonal stripe pattern */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.04] pointer-events-none md:hidden"
+        style={{
+          backgroundImage: "repeating-linear-gradient(135deg, #1F4F2F 0, #1F4F2F 1px, transparent 1px, transparent 8px)",
+        }}
+      />
       <span
         aria-hidden
-        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full bg-volt text-ink text-[9px] md:text-[10px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-black whitespace-nowrap border border-ink"
+        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full bg-volt text-ink text-[9px] md:text-[10px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-black whitespace-nowrap border border-ink z-10"
       >
         <Sparkles className="w-3 h-3 fill-current" /> <span className="hidden sm:inline">One-time · </span>Full report
       </span>
+      {/* Corner brackets — visible mobile only */}
+      <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-ink md:hidden" />
+      <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-ink md:hidden" />
+
+      {/* Tier badge image (mobile only) */}
+      <img
+        src={IMG("badge-single.png")}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="md:hidden mx-auto w-12 h-12 object-contain mt-2 -mb-1"
+      />
 
       <BadgeHeader tone="forest" icon={Trophy} label="Single" />
       <Title size="md" className="text-ink">Single<br className="hidden md:inline lg:hidden" /> Report</Title>
@@ -416,8 +465,8 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
         Everything you need in <span className="font-black text-ink">one</span> premium report.
       </SubLine>
 
-      {/* Product image — hidden on tight mobile cards to give the feature list room */}
-      <div className="mt-3 relative aspect-[16/8] bg-ink/5 border border-ink/10 overflow-hidden hidden md:block">
+      {/* Product image — small on mobile, larger on desktop */}
+      <div className="relative mt-3 aspect-[16/8] md:aspect-[16/8] bg-ink/5 border border-ink/10 overflow-hidden">
         <img
           src={IMG("single-icon.png")}
           alt="Single scout report"
@@ -425,8 +474,8 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
           onError={(e) => { e.currentTarget.style.display = "none"; }}
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <span className="absolute top-2 left-2 bg-ink text-volt text-[9px] uppercase tracking-[0.22em] font-black px-2 py-0.5">
-          48h delivery
+        <span className="absolute top-1 left-1 md:top-2 md:left-2 bg-ink text-volt text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-black px-1.5 md:px-2 py-0.5">
+          48h
         </span>
       </div>
 
@@ -437,7 +486,7 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
         onClick={onCta}
         disabled={loading || disabled}
         data-testid="pricing-cta-single"
-        className="mt-4 w-full bg-ink hover:bg-forest text-volt font-black"
+        className="relative mt-4 w-full bg-ink hover:bg-forest text-volt font-black"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
           <><span className="hidden md:inline">Buy single report</span><span className="md:hidden">Buy report</span> <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>
@@ -452,15 +501,35 @@ function PremiumCard({ price, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-premium"
-      className="relative bg-[#0F3A22] border border-forest p-3 md:p-6 flex flex-col text-white w-full"
+      className="relative bg-[#0F3A22] border border-forest p-3 md:p-6 flex flex-col text-white w-full overflow-hidden"
       style={{ boxShadow: "0 24px 48px -16px rgba(15,58,34,0.55)" }}
     >
+      {/* Radial glow pattern on mobile */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-30 pointer-events-none md:hidden"
+        style={{
+          background: "radial-gradient(circle at 50% 30%, rgba(204,255,0,0.18) 0%, transparent 60%)",
+        }}
+      />
       <span
         aria-hidden
-        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full bg-[#A5DD5F] text-[#0F3A22] text-[9px] md:text-[10px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-black whitespace-nowrap"
+        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full bg-[#A5DD5F] text-[#0F3A22] text-[9px] md:text-[10px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-black whitespace-nowrap z-10"
       >
         <Star className="w-3 h-3 fill-current" /> Most popular
       </span>
+      {/* Corner brackets — mobile only */}
+      <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-[#A5DD5F]/50 md:hidden" />
+      <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-[#A5DD5F]/50 md:hidden" />
+      {/* Tier badge image */}
+      <img
+        src={IMG("badge-premium.png")}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="md:hidden mx-auto w-12 h-12 object-contain mt-2 -mb-1"
+      />
 
       <BadgeHeader tone="lime" icon={TrendingUp} label="Monthly" />
       <Title size="md" className="text-white">Premium</Title>
@@ -474,7 +543,7 @@ function PremiumCard({ price, onCta, loading = false, disabled = false }) {
         onClick={onCta}
         disabled={loading || disabled}
         data-testid="pricing-cta-premium"
-        className="mt-4 w-full bg-[#A5DD5F] hover:bg-[#B9E97A] text-[#0F3A22]"
+        className="relative mt-4 w-full bg-[#A5DD5F] hover:bg-[#B9E97A] text-[#0F3A22]"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
           <><span className="hidden md:inline">Start premium</span><span className="md:hidden">Premium</span> <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>
@@ -489,15 +558,38 @@ function VipCard({ price, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-vip"
-      className="relative bg-[#0A0F0D] border border-[#1F2724] p-3 md:p-6 flex flex-col text-white w-full"
+      className="relative bg-[#0A0F0D] border border-[#1F2724] p-3 md:p-6 flex flex-col text-white w-full overflow-hidden"
       style={{ boxShadow: "0 24px 48px -16px rgba(0,0,0,0.65)" }}
     >
+      {/* Sparkle dot pattern on mobile */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.10] pointer-events-none md:hidden"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 25% 35%, #F5C443 1px, transparent 1px), radial-gradient(circle at 75% 65%, #F5C443 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
       <span
         aria-hidden
-        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full bg-[#F5C443] text-[#0A0F0D] text-[9px] md:text-[10px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-black whitespace-nowrap"
+        className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1 rounded-full bg-[#F5C443] text-[#0A0F0D] text-[9px] md:text-[10px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-black whitespace-nowrap z-10"
       >
         <Trophy className="w-3 h-3 fill-current" /> Best value
       </span>
+      {/* Corner brackets — mobile only */}
+      <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-[#F5C443]/60 md:hidden" />
+      <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-[#F5C443]/60 md:hidden" />
+
+      {/* Tier badge image */}
+      <img
+        src={IMG("badge-vip.png")}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="md:hidden mx-auto w-12 h-12 object-contain mt-2 -mb-1"
+      />
 
       <BadgeHeader tone="gold" icon={Crown} label="Monthly" />
       <Title size="md" className="text-white">
@@ -514,7 +606,7 @@ function VipCard({ price, onCta, loading = false, disabled = false }) {
         onClick={onCta}
         disabled={loading || disabled}
         data-testid="pricing-cta-vip"
-        className="mt-4 w-full bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D]"
+        className="relative mt-4 w-full bg-[#F5C443] hover:bg-[#FFD661] text-[#0A0F0D]"
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
           <>Go VIP <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" /></>
