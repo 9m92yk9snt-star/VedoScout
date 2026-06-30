@@ -3176,6 +3176,14 @@ async def upload_video_and_create_preview(
             upload_will_be_paid = True
         else:
             upload_will_be_paid = free_used and prepaid > 0
+    else:
+        # Admins get a FULL premium report for every upload they make — no
+        # payment, no eligibility burn, no preview/teaser. Setting
+        # `upload_will_be_paid = True` makes the document `is_paid: True` so the
+        # background `generate_full_report_task` auto-fires after the preview
+        # (see line ~3717). All other admin guards (line 3163 `if not is_admin`,
+        # line 3302 `if not is_admin` credit-burn skip) already exist.
+        upload_will_be_paid = True
 
     # ============== RESOLVE SOURCE: file upload OR temp URL-fetch token ==============
     using_temp_token = False
@@ -3279,9 +3287,10 @@ async def upload_video_and_create_preview(
         "progress_step": 1,                         # 1..5 — see analyze_preview_task
         "analysis_error": None,
         "eligibility_consumed": (                   # so the bg task can refund on failure
-            "pass_credit" if used_pass_credit
-            else ("prepaid" if upload_will_be_paid
-                  else ("free_preview" if not is_admin else "admin"))
+            "admin" if is_admin
+            else ("pass_credit" if used_pass_credit
+                  else ("prepaid" if upload_will_be_paid
+                        else "free_preview"))
         ),
     }
     await db.reports.insert_one(report_doc)

@@ -26,6 +26,37 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 89 — Admin uploads now auto-trigger FULL premium report (Feb 27 2026)**:
+  - User feedback (Danish): "admin skal have fuld adgang til uplaode og få fuld rapport for hver video fordi det er admin lav det uden at ændrer noget som helst andet"
+  - Translation: admin must have full upload access AND get the FULL report for every video — because they are admin. Make this change without modifying anything else.
+  - **Root cause**: Admin already had infinite upload eligibility (`reason: admin` from `/api/me/upload-eligibility`) but reports created by admin were stored with `is_paid: False`. The background pipeline at `analyze_preview_task` (server.py line ~3717) only auto-triggers `generate_full_report_task` when `is_paid: True` — so admin uploads were stuck on the free preview tier.
+  - **Fix (server.py, single targeted change at the upload endpoint, lines 3163-3186)**:
+    ```python
+    if not is_admin:
+        # ... eligibility / payment gating (unchanged)
+    else:
+        # Admins get a FULL premium report for every upload they make — no
+        # payment, no eligibility burn, no preview/teaser. Setting
+        # `upload_will_be_paid = True` flips the document's `is_paid: True`
+        # so generate_full_report_task auto-fires after the preview pass.
+        upload_will_be_paid = True
+    ```
+    Plus a corresponding metadata correction on `eligibility_consumed` so admin uploads still carry the `"admin"` label (was being shadowed by the new `prepaid` branch).
+  - **What this changes**: every NEW admin upload now creates a report with `is_paid: True` + `paid_at: <upload time>` + `eligibility_consumed: "admin"`. The existing background task auto-fires `generate_full_report_task` → admin gets the full 4-pillar premium scout report without any payment or eligibility burn.
+  - **What this does NOT change** (per user instruction "uden at ændrer noget som helst andet"):
+    - Free user flow — untouched
+    - Prepaid / Progress Pass flow — untouched
+    - Refund logic — `_refund_upload_eligibility` only handles non-admin branches, so admin failures naturally skip refunds (correct: admin consumed nothing)
+    - All other admin shortcuts (eligibility bypass at line 3163, no credit-burn at line 3311, unlock-on-view at lines 3920/3940/4121/6331) stay exactly as they were
+  - **Verified**:
+    - Backend reload clean (no errors in `/var/log/supervisor/backend.err.log`)
+    - Python lint pass (0 errors)
+    - Admin login + `/api/me/upload-eligibility` returns `{eligible: true, reason: "admin", prepaid_uploads: 999}` ✓
+    - Code path traced: admin upload → `upload_will_be_paid = True` → `report_doc.is_paid = True` → analyze_preview_task line 3717 condition satisfies → `generate_full_report_task` fires ✓
+  - **Files**:
+    - MODIFIED `/app/backend/server.py` lines 3163-3186 (added `else: upload_will_be_paid = True`)
+    - MODIFIED `/app/backend/server.py` lines 3289-3294 (cleaned `eligibility_consumed` logic to preserve `"admin"` label)
+
 - ✅ **🆕 Session 88 — Mobile front-page graphic enrichment + 6 new Nano Banana images (Feb 27 2026)**:
   - User feedback (Danish): "Desktop version looks amazing there is more graphic details then in mobile version I want mobile version to look also rich in graphic details what can we do wrote her ? Jeg tænker Generalt hele front page ? Hvad kan vi gøre og jeg har toppet llm"
   - Translation: Desktop is amazing, mobile lacks graphic richness — enrich the ENTIRE mobile front page. User topped up Emergent LLM Key budget so we could regenerate freely.
