@@ -26,6 +26,41 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 85 — Premium layout overhaul: landing + dashboard (Feb 27 2026)**:
+  - User-reported (Danish): "Design siden layout section opsætning for frontpage dashboard and user dashboard make it look perfekt and good looking use nanobans and you bedst design testing agent. Right now everything looks confusing but use same colors like website is now do not change anything."
+  - Translation: layout/section redesign for landing + dashboard. Use Nano Banana for images. Use testing agent. Keep existing cream-base/forest/volt palette — no colour changes.
+  - **Nano Banana images** (4 generated via `EMERGENT_LLM_KEY` + `gemini-3.1-flash-image-preview`, saved to `/app/backend/static/landing/`):
+    - `hero-pitch.png` (588 KB) — cinematic stadium photo for landing hero, right column
+    - `how-it-works.png` (792 KB) — flat-lay scout workspace, currently unused but available for future feature decoration
+    - `feature-analysis.png` (755 KB) — tablet showing radar chart, currently unused but available for future feature decoration
+    - `social-proof-player.png` (646 KB) — anonymous youth player portrait for testimonial section
+  - **Backend (`server.py` line 152-160)**: NEW StaticFiles mount `/api/static/landing` serving from `/app/backend/static/landing/` so React can fetch the generated images via REACT_APP_BACKEND_URL.
+  - **Generator script (`/app/backend/scripts/generate_landing_images.py`)**: Self-contained, idempotent. Re-runnable with `cd /app/backend && python scripts/generate_landing_images.py` if images need regeneration.
+  - **NEW `/app/frontend/src/components/LandingSections.jsx`** (~330 lines, named exports):
+    - `<TrustStrip />` — 4-tile credibility row (48h delivery · U7-U21 · 10-tap workflow · Pro Scout) placed directly under hero.
+    - `<HowItWorks />` — 3 numbered cards (Upload → Mark → Get report) with forest icon badges + ghosted "01/02/03" giant numerals, mounted on the existing nav anchor `#how-it-works-walkthrough`.
+    - `<WhatsInside />` — 4-feature grid (4-pillar score · Pixel-perfect tracking · Timestamped moments · Personal training plan), mounted on existing nav anchor `#what-you-get`.
+    - `<SocialProof />` — 2-column split (quote card + Nano Banana player portrait).
+    - `<FinalCta />` — Dark ink panel with volt headline, `data-testid="final-cta"` + `final-cta-button`, routes to `/signup?next=/upload` (anon) or `/upload` (logged in).
+  - **Refactored `LandingMinimal.jsx`** (438 lines): hero is now a TWO-COLUMN layout — copy on the left (eyebrow → headline → sub → primary CTA + secondary "How it works" CTA + trust line + sign-in nudge) and a Nano Banana stadium image on the right framed by lime corner brackets, "PRO SCOUT · LIVE" badge top-left, "MATCH FOOTAGE / ANALYSED IN 48H / 4-PILLAR SCORE" caption bottom. Full new section order: Navigation → Hero → TrustStrip → HowItWorks → WhatsInside → PricingTiers (wrapped in `id="pricing-section"`) → SocialProof → FAQ → FinalCta → Footer. FAQ "Common questions / Honest answers" eyebrow + animated clock removed (redundant with new bottom CTA flow); replaced with a clean sub-headline. All section IDs now match Navigation anchors so the menu (Home / How it works / What's inside / Pricing / final-cta-Start) scrolls correctly.
+  - **DashboardPage.jsx** — added a Quick Stats row directly under the welcome header:
+    - 4 stat tiles via NEW `QuickStatTile` component (cream-card body, forest icon badge, big number, uppercase label):
+      - `qs-uploads` — Total uploads (count of reports)
+      - `qs-premium` — Premium reports (`is_paid OR manually_unlocked`) — uses accent forest border + filled icon
+      - `qs-players` — Tracked players
+      - `qs-plan` — Current plan label (VIP Premium / Premium / Progress Pass / Free)
+    - Below the row, a "Last upload · {player} · {date}" meta line (only when at least one report exists).
+    - Welcome now highlights the user's first name in forest green.
+    - The "New upload" CTA gets the same boutique forest shadow as the landing hero CTA so the two pages feel cohesive.
+  - **Verified by testing agent (iteration_34.json — 100% pass, 0 console errors)**:
+    - Landing desktop: all data-testids present, hero image loads (naturalWidth=1408), "How it works" anchor scroll 0→846px works, FAQ toggle aria-expanded toggles correctly, pricing amounts visible ($0/$29.99/$49.99), FinalCta routes to /signup?next=/upload for anonymous, footer renders.
+    - Dashboard premium user: QuickStats reads `{uploads:1, premium:1, players:3, plan:FREE}` (FREE because seed account has prepay-unlock NOT active subscription — correct behaviour). Last-upload meta "LUKAS A. · 6/4/2026" shows. Reports list + Players list + UpgradeBanner render unchanged.
+    - Mobile 390×844 responsive: hero stacks (1 col, 342px), TrustStrip 2×2 (163px each), Dashboard QuickStats 2×2 (165px each), Pricing intentionally remains 3-col (124px each) as previously required by user.
+    - Nano Banana assets: all 4 return HTTP 200 from `/api/static/landing/`.
+  - **Files**:
+    - CREATED `/app/frontend/src/components/LandingSections.jsx`, `/app/backend/scripts/generate_landing_images.py`, 4 PNG assets in `/app/backend/static/landing/`
+    - MODIFIED `/app/frontend/src/pages/LandingMinimal.jsx` (full rewrite), `/app/frontend/src/pages/DashboardPage.jsx` (added QuickStatTile + stats row), `/app/backend/server.py` (StaticFiles mount)
+
 - ✅ **🆕 Session 84 — Retire $399 12-month plan + native UpgradeBanner on dashboard (Feb 23 2026)**:
   - User decisions: keep ONLY legacy active pass holders (they retain their 365-day window + remaining credits), retire the buy flow everywhere else, replace the dashboard's old marketing banner with a **native upgrade section** for Free users — most professional, non-confusing, well-integrated into the dashboard layout.
   - **Dashboard (`DashboardPage.jsx`)**:
