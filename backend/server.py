@@ -3460,6 +3460,22 @@ async def analyze_preview_task(report_id: str):
                 {"id": report_id},
                 {"$set": {"video_filename": web_filename}},
             )
+            # ── DISK CLEANUP: now that the web-friendly .web.mp4 is saved AND
+            # ── the report doc points at it, the original raw upload (.mov /
+            # ── source .mp4) is no longer needed. Removing it here saves
+            # ── ~60 % disk per upload and prevents the container disk from
+            # ── filling. Best-effort only — failure to unlink is logged, not
+            # ── fatal (transcode already succeeded, user impact is zero).
+            try:
+                if raw_path.exists() and raw_path.resolve() != web_path.resolve():
+                    raw_bytes = raw_path.stat().st_size
+                    raw_path.unlink()
+                    logger.info(
+                        f"raw-upload cleanup: removed {raw_path.name} "
+                        f"({raw_bytes // 1024} KB) after successful transcode of {web_filename}"
+                    )
+            except Exception as cleanup_err:
+                logger.warning(f"raw-upload cleanup failed for {report_id}: {cleanup_err}")
 
         # ============== DURATION VALIDATION (5-min cap) ==============
         duration_sec = get_video_duration_seconds(web_path)
@@ -7949,6 +7965,137 @@ async def get_current_single_price() -> float:
     if doc and "value" in doc:
         return float(doc["value"])
     return DEFAULT_SINGLE_PRICE
+
+
+@api_router.post("/admin/cleanup-raw-uploads")
+async def admin_cleanup_raw_uploads(_=Depends(get_current_admin)):
+    """One-shot disk cleanup — sweep `/app/backend/uploads/` for orphaned raw
+    source files left over from before the automatic post-transcode cleanup
+    landed (session 91).
+
+    Two passes:
+      PASS 1 — for any report whose `video_filename` already points at the
+        `.web.mp4`, delete every other source file with the same report-id
+        prefix (raw .mov / .mp4 left over from before auto-cleanup landed).
+      PASS 2 — for any report whose `video_filename` is still a raw .mov/.mp4
+        BUT a sibling `.web.mp4` already exists on disk (orphaned transcode),
+        re-point the doc at the `.web.mp4` AND delete the raw source.
+
+    A whitelist of derivative files (marker, poster, subject crop, anchor
+    crops, preview clip) is never touched.
+    """
+    removed = 0
+    repointed = 0
+    freed_bytes = 0
+    skipped_no_web_version = 0
+    errors: list[str] = []
+
+    DERIVATIVE_SUFFIXES = ("-marker.jpg", "-poster.jpg", "-subject.jpg", "-preview.mp4")
+
+    def _is_derivative(name: str) -> bool:
+        if any(name.endswith(s) for s in DERIVATIVE_SUFFIXES):
+            return True
+        if "-anchor" in name:
+            return True
+        return False
+
+    # ── PASS 1 — reports already pointing at .web.mp4 ───────────────────
+    cursor = db.reports.find(
+        {"video_filename": {"$regex": r"\.web\.mp4$"}},
+        {"_id": 0, "id": 1, "video_filename": 1},
+    )
+    async for r in cursor:
+        report_id = r.get("id")
+        web_name = r.get("video_filename")
+        if not (report_id and web_name and web_name.endswith(".web.mp4")):
+            continue
+        if not (UPLOAD_DIR / web_name).exists():
+            skipped_no_web_version += 1
+            continue
+        for stale in UPLOAD_DIR.glob(f"{report_id}.*"):
+            name = stale.name
+            if name == web_name or _is_derivative(name):
+                continue
+            try:
+                size = stale.stat().st_size
+                stale.unlink()
+                removed += 1
+                freed_bytes += size
+                logger.info(f"cleanup pass1: removed orphan {name} ({size // 1024} KB)")
+            except Exception as e:
+                errors.append(f"pass1 {name}: {e}")
+
+    # ── PASS 2 — reports still pointing at raw, but a .web.mp4 already exists ──
+    cursor = db.reports.find(
+        {"video_filename": {"$not": {"$regex": r"\.web\.mp4$"}}},
+        {"_id": 0, "id": 1, "video_filename": 1},
+    )
+    async for r in cursor:
+        report_id = r.get("id")
+        raw_name = r.get("video_filename")
+        if not (report_id and raw_name):
+            continue
+        web_path = UPLOAD_DIR / f"{report_id}.web.mp4"
+        if not web_path.exists():
+            continue  # no transcoded version available — leave alone
+        raw_path = UPLOAD_DIR / raw_name
+        # Re-point the doc at the playable file
+        try:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"video_filename": web_path.name}},
+            )
+            repointed += 1
+        except Exception as e:
+            errors.append(f"pass2-update {report_id}: {e}")
+            continue
+        # Then delete the raw source
+        if raw_path.exists() and raw_path.resolve() != web_path.resolve():
+            try:
+                size = raw_path.stat().st_size
+                raw_path.unlink()
+                removed += 1
+                freed_bytes += size
+                logger.info(f"cleanup pass2: repointed {report_id} and removed {raw_name} ({size // 1024} KB)")
+            except Exception as e:
+                errors.append(f"pass2-unlink {raw_name}: {e}")
+
+    # ── PASS 3 — truly orphaned raw sources (report row deleted from DB) ──
+    # For every raw .mov/.mp4 on disk that DOES have a .web.mp4 sibling AND
+    # whose report-id prefix has NO matching DB record, delete the raw
+    # source. The .web.mp4 is kept (in case someone restores the report row
+    # from a backup); only the redundant raw bytes are reclaimed.
+    for raw in list(UPLOAD_DIR.glob("*.mov")) + list(UPLOAD_DIR.glob("*.mp4")):
+        name = raw.name
+        if name.endswith(".web.mp4") or _is_derivative(name):
+            continue
+        report_id_guess = name.rsplit(".", 1)[0]
+        sibling_web = UPLOAD_DIR / f"{report_id_guess}.web.mp4"
+        if not sibling_web.exists():
+            continue
+        # Only delete if there is NO DB record referencing this report-id
+        exists_in_db = await db.reports.find_one(
+            {"id": report_id_guess}, {"_id": 0, "id": 1}
+        )
+        if exists_in_db:
+            continue  # handled by pass 1 or pass 2 already
+        try:
+            size = raw.stat().st_size
+            raw.unlink()
+            removed += 1
+            freed_bytes += size
+            logger.info(f"cleanup pass3: removed truly-orphaned raw {name} ({size // 1024} KB)")
+        except Exception as e:
+            errors.append(f"pass3-unlink {name}: {e}")
+
+    return {
+        "removed_files": removed,
+        "repointed_reports": repointed,
+        "freed_bytes": freed_bytes,
+        "freed_mb": round(freed_bytes / (1024 * 1024), 2),
+        "skipped_no_web_version": skipped_no_web_version,
+        "errors": errors[:20],
+    }
 
 
 @api_router.put("/admin/social-links")
