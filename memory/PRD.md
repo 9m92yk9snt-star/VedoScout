@@ -26,6 +26,53 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 88 — Mobile front-page graphic enrichment + 6 new Nano Banana images (Feb 27 2026)**:
+  - User feedback (Danish): "Desktop version looks amazing there is more graphic details then in mobile version I want mobile version to look also rich in graphic details what can we do wrote her ? Jeg tænker Generalt hele front page ? Hvad kan vi gøre og jeg har toppet llm"
+  - Translation: Desktop is amazing, mobile lacks graphic richness — enrich the ENTIRE mobile front page. User topped up Emergent LLM Key budget so we could regenerate freely.
+  - **6 NEW Nano Banana images** generated via `gemini-3.1-flash-image-preview` (saved to `/app/backend/static/landing/`):
+    - `hero-action-portrait.png` (740 KB) — vertical 9:16 player action shot (reserved for future mobile-only hero)
+    - `imagestrip-mobile.png` (821 KB) — square 1:1 crop of the training session for mobile ImageStrip
+    - `badge-free.png` / `badge-single.png` / `badge-premium.png` / `badge-vip.png` (420-690 KB each) — 4 minimal 3D-rendered circular tier badges with palette-matched ring colours
+  - **Hero mobile** (`LandingMinimal.jsx`):
+    - REMOVED `hidden md:block` / `hidden md:flex` so the floating SCOUT REPORT card (rotated -4°, with 7.8/10 mockup + 4-pillar bars) AND the dark "7.8 / OVERALL / U14 · AMF" chip now render on mobile, sized down (w-7/h-7 score box, smaller text, tighter padding)
+    - Increased hero `mt-16` so the floating elements don't clip into TrustStrip
+    - Live-ticker reformatted for mobile (3 short stats wrapping, smaller text)
+  - **HowItWorks mobile** (`LandingSections.jsx`):
+    - Added a vertical green gradient timeline line (`bg-gradient-to-b from-forest via-forest/30 to-forest`) connecting the 3 stacked step cards on mobile only
+    - Each card now has a small forest-green numbered circle marker (01/02/03) on the timeline (overlapping top-left of the image)
+    - Eyebrow chip moved to top-right on mobile (avoids overlap with the circle marker)
+  - **WhatsInside mobile** (`LandingSections.jsx`):
+    - Added a subtle dotted background pattern (`bg radial-gradient #1F4F2F dots`) inside every feature card
+    - Hairline rule next to the feature title is NO LONGER hidden on mobile (`hidden md:block` removed)
+    - Vertical accent strip (`w-[3px]` forest left edge) now visible on every breakpoint
+    - Top-right corner bracket added (turns full forest on hover)
+  - **ImageStrip mobile** (`LandingSections.jsx`):
+    - Layout switched from 21:9 cinematic strip to 5:6 portrait on mobile via `aspect-[5/6] md:aspect-[21/8]`
+    - `<picture>` source with `media="(max-width: 767px)"` swaps to `imagestrip-mobile.png` (square crop) on small viewports
+    - Scrim direction switched: bottom-to-top on mobile (`bg-gradient-to-t`), left-to-right on desktop (`md:bg-gradient-to-r`) — headline now sits at the bottom on mobile
+    - Lime corner brackets (top-left, top-right) added on mobile only
+    - Headline + eyebrow centred on mobile, left-aligned on desktop
+  - **PricingTiers mobile cards** (`PricingTiers.jsx`):
+    - Each tier now has a tier-specific subtle background pattern:
+      - Free: dotted forest grid
+      - Single: 135° diagonal stripes (subtle forest)
+      - Premium: radial volt glow from top
+      - VIP: sparkle 32px dot pattern (gold)
+    - Mobile-only corner brackets at top-left + top-right of every card (matches tier accent colour)
+    - NEW Nano Banana tier badge image (~48×48 px, `md:hidden`, `loading="lazy"`) above the BadgeHeader pill on every card
+    - Restored the single-icon.png product photo on the Single Report card for mobile (was previously hidden) — sized smaller (aspect-[16/8]) with compact "48H" chip
+    - All buttons keep `position: relative` so they sit above the new background pattern overlays
+  - **Self + testing-agent verified (iteration_36.json — 100% pass, 0 design issues, 0 console errors, 0 action items)**:
+    - Mobile 390×844: floating report visible, 7.8 OVERALL chip visible, live-ticker shows '+128 · 12 countries · 98% 48h', HowItWorks shows 3 numbered timeline markers, WhatsInside 4 cards with patterns + brackets, ImageStrip uses imagestrip-mobile.png via `<picture>`, all 4 tier badges loaded, single-icon.png visible, pagination dots + chevrons work, COMPARE PLANS title at text-4xl
+    - Desktop 1920×1080 — full regression PASS: 4 pricing cards, 3 horizontal steps, 4-feature 2x2 grid, hero report rotated -4°, 21:8 cinematic ImageStrip — NO REGRESSION
+    - All 6 new image endpoints return HTTP 200 from `/api/static/landing/`
+  - **Files**:
+    - MODIFIED `/app/frontend/src/pages/LandingMinimal.jsx` (hero floating elements now visible on mobile)
+    - MODIFIED `/app/frontend/src/components/LandingSections.jsx` (HowItWorks timeline, WhatsInside richness, ImageStrip portrait mobile)
+    - MODIFIED `/app/frontend/src/components/PricingTiers.jsx` (4 tier badges + patterns + brackets per card)
+    - NEW `/app/backend/scripts/generate_mobile_assets.py`
+    - 6 NEW PNGs in `/app/backend/static/landing/`
+
 - ✅ **🆕 Session 87 — Single Report tier ($129 one-time) + admin-editable pricing + mobile swipe carousel (Feb 27 2026)**:
   - User feedback (Danish): "Jeg vil gerne tilføje en ekstra betaling future engangs pris med banner for fuld rapport og alt inkluderet 129 dollars og og banner skalmlaves om så de kan swipes på Mobils men ser 2 og lidt af 3 så de indekser at de kan swipes. Grafisk skal de også se godt ud og passe til siden jeg kan se at over tekst er lille inforhold til andre titler på siden brug nano ban for design til at designe det alle priser skal jeg kunne ændre i admin sektion når jeg ændrer dem skal de automatisk ændres alle steder på siden. Hvor poserne bliver nævn eller set"
   - Summary: Add new $129 one-time "Single Report" tier with banner badge · Mobile = swipeable carousel showing 2 cards + peek of 3rd · Bigger COMPARE PLANS headline · ALL prices admin-editable → auto-update site-wide · Nano Banana for design polish.
