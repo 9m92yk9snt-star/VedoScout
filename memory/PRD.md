@@ -26,6 +26,20 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 90 — Bug fix: clipped pricing-card top banner badges (Feb 27 2026)**:
+  - User report (with screenshot, Danish/English): "there is some graphical bug it not posible to see top banner on sell banners" — screenshot showed the floating top pills ("ONE-TIME · FULL REPORT" on Single, "MOST POPULAR" on Premium, "BEST VALUE" on VIP) clipped in half at the top
+  - **Root cause** (RCA in iteration_37.json): In session 88, `overflow-hidden` was added defensively to each `<article>` card to contain the new inset-0 background patterns (Free dotted / Single diagonal / Premium glow / VIP sparkles). The patterns are absolute `inset-0` so they're naturally contained by their positioning — the `overflow-hidden` was redundant AND inadvertently clipped the `absolute -top-3` floating banner pills that hang 12 px above each card.
+  - **Fix** (2 targeted edits in `PricingTiers.jsx`):
+    1. Removed `overflow-hidden` from all 4 `<article>` cards (FreeCard / SingleCard / PremiumCard / VipCard) — restores the floating-badge protrusion
+    2. Added `pt-5` (20 px padding-top) to the mobile carousel track because `overflow-x-auto` creates its own clipping context — the carousel needed headroom for the `-top-3` (12 px) badges to fit inside the scroll clip-region
+  - **Verified (testing-agent iteration_37.json — 100% pass)**:
+    - Desktop 1920×1080: all 3 badges render fully above cards
+    - Mobile 390×844: badges have 9 px headroom inside the carousel clip-region (track innerTop 405.125 px, badgeTop 414.125 px)
+    - 0 console errors
+    - Regression checks pass: background patterns still contained inside cards, corner brackets at top-1.5 unchanged, tier-badge Nano Banana images still load, carousel pagination + chevrons still work
+  - **Files**:
+    - MODIFIED `/app/frontend/src/components/PricingTiers.jsx` (removed 4× `overflow-hidden`, added `pt-5` on mobile carousel track)
+
 - ✅ **🆕 Session 89 — Admin uploads now auto-trigger FULL premium report (Feb 27 2026)**:
   - User feedback (Danish): "admin skal have fuld adgang til uplaode og få fuld rapport for hver video fordi det er admin lav det uden at ændrer noget som helst andet"
   - Translation: admin must have full upload access AND get the FULL report for every video — because they are admin. Make this change without modifying anything else.
