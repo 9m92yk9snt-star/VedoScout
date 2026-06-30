@@ -26,6 +26,34 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 91 — Disk Space Leak fix: auto-cleanup raw uploads + admin cleanup endpoint (Feb 27 2026)**:
+  - User confirmation (Danish): "ok fix det med bonus" → implement both (a) automatic deletion of raw `.mov` files after successful ffmpeg transcoding AND (b) bonus one-shot admin cleanup endpoint for legacy 1.1 GB orphan backlog.
+  - **Part A — auto-cleanup on every new upload** (`server.py` lines ~3450-3494, inside `analyze_preview_task`):
+    - After `transcode_to_web_mp4()` produces a different filename (i.e. the `.web.mp4` was successfully created), AND after the report doc is updated to point at the new `.web.mp4`, the original `raw_path` is unlinked
+    - Defensive guards: `raw_path.exists()` AND `raw_path.resolve() != web_path.resolve()` (transcode-fallback case where ffmpeg failed and returned the same path is correctly skipped)
+    - Best-effort: failure to unlink is logged at WARN level, never raised — transcode already succeeded so user-visible state is fine
+    - Frees ~60 % disk per upload going forward
+  - **Part B — bonus `POST /api/admin/cleanup-raw-uploads`** (server.py lines ~7970-8090, admin-only):
+    - **Pass 1**: For every report whose `video_filename` already ends with `.web.mp4`, sweep `/app/backend/uploads/` for any same-`report_id` prefix file that isn't the playable, the marker .jpg, the poster .jpg, the subject crop, any anchor crop, or the preview clip → delete it (one-time recovery of pre-auto-cleanup orphans)
+    - **Pass 2**: For reports whose `video_filename` is still a raw `.mov`/`.mp4` BUT a `.web.mp4` sibling exists on disk (orphaned transcode from old bug), re-point the doc at the `.web.mp4` AND delete the raw source
+    - **Pass 3**: For truly-orphaned raw files (report-id prefix exists on disk with a `.web.mp4` sibling but the report row was deleted from Mongo), unlink the raw source. The `.web.mp4` is kept defensively in case of DB restore from backup
+    - Returns `{ removed_files, repointed_reports, freed_bytes, freed_mb, skipped_no_web_version, errors }`
+  - **Live impact** (executed once during this session):
+    - Before: `du -sh /app/backend/uploads/` = `1.1G`, 99 files
+    - After 1st run: 2 files removed, 1.93 MB freed (Pass 1 hit on 2 small orphans)
+    - After 3-pass run: **3 additional files removed**, **189.46 MB freed** (Pass 3 caught two truly-orphaned 94 MB `.mov` files with `.web.mp4` siblings and no DB row)
+    - Total after cleanup: `873 MB`, 96 files. Remaining ~870 MB is dominated by 12 raw `.mov` files that ARE the canonical playable for their reports (transcode never ran successfully) — those MUST be kept and were correctly preserved by the safety bars
+  - **Verified (testing-agent iteration_38.json — 100 % pass, 7/7 pytest cases)**:
+    - Endpoint shape correct (all 6 keys, right types)
+    - Auth guard: 403 for non-admin + missing token
+    - Idempotent: second call yields 0 removals/repoints
+    - Safety: all 12 raw `.mov` files without a `.web.mp4` sibling preserved on disk
+    - Regression: recent admin reports still resolve via `/api/reports/mine`, `/api/reports/{id}/status` returns 200
+    - New pytest suite at `/app/backend/tests/test_cleanup_endpoint.py` (TestAuthGuard / TestCleanupBehaviour / TestPostCleanupSafety)
+  - **Files**:
+    - MODIFIED `/app/backend/server.py` — auto-cleanup block in `analyze_preview_task`, new `/api/admin/cleanup-raw-uploads` endpoint
+    - NEW `/app/backend/tests/test_cleanup_endpoint.py`
+
 - ✅ **🆕 Session 90 — Bug fix: clipped pricing-card top banner badges (Feb 27 2026)**:
   - User report (with screenshot, Danish/English): "there is some graphical bug it not posible to see top banner on sell banners" — screenshot showed the floating top pills ("ONE-TIME · FULL REPORT" on Single, "MOST POPULAR" on Premium, "BEST VALUE" on VIP) clipped in half at the top
   - **Root cause** (RCA in iteration_37.json): In session 88, `overflow-hidden` was added defensively to each `<article>` card to contain the new inset-0 background patterns (Free dotted / Single diagonal / Premium glow / VIP sparkles). The patterns are absolute `inset-0` so they're naturally contained by their positioning — the `overflow-hidden` was redundant AND inadvertently clipped the `absolute -top-3` floating banner pills that hang 12 px above each card.
