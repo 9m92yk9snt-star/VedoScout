@@ -680,43 +680,6 @@ export default function AdminPage() {
                     </div>
                   </div>
 
-                  <div className="bg-surface border-2 border-volt/30 p-6 md:p-8 relative overflow-hidden">
-                    <div className="absolute -top-12 -right-12 w-48 h-48 bg-volt/10 rounded-full blur-3xl pointer-events-none" />
-                    <div className="flex items-center gap-2 mb-1 relative">
-                      <Crown className="w-4 h-4 text-volt" />
-                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">12 months · 3 reports</span>
-                    </div>
-                    <h2 className="font-barlow font-black uppercase text-2xl text-ink relative">12-month plan price</h2>
-                    <p className="mt-2 text-ink/65 text-sm relative">
-                      One-time price for the year-long plan — 3 reports + progress tracking + scout review on every report.
-                    </p>
-
-                    <div className="mt-6 relative">
-                      <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Current price (USD)</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={passPriceInput}
-                          onChange={(e) => setPassPriceInput(e.target.value)}
-                          data-testid="admin-pass-price-input"
-                          className="flex-1 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                        />
-                        <button
-                          onClick={handlePassPriceSave}
-                          disabled={savingPassPrice}
-                          data-testid="admin-pass-price-save"
-                          className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 transition-colors disabled:opacity-50 flex items-center gap-2"
-                        >
-                          {savingPassPrice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                          Save
-                        </button>
-                      </div>
-                      <p className="mt-3 text-xs text-ink/50">Currently active: <span className="text-volt font-bold">${passPrice} USD</span></p>
-                    </div>
-                  </div>
-
                   {/* ── Landing variant toggle ── */}
                   <div className="bg-surface border border-gray-border p-6 md:p-8" data-testid="admin-landing-card">
                     <div className="flex items-center gap-2 mb-1">

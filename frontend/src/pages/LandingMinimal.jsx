@@ -52,7 +52,7 @@ const FAQ_ITEMS = [
     a: "Yes. Your video is used only to produce your report and is never published, sold, or shared outside the scout reviewing it. You retain full ownership of your video and your report. You can request deletion of your account and data at any time from your dashboard.",
   },
   {
-    q: "What's the difference between the single report and the 12-month plan?",
+    q: "What's the difference between the single report and the monthly plans?",
     a: "__PRICE_FAQ__",
   },
   {
@@ -224,20 +224,18 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
 function FAQSection() {
   const [openIdx, setOpenIdx] = useState(0);
   const [price, setPrice] = useState(null);
-  const [passPrice, setPassPrice] = useState(null);
 
   useEffect(() => {
     api.get("/settings/price")
       .then(({ data }) => {
         setPrice(data.price);
-        setPassPrice(data.pass_price);
       })
       .catch(() => {});
   }, []);
 
-  const priceFaqAnswer = (price && passPrice)
-    ? `The $${price} is one complete report for one player. The $${passPrice} plan gives you 3 reports across 365 days for the same player — perfect if you want to track progress every few months and see how training translates into score improvements. The 12-month plan also includes a trajectory dashboard showing changes between reports.`
-    : "One single report covers one player. The 12-month plan gives you 3 reports across 365 days for the same player — perfect if you want to track progress every few months and see how training translates into score improvements. The 12-month plan also includes a trajectory dashboard showing changes between reports.";
+  const priceFaqAnswer = price
+    ? `The $${price} single report is a one-off purchase — one complete scout report for one player, delivered in 48 hours. The monthly plans (Premium $29.99/mo, VIP $49.99/mo) give you ongoing access: more uploads per month, advanced AI analysis, progress tracking, and (with VIP) a real scout reviewing your videos. Pick the single report if you just want to try once; pick a monthly plan if you want to keep tracking progress.`
+    : "The single report is a one-off purchase — one complete scout report for one player, delivered in 48 hours. The monthly plans (Premium $29.99/mo, VIP $49.99/mo) give you ongoing access: more uploads per month, advanced AI analysis, progress tracking, and (with VIP) a real scout reviewing your videos.";
 
   return (
     <section

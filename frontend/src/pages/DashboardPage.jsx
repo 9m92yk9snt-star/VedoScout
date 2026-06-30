@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
-import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import { MiniPitch } from "@/components/FootballAccents";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -24,13 +23,11 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
   const [players, setPlayers] = useState([]);
+  // Legacy Progress Pass status — still queried so we can show
+  // remaining credits to users who bought the $399 pass before
+  // subscriptions launched. New users never see the buy flow.
   const [passState, setPassState] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [passModalOpen, setPassModalOpen] = useState(false);
-  // Pass price loaded from /settings/price so it reflects whatever the
-  // admin has currently set (single source of truth — same endpoint
-  // PricingCards / Landing already use).
-  const [passPrice, setPassPrice] = useState(null);
 
   // Subscription state — { subscription: {...}, tiers: {...} } from /api/me/subscription
   const [subscription, setSubscription] = useState(null);
@@ -41,7 +38,6 @@ export default function DashboardPage() {
       api.get("/reports/mine").then(({ data }) => setReports(data)),
       api.get("/progress/players").then(({ data }) => setPlayers(data.items || [])),
       api.get("/progress/pass/status").then(({ data }) => setPassState(data)),
-      api.get("/settings/price").then(({ data }) => setPassPrice(data.pass_price)),
       api.get("/me/subscription").then(({ data }) => { setSubscription(data.subscription); setTiers(data.tiers || {}); }),
     ]).finally(() => setLoading(false));
   };
@@ -51,22 +47,12 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-open the Progress Pass modal when user lands here with ?open_pass=1
-  // (e.g. after logging-in from the pricing page's "Start the 12-Month Plan" CTA).
+  // Subscription return handler — Stripe redirects back here after
+  // checkout success with `?subscribe_session=cs_xxx`. We poll the
+  // status endpoint (max ~10s) which idempotently persists the
+  // subscription on the user record and surfaces a success toast.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get("open_pass") === "1") {
-      setPassModalOpen(true);
-      // strip the query so a refresh doesn't keep reopening
-      params.delete("open_pass");
-      const newSearch = params.toString();
-      navigate({ pathname: location.pathname, search: newSearch ? `?${newSearch}` : "" }, { replace: true });
-    }
-
-    // Subscription return handler — Stripe redirects back here after
-    // checkout success with `?subscribe_session=cs_xxx`. We poll the
-    // status endpoint (max ~10s) which idempotently persists the
-    // subscription on the user record and surfaces a success toast.
     const subSession = params.get("subscribe_session");
     if (subSession) {
       params.delete("subscribe_session");
@@ -117,24 +103,6 @@ export default function DashboardPage() {
     }
   }, [passState?.active, players?.length]);
 
-  const startPassCheckout = async () => ({
-    ...(await api.post("/progress/pass/checkout", {
-      origin_url: window.location.origin,
-    })).data,
-  });
-
-  const onPassSuccess = async ({ session_id }) => {
-    try {
-      await api.post(`/progress/pass/activate/${session_id}`);
-      toast.success("Progress Pass activated — 3 reports unlocked for 12 months");
-      fetchAll();
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Activation failed");
-    } finally {
-      setPassModalOpen(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-cream-base text-ink">
       <Navigation />
@@ -164,19 +132,25 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* PROGRESS PASS BANNER */}
-              <ProgressPassBanner
-                passState={passState}
-                passPrice={passPrice}
-                onBuyClick={() => setPassModalOpen(true)}
-              />
+              {/* PROGRESS PASS BANNER (legacy holders only) — new users
+                 see <UpgradeBanner /> below instead. */}
+              {passState?.active && (
+                <LegacyPassActiveBanner passState={passState} />
+              )}
 
-              {/* SUBSCRIPTION CARD (Premium / VIP) */}
+              {/* SUBSCRIPTION CARD (Premium / VIP) — only when user has one */}
               <SubscriptionCard
                 subscription={subscription}
                 tiers={tiers}
                 onChange={(s) => setSubscription(s)}
               />
+
+              {/* UPGRADE BANNER — for free users without a subscription.
+                 Skipped when the user already has a paid subscription OR
+                 an active Progress Pass (legacy) so we never double-promote. */}
+              {!subscription?.tier && !passState?.active && (
+                <UpgradeBanner tiers={tiers} />
+              )}
 
               {/* REPORTS (Library) — moved to top: this is the most-used
                  part of the dashboard; users want to jump to a report. */}
@@ -276,8 +250,13 @@ export default function DashboardPage() {
                       <PlayerRow
                         key={p.id}
                         p={p}
-                        isPremium={!!passState?.active}
-                        onUpgradeClick={() => setPassModalOpen(true)}
+                        isPremium={!!subscription?.tier || !!passState?.active}
+                        onUpgradeClick={() => {
+                          // Scroll the user to the dashboard's upgrade banner so they
+                          // see ALL plan options instead of a single modal.
+                          const target = document.querySelector('[data-testid="dashboard-upgrade-banner"]');
+                          if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
                         pulse={unlockPulseOn}
                       />
                     ))}
@@ -288,16 +267,6 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-
-      <EmbeddedCheckoutModal
-        open={passModalOpen}
-        onClose={() => setPassModalOpen(false)}
-        sessionInit={startPassCheckout}
-        amount={passPrice ?? 0}
-        currency="USD"
-        product="Progress Pass — 3 reports / 12 months"
-        onSuccess={onPassSuccess}
-      />
     </div>
   );
 }
@@ -437,77 +406,158 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
   );
 }
 
-function ProgressPassBanner({ passState, passPrice, onBuyClick }) {
-  if (passState?.active) {
-    return (
-      <div data-testid="progress-pass-active-banner" className="mt-10 bg-forest text-white p-5 md:p-6 grid md:grid-cols-3 gap-4 items-center border-l-8 border-forest-pop">
-        <div className="md:col-span-2 flex items-center gap-3">
-          <div className="w-11 h-11 bg-white/10 border border-white/30 flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.22em] font-bold opacity-80">Progress Pass active</div>
-            <h2 className="font-barlow font-black uppercase text-xl tracking-tighter">
-              {passState.credits_remaining} of {passState.credits_total} report credits remaining
-            </h2>
-            {passState.expires_at && (
-              <p className="text-xs opacity-80 mt-1">
-                Expires {new Date(passState.expires_at).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex md:justify-end">
-          <Link to="/upload" data-testid="progress-pass-use-credit-btn" className="inline-flex items-center gap-2 bg-white text-forest hover:bg-cream-soft font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 transition-colors">
-            Use a credit <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
-    );
-  }
+/* ────────────────────────────────────────────────────────────────────────
+ *  LEGACY PROGRESS PASS BANNER — shows the remaining credits + expiry
+ *  ONLY for users who already purchased the $399 12-month Progress Pass
+ *  before subscriptions launched. New users no longer see this product;
+ *  the marketing/buy variant has been retired in favour of Premium / VIP.
+ * ──────────────────────────────────────────────────────────────────────── */
+function LegacyPassActiveBanner({ passState }) {
+  if (!passState?.active) return null;
   return (
-    <div data-testid="progress-pass-promo-banner" className="mt-10 relative overflow-hidden bg-ink text-white p-6 md:p-8 grid md:grid-cols-5 gap-6 items-center">
-      <div className="absolute -top-12 -right-12 w-64 h-64 bg-forest-pop/30 rounded-full blur-3xl pointer-events-none" />
-      <div className="md:col-span-3 relative">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] font-bold text-forest">
-          <Sparkles className="w-3.5 h-3.5" /> New · Progress Pass
+    <div data-testid="progress-pass-active-banner" className="mt-10 bg-forest text-white p-5 md:p-6 grid md:grid-cols-3 gap-4 items-center border-l-8 border-forest-pop">
+      <div className="md:col-span-2 flex items-center gap-3">
+        <div className="w-11 h-11 bg-white/10 border border-white/30 flex items-center justify-center">
+          <CheckCircle2 className="w-5 h-5" />
         </div>
-        <h2 className="mt-2 font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
-          Track real growth.<br />
-          <span className="text-forest">3 reports / 12 months.</span>
-        </h2>
-        <p className="mt-3 text-sm text-white/75 max-w-md">
-          One purchase. Three premium reports for the same player. Age-adjusted percentile tracking, archetype overlay, growth narrative — every 3–6 months.
-        </p>
-        <ul className="mt-4 space-y-1.5 text-sm text-white/85">
-          <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Age-adjusted percentile shift (honest)</li>
-          <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Trajectory vs archetype path</li>
-          <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Between-the-lines narrative</li>
-          <li className="flex items-center gap-2"><Zap className="w-3.5 h-3.5 text-forest" /> Watch yourself improve (video diff)</li>
-        </ul>
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.22em] font-bold opacity-80">Progress Pass active</div>
+          <h2 className="font-barlow font-black uppercase text-xl tracking-tighter">
+            {passState.credits_remaining} of {passState.credits_total} report credits remaining
+          </h2>
+          {passState.expires_at && (
+            <p className="text-xs opacity-80 mt-1">
+              Expires {new Date(passState.expires_at).toLocaleDateString()}
+            </p>
+          )}
+        </div>
       </div>
-      <div className="md:col-span-2 relative">
-        <div className="bg-white/5 border border-white/15 p-5 backdrop-blur-sm">
-          <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/60">One-time</div>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span data-testid="progress-pass-price" className="font-barlow font-black text-5xl tracking-tighter">
-              ${passPrice ?? "—"}
+      <div className="flex md:justify-end">
+        <Link to="/upload" data-testid="progress-pass-use-credit-btn" className="inline-flex items-center gap-2 bg-white text-forest hover:bg-cream-soft font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 transition-colors">
+          Use a credit <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+
+/* ────────────────────────────────────────────────────────────────────────
+ *  UPGRADE BANNER — shown on the dashboard ONLY when the user has no
+ *  active subscription and no legacy Progress Pass. Two compact cards
+ *  side-by-side (Premium and VIP) reuse the same /payments/subscribe
+ *  endpoint as the landing pricing section — clicking either card
+ *  full-redirects to Stripe Checkout in `mode=subscription`.
+ *  Once the subscription is active <SubscriptionCard /> takes over and
+ *  this banner is hidden, so we never double-promote.
+ * ──────────────────────────────────────────────────────────────────────── */
+function UpgradeBanner({ tiers }) {
+  const [busy, setBusy] = useState(null); // "premium" | "vip" | null
+
+  const startSubscription = async (tier) => {
+    if (busy) return;
+    setBusy(tier);
+    try {
+      const { data } = await api.post("/payments/subscribe", {
+        tier,
+        origin_url: window.location.origin,
+      });
+      if (!data?.url) throw new Error("No checkout URL received");
+      window.location.href = data.url;
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not start checkout.", { duration: 7000 });
+      setBusy(null);
+    }
+  };
+
+  const premium = tiers?.premium || { amount: 29.99 };
+  const vip = tiers?.vip || { amount: 49.99 };
+
+  return (
+    <div data-testid="dashboard-upgrade-banner" className="mt-10 relative overflow-hidden bg-cream-card border border-gray-border p-5 md:p-7">
+      <div className="flex items-center gap-2 mb-3">
+        <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+          <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+          <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+        </span>
+        <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
+          Unlock your full potential
+        </span>
+      </div>
+      <h2 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter text-ink leading-[0.95]">
+        Ready for more?<br />
+        <span className="text-forest">Upgrade your plan.</span>
+      </h2>
+      <p className="mt-2 text-sm text-ink/65 max-w-xl">
+        You&apos;re on the Free plan. Upgrade for more uploads, advanced AI analysis, and (with VIP) a real scout reviewing your video.
+      </p>
+
+      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Premium mini-card */}
+        <button
+          type="button"
+          data-testid="dashboard-upgrade-premium-btn"
+          onClick={() => startSubscription("premium")}
+          disabled={busy !== null}
+          className="relative text-left bg-[#0F3A22] border border-forest p-5 hover:shadow-[0_18px_36px_-12px_rgba(15,58,34,0.55)] transition-all disabled:opacity-60 disabled:cursor-wait"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="inline-flex items-center gap-1.5 text-[#A5DD5F] text-[10px] uppercase tracking-[0.18em] font-black">
+              <TrendingUp className="w-3.5 h-3.5" /> Premium
             </span>
-            <span className="text-xs text-white/55">USD</span>
+            <span className="text-[9px] uppercase tracking-[0.16em] font-bold text-[#A5DD5F]/80 bg-[#A5DD5F]/10 px-2 py-0.5 rounded-full">
+              Most popular
+            </span>
           </div>
-          <div className="mt-1 text-xs text-white/55">
-            {passPrice ? `≈ $${Math.round(passPrice / 3)} per report` : "≈ per-report cost"} · 3 reports / 12 mo
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-barlow font-black text-3xl text-[#CCFF00]">${premium.amount?.toFixed(2)}</span>
+            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
           </div>
-          <button
-            data-testid="buy-progress-pass-btn"
-            onClick={onBuyClick}
-            className="mt-4 w-full bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-3 transition-colors"
-          >
-            Unlock Progress Pass
-          </button>
-          <p className="mt-2 text-[10px] uppercase tracking-[0.18em] text-white/50 text-center">Secure · Stripe · No subscription</p>
-        </div>
+          <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> 5 video uploads per month</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Advanced AI analysis</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Progress tracking + PDF</li>
+          </ul>
+          <span className="mt-4 inline-flex items-center gap-1.5 bg-[#A5DD5F] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
+            {busy === "premium" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Start Premium <ArrowRight className="w-3.5 h-3.5" /></>}
+          </span>
+        </button>
+
+        {/* VIP mini-card */}
+        <button
+          type="button"
+          data-testid="dashboard-upgrade-vip-btn"
+          onClick={() => startSubscription("vip")}
+          disabled={busy !== null}
+          className="relative text-left bg-[#0A0F0D] border border-[#1F2724] p-5 hover:shadow-[0_18px_36px_-12px_rgba(0,0,0,0.65)] transition-all disabled:opacity-60 disabled:cursor-wait"
+        >
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="inline-flex items-center gap-1.5 text-[#F5C443] text-[10px] uppercase tracking-[0.18em] font-black">
+              <Crown className="w-3.5 h-3.5" fill="#F5C443" /> VIP Premium
+            </span>
+            <span className="text-[9px] uppercase tracking-[0.16em] font-bold text-[#F5C443]/80 bg-[#F5C443]/10 px-2 py-0.5 rounded-full">
+              Best value
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-barlow font-black text-3xl text-[#F5C443]">${vip.amount?.toFixed(2)}</span>
+            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
+          </div>
+          <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Unlimited uploads</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Real scout review</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Direct scout contact</li>
+          </ul>
+          <span className="mt-4 inline-flex items-center gap-1.5 bg-[#F5C443] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
+            {busy === "vip" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Go VIP <ArrowRight className="w-3.5 h-3.5" /></>}
+          </span>
+        </button>
       </div>
+
+      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/45 flex items-center gap-1.5">
+        <Lock className="w-3 h-3 text-forest" />
+        Secure Stripe · Cancel anytime from your dashboard
+      </p>
     </div>
   );
 }
