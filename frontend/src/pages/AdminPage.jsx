@@ -50,6 +50,15 @@ export default function AdminPage() {
   const [price, setPrice] = useState(1);
   const [priceInput, setPriceInput] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
+
+  // ── NEW: admin-controlled 3-tier display pricing ───────────────────
+  // Drives the public Pricing Tiers component (Single one-time / Premium / VIP).
+  // Saved via PUT /api/admin/pricing — backend persists in settings collection.
+  const [tierPrices, setTierPrices] = useState({ single: 129, premium: 29.99, vip: 49.99 });
+  const [tierInputs, setTierInputs] = useState({ single: "129", premium: "29.99", vip: "49.99" });
+  const [savingTierPrices, setSavingTierPrices] = useState(false);
+  const [stripeSyncWarning, setStripeSyncWarning] = useState(false);
+
   const [loading, setLoading] = useState(true);
 
   // Social links (admin-editable)
@@ -83,6 +92,12 @@ export default function AdminPage() {
         const [pr] = await Promise.all([api.get("/settings/price")]);
         setPrice(pr.data.price);
         setPriceInput(String(pr.data.price));
+        // Reflect tier prices even for scouts (read-only — they can't save)
+        const sp = Number(pr.data.single_price) || 129;
+        const pp = Number(pr.data.premium_price) || 29.99;
+        const vp = Number(pr.data.vip_price) || 49.99;
+        setTierPrices({ single: sp, premium: pp, vip: vp });
+        setTierInputs({ single: String(sp), premium: String(pp), vip: String(vp) });
       } else {
         const [s, r, u, p, pr, m, bd] = await Promise.all([
           api.get("/admin/stats"),
@@ -99,6 +114,11 @@ export default function AdminPage() {
         setPayments(p.data);
         setPrice(pr.data.price);
         setPriceInput(String(pr.data.price));
+        const sp = Number(pr.data.single_price) || 129;
+        const pp = Number(pr.data.premium_price) || 29.99;
+        const vp = Number(pr.data.vip_price) || 49.99;
+        setTierPrices({ single: sp, premium: pp, vip: vp });
+        setTierInputs({ single: String(sp), premium: String(pp), vip: String(vp) });
         setMessages(m.data);
         setBlogDraftCount((bd.data?.items || []).length);
         if (pr.data.social) {
@@ -134,6 +154,47 @@ export default function AdminPage() {
       toast.error("Failed to update price");
     } finally {
       setSavingPrice(false);
+    }
+  };
+
+  /**
+   * Save the 3 admin-controlled DISPLAY prices in one shot.
+   *
+   * - `single_price` is wired directly to the one-time Single Report
+   *   checkout — the saved value is what the buyer pays.
+   * - `premium_price` / `vip_price` are DISPLAY values used across the
+   *   public Pricing Tiers UI. Stripe Price IDs for the recurring
+   *   subscriptions are immutable; the backend returns
+   *   `stripe_sync_required: true` so we can surface a small note
+   *   without blocking the admin save.
+   */
+  const handleTierPricesSave = async () => {
+    const s = parseFloat(tierInputs.single);
+    const p = parseFloat(tierInputs.premium);
+    const v = parseFloat(tierInputs.vip);
+    if (!s || s <= 0 || !p || p <= 0 || !v || v <= 0) {
+      toast.error("All prices must be positive numbers");
+      return;
+    }
+    setSavingTierPrices(true);
+    try {
+      const { data } = await api.put("/admin/pricing", {
+        single_price: s,
+        premium_price: p,
+        vip_price: v,
+      });
+      setTierPrices({
+        single:  Number(data.single_price)  || s,
+        premium: Number(data.premium_price) || p,
+        vip:     Number(data.vip_price)     || v,
+      });
+      setStripeSyncWarning(!!data.stripe_sync_required);
+      toast.success("Plan pricing saved — site updates immediately");
+    } catch (err) {
+      const detail = err?.response?.data?.detail || "Failed to save pricing";
+      toast.error(detail);
+    } finally {
+      setSavingTierPrices(false);
     }
   };
 
@@ -620,14 +681,120 @@ export default function AdminPage() {
               )}
 
               {activeTab === "settings" && (
-                <div className="space-y-6 max-w-xl">
+                <div className="space-y-6 max-w-3xl">
+                  {/* ── NEW: 3-tier display pricing card ── */}
+                  <div
+                    data-testid="admin-tier-pricing-card"
+                    className="bg-surface border border-gray-border p-6 md:p-8"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <BadgeDollarSign className="w-4 h-4 text-volt" />
+                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">Plan pricing</span>
+                    </div>
+                    <h2 className="font-barlow font-black uppercase text-2xl text-ink">Public tier prices</h2>
+                    <p className="mt-2 text-ink/65 text-sm">
+                      These three values drive every Pricing card across the site (landing page, dashboard
+                      upgrade banner, FAQ). Saved instantly &mdash; the public site refreshes on next load.
+                    </p>
+
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Single one-time */}
+                      <label className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">
+                          Single Report · one-time
+                        </span>
+                        <div className="flex">
+                          <span className="bg-deepnavy border border-r-0 border-gray-border px-3 py-3 text-ink/55 font-bold">$</span>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={tierInputs.single}
+                            onChange={(e) => setTierInputs((s) => ({ ...s, single: e.target.value }))}
+                            data-testid="admin-tier-single-input"
+                            className="flex-1 min-w-0 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                          />
+                        </div>
+                        <span className="mt-1.5 text-[11px] text-ink/45">Current: <span className="text-volt font-bold">${tierPrices.single}</span></span>
+                      </label>
+
+                      {/* Premium /mo */}
+                      <label className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">
+                          Premium · per month
+                        </span>
+                        <div className="flex">
+                          <span className="bg-deepnavy border border-r-0 border-gray-border px-3 py-3 text-ink/55 font-bold">$</span>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={tierInputs.premium}
+                            onChange={(e) => setTierInputs((s) => ({ ...s, premium: e.target.value }))}
+                            data-testid="admin-tier-premium-input"
+                            className="flex-1 min-w-0 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                          />
+                        </div>
+                        <span className="mt-1.5 text-[11px] text-ink/45">Current: <span className="text-volt font-bold">${tierPrices.premium}</span></span>
+                      </label>
+
+                      {/* VIP /mo */}
+                      <label className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">
+                          VIP · per month
+                        </span>
+                        <div className="flex">
+                          <span className="bg-deepnavy border border-r-0 border-gray-border px-3 py-3 text-ink/55 font-bold">$</span>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={tierInputs.vip}
+                            onChange={(e) => setTierInputs((s) => ({ ...s, vip: e.target.value }))}
+                            data-testid="admin-tier-vip-input"
+                            className="flex-1 min-w-0 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                          />
+                        </div>
+                        <span className="mt-1.5 text-[11px] text-ink/45">Current: <span className="text-volt font-bold">${tierPrices.vip}</span></span>
+                      </label>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
+                      <p className="text-[11px] text-ink/45 max-w-xl leading-relaxed">
+                        Single Report is a real one-time checkout &mdash; the saved value is what the buyer pays.
+                        Premium / VIP affect the displayed price; Stripe subscription Price IDs are immutable.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleTierPricesSave}
+                        disabled={savingTierPrices}
+                        data-testid="admin-tier-save"
+                        className="bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {savingTierPrices ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Save plan prices
+                      </button>
+                    </div>
+
+                    {stripeSyncWarning && (
+                      <p
+                        data-testid="admin-stripe-sync-warning"
+                        className="mt-3 text-[11px] text-amber-500 leading-relaxed"
+                      >
+                        Note: Premium / VIP DISPLAY price updated. The recurring Stripe Price ID was created at the
+                        original amount and stays immutable until re-created via Stripe Dashboard.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── Legacy: report_price single price card (left for backward compat) ── */}
                   <div className="bg-surface border border-gray-border p-6 md:p-8">
                     <div className="flex items-center gap-2 mb-1">
                       <BadgeDollarSign className="w-4 h-4 text-volt" />
-                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">One-time</span>
+                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">Legacy</span>
                     </div>
-                    <h2 className="font-barlow font-black uppercase text-2xl text-ink">Single report price</h2>
-                    <p className="mt-2 text-ink/65 text-sm">The one-time price a buyer pays to unlock a single full report (includes scout review).</p>
+                    <h2 className="font-barlow font-black uppercase text-2xl text-ink">Legacy report price</h2>
+                    <p className="mt-2 text-ink/65 text-sm">Older one-time-purchase value used by legacy flows. New checkouts use <span className="text-volt font-bold">Single Report</span> price above.</p>
 
                     <div className="mt-6">
                       <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Current price (USD)</label>

@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 35 testing — admin-editable 4-tier pricing (single/premium/vip) end-to-end. All backend pricing endpoints work, validation correct, role enforcement correct. Frontend renders 4 cards desktop (FREE | SINGLE REPORT | PREMIUM | VIP) with $0/$129/$29.99/$49.99 and headline at 72px (lg:text-7xl). Mobile carousel renders 4 slides with card-3 peek (23px visible on 390px viewport — confirms swipe affordance). Admin Settings page has the new 'PUBLIC TIER PRICES' / 'PLAN PRICING' card with the requested data-testids (admin-tier-single-input / premium-input / vip-input / admin-tier-save). Edit → Save → toast → 'Current: $X' labels update, and a fresh tab on / immediately reflects the new values (auto-update-everywhere requirement verified). Prices restored to defaults at the end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PricingTiers · Single Report card", "issues": ["The review_request expected a single concatenated 'ONE-TIME · FULL REPORT' badge at the top of the Single card. Actual implementation: 'SINGLE' BadgeHeader (Trophy icon) at top + separate 'ONE-TIME' label under the $129 price. Functionally communicates both states, but does not match the exact badge copy described in the spec. Non-blocking — only flag if the exact wording matters."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter35_tier_pricing.py",
+    "/app/test_reports/pytest/iter35_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: Add data-testid attributes to the mobile pagination dots and chevron buttons in /app/frontend/src/components/PricingTiers.jsx (lines 325-356). Currently only aria-labels exist ('Previous plan', 'Next plan', 'Go to plan N'). Suggested: data-testid='pricing-mobile-prev', 'pricing-mobile-next', 'pricing-mobile-dot-{i}'. Functionality works, but matches the spec's requested testids and improves test stability.",
+    "OPTIONAL: If the spec's exact 'ONE-TIME · FULL REPORT' badge copy is required (vs the current 'SINGLE' badge + 'ONE-TIME' label split), update SingleCard's BadgeHeader label."
+  ],
+  "critical_code_review_comments": [
+    "PricingUpdate validation in /api/admin/pricing correctly rejects 0/negative/>9999 for single and >999 for premium/vip with 400 responses — verified.",
+    "/settings/price is public (no auth) and exposes single_price/premium_price/vip_price alongside legacy price/pass_price — backward compatible.",
+    "Mobile cards width is 44vw min 155 max 200 — produces the intended 2-cards-visible + 3rd-card-peek layout on 390px viewport (verified 23px peek). Do NOT change as per main agent note.",
+    "Legacy /admin/price endpoint and 'Legacy Report Price' card are kept intentionally for backward compat — verified, no conflict."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter35_tier_pricing.py (new)"
+  ],
+  "success_rate": {"backend": "100% (9/9 executed, 1 regression skipped due to existing active subscription on premium account — endpoint not broken)", "frontend": "100% on critical flows; 2 cosmetic notes"},
+  "test_credentials": "Used admin@elitescout.com / Admin@2026!Elite, premium@elitescout.com / Premium@2026, free@elitescout.com / Free@2026 — all valid.",
+  "seed_data_creation": "None. Pricing was temporarily changed to 149/34.99/59.99 then restored to 129/29.99/49.99 — verified clean state at end of run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pricing endpoint /api/admin/pricing is solid. Pricing test suite at /app/backend/tests/test_iter35_tier_pricing.py is reusable as regression. The premium subscribe test was skipped because premium@elitescout.com already has an active subscription (409 response) — to regression-test the subscribe flow, use a fresh account without an active sub, or assert on the 409 code as evidence the endpoint is reachable. Mobile chevrons/dots in PricingTiers.jsx lack data-testid — use button[aria-label='Next plan'] / [aria-label^='Go to plan'] / [aria-label='Previous plan'] as selectors for now.",
+  "rca of the issue": "N/A — no critical bugs found in this iteration."
+}

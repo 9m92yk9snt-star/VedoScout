@@ -114,6 +114,9 @@ ADMIN_EMAIL = os.environ["ADMIN_EMAIL"]
 ADMIN_PASSWORD = os.environ["ADMIN_PASSWORD"]
 DEFAULT_PRICE = float(os.environ.get("DEFAULT_REPORT_PRICE_USD", "159"))
 DEFAULT_PASS_PRICE = float(os.environ.get("DEFAULT_PASS_PRICE_USD", "399"))
+DEFAULT_SINGLE_PRICE = float(os.environ.get("DEFAULT_SINGLE_PRICE_USD", "129"))
+DEFAULT_PREMIUM_PRICE = float(os.environ.get("DEFAULT_PREMIUM_PRICE_USD", "29.99"))
+DEFAULT_VIP_PRICE = float(os.environ.get("DEFAULT_VIP_PRICE_USD", "49.99"))
 DEFAULT_SOCIAL_LINKS = {
     "twitter_url":   "https://twitter.com/scoutmeplay",
     "facebook_url":  "https://www.facebook.com/scoutmeplay",
@@ -1959,6 +1962,22 @@ class PriceUpdate(BaseModel):
     price_dkk: Optional[float] = None
 
 
+class PricingUpdate(BaseModel):
+    """Update one or more of the admin-controlled display prices.
+
+    `single_price` directly drives the one-time Single-Report checkout (Stripe
+    receives the new amount on every new session, so it always matches the UI).
+    `premium_price` / `vip_price` are DISPLAY values only — they update the
+    pricing tier cards across the site immediately. The actual recurring
+    Stripe Price IDs are immutable and were created on backend startup. When
+    one of these is changed, a `stripe_sync_required` flag is returned so the
+    admin UI can surface a note.
+    """
+    single_price:  Optional[float] = None
+    premium_price: Optional[float] = None
+    vip_price:     Optional[float] = None
+
+
 class SocialLinksUpdate(BaseModel):
     twitter_url:   Optional[str] = None
     facebook_url:  Optional[str] = None
@@ -3056,6 +3075,13 @@ async def public_price():
     value = doc.get("value", DEFAULT_PRICE) if doc else DEFAULT_PRICE
     pass_doc = await db.settings.find_one({"key": "pass_price"}, {"_id": 0})
     pass_value = pass_doc.get("value", DEFAULT_PASS_PRICE) if pass_doc else DEFAULT_PASS_PRICE
+    # NEW: 3 monthly + single-report admin-controlled display prices
+    single_doc = await db.settings.find_one({"key": "single_price"}, {"_id": 0})
+    single_value = float(single_doc["value"]) if single_doc and "value" in single_doc else DEFAULT_SINGLE_PRICE
+    prem_doc = await db.settings.find_one({"key": "premium_price"}, {"_id": 0})
+    premium_value = float(prem_doc["value"]) if prem_doc and "value" in prem_doc else DEFAULT_PREMIUM_PRICE
+    vip_doc = await db.settings.find_one({"key": "vip_price"}, {"_id": 0})
+    vip_value = float(vip_doc["value"]) if vip_doc and "value" in vip_doc else DEFAULT_VIP_PRICE
     landing_doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
     landing_value = landing_doc.get("value", "minimal") if landing_doc else "minimal"
     if landing_value not in ("full", "minimal"):
@@ -3064,6 +3090,9 @@ async def public_price():
     return {
         "price": float(value),
         "pass_price": float(pass_value),
+        "single_price": float(single_value),
+        "premium_price": float(premium_value),
+        "vip_price": float(vip_value),
         "currency": PRICE_CURRENCY,
         "price_dkk": float(value),
         "social": await get_social_links(),
@@ -6608,8 +6637,14 @@ async def get_upload_eligibility(user=Depends(get_current_user)):
 
 @api_router.post("/payments/prepay-upload")
 async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Request, user=Depends(get_current_user)):
-    """Stripe checkout for a single upload credit. On success, +1 prepaid_uploads."""
-    price = await get_current_price()
+    """Stripe checkout for a single Single-Report purchase. On success, +1 prepaid_uploads
+    (which the buyer redeems to unlock one full premium scout report).
+
+    Price source: `single_price` setting (default $129), admin-editable via
+    PUT /api/admin/pricing — so this checkout always charges the same amount
+    shown on the public Pricing Tiers card.
+    """
+    price = await get_current_single_price()
 
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
@@ -7123,7 +7158,7 @@ def _build_embedded_metadata(extra: Dict[str, str]) -> Dict[str, str]:
 async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_current_user)):
     if not _embedded_ready():
         raise HTTPException(status_code=503, detail="Embedded checkout not configured. Add Stripe pk_/sk_ keys.")
-    price = await get_current_price()
+    price = await get_current_single_price()
     amount_cents = int(round(float(price) * 100))
 
     origin = payload.origin_url.rstrip("/")
@@ -7844,6 +7879,67 @@ async def admin_update_pass_price(payload: PriceUpdate, _=Depends(get_current_ad
         upsert=True,
     )
     return {"pass_price": float(new_price), "currency": PRICE_CURRENCY}
+
+
+@api_router.put("/admin/pricing")
+async def admin_update_pricing(payload: PricingUpdate, _=Depends(get_current_admin)):
+    """Bulk update for the 3 admin-controlled display prices.
+
+    Accepts any subset of {single_price, premium_price, vip_price}. Returns
+    the new values plus a `stripe_sync_required` flag when premium or vip
+    prices changed (subscription Stripe Prices are immutable — see
+    PricingUpdate docstring).
+    """
+    updates: list[tuple[str, float]] = []
+    if payload.single_price is not None:
+        if payload.single_price <= 0 or payload.single_price > 9999:
+            raise HTTPException(status_code=400, detail="single_price out of range")
+        updates.append(("single_price", float(payload.single_price)))
+    if payload.premium_price is not None:
+        if payload.premium_price <= 0 or payload.premium_price > 999:
+            raise HTTPException(status_code=400, detail="premium_price out of range")
+        updates.append(("premium_price", float(payload.premium_price)))
+    if payload.vip_price is not None:
+        if payload.vip_price <= 0 or payload.vip_price > 999:
+            raise HTTPException(status_code=400, detail="vip_price out of range")
+        updates.append(("vip_price", float(payload.vip_price)))
+    if not updates:
+        raise HTTPException(status_code=400, detail="No prices provided")
+    now = now_iso()
+    for key, value in updates:
+        await db.settings.update_one(
+            {"key": key},
+            {"$set": {"key": key, "value": value, "updated_at": now}},
+            upsert=True,
+        )
+    stripe_sync_required = any(k in ("premium_price", "vip_price") for k, _ in updates)
+    # Echo current state of all three for the UI
+    snap = {}
+    for key, default in (
+        ("single_price", DEFAULT_SINGLE_PRICE),
+        ("premium_price", DEFAULT_PREMIUM_PRICE),
+        ("vip_price", DEFAULT_VIP_PRICE),
+    ):
+        doc = await db.settings.find_one({"key": key})
+        snap[key] = float(doc["value"]) if doc and "value" in doc else default
+    return {
+        **snap,
+        "currency": PRICE_CURRENCY,
+        "stripe_sync_required": stripe_sync_required,
+        "note": (
+            "Premium/VIP changes update the displayed price on the website immediately. "
+            "Stripe subscription Price IDs are immutable, so the actual checkout amount "
+            "stays at the originally configured value until the Stripe Prices are re-created."
+        ) if stripe_sync_required else None,
+    }
+
+
+async def get_current_single_price() -> float:
+    """Helper used by the one-time Single Report checkout endpoint."""
+    doc = await db.settings.find_one({"key": "single_price"})
+    if doc and "value" in doc:
+        return float(doc["value"])
+    return DEFAULT_SINGLE_PRICE
 
 
 @api_router.put("/admin/social-links")
