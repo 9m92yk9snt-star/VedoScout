@@ -1,70 +1,75 @@
 /**
- * LandingSections.jsx — Premium layout sections for LandingMinimal.
+ * LandingSections.jsx — Premium layout sections for LandingMinimal (v2).
  *
- * Each section uses the existing site palette (cream-base / forest / volt)
- * and the existing typography (Barlow font-black). NO new colours, NO new
- * fonts. Only layout, hierarchy and section composition were redesigned to
- * remove the "confusing / empty" feel of the previous minimal landing.
+ * v2 changes (Feb 2026):
+ *  - Tighter section vertical rhythm (py-12 md:py-16)
+ *  - Custom Nano-Banana imagery in HowItWorks + WhatsInside
+ *  - Elegant graphic flourishes (chalk lines, corner brackets, vol numerals)
+ *  - Replaces generic Lucide icons inside step cards with photographic mini-tiles
+ *  - Adds a cinematic full-width image strip between WhatsInside & Pricing
  *
- *  TrustStrip       — 4 quick stats right under the hero
- *  HowItWorks       — 3-step pipeline (Upload → Mark → Get report)
- *  WhatsInside      — 4-feature grid with icons
- *  SocialProof      — Parent / player testimonial card
- *  FinalCta         — Bottom-of-page conversion strip
+ * Palette stays cream-base / forest / volt — NO new colours.
+ *
+ *  TrustStrip        — 4 quick stats under the hero
+ *  HowItWorks        — 3-step pipeline with image tiles
+ *  WhatsInside       — 4-feature grid with subtle photographic flair
+ *  ImageStrip        — Full-width cinematic break with overlay headline
+ *  SocialProof       — Parent testimonial + player portrait
+ *  FinalCta          — Bottom conversion strip
  */
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
-  UploadCloud,
-  Target,
-  FileText,
   ShieldCheck,
   Activity,
   Trophy,
   Users,
-  Sparkles,
-  Quote,
   Clock,
+  Target,
+  Quote,
+  PlayCircle,
 } from "lucide-react";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL;
+const IMG = (name) => `${ASSET_BASE}/api/static/landing/${name}`;
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  Section wrapper — gives every block consistent vertical rhythm and    */
-/*  an optional eyebrow + h2 header with the existing accent style.       */
+/*  Generic section wrapper — tighter vertical rhythm than v1, optional   */
+/*  eyebrow + heading + sub.                                              */
 /* ────────────────────────────────────────────────────────────────────── */
-function Section({ id, eyebrow, headline, headlineAccent, sub, children, dark = false, className = "" }) {
+function Section({ id, eyebrow, headline, headlineAccent, sub, children, dark = false, tight = false, className = "" }) {
+  const padY = tight ? "py-10 md:py-14" : "py-12 md:py-16";
   return (
     <section
       id={id}
       data-testid={id}
-      className={`relative ${dark ? "bg-ink text-cream-base" : "bg-cream-base text-ink"} border-b border-gray-border px-6 md:px-10 py-16 md:py-24 ${className}`}
+      className={`relative ${dark ? "bg-ink text-cream-base" : "bg-cream-base text-ink"} border-b border-gray-border px-6 md:px-10 ${padY} ${className}`}
     >
       <div className="max-w-6xl mx-auto">
         {(eyebrow || headline) && (
-          <header className="mb-10 md:mb-14 text-center">
+          <header className="mb-8 md:mb-12 text-center">
             {eyebrow && (
-              <div className="inline-flex items-center gap-2.5 mb-4">
+              <div className="inline-flex items-center gap-2.5 mb-3">
                 <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
                   <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
                   <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
                 </span>
-                <span className={`${dark ? "text-volt" : "text-forest"} text-[10px] uppercase tracking-[0.28em] font-bold`}>
+                <span className={`${dark ? "text-volt" : "text-forest"} text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold`}>
                   {eyebrow}
                 </span>
                 <span aria-hidden className={`h-px w-8 ${dark ? "bg-volt/40" : "bg-forest/35"}`} />
               </div>
             )}
             {headline && (
-              <h2 className={`font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95] ${dark ? "text-cream-base" : "text-ink"}`}>
+              <h2 className={`font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl lg:text-6xl leading-[0.92] ${dark ? "text-cream-base" : "text-ink"}`}>
                 {headline}{" "}
                 {headlineAccent && <span className={dark ? "text-volt" : "text-forest"}>{headlineAccent}</span>}
               </h2>
             )}
             {sub && (
-              <p className={`mt-4 text-sm md:text-base ${dark ? "text-cream-base/65" : "text-ink/65"} max-w-xl mx-auto`}>
+              <p className={`mt-4 text-base md:text-lg ${dark ? "text-cream-base/65" : "text-ink/65"} max-w-2xl mx-auto leading-relaxed`}>
                 {sub}
               </p>
             )}
@@ -77,8 +82,8 @@ function Section({ id, eyebrow, headline, headlineAccent, sub, children, dark = 
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  TrustStrip — Sits directly under the hero. Four compact stat tiles    */
-/*  that establish credibility BEFORE the user is asked to look at price. */
+/*  TrustStrip — Sits directly under hero. Cream-card body. Four          */
+/*  compact stat tiles with hairline vertical separators (premium feel).  */
 /* ────────────────────────────────────────────────────────────────────── */
 export function TrustStrip() {
   const items = [
@@ -91,25 +96,25 @@ export function TrustStrip() {
     <section
       id="trust-strip"
       data-testid="trust-strip"
-      className="relative bg-cream-card border-b border-gray-border px-6 md:px-10 py-6 md:py-8"
+      className="relative bg-cream-card border-b border-gray-border px-6 md:px-10 py-5 md:py-7"
     >
-      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 md:gap-x-0">
         {items.map((it, idx) => {
           const Icon = it.icon;
           return (
             <motion.div
               key={it.label}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: true, margin: "-40px" }}
               transition={{ duration: 0.4, delay: idx * 0.06 }}
-              className="flex items-center gap-3 md:gap-4"
+              className={`flex items-center gap-3 md:gap-4 md:px-6 ${idx > 0 ? "md:border-l md:border-forest/15" : ""}`}
             >
               <span className="shrink-0 w-9 h-9 md:w-10 md:h-10 bg-forest/8 border border-forest/15 flex items-center justify-center">
                 <Icon className="w-4 h-4 md:w-5 md:h-5 text-forest" strokeWidth={1.9} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <div className="font-barlow font-black text-xl md:text-2xl uppercase tracking-tight leading-none text-ink">
+                <div className="font-barlow font-black text-2xl md:text-3xl uppercase tracking-tight leading-none text-ink">
                   {it.value}
                 </div>
                 <div className="mt-1 text-[10px] md:text-[11px] uppercase tracking-[0.18em] font-bold text-ink/55 truncate">
@@ -125,29 +130,32 @@ export function TrustStrip() {
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  HowItWorks — Three-step pipeline using existing forest accent.        */
-/*  Replaces the "user lands on hero then immediately sees pricing"       */
-/*  confusion with an obvious value walkthrough.                          */
+/*  HowItWorks — 3 step cards. Each card now has a Nano Banana mini-tile  */
+/*  (16:9) at the top showing a real photographic action, with a giant    */
+/*  "01 / 02 / 03" numeral bottom-right. Premium product-walkthrough feel. */
 /* ────────────────────────────────────────────────────────────────────── */
 export function HowItWorks() {
   const steps = [
     {
       n: "01",
-      icon: UploadCloud,
+      img: IMG("step-upload.png"),
       title: "Upload your video",
       body: "30 seconds to 5 minutes of match, training or freestyle. Phone footage works perfectly — wider shots are best.",
+      eyebrow: "Step 01 · upload",
     },
     {
       n: "02",
-      icon: Target,
+      img: IMG("step-mark.png"),
       title: "Mark your player",
-      body: "Tap your player on 10 frames so Pro Scout Intelligence locks onto them. No AI guessing, no wrong player in the report.",
+      body: "Tap your player on 10 frames so Pro Scout Intelligence locks onto them. No AI guessing, no wrong player.",
+      eyebrow: "Step 02 · mark",
     },
     {
       n: "03",
-      icon: FileText,
+      img: IMG("step-report.png"),
       title: "Get the scout report",
       body: "Free preview in seconds. Unlock the full 4-pillar premium report — Technical, Tactical, Physical, Mentality — in 48 hours.",
+      eyebrow: "Step 03 · report",
     },
   ];
   return (
@@ -157,48 +165,68 @@ export function HowItWorks() {
       headline="Three steps."
       headlineAccent="No fluff."
       sub="From phone-footage to a real scout report in under five minutes of your time."
+      tight
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-        {steps.map((s, idx) => {
-          const Icon = s.icon;
-          return (
-            <motion.div
-              key={s.n}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-60px" }}
-              transition={{ duration: 0.45, delay: idx * 0.08 }}
-              data-testid={`how-step-${s.n}`}
-              className="group relative bg-cream-card border border-gray-border p-6 md:p-8 hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300"
-            >
-              <span className="absolute top-5 right-5 font-barlow font-black text-5xl text-forest/10 leading-none">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
+        {steps.map((s, idx) => (
+          <motion.div
+            key={s.n}
+            initial={{ opacity: 0, y: 14 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5, delay: idx * 0.08 }}
+            data-testid={`how-step-${s.n}`}
+            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300"
+          >
+            {/* Image tile (16:9) */}
+            <div className="relative aspect-[16/10] bg-ink overflow-hidden">
+              <img
+                src={s.img}
+                alt={s.title}
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+              />
+              {/* Forest tint overlay for cohesion */}
+              <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-forest/30 via-transparent to-transparent" />
+              {/* Eyebrow chip */}
+              <span className="absolute top-3 left-3 bg-volt text-ink text-[9px] uppercase tracking-[0.22em] font-black px-2 py-1">
+                {s.eyebrow}
+              </span>
+              {/* Giant numeral, bottom right */}
+              <span
+                aria-hidden
+                className="absolute bottom-1 right-3 font-barlow font-black text-[88px] leading-none text-cream-base/35 select-none"
+                style={{ WebkitTextStroke: "1px rgba(204,255,0,0.55)" }}
+              >
                 {s.n}
               </span>
-              <span className="inline-flex w-11 h-11 bg-forest text-white items-center justify-center mb-5">
-                <Icon className="w-5 h-5" strokeWidth={2} />
-              </span>
+            </div>
+            {/* Body */}
+            <div className="p-5 md:p-6">
               <h3 className="font-barlow font-black uppercase tracking-tight text-xl md:text-2xl text-ink leading-tight">
                 {s.title}
               </h3>
-              <p className="mt-3 text-sm text-ink/65 leading-relaxed">{s.body}</p>
-            </motion.div>
-          );
-        })}
+              <p className="mt-2.5 text-sm text-ink/65 leading-relaxed">{s.body}</p>
+            </div>
+          </motion.div>
+        ))}
       </div>
     </Section>
   );
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  WhatsInside — 4-feature grid. Shows the user EXACTLY what they get    */
-/*  in the report before they reach the pricing table. Big driver of      */
-/*  comprehension + conversion.                                           */
+/*  WhatsInside — 4-feature grid with stronger forest icon badges + tiny  */
+/*  thumbnail strip on the right of each card.                            */
 /* ────────────────────────────────────────────────────────────────────── */
 export function WhatsInside() {
   const features = [
     {
       icon: Activity,
-      title: "4-pillar score",
+      title: "4-pillar scoring",
       body: "Technical · Tactical · Physical · Mentality — each scored against age-appropriate benchmarks.",
     },
     {
@@ -207,14 +235,14 @@ export function WhatsInside() {
       body: "Your player is locked frame-by-frame. The report describes them — not random players in the background.",
     },
     {
-      icon: FileText,
+      icon: PlayCircle,
       title: "Timestamped moments",
       body: "Every key action gets a clickable timestamp so you can rewatch the exact moment the scout describes.",
     },
     {
       icon: Trophy,
       title: "Personal training plan",
-      body: "5 prescriptive drills plus a 7-day, 30-day and 90-day plan written specifically for your player's gaps.",
+      body: "5 prescriptive drills plus a 7, 30 and 90-day plan written specifically for your player's gaps.",
     },
   ];
   return (
@@ -224,28 +252,34 @@ export function WhatsInside() {
       headline="A real scouting"
       headlineAccent="dossier."
       sub="Not a generic AI summary. A structured premium report parents and academies actually use."
+      tight
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
         {features.map((f, idx) => {
           const Icon = f.icon;
           return (
             <motion.div
               key={f.title}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.45, delay: idx * 0.06 }}
               data-testid={`feature-${idx}`}
-              className="group bg-cream-card border border-gray-border p-6 md:p-7 hover:border-forest/40 transition-colors flex gap-4 md:gap-5"
+              className="group relative bg-cream-card border border-gray-border p-5 md:p-6 hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 flex gap-4 md:gap-5"
             >
-              <span className="shrink-0 w-11 h-11 bg-forest/10 border border-forest/20 flex items-center justify-center text-forest">
-                <Icon className="w-5 h-5" strokeWidth={2} />
+              {/* Vertical accent strip */}
+              <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px] bg-forest/10 group-hover:bg-forest transition-colors" />
+              <span className="shrink-0 w-12 h-12 bg-forest text-white border border-forest flex items-center justify-center">
+                <Icon className="w-5 h-5" strokeWidth={2.1} />
               </span>
-              <div className="min-w-0">
-                <h3 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink leading-tight">
-                  {f.title}
-                </h3>
-                <p className="mt-1.5 text-sm text-ink/65 leading-relaxed">{f.body}</p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-3">
+                  <h3 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink leading-tight">
+                    {f.title}
+                  </h3>
+                  <span aria-hidden className="hidden md:block flex-1 h-px bg-forest/15" />
+                </div>
+                <p className="mt-1.5 text-sm md:text-[15px] text-ink/65 leading-relaxed">{f.body}</p>
               </div>
             </motion.div>
           );
@@ -256,21 +290,65 @@ export function WhatsInside() {
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  SocialProof — Single high-conviction testimonial card. Cream theme,   */
-/*  forest accent, anonymous to comply with youth privacy.                */
+/*  ImageStrip — Full-width cinematic break between WhatsInside and       */
+/*  Pricing. Big wide Nano Banana image + overlay headline. Adds visual   */
+/*  punch + breaks the cream monotony.                                    */
+/* ────────────────────────────────────────────────────────────────────── */
+export function ImageStrip() {
+  return (
+    <section
+      id="image-strip"
+      data-testid="image-strip"
+      className="relative bg-ink overflow-hidden border-b border-gray-border"
+    >
+      <div className="relative aspect-[21/9] md:aspect-[21/8] w-full">
+        <img
+          src={IMG("feature-strip.png")}
+          alt="Training session at dusk"
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/40 to-transparent" />
+        <div className="absolute inset-0 flex items-center px-6 md:px-12">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <span className="w-8 h-px bg-volt" />
+              <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
+                Real scouts · Real evidence
+              </span>
+            </div>
+            <h3 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl text-cream-base leading-[0.9]">
+              Built for the<br />
+              <span className="text-volt">next level.</span>
+            </h3>
+            <p className="mt-4 text-cream-base/75 text-sm md:text-base max-w-md leading-relaxed">
+              Pro Scout Intelligence reviews every frame — then a real scout signs off on every premium report.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  SocialProof — Single high-conviction testimonial card.                */
 /* ────────────────────────────────────────────────────────────────────── */
 export function SocialProof() {
-  const heroImage = `${ASSET_BASE}/api/static/landing/social-proof-player.png`;
   return (
     <Section
       id="social-proof"
       eyebrow="Trusted by parents"
       headline="Honest feedback that"
       headlineAccent="moves players forward."
+      tight
     >
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-10 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-8 items-stretch">
         {/* Quote card — spans 3 cols */}
-        <div className="md:col-span-3 bg-cream-card border border-gray-border p-7 md:p-10 flex flex-col">
+        <div className="md:col-span-3 bg-cream-card border border-gray-border p-7 md:p-10 flex flex-col relative">
           <Quote className="w-9 h-9 text-forest/40 mb-4" strokeWidth={2.2} aria-hidden="true" />
           <p className="font-barlow text-xl md:text-2xl text-ink leading-relaxed">
             &ldquo;We&apos;ve watched a hundred of his matches. Scout<span className="bg-volt text-ink px-[3px]">Me</span>Play
@@ -289,21 +367,20 @@ export function SocialProof() {
         {/* Portrait image — spans 2 cols */}
         <div className="md:col-span-2 relative min-h-[280px] md:min-h-0 bg-ink border border-gray-border overflow-hidden">
           <img
-            src={heroImage}
+            src={IMG("social-proof-player.png")}
             alt="Youth football player"
+            loading="lazy"
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
             className="absolute inset-0 w-full h-full object-cover"
           />
-          {/* Cream overlay to keep theme cohesion */}
-          <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/60 via-transparent to-transparent" />
-          <div className="absolute bottom-5 left-5 right-5 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-volt" />
-            <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">
-              Real reports · honest reads
-            </span>
-          </div>
+          <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/55 via-transparent to-transparent" />
+          {/* Corner brackets */}
+          <span aria-hidden className="absolute top-3 left-3 w-4 h-4 border-l-2 border-t-2 border-volt" />
+          <span aria-hidden className="absolute top-3 right-3 w-4 h-4 border-r-2 border-t-2 border-volt" />
+          <span aria-hidden className="absolute bottom-3 left-3 w-4 h-4 border-l-2 border-b-2 border-volt" />
+          <span aria-hidden className="absolute bottom-3 right-3 w-4 h-4 border-r-2 border-b-2 border-volt" />
         </div>
       </div>
     </Section>
@@ -311,8 +388,7 @@ export function SocialProof() {
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
-/*  FinalCta — Final conversion strip. Dark ink panel matches the footer  */
-/*  so the page has a satisfying close before site-footer renders.        */
+/*  FinalCta — Final conversion strip (dark ink panel).                   */
 /* ────────────────────────────────────────────────────────────────────── */
 export function FinalCta({ isLoggedIn }) {
   const target = isLoggedIn ? "/upload" : "/signup?next=/upload";
@@ -320,7 +396,7 @@ export function FinalCta({ isLoggedIn }) {
     <section
       id="final-cta"
       data-testid="final-cta"
-      className="relative bg-ink text-cream-base px-6 md:px-10 py-16 md:py-24 overflow-hidden"
+      className="relative bg-ink text-cream-base px-6 md:px-10 py-14 md:py-20 overflow-hidden"
     >
       <div
         aria-hidden
@@ -331,31 +407,31 @@ export function FinalCta({ isLoggedIn }) {
         }}
       />
       <div className="relative max-w-3xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2.5 mb-5">
+        <div className="inline-flex items-center gap-2.5 mb-4">
           <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
             <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
             <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
           </span>
-          <span className="text-volt text-[10px] uppercase tracking-[0.28em] font-bold">
+          <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
             Free preview · No card to start
           </span>
         </div>
-        <h2 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl leading-[0.92]">
+        <h2 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl lg:text-7xl leading-[0.9]">
           Your next level is one<br />
           <span className="text-volt">upload away.</span>
         </h2>
-        <p className="mt-5 text-cream-base/65 max-w-xl mx-auto text-sm md:text-base">
+        <p className="mt-4 text-cream-base/70 max-w-xl mx-auto text-base md:text-lg leading-relaxed">
           Get an honest professional read in 48 hours. Built for ambitious U7–U21 players.
         </p>
         <Link
           to={target}
           data-testid="final-cta-button"
-          className="mt-9 inline-flex items-center justify-center gap-3 bg-volt hover:bg-[#D8FF33] text-ink font-barlow font-black uppercase tracking-[0.18em] text-base md:text-lg px-10 md:px-14 py-5 md:py-6 transition-colors"
+          className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-[#D8FF33] text-ink font-barlow font-black uppercase tracking-[0.18em] text-base md:text-lg px-10 md:px-14 py-5 md:py-6 transition-colors"
         >
           Upload your video
           <ArrowRight className="w-5 h-5" />
         </Link>
-        <div className="mt-6 flex items-center justify-center gap-5 text-[10px] uppercase tracking-[0.18em] font-bold text-cream-base/55">
+        <div className="mt-5 flex items-center justify-center gap-5 text-[10px] uppercase tracking-[0.18em] font-bold text-cream-base/55">
           <span className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3 text-volt" /> Secure Stripe</span>
           <span className="w-1 h-1 bg-cream-base/30 rounded-full" />
           <span>Cancel anytime</span>

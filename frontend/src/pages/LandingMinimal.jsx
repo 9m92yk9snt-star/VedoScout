@@ -27,6 +27,7 @@ import {
   TrustStrip,
   HowItWorks,
   WhatsInside,
+  ImageStrip,
   SocialProof,
   FinalCta,
 } from "@/components/LandingSections";
@@ -94,6 +95,7 @@ export default function LandingMinimal() {
       <TrustStrip />
       <HowItWorks />
       <WhatsInside />
+      <ImageStrip />
       <div id="pricing-section" data-testid="pricing-section">
         <PricingTiers />
       </div>
@@ -106,56 +108,93 @@ export default function LandingMinimal() {
 }
 
 /* ============================================================ */
-/*  HERO — Two-column on desktop (text + image), stacked mobile  */
+/*  HERO — Lagdelt komposition med dybde og WAU effekt           */
+/*  Left: dramatic copy + CTA + live scout activity ticker       */
+/*  Right: stacked images (action shot + floating scout report)  */
 /* ============================================================ */
 function HeroSection({ onPrimaryCta, isLoggedIn }) {
-  const heroImage = `${ASSET_BASE}/api/static/landing/hero-pitch.png`;
+  const heroAction = `${ASSET_BASE}/api/static/landing/hero-action.png`;
+  const heroReport = `${ASSET_BASE}/api/static/landing/hero-report-card.png`;
   return (
     <section
       id="hero-section"
       data-testid="hero-minimal"
-      className="relative px-6 md:px-10 pt-14 md:pt-20 pb-16 md:pb-24 border-b border-gray-border overflow-hidden bg-cream-base"
+      className="relative px-6 md:px-10 pt-12 md:pt-16 pb-14 md:pb-20 border-b border-gray-border overflow-hidden bg-cream-base"
     >
-      {/* Subtle dotted backdrop */}
+      {/* Layered backdrop: grid + fading dot field + corner accents */}
       <div
         aria-hidden
         className="absolute inset-0 opacity-[0.05] pointer-events-none"
         style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
-          backgroundSize: "36px 36px",
+          backgroundImage:
+            "linear-gradient(#1F4F2F 1px, transparent 1px), linear-gradient(90deg, #1F4F2F 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage: "radial-gradient(ellipse at center, black 0%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse at center, black 0%, transparent 75%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute -top-10 -left-10 w-72 h-72 rounded-full pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(204,255,0,0.18) 0%, transparent 70%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute bottom-0 right-0 w-96 h-96 rounded-full pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(31,79,47,0.22) 0%, transparent 70%)",
         }}
       />
 
-      <div className="relative max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-        {/* LEFT — copy + CTA */}
-        <div className="lg:col-span-7 text-center lg:text-left">
-          {/* Eyebrow */}
+      <div className="relative max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        {/* ───────── LEFT — copy + CTA ───────── */}
+        <div className="lg:col-span-6 text-center lg:text-left relative">
+          {/* Eyebrow with chalk line */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="inline-flex items-center gap-2.5 mb-5"
+            className="inline-flex items-center gap-2.5 mb-4"
           >
             <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
               <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
               <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
             </span>
-            <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
+            <span className="text-forest text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
               Pro Scout Intelligence · 48h delivery
             </span>
             <span aria-hidden className="h-px w-8 bg-forest/35" />
           </motion.div>
 
-          {/* Headline */}
+          {/* Headline — bigger, tighter, with subtle accent */}
           <motion.h1
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.05 }}
+            transition={{ duration: 0.55, delay: 0.05 }}
             data-testid="hero-headline"
-            className="font-barlow font-black uppercase tracking-tighter text-5xl sm:text-6xl lg:text-[5.5rem] leading-[0.9] text-ink"
+            className="font-barlow font-black uppercase tracking-tighter text-[3.25rem] sm:text-7xl lg:text-[5.75rem] leading-[0.86] text-ink"
           >
-            Ready to discover<br />
-            <span className="text-forest">your true level?</span>
+            See your game<br />
+            through<br />
+            <span className="relative inline-block text-forest">
+              scout eyes.
+              <svg
+                aria-hidden
+                className="absolute -bottom-2 left-0 w-full h-2 text-volt"
+                viewBox="0 0 200 8"
+                preserveAspectRatio="none"
+              >
+                <path
+                  d="M0 5 Q 50 0 100 5 T 200 5"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -166,7 +205,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             className="mt-6 text-base md:text-lg text-ink/70 leading-relaxed max-w-xl mx-auto lg:mx-0"
           >
             Upload your video. Get an honest professional scout report in 48 hours.
-            Built for ambitious U7–U21 players chasing the next level.
+            Built for ambitious U7&ndash;U21 players chasing the next level.
           </motion.p>
 
           {/* CTA row */}
@@ -174,7 +213,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.25 }}
-            className="mt-8 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 justify-center lg:justify-start"
+            className="mt-7 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 justify-center lg:justify-start"
           >
             <button
               type="button"
@@ -183,7 +222,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               className="group inline-flex items-center justify-center gap-3 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base px-8 md:px-10 py-4 md:py-5 transition-all w-full sm:w-auto"
               style={{
                 boxShadow:
-                  "0 24px 48px -16px rgba(31, 79, 47, 0.45), 0 10px 20px -8px rgba(31, 79, 47, 0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
+                  "0 26px 48px -16px rgba(31, 79, 47, 0.5), 0 10px 20px -8px rgba(31, 79, 47, 0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
               }}
             >
               Upload your video
@@ -192,7 +231,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             <a
               href="#how-it-works-walkthrough"
               data-testid="hero-secondary-cta"
-              className="inline-flex items-center justify-center gap-2 text-ink hover:text-forest font-barlow font-black uppercase tracking-[0.18em] text-sm border-2 border-ink/20 hover:border-forest/60 px-7 py-4 transition-colors w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 text-ink hover:text-forest font-barlow font-black uppercase tracking-[0.18em] text-sm border-2 border-ink/15 hover:border-forest/60 px-7 py-4 transition-colors w-full sm:w-auto"
             >
               <PlayCircle className="w-4 h-4" /> How it works
             </a>
@@ -203,7 +242,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="mt-6 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-5 justify-center lg:justify-start"
+            className="mt-5 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-5 justify-center lg:justify-start"
           >
             <span className="text-[11px] text-ink/55 flex items-center gap-1.5 uppercase tracking-[0.18em] font-bold">
               <ShieldCheck className="w-3.5 h-3.5 text-forest" />
@@ -224,31 +263,28 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
           </motion.div>
         </div>
 
-        {/* RIGHT — hero image (Nano Banana). Falls back gracefully if missing. */}
+        {/* ───────── RIGHT — Lagdelt billed-komposition ───────── */}
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="lg:col-span-5 relative"
+          className="lg:col-span-6 relative"
+          data-testid="hero-composition"
         >
-          <div
-            className="relative aspect-[4/5] md:aspect-[4/5] w-full bg-ink overflow-hidden border border-gray-border"
-            data-testid="hero-image-frame"
-          >
+          {/* MAIN — action shot frame */}
+          <div className="relative aspect-[4/5] w-full bg-ink overflow-hidden border border-gray-border">
             <img
-              src={heroImage}
-              alt="Professional football pitch"
+              src={heroAction}
+              alt="Young footballer in action"
               onError={(e) => {
-                // Graceful fallback if Nano Banana hasn't generated yet
                 e.currentTarget.style.display = "none";
-                e.currentTarget.parentElement?.classList.add("hero-image-fallback");
               }}
               className="absolute inset-0 w-full h-full object-cover"
             />
-            {/* Cream tint overlay to keep aesthetic cohesive with the rest of the page */}
+            {/* Forest gradient overlay for cohesion */}
             <div
               aria-hidden
-              className="absolute inset-0 bg-gradient-to-tr from-forest/30 via-transparent to-ink/30 mix-blend-multiply"
+              className="absolute inset-0 bg-gradient-to-tr from-ink/45 via-transparent to-forest/25 mix-blend-multiply"
             />
             {/* Corner brackets */}
             <span aria-hidden className="absolute top-3 left-3 w-5 h-5 border-l-2 border-t-2 border-volt" />
@@ -267,17 +303,93 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             {/* Bottom caption */}
             <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-volt/90 font-bold">Match footage</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-volt/95 font-bold">Match footage</div>
                 <div className="font-barlow font-black uppercase text-white text-xl md:text-2xl leading-tight">
                   Analysed in 48h
                 </div>
               </div>
-              <span className="bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] font-bold text-white">
-                4-pillar score
-              </span>
             </div>
+
+            {/* Decorative scan line */}
+            <motion.div
+              aria-hidden
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 0.5, 0] }}
+              transition={{ duration: 3, repeat: Infinity, delay: 1 }}
+              className="absolute inset-x-0 h-px bg-volt"
+              style={{ top: "30%" }}
+            />
           </div>
+
+          {/* FLOATING SCOUT REPORT CARD — overlapper bottom-left of image */}
+          <motion.div
+            initial={{ opacity: 0, y: 20, rotate: -8 }}
+            animate={{ opacity: 1, y: 0, rotate: -4 }}
+            transition={{ duration: 0.75, delay: 0.4, ease: "easeOut" }}
+            className="hidden md:block absolute -bottom-8 -left-10 w-[44%] z-10"
+            data-testid="hero-floating-report"
+          >
+            <div
+              className="relative bg-cream-card border-2 border-ink overflow-hidden"
+              style={{
+                boxShadow:
+                  "0 32px 60px -16px rgba(10,26,18,0.4), 0 12px 22px -10px rgba(10,26,18,0.3)",
+              }}
+            >
+              <img
+                src={heroReport}
+                alt="Scout report preview"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+                className="block w-full h-auto"
+              />
+              {/* Bottom strip with score */}
+              <div className="bg-forest text-white px-3 py-2 flex items-center justify-between border-t border-ink">
+                <span className="text-[9px] uppercase tracking-[0.22em] font-bold">Scout report</span>
+                <span className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt">
+                  4-pillar · 48h
+                </span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* STATS CHIP — top right */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.55 }}
+            className="hidden md:flex absolute -top-4 -right-3 z-10 bg-ink text-cream-base px-4 py-3 items-center gap-3 border border-ink"
+            style={{
+              boxShadow:
+                "0 18px 36px -10px rgba(10,26,18,0.4)",
+            }}
+          >
+            <span className="w-9 h-9 bg-volt text-ink flex items-center justify-center font-barlow font-black text-base leading-none">
+              7.8
+            </span>
+            <div className="text-left">
+              <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt">Overall score</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] font-bold text-cream-base/80">U14 · AMF</div>
+            </div>
+          </motion.div>
         </motion.div>
+      </div>
+
+      {/* HERO LIVE-TICKER — below the composition, full width */}
+      <div className="relative max-w-6xl mx-auto mt-12 md:mt-16 pt-6 border-t border-forest/15 flex flex-wrap items-center justify-center md:justify-between gap-x-8 gap-y-3">
+        <span className="text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold text-ink/45 flex items-center gap-2">
+          <span aria-hidden className="relative flex items-center justify-center w-1.5 h-1.5 shrink-0">
+            <span className="absolute inset-0 rounded-full bg-forest animate-ping opacity-60" />
+            <span className="relative rounded-full w-1 h-1 bg-forest" />
+          </span>
+          Live · scouting now
+        </span>
+        <div className="flex items-center gap-6 md:gap-10 text-[10px] md:text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55">
+          <span><span className="text-forest font-black">+128</span> reports this month</span>
+          <span className="hidden sm:inline"><span className="text-forest font-black">12 countries</span></span>
+          <span><span className="text-forest font-black">98%</span> 48h delivery</span>
+        </div>
       </div>
     </section>
   );

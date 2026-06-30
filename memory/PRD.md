@@ -26,6 +26,45 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 86 — Hero v2 WOW redesign + 6 new Nano Banana images (Feb 27 2026)**:
+  - User feedback (Danish): "Jeg er ikke glad for front page især starten , jeg synes side mangle dybte og Wau effekt overskrifter og tekst nogle steder er små og noget steder store afstand mellem de forskellige sektioner er også for stor der mangler en elegant touch så alt ser bare godt ud forside er også fattig på billder især i starten også de forskellige icons ser mature ud brug nano til at sætte en grafisk proffesionaliswm".
+  - Translation: hero start lacks depth + WOW factor, headlines/text inconsistent sizes, section spacing too loose, lacks elegant touch, front page poor on images (especially at start), generic icons look dated — use Nano Banana for graphic professionalism. ALL existing colours (cream-base/forest/volt) preserved.
+  - **6 new Nano Banana images** generated via `gemini-3.1-flash-image-preview` (saved to `/app/backend/static/landing/`):
+    - `hero-action.png` (714 KB) — DRAMATIC cinematic action shot of U14 player mid-sprint with ball
+    - `hero-report-card.png` (390 KB) — Vertical 3D-rendered scout-report mockup with `7.8/10` score + 4 mini bar charts
+    - `step-upload.png` (723 KB) — Hand holding phone with "Uploading 42%" progress
+    - `step-mark.png` (697 KB) — Finger tapping phone with lime bounding box around player
+    - `step-report.png` (895 KB) — Open scout report on cream paper with radar chart + pen
+    - `feature-strip.png` (882 KB) — Wide cinematic 21:9 training-session photograph
+  - **Hero v2 — lagdelt WAU komposition** (`LandingMinimal.jsx`):
+    - Grid background pattern + radial halos (volt top-left, forest bottom-right) for ambient depth
+    - Headline rewritten: **"SEE YOUR GAME THROUGH SCOUT EYES."** with an animated volt squiggle underline on "scout eyes" — signature WAU element
+    - Right column = MAIN action-shot frame + **floating scout-report card overlapping bottom-left at -4° rotation** with the `7.8/10` score visible (depth + dimension)
+    - Floating dark "7.8 · OVERALL SCORE · U14 · AMF" chip top-right of image (off-canvas) — adds dramatic depth
+    - Animated scan-line crossing the action image every 3 s (subtle scout-scope feel)
+    - Bottom **live-ticker row**: "● LIVE · SCOUTING NOW · +128 REPORTS THIS MONTH · 12 COUNTRIES · 98% 48H DELIVERY" — establishes immediate credibility
+  - **HowItWorks v2** (`LandingSections.jsx`):
+    - Each of the 3 step cards now has a **photographic Nano Banana tile** (16:10 ratio) at the top (replaced the generic forest Lucide-icon boxes)
+    - Each card has a ghosted **giant numeral 01/02/03** (88px, volt outline) in the bottom-right corner of the image
+    - "STEP 0X · UPLOAD / MARK / REPORT" volt chip top-left of each tile
+    - Forest gradient overlay on each image for cohesion
+    - Card hover: lifts 2px + scales image 1.03 over 700 ms — boutique product feel
+  - **WhatsInside v2**: forest icon badges upgraded from `bg-forest/10` outline to **solid forest fill (`bg-forest text-white`)**; hairline rule next to each title; left vertical accent strip that turns full forest on hover.
+  - **NEW `<ImageStrip />`**: Full-width cinematic break between WhatsInside and Pricing — wide 21:9 Nano Banana training photo with left-side dark gradient + volt overlay headline "BUILT FOR THE NEXT LEVEL". Breaks the cream monotony with a dark visual punctuation.
+  - **SocialProof v2**: Player portrait now has 4 lime corner brackets + softer bottom gradient (no more bottom "Real reports" eyebrow which felt redundant). Quote text + Mette parent attribution layout unchanged.
+  - **FinalCta v2**: Bigger headline (text-4xl md:text-6xl lg:text-7xl), tighter top spacing, "Refund if we miss 48h" trust pill added inline with Stripe + cancel-anytime row.
+  - **Tighter section rhythm everywhere**: `py-16 md:py-24` → `py-12 md:py-16` (TrustStrip / FAQ); Hero padding `pt-14 md:pt-20 pb-16 md:pb-24` → `pt-12 md:pt-16 pb-14 md:pb-20`. Reduces overall page height by ~25 % and removes the "empty / loose" feel the user reported.
+  - **Self-verified** (no console errors, all 6 images load at full natural width — hero-action.png 928×, hero-report-card 896×, step-{upload,mark,report} 1024× each):
+    - DOM order: hero → trust-strip → how-it-works-walkthrough → what-you-get → image-strip → pricing-section → social-proof → faq-minimal → final-cta → footer-minimal
+    - Nav anchor scroll-into-view works: "How it works" → scrollY=1040 · "Pricing" → scrollY=3152
+    - `[data-testid="hero-floating-report"]` present in DOM
+    - Lint clean (0 warnings/errors)
+  - **Files**:
+    - MODIFIED `/app/frontend/src/components/LandingSections.jsx` (full rewrite, ~395 lines — adds `<ImageStrip />`, photographic step tiles, tighter spacing)
+    - MODIFIED `/app/frontend/src/pages/LandingMinimal.jsx` (full hero rewrite with layered composition + live ticker)
+    - NEW `/app/backend/scripts/generate_landing_images_v2.py` — 6-image generator script (Nano Banana)
+    - 6 new PNG assets under `/app/backend/static/landing/`
+
 - ✅ **🆕 Session 85 — Premium layout overhaul: landing + dashboard (Feb 27 2026)**:
   - User-reported (Danish): "Design siden layout section opsætning for frontpage dashboard and user dashboard make it look perfekt and good looking use nanobans and you bedst design testing agent. Right now everything looks confusing but use same colors like website is now do not change anything."
   - Translation: layout/section redesign for landing + dashboard. Use Nano Banana for images. Use testing agent. Keep existing cream-base/forest/volt palette — no colour changes.
