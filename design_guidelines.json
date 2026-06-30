@@ -1,120 +1,125 @@
 {
-  "project_context": {
-    "domain": "Premium Sports SaaS",
-    "theme": "Light",
-    "archetype": "1 (Organic & Earthy / Luxury Hybrid)",
-    "mood": "Premium, professional athleticwear (like high-end Nike/Adidas), warm, grounded, authoritative.",
-    "core_changes": "Transitioning from a dark-mode 'fintech-bro' look (deep navy + electric volt) to a premium light-cream and forest-green aesthetic."
+  "theme": {
+    "archetype": "Archetype 2: Performance Pro",
+    "mode": "Hybrid (Light Base with Dark Tactical Elements)",
+    "description": "Football-native aesthetic, boutique pro academy feel, high contrast. Inspired by Whoop, Polar, On Running. Premium, serious, aggressive but grounded. Elite athleticism & precision."
   },
   "colors": {
-    "palette": {
-      "cream-base": "#F4EFE6",
-      "cream-soft": "#EAE3D2",
-      "cream-card": "#FFFFFF",
+    "background": {
+      "cream_base": "#F6EFE3",
+      "cream_card": "#FFFAF1",
+      "ink_black": "#0A1A12",
+      "forest_dark": "#1F4F2F"
+    },
+    "primary": {
       "forest": "#1F4F2F",
-      "forest-pop": "#2D6B3D",
-      "ink": "#0A0F0D",
-      "gray-body": "#4B5563",
-      "gray-border": "#E5E7EB",
+      "forest_pop": "#2A6B3F"
+    },
+    "accent": {
+      "volt": "#CCFF00",
+      "lime": "#A5DD5F",
+      "gold": "#F5C443"
+    },
+    "text": {
+      "ink": "#0A1A12",
+      "ink_muted": "rgba(10,26,18,0.65)",
       "white": "#FFFFFF"
-    },
-    "mapping_old_to_new": {
-      "bg-deepnavy": "bg-cream-base (Except Navbar/Footers which become bg-ink)",
-      "text-volt": "text-forest",
-      "text-white": "text-ink (for headings) / text-gray-body (for body), except when on bg-ink",
-      "bg-surface": "bg-cream-card (with border-gray-border)"
     }
   },
-  "typography": {
-    "headings": {
-      "font_family": "Barlow Condensed (or similar ultra-condensed sans-serif)",
-      "weight": "800/900 (Black/ExtraBold)",
-      "casing": "uppercase",
-      "tracking": "tracking-tight",
-      "colors": "text-ink"
-    },
-    "body": {
-      "font_family": "DM Sans, Manrope, or Inter",
-      "weight": "400/500",
-      "casing": "normal-case",
-      "colors": "text-gray-body"
-    },
+  "recipes": {
     "buttons": {
-      "font_family": "Body font",
-      "weight": "700 (Bold)",
-      "casing": "uppercase",
-      "tracking": "tracking-widest"
+      "primary": "bg-[#1F4F2F] hover:bg-[#2A6B3F] text-[#FFFFFF] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all shadow-[4px_4px_0_0_#0A1A12] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0A1A12] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] border border-[#0A1A12]",
+      "secondary_outline": "bg-transparent text-[#0A1A12] border-2 border-[#0A1A12] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all hover:bg-[#0A1A12] hover:text-[#F6EFE3] shadow-[4px_4px_0_0_#0A1A12] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0A1A12]",
+      "vip_gold": "bg-[#F5C443] hover:bg-[#FFD661] text-[#0A1A12] border border-[#0A1A12] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all shadow-[4px_4px_0_0_#0A1A12] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0A1A12]",
+      "volt_accent": "bg-[#CCFF00] hover:bg-[#D8FF33] text-[#0A1A12] border border-[#0A1A12] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all shadow-[4px_4px_0_0_#1F4F2F] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#1F4F2F]"
+    },
+    "cards": {
+      "base": "bg-[#FFFAF1] border-2 border-[#0A1A12] rounded-none p-6 md:p-8 hover:bg-[#FFFFFF] transition-colors",
+      "premium": "bg-[#0F3A22] border-2 border-[#A5DD5F] rounded-none p-6 md:p-8 text-[#FFFFFF] relative overflow-hidden shadow-[8px_8px_0_0_#0A1A12]",
+      "vip": "bg-[#0A0F0D] border-2 border-[#F5C443] rounded-none p-6 md:p-8 text-[#FFFFFF] relative overflow-hidden shadow-[8px_8px_0_0_#0A1A12]"
+    },
+    "typography": {
+      "h1_hero": "font-barlow font-black uppercase tracking-tighter text-6xl md:text-7xl lg:text-[5.5rem] leading-[0.85] text-[#0A1A12]",
+      "h2_section": "font-barlow font-black uppercase tracking-tighter text-4xl md:text-5xl lg:text-6xl leading-[0.9] text-[#0A1A12]",
+      "h3_card": "font-barlow font-black uppercase tracking-tight text-2xl md:text-3xl text-[#0A1A12] leading-none",
+      "eyebrow": "text-[#1F4F2F] text-[11px] md:text-xs uppercase tracking-[0.25em] font-bold"
+    },
+    "spacing": {
+      "section_y": "py-24 md:py-32",
+      "container_px": "px-6 md:px-12",
+      "grid_gap_bento": "gap-4 md:gap-6",
+      "grid_gap_loose": "gap-8 md:gap-12"
     }
   },
-  "components": {
-    "navbar": {
-      "background": "bg-ink",
-      "text": "text-white",
-      "logo": "Rebuild existing 'scout reticle' SVG using the new text-forest color. Wordmark: 'SCOUTMEPLAY' with 'ME' in text-forest. Tagline: small uppercase text next to logo.",
-      "layout": "Sticky top, flex-row, UPLOAD VIDEO button on right (bg-forest text-white rounded-full pill) + square logout icon."
+  "components_upgrades": {
+    "LandingMinimal": {
+      "HeroSection": [
+        "Incorporate a 'Control Room' / Tactical feel. Remove the faint circular svg and replace it with a full-bleed cinematic background image (from image_urls.hero_fallback) with a heavy bg-[#F6EFE3]/90 overlay to maintain the cream theme but add aggressive grit.",
+        "Change CTA button to recipes.buttons.primary to introduce the solid offset brutalist shadow.",
+        "Enhance eyebrow: Add an animated 'Tracing Beam' or tactical line under the eyebrow text.",
+        "Make the 'Pro Scout Intelligence' text pop with #2A6B3F."
+      ],
+      "PricingTiers": [
+        "Apply Archetype 2 Tactical Minimalism: Remove soft drop shadows. Replace them with solid brutalist borders (border-2) and offset shadows (`shadow-[8px_8px_0_0_#0A1A12]`).",
+        "Retain 3-col on mobile, but use gap-1 sm:gap-4.",
+        "Add a subtle grain/noise texture overlay to the Premium and VIP cards to make them feel less flat.",
+        "Ensure all inner dividers inside pricing cards are sharp (h-[2px] bg-ink or bg-white/20)."
+      ],
+      "FAQSection": [
+        "Change accordion toggle from soft rotation to a sharp snap animation.",
+        "Add a 4px left border (border-l-4 border-[#1F4F2F]) to the open state instead of full box shadow.",
+        "Update font sizes to match recipes.typography.h3_card for the questions to give them weight."
+      ]
     },
-    "hero_paywall": {
-      "wrapper": "bg-cream-base",
-      "layout": "Grid (text left, image right). On mobile: flex-col with image below or above text (max-h-[80vh]).",
-      "pill": "Small gray rounded pill with lock icon, text 'PREMIUM'.",
-      "headline": "Ultra-condensed text-ink, uppercase, text-5xl to text-7xl. The number '9' colored text-forest.",
-      "list_items": "Thin-line green icons + dark gray text labels.",
-      "cta_button": "w-full bg-forest text-white rounded-full uppercase tracking-widest. Lock icon on the left.",
-      "trust_note": "Small text-gray-body centered below CTA."
-    },
-    "feature_card_grid": {
-      "wrapper": "bg-cream-soft",
-      "layout": "3x3 bento-style grid.",
-      "cards": "bg-cream-card (white) rounded-xl border border-gray-border shadow-sm p-6.",
-      "card_icon": "Hand-drawn style thin-line icon, text-forest.",
-      "card_title": "Bold black uppercase (text-ink).",
-      "card_description": "2-3 lines of text-gray-body."
-    },
-    "trust_strip": {
-      "layout": "3-column flex/grid layout used consistently on the landing page and inside the report paywall.",
-      "content": "Thin-line green icons above/next to bold uppercase headers ('TRUSTED & SECURE', etc.) and small subtext.",
-      "background": "Transparent or bg-cream-soft."
-    },
-    "embedded_checkout_modal": {
-      "wrapper": "Repaint the wrapper modal from dark navy to bg-cream-card.",
-      "branding": "Change primary buttons inside the flow (if customizable) to forest green."
-    },
-    "forms": {
-      "inputs": "bg-cream-card text-ink border-gray-border focus:ring-forest focus:border-forest.",
-      "labels": "text-ink font-bold uppercase text-sm tracking-wide."
-    },
-    "footer": {
-      "background": "bg-ink",
-      "text": "text-white",
-      "layout": "Brand/About/Contact/Legal columns. Links text-gray-300 hover:text-white."
+    "DashboardPage": {
+      "WelcomeHeader": [
+        "Increase padding top to pt-32 pb-24 for breathing room.",
+        "Make headline text massive (text-5xl md:text-6xl).",
+        "Place the 'New upload' button inline with the title using flex-wrap, styling it with recipes.buttons.primary."
+      ],
+      "UpgradeBanner": [
+        "Use dark tactical cards for both mini-cards. Premium = #0F3A22, VIP = #0A0F0D.",
+        "Add 1px neon inner borders (border-[#A5DD5F]/50 and border-[#F5C443]/50).",
+        "Remove soft shadows, add sharp inner glows (shadow-[inset_0_0_20px_rgba(204,255,0,0.05)])."
+      ],
+      "ReportsLibrary": [
+        "Change the grid to dense 'Control Room' style: gap-0 border-y border-x border-[#0A1A12]/10. Items share borders (border-r border-b).",
+        "Make the preview/premium badges razor-sharp with no rounded corners. bg-[#1F4F2F] text-white or bg-[#0A1A12] text-[#CCFF00].",
+        "Ensure image thumbnails have a grayscale filter by default, revealing full color on group-hover (group-hover:grayscale-0 transition-all duration-500) to feel like scout analysis footage."
+      ],
+      "PlayersList": [
+        "Convert rows into technical 'register' lines. Use 1px border-b border-[#0A1A12]/10.",
+        "Hover state: from bg-[#FFFAF1] to bg-[#CCFF00]/10 transition.",
+        "Align Premium/Upgrade badges strictly to the right edge with monospaced positioning."
+      ]
     }
   },
-  "icons": {
-    "library": "iconoir-react",
-    "instructions": "Install `yarn add iconoir-react`. Use these icons for a thinner, hand-drawn look instead of standard Lucide. If Lucide is mandatory, use `strokeWidth={1.25}` or `1.5`."
+  "image_generation_prompts_nano_banana": {
+    "LandingHeroBackground": "Cinematic wide-angle photography of a pristine football pitch at night. Heavy mist, blinding stadium floodlights cutting through the dark. Monochromatic forest green and deep black tones. High contrast, gritty, professional sports documentary style. Leave negative space in the center.",
+    "PricingPremiumTexture": "Macro close-up photography of technical sports fabric, like a high-end football jersey or modern running shoe mesh. Deep forest green color, tactical, minimalist, with subtle diagonal striations. Low lighting, premium.",
+    "VIPCardAccent": "A glowing golden crown insignia rendered in 3D wireframe style, floating against pitch black. Subtle metallic highlights.",
+    "DashboardEmptyState": "A cinematic close-up of a professional scout's clipboard and stopwatch resting on artificial turf. Shallow depth of field, moody lighting, forest green color grading."
   },
-  "layout_spacing": {
-    "philosophy": "Generous spacing. p-6 or p-8 inside cards. gap-6 to gap-12 between sections.",
-    "mobile_strategy": "Content goes full-bleed, but text/cards maintain p-4/p-6 padding to prevent edge collisions. Navbar stays black on mobile."
-  },
-  "media": {
-    "hero_image": {
-      "url": "https://images.pexels.com/photos/9040063/pexels-photo-9040063.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "description": "A goalkeeper in a green jersey stands ready on a rustic soccer field in Caldas, Colombia. Fits the forest-green premium aesthetic.",
-      "placement": "Hero / Paywall right-side section."
+  "image_urls": {
+    "hero_fallback": {
+      "url": "https://images.pexels.com/photos/15779126/pexels-photo-15779126.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Aerial stadium night for hero background or VIP card texture. Apply a heavy cream overlay in CSS to preserve the text contrast."
+    },
+    "dashboard_coach": {
+      "url": "https://images.unsplash.com/photo-1585757318177-0570a997dc3a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxzb2NjZXIlMjBjb2FjaCUyMG5vdGVib29rfGVufDB8fHx8MTc4MjgyOTg3Mnww&ixlib=rb-4.1.0&q=85",
+      "description": "Coach notebook image for dashboard empty state or welcome banner."
     }
   },
-  "testing": {
-    "requirements": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='upload-video-btn')."
+  "micro_interactions": {
+    "buttons": "Hover: rigid translation translate-y-[2px] translate-x-[2px] with a sharp, dense shadow shadow-[2px_2px_0_0_#0A1A12]. Active: translate-y-[4px] translate-x-[4px] with no shadow.",
+    "cards": "Hover: subtle 2px border color shift (e.g., border-[#0A1A12]/10 -> border-[#0A1A12]). Do NOT use soft blurring shadow. Use rigid translation if elevated.",
+    "grid_items": "Staggered fade-in on load using framer-motion. duration 0.4, delay 0.05 increments.",
+    "thumbnails": "Grayscale by default. group-hover:grayscale-0 group-hover:scale-105 duration-700 ease-out."
   },
-  "instructions_to_main_agent": [
-    "Run `yarn add iconoir-react` for thin-line hand-drawn icons.",
-    "Add the new colors (`cream-base`, `cream-soft`, `cream-card`, `forest`, `forest-pop`, `ink`) to tailwind.config.js.",
-    "Ensure `Barlow Condensed` (or a similar ultra-condensed font) is imported and applied to the heading class utility.",
-    "Do a global search-and-replace logically for `bg-deepnavy` -> `bg-cream-base` (except nav/footer) and `text-volt` -> `text-forest`.",
-    "Rebuild the 'scout reticle' logo as an inline SVG so it can inherit `text-forest` via `currentColor`.",
-    "Retain all functionalities (Stripe checkout, video scrubber, segment filters) perfectly while overhauling the visuals.",
-    "Apply the Trust Strip to the bottom of both the landing page and the report paywall card.",
-    "Always maintain WCAG accessibility for text on backgrounds (e.g. text-ink on bg-cream-base is perfect)."
+  "implementation_priority": [
+    "1. Landing Hero: Update spacing, inject tactical background image logic, apply brutalist button shadows.",
+    "2. Landing Pricing: Adjust borders to solid 2px, apply solid offset shadows, remove all soft drop shadows.",
+    "3. Dashboard Welcome & Banner: Refine the grid, add tactical notebook imagery to empty states.",
+    "4. Dashboard Reports & Players: Convert cards to sharp-edged Control Room grid items, implement grayscale hover effects on thumbnails."
   ]
 }
