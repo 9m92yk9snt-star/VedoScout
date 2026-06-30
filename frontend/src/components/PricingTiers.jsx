@@ -326,6 +326,7 @@ function MobileCarousel({ cards }) {
         <button
           type="button"
           aria-label="Previous plan"
+          data-testid="pricing-mobile-prev"
           onClick={() => scrollToCard(Math.max(0, idx - 1))}
           className="w-9 h-9 flex items-center justify-center border border-forest/30 text-forest bg-cream-card disabled:opacity-30"
           disabled={idx === 0}
@@ -339,6 +340,7 @@ function MobileCarousel({ cards }) {
               key={i}
               type="button"
               aria-label={`Go to plan ${i + 1}`}
+              data-testid={`pricing-mobile-dot-${i}`}
               onClick={() => scrollToCard(i)}
               className={`transition-all ${i === idx ? "w-6 bg-forest" : "w-1.5 bg-forest/30"} h-1.5`}
             />
@@ -348,6 +350,7 @@ function MobileCarousel({ cards }) {
         <button
           type="button"
           aria-label="Next plan"
+          data-testid="pricing-mobile-next"
           onClick={() => scrollToCard(Math.min(cards.length - 1, idx + 1))}
           className="w-9 h-9 flex items-center justify-center border border-forest/30 text-forest bg-cream-card disabled:opacity-30"
           disabled={idx === cards.length - 1}

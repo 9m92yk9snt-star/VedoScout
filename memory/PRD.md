@@ -26,6 +26,47 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 87 — Single Report tier ($129 one-time) + admin-editable pricing + mobile swipe carousel (Feb 27 2026)**:
+  - User feedback (Danish): "Jeg vil gerne tilføje en ekstra betaling future engangs pris med banner for fuld rapport og alt inkluderet 129 dollars og og banner skalmlaves om så de kan swipes på Mobils men ser 2 og lidt af 3 så de indekser at de kan swipes. Grafisk skal de også se godt ud og passe til siden jeg kan se at over tekst er lille inforhold til andre titler på siden brug nano ban for design til at designe det alle priser skal jeg kunne ændre i admin sektion når jeg ændrer dem skal de automatisk ændres alle steder på siden. Hvor poserne bliver nævn eller set"
+  - Summary: Add new $129 one-time "Single Report" tier with banner badge · Mobile = swipeable carousel showing 2 cards + peek of 3rd · Bigger COMPARE PLANS headline · ALL prices admin-editable → auto-update site-wide · Nano Banana for design polish.
+  - **NEW 4-tier pricing**:
+    1. FREE ($0 / month) — unchanged
+    2. SINGLE REPORT ($129 one-time) — NEW. Brutalist black border + offset shadow `8px 8px 0 0`. Volt "ONE-TIME · FULL REPORT" badge floating above the card. Includes a Nano Banana product photo (`single-icon.png`) of a rolled scout report tied with lime ribbon. CTA wires to `/api/payments/prepay-upload` (one-time Stripe checkout).
+    3. PREMIUM ($29.99 / month) — unchanged
+    4. VIP PREMIUM ($49.99 / month) — unchanged
+  - **Backend (`server.py`)** — full price layer rewrite:
+    - 3 new defaults: `DEFAULT_SINGLE_PRICE=129`, `DEFAULT_PREMIUM_PRICE=29.99`, `DEFAULT_VIP_PRICE=49.99` (overridable via env)
+    - NEW model `PricingUpdate` with optional `single_price`/`premium_price`/`vip_price`
+    - `GET /api/settings/price` now returns all 5 fields: `{ price, pass_price, single_price, premium_price, vip_price, currency, social, active_landing }` (legacy fields kept for backward compat)
+    - NEW `PUT /api/admin/pricing` (admin-only) — bulk update endpoint. Returns `stripe_sync_required: true` if premium/vip changed, since Stripe Price IDs are immutable
+    - NEW helper `get_current_single_price()` — used by `POST /api/payments/prepay-upload` and `POST /api/payments/embedded/prepay-upload` so the one-time checkout always matches the admin-set display price
+  - **PricingTiers.jsx — full rewrite** (~605 lines):
+    - 4-card layout. Desktop ≥1024 = 4-col grid. Tablet (md) = 2×2 grid. Mobile = horizontal swipe carousel.
+    - **Mobile carousel**: `flex overflow-x-auto snap-x snap-mandatory` track. Each card is `w-[44vw] min-w-[155px] max-w-[200px]` so 2 full cards + 23 px peek of the 3rd are visible on a 390 px viewport. Animated pagination dots (4 total, active dot grows to `w-6 bg-forest`). Chevron prev/next buttons (`data-testid=pricing-mobile-prev/next`). "SWIPE TO COMPARE ALL PLANS →" hint.
+    - **Bigger headline**: `text-4xl md:text-6xl lg:text-7xl` ("COMPARE PLANS. CHOOSE YOUR LEVEL.") — matches the other section h2s on the site (per user feedback "overskrift er lille inforhold til andre titler")
+    - **Live pricing** — `useEffect` fetches `/api/settings/price` on mount and overrides the local fallback prices. Any admin save propagates to the live site on next page load.
+    - **Mobile card optimisations**: smaller titles (`text-lg md:text-3xl`), smaller prices (`text-3xl md:text-5xl lg:text-6xl`), hidden sub-line + product image on mobile, condensed CTA labels ("Buy report" / "Premium" / "VIP" on mobile vs full labels on desktop)
+    - All `data-testid`s: `pricing-tiers-title`, `pricing-card-{free,single,premium,vip}`, `pricing-cta-{free,single,premium,vip}`, `pricing-tiers-cards-{mobile,desktop}`, `pricing-mobile-slide-{0..3}`, `pricing-mobile-{prev,next}`, `pricing-mobile-dot-{0..3}`
+  - **AdminPage.jsx — Settings tab**:
+    - NEW "PUBLIC TIER PRICES / Plan pricing" card with 3 number inputs (data-testids `admin-tier-single-input`, `admin-tier-premium-input`, `admin-tier-vip-input`) + save button (`admin-tier-save`)
+    - Each input has its own "Current: $X" caption showing the live persisted value
+    - `handleTierPricesSave` calls `PUT /api/admin/pricing` with all 3 values. On `stripe_sync_required=true`, a small amber note appears explaining that Premium/VIP DISPLAY changed but Stripe Price IDs are immutable until re-created from Stripe Dashboard.
+    - The legacy "Single report price" card (USD `report_price`) is kept below the new card for backward compat (renamed "LEGACY REPORT PRICE")
+  - **Nano Banana**: Generated `single-icon.png` via `gemini-3.1-flash-image-preview` (rolled scout report with lime ribbon, premium product still-life). NOTE: `single-banner.png` failed because Emergent LLM Key budget for this session was exceeded — user should top up if more imagery needed (Profile → Universal Key → Add Balance).
+  - **Verified (testing agent iteration_35.json — 100 % pass)**:
+    - Backend: `/api/settings/price` returns all 5 prices, `/api/admin/pricing` validates range/auth, bulk-saves correctly, returns `stripe_sync_required: true` for premium/vip changes
+    - Desktop: 4 cards render side-by-side, headline at 72 px (lg:text-7xl), all prices match DB
+    - Mobile 390 × 844: carousel renders with 2 full cards + 23 px peek of card-3, dots + chevrons work
+    - Admin: Settings tab → "Public Tier Prices" card edits + saves → live site updates immediately on refresh (auto-update-everywhere verified)
+    - Pytest suite created at `/app/backend/tests/test_iter35_tier_pricing.py`
+  - **Files**:
+    - MODIFIED `/app/backend/server.py` (3 new defaults, PricingUpdate model, `/admin/pricing` endpoint, `get_current_single_price` helper, prepay-upload now reads single_price)
+    - REWRITE `/app/frontend/src/components/PricingTiers.jsx` (4 cards, mobile carousel, dynamic pricing)
+    - MODIFIED `/app/frontend/src/pages/AdminPage.jsx` (new Plan Pricing card)
+    - NEW `/app/backend/scripts/generate_single_banner.py`
+    - NEW `/app/backend/static/landing/single-icon.png`
+    - NEW `/app/backend/tests/test_iter35_tier_pricing.py`
+
 - ✅ **🆕 Session 86 — Hero v2 WOW redesign + 6 new Nano Banana images (Feb 27 2026)**:
   - User feedback (Danish): "Jeg er ikke glad for front page især starten , jeg synes side mangle dybte og Wau effekt overskrifter og tekst nogle steder er små og noget steder store afstand mellem de forskellige sektioner er også for stor der mangler en elegant touch så alt ser bare godt ud forside er også fattig på billder især i starten også de forskellige icons ser mature ud brug nano til at sætte en grafisk proffesionaliswm".
   - Translation: hero start lacks depth + WOW factor, headlines/text inconsistent sizes, section spacing too loose, lacks elegant touch, front page poor on images (especially at start), generic icons look dated — use Nano Banana for graphic professionalism. ALL existing colours (cream-base/forest/volt) preserved.
