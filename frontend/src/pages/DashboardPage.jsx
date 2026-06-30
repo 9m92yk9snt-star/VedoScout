@@ -103,6 +103,19 @@ export default function DashboardPage() {
     }
   }, [passState?.active, players?.length]);
 
+  // ─── derived stats for the quick-stats row ───
+  const totalReports = reports.length;
+  const premiumReports = reports.filter((r) => r.is_paid || r.manually_unlocked).length;
+  const trackedPlayers = players.length;
+  const lastReport = reports[0]; // assumed sorted desc by API
+  const planLabel = subscription?.tier
+    ? subscription.tier === "vip"
+      ? "VIP Premium"
+      : "Premium"
+    : passState?.active
+    ? "Progress Pass"
+    : "Free";
+
   return (
     <div className="min-h-screen bg-cream-base text-ink">
       <Navigation />
@@ -110,21 +123,66 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <span className="text-forest text-xs uppercase tracking-[0.25em] font-bold">Your dashboard</span>
+              <span className="text-forest text-xs uppercase tracking-[0.25em] font-bold inline-flex items-center gap-2">
+                <span className="relative flex items-center justify-center w-2 h-2 shrink-0" aria-hidden>
+                  <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+                  <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+                </span>
+                Your dashboard
+              </span>
               <h1 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.95]">
-                Welcome, {user?.full_name?.split(" ")[0] || "Player"}
+                Welcome,{" "}
+                <span className="text-forest">
+                  {user?.full_name?.split(" ")[0] || "Player"}
+                </span>
               </h1>
-              <p className="mt-2 text-ink/65 text-sm">Track growth across reports, manage uploads, unlock premium analysis.</p>
+              <p className="mt-2 text-ink/65 text-sm">
+                Track growth across reports, manage uploads, unlock premium analysis.
+              </p>
             </div>
             <Link
               to="/upload"
               data-testid="dashboard-upload-btn"
               className="bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors flex items-center gap-2 self-start md:self-end"
+              style={{
+                boxShadow:
+                  "0 18px 36px -16px rgba(31, 79, 47, 0.45), 0 8px 16px -8px rgba(31, 79, 47, 0.3)",
+              }}
             >
               <Plus className="w-4 h-4" />
               New upload
             </Link>
           </div>
+
+          {/* QUICK STATS ROW — establishes hierarchy immediately. Hidden while loading. */}
+          {!loading && (
+            <div
+              data-testid="dashboard-quick-stats"
+              className="mt-6 md:mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"
+            >
+              <QuickStatTile icon={Film} label="Total uploads" value={totalReports} testid="qs-uploads" />
+              <QuickStatTile icon={CheckCircle2} label="Premium reports" value={premiumReports} accent testid="qs-premium" />
+              <QuickStatTile icon={Activity} label="Tracked players" value={trackedPlayers} testid="qs-players" />
+              <QuickStatTile
+                icon={planLabel === "VIP Premium" ? Crown : planLabel === "Premium" ? TrendingUp : Sparkles}
+                label="Current plan"
+                value={planLabel}
+                small
+                testid="qs-plan"
+              />
+            </div>
+          )}
+
+          {/* Last activity meta */}
+          {!loading && lastReport && (
+            <p className="mt-3 text-[11px] uppercase tracking-[0.2em] font-bold text-ink/50">
+              Last upload ·{" "}
+              <span className="text-forest">
+                {lastReport.player_details?.player_name || "—"}
+              </span>{" "}
+              · {new Date(lastReport.created_at).toLocaleDateString()}
+            </p>
+          )}
 
           {loading ? (
             <div className="text-center py-16">
@@ -403,6 +461,43 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
         </>
       )}
     </li>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────
+ *  QuickStatTile — small KPI tile used in the dashboard's top stats row.
+ *  Cream-card body, forest icon badge, big number, uppercase label. Mirrors
+ *  the visual language of the rest of the dashboard so the new row feels
+ *  native, not bolted on.
+ * ──────────────────────────────────────────────────────────────────────── */
+function QuickStatTile({ icon: Icon, label, value, accent = false, small = false, testid }) {
+  return (
+    <div
+      data-testid={testid}
+      className={`relative bg-cream-card border ${
+        accent ? "border-forest/40" : "border-gray-border"
+      } p-4 md:p-5 flex items-start gap-3 md:gap-4 hover:border-forest/50 transition-colors`}
+    >
+      <span
+        className={`shrink-0 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center border ${
+          accent ? "bg-forest text-white border-forest" : "bg-forest/10 text-forest border-forest/20"
+        }`}
+      >
+        <Icon className="w-4 h-4 md:w-5 md:h-5" strokeWidth={2} />
+      </span>
+      <div className="min-w-0">
+        <div
+          className={`font-barlow font-black uppercase leading-none text-ink ${
+            small ? "text-base md:text-lg tracking-tight" : "text-2xl md:text-3xl tracking-tighter"
+          }`}
+        >
+          {value}
+        </div>
+        <div className="mt-1.5 text-[10px] md:text-[11px] uppercase tracking-[0.18em] font-bold text-ink/55">
+          {label}
+        </div>
+      </div>
+    </div>
   );
 }
 

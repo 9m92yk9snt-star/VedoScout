@@ -151,6 +151,12 @@ api_router = APIRouter(prefix="/api")
 # Mount uploads as static (under /api so Kubernetes ingress routes it to backend)
 app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
+# Mount landing assets (Nano Banana generated images, etc.). Created on demand
+# by /app/backend/scripts/generate_landing_images.py.
+_LANDING_STATIC = ROOT_DIR / "static" / "landing"
+_LANDING_STATIC.mkdir(parents=True, exist_ok=True)
+app.mount("/api/static/landing", StaticFiles(directory=str(_LANDING_STATIC)), name="landing-static")
+
 # ============== MODELS ==============
 
 def now_iso() -> str:

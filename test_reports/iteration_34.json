@@ -1,0 +1,64 @@
+{
+  "summary": "Frontend-only visual/layout regression for ScoutMePlay landing + dashboard overhaul. Verified new sections (TrustStrip, HowItWorks, WhatsInside, SocialProof, FinalCta), Nano Banana hero image, anchor scroll, FAQ toggle, pricing CTAs, dashboard QuickStats, and mobile responsiveness at 390x844. All critical assertions passed with 0 console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard (premium@elitescout.com)", "issues": ["Header reads 'WELCOME, PREMIUM' while the qs-plan tile reads 'FREE / CURRENT PLAN' and UpgradeBanner is shown. This is consistent with the data model (premium one-off unlock != active subscription tier) but the UX combination of 'Welcome, Premium' + 'Plan: Free' + Upgrade banner is mildly confusing. Pre-existing — not introduced by this iteration. Consider clarifying display name vs. tier label later."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/landing_desktop.png",
+    "/app/test_reports/dashboard_desktop.png",
+    "/app/test_reports/landing_mobile.png",
+    "/app/test_reports/dashboard_mobile.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "LandingMinimal.jsx is 438 lines — acceptable but trending close to the 700-line threshold. Future refactor could split FAQSection and SiteFooter into separate files (`/components/Landing/FAQSection.jsx`, `SiteFooter.jsx`).",
+    "Hero img onError fallback adds a 'hero-image-fallback' class but no CSS rule is defined for it (no visible background/placeholder). If the image were ever to fail, the dark .bg-ink frame is shown but the user wouldn't see any branded placeholder. Consider adding a textual/SVG fallback inside the frame.",
+    "DashboardPage.jsx qs-plan tile shows 'FREE' for the seeded premium@elitescout.com account (which has an unlocked premium report but no active subscription). Confirm this is the intended source of truth (subscription tier, not report unlock status). If intentional, OK."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "Used premium@elitescout.com / Premium@2026 from /app/memory/test_credentials.md — login worked.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Landing overhaul verified end-to-end. All 4 Nano Banana PNGs at /api/static/landing/* return 200 (hero-pitch.png, how-it-works.png, social-proof-player.png, feature-analysis.png). Hero img naturalWidth=1408 confirms it loads. data-testids verified on desktop: landing-minimal, hero-minimal, hero-image-frame, hero-upload-cta, hero-secondary-cta, trust-strip, how-step-01/02/03, feature-0..3, pricing-section, faq-minimal, faq-minimal-toggle-N, final-cta, final-cta-button, footer-minimal, dashboard-quick-stats, qs-uploads/qs-premium/qs-players/qs-plan, dashboard-upgrade-banner. Mobile (390x844) responsive verified: hero stacks (1 col), TrustStrip 2x2 (163px x 2), dashboard QuickStats 2x2 (165px x 2), Pricing remains 3-col (124px x 3) as intentional. 'How it works' anchor scroll: 0 -> 846px. FinalCta is an <a> routing to /signup?next=/upload for anonymous user. FAQ toggle aria-expanded works. No console errors on either page.",
+  "test_results_detail": {
+    "landing_desktop": {
+      "all_data_testids_present": true,
+      "hero_image_loaded": true,
+      "hero_image_natural_width": 1408,
+      "how_it_works_scroll": "0 -> 846px",
+      "faq_toggle": "works (aria-expanded toggled true)",
+      "pricing_amounts_visible": ["$0", "$29.99", "$49.99"],
+      "final_cta_anon_route": "/signup?next=/upload",
+      "console_errors": 0
+    },
+    "dashboard_desktop_premium_user": {
+      "quick_stats": {"qs-uploads": "1", "qs-premium": "1", "qs-players": "3", "qs-plan": "FREE"},
+      "last_upload_meta": "LUKAS A. · 6/4/2026",
+      "reports_list_rendered": true,
+      "players_section_rendered": true,
+      "upgrade_banner_rendered": true,
+      "console_errors": 0,
+      "note": "qs-plan=FREE because premium@elitescout.com has a one-off unlocked report, not an active subscription tier — UpgradeBanner correctly appears. This matches the documented behaviour."
+    },
+    "mobile_390x844": {
+      "hero_grid_columns": "342px (1 col, stacked)",
+      "trust_strip_grid": "163px 163px (2x2)",
+      "pricing_grid": "124px x 3 (3-col preserved as required)",
+      "dashboard_quick_stats_grid": "165px 165px (2x2)",
+      "console_errors": 0
+    },
+    "nano_banana_assets": {
+      "hero-pitch.png": "200 OK (588775 bytes)",
+      "how-it-works.png": "200 OK",
+      "social-proof-player.png": "200 OK",
+      "feature-analysis.png": "200 OK"
+    }
+  }
+}

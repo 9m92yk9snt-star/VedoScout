@@ -1,31 +1,40 @@
 /**
- * LandingMinimal — Short, conversion-focused landing variant.
+ * LandingMinimal — Premium, ryddet landing layout.
  *
- * Layout (matching user-provided screenshots, top → bottom):
+ * Layout (top → bottom):
  *   1. Top bar (existing <Navigation />)
- *   2. Hero — "Ready to discover your true level?" + Upload CTA + Sign-in nudge
- *   3. Pricing — <PricingCards /> (Single $159 + 12-month $399)
- *   4. FAQ — "Honest answers. No fluff."
- *   5. Footer — Lightweight site footer (mobile bottom-tabs are mounted globally)
+ *   2. Hero — split layout (text + Nano-Banana pitch image)
+ *   3. TrustStrip — 4 quick stats
+ *   4. HowItWorks — 3-step pipeline (Upload → Mark → Get report)
+ *   5. WhatsInside — 4-feature grid
+ *   6. PricingTiers — Free · Premium · VIP (existing component)
+ *   7. SocialProof — parent testimonial
+ *   8. FAQ — Honest answers, no fluff
+ *   9. FinalCta — last conversion strip
+ *  10. SiteFooter
  *
- * Admin toggles between Landing.jsx (full) and LandingMinimal.jsx (minimal)
- * via /admin → Settings → "Active landing variant".
+ * Palette stays exactly cream-base / forest / volt — no new colours.
  */
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, Send } from "lucide-react";
+import { ArrowRight, ShieldCheck, Send, PlayCircle } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
 import PricingTiers from "@/components/PricingTiers";
 import SEO, { organizationJsonLd } from "@/components/SEO";
+import {
+  TrustStrip,
+  HowItWorks,
+  WhatsInside,
+  SocialProof,
+  FinalCta,
+} from "@/components/LandingSections";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
-/* ─────────────────────────────────────────────────────────────────
- *  FAQ items — kept in sync with the long-form Landing FAQ. The
- *  pricing answer is filled dynamically from /settings/price.
- * ───────────────────────────────────────────────────────────────── */
+const ASSET_BASE = process.env.REACT_APP_BACKEND_URL;
+
 const FAQ_ITEMS = [
   {
     q: "How long does it take to get my report?",
@@ -74,144 +83,200 @@ export default function LandingMinimal() {
     <div data-testid="landing-minimal" className="min-h-screen bg-cream-base text-ink overflow-x-clip">
       <SEO
         title="ScoutMePlay — Discover your true football level"
-        description="Upload your football video and get an honest professional scout review in 48 hours. Built for ambitious U7–U21 players. No subscription, no fluff."
+        description="Upload your football video and get an honest professional scout review in 48 hours. Built for ambitious U7–U21 players."
         canonical="/"
         jsonLd={organizationJsonLd()}
       />
 
-      {/* ─────────── 1. TOP BAR ─────────── */}
       <Navigation />
 
-      {/* ─────────── 2. HERO (USER UPLOAD + SIGN) ─────────── */}
       <HeroSection onPrimaryCta={handlePrimaryCta} isLoggedIn={!!user} />
-
-      {/* ─────────── 3. PRICING (Free · Premium · VIP Premium) ─────────── */}
-      <PricingTiers />
-
-      {/* ─────────── 4. FAQ ─────────── */}
+      <TrustStrip />
+      <HowItWorks />
+      <WhatsInside />
+      <div id="pricing-section" data-testid="pricing-section">
+        <PricingTiers />
+      </div>
+      <SocialProof />
       <FAQSection />
-
-      {/* ─────────── 5. FOOTER ─────────── */}
+      <FinalCta isLoggedIn={!!user} />
       <SiteFooter />
     </div>
   );
 }
 
 /* ============================================================ */
-/*  HERO                                                         */
+/*  HERO — Two-column on desktop (text + image), stacked mobile  */
 /* ============================================================ */
 function HeroSection({ onPrimaryCta, isLoggedIn }) {
+  const heroImage = `${ASSET_BASE}/api/static/landing/hero-pitch.png`;
   return (
     <section
+      id="hero-section"
       data-testid="hero-minimal"
-      className="relative px-6 md:px-10 pt-16 md:pt-24 pb-20 md:pb-28 border-b border-gray-border overflow-hidden"
+      className="relative px-6 md:px-10 pt-14 md:pt-20 pb-16 md:pb-24 border-b border-gray-border overflow-hidden bg-cream-base"
     >
-      {/* Subtle background pitch lines */}
+      {/* Subtle dotted backdrop */}
       <div
         aria-hidden
         className="absolute inset-0 opacity-[0.05] pointer-events-none"
         style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+          backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
           backgroundSize: "36px 36px",
         }}
       />
-      {/* Faint football silhouette in the background */}
-      <div
-        aria-hidden
-        className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.04]"
-      >
-        <svg viewBox="0 0 200 200" className="w-[60%] max-w-[480px]" fill="none">
-          <circle cx="100" cy="100" r="78" stroke="#0A1A12" strokeWidth="3" />
-          <path
-            d="M100 22 L120 60 L160 70 L130 100 L140 142 L100 122 L60 142 L70 100 L40 70 L80 60 Z"
-            fill="#0A1A12"
-            opacity="0.5"
-          />
-        </svg>
-      </div>
 
-      <div className="relative max-w-3xl mx-auto text-center">
-        {/* Eyebrow */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="inline-flex items-center gap-2.5 mb-6"
-        >
-          <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
-            <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
-            <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
-          </span>
-          <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
-            Pro Scout Intelligence · 48h delivery
-          </span>
-          <span aria-hidden className="h-px w-8 bg-forest/35" />
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.05 }}
-          data-testid="hero-headline"
-          className="font-barlow font-black uppercase tracking-tighter text-5xl sm:text-6xl md:text-7xl leading-[0.92] text-ink"
-        >
-          Ready to discover<br />
-          <span className="text-forest">your true level?</span>
-        </motion.h1>
-
-        {/* Subheadline */}
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.15 }}
-          className="mt-7 md:mt-9 text-base md:text-lg text-ink/70 leading-relaxed max-w-2xl mx-auto"
-        >
-          Upload your video and get an instant free scout preview. Built for ambitious
-          U7–U21 players chasing the next level. No card needed to start.
-        </motion.p>
-
-        {/* Primary CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-          className="mt-9 md:mt-11"
-        >
-          <button
-            type="button"
-            onClick={onPrimaryCta}
-            data-testid="hero-upload-cta"
-            className="group inline-flex items-center justify-center gap-3 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-base md:text-lg px-10 md:px-14 py-5 md:py-6 transition-all w-full sm:w-auto"
-            style={{
-              boxShadow:
-                "0 24px 48px -16px rgba(31, 79, 47, 0.45), 0 10px 20px -8px rgba(31, 79, 47, 0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
-            }}
+      <div className="relative max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+        {/* LEFT — copy + CTA */}
+        <div className="lg:col-span-7 text-center lg:text-left">
+          {/* Eyebrow */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="inline-flex items-center gap-2.5 mb-5"
           >
-            Upload your video
-            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-          </button>
+            <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
+              <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
+              <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+            </span>
+            <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
+              Pro Scout Intelligence · 48h delivery
+            </span>
+            <span aria-hidden className="h-px w-8 bg-forest/35" />
+          </motion.div>
 
-          {/* Sign-in nudge (for non-logged-in users) */}
-          {!isLoggedIn && (
-            <p className="mt-5 text-xs uppercase tracking-[0.2em] text-ink/55 font-bold">
-              Already have an account?{" "}
-              <Link
-                to="/login"
-                data-testid="hero-signin-link"
-                className="text-forest hover:text-forest-pop underline underline-offset-4 decoration-forest/40"
-              >
-                Sign in
-              </Link>
-            </p>
-          )}
+          {/* Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
+            data-testid="hero-headline"
+            className="font-barlow font-black uppercase tracking-tighter text-5xl sm:text-6xl lg:text-[5.5rem] leading-[0.9] text-ink"
+          >
+            Ready to discover<br />
+            <span className="text-forest">your true level?</span>
+          </motion.h1>
 
-          {/* Trust line */}
-          <p className="mt-4 text-[11px] text-ink/55 flex items-center justify-center gap-1.5 uppercase tracking-[0.18em] font-bold">
-            <ShieldCheck className="w-3.5 h-3.5 text-forest" />
-            Free preview · No card to start
-          </p>
+          {/* Subheadline */}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+            className="mt-6 text-base md:text-lg text-ink/70 leading-relaxed max-w-xl mx-auto lg:mx-0"
+          >
+            Upload your video. Get an honest professional scout report in 48 hours.
+            Built for ambitious U7–U21 players chasing the next level.
+          </motion.p>
+
+          {/* CTA row */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.25 }}
+            className="mt-8 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 justify-center lg:justify-start"
+          >
+            <button
+              type="button"
+              onClick={onPrimaryCta}
+              data-testid="hero-upload-cta"
+              className="group inline-flex items-center justify-center gap-3 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base px-8 md:px-10 py-4 md:py-5 transition-all w-full sm:w-auto"
+              style={{
+                boxShadow:
+                  "0 24px 48px -16px rgba(31, 79, 47, 0.45), 0 10px 20px -8px rgba(31, 79, 47, 0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
+              }}
+            >
+              Upload your video
+              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+            </button>
+            <a
+              href="#how-it-works-walkthrough"
+              data-testid="hero-secondary-cta"
+              className="inline-flex items-center justify-center gap-2 text-ink hover:text-forest font-barlow font-black uppercase tracking-[0.18em] text-sm border-2 border-ink/20 hover:border-forest/60 px-7 py-4 transition-colors w-full sm:w-auto"
+            >
+              <PlayCircle className="w-4 h-4" /> How it works
+            </a>
+          </motion.div>
+
+          {/* Trust line + sign-in nudge */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="mt-6 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-5 justify-center lg:justify-start"
+          >
+            <span className="text-[11px] text-ink/55 flex items-center gap-1.5 uppercase tracking-[0.18em] font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-forest" />
+              Free preview · No card to start
+            </span>
+            {!isLoggedIn && (
+              <span className="text-[11px] uppercase tracking-[0.18em] text-ink/55 font-bold">
+                Have an account?{" "}
+                <Link
+                  to="/login"
+                  data-testid="hero-signin-link"
+                  className="text-forest hover:text-forest-pop underline underline-offset-4 decoration-forest/40"
+                >
+                  Sign in
+                </Link>
+              </span>
+            )}
+          </motion.div>
+        </div>
+
+        {/* RIGHT — hero image (Nano Banana). Falls back gracefully if missing. */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="lg:col-span-5 relative"
+        >
+          <div
+            className="relative aspect-[4/5] md:aspect-[4/5] w-full bg-ink overflow-hidden border border-gray-border"
+            data-testid="hero-image-frame"
+          >
+            <img
+              src={heroImage}
+              alt="Professional football pitch"
+              onError={(e) => {
+                // Graceful fallback if Nano Banana hasn't generated yet
+                e.currentTarget.style.display = "none";
+                e.currentTarget.parentElement?.classList.add("hero-image-fallback");
+              }}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {/* Cream tint overlay to keep aesthetic cohesive with the rest of the page */}
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-tr from-forest/30 via-transparent to-ink/30 mix-blend-multiply"
+            />
+            {/* Corner brackets */}
+            <span aria-hidden className="absolute top-3 left-3 w-5 h-5 border-l-2 border-t-2 border-volt" />
+            <span aria-hidden className="absolute top-3 right-3 w-5 h-5 border-r-2 border-t-2 border-volt" />
+            <span aria-hidden className="absolute bottom-3 left-3 w-5 h-5 border-l-2 border-b-2 border-volt" />
+            <span aria-hidden className="absolute bottom-3 right-3 w-5 h-5 border-r-2 border-b-2 border-volt" />
+
+            {/* Floating "TRACKING" badge */}
+            <div className="absolute top-5 left-5">
+              <span className="inline-flex items-center gap-1.5 bg-volt text-ink text-[10px] uppercase tracking-[0.22em] font-black px-2.5 py-1.5">
+                <span className="w-1.5 h-1.5 bg-ink rounded-full animate-pulse" />
+                Pro scout · live
+              </span>
+            </div>
+
+            {/* Bottom caption */}
+            <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-volt/90 font-bold">Match footage</div>
+                <div className="font-barlow font-black uppercase text-white text-xl md:text-2xl leading-tight">
+                  Analysed in 48h
+                </div>
+              </div>
+              <span className="bg-white/10 backdrop-blur-sm border border-white/20 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] font-bold text-white">
+                4-pillar score
+              </span>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>
@@ -227,9 +292,7 @@ function FAQSection() {
 
   useEffect(() => {
     api.get("/settings/price")
-      .then(({ data }) => {
-        setPrice(data.price);
-      })
+      .then(({ data }) => setPrice(data.price))
       .catch(() => {});
   }, []);
 
@@ -239,15 +302,15 @@ function FAQSection() {
 
   return (
     <section
+      id="faq-section"
       data-testid="faq-minimal"
-      className="relative py-16 md:py-20 border-b border-gray-border bg-cream-base"
+      className="relative py-16 md:py-24 border-b border-gray-border bg-cream-base"
     >
       <div
         aria-hidden
         className="absolute inset-0 opacity-[0.04] pointer-events-none"
         style={{
-          backgroundImage:
-            "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
+          backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
           backgroundSize: "32px 32px",
         }}
       />
@@ -267,23 +330,9 @@ function FAQSection() {
             Honest answers.<br />
             <span className="text-forest">No fluff.</span>
           </h2>
-          <div className="mt-5 inline-flex items-center gap-2.5 px-3 py-1.5 border border-forest/25 bg-forest/5">
-            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-forest shrink-0" aria-hidden>
-              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.4" opacity="0.3" />
-              <line x1="12" y1="12" x2="12" y2="6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              <motion.line
-                x1="12" y1="12" x2="16" y2="12"
-                stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
-                style={{ transformOrigin: "12px 12px" }}
-                animate={{ rotate: [0, 360] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-              />
-              <circle cx="12" cy="12" r="1.2" fill="currentColor" />
-            </svg>
-            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-forest/85">
-              Answered in 30 seconds
-            </span>
-          </div>
+          <p className="mt-4 text-sm md:text-base text-ink/65 max-w-xl mx-auto">
+            Answered in 30 seconds — everything parents and players ask before booking a report.
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -293,8 +342,10 @@ function FAQSection() {
               <div
                 key={i}
                 data-testid={`faq-minimal-item-${i}`}
-                className={`border border-gray-border bg-cream-card transition-all duration-300 ${
-                  isOpen ? "shadow-md" : "hover:border-forest/40"
+                className={`border bg-cream-card transition-all duration-300 ${
+                  isOpen
+                    ? "border-forest shadow-[0_6px_22px_-12px_rgba(31,79,47,0.35)]"
+                    : "border-gray-border hover:border-forest/40"
                 }`}
               >
                 <button
