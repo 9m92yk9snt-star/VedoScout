@@ -118,6 +118,13 @@ DEFAULT_PASS_PRICE = float(os.environ.get("DEFAULT_PASS_PRICE_USD", "399"))
 DEFAULT_SINGLE_PRICE = float(os.environ.get("DEFAULT_SINGLE_PRICE_USD", "129"))
 DEFAULT_PREMIUM_PRICE = float(os.environ.get("DEFAULT_PREMIUM_PRICE_USD", "29.99"))
 DEFAULT_VIP_PRICE = float(os.environ.get("DEFAULT_VIP_PRICE_USD", "49.99"))
+# When a subscribed user (Premium / VIP) has exhausted their monthly quota,
+# they can buy additional reports at a discounted per-report rate — cheaper
+# than the $129 Single Report price because they're already paying for a
+# subscription. These are the defaults; admin overrides are stored in
+# `settings.premium_extra_report_price` / `settings.vip_extra_report_price`.
+DEFAULT_PREMIUM_EXTRA_PRICE = float(os.environ.get("DEFAULT_PREMIUM_EXTRA_USD", "89"))
+DEFAULT_VIP_EXTRA_PRICE = float(os.environ.get("DEFAULT_VIP_EXTRA_USD", "59"))
 DEFAULT_SOCIAL_LINKS = {
     "twitter_url":   "https://twitter.com/scoutmeplay",
     "facebook_url":  "https://www.facebook.com/scoutmeplay",
@@ -134,15 +141,15 @@ PRICE_CURRENCY = os.environ.get("DEFAULT_REPORT_CURRENCY", "usd").lower()
 SUBSCRIPTION_TIERS = {
     "premium": {
         "name": "ScoutMePlay Premium",
-        "description": "5 video reports per month · Advanced AI analysis · Progress tracking · PDF downloads · Scout database visibility",
+        "description": "2 video reports per month · Extra reports at discounted rate · Advanced AI analysis · Progress tracking · PDF downloads · Scout database visibility",
         "amount": 29.99,
-        "monthly_upload_limit": 5,
+        "monthly_upload_limit": 2,
     },
     "vip": {
         "name": "ScoutMePlay VIP Premium",
-        "description": "Unlimited reports · Elite AI analysis · Real scout review · Direct scout contact · Personalised scout feedback",
+        "description": "4 video reports per month · Extra reports at deepest discount · Elite AI analysis · Real scout review · Direct scout contact · Personalised scout feedback",
         "amount": 49.99,
-        "monthly_upload_limit": None,   # None = unlimited
+        "monthly_upload_limit": 4,
     },
 }
 # A user record's `subscription.tier` will be one of {"free", "premium", "vip"}.
@@ -1977,6 +1984,10 @@ class PricingUpdate(BaseModel):
     single_price:  Optional[float] = None
     premium_price: Optional[float] = None
     vip_price:     Optional[float] = None
+    # NEW — per-report extra-purchase price for subscribers who exhausted quota.
+    # Cheaper than the single_price because the buyer is already paying for a subscription.
+    premium_extra_price: Optional[float] = None
+    vip_extra_price:     Optional[float] = None
 
 
 class SocialLinksUpdate(BaseModel):
@@ -3083,6 +3094,11 @@ async def public_price():
     premium_value = float(prem_doc["value"]) if prem_doc and "value" in prem_doc else DEFAULT_PREMIUM_PRICE
     vip_doc = await db.settings.find_one({"key": "vip_price"}, {"_id": 0})
     vip_value = float(vip_doc["value"]) if vip_doc and "value" in vip_doc else DEFAULT_VIP_PRICE
+    # NEW: per-report extra prices for subscribers who exhausted their quota.
+    pem_doc = await db.settings.find_one({"key": "premium_extra_report_price"}, {"_id": 0})
+    premium_extra_value = float(pem_doc["value"]) if pem_doc and "value" in pem_doc else DEFAULT_PREMIUM_EXTRA_PRICE
+    vex_doc = await db.settings.find_one({"key": "vip_extra_report_price"}, {"_id": 0})
+    vip_extra_value = float(vex_doc["value"]) if vex_doc and "value" in vex_doc else DEFAULT_VIP_EXTRA_PRICE
     landing_doc = await db.settings.find_one({"key": "active_landing"}, {"_id": 0})
     landing_value = landing_doc.get("value", "minimal") if landing_doc else "minimal"
     if landing_value not in ("full", "minimal"):
@@ -3094,6 +3110,8 @@ async def public_price():
         "single_price": float(single_value),
         "premium_price": float(premium_value),
         "vip_price": float(vip_value),
+        "premium_extra_price": float(premium_extra_value),
+        "vip_extra_price": float(vip_extra_value),
         "currency": PRICE_CURRENCY,
         "price_dkk": float(value),
         "social": await get_social_links(),
@@ -6764,38 +6782,53 @@ async def get_upload_eligibility(user=Depends(get_current_user)):
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
     pass_state = _progress_pass_active(user)
     subscription_block = None
+    # Every branch below benefits from knowing the price of one extra report
+    # for the current user — the dashboard uses it for the "buy 1 extra report"
+    # button when the user's monthly quota is exhausted.
+    extra_price, extra_tier = await get_extra_report_price_for_user(user)
     if sub_tier:
-        # Communicate the cap so the frontend can show "5/5 used — resets at <date>"
+        # Communicate the cap so the frontend can show "2/2 used — resets at <date>"
         tier_conf = SUBSCRIPTION_TIERS.get(sub_tier, {})
         subscription_block = {
             "tier": sub_tier,
             "monthly_limit": tier_conf.get("monthly_upload_limit"),
             "remaining": 0,
             "exhausted": True,
+            "extra_report_price": extra_price,
+            "extra_report_price_tier": extra_tier,
         }
     if not free_used:
         return {"eligible": True, "reason": "free_preview", "free_preview_used": False,
-                "prepaid_uploads": prepaid, "progress_pass": pass_state, "subscription": subscription_block}
+                "prepaid_uploads": prepaid, "progress_pass": pass_state, "subscription": subscription_block,
+                "extra_report_price": extra_price, "extra_report_price_tier": extra_tier}
     if prepaid > 0:
         return {"eligible": True, "reason": "prepaid", "free_preview_used": True,
-                "prepaid_uploads": prepaid, "progress_pass": pass_state, "subscription": subscription_block}
+                "prepaid_uploads": prepaid, "progress_pass": pass_state, "subscription": subscription_block,
+                "extra_report_price": extra_price, "extra_report_price_tier": extra_tier}
     if pass_state.get("active"):
         return {"eligible": True, "reason": "progress_pass", "free_preview_used": True,
-                "prepaid_uploads": 0, "progress_pass": pass_state, "subscription": subscription_block}
+                "prepaid_uploads": 0, "progress_pass": pass_state, "subscription": subscription_block,
+                "extra_report_price": extra_price, "extra_report_price_tier": extra_tier}
     return {"eligible": False, "reason": "prepay_required", "free_preview_used": True,
-            "prepaid_uploads": 0, "progress_pass": pass_state, "subscription": subscription_block}
+            "prepaid_uploads": 0, "progress_pass": pass_state, "subscription": subscription_block,
+            "extra_report_price": extra_price, "extra_report_price_tier": extra_tier}
 
 
 @api_router.post("/payments/prepay-upload")
 async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Request, user=Depends(get_current_user)):
-    """Stripe checkout for a single Single-Report purchase. On success, +1 prepaid_uploads
+    """Stripe checkout for a single per-report purchase. On success, +1 prepaid_uploads
     (which the buyer redeems to unlock one full premium scout report).
 
-    Price source: `single_price` setting (default $129), admin-editable via
-    PUT /api/admin/pricing — so this checkout always charges the same amount
-    shown on the public Pricing Tiers card.
+    Price source depends on the buyer's subscription tier:
+      - Free / no subscription  → `single_price`  (default $129)
+      - Premium subscriber      → `premium_extra_report_price` (default $89)
+      - VIP subscriber          → `vip_extra_report_price` (default $59)
+
+    All three amounts are admin-editable via PUT /api/admin/pricing, so
+    subscribers always see the discount that matches the amount shown on
+    their dashboard's "buy extra report" button.
     """
-    price = await get_current_single_price()
+    price, price_tier = await get_extra_report_price_for_user(user)
 
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
@@ -6809,6 +6842,7 @@ async def create_prepay_upload_checkout(payload: PrepayUploadInit, request: Requ
         "kind": "prepay_upload",
         "user_id": user["id"],
         "user_email": user["email"],
+        "price_tier": price_tier,  # "single" | "premium" | "vip" — which discount was applied
         # Brand attribution — keeps ScoutMePlay separate from 1MillionBolde in the shared Stripe account
         "brand": "ScoutMePlay",
         "company": "Mentalkids",
@@ -8076,6 +8110,14 @@ async def admin_update_pricing(payload: PricingUpdate, _=Depends(get_current_adm
         if payload.vip_price <= 0 or payload.vip_price > 999:
             raise HTTPException(status_code=400, detail="vip_price out of range")
         updates.append(("vip_price", float(payload.vip_price)))
+    if payload.premium_extra_price is not None:
+        if payload.premium_extra_price <= 0 or payload.premium_extra_price > 9999:
+            raise HTTPException(status_code=400, detail="premium_extra_price out of range")
+        updates.append(("premium_extra_report_price", float(payload.premium_extra_price)))
+    if payload.vip_extra_price is not None:
+        if payload.vip_extra_price <= 0 or payload.vip_extra_price > 9999:
+            raise HTTPException(status_code=400, detail="vip_extra_price out of range")
+        updates.append(("vip_extra_report_price", float(payload.vip_extra_price)))
     if not updates:
         raise HTTPException(status_code=400, detail="No prices provided")
     now = now_iso()
@@ -8086,21 +8128,26 @@ async def admin_update_pricing(payload: PricingUpdate, _=Depends(get_current_adm
             upsert=True,
         )
     stripe_sync_required = any(k in ("premium_price", "vip_price") for k, _ in updates)
-    # Echo current state of all three for the UI
+    # Echo current state of all five for the UI
     snap = {}
     for key, default in (
         ("single_price", DEFAULT_SINGLE_PRICE),
         ("premium_price", DEFAULT_PREMIUM_PRICE),
         ("vip_price", DEFAULT_VIP_PRICE),
+        ("premium_extra_report_price", DEFAULT_PREMIUM_EXTRA_PRICE),
+        ("vip_extra_report_price", DEFAULT_VIP_EXTRA_PRICE),
     ):
         doc = await db.settings.find_one({"key": key})
         snap[key] = float(doc["value"]) if doc and "value" in doc else default
+    # Alias the two extra-report keys to the shorter public names expected by the frontend
+    snap["premium_extra_price"] = snap.pop("premium_extra_report_price")
+    snap["vip_extra_price"] = snap.pop("vip_extra_report_price")
     return {
         **snap,
         "currency": PRICE_CURRENCY,
         "stripe_sync_required": stripe_sync_required,
         "note": (
-            "Premium/VIP changes update the displayed price on the website immediately. "
+            "Premium/VIP subscription changes update the displayed price on the website immediately. "
             "Stripe subscription Price IDs are immutable, so the actual checkout amount "
             "stays at the originally configured value until the Stripe Prices are re-created."
         ) if stripe_sync_required else None,
@@ -8113,6 +8160,29 @@ async def get_current_single_price() -> float:
     if doc and "value" in doc:
         return float(doc["value"])
     return DEFAULT_SINGLE_PRICE
+
+
+async def get_extra_report_price_for_user(user: dict) -> tuple[float, str]:
+    """Return `(price, source_tier)` for the per-report price the given user
+    would pay when buying an ADDITIONAL report beyond their monthly quota.
+
+      - Free / no subscription  → `single_price`  ($129 default)
+      - Premium subscriber      → `premium_extra_report_price`  ($89 default)
+      - VIP subscriber          → `vip_extra_report_price`      ($59 default)
+
+    `source_tier` is one of {"single", "premium", "vip"} — useful for
+    downstream metadata / UI copy.
+    """
+    tier = (user.get("subscription") or {}).get("tier") if user else None
+    if tier == "vip":
+        doc = await db.settings.find_one({"key": "vip_extra_report_price"})
+        val = float(doc["value"]) if doc and "value" in doc else DEFAULT_VIP_EXTRA_PRICE
+        return (val, "vip")
+    if tier == "premium":
+        doc = await db.settings.find_one({"key": "premium_extra_report_price"})
+        val = float(doc["value"]) if doc and "value" in doc else DEFAULT_PREMIUM_EXTRA_PRICE
+        return (val, "premium")
+    return (await get_current_single_price(), "single")
 
 
 @api_router.post("/admin/cleanup-raw-uploads")

@@ -51,11 +51,12 @@ export default function AdminPage() {
   const [priceInput, setPriceInput] = useState("");
   const [savingPrice, setSavingPrice] = useState(false);
 
-  // ── NEW: admin-controlled 3-tier display pricing ───────────────────
-  // Drives the public Pricing Tiers component (Single one-time / Premium / VIP).
-  // Saved via PUT /api/admin/pricing — backend persists in settings collection.
-  const [tierPrices, setTierPrices] = useState({ single: 129, premium: 29.99, vip: 49.99 });
-  const [tierInputs, setTierInputs] = useState({ single: "129", premium: "29.99", vip: "49.99" });
+  // ── NEW: admin-controlled 5-tier display pricing ───────────────────
+  // Drives the public Pricing Tiers component (Single one-time / Premium / VIP)
+  // + the per-report extra-purchase prices shown to subscribers who exhaust
+  // their monthly quota. Saved via PUT /api/admin/pricing.
+  const [tierPrices, setTierPrices] = useState({ single: 129, premium: 29.99, vip: 49.99, premiumExtra: 89, vipExtra: 59 });
+  const [tierInputs, setTierInputs] = useState({ single: "129", premium: "29.99", vip: "49.99", premiumExtra: "89", vipExtra: "59" });
   const [savingTierPrices, setSavingTierPrices] = useState(false);
   const [stripeSyncWarning, setStripeSyncWarning] = useState(false);
 
@@ -96,8 +97,10 @@ export default function AdminPage() {
         const sp = Number(pr.data.single_price) || 129;
         const pp = Number(pr.data.premium_price) || 29.99;
         const vp = Number(pr.data.vip_price) || 49.99;
-        setTierPrices({ single: sp, premium: pp, vip: vp });
-        setTierInputs({ single: String(sp), premium: String(pp), vip: String(vp) });
+        const pe = Number(pr.data.premium_extra_price) || 89;
+        const ve = Number(pr.data.vip_extra_price) || 59;
+        setTierPrices({ single: sp, premium: pp, vip: vp, premiumExtra: pe, vipExtra: ve });
+        setTierInputs({ single: String(sp), premium: String(pp), vip: String(vp), premiumExtra: String(pe), vipExtra: String(ve) });
       } else {
         const [s, r, u, p, pr, m, bd] = await Promise.all([
           api.get("/admin/stats"),
@@ -117,8 +120,10 @@ export default function AdminPage() {
         const sp = Number(pr.data.single_price) || 129;
         const pp = Number(pr.data.premium_price) || 29.99;
         const vp = Number(pr.data.vip_price) || 49.99;
-        setTierPrices({ single: sp, premium: pp, vip: vp });
-        setTierInputs({ single: String(sp), premium: String(pp), vip: String(vp) });
+        const pe = Number(pr.data.premium_extra_price) || 89;
+        const ve = Number(pr.data.vip_extra_price) || 59;
+        setTierPrices({ single: sp, premium: pp, vip: vp, premiumExtra: pe, vipExtra: ve });
+        setTierInputs({ single: String(sp), premium: String(pp), vip: String(vp), premiumExtra: String(pe), vipExtra: String(ve) });
         setMessages(m.data);
         setBlogDraftCount((bd.data?.items || []).length);
         if (pr.data.social) {
@@ -172,7 +177,9 @@ export default function AdminPage() {
     const s = parseFloat(tierInputs.single);
     const p = parseFloat(tierInputs.premium);
     const v = parseFloat(tierInputs.vip);
-    if (!s || s <= 0 || !p || p <= 0 || !v || v <= 0) {
+    const pe = parseFloat(tierInputs.premiumExtra);
+    const ve = parseFloat(tierInputs.vipExtra);
+    if (!s || s <= 0 || !p || p <= 0 || !v || v <= 0 || !pe || pe <= 0 || !ve || ve <= 0) {
       toast.error("All prices must be positive numbers");
       return;
     }
@@ -182,11 +189,15 @@ export default function AdminPage() {
         single_price: s,
         premium_price: p,
         vip_price: v,
+        premium_extra_price: pe,
+        vip_extra_price: ve,
       });
       setTierPrices({
-        single:  Number(data.single_price)  || s,
-        premium: Number(data.premium_price) || p,
-        vip:     Number(data.vip_price)     || v,
+        single:       Number(data.single_price)        || s,
+        premium:      Number(data.premium_price)       || p,
+        vip:          Number(data.vip_price)           || v,
+        premiumExtra: Number(data.premium_extra_price) || pe,
+        vipExtra:     Number(data.vip_extra_price)     || ve,
       });
       setStripeSyncWarning(!!data.stripe_sync_required);
       toast.success("Plan pricing saved — site updates immediately");
@@ -757,6 +768,63 @@ export default function AdminPage() {
                         </div>
                         <span className="mt-1.5 text-[11px] text-ink/45">Current: <span className="text-volt font-bold">${tierPrices.vip}</span></span>
                       </label>
+                    </div>
+
+                    {/* ── NEW: per-report extra-purchase prices for subscribers ── */}
+                    <div className="mt-6 border-t border-gray-border pt-6">
+                      <div className="text-[10px] uppercase tracking-[0.22em] font-black text-volt mb-1">
+                        Subscriber extra-report rates
+                      </div>
+                      <p className="text-[11px] text-ink/55 leading-relaxed mb-4 max-w-3xl">
+                        When a Premium or VIP subscriber has used their monthly quota, they can buy additional reports at these discounted rates &mdash; cheaper than the ${tierPrices.single} single-report price. Rate charged is automatically picked based on the buyer&apos;s active tier.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Premium extra */}
+                        <label className="flex flex-col">
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-ink/55 mb-1.5">
+                            Premium extra report
+                          </span>
+                          <div className="flex">
+                            <span className="bg-deepnavy border border-r-0 border-gray-border px-3 py-3 text-ink/55 font-bold">$</span>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={tierInputs.premiumExtra}
+                              onChange={(e) => setTierInputs((s) => ({ ...s, premiumExtra: e.target.value }))}
+                              data-testid="admin-tier-premium-extra-input"
+                              className="flex-1 min-w-0 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                            />
+                          </div>
+                          <span className="mt-1.5 text-[11px] text-ink/45">
+                            Current: <span className="text-volt font-bold">${tierPrices.premiumExtra}</span>
+                            <span className="ml-1 text-ink/35">/ report</span>
+                          </span>
+                        </label>
+
+                        {/* VIP extra */}
+                        <label className="flex flex-col">
+                          <span className="text-[10px] uppercase tracking-widest font-bold text-ink/55 mb-1.5">
+                            VIP extra report
+                          </span>
+                          <div className="flex">
+                            <span className="bg-deepnavy border border-r-0 border-gray-border px-3 py-3 text-ink/55 font-bold">$</span>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={tierInputs.vipExtra}
+                              onChange={(e) => setTierInputs((s) => ({ ...s, vipExtra: e.target.value }))}
+                              data-testid="admin-tier-vip-extra-input"
+                              className="flex-1 min-w-0 bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                            />
+                          </div>
+                          <span className="mt-1.5 text-[11px] text-ink/45">
+                            Current: <span className="text-volt font-bold">${tierPrices.vipExtra}</span>
+                            <span className="ml-1 text-ink/35">/ report</span>
+                          </span>
+                        </label>
+                      </div>
                     </div>
 
                     <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">

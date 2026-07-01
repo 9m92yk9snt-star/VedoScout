@@ -62,7 +62,8 @@ const SINGLE_FEATURES = [
 
 const PREMIUM_FEATURES = [
   { label: "Professional Player Profile",      included: true },
-  { label: "5 Video Reports Monthly",          included: true },
+  { label: "2 Video Reports Monthly",          included: true },
+  { label: "Extra Reports at Subscriber Rate", included: true, hint: "cheaper than a single report" },
   { label: "Advanced AI Football Analysis",    included: true },
   { label: "Progress Tracking Over Time",      included: true },
   { label: "Personal Development Plan",        included: true },
@@ -73,7 +74,8 @@ const PREMIUM_FEATURES = [
 
 const VIP_FEATURES = [
   { label: "Everything in Premium",                  included: true },
-  { label: "Unlimited Video Reports",                 included: true },
+  { label: "4 Video Reports Monthly",                 included: true },
+  { label: "Extra Reports at Deepest Discount",       included: true, hint: "cheapest per-report rate" },
   { label: "Elite AI Football Analysis",              included: true },
   { label: "Real Scout Reviews Your Videos",          included: true },
   { label: "Direct Contact with Professional Scouts", included: true },
@@ -95,16 +97,18 @@ export default function PricingTiers() {
   const [busyTier, setBusyTier] = useState(null);
 
   // ── live-pricing fetched from backend ──────────────────────────────
-  const [prices, setPrices] = useState({ single: 129, premium: 29.99, vip: 49.99 });
+  const [prices, setPrices] = useState({ single: 129, premium: 29.99, vip: 49.99, premiumExtra: 89, vipExtra: 59 });
   useEffect(() => {
     let alive = true;
     api.get("/settings/price")
       .then(({ data }) => {
         if (!alive) return;
         setPrices({
-          single:  Number(data.single_price)  || 129,
-          premium: Number(data.premium_price) || 29.99,
-          vip:     Number(data.vip_price)     || 49.99,
+          single:       Number(data.single_price)        || 129,
+          premium:      Number(data.premium_price)       || 29.99,
+          vip:          Number(data.vip_price)           || 49.99,
+          premiumExtra: Number(data.premium_extra_price) || 89,
+          vipExtra:     Number(data.vip_extra_price)     || 59,
         });
       })
       .catch(() => {});
@@ -178,16 +182,16 @@ export default function PricingTiers() {
     {
       key: "premium",
       render: (size) => (
-        <PremiumCard size={size} price={prices.premium} onCta={goPremium} loading={busyTier === "premium"} disabled={!!busyTier && busyTier !== "premium"} />
+        <PremiumCard size={size} price={prices.premium} extraPrice={prices.premiumExtra} singlePrice={prices.single} onCta={goPremium} loading={busyTier === "premium"} disabled={!!busyTier && busyTier !== "premium"} />
       ),
     },
     {
       key: "vip",
       render: (size) => (
-        <VipCard size={size} price={prices.vip} onCta={goVip} loading={busyTier === "vip"} disabled={!!busyTier && busyTier !== "vip"} />
+        <VipCard size={size} price={prices.vip} extraPrice={prices.vipExtra} singlePrice={prices.single} onCta={goVip} loading={busyTier === "vip"} disabled={!!busyTier && busyTier !== "vip"} />
       ),
     },
-  ]), [prices.single, prices.premium, prices.vip, busyTier, user]);
+  ]), [prices.single, prices.premium, prices.vip, prices.premiumExtra, prices.vipExtra, busyTier, user]);
 
   return (
     <section
@@ -499,7 +503,7 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
 }
 
 /* ── PREMIUM (monthly subscription) ── */
-function PremiumCard({ price, onCta, loading = false, disabled = false }) {
+function PremiumCard({ price, extraPrice, singlePrice, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-premium"
@@ -541,6 +545,25 @@ function PremiumCard({ price, onCta, loading = false, disabled = false }) {
       <Divider dark />
       <FeatureList items={PREMIUM_FEATURES} tone="lime" dark />
 
+      {/* Extra-report savings ribbon — highlights the discount vs single-report */}
+      {extraPrice != null && (
+        <div
+          data-testid="pricing-premium-extra-line"
+          className="mt-3 border border-[#A5DD5F]/40 bg-[#A5DD5F]/10 px-3 py-2 flex items-center justify-between gap-2"
+        >
+          <div className="text-[10px] uppercase tracking-[0.16em] font-black text-[#A5DD5F]">
+            Need more reports?
+          </div>
+          <div className="text-[11px] text-white/85 leading-tight">
+            <span className="font-barlow font-black text-[#CCFF00] text-base">{fmtPrice(extraPrice)}</span>
+            <span className="ml-1 text-white/60 line-through decoration-white/40 text-[10px] tabular-nums">
+              {singlePrice ? fmtPrice(singlePrice) : ""}
+            </span>
+            <span className="ml-1 opacity-70">/ extra</span>
+          </div>
+        </div>
+      )}
+
       <Cta
         onClick={onCta}
         disabled={loading || disabled}
@@ -556,7 +579,7 @@ function PremiumCard({ price, onCta, loading = false, disabled = false }) {
 }
 
 /* ── VIP (monthly subscription) ── */
-function VipCard({ price, onCta, loading = false, disabled = false }) {
+function VipCard({ price, extraPrice, singlePrice, onCta, loading = false, disabled = false }) {
   return (
     <article
       data-testid="pricing-card-vip"
@@ -599,10 +622,29 @@ function VipCard({ price, onCta, loading = false, disabled = false }) {
         <span className="md:hidden">VIP</span>
       </Title>
       <Price amount={fmtPrice(price)} suffix="/ month" tone="gold" />
-      <SubLine className="text-white/70 hidden md:block">Everything. Unlimited. Reviewed.</SubLine>
+      <SubLine className="text-white/70 hidden md:block">Everything. 4 reports. Reviewed.</SubLine>
 
       <Divider dark />
       <FeatureList items={VIP_FEATURES} tone="gold" dark />
+
+      {/* Extra-report savings ribbon */}
+      {extraPrice != null && (
+        <div
+          data-testid="pricing-vip-extra-line"
+          className="mt-3 border border-[#F5C443]/40 bg-[#F5C443]/10 px-3 py-2 flex items-center justify-between gap-2"
+        >
+          <div className="text-[10px] uppercase tracking-[0.16em] font-black text-[#F5C443]">
+            Need more reports?
+          </div>
+          <div className="text-[11px] text-white/85 leading-tight">
+            <span className="font-barlow font-black text-[#F5C443] text-base">{fmtPrice(extraPrice)}</span>
+            <span className="ml-1 text-white/60 line-through decoration-white/40 text-[10px] tabular-nums">
+              {singlePrice ? fmtPrice(singlePrice) : ""}
+            </span>
+            <span className="ml-1 opacity-70">/ extra</span>
+          </div>
+        </div>
+      )}
 
       <Cta
         onClick={onCta}

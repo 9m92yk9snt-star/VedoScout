@@ -211,20 +211,30 @@ export default function DashboardPage() {
 
               {/* UPGRADE BANNER — shown to:
                  (a) free users without any subscription, and
-                 (b) Premium subscribers who have hit their 5/5 monthly limit
-                     → banner switches to "VIP only" variant.
-                 Skipped when: user has VIP, or a legacy Progress Pass is active. */}
+                 (b) Premium subscribers who have hit their monthly limit → banner
+                     shows "Buy 1 extra report for $89" + VIP upgrade side by side.
+                 (c) VIP subscribers who have hit their 4/month limit → banner
+                     shows "Buy 1 extra report for $59" only (no further upgrade).
+                 Skipped when: legacy Progress Pass is active. */}
               {(() => {
                 const isPremiumAtLimit =
                   subscription?.tier === "premium" && usage?.exhausted;
+                const isVipAtLimit =
+                  subscription?.tier === "vip" && usage?.exhausted;
                 const showBanner =
                   (!subscription?.tier && !passState?.active) ||
-                  (isPremiumAtLimit && !passState?.active);
+                  (isPremiumAtLimit && !passState?.active) ||
+                  (isVipAtLimit && !passState?.active);
                 if (!showBanner) return null;
+                const mode = isVipAtLimit
+                  ? "vip-at-limit"
+                  : isPremiumAtLimit
+                  ? "premium-at-limit"
+                  : "free";
                 return (
                   <UpgradeBanner
                     tiers={tiers}
-                    mode={isPremiumAtLimit ? "premium-at-limit" : "free"}
+                    mode={mode}
                     usage={usage}
                   />
                 );
@@ -567,8 +577,12 @@ function LegacyPassActiveBanner({ passState }) {
  *  this banner is hidden, so we never double-promote.
  * ──────────────────────────────────────────────────────────────────────── */
 function UpgradeBanner({ tiers, mode = "free", usage = null }) {
-  const [busy, setBusy] = useState(null); // "premium" | "vip" | null
-  const isAtLimit = mode === "premium-at-limit";
+  const [busy, setBusy] = useState(null); // "premium" | "vip" | "extra" | null
+  const isPremiumAtLimit = mode === "premium-at-limit";
+  const isVipAtLimit = mode === "vip-at-limit";
+  const isAtLimit = isPremiumAtLimit || isVipAtLimit;
+  const extraPrice = usage?.extra_report_price;
+  const extraTierLabel = isVipAtLimit ? "VIP" : "Premium";
 
   const startSubscription = async (tier) => {
     if (busy) return;
@@ -586,12 +600,39 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
     }
   };
 
+  // Buys ONE extra report at the current user's discounted subscriber rate
+  // (Premium: $89 default, VIP: $59 default — admin-editable). Reuses the
+  // same /payments/prepay-upload endpoint as free users; the backend now
+  // switches the price to the subscriber rate automatically based on tier.
+  const buyExtraReport = async () => {
+    if (busy) return;
+    setBusy("extra");
+    try {
+      const { data } = await api.post("/payments/prepay-upload", {
+        origin_url: window.location.origin,
+      });
+      if (!data?.url) throw new Error("No checkout URL received");
+      window.location.href = data.url;
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not start checkout.", { duration: 7000 });
+      setBusy(null);
+    }
+  };
+
   const premium = tiers?.premium || { amount: 29.99 };
   const vip = tiers?.vip || { amount: 49.99 };
+  const monthlyLimit = usage?.monthly_limit ?? (isVipAtLimit ? 4 : 2);
+  const usedThisPeriod = usage?.used_this_period ?? monthlyLimit;
 
   return (
     <div
-      data-testid={isAtLimit ? "dashboard-upgrade-banner-at-limit" : "dashboard-upgrade-banner"}
+      data-testid={
+        isVipAtLimit
+          ? "dashboard-upgrade-banner-vip-at-limit"
+          : isPremiumAtLimit
+          ? "dashboard-upgrade-banner-at-limit"
+          : "dashboard-upgrade-banner"
+      }
       className="mt-10 relative overflow-hidden bg-cream-card border border-gray-border p-5 md:p-7"
     >
       <div className="flex items-center gap-2 mb-3">
@@ -601,26 +642,92 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
         </span>
         <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
           {isAtLimit
-            ? `Premium limit reached · ${usage?.used_this_period ?? 5} / ${usage?.monthly_limit ?? 5} this month`
+            ? `${extraTierLabel} limit reached · ${usedThisPeriod} / ${monthlyLimit} this month`
             : "Unlock your full potential"}
         </span>
       </div>
       <h2 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter text-ink leading-[0.95]">
         {isAtLimit ? (
-          <>Need more uploads?<br /><span className="text-[#0A0F0D]">Go <span className="text-[#B8891C]">VIP</span>.</span></>
+          <>Need more reports?<br /><span className="text-forest">Buy 1 extra{extraPrice ? <> · <span className="text-volt">${extraPrice}</span></> : null}</span></>
         ) : (
           <>Ready for more?<br /><span className="text-forest">Upgrade your plan.</span></>
         )}
       </h2>
       <p className="mt-2 text-sm text-ink/65 max-w-xl">
-        {isAtLimit
-          ? "You've used all 5 Premium uploads this month. Go VIP for unlimited uploads, real scout reviews, and direct scout contact."
+        {isVipAtLimit
+          ? `You've used all ${monthlyLimit} VIP reports this month. Buy 1 extra at your subscriber rate — cheaper than the single-report price. Quota resets next billing cycle.`
+          : isPremiumAtLimit
+          ? `You've used all ${monthlyLimit} Premium reports this month. Buy 1 extra at your subscriber rate — or step up to VIP for 4 reports/month and the deepest per-report discount.`
           : "You're on the Free plan. Upgrade for more uploads, advanced AI analysis, and (with VIP) a real scout reviewing your video."}
       </p>
 
-      <div className={`mt-5 grid gap-3 ${isAtLimit ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
+      {isAtLimit ? (
+        <div className={`mt-5 grid gap-3 ${isPremiumAtLimit ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+          {/* Buy-1-extra-report card — primary action for at-limit subscribers */}
+          <button
+            type="button"
+            data-testid="dashboard-buy-extra-report-btn"
+            onClick={buyExtraReport}
+            disabled={busy !== null}
+            className="relative text-left bg-[#0F3A22] border border-forest p-5 hover:shadow-[0_18px_36px_-12px_rgba(15,58,34,0.55)] transition-all disabled:opacity-60 disabled:cursor-wait"
+          >
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <span className="inline-flex items-center gap-1.5 text-[#CCFF00] text-[10px] uppercase tracking-[0.18em] font-black">
+                <TrendingUp className="w-3.5 h-3.5" /> Extra report
+              </span>
+              <span className="text-[9px] uppercase tracking-[0.16em] font-bold text-[#A5DD5F]/80 bg-[#A5DD5F]/10 px-2 py-0.5 rounded-full">
+                Cheapest for you
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-barlow font-black text-3xl text-[#CCFF00]">${extraPrice ?? (isVipAtLimit ? 59 : 89)}</span>
+              <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ one report</span>
+            </div>
+            <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
+              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Same full 4-pillar premium report</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Cheaper than the single-report price</li>
+              <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Subscription stays untouched</li>
+            </ul>
+            <span className="mt-4 inline-flex items-center gap-1.5 bg-[#A5DD5F] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
+              {busy === "extra" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Buy 1 report <ArrowRight className="w-3.5 h-3.5" /></>}
+            </span>
+          </button>
+
+          {/* VIP upgrade — only offered to Premium-at-limit users */}
+          {isPremiumAtLimit && (
+            <button
+              type="button"
+              data-testid="dashboard-upgrade-vip-btn"
+              onClick={() => startSubscription("vip")}
+              disabled={busy !== null}
+              className="relative text-left bg-[#0A0F0D] border border-[#1F2724] p-5 hover:shadow-[0_18px_36px_-12px_rgba(0,0,0,0.65)] transition-all disabled:opacity-60 disabled:cursor-wait"
+            >
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <span className="inline-flex items-center gap-1.5 text-[#F5C443] text-[10px] uppercase tracking-[0.18em] font-black">
+                  <Crown className="w-3.5 h-3.5" fill="#F5C443" /> Upgrade to VIP
+                </span>
+                <span className="text-[9px] uppercase tracking-[0.16em] font-bold text-[#F5C443]/80 bg-[#F5C443]/10 px-2 py-0.5 rounded-full">
+                  Best value
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-barlow font-black text-3xl text-[#F5C443]">${vip.amount?.toFixed(2)}</span>
+                <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
+              </div>
+              <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
+                <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> 4 reports per month included</li>
+                <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Real scout review + direct contact</li>
+                <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Deeper per-report discount</li>
+              </ul>
+              <span className="mt-4 inline-flex items-center gap-1.5 bg-[#F5C443] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
+                {busy === "vip" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Go VIP <ArrowRight className="w-3.5 h-3.5" /></>}
+              </span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2">
         {/* Premium mini-card — hidden when Premium user has hit the limit */}
-        {!isAtLimit && (
         <button
           type="button"
           data-testid="dashboard-upgrade-premium-btn"
@@ -641,15 +748,14 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
             <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
           </div>
           <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> 5 video uploads per month</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Advanced AI analysis</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Progress tracking + PDF</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> 2 video reports per month</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Extra reports at subscriber rate</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Advanced AI analysis + PDF</li>
           </ul>
           <span className="mt-4 inline-flex items-center gap-1.5 bg-[#A5DD5F] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
             {busy === "premium" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Start Premium <ArrowRight className="w-3.5 h-3.5" /></>}
           </span>
         </button>
-        )}
 
         {/* VIP mini-card */}
         <button
@@ -672,15 +778,16 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
             <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
           </div>
           <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Unlimited uploads</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Real scout review</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Direct scout contact</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> 4 video reports per month</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Real scout review + direct contact</li>
+            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Deepest per-report discount</li>
           </ul>
           <span className="mt-4 inline-flex items-center gap-1.5 bg-[#F5C443] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
             {busy === "vip" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Go VIP <ArrowRight className="w-3.5 h-3.5" /></>}
           </span>
         </button>
       </div>
+      )}
 
       <p className="mt-3 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/45 flex items-center gap-1.5">
         <Lock className="w-3 h-3 text-forest" />
@@ -755,7 +862,7 @@ function SubscriptionCard({ subscription, tiers, onChange }) {
         <p className="mt-1 text-sm text-white/70">
           ${conf.amount?.toFixed(2) ?? "—"} / month ·{" "}
           {isVip
-            ? "Unlimited uploads, scout review, direct contact"
+            ? "4 reports per month, scout review, direct contact, deepest discount"
             : `${conf.monthly_upload_limit ?? "—"} uploads per month, advanced AI analysis`}
         </p>
         {periodEnd && (

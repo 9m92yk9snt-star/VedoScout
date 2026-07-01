@@ -26,6 +26,43 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 101 — New subscription model: monthly quota + admin-editable per-report extra prices (Feb 27 2026)**:
+  - User feedback (Danish/English hybrid): Premium = 2 reports/month + extra reports at $89 (cheaper than $129 single); VIP = 4 reports/month + extra reports at $59; both extra-prices admin-editable; dashboard surfaces the "buy extra report" CTA when quota is used up.
+  - **Backend (`server.py`)**:
+    - `SUBSCRIPTION_TIERS.premium.monthly_upload_limit` 5 → **2**; `SUBSCRIPTION_TIERS.vip.monthly_upload_limit` `None` (unlimited) → **4**. Descriptions updated so Stripe checkout copy + `/tiers` response reflect the new caps.
+    - Added `DEFAULT_PREMIUM_EXTRA_PRICE = 89.0` and `DEFAULT_VIP_EXTRA_PRICE = 59.0` (env-overridable via `DEFAULT_PREMIUM_EXTRA_USD` / `DEFAULT_VIP_EXTRA_USD`).
+    - Extended `PricingUpdate` Pydantic model with `premium_extra_price` + `vip_extra_price` optional fields.
+    - `GET /api/settings/price` now also returns `premium_extra_price` + `vip_extra_price` (public — used by both landing PricingTiers and the dashboard).
+    - `PUT /api/admin/pricing` accepts + persists the 2 new keys (`premium_extra_report_price` / `vip_extra_report_price` in settings collection), validates range 1..9999, and echoes all 5 prices back so the admin UI is single-source-of-truth.
+    - New helper `get_extra_report_price_for_user(user) -> (price, tier)` — dispatches to the correct discount based on the buyer's active `subscription.tier` (VIP → $59, Premium → $89, otherwise → single $129).
+    - `POST /api/payments/prepay-upload` now calls `get_extra_report_price_for_user()` instead of `get_current_single_price()`, and adds `price_tier` to the Stripe metadata for downstream analytics.
+    - `GET /api/me/upload-eligibility` returns the per-user `extra_report_price` + `extra_report_price_tier` on every branch, so the dashboard can render the correct discounted CTA amount without a second round-trip.
+  - **Frontend — `PricingTiers.jsx`**:
+    - `PREMIUM_FEATURES` — "5 Video Reports Monthly" → "2 Video Reports Monthly"; added new feature line "Extra Reports at Subscriber Rate (cheaper than a single report)".
+    - `VIP_FEATURES` — "Unlimited Video Reports" → "4 Video Reports Monthly"; added new feature "Extra Reports at Deepest Discount (cheapest per-report rate)".
+    - `prices` state extended with `premiumExtra` / `vipExtra`; fetched from `/settings/price`.
+    - `PremiumCard` + `VipCard` gained `extraPrice` + `singlePrice` props. Each card now shows a **"NEED MORE REPORTS?"** ribbon at the bottom with the extra-price in bright volt/gold and the single-report price crossed-out for savings anchoring.
+  - **Frontend — `DashboardPage.jsx`**:
+    - `UpgradeBanner` mode extended: `"vip-at-limit"` added alongside `"premium-at-limit"` and `"free"`.
+    - Trigger updated to show the banner when EITHER Premium OR VIP subscriber has exhausted quota.
+    - When at limit: banner headline flips to "Need more reports? Buy 1 extra · $89/$59" and a new left card **"Extra report — Cheapest for you"** appears with a dark-forest CTA that hits `/payments/prepay-upload` (which now charges the discounted subscriber rate automatically).
+    - For Premium-at-limit: extra-report card is paired with a VIP upgrade card (2-col grid). For VIP-at-limit: extra-report card is the only option (1-col grid — no further upgrade above VIP).
+    - `SubscriptionCard` "Unlimited uploads, scout review, direct contact" → "4 reports per month, scout review, direct contact, deepest discount".
+    - Free-user banner mini-cards: Premium bullets updated to reflect the 2/month + subscriber-rate messaging; VIP bullets updated to 4/month + deepest discount.
+  - **Frontend — `AdminPage.jsx`**:
+    - `tierPrices` + `tierInputs` state now hold 5 keys (single, premium, vip, premiumExtra, vipExtra).
+    - `load()` fetches all 5 prices on admin + scout paths.
+    - `handleTierPricesSave()` sends all 5 to `PUT /api/admin/pricing`.
+    - New **"SUBSCRIBER EXTRA-REPORT RATES"** section inside the "PUBLIC TIER PRICES" card, with two side-by-side numeric inputs (Premium extra / VIP extra), explanation copy that references the single-report price for anchor comparison, and `Current: $89 / report` display beneath each input.
+  - **Verified via curl**: `/settings/price` returns `premium_extra_price: 89.0`, `vip_extra_price: 59.0`. `PUT /api/admin/pricing` with both new keys succeeds and echoes back all 5 prices + `stripe_sync_required: false` (extra prices don't touch Stripe subscription Price IDs). `/me/upload-eligibility` returns `extra_report_price: 129.0` + `extra_report_price_tier: "single"` for a non-subscribed user (correct — they'd pay full single-report price).
+  - **Verified via screenshot** on the live pricing page: Premium card shows "2 Video Reports Monthly" + volt-lime ribbon "NEED MORE REPORTS? $89 ~~$129~~ / extra". VIP card shows "4 Video Reports Monthly" + gold ribbon "NEED MORE REPORTS? $59 ~~$129~~ / extra". Admin page shows the new "SUBSCRIBER EXTRA-REPORT RATES" section with both editable inputs populated at 89 / 59.
+  - **Zero data corruption**. Existing users who were on old "unlimited VIP" or "5/mo Premium" limits will see their remaining count adjust on their next fetch of `/me/upload-eligibility` — no migration needed since usage is calculated per calendar month, not stored.
+  - **Files**:
+    - MODIFIED `/app/backend/server.py` (constants + `SUBSCRIPTION_TIERS` limits + `PricingUpdate` + settings endpoints + `get_extra_report_price_for_user` + `create_prepay_upload_checkout` + `/me/upload-eligibility`)
+    - MODIFIED `/app/frontend/src/components/PricingTiers.jsx` (feature lists + prices state + `PremiumCard` / `VipCard` extra-price ribbons)
+    - MODIFIED `/app/frontend/src/pages/DashboardPage.jsx` (`UpgradeBanner` — new "vip-at-limit" mode + "Buy extra report" primary CTA + `buyExtraReport()` handler)
+    - MODIFIED `/app/frontend/src/pages/AdminPage.jsx` (5-price state + save handler + new UI section)
+
 - ✅ **🆕 Session 100 — PDF download bug fix + Nano Banana redesign of the printed PDF (Feb 27 2026)**:
   - User feedback (Danish): "PDF RAPPORT VIRKER IKKE NÅR JEG TRYKKER PÅ DOWNLOAD MEN OGSÅ PDF RAPPORT SKAL DESIGNENS VED AT BRUGE NANOBANANA SÅ DEN SER GRAFISK FLOT UD SOM RAPPORT HER" — download broken + PDF must be redesigned with Nano Banana to look as premium as the web report.
   - **BUG FIX — download button** (`ReportPage.jsx`): the anchor element was never appended to the DOM before `.click()` — Chrome ≥91 / Safari / iOS webviews now require it. Filename with spaces + trailing dot (e.g. `Lukas A..pdf`) also caused browsers to strip the `.pdf` extension. Fix: sanitise player name via `[^A-Za-z0-9À-ÿ]+ → _`, append the `<a>` to `document.body`, click, then delay `revokeObjectURL` + `removeChild` by 400ms so the browser can start reading the blob. Verified via Playwright `expect_download` — "DOWNLOAD OK: filename=EliteScout_Lukas_A_Report.pdf".
