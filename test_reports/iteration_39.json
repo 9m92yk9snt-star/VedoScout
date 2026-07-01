@@ -1,0 +1,65 @@
+{
+  "summary": "Frontend-only verification of the ReportPage warm-language refactor + 6 Nano Banana image assets on the seeded Lukas A. premium demo report. Logged in as premium@elitescout.com/Premium@2026, opened /report/64f59196-... Verified all 21 old-to-new label transitions, all 6 Nano Banana assets serve 200 image/png via /api/static/landing/, hero divider renders with data-testid, pillar sections have thumbnails + sub-captions, #report-mindset id is used, old #report-mentality-analysis id is gone, zero cold labels leaked, zero console errors, mobile 390x844 works. 2 warm labels are gated behind marker_url conditional and are documented-expected absent on the legacy Lukas seed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/report_warm_desktop.png",
+    "/app/test_reports/report_warm_mobile.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Two warm-labels ('Your player \u00b7 tracked' at line 2077 and 'inside the lime box' at line 2134) are inside `marker_url && (...)` block. They ARE present in code but do not render on the legacy Lukas A. seed which has no marker_url \u2014 this matches the documented expectation in /app/memory/test_credentials.md ('the Locked Player jersey/shorts chips are absent'). Not a bug.",
+    "ReportPage.jsx is now 3053 lines \u2014 exceeds the 700-line guideline. Recommend splitting into smaller focused subcomponents (HeroDivider, ScoutSummary, PillarSection, ChartAndScores) in a follow-up refactor. Pre-existing concern, not from this iteration.",
+    "Pre-existing ESLint unescaped-apostrophe warnings persist in the file (call-outs like `scout&apos;s eyes` are correctly escaped, but other lines still emit lint warnings). Non-blocking at runtime."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only test)", "frontend": "100%"},
+  "test_credentials": "premium@elitescout.com / Premium@2026 (seeded Lukas A. demo report id 64f59196-a520-4ba4-a0f9-de96df8802ef)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Warm-language refactor + Nano Banana imagery verified live on seeded Lukas A. demo. All 6 Nano Banana assets served correctly by /api/static/landing/. Hero divider has data-testid='report-hero-divider'. Mindset section id is now 'report-mindset' (old 'report-mentality-analysis' fully removed). Pillar section sub captions and thumbnails render correctly on desktop; thumbnails hidden on mobile <640px by design (hidden-sm-block). If future tests need to see 'Your player \u00b7 tracked' + 'inside the lime box' warm labels, they must be tested on a NEW upload with actual marker_url (use testpremium-mar@elitescout.com / Premium@2026! and upload via marker studio, or use a report that has marker_url in its full_report payload).",
+  "detailed_results": {
+    "warm_labels_visible_on_lukas_demo": {
+      "OK": ["Scout's Summary", "Reviewed for his age", "Where he stands on the football ladder", "His game at a glance", "Mindset", "Mindset & body language", "For his age", "For his position", "Ready for next level", "Room to grow", "Pro style match", "who he reminds us of", "What we looked at", "Saved for his next age group", "tied to the exact moment", "real professional players actually do per 90", "Your full scout report", "Through / a scout's eyes"],
+      "conditionally_absent_expected": ["Your player \u00b7 tracked (gated by marker_url)", "inside the lime box (gated by marker_url)"]
+    },
+    "cold_labels_regression_check_all_absent": ["Executive Summary", "Age-anchored evaluation", "Tier landscape", "Pillar overview", "Locked player", "Next-Level Readiness", "Development Priority", "Scout-grade transparency", "Deliberately not evaluated", "Could not be assessed from this specific video"],
+    "pillar_sub_captions_present": ["Ball, dribbling, passing, shooting", "Scanning, decisions, positioning", "Speed, balance, agility, stamina", "Confidence, courage, focus, body language"],
+    "nano_banana_assets_curl": {
+      "report-hero-divider.png": "200 image/png",
+      "pillar-technical.png": "200 image/png",
+      "pillar-tactical.png": "200 image/png",
+      "pillar-physical.png": "200 image/png",
+      "pillar-mental.png": "200 image/png",
+      "scout-avatar.png": "200 image/png"
+    },
+    "images_rendered_in_dom_after_scroll": {
+      "report-hero-divider.png": "complete=True naturalWidth=1584 visible=True",
+      "pillar-technical.png": "complete=True naturalWidth=1024 visible=True",
+      "pillar-tactical.png": "complete=True naturalWidth=1024 visible=True",
+      "pillar-physical.png": "complete=True naturalWidth=1024 visible=True",
+      "pillar-mental.png": "complete=True naturalWidth=1024 visible=True"
+    },
+    "dom_ids_and_testids": {
+      "[data-testid=report-hero-divider]": "exists",
+      "#report-mindset": "exists",
+      "#report-mentality-analysis (old, should be gone)": "not present"
+    },
+    "regression_features": {
+      "PDF download button": "present",
+      "Radar chart MENTALITY axis label (intentionally kept)": "present",
+      "TECHNICAL/TACTICAL/PHYSICAL headers": "present",
+      "Top Strengths": "present",
+      "console_errors": 0
+    },
+    "mobile_390x844": {
+      "hero_divider": "renders (aspect ratio scales correctly)",
+      "warm labels present": ["Scout's Summary", "Mindset", "Room to grow", "Your full scout report", "Reviewed for his age"]
+    }
+  }
+}

@@ -109,7 +109,7 @@ function scoreColor(s) {
   return "text-red-400";
 }
 
-function SectionGrid({ title, section, onSeek, chapter }) {
+function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
   if (!section) return null;
   return (
     <div className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20" id={`report-${title.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -119,7 +119,25 @@ function SectionGrid({ title, section, onSeek, chapter }) {
           <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">{chapter}</span>
         </div>
       )}
-      <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">{title}</h3>
+      <div className="flex items-start gap-4 mb-1">
+        {imageSrc && (
+          <span className="hidden sm:block shrink-0 w-14 h-14 md:w-16 md:h-16 overflow-hidden border border-forest/20 bg-ink/5">
+            <img
+              src={imageSrc}
+              alt=""
+              loading="lazy"
+              onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }}
+              className="block w-full h-full object-cover"
+            />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-[0.95]">{title}</h3>
+          {sub && (
+            <p className="mt-1 text-sm text-ink/55">{sub}</p>
+          )}
+        </div>
+      </div>
       <div className="mt-6 grid sm:grid-cols-2 gap-4">
         {Object.entries(section).map(([key, val]) => {
           const cannotEval = val?.cannot_evaluate === true;
@@ -266,7 +284,7 @@ function OverallBenchmarkBanner({ ob, overallScore }) {
           </div>
           {ob.age_bracket_used && (
             <div className="mt-3 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-base/65">
-              calibrated for {ob.age_bracket_used.replace(/_/g, " ").toLowerCase()}
+              for his age ({ob.age_bracket_used.replace(/_/g, " ").toLowerCase()})
             </div>
           )}
         </div>
@@ -298,7 +316,7 @@ function OverallBenchmarkBanner({ ob, overallScore }) {
 
       {/* Tier landscape — horizontal scale showing player position */}
       <div className="relative mt-8 pt-6 border-t border-cream-base/15">
-        <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/65 mb-3">Tier landscape</div>
+        <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/65 mb-3">Where he stands on the football ladder</div>
         <div className="grid grid-cols-4 gap-0.5">
           {["standard_club", "strong_club", "pro_academy", "elite_academy"].map((k) => {
             const m = TIER_META[k];
@@ -1062,7 +1080,7 @@ function StatsBombCalibrationPanel({ calibration }) {
             Where your scores sit vs Euro 2024 senior pros
           </h3>
           <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
-            Each score is anchored against the actual per-90 distribution of{" "}
+            Each score is checked against what real professional players actually do per 90 minutes at{" "}
             <span className="font-bold text-forest">{position_n} {position} starters</span>{" "}
             at the European Championship 2024 — extracted from public StatsBomb event-level data across{" "}
             <span className="font-bold text-forest">{matches} matches</span>.
@@ -1175,7 +1193,7 @@ function AgeStageBanner({ age_intelligence }) {
     <div data-testid="age-stage-banner" className="bg-forest text-cream-base p-5 md:p-6">
       <div className="flex items-center gap-4 flex-wrap">
         <div className="text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/75 px-2.5 py-1 bg-cream-base/15">
-          Age-anchored evaluation
+          Reviewed for his age
         </div>
         <div className="font-barlow font-black text-2xl md:text-3xl tracking-tight uppercase">
           {age_band}
@@ -1227,16 +1245,16 @@ function WhatWeEvaluatedBlock({ age_intelligence }) {
   return (
     <div data-testid="what-we-evaluated-block" className="bg-surface border border-gray-border p-6 md:p-7">
       <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">
-        What we evaluated · What we could not
+        What we looked at · What we left for later
       </div>
       <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight mb-5">
-        Scout-grade transparency
+        What this report covers
       </h3>
 
       <div className="grid md:grid-cols-2 gap-4">
         <div data-testid="what-we-evaluated-list" className="bg-cream-card border-l-4 border-forest p-5">
           <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-forest mb-3">
-            Evaluated for this stage
+            Reviewed for his age
           </div>
           <ul className="space-y-2">
             {evaluated.map((item, i) => (
@@ -1250,7 +1268,7 @@ function WhatWeEvaluatedBlock({ age_intelligence }) {
 
         <div data-testid="what-we-did-not-evaluate-list" className="bg-cream-card border-l-4 border-ink/30 p-5">
           <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-3">
-            Deliberately not evaluated at this stage
+            Saved for his next age group
           </div>
           {not_for_stage.length > 0 ? (
             <ul className="space-y-2">
@@ -1262,7 +1280,7 @@ function WhatWeEvaluatedBlock({ age_intelligence }) {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-ink/60 italic">At this stage we evaluate everything visible. No category is deliberately deferred.</p>
+            <p className="text-sm text-ink/60 italic">For his age, we look at everything visible &mdash; nothing was held back.</p>
           )}
         </div>
       </div>
@@ -1270,7 +1288,7 @@ function WhatWeEvaluatedBlock({ age_intelligence }) {
       {ai_blind_spots.length > 0 && (
         <div data-testid="ai-blind-spots" className="mt-4 p-4 bg-cream-soft">
           <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">
-            Could not be assessed from this specific video
+            Couldn&apos;t be seen in this particular video
           </div>
           <ul className="space-y-1">
             {ai_blind_spots.slice(0, 6).map((item, i) => (
@@ -1297,15 +1315,15 @@ function AgeIntelligenceScoreboard({ age_intelligence, position_hint }) {
   const nextStage = age_intelligence.next_stage;
 
   const SCORES = [
-    { key: "current_age_score",            label: "Current Age Score",          hint: `vs ${stage.age_band || "peers"} peers` },
-    { key: "position_specific_score",      label: "Position-Specific Score",    hint: position_hint || "for your position" },
-    { key: "next_level_readiness_score",   label: "Next-Level Readiness",       hint: nextStage ? `toward ${nextStage.age_band}` : "already at top stage" },
-    { key: "pro_style_match_score",        label: "Pro Style Match",            hint: "long-term style reference" },
+    { key: "current_age_score",            label: "For his age",                hint: `vs ${stage.age_band || "peers"} peers` },
+    { key: "position_specific_score",      label: "For his position",           hint: position_hint || "in his role" },
+    { key: "next_level_readiness_score",   label: "Ready for next level",       hint: nextStage ? `toward ${nextStage.age_band}` : "already at top level" },
+    { key: "pro_style_match_score",        label: "Pro style match",            hint: "who he reminds us of" },
     { key: "technical_score",              label: "Technical",                  hint: "ball, dribbling, passing" },
     { key: "tactical_score",               label: "Tactical",                   hint: "scanning, decision-making, positioning" },
     { key: "physical_score",               label: "Physical",                   hint: "speed, balance, agility" },
-    { key: "mentality_body_language_score",label: "Mentality / Body Language",  hint: "confidence, courage, focus" },
-    { key: "development_priority_score",   label: "Development Priority",       hint: "how much room to grow" },
+    { key: "mentality_body_language_score",label: "Mindset & body language",    hint: "confidence, courage, focus" },
+    { key: "development_priority_score",   label: "Room to grow",               hint: "biggest area to work on" },
   ];
 
   return (
@@ -1316,7 +1334,7 @@ function AgeIntelligenceScoreboard({ age_intelligence, position_hint }) {
             Age Intelligence Scoreboard
           </div>
           <h3 className="font-barlow font-black uppercase text-xl md:text-2xl text-ink leading-tight">
-            9 scores · age-anchored to {stage.age_band}
+            9 scores · for {stage.age_band}
           </h3>
           <p className="mt-1.5 text-xs text-ink/60 max-w-2xl">
             Each score is computed deterministically against the {stage.label?.toLowerCase()} rubric.
@@ -2056,7 +2074,7 @@ export default function ReportPage() {
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         <FootballIcon className="w-3.5 h-3.5 text-forest" />
-                        <span className="text-[10px] uppercase tracking-[0.22em] font-black text-forest">Locked player · tracked</span>
+                        <span className="text-[10px] uppercase tracking-[0.22em] font-black text-forest">Your player · tracked</span>
                       </div>
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#CCFF00] text-ink text-[8px] uppercase tracking-[0.18em] font-black rounded-sm">
                         <span className="w-1 h-1 rounded-full bg-ink" /> Auto-lock
@@ -2113,7 +2131,7 @@ export default function ReportPage() {
                       </div>
                     )}
                     <p className="mt-2.5 text-[11px] text-ink/60 leading-snug">
-                      Every observation in this report is anchored to the player inside the lime box — no one else.
+                      Every note in this report is about the player inside the lime box &mdash; no one else.
                     </p>
                   </div>
                 )}
@@ -2453,7 +2471,7 @@ export default function ReportPage() {
                 { id: "report-technical-analysis", num: "02", label: "Technical" },
                 { id: "report-tactical-analysis", num: "03", label: "Tactical" },
                 { id: "report-physical-analysis", num: "04", label: "Physical" },
-                { id: "report-mentality-analysis", num: "05", label: "Mentality" },
+                { id: "report-mindset", num: "05", label: "Mindset" },
                 { id: "report-video-moments", num: "06", label: "Moments" },
                 { id: "report-final-summary", num: "07", label: "Final" },
               ]}
@@ -2469,14 +2487,47 @@ export default function ReportPage() {
             )}
 
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
-              {/* Executive Summary */}
+              {/* Hero divider — warm football opening shot. Only when unlocked. */}
+              {(unlocked && full_report) && (
+                <div
+                  data-testid="report-hero-divider"
+                  className="relative aspect-[21/8] md:aspect-[21/7] w-full overflow-hidden bg-ink border border-gray-border"
+                >
+                  <img
+                    src={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/report-hero-divider.png`}
+                    alt=""
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/45 to-ink/15" />
+                  <div className="absolute inset-0 flex items-center px-6 md:px-12">
+                    <div className="max-w-xl">
+                      <div className="inline-flex items-center gap-2 mb-2">
+                        <span className="w-7 h-px bg-volt" />
+                        <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
+                          Your full scout report
+                        </span>
+                      </div>
+                      <h2 className="font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl text-cream-base leading-[0.92]">
+                        Through<br /><span className="text-volt">a scout&apos;s eyes.</span>
+                      </h2>
+                      <p className="mt-3 text-cream-base/75 text-sm md:text-base max-w-md leading-relaxed hidden sm:block">
+                        Honest, age-appropriate notes &mdash; what stood out, what to work on, and how to grow next.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Scout's Summary */}
               {(unlocked && full_report) && (
                 <div className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20" id="report-executive">
                   <div className="flex items-center gap-2 mb-2">
                     <PitchLineDivider className="w-10 h-2 text-forest/55" />
                     <span className="text-[9px] uppercase tracking-[0.32em] font-black text-forest">Chapter · 01</span>
                   </div>
-                  <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Executive Summary</h3>
+                  <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink">Scout&apos;s Summary</h3>
                   <p className="mt-4 text-ink/85 leading-relaxed">{full_report.executive_summary}</p>
                 </div>
               )}
@@ -2580,12 +2631,12 @@ export default function ReportPage() {
                     <div data-testid="performance-radar-card" className="bg-surface border border-gray-border p-6 md:p-8">
                       <div className="flex items-start justify-between gap-4 flex-wrap mb-2">
                         <div>
-                          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Pillar overview</div>
+                          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">His game at a glance</div>
                           <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
                             Performance radar
                           </h3>
                           <p className="mt-2 text-sm text-ink/65 max-w-md">
-                            One shape per pillar — Technical, Tactical, Physical, Mental. The further the shape reaches an axis, the stronger the player is in that area.
+                            One shape per area &mdash; Technical, Tactical, Physical, Mental. The further the shape reaches an axis, the stronger the player is in that area.
                           </p>
                         </div>
                         <div className="flex flex-col gap-1 items-start">
@@ -2669,10 +2720,38 @@ export default function ReportPage() {
                     </div>
                   )}
 
-                  <SectionGrid title="Technical Analysis" section={full_report.technical} onSeek={seekVideoTo} chapter="Chapter · 02 · Technical" />
-                  <SectionGrid title="Tactical Analysis" section={full_report.tactical} onSeek={seekVideoTo} chapter="Chapter · 03 · Tactical" />
-                  <SectionGrid title="Physical Analysis" section={full_report.physical} onSeek={seekVideoTo} chapter="Chapter · 04 · Physical" />
-                  <SectionGrid title="Mentality Analysis" section={full_report.mentality} onSeek={seekVideoTo} chapter="Chapter · 05 · Mentality" />
+                  <SectionGrid
+                    title="Technical"
+                    sub="Ball, dribbling, passing, shooting"
+                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-technical.png`}
+                    section={full_report.technical}
+                    onSeek={seekVideoTo}
+                    chapter="Chapter · 02 · Technical"
+                  />
+                  <SectionGrid
+                    title="Tactical"
+                    sub="Scanning, decisions, positioning"
+                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-tactical.png`}
+                    section={full_report.tactical}
+                    onSeek={seekVideoTo}
+                    chapter="Chapter · 03 · Tactical"
+                  />
+                  <SectionGrid
+                    title="Physical"
+                    sub="Speed, balance, agility, stamina"
+                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-physical.png`}
+                    section={full_report.physical}
+                    onSeek={seekVideoTo}
+                    chapter="Chapter · 04 · Physical"
+                  />
+                  <SectionGrid
+                    title="Mindset"
+                    sub="Confidence, courage, focus, body language"
+                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-mental.png`}
+                    section={full_report.mentality}
+                    onSeek={seekVideoTo}
+                    chapter="Chapter · 05 · Mindset"
+                  />
 
                   {/* European Academy reference profile — position priorities vs Pro Academy expectations */}
                   <AgeProfileCard ref={age_profile_reference} />
@@ -2834,7 +2913,7 @@ export default function ReportPage() {
                       <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">Frame-stamped evidence</div>
                       <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">Video moments</h3>
                       <p className="mt-2 text-sm text-ink/65 max-w-xl">
-                        Every observation is anchored to the exact frame it was seen at — so you can verify each note in the original clip.
+                        Every note is tied to the exact moment in the video &mdash; so you can rewatch it yourself.
                       </p>
                       {/* Mini timeline ribbon — visualises WHEN in the clip each moment occurred. */}
                       <div className="mt-5 relative h-1.5 bg-cream-soft border border-forest/15 rounded-full overflow-visible" aria-hidden>
