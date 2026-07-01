@@ -401,15 +401,6 @@ function FreeCard({ onCta }) {
           <span className="relative rounded-full w-1 h-1 bg-forest" />
         </span>
       </span>
-      {/* Tier badge image (mobile only - shown above title) */}
-      <img
-        src={IMG("badge-free.png")}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
-        className="md:hidden mx-auto w-12 h-12 object-contain mt-1 -mb-1"
-      />
       <BadgeHeader tone="ghost" icon={Sparkles} label="Start" />
       <Title size="md" className="text-ink">Free</Title>
       <Price amount="$0" suffix="/ month" tone="ink" />
@@ -452,16 +443,6 @@ function SingleCard({ price, onCta, loading = false, disabled = false }) {
       {/* Corner brackets — visible mobile only */}
       <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-ink md:hidden" />
       <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-ink md:hidden" />
-
-      {/* Tier badge image (mobile only) */}
-      <img
-        src={IMG("badge-single.png")}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
-        className="md:hidden mx-auto w-12 h-12 object-contain mt-2 -mb-1"
-      />
 
       <BadgeHeader tone="forest" icon={Trophy} label="Single" />
       <Title size="md" className="text-ink">Single<br className="hidden md:inline lg:hidden" /> Report</Title>
@@ -526,15 +507,6 @@ function PremiumCard({ price, extraPrice, singlePrice, onCta, loading = false, d
       {/* Corner brackets — mobile only */}
       <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-[#A5DD5F]/50 md:hidden" />
       <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-[#A5DD5F]/50 md:hidden" />
-      {/* Tier badge image */}
-      <img
-        src={IMG("badge-premium.png")}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
-        className="md:hidden mx-auto w-12 h-12 object-contain mt-2 -mb-1"
-      />
 
       <BadgeHeader tone="lime" icon={TrendingUp} label="Monthly" />
       <Title size="md" className="text-white">Premium</Title>
@@ -609,16 +581,6 @@ function VipCard({ price, extraPrice, singlePrice, onCta, loading = false, disab
       {/* Corner brackets — mobile only */}
       <span aria-hidden className="absolute top-1.5 left-1.5 w-2.5 h-2.5 border-l border-t border-[#F5C443]/60 md:hidden" />
       <span aria-hidden className="absolute top-1.5 right-1.5 w-2.5 h-2.5 border-r border-t border-[#F5C443]/60 md:hidden" />
-
-      {/* Tier badge image */}
-      <img
-        src={IMG("badge-vip.png")}
-        alt=""
-        aria-hidden
-        loading="lazy"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
-        className="md:hidden mx-auto w-12 h-12 object-contain mt-2 -mb-1"
-      />
 
       <BadgeHeader tone="gold" icon={Crown} label="Monthly" />
       <Title size="md" className="text-white">

@@ -530,35 +530,116 @@ function FAQSection({ faqItems }) {
 /*  FOOTER                                                       */
 /* ============================================================ */
 function SiteFooter() {
+  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
   return (
     <footer
       data-testid="footer-minimal"
-      className="bg-ink text-white/70 px-6 md:px-10 py-10 md:py-14"
+      className="relative isolate overflow-hidden bg-ink text-white/75 px-6 md:px-10 py-14 md:py-20"
     >
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-        <div>
-          <span className="font-barlow font-black uppercase text-white text-xl tracking-[0.16em]">
-            SCOUT<span className="text-ink bg-volt px-[3px]">ME</span>PLAY
+      {/* Layer 1 — Nano Banana hero turf (aerial pitch at midnight) */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-30 opacity-55"
+        style={{
+          backgroundImage: `url(${BACKEND_URL}/api/static/landing/footer-hero-turf.png)`,
+          backgroundSize: "cover",
+          backgroundPosition: "center 30%",
+        }}
+      />
+      {/* Layer 2 — dark ink gradient wash so text stays readable */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-20"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(10,26,18,0.72) 0%, rgba(10,26,18,0.88) 45%, rgba(10,26,18,0.96) 100%)",
+        }}
+      />
+      {/* Layer 3 — Nano Banana grain texture, blended in */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 opacity-25 mix-blend-overlay"
+        style={{
+          backgroundImage: `url(${BACKEND_URL}/api/static/landing/footer-noise-grain.png)`,
+          backgroundSize: "512px 512px",
+          backgroundRepeat: "repeat",
+        }}
+      />
+      {/* Layer 4 — top chalk line divider (subtle floodlight glow) */}
+      <div
+        aria-hidden
+        className="absolute top-0 left-0 right-0 h-px -z-10"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent 0%, rgba(204,255,0,0.35) 20%, rgba(245,196,67,0.4) 50%, rgba(204,255,0,0.35) 80%, transparent 100%)",
+        }}
+      />
+      <span
+        aria-hidden
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 -z-10 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at top, rgba(245,196,67,0.35) 0%, transparent 70%)",
+        }}
+      />
+
+      <div className="relative max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
+        {/* Brand block */}
+        <div className="text-center md:text-left">
+          {/* Volt kicker line */}
+          <span
+            aria-hidden
+            className="hidden md:inline-block w-8 h-px bg-volt align-middle mr-3"
+          />
+          <span className="font-barlow font-black uppercase text-white text-2xl md:text-3xl tracking-[0.14em]">
+            SCOUT<span className="text-ink bg-volt px-[3px] mx-[1px]">ME</span>PLAY
           </span>
-          <p className="mt-3 text-xs uppercase tracking-[0.18em] text-white/55 font-bold">
+          <p className="mt-3 text-[10px] md:text-[11px] uppercase tracking-[0.22em] text-white/60 font-bold">
             See your game through scout eyes
           </p>
+          {/* Tiny football pitch icon divider */}
+          <div className="mt-4 flex items-center gap-2 justify-center md:justify-start">
+            <span aria-hidden className="w-3 h-px bg-volt/50" />
+            <span aria-hidden className="w-1 h-1 rounded-full bg-volt" />
+            <span aria-hidden className="w-3 h-px bg-volt/50" />
+            <span className="text-[9px] uppercase tracking-[0.28em] font-black text-white/40">Elite</span>
+            <span aria-hidden className="w-3 h-px bg-volt/50" />
+            <span aria-hidden className="w-1 h-1 rounded-full bg-volt" />
+            <span aria-hidden className="w-3 h-px bg-volt/50" />
+          </div>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] uppercase tracking-[0.18em] font-bold">
-          <Link data-testid="footer-link-about" to="/about" className="text-white/70 hover:text-white">About</Link>
-          <Link data-testid="footer-link-methodology" to="/methodology" className="text-white/70 hover:text-white">Methodology</Link>
-          <Link data-testid="footer-link-blog" to="/blog" className="text-white/70 hover:text-white">Blog</Link>
-          <Link data-testid="footer-link-privacy" to="/privacy" className="text-white/70 hover:text-white">Privacy</Link>
-          <Link data-testid="footer-link-terms" to="/terms" className="text-white/70 hover:text-white">Terms</Link>
+        {/* Nav */}
+        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[11px] md:text-[12px] uppercase tracking-[0.22em] font-bold">
+          {[
+            ["/about", "About", "footer-link-about"],
+            ["/methodology", "Methodology", "footer-link-methodology"],
+            ["/blog", "Blog", "footer-link-blog"],
+            ["/privacy", "Privacy", "footer-link-privacy"],
+            ["/terms", "Terms", "footer-link-terms"],
+          ].map(([to, label, testid]) => (
+            <Link
+              key={to}
+              to={to}
+              data-testid={testid}
+              className="group relative text-white/70 hover:text-white transition-colors duration-200"
+            >
+              <span>{label}</span>
+              <span
+                aria-hidden
+                className="absolute -bottom-1 left-0 right-0 h-px bg-volt scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300"
+              />
+            </Link>
+          ))}
         </nav>
       </div>
 
-      <div className="max-w-6xl mx-auto mt-8 pt-6 border-t border-white/10 text-[10px] uppercase tracking-[0.2em] text-white/45 font-bold flex flex-col sm:flex-row items-center justify-between gap-3">
+      {/* Bottom bar */}
+      <div className="relative max-w-6xl mx-auto mt-10 pt-6 border-t border-white/10 text-[10px] uppercase tracking-[0.24em] text-white/45 font-bold flex flex-col sm:flex-row items-center justify-between gap-3">
         <span>© {new Date().getFullYear()} ScoutMePlay · MentalKids · Denmark</span>
-        <span className="flex items-center gap-1.5">
-          <ShieldCheck className="w-3 h-3 text-forest" />
-          Secure Stripe · No subscription
+        <span className="flex items-center gap-2">
+          <ShieldCheck className="w-3.5 h-3.5 text-volt" strokeWidth={2.4} />
+          <span>Secure Stripe · No subscription</span>
         </span>
       </div>
     </footer>
