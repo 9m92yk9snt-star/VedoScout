@@ -59,6 +59,7 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image as RLImage
 )
+from reportlab.platypus.flowables import Flowable
 
 # ---- Setup ----
 ROOT_DIR = Path(__file__).parent
@@ -70,7 +71,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 12  # v12 = 60-Second Scout Summary score now uses baseline-aligned _big_score
+PDF_RENDER_VERSION = 13  # v13 = Nano Banana cover + section header hero bands (Feb 27 2026)
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -4429,9 +4430,13 @@ def _draw_background(canv, doc):
     canv.restoreState()
 
 
+_NANO_BANANA_DIR = Path(__file__).resolve().parent / "static" / "landing"
+
+
 def _draw_cover_background(canv, doc):
-    """Cover page background: cream + large forest panel on the left,
-    big ScoutMePlay wordmark at the top.
+    """Cover page background: cream + Nano Banana stadium-tunnel photo behind
+    a heavy forest tint on the LEFT PANEL, big ScoutMePlay wordmark rotated
+    vertically. Mirrors the cinematic feel of the web report's OverallBenchmarkBanner.
     """
     canv.saveState()
     w, h = doc.pagesize
@@ -4442,8 +4447,35 @@ def _draw_cover_background(canv, doc):
 
     # Forest left panel (1/3 width)
     panel_w = w * 0.34
+
+    # Nano Banana stadium tunnel photo — covers the left panel behind the forest tint
+    tunnel_bg = _NANO_BANANA_DIR / "bg-benchmark-tunnel.png"
+    if tunnel_bg.exists():
+        try:
+            # Crop-to-fit: draw slightly wider than the panel and let the panel clip
+            canv.drawImage(
+                str(tunnel_bg),
+                x=0,
+                y=0,
+                width=panel_w,
+                height=h,
+                preserveAspectRatio=False,  # fill the entire panel
+                anchor="c",
+                mask="auto",
+            )
+        except Exception:
+            # If the image is unreadable for any reason, fall back to solid forest
+            canv.setFillColor(_PDF_FOREST)
+            canv.rect(0, 0, panel_w, h, fill=1, stroke=0)
+    else:
+        canv.setFillColor(_PDF_FOREST)
+        canv.rect(0, 0, panel_w, h, fill=1, stroke=0)
+
+    # Heavy forest tint on top — keeps brand identity while letting the photo add depth
     canv.setFillColor(_PDF_FOREST)
+    canv.setFillAlpha(0.72)
     canv.rect(0, 0, panel_w, h, fill=1, stroke=0)
+    canv.setFillAlpha(1.0)
 
     # Subtle diagonal accent stripe on the forest panel
     canv.setFillColor(_PDF_FOREST_POP)
@@ -4478,6 +4510,96 @@ def _draw_cover_background(canv, doc):
 
 
 # ---- Reusable visual primitives ----
+
+# Nano Banana background images shared with the web report. Each key maps to a
+# concrete PNG under /app/backend/static/landing/ — same asset the web report uses.
+_NANO_BG = {
+    "technical": _NANO_BANANA_DIR / "bg-radar-tactics.png",      # chalk tactics board
+    "tactical":  _NANO_BANANA_DIR / "bg-archetype-aerial.png",   # aerial pitch layout
+    "physical":  _NANO_BANANA_DIR / "bg-standout-boots.png",     # boots on grass
+    "mentality": _NANO_BANANA_DIR / "bg-standout-net.png",       # goal net close-up
+    "scout":     _NANO_BANANA_DIR / "bg-scout-hero.png",         # chalk touchline
+    "tunnel":    _NANO_BANANA_DIR / "bg-benchmark-tunnel.png",   # stadium tunnel
+}
+
+
+class _NanoHeroBand(Flowable):
+    """A photo-band section header — Nano Banana image + heavy forest tint +
+    white section title + volt eyebrow. Mirrors the cinematic hero-band feel
+    of the web report's chapter openers so the printed PDF and the on-screen
+    report share the same premium visual language.
+
+    Fixed-height (2.6 cm) full-width strip. Draws its own background image,
+    so callers just insert it into the story like any other flowable.
+    """
+
+    def __init__(self, image_path: Path, section_num: str, title: str, subtitle: str = "",
+                 width: float = None, height: float = 2.6 * cm):
+        Flowable.__init__(self)
+        self.image_path = image_path
+        self.section_num = (section_num or "").upper()
+        self.title = (title or "").upper()
+        self.subtitle = subtitle or ""
+        self._w = width or (A4[0] - 3.2 * cm)  # matches the inner_frame width
+        self._h = height
+
+    def wrap(self, availWidth, availHeight):  # noqa: N802 (ReportLab API)
+        return (self._w, self._h)
+
+    def draw(self):
+        c = self.canv
+        w, h = self._w, self._h
+
+        # 1) Background image, cropped to fit the strip
+        try:
+            if self.image_path and Path(self.image_path).exists():
+                c.drawImage(
+                    str(self.image_path), 0, 0, width=w, height=h,
+                    preserveAspectRatio=False, anchor="c", mask="auto",
+                )
+            else:
+                c.setFillColor(_PDF_FOREST)
+                c.rect(0, 0, w, h, fill=1, stroke=0)
+        except Exception:
+            c.setFillColor(_PDF_FOREST)
+            c.rect(0, 0, w, h, fill=1, stroke=0)
+
+        # 2) Heavy forest tint — keeps the brand identity, lets photo add depth
+        c.setFillColor(_PDF_FOREST)
+        c.setFillAlpha(0.80)
+        c.rect(0, 0, w, h, fill=1, stroke=0)
+        c.setFillAlpha(1.0)
+
+        # 3) Volt accent stripe on the left edge (matches the web hero divider)
+        c.setFillColor(HexColor("#CCFF00"))
+        c.rect(0, 0, 0.14 * cm, h, fill=1, stroke=0)
+
+        # 4) Text — volt eyebrow + big white section title + optional subtitle
+        c.setFillColor(HexColor("#CCFF00"))
+        c.setFont("Helvetica-Bold", 7.5)
+        c.drawString(0.65 * cm, h - 0.75 * cm, self.section_num)
+
+        c.setFillColor(HexColor("#FFFFFF"))
+        c.setFont("Helvetica-Bold", 17)
+        c.drawString(0.65 * cm, h - 1.55 * cm, self.title)
+
+        if self.subtitle:
+            c.setFillColor(HexColor("#FFFFFFCC"))
+            c.setFont("Helvetica", 8.5)
+            c.drawString(0.65 * cm, h - 2.15 * cm, self.subtitle)
+
+
+def _nano_hero(section_num: str, title: str, subtitle: str, pillar_key: str) -> list:
+    """Convenience factory — returns a `_NanoHeroBand` for a pillar section,
+    plus the spacer that lets the score table below breathe."""
+    band = _NanoHeroBand(
+        image_path=_NANO_BG.get(pillar_key),
+        section_num=section_num,
+        title=title,
+        subtitle=subtitle,
+    )
+    return [band, Spacer(1, 0.6 * cm)]
+
 
 def _section_header(title: str, styles, idx: int = None):
     """Forest eyebrow + big ink title + thicker forest underline.
@@ -5991,14 +6113,16 @@ def build_pdf(report_doc: dict, output_path: str):
     # ===== TECHNICAL & TACTICAL — premium per-skill cards with benchmarks =====
     section_idx = 4 if ob.get("tier") else 3
     if "technical" in full:
-        story += _section_header("Technical analysis", styles, idx=section_idx)
+        story += _nano_hero(f"Section {section_idx:02d}", "Technical analysis",
+                            "Ball, dribbling, passing, shooting", "technical")
         story += _skill_section_block(full["technical"], styles)
         story.append(Spacer(1, 0.4 * cm))
         section_idx += 1
 
     if "tactical" in full:
         story.append(PageBreak())
-        story += _section_header("Tactical analysis", styles, idx=section_idx)
+        story += _nano_hero(f"Section {section_idx:02d}", "Tactical analysis",
+                            "Scanning, decisions, positioning", "tactical")
         story += _skill_section_block(full["tactical"], styles)
         section_idx += 1
 
@@ -6006,14 +6130,16 @@ def build_pdf(report_doc: dict, output_path: str):
 
     # ===== PHYSICAL & MENTALITY =====
     if "physical" in full:
-        story += _section_header("Physical analysis", styles, idx=section_idx)
+        story += _nano_hero(f"Section {section_idx:02d}", "Physical analysis",
+                            "Speed, balance, agility, stamina", "physical")
         story += _skill_section_block(full["physical"], styles)
         story.append(Spacer(1, 0.4 * cm))
         section_idx += 1
 
     if "mentality" in full:
         story.append(PageBreak())
-        story += _section_header("Mentality analysis", styles, idx=section_idx)
+        story += _nano_hero(f"Section {section_idx:02d}", "Mentality analysis",
+                            "Confidence, courage, focus, body language", "mentality")
         story += _skill_section_block(full["mentality"], styles)
         section_idx += 1
 

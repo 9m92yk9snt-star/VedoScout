@@ -1864,13 +1864,30 @@ export default function ReportPage() {
       const res = await api.get(`/reports/${id}/pdf`, { responseType: "blob" });
       const blob = new Blob([res.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
+      // Sanitise the filename — trailing dots + spaces make Chrome/Safari
+      // strip the `.pdf` extension, which is what most "download does nothing"
+      // reports are actually about.
+      const raw = report?.player_details?.player_name || "report";
+      const safe = String(raw).replace(/[^A-Za-z0-9À-ÿ]+/g, "_").replace(/_+$/, "") || "report";
+      const filename = `EliteScout_${safe}_Report.pdf`;
       const link = document.createElement("a");
       link.href = url;
-      link.download = `EliteScout_${report?.player_details?.player_name || "report"}.pdf`;
+      link.download = filename;
+      link.rel = "noopener";
+      link.style.display = "none";
+      // Anchor MUST be in the DOM for the click to trigger a download in
+      // Chrome ≥91 + Safari + iOS webviews. This was the bug.
+      document.body.appendChild(link);
       link.click();
-      window.URL.revokeObjectURL(url);
+      // Give the browser a beat to start reading the blob before we tear it
+      // down. Firefox especially throws if the URL is revoked too early.
+      setTimeout(() => {
+        try { document.body.removeChild(link); } catch (_) {}
+        window.URL.revokeObjectURL(url);
+      }, 400);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "PDF download failed");
+      const detail = err?.response?.data?.detail || err?.message || "PDF download failed";
+      toast.error(String(detail));
     } finally {
       setDownloadingPdf(false);
     }

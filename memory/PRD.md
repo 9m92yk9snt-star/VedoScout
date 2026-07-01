@@ -26,6 +26,31 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 100 — PDF download bug fix + Nano Banana redesign of the printed PDF (Feb 27 2026)**:
+  - User feedback (Danish): "PDF RAPPORT VIRKER IKKE NÅR JEG TRYKKER PÅ DOWNLOAD MEN OGSÅ PDF RAPPORT SKAL DESIGNENS VED AT BRUGE NANOBANANA SÅ DEN SER GRAFISK FLOT UD SOM RAPPORT HER" — download broken + PDF must be redesigned with Nano Banana to look as premium as the web report.
+  - **BUG FIX — download button** (`ReportPage.jsx`): the anchor element was never appended to the DOM before `.click()` — Chrome ≥91 / Safari / iOS webviews now require it. Filename with spaces + trailing dot (e.g. `Lukas A..pdf`) also caused browsers to strip the `.pdf` extension. Fix: sanitise player name via `[^A-Za-z0-9À-ÿ]+ → _`, append the `<a>` to `document.body`, click, then delay `revokeObjectURL` + `removeChild` by 400ms so the browser can start reading the blob. Verified via Playwright `expect_download` — "DOWNLOAD OK: filename=EliteScout_Lukas_A_Report.pdf".
+  - **PDF REDESIGN — Nano Banana on the cover** (`_draw_cover_background`): the old cover had a flat forest-green LEFT PANEL. Now the same panel draws the `bg-benchmark-tunnel.png` (Nano Banana stadium tunnel photograph) full-height at `preserveAspectRatio=False`, then applies a `_PDF_FOREST` fill at `setFillAlpha(0.72)` on top — cinematic tunnel visible through the forest tint, brand identity preserved. Vertical wordmark + tagline + footer text all retested and remain readable. Verified via `pdftoppm` render + LLM visual analysis: "The left panel clearly displays a photographic background of a stadium tunnel, significantly darkened and tinted with a forest-green hue. The tunnel structure and the glimpse of a green field at the end are still discernible."
+  - **PDF REDESIGN — Nano Banana hero bands for pillar sections** — new `Flowable` subclass `_NanoHeroBand` renders a full-width 2.6cm strip at the top of each pillar section (Technical / Tactical / Physical / Mentality) with:
+    - Background image (crop-to-fit): `bg-radar-tactics.png` for Technical (chalk tactics board), `bg-archetype-aerial.png` for Tactical (aerial pitch), `bg-standout-boots.png` for Physical (boots on grass), `bg-standout-net.png` for Mentality (goal net close-up)
+    - `setFillAlpha(0.80)` forest tint on top so the photo shows through moodily
+    - Volt-lime `0.14cm`-wide accent stripe on the left edge (matches the web hero divider)
+    - Volt eyebrow "SECTION XX" + big white "TECHNICAL ANALYSIS" (17pt Helvetica-Bold) + subtitle "Ball, dribbling, passing, shooting" (8.5pt)
+  - **`_NANO_BG` registry** — one dict mapping pillar key → Nano Banana bg path so all 4 pillar sections reuse the same source-of-truth image locations.
+  - **`_nano_hero()` factory** — clean 1-line replacement for the old `_section_header()` calls in the 4 pillar sections. `story += _nano_hero(f"Section {n:02d}", "Technical analysis", "Ball, dribbling, ...", "technical")`.
+  - **Bumped `PDF_RENDER_VERSION` 12 → 13** so all cached PDFs get regenerated with the new visuals. Verified: `_purge_stale_pdfs()` correctly deleted the old `.v12.pdf` and built the new `.v13.pdf` on next request.
+  - **PDF size**: 135 KB → 5.1 MB (embeds 5 Nano Banana photos). Trade-off accepted — user explicitly asked for premium visual quality; 5 MB is normal for photograph-heavy scout reports.
+  - **Regression check via visual LLM analysis** on rendered pages: cover shows tunnel through forest tint, wordmark readable, right-side cream area with player name + score box intact. Page 9 shows the new Technical hero band with tactics chalkboard visible through the forest tint, "SECTION 04" + "TECHNICAL ANALYSIS" + "Ball, dribbling, passing, shooting" all rendering correctly.
+  - **Files**:
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (`handleDownloadPdf` — 3 fixes: sanitize filename, append to DOM, delayed revoke)
+    - MODIFIED `/app/backend/server.py`:
+      - added `from reportlab.platypus.flowables import Flowable` import
+      - bumped `PDF_RENDER_VERSION` 12 → 13
+      - rewrote `_draw_cover_background` to draw `bg-benchmark-tunnel.png` + forest tint on the left panel
+      - added `_NANO_BANANA_DIR` + `_NANO_BG` registry
+      - added `_NanoHeroBand` Flowable subclass + `_nano_hero()` factory
+      - swapped the 4 pillar `_section_header(...)` calls in `build_pdf` for `_nano_hero(...)`
+  - **Zero data/score changes**. Purely presentational + one frontend bug fix.
+
 - ✅ **🆕 Session 99 — Extended Nano Banana bg treatment to Overall Benchmark & Archetype heroes (Feb 27 2026)**:
   - User said YES to the proposed enhancement — extend the same photo-atmosphere treatment to the remaining big forest-green hero panels so the whole report has consistent premium cinematic feel.
   - **2 new Nano Banana images** generated (`generate_football_bgs_2.py`), forest-green-friendly palette, strict "NO PEOPLE" system + user prompts:
