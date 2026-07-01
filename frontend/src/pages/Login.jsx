@@ -3,11 +3,12 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import Navigation from "@/components/Navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -62,16 +63,37 @@ export default function Login() {
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                data-testid="login-password"
-                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
-                placeholder="••••••••"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Password</label>
+                <Link
+                  to="/forgot-password"
+                  data-testid="login-forgot-password"
+                  className="text-[10px] uppercase tracking-widest font-bold text-volt hover:text-ink transition-colors"
+                >
+                  Forgot?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  data-testid="login-password"
+                  className="w-full bg-surface border border-gray-border pl-4 pr-11 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/50 hover:text-ink"
+                  tabIndex={-1}
+                  aria-label="Toggle password visibility"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <button
               type="submit"

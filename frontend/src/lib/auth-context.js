@@ -31,10 +31,10 @@ export function AuthProvider({ children }) {
     }
   }, [persist]);
 
-  const signup = useCallback(async (email, password, full_name) => {
+  const signup = useCallback(async (email, password, full_name, honeypot = "") => {
     setLoading(true);
     try {
-      const { data } = await api.post("/auth/signup", { email, password, full_name });
+      const { data } = await api.post("/auth/signup", { email, password, full_name, website: honeypot });
       persist(data.access_token, data.user);
       return data.user;
     } finally {
@@ -47,6 +47,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("elite_user");
     setUser(null);
   }, []);
+
+  // Used by /reset-password after a successful token exchange — persists the
+  // freshly-issued access_token + user so the visitor is logged in immediately.
+  const setAuthFromResponse = useCallback((data) => {
+    if (data?.access_token && data?.user) {
+      persist(data.access_token, data.user);
+    }
+  }, [persist]);
 
   useEffect(() => {
     // verify token on mount
@@ -61,7 +69,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, loading, setAuthFromResponse }}>
       {children}
     </AuthContext.Provider>
   );

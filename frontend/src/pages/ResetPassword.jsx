@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
 import Navigation from "@/components/Navigation";
 import { ArrowRight, Check, X, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import api from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 const RULES = [
   { key: "len", label: "At least 10 characters", test: (p) => p.length >= 10 },
@@ -12,39 +13,46 @@ const RULES = [
   { key: "digit", label: "One number", test: (p) => /\d/.test(p) },
   { key: "symbol", label: "One symbol (! ? # $ %)", test: (p) => /[^A-Za-z0-9]/.test(p) },
 ];
+const score = (pw) => RULES.filter((r) => r.test(pw)).length;
 
-function scorePassword(pw) {
-  return RULES.filter((r) => r.test(pw)).length;
-}
+export default function ResetPassword() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const token = params.get("token") || "";
+  const { setAuthFromResponse } = useAuth();
 
-export default function Signup() {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  // Hidden honeypot — matches the backend `website` field.
-  // Bots that auto-fill every input trigger this and get rejected.
-  const [honeypot, setHoneypot] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const { signup } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
 
-  const params = new URLSearchParams(location.search);
-  const nextParam = params.get("next");
-  const openPass = params.get("open_pass");
-  const resolvedNext = nextParam
-    ? (openPass ? `${nextParam}${nextParam.includes("?") ? "&" : "?"}open_pass=${openPass}` : nextParam)
-    : null;
-
-  const score = useMemo(() => scorePassword(password), [password]);
+  const s = useMemo(() => score(password), [password]);
   const passwordsMatch = password && password === confirmPassword;
-  const canSubmit = score === RULES.length && passwordsMatch && fullName.trim() && email.trim();
+  const canSubmit = s === RULES.length && passwordsMatch && token;
+
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-deepnavy text-ink">
+        <Navigation />
+        <div className="pt-32 pb-20 px-6 max-w-md mx-auto">
+          <h1 className="font-barlow font-black uppercase text-4xl">Invalid reset link</h1>
+          <p className="mt-3 text-ink/60 text-sm">
+            This link is missing its token. Request a fresh one from the forgot-password page.
+          </p>
+          <Link
+            to="/forgot-password"
+            className="mt-8 inline-flex items-center gap-2 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
+          >
+            Request new link <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (score < RULES.length) {
+    if (s < RULES.length) {
       toast.error("Password doesn't meet all requirements.");
       return;
     }
@@ -54,72 +62,57 @@ export default function Signup() {
     }
     setSubmitting(true);
     try {
-      await signup(email, password, fullName, honeypot);
-      toast.success("Account created. Let's upload your video.");
-      navigate(resolvedNext || "/upload");
+      const { data } = await api.post("/auth/reset-password", {
+        token,
+        new_password: password,
+      });
+      if (data?.access_token) {
+        // Persist the fresh session — user is logged in immediately.
+        localStorage.setItem("elite_token", data.access_token);
+        localStorage.setItem("elite_user", JSON.stringify(data.user));
+        if (typeof setAuthFromResponse === "function") setAuthFromResponse(data);
+      }
+      toast.success("Password updated. You're logged in.");
+      navigate(data?.user?.role === "admin" || data?.user?.role === "scout" ? "/admin" : "/dashboard");
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Sign up failed");
+      toast.error(err?.response?.data?.detail || "Could not reset password");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const strengthLabel = ["Very weak", "Weak", "Fair", "Strong", "Very strong", "Excellent"][score];
+  const strengthLabel = ["Very weak", "Weak", "Fair", "Strong", "Very strong", "Excellent"][s];
   const strengthColor = [
     "bg-red-500/70", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-lime-400", "bg-forest-pop",
-  ][score];
+  ][s];
 
   return (
-    <div className="min-h-screen bg-deepnavy text-ink">
+    <div className="min-h-screen bg-deepnavy text-ink" data-testid="reset-password-page">
       <Navigation />
       <div className="pt-32 pb-20 px-6">
         <div className="max-w-md mx-auto">
-          <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Get started</span>
+          <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">
+            Reset password
+          </span>
           <h1 className="mt-3 font-barlow font-black uppercase text-5xl tracking-tighter leading-[0.95]">
-            Create account
+            Pick a new<br />password.
           </h1>
           <p className="mt-3 text-ink/65 text-sm">
-            Free preview included. No card required to start.
+            You&apos;ll be logged in automatically once it&apos;s saved.
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-10 space-y-5" data-testid="signup-form">
-            <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Full name</label>
-              <input
-                type="text" required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                data-testid="signup-name"
-                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
-                placeholder="Jane Doe"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Email</label>
-              <input
-                type="email" required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                data-testid="signup-email"
-                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
-                placeholder="you@email.com"
-                autoComplete="email"
-              />
-            </div>
-
+          <form onSubmit={handleSubmit} className="mt-10 space-y-5" data-testid="reset-form">
             <div>
               <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">
-                Password
+                New password
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  required
-                  minLength={10}
+                  required minLength={10}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  data-testid="signup-password"
+                  data-testid="reset-password-input"
                   className="w-full bg-surface border border-gray-border pl-4 pr-11 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
                   placeholder="Minimum 10 characters"
                   autoComplete="new-password"
@@ -129,21 +122,19 @@ export default function Signup() {
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/50 hover:text-ink"
                   tabIndex={-1}
-                  aria-label="Toggle password visibility"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
 
-              {/* Strength meter */}
               {password.length > 0 && (
-                <div className="mt-2 space-y-2" data-testid="password-strength">
+                <div className="mt-2 space-y-2">
                   <div className="flex gap-1">
                     {[0, 1, 2, 3, 4].map((i) => (
                       <div
                         key={i}
                         className={`h-1 flex-1 transition-colors ${
-                          i < score ? strengthColor : "bg-white/10"
+                          i < s ? strengthColor : "bg-white/10"
                         }`}
                       />
                     ))}
@@ -156,11 +147,7 @@ export default function Signup() {
                       const ok = r.test(password);
                       return (
                         <li key={r.key} className="flex items-center gap-2">
-                          {ok ? (
-                            <Check className="w-3 h-3 text-forest-pop shrink-0" />
-                          ) : (
-                            <X className="w-3 h-3 text-ink/30 shrink-0" />
-                          )}
+                          {ok ? <Check className="w-3 h-3 text-forest-pop shrink-0" /> : <X className="w-3 h-3 text-ink/30 shrink-0" />}
                           <span className={ok ? "text-ink/70" : "text-ink/40"}>{r.label}</span>
                         </li>
                       );
@@ -172,14 +159,14 @@ export default function Signup() {
 
             <div>
               <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">
-                Confirm password
+                Confirm new password
               </label>
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                data-testid="signup-password-confirm"
+                data-testid="reset-password-confirm"
                 className={`w-full bg-surface border px-4 py-3 text-ink focus:outline-none focus:ring-1 transition-colors ${
                   confirmPassword && !passwordsMatch
                     ? "border-red-500 focus:border-red-500 focus:ring-red-500"
@@ -191,7 +178,7 @@ export default function Signup() {
                 autoComplete="new-password"
               />
               {confirmPassword && !passwordsMatch && (
-                <p className="mt-1.5 text-[11px] text-red-400">Passwords don't match yet.</p>
+                <p className="mt-1.5 text-[11px] text-red-400">Passwords don&apos;t match yet.</p>
               )}
               {passwordsMatch && (
                 <p className="mt-1.5 text-[11px] text-forest-pop inline-flex items-center gap-1">
@@ -200,47 +187,21 @@ export default function Signup() {
               )}
             </div>
 
-            {/* Honeypot — visually hidden, not tabbable, not autocompletable */}
-            <div aria-hidden="true" className="absolute -left-[9999px] w-px h-px overflow-hidden opacity-0 pointer-events-none">
-              <label>
-                Do not fill this
-                <input
-                  type="text"
-                  tabIndex={-1}
-                  autoComplete="off"
-                  value={honeypot}
-                  onChange={(e) => setHoneypot(e.target.value)}
-                  name="website"
-                />
-              </label>
-            </div>
-
             <button
               type="submit"
               disabled={submitting || !canSubmit}
-              data-testid="signup-submit"
+              data-testid="reset-submit"
               className="w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {submitting ? "Creating..." : "Create account"}
+              {submitting ? "Saving..." : "Set new password & log in"}
               {!submitting && <ArrowRight className="w-4 h-4" />}
             </button>
 
             <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest font-bold text-ink/40">
               <ShieldCheck className="w-3 h-3" />
-              Passwords are bcrypt-hashed · never stored in plain text
+              One-time use link · valid for 60 minutes
             </div>
           </form>
-
-          <p className="mt-8 text-sm text-ink/55 text-center">
-            Have an account?{" "}
-            <Link
-              to={`/login${location.search || ""}`}
-              data-testid="signup-to-login"
-              className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold"
-            >
-              Log in
-            </Link>
-          </p>
         </div>
       </div>
     </div>

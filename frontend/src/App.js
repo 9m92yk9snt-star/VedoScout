@@ -11,6 +11,8 @@ import Landing from "@/pages/Landing";
 import LandingMinimal from "@/pages/LandingMinimal";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import UploadPage from "@/pages/UploadPage";
 import ReportPage from "@/pages/ReportPage";
 import AdminPage from "@/pages/AdminPage";
@@ -77,6 +79,8 @@ function AnimatedRoutes() {
         <Route path="/" element={<PageTransition><LandingRoute /></PageTransition>} />
         <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
         <Route path="/signup" element={<PageTransition><Signup /></PageTransition>} />
+        <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
+        <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/upload" element={<PageTransition><RequireAuth><UploadPage /></RequireAuth></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><RequireAuth><DashboardPage /></RequireAuth></PageTransition>} />
         <Route path="/trajectory/:id" element={<PageTransition><RequireAuth><TrajectoryPage /></RequireAuth></PageTransition>} />

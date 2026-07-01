@@ -26,6 +26,34 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 110 — Auth security hardening (Feb 28 2026)**:
+  - **Password strength** enforced on both server (`validate_password_strength` in `server.py`) and client (live strength meter with 5 rules + colored gradient):
+    - Min 10 chars, requires lowercase + uppercase + digit + symbol, max 128 chars.
+    - Rejects common junk passwords (`password123`, `qwerty1234`, etc.).
+    - Client shows: 5-segment strength bar (very weak → excellent), live checklist with green ticks, live label.
+  - **Confirm password** field on Signup + Reset — green border + "Passwords match." when identical, red border + inline error otherwise.
+  - **Show/hide password** toggle (eye icon) on Signup, Login, Reset — respects visibility across both password + confirm fields.
+  - **Login rate limiting**: 5 failed attempts per (ip, email) combo → 15-minute lockout with clear message ("Too many failed login attempts. Try again in X minutes."). Successful login clears the counter; reset-password also clears any lockout for that email.
+  - **Signup rate limiting**: max 5 signups per IP per hour with TTL cleanup (`signup_attempts` Mongo collection).
+  - **Honeypot** hidden `website` field on Signup — bots that auto-fill every input get soft-rejected (looks identical to normal error). Not tabbable, `autocomplete="off"`, absolutely positioned off-screen.
+  - **Forgot password flow** (`/forgot-password` + `/reset-password`):
+    - `POST /api/auth/forgot-password` → generates 32-byte URL-safe token, stores in `password_reset_tokens` collection with 60-min TTL index (Mongo auto-deletes expired tokens), emails reset link via Gmail SMTP using the branded chrome (`render_bulk_email`).
+    - Always returns generic 200 — no email enumeration.
+    - `POST /api/auth/reset-password` → verifies token isn't used/expired, rotates password hash, marks token as `used`, clears any brute-force lockout, and returns a fresh access_token so the user is logged in automatically.
+    - New pages `ForgotPassword.jsx` + `ResetPassword.jsx` with same strength meter + confirm field as signup.
+    - Login page now shows "Forgot?" link next to password label.
+  - **Mongo indexes** created on startup: `users.email` (unique), `password_reset_tokens.expires_at` (TTL 0s), `password_reset_tokens.token` (unique), `signup_attempts.created_at` (TTL 3600s), `login_attempts.key` (unique).
+  - **Verified via curl**:
+    - Weak signup → clear detail error listing missing rules.
+    - Strong signup → token returned.
+    - Honeypot filled → soft-reject.
+    - 6× wrong login → 5th accepted the credentials attempt, 6th responded "Too many failed login attempts. Try again in 14 minutes."
+    - Forgot-password (real + unknown email) → both return identical generic 200.
+    - Reset with weak password → validation error.
+    - Reset with strong password → token returned, user auto-logged-in.
+    - Token reuse → "This reset link is no longer valid."
+    - Login with new password → OK.
+
 - ✅ **🆕 Session 109 — Premium cinematic /scouts landing page redesign (Feb 28 2026)**:
   - **4 new Nano Banana images generated** (`generate_scouts_landing.py`): scouts-hero-tunnel (silhouettes walking into stadium tunnel with god-rays), scouts-boardroom (top-down war-room table with notebook + tactical printouts + passports), scouts-data-tablet (dashboard on oak wood), scouts-signing-desk (hands over contract with brass fountain pen).
   - **Complete visual overhaul** of `/scouts` (`ScoutsLandingPage.jsx` rewritten):

@@ -17,6 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 
 import bcrypt
+import secrets
 import jwt as pyjwt
 from dotenv import load_dotenv
 import httpx
@@ -1965,13 +1966,25 @@ def ensure_share_card(report_doc: dict) -> Optional[str]:
 
 class UserSignup(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
-    full_name: str
+    password: str = Field(min_length=10, max_length=128)
+    full_name: str = Field(min_length=1, max_length=80)
+    # Honeypot — bots fill hidden form fields, humans leave it empty. Blocks signup
+    # if any value is submitted. Frontend renders this as a visually-hidden input.
+    website: Optional[str] = Field(default="", max_length=200)
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=16, max_length=128)
+    new_password: str = Field(min_length=10, max_length=128)
 
 
 class UserPublic(BaseModel):
@@ -2094,6 +2107,111 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except Exception:
         return False
+
+
+# ── SECURITY HELPERS (added Feb 2026) ──────────────────────────────────
+
+_PASSWORD_MIN_LENGTH = 10
+_LOGIN_MAX_ATTEMPTS = 5           # per (ip, email) combo
+_LOGIN_LOCKOUT_MINUTES = 15
+_SIGNUP_MAX_PER_IP_PER_HOUR = 5
+_RESET_TOKEN_TTL_MINUTES = 60
+
+
+def validate_password_strength(pw: str) -> None:
+    """Enforce a strong-enough password. Raises HTTPException 400 with a clear
+    message so the frontend can show it verbatim. Rules mirror what the client-
+    side validator shows so the two never diverge (defence in depth)."""
+    if not pw or len(pw) < _PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {_PASSWORD_MIN_LENGTH} characters.",
+        )
+    if len(pw) > 128:
+        raise HTTPException(status_code=400, detail="Password is too long (max 128 characters).")
+    checks = [
+        (any(c.islower() for c in pw), "a lowercase letter"),
+        (any(c.isupper() for c in pw), "an uppercase letter"),
+        (any(c.isdigit() for c in pw), "a digit"),
+        (any(not c.isalnum() for c in pw), "a symbol (e.g. ! ? # $ %)"),
+    ]
+    missing = [label for ok, label in checks if not ok]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must include " + ", ".join(missing) + ".",
+        )
+    # Optional: reject the most common junk passwords outright.
+    if pw.lower() in {
+        "password1!", "password123", "qwerty1234", "welcome123!", "abcd1234!",
+        "footballer1!", "letmein123!", "scoutmeplay1!",
+    }:
+        raise HTTPException(status_code=400, detail="That password is too common. Try a unique passphrase.")
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP behind Kubernetes ingress / Cloudflare."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip() or "unknown"
+    return (request.client.host if request.client else "unknown") or "unknown"
+
+
+async def _login_lockout_check(ip: str, email: str) -> None:
+    """Reject login if too many failed attempts. Uses a Mongo counter keyed on
+    (ip:email) with a 15-minute rolling window."""
+    key = f"{ip}:{email.lower()}"
+    doc = await db.login_attempts.find_one({"key": key}, {"_id": 0})
+    if not doc:
+        return
+    if doc.get("locked_until"):
+        try:
+            locked_until = datetime.fromisoformat(str(doc["locked_until"]).replace("Z", "+00:00"))
+            if locked_until > datetime.now(timezone.utc):
+                mins = max(1, int((locked_until - datetime.now(timezone.utc)).total_seconds() / 60))
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Too many failed login attempts. Try again in {mins} minute{'s' if mins != 1 else ''}.",
+                )
+        except (TypeError, ValueError):
+            pass
+
+
+async def _login_attempt_record_failure(ip: str, email: str) -> None:
+    key = f"{ip}:{email.lower()}"
+    doc = await db.login_attempts.find_one({"key": key}, {"_id": 0}) or {}
+    count = int(doc.get("count") or 0) + 1
+    updates = {"count": count, "key": key, "last_at": now_iso()}
+    if count >= _LOGIN_MAX_ATTEMPTS:
+        updates["locked_until"] = (
+            datetime.now(timezone.utc) + timedelta(minutes=_LOGIN_LOCKOUT_MINUTES)
+        ).isoformat()
+    await db.login_attempts.update_one({"key": key}, {"$set": updates}, upsert=True)
+
+
+async def _login_attempt_clear(ip: str, email: str) -> None:
+    key = f"{ip}:{email.lower()}"
+    await db.login_attempts.delete_one({"key": key})
+
+
+async def _signup_rate_limit_check(ip: str) -> None:
+    """Reject if more than N signups from the same IP in the last hour."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    recent = await db.signup_attempts.count_documents({"ip": ip, "created_at": {"$gte": since}})
+    if recent >= _SIGNUP_MAX_PER_IP_PER_HOUR:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many signups from this network. Please try again later.",
+        )
+
+
+async def _signup_rate_limit_record(ip: str) -> None:
+    await db.signup_attempts.insert_one({"ip": ip, "created_at": now_iso()})
+
+
+def _generate_reset_token() -> str:
+    """32-byte URL-safe token (256 bits) — cryptographically random."""
+    return secrets.token_urlsafe(32)
 
 
 def create_token(user_id: str, email: str, role: str) -> str:
@@ -3083,7 +3201,18 @@ async def root():
 # ============== ROUTES: AUTH ==============
 
 @api_router.post("/auth/signup", response_model=TokenResponse)
-async def signup(payload: UserSignup, background_tasks: BackgroundTasks):
+async def signup(payload: UserSignup, request: Request, background_tasks: BackgroundTasks):
+    # Honeypot — the visible signup form leaves the hidden "website" field empty.
+    # Bots that fill every field trigger this branch and get a soft-reject that
+    # looks identical to a real success in the network tab.
+    if (payload.website or "").strip():
+        logger.info("Honeypot triggered on /auth/signup — silently rejecting bot signup")
+        raise HTTPException(status_code=400, detail="Signup could not be completed. Please try again.")
+
+    ip = _client_ip(request)
+    await _signup_rate_limit_check(ip)
+    validate_password_strength(payload.password)
+
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -3092,11 +3221,12 @@ async def signup(payload: UserSignup, background_tasks: BackgroundTasks):
         "id": user_id,
         "email": payload.email.lower(),
         "password_hash": hash_password(payload.password),
-        "full_name": payload.full_name,
+        "full_name": payload.full_name.strip(),
         "role": "user",
         "created_at": now_iso(),
     }
     await db.users.insert_one(user_doc)
+    await _signup_rate_limit_record(ip)
     # Fire-and-forget welcome email — never blocks the signup response.
     # Silently no-ops when SMTP env vars aren't configured (dev / preview).
     try:
@@ -3118,13 +3248,130 @@ async def signup(payload: UserSignup, background_tasks: BackgroundTasks):
 
 
 @api_router.post("/auth/login", response_model=TokenResponse)
-async def login(payload: UserLogin):
-    user = await db.users.find_one({"email": payload.email.lower()})
+async def login(payload: UserLogin, request: Request):
+    ip = _client_ip(request)
+    email = payload.email.lower()
+    await _login_lockout_check(ip, email)
+    user = await db.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user["password_hash"]):
+        await _login_attempt_record_failure(ip, email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    await _login_attempt_clear(ip, email)
     token = create_token(user["id"], user["email"], user["role"])
     return TokenResponse(
         access_token=token,
+        user=UserPublic(
+            id=user["id"],
+            email=user["email"],
+            full_name=user["full_name"],
+            role=user["role"],
+            created_at=user["created_at"],
+        ),
+    )
+
+
+# ── Password reset flow ────────────────────────────────────────────────
+# Two-step: /auth/forgot-password creates a one-time-use token and emails
+# the reset link. /auth/reset-password consumes the token and rotates the
+# password hash. We ALWAYS return 200 on /forgot-password (even when the
+# email is unknown) to avoid leaking which addresses are registered.
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, request: Request, background_tasks: BackgroundTasks):
+    email = payload.email.lower().strip()
+    # Rate-limit password-reset requests by IP too — same window as signup.
+    ip = _client_ip(request)
+    try:
+        await _signup_rate_limit_check(ip)
+    except HTTPException:
+        # Silently swallow to avoid confirming address enumeration.
+        return {"ok": True, "message": "If an account exists for that email, you'll receive a reset link shortly."}
+
+    user = await db.users.find_one({"email": email}, {"_id": 0, "id": 1, "email": 1, "full_name": 1})
+    if user:
+        token = _generate_reset_token()
+        expires_at = (datetime.now(timezone.utc) + timedelta(minutes=_RESET_TOKEN_TTL_MINUTES))
+        await db.password_reset_tokens.insert_one({
+            "token": token,
+            "user_id": user["id"],
+            "email": user["email"],
+            "expires_at": expires_at,  # datetime object for TTL index compatibility
+            "used": False,
+            "created_at": now_iso(),
+            "ip": ip,
+        })
+        # Build reset URL against the frontend origin.
+        frontend_origin = os.environ.get("PUBLIC_FRONTEND_URL") or str(request.url).split("/api/")[0]
+        reset_url = f"{frontend_origin}/reset-password?token={token}"
+        try:
+            from email_templates import render_bulk_email  # reuse the branded chrome
+            body_html = (
+                f"<p>We received a request to reset the password for your ScoutMePlay account.</p>"
+                f"<p>Click the button below within the next {_RESET_TOKEN_TTL_MINUTES} minutes to choose a new password:</p>"
+                f"<p style='margin:24px 0;'><a href='{reset_url}' "
+                f"style='background:#1F4F2F;color:#fff;padding:14px 24px;font-weight:800;"
+                f"letter-spacing:2px;text-transform:uppercase;text-decoration:none;font-size:13px;'>Reset my password</a></p>"
+                f"<p style='font-size:12px;color:#666;'>If the button doesn't work, copy this link:<br/>"
+                f"<span style='word-break:break-all;color:#1F4F2F;'>{reset_url}</span></p>"
+                f"<p>If you didn't request this, you can safely ignore this email — your password won't change.</p>"
+            )
+            html, text, subject = render_bulk_email(
+                subject="Reset your ScoutMePlay password",
+                body_html=body_html,
+                preheader="Click within 60 minutes to reset your password",
+            )
+            background_tasks.add_task(send_email, user["email"], subject, html, text)
+        except Exception as exc:
+            logger.warning("Could not queue reset email for %s: %s", email, exc)
+    else:
+        # No user with that email — still log the attempt so brute-force scans
+        # against valid emails don't slip past without being counted.
+        logger.info("Password-reset requested for unknown email %s (ip=%s)", email, ip)
+
+    return {"ok": True, "message": "If an account exists for that email, you'll receive a reset link shortly."}
+
+
+@api_router.post("/auth/reset-password", response_model=TokenResponse)
+async def reset_password(payload: ResetPasswordRequest, request: Request):
+    validate_password_strength(payload.new_password)
+
+    token_doc = await db.password_reset_tokens.find_one({"token": payload.token}, {"_id": 0})
+    if not token_doc or token_doc.get("used"):
+        raise HTTPException(status_code=400, detail="This reset link is no longer valid. Request a new one.")
+
+    expires_at = token_doc.get("expires_at")
+    if isinstance(expires_at, str):
+        try:
+            expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+        except ValueError:
+            expires_at = None
+    if isinstance(expires_at, datetime) and expires_at.tzinfo is None:
+        # Mongo hands datetimes back naive-UTC; make them explicit so the
+        # comparison against `datetime.now(tz=UTC)` doesn't blow up.
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if not expires_at or expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="This reset link has expired. Request a new one.")
+
+    user = await db.users.find_one({"id": token_doc["user_id"]}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=400, detail="Account no longer exists.")
+
+    # Rotate the password hash and consume the token.
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password), "password_updated_at": now_iso()}},
+    )
+    await db.password_reset_tokens.update_one(
+        {"token": payload.token},
+        {"$set": {"used": True, "used_at": now_iso()}},
+    )
+    # Clear any brute-force lockout for this user.
+    await db.login_attempts.delete_many({"key": {"$regex": f":{user['email']}$"}})
+
+    # Log the user in immediately (matches "reset → dashboard" UX expectation).
+    access_token = create_token(user["id"], user["email"], user["role"])
+    return TokenResponse(
+        access_token=access_token,
         user=UserPublic(
             id=user["id"],
             email=user["email"],
@@ -9290,6 +9537,24 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
+    # ── Security indexes (idempotent, safe to call every boot) ──
+    try:
+        # Unique email index — belt+braces for our email-uniqueness check.
+        await db.users.create_index("email", unique=True, background=True)
+        # TTL on password reset tokens → Mongo auto-deletes when expires_at passes.
+        await db.password_reset_tokens.create_index(
+            "expires_at", expireAfterSeconds=0, background=True
+        )
+        await db.password_reset_tokens.create_index("token", unique=True, background=True)
+        # TTL cleanup for signup-rate-limit records (1 hour window).
+        await db.signup_attempts.create_index(
+            "created_at", expireAfterSeconds=3600, background=True
+        )
+        # Login-attempts records live at most 24h (way past any lockout window).
+        await db.login_attempts.create_index("key", unique=True, background=True)
+    except Exception:
+        logger.exception("Security index creation failed (non-fatal)")
+
     # Ensure admin user exists (idempotent)
     existing = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
     if not existing:
