@@ -110,7 +110,6 @@ export default function LandingMinimal() {
       <HeroSection onPrimaryCta={handlePrimaryCta} isLoggedIn={!!user} />
       <TrustStrip />
       <HowItWorks />
-      <DemoVideoCarousel />
       <WhatsInside />
       <ImageStrip />
       <div id="pricing-section" data-testid="pricing-section">
@@ -118,6 +117,7 @@ export default function LandingMinimal() {
       </div>
       <SocialProof />
       <FAQSection faqItems={faqItems} />
+      <DemoVideoCarousel />
       <FinalCta isLoggedIn={!!user} />
       <SiteFooter />
     </div>
