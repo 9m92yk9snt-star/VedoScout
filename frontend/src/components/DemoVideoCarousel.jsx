@@ -85,7 +85,9 @@ export default function DemoVideoCarousel() {
               See how<br /><span className="text-volt">it actually works.</span>
             </h2>
             <p className="mt-3 text-white/60 max-w-md leading-relaxed">
-              Short walkthroughs recorded by our team. Real screen, real report.
+              {videos.length === 0
+                ? "First iPhone workflow demos landing here soon."
+                : "Short walkthroughs recorded by our team. Real screen, real report."}
             </p>
           </div>
 
