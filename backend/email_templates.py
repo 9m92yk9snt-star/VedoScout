@@ -200,3 +200,60 @@ def render_bulk_email(subject: str, body_html: str, preheader: str = "") -> tupl
     """
     plaintext = f"{subject}\n\n(Please view this email in an HTML-capable client for the full formatting.)"
     return _wrap_html(inner, preheader or subject), plaintext, subject
+
+
+# ── ADMIN SALE NOTIFICATION ───────────────────────────────────────────────
+def render_admin_sale_notification(
+    product_name: str,
+    amount_cents: int,
+    currency: str,
+    buyer_email: str,
+    buyer_name: Optional[str] = None,
+    extra_details: Optional[str] = None,
+    session_id: Optional[str] = None,
+) -> tuple[str, str, str]:
+    """Realtime sales feed to the ScoutMePlay operator inbox.
+    Fires from the Stripe webhook right after every successful payment.
+    """
+    site = _site_url()
+    amount = amount_cents / 100.0
+    amount_str = f"${amount:.2f}" if (currency or "USD").upper() == "USD" else f"{amount:.2f} {(currency or 'USD').upper()}"
+    display_buyer = (buyer_name or "").strip() or buyer_email
+    short_product = product_name.replace(" Subscription", "").replace(" Purchase", "")
+    subject = f"💸 New sale — {amount_str} · {short_product} · {display_buyer}"
+    preheader = f"{amount_str} from {display_buyer} — {product_name}"
+    details_html = f'<div style="margin-top:4px; font-size:12px; color:#6B6B6B;">{extra_details}</div>' if extra_details else ""
+    session_html = f'<div style="margin-top:14px; font-size:10.5px; color:#6B6B6B; letter-spacing:1px; text-transform:uppercase; font-weight:700;">Stripe session</div><div style="margin-top:2px; font-size:12px; color:#0A0F0D; font-family:monospace; word-break:break-all;">{session_id}</div>' if session_id else ""
+    inner = f"""
+    <span style="display:inline-block; padding:4px 10px; background:#CCFF00; color:#0A0F0D; font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:800;">
+      New sale
+    </span>
+    <h1 style="margin:14px 0 8px 0; font-size:32px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.05;">
+      {amount_str}
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <table role="presentation" cellspacing="0" cellpadding="0" width="100%" style="background:#F5F1E8; border:1px solid #D4CFC1; margin:0 0 22px 0;">
+      <tr><td style="padding:16px 18px;">
+        <div style="font-size:9.5px; letter-spacing:2px; text-transform:uppercase; font-weight:800; color:#1F4F2F;">Product</div>
+        <div style="margin-top:6px; font-size:16px; font-weight:800; color:#0A0F0D;">{product_name}</div>
+        {details_html}
+        <div style="margin-top:16px; font-size:9.5px; letter-spacing:2px; text-transform:uppercase; font-weight:800; color:#1F4F2F;">Buyer</div>
+        <div style="margin-top:4px; font-size:14px; font-weight:700; color:#0A0F0D;">{display_buyer}</div>
+        <div style="margin-top:2px; font-size:12px; color:#6B6B6B;">{buyer_email}</div>
+        {session_html}
+      </td></tr>
+    </table>
+    {_btn("Open admin dashboard", f"{site}/admin")}
+    <p style="margin:22px 0 0 0; font-size:11px; color:#6B6B6B; line-height:1.6;">
+      Auto-generated when Stripe fires <code>checkout.session.completed</code>. Payments feed lives at <a href="{site}/admin" style="color:#1F4F2F; font-weight:700;">/admin → Payments</a>.
+    </p>
+    """
+    plaintext = (
+        f"NEW SALE — {amount_str}\n"
+        f"Product: {product_name}\n"
+        f"{(extra_details + chr(10)) if extra_details else ''}"
+        f"Buyer: {display_buyer} <{buyer_email}>\n"
+        f"{('Stripe session: ' + session_id + chr(10)) if session_id else ''}"
+        f"\nAdmin: {site}/admin"
+    )
+    return _wrap_html(inner, preheader), plaintext, subject

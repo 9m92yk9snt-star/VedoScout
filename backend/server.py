@@ -29,6 +29,7 @@ from email_templates import (
     render_welcome_email,
     render_purchase_confirmation,
     render_bulk_email,
+    render_admin_sale_notification,
 )
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -7776,6 +7777,32 @@ async def stripe_webhook_embedded(request: Request):
                 )
                 # Use asyncio.create_task since we're already inside an async webhook
                 asyncio.create_task(send_email_async(user_email, subject, html, text))
+
+                # ── Realtime admin sales-notification ──
+                # Fires to the ScoutMePlay operator inbox on EVERY paid checkout
+                # (subscription / single-report / extra-report / progress-pass).
+                # Uses SMTP_FROM_EMAIL as the recipient (defaults to scoutmeplay@gmail.com).
+                try:
+                    admin_recipient = (
+                        os.environ.get("ADMIN_SALES_EMAIL")
+                        or os.environ.get("SMTP_FROM_EMAIL")
+                        or os.environ.get("SMTP_USERNAME")
+                    )
+                    if admin_recipient:
+                        adm_html, adm_text, adm_subject = render_admin_sale_notification(
+                            product_name=product_name,
+                            amount_cents=amount_cents,
+                            currency=currency,
+                            buyer_email=user_email,
+                            buyer_name=user_name,
+                            extra_details=extra_details,
+                            session_id=session_id,
+                        )
+                        asyncio.create_task(
+                            send_email_async(admin_recipient, adm_subject, adm_html, adm_text)
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Admin sale-notification email dispatch failed: %s", exc)
         except Exception as exc:  # noqa: BLE001 — never block webhook on email failure
             logger.warning("Purchase-confirmation email dispatch failed: %s", exc)
     elif event["type"] in (

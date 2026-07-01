@@ -26,6 +26,14 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 106 — Realtime admin sale-notification email (Feb 28 2026)**:
+  - After every successful Stripe `checkout.session.completed` (subscription, single-report, extra-report, progress-pass), the operator now receives an instant email at `SMTP_FROM_EMAIL` (falls back to `SMTP_USERNAME`, override via `ADMIN_SALES_EMAIL` env var).
+  - Subject line: `💸 New sale — $99.00 · Premium · Lukas A.` (dynamic amount + short product + buyer).
+  - Body shows amount hero, product+extra-detail row, buyer name/email, Stripe session id + "Open admin dashboard" CTA to `/admin`.
+  - New template `render_admin_sale_notification()` in `email_templates.py` using the shared brand chrome (volt-lime pill "NEW SALE" instead of green "PAYMENT RECEIVED").
+  - Wired into `server.py` webhook right after the buyer's purchase-confirmation dispatch — non-blocking, wrapped in try/except so a mail failure never breaks the webhook.
+  - Verified: Python REPL invocation → SMTP delivered subject `💸 New sale — $99.00 · Premium · Lukas A.` to `scoutmeplay@gmail.com`.
+
 - ✅ **🆕 Session 105 — Gmail SMTP ACTIVATED (Feb 28 2026)**:
   - User provided the 16-char Gmail App Password for `scoutmeplay@gmail.com`.
   - Added `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USERNAME=scoutmeplay@gmail.com`, `SMTP_PASSWORD=****`, `SMTP_FROM_NAME=ScoutMePlay`, `SMTP_FROM_EMAIL=scoutmeplay@gmail.com` to `/app/backend/.env` and restarted backend via supervisor.
