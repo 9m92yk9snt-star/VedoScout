@@ -26,7 +26,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 112 — Admin demo-video delete bug + landing carousel shrink (Mar 01 2026)**:
+- ✅ **🆕 Session 113 — Landing carousel polish + HEVC/H.264 fix (Mar 01 2026)**:
+  - **Bug: Banger Kick video played audio but no image (Chrome/Firefox)**. Root cause: iPhone-uploaded MP4 was HEVC codec + `yuv420p10le` (10-bit HDR) — only Safari can decode this. Fix in `server.py` `admin_upload_demo_video_file`: every upload now runs through `ffmpeg -c:v libx264 -pix_fmt yuv420p -crf 24` + auto-generates a poster JPG from second 1. All 3 existing DB videos re-encoded server-side and DB updated to point at `.web.mp4` URLs (also freed ~110 MB of disk).
+  - **Bug: h2 title too small**. Restored to `text-2xl md:text-3xl` (was `text-lg md:text-xl` after previous shrink) — now visually proportional with the other landing sections.
+  - **Bug: frame around video had empty white space + film-strip perforations looked cheap**. Replaced `FilmFrame` with new `PremiumFrame`: clean rounded-[10px] bg-ink bezel + inner volt/15 ring + 4 volt-green L-shaped corner ticks + hover-lift `-translate-y-1` + soft forest-green glow on hover. Video now uses `aspect-[9/16]` + `object-cover` matching iPhone portrait exactly — zero side whitespace. Caption strip below is dark gradient with white text + volt-green top border.
+  - **Larger volt play button** (12→68px) with `shadow-[0_10px_30px_-4px_rgba(204,255,0,0.55)]` + `ring-4 ring-volt/25` for a premium interaction cue.
+  - **ffmpeg reinstalled** — recurring container-drop issue (9th time). `apt-get install ffmpeg` restored it.
+  - Verified via `testing_agent_v3_fork` iteration_45 — 100% backend (4/4 pytest + file-level ffprobe + DB verification), 100% frontend for title + frame. Video playback tested at file level (Playwright headless Chromium lacks H.264 codec — not a product bug; real Chrome/FF/Safari decode fine).
+
+- ✅ **Session 112 — Admin demo-video delete bug + landing carousel shrink (Mar 01 2026)**:
   - **Bug fixed**: Admin `Delete` button on `/admin → Demo Videos` was silently doing nothing because `window.confirm()` is blocked inside the Emergent preview iframe. Replaced with a two-step inline confirm UX in `DemoVideosAdmin.jsx`: first click flips the button to red-bg + `animate-pulse` with label `Click to confirm`, second click within 4 s actually calls `DELETE /api/admin/demo-videos/{id}`. Auto-cancels after 4 s via `useEffect` + `setTimeout` cleanup.
   - **Landing carousel shrunk** in `DemoVideoCarousel.jsx` per user request ("stadigvæk for stort"): section padding `py-14 md:py-16` → `py-8 md:py-10`, halo bokeh 720px → 440px (opacity 60→50), headline `text-2xl md:text-3xl` → `text-lg md:text-xl`, prev/next arrows 36px → 32px, film-frame cards `md:w-[340px]` → `md:w-[240px]`, video area `max-h-[420px]` → `max-h-[300px]`, chalk-arrow decoration shrunk 380×140 → 260×100. Total section height ~555px on desktop (measured).
   - Verified end-to-end via `testing_agent_v3_fork` iteration_44: 100% backend (4/4 pytest — `test_demo_videos_delete.py` new) and 100% frontend (3/3 UI tests: sizing + 2-click delete + auto-cancel).
