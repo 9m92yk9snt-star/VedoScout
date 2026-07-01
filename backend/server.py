@@ -24,6 +24,7 @@ import httpx
 
 # Local modules
 import r2_storage
+from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, status, BackgroundTasks
 
 # ScoutMePlay email service — Gmail SMTP + templates. Modules silently no-op
@@ -1727,7 +1728,7 @@ def _extract_video_frame(video_path: Path, seconds: int, out_path: Path) -> bool
         import subprocess
         result = subprocess.run(
             [
-                "ffmpeg", "-y", "-ss", str(max(0, int(seconds))),
+                FFMPEG_BIN, "-y", "-ss", str(max(0, int(seconds))),
                 "-i", str(video_path),
                 "-frames:v", "1", "-q:v", "3",
                 "-vf", "scale=640:-1",
@@ -2669,7 +2670,15 @@ async def call_gemini_with_video(
     file_contents.append(video_file)
 
     user_message = UserMessage(text=prompt, file_contents=file_contents)
-    response = await chat.send_message(user_message)
+    # Hard wall-clock timeout to prevent the analysis pipeline from hanging
+    # indefinitely if Gemini stalls (previously caused 20-min "stuck at step 2"
+    # reports on production). 8 min gives generous headroom for a 1-min video
+    # while still failing fast enough to surface a "try again" state.
+    try:
+        response = await asyncio.wait_for(chat.send_message(user_message), timeout=480)
+    except asyncio.TimeoutError:
+        logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
+        raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
     response_text = response if isinstance(response, str) else str(response)
     try:
         return extract_json(response_text)
@@ -3097,7 +3106,7 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
     try:
         result = subprocess.run(
             [
-                "ffmpeg", "-y", "-i", str(src_path),
+                FFMPEG_BIN, "-y", "-i", str(src_path),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
                 "-pix_fmt", "yuv420p",
                 "-vf", "scale='min(1280,iw)':-2",
@@ -3117,23 +3126,13 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
 
 
 def get_video_duration_seconds(path: Path) -> float:
-    """Return video duration in seconds (0 on failure)."""
-    import subprocess
-    try:
-        result = subprocess.run(
-            [
-                "ffprobe", "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                str(path),
-            ],
-            capture_output=True, timeout=15, text=True,
-        )
-        if result.returncode == 0:
-            return float(result.stdout.strip() or 0)
-    except Exception as e:
-        logger.warning(f"ffprobe failed: {e}")
-    return 0.0
+    """Return video duration in seconds (0 on failure).
+
+    Uses the resilient ffprobe → opencv fallback chain in media_binaries so
+    duration extraction survives environments where ffprobe isn't installed
+    (e.g. the Emergent Kubernetes base image).
+    """
+    return get_duration_seconds(path)
 
 
 def make_preview_clip(video_path: Path, marker_seconds: float, window_seconds: int = 15) -> Path:
@@ -3157,7 +3156,7 @@ def make_preview_clip(video_path: Path, marker_seconds: float, window_seconds: i
 
     out_path = video_path.with_name(video_path.stem + ".preview.mp4")
     cmd = [
-        "ffmpeg", "-y",
+        FFMPEG_BIN, "-y",
         "-ss", f"{start:.2f}",
         "-i", str(video_path),
         "-t", f"{actual_window:.2f}",
@@ -3184,7 +3183,7 @@ def generate_poster(video_path: Path) -> Optional[Path]:
     try:
         result = subprocess.run(
             [
-                "ffmpeg", "-y", "-i", str(video_path),
+                FFMPEG_BIN, "-y", "-i", str(video_path),
                 "-ss", "00:00:02", "-vframes", "1",
                 "-vf", "scale='min(1280,iw)':-2",
                 "-q:v", "4",
@@ -3892,7 +3891,7 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
         import subprocess
         r = subprocess.run(
             [
-                "ffmpeg", "-y", "-i", str(fpath),
+                FFMPEG_BIN, "-y", "-i", str(fpath),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
                 "-pix_fmt", "yuv420p",
                 "-vf", "scale='min(1280,iw)':-2",
@@ -3911,7 +3910,7 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
             try:
                 pr = subprocess.run(
                     [
-                        "ffmpeg", "-y", "-ss", "1", "-i", str(web_path),
+                        FFMPEG_BIN, "-y", "-ss", "1", "-i", str(web_path),
                         "-vframes", "1", "-q:v", "3",
                         "-loglevel", "error",
                         str(poster_path),

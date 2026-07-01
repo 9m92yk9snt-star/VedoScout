@@ -31,6 +31,13 @@ from typing import Optional
 import cv2
 import numpy as np
 
+# Resilient ffmpeg path (bundled via imageio-ffmpeg when system binary is
+# missing — Emergent's Kubernetes base image doesn't ship ffmpeg).
+try:
+    from media_binaries import FFMPEG_BIN
+except Exception:  # pragma: no cover — very defensive
+    FFMPEG_BIN = "ffmpeg"
+
 logger = logging.getLogger(__name__)
 
 
@@ -88,7 +95,7 @@ def extract_frame_at(video_path: str | Path, t_seconds: float, out_path: str | P
     try:
         subprocess.run(
             [
-                "ffmpeg", "-y", "-loglevel", "error",
+                FFMPEG_BIN, "-y", "-loglevel", "error",
                 "-ss", f"{max(0.0, float(t_seconds)):.3f}",
                 "-i", str(video_path),
                 "-frames:v", "1",
@@ -291,7 +298,7 @@ def extract_audio_events(
         # Downmix to mono 16 kHz — small file, fast to scan.
         subprocess.run(
             [
-                "ffmpeg", "-y", "-loglevel", "error",
+                FFMPEG_BIN, "-y", "-loglevel", "error",
                 "-i", str(video_path),
                 "-ac", "1", "-ar", "16000",
                 "-vn", str(wav_path),

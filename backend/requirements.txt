@@ -133,3 +133,4 @@ yarl==1.24.2
 yt-dlp==2026.6.9
 zipp==4.1.0
 curl_cffi==0.15.0
+imageio-ffmpeg==0.6.0
