@@ -11,6 +11,7 @@ import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 import FullFrameWithBoxCanvas from "@/components/FullFrameWithBoxCanvas";
 import { FootballIcon, MiniPitch, JerseyChip, PitchLineDivider } from "@/components/FootballAccents";
 import { PillarIcon, AnimatedScore, SkillMeter, MomentCard, PitchDecoration } from "@/components/report/FootballReport";
+import PerformanceRadarHero from "@/components/report/PerformanceRadarHero";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -2668,98 +2669,12 @@ export default function ReportPage() {
                   {/* Player DNA — unique attribute fingerprint */}
                   <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
 
-                  {/* Performance Radar — 4-pillar visualisation with tier reference rings */}
+                  {/* Performance Radar — cinematic dark centrepiece (custom SVG + Nano Banana bg) */}
                   {radarData && (
-                    <div data-testid="performance-radar-card" className="bg-surface border border-gray-border p-6 md:p-8">
-                      <div className="flex items-start justify-between gap-4 flex-wrap mb-2">
-                        <div>
-                          <div className="text-[10px] uppercase tracking-[0.28em] font-bold text-forest mb-2">His game at a glance</div>
-                          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-tight">
-                            Performance radar
-                          </h3>
-                          <p className="mt-2 text-sm text-ink/65 max-w-md">
-                            One shape per area &mdash; Technical, Tactical, Physical, Mental. The further the shape reaches an axis, the stronger the player is in that area.
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-1 items-start">
-                          <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/55">Reference rings</div>
-                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
-                            <span className="w-3 h-1 bg-stone-400" /> <span className="text-ink/70">Standard 4</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
-                            <span className="w-3 h-1 bg-amber-700" /> <span className="text-ink/70">Strong 6</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
-                            <span className="w-3 h-1 bg-forest-pop" /> <span className="text-ink/70">Pro 8</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.14em] font-bold">
-                            <span className="w-3 h-1 bg-forest" /> <span className="text-ink/70">Elite 9.5</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-4 h-[420px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart data={radarData} margin={{ top: 24, right: 56, bottom: 24, left: 56 }} outerRadius="78%">
-                            <PolarGrid stroke="#D4CFC1" strokeDasharray="2 3" />
-                            <PolarAngleAxis
-                              dataKey="axis"
-                              tick={{ fill: "#0A0F0D", fontSize: 13, fontWeight: 800, letterSpacing: 1 }}
-                            />
-                            <PolarRadiusAxis
-                              angle={90}
-                              domain={[0, 10]}
-                              tickCount={6}
-                              tick={{ fill: "#9CA3AF", fontSize: 10 }}
-                              axisLine={false}
-                              tickFormatter={(v) => (v === 0 ? "" : String(v))}
-                            />
-                            {/* Tier reference rings — drawn as faint radars behind the player shape */}
-                            <Radar
-                              name="Elite"
-                              dataKey={() => 9.5}
-                              data={radarData}
-                              stroke="#1F4F2F"
-                              strokeWidth={1}
-                              strokeDasharray="3 3"
-                              fill="transparent"
-                              isAnimationActive={false}
-                            />
-                            <Radar
-                              name="Pro"
-                              dataKey={() => 8}
-                              data={radarData}
-                              stroke="#2D6B3D"
-                              strokeWidth={1}
-                              strokeDasharray="3 3"
-                              fill="transparent"
-                              isAnimationActive={false}
-                            />
-                            <Radar
-                              name="Strong"
-                              dataKey={() => 6}
-                              data={radarData}
-                              stroke="#B45309"
-                              strokeWidth={1}
-                              strokeDasharray="3 3"
-                              fill="transparent"
-                              isAnimationActive={false}
-                            />
-                            {/* Player shape */}
-                            <Radar
-                              name="Player"
-                              dataKey="score"
-                              stroke="#1F4F2F"
-                              strokeWidth={2.5}
-                              fill="#1F4F2F"
-                              fillOpacity={0.28}
-                            />
-                          </RadarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <p className="mt-2 text-xs text-ink/50 italic">
-                        Dashed rings = reference levels for Strong Club, Pro Academy, and Elite Academy. The solid forest shape is the player's profile.
-                      </p>
-                    </div>
+                    <PerformanceRadarHero
+                      scores={full_report.scores}
+                      bgSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/radar-hero-stadium.png`}
+                    />
                   )}
 
                   <SectionGrid

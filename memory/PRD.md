@@ -26,6 +26,31 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 95 — Performance Radar Hero: cinematic Nano Banana redesign (Feb 27 2026)**:
+  - User feedback (Danish): the Performance Radar looks like something from the 80s — flat, boring, not interactive, not visually expressive. Complete redesign with Nano Banana + cool graphic elements + animations + design agent.
+  - **Design agent** (`/app/design_guidelines.json`): specified custom Framer Motion SVG radar replacing Recharts, dark ink hero container with stadium background, floating tactical key panel, axis-anchored score chips, animated shape draw-in with `pathLength: 1`, pulsing Elite ring, hover interactions.
+  - **2 NEW Nano Banana images** generated via `gemini-3.1-flash-image-preview`:
+    - `radar-hero-stadium.png` (750 KB, 21:9) — cinematic night stadium with floodlights & mist (used as radar background)
+    - `radar-hero-tactics.png` (812 KB, 21:9) — matte dark tactics chalkboard (available for future use)
+  - **NEW `/app/frontend/src/components/report/PerformanceRadarHero.jsx`** (~275 lines):
+    - Custom hand-built 4-axis diamond SVG radar (viewBox 520×520) — no Recharts. Cardinal axes math: Top=Technical, Right=Tactical, Bottom=Physical, Left=Mindset.
+    - **Layered animations** via framer-motion + `useInView`: 5 chalk background rings fade in first, then 4 tier reference rings (Standard/Strong/Pro/Elite dashed) stagger in with different dash patterns and stroke colours (Elite gets an infinite `[0.55, 0.95, 0.55]` opacity pulse), then the player fill fades in (0→1 fillOpacity), then the volt player stroke draws in via `pathLength: 0→1` over 1.4s, and finally the 4 vertex dots pop in with spring physics.
+    - **Volt glow filter** applied to the player stroke and vertex dots (SVG `feGaussianBlur + feMerge`), giving them a subtle neon glow against the ink background.
+    - **Radial gradient** (`playerFill`) on the player polygon — bright volt at centre fading out to 10% at edges.
+    - **4 axis chips** absolutely positioned at each pole (top/right/bottom/left), each with the appropriate `PillarIcon` (ball / pitch / lightning / shield), pillar label, and animated score. Chips have hover state (scale 1.08) and become fully volt when the corresponding vertex is being hovered.
+    - **Interactive hover**: `useState` tracks which axis (0-3) is hovered; hovering an axis chip brightens the corresponding cardinal axis line (opacity 0.14→0.55) and enlarges the vertex dot (r 6→9).
+    - **Left column content**: "Chapter · Performance" volt eyebrow with lime accent line, huge 4xl-6xl Barlow Condensed "HIS GAME AT A GLANCE" hero title (second line in volt), sub-copy, overall shape score (average of 4 pillars, in giant 6xl-7xl volt Barlow), and a `backdrop-blur-md` **Tactical Key panel** with 4 dashed swatches for Standard/Strong/Pro/Elite tiers.
+    - **Cinematic details**: heavy multi-layer ink gradients on top of the stadium bg; forest+volt blur halos behind the radar; N/E/S/W compass ticks; "LIVE ANALYSIS · 04 PILLARS" scan-line eyebrow at top; "0 ─ 10 SCALE" at bottom; volt gradient scan-line at the very bottom of the section.
+  - **`ReportPage.jsx` integration**: Replaced the old ~92-line Recharts `<div data-testid="performance-radar-card">` block with a single `<PerformanceRadarHero scores={full_report.scores} bgSrc="/api/static/landing/radar-hero-stadium.png" />` call. Zero backend/data changes — the same scores object is passed through.
+  - **New data-testids for QA**: `performance-radar-hero`, `radar-svg`, `radar-tactical-key`, `radar-chip-{technical|tactical|physical|mindset}`, `radar-ring-{standard|strong|pro|elite}`, `radar-vertex-{0..3}`, `radar-player-fill`, `radar-player-stroke`
+  - **Self-verified via screenshot** (per user's ban on testing agent): rendered at desktop 1920×1000 — all 4 rings + 4 chips + player shape + volt glow + Tactical Key panel + Nano Banana background all rendering correctly. Lukas A. premium demo shows 8.3 overall shape, Technical 8, Tactical 9, Physical 7, Mindset 9. Regression check: Technical / Tactical / Physical / Mindset pillar sections below still render with their PillarIcon + PitchDecoration + SkillMeter from Session 94.
+  - **Files**:
+    - NEW `/app/frontend/src/components/report/PerformanceRadarHero.jsx`
+    - NEW `/app/backend/scripts/generate_radar_hero.py`
+    - NEW `/app/backend/static/landing/radar-hero-stadium.png` (750 KB)
+    - NEW `/app/backend/static/landing/radar-hero-tactics.png` (812 KB)
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (import + block replacement)
+
 - ✅ **🆕 Session 94 — Premium Report UI/UX Overhaul: animated scores + skill meters + football-native icons (Feb 27 2026)**:
   - User feedback (Danish): trim overwhelming numbers, make report feel "alive" and "football-native" — add animated score cards (count-ups, progress bars, rings), interactive diagrams, football-native visuals (SVG icons instead of person images, pitch lines), better structural hierarchy. Explicit constraints: **NO backend/data/score changes** and **NO testing agent**.
   - **NEW `/app/frontend/src/components/report/FootballReport.jsx`** (~320 lines, 5 named-export primitives):
