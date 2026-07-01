@@ -4029,28 +4029,42 @@ async def upload_video_and_create_preview(
     # ============== UPLOAD GATE ==============
     # Free users get ONE free preview lifetime. After that, every upload requires
     # a pre-payment OR a Progress Pass credit.
+    # VIP/Premium subscribers ALWAYS get a full paid report — their subscription
+    # bundles unlimited (or 4/month for VIP, 2/month for Premium) full reports.
     is_admin = user.get("role") == "admin"
     free_used = bool(user.get("free_preview_used"))
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
     pass_state = _progress_pass_active(user)
+    sub = user.get("subscription") or {}
+    active_sub_tier = sub.get("tier") if sub.get("status") == "active" else None
+    is_paid_subscriber = active_sub_tier in ("premium", "vip")
     used_pass_credit = False
+    used_subscription_slot = False
     upload_will_be_paid = False
     if not is_admin:
-        if free_used and prepaid <= 0 and not pass_state.get("active"):
-            current_price = await get_current_price()
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "PREPAY_REQUIRED",
-                    "message": f"Your free preview is used. Pay ${current_price:g} to upload your next video — or activate a Progress Pass to track growth.",
-                },
-            )
-        # Prefer Progress Pass credit when prepaid credits are not present.
-        if free_used and prepaid <= 0 and pass_state.get("active"):
-            used_pass_credit = True
+        # VIP/Premium subscription → always full report, no free-preview gate.
+        if is_paid_subscriber:
             upload_will_be_paid = True
+            used_subscription_slot = True
         else:
-            upload_will_be_paid = free_used and prepaid > 0
+            if free_used and prepaid <= 0 and not pass_state.get("active"):
+                current_price = await get_current_price()
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "PREPAY_REQUIRED",
+                        "message": f"Your free preview is used. Pay ${current_price:g} to upload your next video — or activate a Progress Pass to track growth.",
+                    },
+                )
+            # Prefer Progress Pass credit when prepaid credits are not present.
+            if free_used and prepaid <= 0 and pass_state.get("active"):
+                used_pass_credit = True
+                upload_will_be_paid = True
+            # If user has prepaid credits, always burn one (even on their first
+            # upload) — admin-granted Premium/VIP users start with prepaid=10.
+            elif prepaid > 0:
+                upload_will_be_paid = True
+            # else: first-ever free preview (free_used=False, prepaid=0) → preview-only
     else:
         # Admins get a FULL premium report for every upload they make — no
         # payment, no eligibility burn, no preview/teaser. Setting
@@ -4163,9 +4177,10 @@ async def upload_video_and_create_preview(
         "analysis_error": None,
         "eligibility_consumed": (                   # so the bg task can refund on failure
             "admin" if is_admin
-            else ("pass_credit" if used_pass_credit
-                  else ("prepaid" if upload_will_be_paid
-                        else "free_preview"))
+            else ("subscription" if used_subscription_slot
+                  else ("pass_credit" if used_pass_credit
+                        else ("prepaid" if upload_will_be_paid
+                              else "free_preview")))
         ),
     }
     await db.reports.insert_one(report_doc)
@@ -4184,7 +4199,14 @@ async def upload_video_and_create_preview(
     # uploads while the background task runs. The background task will refund this
     # credit if the analysis ultimately fails (content gate rejection or Gemini error).
     if not is_admin:
-        if used_pass_credit:
+        if used_subscription_slot:
+            # VIP/Premium subscription — increment reports_used_this_period
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$inc": {"subscription.reports_used_this_period": 1},
+                 "$set": {"last_upload_at": now_iso()}},
+            )
+        elif used_pass_credit:
             await consume_pass_credit(db, user["id"])
             await db.users.update_one(
                 {"id": user["id"]},
