@@ -82,10 +82,10 @@ export default function DemoVideoCarousel() {
               </span>
               <span aria-hidden className="inline-block w-6 h-px bg-forest/40" />
             </div>
-            <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl leading-[0.95]">
+            <h2 className="font-barlow font-black uppercase tracking-tighter text-2xl md:text-3xl leading-[0.95]">
               See how <span className="text-forest">it actually works.</span>
             </h2>
-            <p className="mt-1 text-ink/55 text-xs leading-snug max-w-md">
+            <p className="mt-1.5 text-ink/55 text-sm leading-snug max-w-md">
               {videos.length === 0
                 ? "First iPhone workflow demos landing here soon."
                 : "Short walkthroughs. Real screen, real report."}
@@ -226,8 +226,8 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
   }, [isPlaying]);
 
   return (
-    <FilmFrame testid={`demo-card-${video.id}`}>
-      <div className="relative aspect-[9/14] max-h-[300px] bg-black">
+    <PremiumFrame testid={`demo-card-${video.id}`}>
+      <div className="relative aspect-[9/16] bg-black">
         {started ? (
           <video
             ref={videoRef}
@@ -237,7 +237,7 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
             playsInline
             preload="metadata"
             onPause={onPause}
-            className="w-full h-full object-contain bg-black"
+            className="w-full h-full object-cover bg-black"
             data-testid={`demo-video-el-${video.id}`}
           />
         ) : (
@@ -252,64 +252,61 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
               <img
                 src={abs(video.poster_url)}
                 alt=""
-                className="absolute inset-0 w-full h-full object-contain bg-black"
+                className="absolute inset-0 w-full h-full object-cover"
               />
             ) : (
-              <div className="absolute inset-0 bg-gradient-to-br from-forest/40 to-ink" />
+              <div className="absolute inset-0 bg-gradient-to-br from-forest via-forest/70 to-ink" />
             )}
-            <div className="absolute inset-0 bg-black/25 group-hover/play:bg-black/10 transition-colors" />
-            <div className="relative w-12 h-12 md:w-14 md:h-14 bg-volt text-ink rounded-full flex items-center justify-center transition-transform group-hover/play:scale-110 shadow-lg shadow-black/30">
-              <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5" fill="currentColor" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent group-hover/play:from-black/50 transition-colors" />
+            {/* Volt play button — larger, bolder, with soft glow */}
+            <div className="relative w-16 h-16 md:w-[68px] md:h-[68px] bg-volt text-ink rounded-full flex items-center justify-center transition-transform duration-300 group-hover/play:scale-110 shadow-[0_10px_30px_-4px_rgba(204,255,0,0.55)] ring-4 ring-volt/25">
+              <Play className="w-6 h-6 md:w-7 md:h-7 ml-0.5" fill="currentColor" strokeWidth={0} />
             </div>
           </button>
         )}
       </div>
-      <div className="px-4 py-3 border-t border-ink/10 bg-white">
-        <h3 className="font-barlow font-black uppercase text-sm md:text-base tracking-tight leading-tight text-ink">
+      {/* Caption strip inside the frame */}
+      <div className="px-4 py-3 bg-gradient-to-b from-ink to-[#0a1614] border-t border-volt/20">
+        <h3 className="font-barlow font-black uppercase text-sm md:text-base tracking-tight leading-tight text-white">
           {video.title}
         </h3>
         {video.subtitle && (
-          <p className="mt-1 text-ink/60 text-xs leading-snug line-clamp-2">{video.subtitle}</p>
+          <p className="mt-1 text-white/55 text-xs leading-snug line-clamp-2">{video.subtitle}</p>
         )}
       </div>
-    </FilmFrame>
+    </PremiumFrame>
   );
 }
 
-/* ─── FILM-FRAME wrapper — CSS-drawn 35mm film sprocket-hole edges ─── */
-function FilmFrame({ children, testid }) {
+/* ─── PREMIUM FRAME — clean iPhone-mockup styled bezel with brass ticks ─── */
+function PremiumFrame({ children, testid }) {
   return (
     <article
       data-demo-card
       data-testid={testid}
-      className="snap-start shrink-0 w-[68%] sm:w-[48%] md:w-[240px] relative"
+      className="snap-start shrink-0 w-[72%] sm:w-[48%] md:w-[240px] relative group"
     >
-      {/* Film sprocket holes — left edge */}
-      <div
-        aria-hidden
-        className="absolute left-0 top-0 bottom-0 w-2 bg-ink/85"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to bottom, transparent 0 8px, #F5F1E8 8px 14px)",
-        }}
-      />
-      {/* Film sprocket holes — right edge */}
-      <div
-        aria-hidden
-        className="absolute right-0 top-0 bottom-0 w-2 bg-ink/85"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to bottom, transparent 0 8px, #F5F1E8 8px 14px)",
-        }}
-      />
-      {/* Actual card content — nudged inside so film-strip edges show */}
-      <div className="ml-2 mr-2 bg-white border border-ink/10 overflow-hidden shadow-lg shadow-ink/[0.04]">
-        {children}
-      </div>
+      {/* Corner brass ticks — top-left */}
+      <span aria-hidden className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-volt/70 z-10" />
+      <span aria-hidden className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-volt/70 z-10" />
+      <span aria-hidden className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-volt/70 z-10" />
+      <span aria-hidden className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-volt/70 z-10" />
 
-      {/* Corner ornaments — brass ticks */}
-      <span aria-hidden className="absolute -top-1 left-4 right-4 h-px bg-ink/15" />
-      <span aria-hidden className="absolute -bottom-1 left-4 right-4 h-px bg-ink/15" />
+      {/* Soft glow behind the frame — only visible on hover */}
+      <span
+        aria-hidden
+        className="absolute -inset-2 bg-forest/25 blur-xl opacity-0 group-hover:opacity-60 transition-opacity duration-500 -z-10"
+      />
+
+      {/* The frame itself — deep bezel + inner ring, no sprocket holes */}
+      <div
+        className="relative bg-ink rounded-[10px] p-[3px] shadow-[0_18px_40px_-12px_rgba(31,79,47,0.4),0_2px_0_0_rgba(0,0,0,0.05)] transition-transform duration-500 group-hover:-translate-y-1"
+      >
+        {/* Inner bezel line — thin volt-tinted ring for the premium feel */}
+        <div className="rounded-[8px] overflow-hidden border border-volt/15 bg-black">
+          {children}
+        </div>
+      </div>
     </article>
   );
 }

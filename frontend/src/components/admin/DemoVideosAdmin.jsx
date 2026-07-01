@@ -332,7 +332,12 @@ function DemoVideoForm({ onCancel, onSave, initialOrder = 10 }) {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setVideoUrl(data.url);
-      toast.success("Video uploaded.");
+      // Backend now auto-generates a poster from the first ~1s of the clip.
+      // Only set it if the user hasn't uploaded their own poster yet.
+      if (data.poster_url && !posterUrl) {
+        setPosterUrl(data.poster_url);
+      }
+      toast.success("Video uploaded & re-encoded for web.");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Upload failed");
     } finally {

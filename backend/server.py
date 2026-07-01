@@ -3720,8 +3720,9 @@ async def admin_delete_demo_video(video_id: str, _=Depends(get_current_admin)):
 
 @api_router.post("/admin/demo-videos/upload-video")
 async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(get_current_admin)):
-    """Upload an iPhone MOV / MP4 video file. Returns the public /api/uploads/... URL
-    which the admin can then paste into the create-video form's video_url field."""
+    """Upload an iPhone MOV / MP4 video file. Re-encodes to browser-safe H.264 8-bit
+    (Chrome/Firefox can't decode HEVC/10-bit iPhone footage), auto-generates a poster
+    from the first frame, and returns the public /api/uploads/... URL."""
     if file.content_type not in _DEMO_VIDEO_ALLOWED:
         raise HTTPException(400, f"Only MP4 / MOV / WebM videos are allowed (got {file.content_type})")
     demo_dir = UPLOAD_DIR / "demo_videos"
@@ -3733,7 +3734,8 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
         "video/x-m4v": "m4v",
     }
     ext = ext_by_mime.get(file.content_type, "mp4")
-    fname = f"{uuid.uuid4().hex}.{ext}"
+    stem = uuid.uuid4().hex
+    fname = f"{stem}.{ext}"
     fpath = demo_dir / fname
     total = 0
     with fpath.open("wb") as buf:
@@ -3746,9 +3748,56 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
                 fpath.unlink(missing_ok=True)
                 raise HTTPException(413, "Video is too large (max 100 MB).")
             buf.write(chunk)
+
+    # Re-encode to browser-safe H.264 8-bit + AAC + faststart. Chrome/Firefox
+    # can't decode HEVC or yuv420p10le which iPhones default to.
+    web_path = demo_dir / f"{stem}.web.mp4"
+    poster_path = demo_dir / f"{stem}.poster.jpg"
+    final_url = f"/api/uploads/demo_videos/{fname}"  # fallback if ffmpeg fails
+    poster_url = None
+    try:
+        import subprocess
+        r = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(fpath),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
+                "-pix_fmt", "yuv420p",
+                "-vf", "scale='min(1280,iw)':-2",
+                "-c:a", "aac", "-b:a", "128k",
+                "-movflags", "+faststart",
+                "-loglevel", "error",
+                str(web_path),
+            ],
+            capture_output=True, timeout=180,
+        )
+        if r.returncode == 0 and web_path.exists() and web_path.stat().st_size > 0:
+            # keep original mov/mp4 around briefly; delete to save disk
+            fpath.unlink(missing_ok=True)
+            final_url = f"/api/uploads/demo_videos/{stem}.web.mp4"
+            # Auto-extract a poster from ~1s in (avoids all-black first frame)
+            try:
+                pr = subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-ss", "1", "-i", str(web_path),
+                        "-vframes", "1", "-q:v", "3",
+                        "-loglevel", "error",
+                        str(poster_path),
+                    ],
+                    capture_output=True, timeout=30,
+                )
+                if pr.returncode == 0 and poster_path.exists() and poster_path.stat().st_size > 0:
+                    poster_url = f"/api/uploads/demo_videos/{stem}.poster.jpg"
+            except Exception as e:
+                logger.warning(f"demo-video poster extraction failed: {e}")
+        else:
+            logger.warning(f"demo-video ffmpeg transcode rc={r.returncode} stderr={r.stderr[:200]}")
+    except Exception as e:
+        logger.warning(f"demo-video ffmpeg transcode failed: {e}")
+
     return {
         "ok": True,
-        "url": f"/api/uploads/demo_videos/{fname}",
+        "url": final_url,
+        "poster_url": poster_url,
         "size_bytes": total,
         "content_type": file.content_type,
     }

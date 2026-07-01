@@ -1,0 +1,25 @@
+{
+  "summary": "Verified 3 landing-carousel fixes + regression. FIX#1 h2 title now 30px (text-3xl on desktop) — visually proportional to other section titles. FIX#2 both demo videos re-encoded to H.264 yuv420p 8-bit — DB updated to .web.mp4, files served 200 OK with Content-Type video/mp4 (~5MB each), ffprobe confirms codec_name=h264 + pix_fmt=yuv420p (browser-safe). FIX#3 PremiumFrame verified — 4 volt corner ticks, aspect-[9/16] video, dark gradient caption strip, 68px volt play button with soft glow, hover-lift transform. Regression pytest 4/4 passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_demo_videos_delete.py",
+    "/app/test_reports/pytest/demo_videos_delete_iter45.xml",
+    "/app/test_reports/iter45_carousel.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "FIX#1 h2 uses className 'text-2xl md:text-3xl' — measured live at 1400px viewport: computed fontSize=30px, matches spec exactly.",
+    "FIX#2 verified via ffprobe on /app/backend/uploads/demo_videos/b5979130f7ab4549b1d53a62666316a6.web.mp4 → codec_name=h264, pix_fmt=yuv420p, 1280x720. Playwright headless-Chromium reports videoWidth=0 with MediaError code 4 because open-source Chromium build LACKS proprietary H.264 codecs (canPlayType('video/mp4;codecs=avc1.*') returns '' for baseline/main/high). This is a Playwright limitation — real Chrome/Firefox/Safari WILL decode this file correctly. DB GET /api/demo-videos confirms both items point to .web.mp4 URLs. HEAD returns 200 + video/mp4 + content-length ~4.9MB. Old HEVC files have been deleted from uploads folder.",
+    "FIX#3 PremiumFrame verified structurally: 4 volt corner ticks (span.border-volt/70), rounded-[10px] bg-ink bezel with inner rounded-[8px] volt/15 ring, aspect-[9/16] portrait wrapper with object-cover video, group-hover:-translate-y-1 lift transform. Caption strip uses bg-gradient-to-b from-ink to-[#0a1614] with white title — no more film-strip perforations, no whitespace bars.",
+    "Screenshot at /app/test_reports/iter45_carousel.png shows two clean iPhone-mockup style cards on 1400px desktop — matches the acceptance criteria."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (4/4 pytest + file-format verification)", "frontend": "100% for FIX#1 and FIX#3 (measured); FIX#2 verified at file level (Playwright cannot decode H.264 due to open-source Chromium — not a product bug)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (used from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Regression test creates + deletes TEST_DELETE_ME row via POST/DELETE /api/admin/demo-videos. DB clean after run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Playwright headless Chromium in this environment does NOT support H.264 (canPlayType returns empty). Any future test of native <video> playback for MP4/H.264 content should either (a) verify via ffprobe + HEAD + DB URL sanity checks (as done here), (b) use webm/vp8/vp9 encoding, or (c) run in a full Chrome (not Chromium) build. Do NOT report videoWidth=0 in headless Chromium as a bug for H.264 content.",
+  "rca of the issue": "iPhone iOS uploads .mov or HEVC-encoded .mp4 with pix_fmt=yuv420p10le (10-bit HDR) which only Safari can decode. Chrome/Firefox users saw audio-only with black frame. Fix: backend admin_upload_demo_video_file now transcodes to H.264 8-bit yuv420p via ffmpeg (libx264 veryfast crf24), stores as .web.mp4, and auto-generates a 1-second-in poster JPG. Both existing DB rows were re-uploaded and their video_url points to the new .web.mp4 files. Reproduction: n/a — resolved."
+}
