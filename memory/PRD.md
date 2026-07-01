@@ -26,6 +26,33 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 93 — Premium-at-limit UpgradeBanner variant (Feb 27 2026)**:
+  - Continuation task from previous backlog: when a Premium subscriber uses all 5/5 monthly uploads, the Dashboard's UpgradeBanner must hide the Premium card and show ONLY the VIP option (as the natural next step). Previously the banner was only shown to users WITHOUT any subscription, so a maxed-out Premium user had no visible upgrade path.
+  - **Backend** (`server.py` — `/api/me/subscription`):
+    - Extended response with a new `usage` object: `{used_this_period, monthly_limit, remaining, exhausted}`. Populated only when the user has an active subscription; `null` otherwise (Free / legacy prepay / admin).
+    - Uses the same `count_documents({user_id, created_at ≥ period_start})` query as `/me/upload-eligibility` to stay consistent with the eligibility gate.
+  - **Frontend** (`DashboardPage.jsx`):
+    - New `usage` state populated from `/me/subscription`
+    - New render guard: `(!subscription?.tier && !passState?.active) || (isPremiumAtLimit && !passState?.active)` — shows the banner to Free users AND to Premium users at limit, but never to VIP users or Progress Pass holders
+    - `UpgradeBanner` extended with `mode` (`"free"` | `"premium-at-limit"`) and `usage` props
+    - `"premium-at-limit"` variant:
+      - `data-testid="dashboard-upgrade-banner-at-limit"` (separate from the free-user banner testid)
+      - Amber-gold pulse indicator (matches VIP tier colour) instead of the volt-lime pulse
+      - Eyebrow: `Premium limit reached · {used} / {limit} this month`
+      - Headline: `Need more uploads? Go VIP.`
+      - Body: `You've used all 5 Premium uploads this month. Go VIP for unlimited uploads, real scout reviews, and direct scout contact.`
+      - Grid switches from `sm:grid-cols-2` to `grid-cols-1` — Premium mini-card hidden, VIP mini-card fills the width
+  - **Verified (testing-agent iteration_40.json — 100 %: backend 4/4 pytest + frontend full pass)**:
+    - Backend endpoint returns correct `usage` shape (null for Free/admin/seed-Premium, populated for real subs). Latency <300 ms.
+    - Free user path: default banner renders (Premium + VIP side by side, "Ready for more?" copy)
+    - Premium-at-limit path (mocked via Playwright `page.route` since LIVE Stripe was off-limits): banner correctly switches — testid changes, Premium hidden, VIP only, single-column grid, all target copy present
+    - Regression: reports library, players list, Quick Stats row, SubscriptionCard all still render, zero console errors
+    - Pytest suite created at `/app/backend/tests/test_iter40_subscription_usage.py`
+  - **Files**:
+    - MODIFIED `/app/backend/server.py` — `/api/me/subscription` now returns `usage`
+    - MODIFIED `/app/frontend/src/pages/DashboardPage.jsx` — new `usage` state, render guard, extended `UpgradeBanner` with `mode` + `usage` props (2-col vs 1-col grid, VIP-only variant)
+    - NEW `/app/backend/tests/test_iter40_subscription_usage.py`
+
 - ✅ **🆕 Session 92 — Report page warm-language refactor + 6 Nano Banana visuals (Feb 27 2026)**:
   - User feedback (Danish/English): report felt visually FLAT and used COLD/technical words ("anchored", "in module of", "pillar", "evaluation") that parents don't understand. Wanted Nano Banana graphics + warmer football-feel language.
   - **6 NEW Nano Banana images** generated via `gemini-3.1-flash-image-preview` (saved to `/app/backend/static/landing/`):
