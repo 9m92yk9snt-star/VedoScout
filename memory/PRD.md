@@ -26,6 +26,18 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 108 — One-time scout pricing + verification workflow + fake players seed (Feb 28 2026)**:
+  - **Pricing overhaul**: Retired 3 monthly tiers (scout_basic $49/mo, scout_pro $149/mo, club_enterprise $499/mo). Replaced with 2 ONE-TIME lifetime tiers: **Scout $399** (individual scouts/agents) and **Club $899** (5 seats, priority support). Old Stripe products auto-cleaned; new one-time products auto-provisioned on backend startup.
+  - **Stripe checkout flow**: Changed from `mode="subscription"` to `mode="payment"` for scout access. Access is now marked `one_time: true` and never expires (no `current_period_end` gating).
+  - **Verification workflow (3-layer trust system)**:
+    1. **Payment as filter** — $399/$899 price gate.
+    2. **Info-form modal** (`VerificationModal`) shown BEFORE Stripe checkout — captures organization name, org type dropdown (independent scout / scouting agency / player agent / club / media), role/title, country, website, LinkedIn URL, phone, freeform notes. Persisted to `users.scout_verification` immediately even if the buyer bails from Stripe.
+    3. **Admin manual review** via new `/admin` → "Scout DB Verify" tab. `ScoutVerificationAdmin.jsx` lists every paying scout/club with all their verification info + LinkedIn/website deep-links. Admin can grant/revoke the green **Verified** badge (`PUT /admin/scouts/{id}/verify`) and instantly **Revoke access** (`PUT /admin/scouts/{id}/revoke`) with an internal reason. Restore works too.
+  - **Player database seeded**: New `/app/backend/seed_fictional_players.py` — creates 18 fictional discoverable players (deterministic random seed) across Denmark, Sweden, Norway, Netherlands, Germany, Belgium, England, France, Spain, Portugal, Croatia, Serbia, Poland with realistic clubs (Brøndby IF, Ajax, Bayern München, La Masia, etc.). Each gets birth_year 2007-2014, position, foot, height, weight, bio + 1 fake paid report with overall score 65-92. Total discoverable now = 19.
+  - **Backend endpoints added**: `GET /api/admin/scouts`, `PUT /api/admin/scouts/{id}/verify`, `PUT /api/admin/scouts/{id}/revoke`, `PUT /api/admin/scouts/{id}/restore`. `/api/scout-access/me` now returns `verified`, `one_time`, `revoked_at`, `revoked_reason`, and full `verification` block.
+  - **Scout access data model**: `scout_access.status` values are now `active` | `revoked` (was `active` only). `_require_scout_access` rejects revoked scouts. `_has_active_scout_access` treats `one_time: true` as lifetime.
+  - **Verified**: curl tests pass (tiers endpoint returns 2 one-time tiers, admin scouts list returns empty until first payment), screenshots confirm — pricing page shows $399/$899 with "PAY ONCE. SEARCH FOREVER." hero; verification modal opens with all fields; admin CMS shows stat tiles + empty state; player database renders 19 fake+real discoverable players with correct filtering.
+
 - ✅ **🆕 Session 107 — Scout Database Fase 1+2 (Feb 28 2026)**:
   - **Player-side (Fase 1)**:
     - New `ProfileVisibilityCard` in Dashboard: avatar upload OR auto-generate from bounding-box crop of a video report + "Let scouts find me" toggle + public profile fields (position, foot, height/weight, country, club, bio).

@@ -3,29 +3,27 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Search, Users, Shield, Sparkles, ArrowRight, Check, Loader2,
-  Building2, UserCheck, Crown, Zap,
+  Building2, UserCheck, Crown, Zap, X, ShieldCheck,
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
-const TIER_ICON = {
-  scout_basic: UserCheck,
-  scout_pro: Zap,
-  club_enterprise: Building2,
-};
-
-const TIER_ACCENT = {
-  scout_basic: "border-forest text-forest",
-  scout_pro: "border-forest-pop text-forest-pop",
-  club_enterprise: "border-amber-600 text-amber-700",
-};
+const ORG_TYPES = [
+  { value: "solo_scout", label: "Independent scout" },
+  { value: "scouting_agency", label: "Scouting agency" },
+  { value: "agent", label: "Player agent" },
+  { value: "club", label: "Football club" },
+  { value: "media", label: "Football media" },
+];
 
 export default function ScoutsLandingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [tiers, setTiers] = useState([]);
   const [access, setAccess] = useState(null);
+  const [showVerification, setShowVerification] = useState(false);
+  const [pendingTier, setPendingTier] = useState(null);
   const [loadingTier, setLoadingTier] = useState(null);
 
   useEffect(() => {
@@ -35,16 +33,22 @@ export default function ScoutsLandingPage() {
     }
   }, [user]);
 
-  const handleSubscribe = async (tierId) => {
+  const startCheckout = (tierId) => {
     if (!user) {
       navigate(`/signup?next=/scouts&tier=${tierId}`);
       return;
     }
-    setLoadingTier(tierId);
+    setPendingTier(tierId);
+    setShowVerification(true);
+  };
+
+  const submitVerificationAndCheckout = async (verificationData) => {
+    setLoadingTier(pendingTier);
     try {
       const { data } = await api.post("/scout-access/subscribe", {
-        tier: tierId,
+        tier: pendingTier,
         origin_url: window.location.origin,
+        verification: verificationData,
       });
       if (data.url) window.location.href = data.url;
     } catch (err) {
@@ -97,7 +101,7 @@ export default function ScoutsLandingPage() {
                 <ArrowRight className="w-4 h-4" />
               </Link>
               <span className="inline-flex items-center gap-2 border border-forest/40 bg-forest/5 text-forest px-4 py-4 text-[11px] uppercase tracking-widest font-black">
-                <Check className="w-4 h-4" /> {access.tier?.replace("_", " ")} · active
+                <Check className="w-4 h-4" /> {access.tier} · lifetime {access.verified ? "· verified" : "· pending review"}
               </span>
             </div>
           ) : (
@@ -128,7 +132,7 @@ export default function ScoutsLandingPage() {
               The scout advantage
             </div>
             <h2 className="font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95]">
-              Save weeks.<br /><span className="text-forest">Find hidden gems.</span>
+              One-time fee.<br /><span className="text-forest">Lifetime access.</span>
             </h2>
           </div>
 
@@ -145,9 +149,9 @@ export default function ScoutsLandingPage() {
                 copy: "Every discoverable player already has a report: 4-pillar scores, age-benchmarked percentiles, timestamped highlights.",
               },
               {
-                icon: Shield,
-                title: "GDPR-safe & parent-consented",
-                copy: "Minors require verified parental consent before appearing. Every player can withdraw visibility instantly.",
+                icon: ShieldCheck,
+                title: "Verified professionals only",
+                copy: "We manually review every scout and club. Verified accounts get a green badge — players trust who they're talking to.",
               },
             ].map(({ icon: Icon, title, copy }) => (
               <div key={title} className="bg-cream-card p-8">
@@ -164,54 +168,60 @@ export default function ScoutsLandingPage() {
 
       {/* PRICING */}
       <section id="scout-pricing" className="py-20 md:py-28 bg-ink text-white">
-        <div className="max-w-6xl mx-auto px-6 md:px-10">
+        <div className="max-w-4xl mx-auto px-6 md:px-10">
           <div className="text-center mb-14">
             <div className="text-[10px] uppercase tracking-[0.28em] font-black text-volt mb-2">
-              Simple pricing
+              One-time · Lifetime
             </div>
             <h2 className="font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl leading-[0.95]">
-              Pick your access.<br /><span className="text-volt">Cancel anytime.</span>
+              Pay once.<br /><span className="text-volt">Search forever.</span>
             </h2>
+            <p className="mt-4 text-white/60 max-w-xl mx-auto">
+              No subscriptions. No hidden renewals. Verified scouts and clubs get lifetime access
+              to the ScoutMePlay player database with a single payment.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {tiers.map((t) => {
-              const Icon = TIER_ICON[t.id] || UserCheck;
+              const isClub = t.id === "club";
+              const Icon = isClub ? Building2 : UserCheck;
               const isCurrent = access?.active && access.tier === t.id;
               return (
                 <article
                   key={t.id}
                   data-testid={`scouts-tier-${t.id}`}
-                  className={`relative bg-[#0A0F0D] border-2 p-8 flex flex-col ${
-                    t.id === "scout_pro" ? "border-volt" : "border-white/10"
+                  className={`relative bg-[#0A0F0D] border-2 p-8 md:p-10 flex flex-col ${
+                    isClub ? "border-volt" : "border-white/10"
                   }`}
                 >
-                  {t.id === "scout_pro" && (
+                  {isClub && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-volt text-ink text-[10px] uppercase tracking-[0.2em] font-black px-3 py-1 whitespace-nowrap">
-                      <Crown className="inline w-3 h-3 -mt-0.5" /> Most popular
+                      <Crown className="inline w-3 h-3 -mt-0.5" /> For serious clubs
                     </span>
                   )}
-                  <Icon className={`w-8 h-8 mb-4 ${t.id === "scout_pro" ? "text-volt" : "text-white/60"}`} strokeWidth={1.5} />
-                  <h3 className="font-barlow font-black uppercase text-2xl leading-tight tracking-tight">
-                    {t.name.replace("ScoutMePlay ", "")}
+                  <Icon className={`w-9 h-9 mb-4 ${isClub ? "text-volt" : "text-white/60"}`} strokeWidth={1.5} />
+                  <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl leading-tight tracking-tight">
+                    {t.name.replace("ScoutMePlay ", "").replace(" — Lifetime", "")}
                   </h3>
                   <div className="mt-3 flex items-baseline gap-2">
-                    <span className="font-barlow font-black text-5xl text-white">${t.amount}</span>
-                    <span className="text-white/50 text-sm">/ month</span>
+                    <span className="font-barlow font-black text-5xl md:text-6xl text-white">${t.amount}</span>
+                    <span className="text-white/50 text-sm">one-time</span>
                   </div>
                   <p className="mt-3 text-sm text-white/60 leading-relaxed">{t.description}</p>
 
                   <ul className="mt-6 space-y-2 flex-1">
-                    <FeatureLine>Search index of discoverable players</FeatureLine>
-                    <FeatureLine>Filter by position, foot, age, country, score</FeatureLine>
+                    <FeatureLine>Lifetime access to the player database</FeatureLine>
+                    <FeatureLine>Unlimited searches + filters</FeatureLine>
+                    <FeatureLine>Unlimited contact reveals</FeatureLine>
+                    <FeatureLine>Full player reports + video previews</FeatureLine>
+                    {t.seats > 1 && <FeatureLine>{t.seats} team seats (share with your scouting team)</FeatureLine>}
+                    {isClub && <FeatureLine>Priority support · custom filters on request</FeatureLine>}
                     <FeatureLine>
-                      {t.monthly_reveals === null
-                        ? "Unlimited contact reveals"
-                        : `${t.monthly_reveals} contact reveals / month`}
+                      <span className="inline-flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-volt" /> Verified badge after manual review
+                      </span>
                     </FeatureLine>
-                    {t.seats > 1 && <FeatureLine>{t.seats} team seats</FeatureLine>}
-                    {t.id !== "scout_basic" && <FeatureLine>Saved favourites & CSV export</FeatureLine>}
-                    {t.id === "club_enterprise" && <FeatureLine>Custom filters + priority support</FeatureLine>}
                   </ul>
 
                   {isCurrent ? (
@@ -221,11 +231,11 @@ export default function ScoutsLandingPage() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => handleSubscribe(t.id)}
+                      onClick={() => startCheckout(t.id)}
                       disabled={loadingTier === t.id}
                       data-testid={`scouts-tier-${t.id}-cta`}
-                      className={`mt-6 group inline-flex items-center justify-center gap-2 py-3 font-barlow font-black uppercase tracking-widest text-sm transition-colors ${
-                        t.id === "scout_pro"
+                      className={`mt-6 group inline-flex items-center justify-center gap-2 py-4 font-barlow font-black uppercase tracking-widest text-sm transition-colors ${
+                        isClub
                           ? "bg-volt hover:bg-white text-ink"
                           : "bg-white/10 hover:bg-white text-white hover:text-ink"
                       } disabled:opacity-60`}
@@ -233,7 +243,7 @@ export default function ScoutsLandingPage() {
                       {loadingTier === t.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>Subscribe <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" /></>
+                        <>Get lifetime access <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" /></>
                       )}
                     </button>
                   )}
@@ -242,8 +252,8 @@ export default function ScoutsLandingPage() {
             })}
           </div>
 
-          <p className="mt-10 text-center text-xs text-white/40">
-            Secure Stripe billing · Cancel anytime from your dashboard · No hidden fees.
+          <p className="mt-10 text-center text-xs text-white/40 max-w-md mx-auto">
+            Secure Stripe checkout · One-time payment · Verified badge granted after manual review of your credentials.
           </p>
         </div>
       </section>
@@ -260,6 +270,16 @@ export default function ScoutsLandingPage() {
           </p>
         </div>
       </section>
+
+      {/* Verification modal */}
+      {showVerification && (
+        <VerificationModal
+          tier={pendingTier}
+          onClose={() => { setShowVerification(false); setPendingTier(null); }}
+          onSubmit={(data) => { setShowVerification(false); submitVerificationAndCheckout(data); }}
+          loading={loadingTier === pendingTier}
+        />
+      )}
     </div>
   );
 }
@@ -270,5 +290,196 @@ function FeatureLine({ children }) {
       <Check className="w-4 h-4 text-forest-pop shrink-0 mt-0.5" />
       <span>{children}</span>
     </li>
+  );
+}
+
+function VerificationModal({ tier, onClose, onSubmit, loading }) {
+  const [form, setForm] = useState({
+    organization_name: "",
+    organization_type: tier === "club" ? "club" : "solo_scout",
+    role_title: "",
+    country: "",
+    website: "",
+    linkedin_url: "",
+    phone: "",
+    notes: "",
+  });
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const canSubmit = form.organization_name.trim() && form.role_title.trim() && form.country.trim();
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    onSubmit(form);
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-start md:items-center justify-center bg-ink/70 backdrop-blur-sm p-4 overflow-y-auto"
+      onClick={onClose}
+      data-testid="verification-modal"
+    >
+      <form
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-2xl bg-cream-base border border-ink/10 my-8"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-ink/10 px-6 md:px-8 py-5">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.22em] font-black text-forest">
+              Step 1 of 2 · Verification
+            </div>
+            <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl leading-none mt-1">
+              Tell us who you are
+            </h3>
+            <p className="mt-2 text-sm text-ink/60">
+              We manually review every scout & club before granting the verified badge.
+              This info is only visible to admins — not to players.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} data-testid="verification-close" className="text-ink/40 hover:text-ink">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="px-6 md:px-8 py-6 space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <VField label="Organization / Club name *" required>
+              <input
+                type="text" maxLength={80} required
+                data-testid="v-org-name"
+                value={form.organization_name}
+                onChange={(e) => set("organization_name", e.target.value)}
+                placeholder="Brøndby IF Scouting"
+                className="v-input"
+              />
+            </VField>
+            <VField label="Type *" required>
+              <select
+                data-testid="v-org-type"
+                value={form.organization_type}
+                onChange={(e) => set("organization_type", e.target.value)}
+                className="v-input"
+              >
+                {ORG_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </VField>
+            <VField label="Your role / title *" required>
+              <input
+                type="text" maxLength={80} required
+                data-testid="v-role-title"
+                value={form.role_title}
+                onChange={(e) => set("role_title", e.target.value)}
+                placeholder="Head of Recruitment"
+                className="v-input"
+              />
+            </VField>
+            <VField label="Country *" required>
+              <input
+                type="text" maxLength={40} required
+                data-testid="v-country"
+                value={form.country}
+                onChange={(e) => set("country", e.target.value)}
+                placeholder="Denmark"
+                className="v-input"
+              />
+            </VField>
+            <VField label="Organization website">
+              <input
+                type="url" maxLength={200}
+                data-testid="v-website"
+                value={form.website}
+                onChange={(e) => set("website", e.target.value)}
+                placeholder="https://brondby.com"
+                className="v-input"
+              />
+            </VField>
+            <VField label="Your LinkedIn URL">
+              <input
+                type="url" maxLength={200}
+                data-testid="v-linkedin"
+                value={form.linkedin_url}
+                onChange={(e) => set("linkedin_url", e.target.value)}
+                placeholder="https://linkedin.com/in/..."
+                className="v-input"
+              />
+            </VField>
+            <VField label="Phone (optional)">
+              <input
+                type="tel" maxLength={40}
+                data-testid="v-phone"
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                placeholder="+45 12 34 56 78"
+                className="v-input"
+              />
+            </VField>
+          </div>
+          <VField label="Anything else we should know? (optional)">
+            <textarea
+              rows={2} maxLength={400}
+              data-testid="v-notes"
+              value={form.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              placeholder="Recent placements, references, licenses…"
+              className="v-input resize-none"
+            />
+          </VField>
+
+          <div className="border border-forest/30 bg-forest/5 p-4 text-sm text-ink/70 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-forest mt-0.5 shrink-0" />
+            <div>
+              <strong className="text-ink">You get instant database access after payment.</strong>{" "}
+              A ScoutMePlay admin reviews your info within 48 hours and grants the green verified
+              badge shown to players. If we can't verify you, we refund the payment in full.
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-ink/10 px-6 md:px-8 py-4 bg-cream-card">
+          <button
+            type="button" onClick={onClose}
+            className="text-[11px] uppercase tracking-widest font-black text-ink/50 hover:text-ink transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!canSubmit || loading}
+            data-testid="verification-continue"
+            className="inline-flex items-center gap-2 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continue to secure checkout <ArrowRight className="w-4 h-4" /></>}
+          </button>
+        </div>
+      </form>
+
+      {/* Utility class for inputs inside the modal */}
+      <style>{`
+        .v-input {
+          width: 100%;
+          border: 1px solid rgba(31, 39, 36, 0.15);
+          background: #fff;
+          padding: 10px 12px;
+          font-size: 14px;
+          transition: border-color 0.15s;
+        }
+        .v-input:focus { border-color: #1F4F2F; outline: none; }
+      `}</style>
+    </div>
+  );
+}
+
+function VField({ label, children }) {
+  return (
+    <label className="block">
+      <div className="text-[10px] uppercase tracking-[0.2em] font-black text-forest mb-1.5">
+        {label}
+      </div>
+      {children}
+    </label>
   );
 }

@@ -165,34 +165,27 @@ SUBSCRIPTION_TIERS = {
 # A user record's `subscription.tier` will be one of {"free", "premium", "vip"}.
 # Free is implicit (no Stripe price/product); paid tiers are the keys above.
 
-# Single source of truth for the PAID SCOUT ACCESS tiers — a separate subscription
-# type from the player-side Premium/VIP tiers. Grants read access to the /players-database
-# (the paid scout search index of discoverable players). One user can hold BOTH a player
-# subscription and a scout-access subscription simultaneously.
+# Single source of truth for the PAID SCOUT ACCESS tiers — ONE-TIME LIFETIME
+# purchases (not subscriptions). One user pays once → permanent database access
+# until admin manually revokes. Unlimited searches + reveals for both tiers.
 SCOUT_ACCESS_TIERS = {
-    "scout_basic": {
-        "name": "ScoutMePlay Scout Basic",
-        "description": "Search + view player profiles · 5 contact reveals/month · Individual scouts & agents",
-        "amount": 49.00,
-        "monthly_reveals": 5,
-        "seats": 1,
-        "role_hint": "scout_client",
-    },
-    "scout_pro": {
-        "name": "ScoutMePlay Scout Pro",
-        "description": "Unlimited contact reveals · Saved favourites · CSV export · Priority support",
-        "amount": 149.00,
+    "scout": {
+        "name": "ScoutMePlay Scout — Lifetime",
+        "description": "Individual scouts & agents · Lifetime database access · Unlimited searches + reveals",
+        "amount": 399.00,
         "monthly_reveals": None,  # unlimited
         "seats": 1,
         "role_hint": "scout_client",
+        "one_time": True,
     },
-    "club_enterprise": {
-        "name": "ScoutMePlay Club Enterprise",
-        "description": "5 seats · Unlimited reveals · Custom filters · Team dashboard · Priority support",
-        "amount": 499.00,
+    "club": {
+        "name": "ScoutMePlay Club — Lifetime",
+        "description": "Football clubs · Lifetime access · 5 seats · Unlimited searches + reveals · Priority support",
+        "amount": 899.00,
         "monthly_reveals": None,  # unlimited
         "seats": 5,
         "role_hint": "club_client",
+        "one_time": True,
     },
 }
 
@@ -6992,12 +6985,20 @@ async def _get_subscription_price_id(tier: str) -> Optional[str]:
 
 async def _ensure_scout_access_products():
     """Mirrors `_ensure_subscription_products` but for the SCOUT ACCESS tiers.
-    Creates a Stripe Product + monthly recurring Price for scout_basic / scout_pro /
-    club_enterprise, cached under settings key `stripe_scout_access_<tier>`.
+    Fase 2 update — creates a Stripe Product + ONE-TIME Price for scout / club,
+    cached under settings key `stripe_scout_access_<tier>`. Not recurring.
     """
     if not _embedded_ready():
         return
     _arm_real_stripe()
+    # Clean out any legacy tier settings from the retired monthly model so the
+    # new one-time tiers don't accidentally return an old subscription price_id.
+    await db.settings.delete_many({"key": {"$in": [
+        "stripe_scout_access_scout_basic",
+        "stripe_scout_access_scout_pro",
+        "stripe_scout_access_club_enterprise",
+    ]}})
+
     for tier_id, conf in SCOUT_ACCESS_TIERS.items():
         settings_key = f"stripe_scout_access_{tier_id}"
         existing = await db.settings.find_one({"key": settings_key}, {"_id": 0})
@@ -7011,12 +7012,12 @@ async def _ensure_scout_access_products():
                     **_SCOUTMEPLAY_METADATA,
                     "tier": tier_id,
                     "tier_kind": "scout_access",
+                    "billing": "one_time",
                 },
             )
             price = stripe_sdk.Price.create(
                 unit_amount=int(round(conf["amount"] * 100)),
                 currency=PRICE_CURRENCY,
-                recurring={"interval": "month"},
                 product=product.id,
                 metadata={"tier": tier_id, "kind": "scout_access"},
             )
@@ -7033,12 +7034,13 @@ async def _ensure_scout_access_products():
                     "price_id": price.id,
                     "amount": conf["amount"],
                     "currency": PRICE_CURRENCY,
+                    "one_time": True,
                 },
                 "updated_at": now_iso(),
             }},
             upsert=True,
         )
-        logger.info(f"Stripe provisioned scout-access tier '{tier_id}' → {price.id} (${conf['amount']}/mo)")
+        logger.info(f"Stripe provisioned scout-access tier '{tier_id}' → {price.id} (${conf['amount']} lifetime)")
 
 
 async def _get_scout_access_price_id(tier: str) -> Optional[str]:
@@ -7047,15 +7049,19 @@ async def _get_scout_access_price_id(tier: str) -> Optional[str]:
 
 
 def _has_active_scout_access(user: dict) -> Optional[dict]:
-    """Returns the active scout_access dict if the user is currently subscribed as a scout/club,
-    otherwise None. Considers status='active' AND the current period not expired."""
+    """Returns the active scout_access dict if the user has paid scout access,
+    otherwise None. Fase 2 update — access is now LIFETIME (one-time payment),
+    so we only reject if status is explicitly 'revoked' by admin."""
     sa = user.get("scout_access") or {}
     if sa.get("status") != "active":
         return None
+    # Legacy monthly subs still respect period_end. New one-time purchases
+    # (marked one_time=True) never expire.
+    if sa.get("one_time"):
+        return sa
     period_end = sa.get("current_period_end")
     if period_end:
         try:
-            # Accept both ISO string and epoch int
             if isinstance(period_end, (int, float)):
                 exp = datetime.fromtimestamp(period_end, tz=timezone.utc)
             else:
@@ -8075,35 +8081,26 @@ async def stripe_webhook_embedded(request: Request):
                 )
 
         elif kind == "scout_access":
-            # Fase 2 — grant scout database access. Mirror of the subscription
-            # branch above, but writes to `users.scout_access` instead of
-            # `users.subscription` and (for regular users only) elevates their
-            # role to scout_client / club_client for future authorization.
+            # Fase 2 (updated) — ONE-TIME payment for lifetime scout database access.
+            # Writes to `users.scout_access` and (for regular users only) elevates
+            # their role to scout_client / club_client for future authorization.
             user_id = metadata.get("user_id") or (txn or {}).get("user_id")
-            sub_id = session.get("subscription")
             tier_id = metadata.get("tier") or (txn or {}).get("tier")
-            if user_id and sub_id and tier_id and not (txn or {}).get("credited"):
+            if user_id and tier_id and not (txn or {}).get("credited"):
                 try:
-                    _arm_real_stripe()
-                    live = stripe_sdk.Subscription.retrieve(sub_id)
-                    period_end_raw = getattr(live, "current_period_end", None) or (
-                        live.get("current_period_end") if isinstance(live, dict) else None
-                    )
-                    period_end = None
-                    if period_end_raw:
-                        period_end = datetime.fromtimestamp(int(period_end_raw), tz=timezone.utc).isoformat()
                     tier_conf = SCOUT_ACCESS_TIERS.get(tier_id, {})
                     scout_access_state = {
                         "tier": tier_id,
                         "status": "active",
-                        "stripe_subscription_id": sub_id,
+                        "one_time": True,
                         "stripe_customer_id": session.get("customer"),
-                        "current_period_end": period_end,
+                        "stripe_payment_intent": session.get("payment_intent"),
+                        "current_period_end": None,  # lifetime
                         "monthly_reveals": tier_conf.get("monthly_reveals"),
                         "seats": tier_conf.get("seats", 1),
                         "reveals_used_this_period": 0,
-                        "reveal_period_marker": period_end,
                         "started_at": now_iso(),
+                        "verified": False,
                     }
                     set_ops = {"scout_access": scout_access_state}
                     role_hint = tier_conf.get("role_hint", "scout_client")
@@ -9337,9 +9334,23 @@ async def on_startup():
 # for scouts, agents and clubs. Users can hold both a player subscription
 # (Premium/VIP) and a scout access subscription at the same time.
 
+class ScoutVerificationProfile(BaseModel):
+    """Verification info captured before checkout — used by admin to review + verify.
+    Payment is only step 1; admin verified badge is granted after review."""
+    organization_name: Optional[str] = None
+    organization_type: Optional[str] = None  # "scouting_agency" | "club" | "solo_scout" | "agent" | "media"
+    role_title: Optional[str] = None
+    country: Optional[str] = None
+    website: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class ScoutAccessSubscribe(BaseModel):
     tier: str
     origin_url: str
+    verification: Optional[ScoutVerificationProfile] = None
 
 
 def _scout_reveal_period_state(user_doc: dict) -> dict:
@@ -9385,25 +9396,33 @@ async def get_my_scout_access(user=Depends(get_current_user)):
         "active": bool(active),
         "tier": tier_id,
         "status": sa.get("status", "inactive"),
+        "verified": bool(sa.get("verified")),
+        "one_time": bool(sa.get("one_time")),
         "current_period_end": sa.get("current_period_end"),
         "monthly_reveals": limit,
         "reveals_used_this_period": used,
         "reveals_remaining": remaining,
         "seats": tier_conf.get("seats", 1),
         "started_at": sa.get("started_at"),
+        "revoked_at": sa.get("revoked_at"),
+        "revoked_reason": sa.get("revoked_reason"),
+        "verification": user.get("scout_verification") or None,
     }
 
 
 @api_router.post("/scout-access/subscribe")
 async def subscribe_scout_access(payload: ScoutAccessSubscribe, user=Depends(get_current_user)):
-    """Create a Stripe Checkout Session for a scout access subscription."""
+    """Create a Stripe Checkout Session for a ONE-TIME scout access purchase.
+    Also persists the caller-provided verification profile so admin can review
+    the buyer before granting the 'Verified' badge (auto-granted access is
+    still gated by successful payment + optional admin revoke)."""
     tier = (payload.tier or "").lower().strip()
     if tier not in SCOUT_ACCESS_TIERS:
         raise HTTPException(400, "Unknown scout access tier")
     if not _embedded_ready():
         raise HTTPException(503, "Scout access checkout not configured. Add Stripe live keys to enable.")
     if _has_active_scout_access(user):
-        raise HTTPException(409, "You already have an active scout access subscription.")
+        raise HTTPException(409, "You already have scout access.")
 
     price_id = await _get_scout_access_price_id(tier)
     if not price_id:
@@ -9411,6 +9430,17 @@ async def subscribe_scout_access(payload: ScoutAccessSubscribe, user=Depends(get
         price_id = await _get_scout_access_price_id(tier)
         if not price_id:
             raise HTTPException(503, f"Stripe scout-access price for '{tier}' not provisioned yet — try again.")
+
+    # Persist the verification info onto the user right away (survives even if
+    # the buyer bails from the Stripe page — we still have their intent).
+    if payload.verification:
+        v = payload.verification.dict(exclude_unset=True)
+        if v:
+            v["updated_at"] = now_iso()
+            await db.users.update_one(
+                {"id": user["id"]},
+                {"$set": {"scout_verification": v}},
+            )
 
     origin = payload.origin_url.rstrip("/")
     success_url = f"{origin}/players-database?scout_session={{CHECKOUT_SESSION_ID}}"
@@ -9421,25 +9451,22 @@ async def subscribe_scout_access(payload: ScoutAccessSubscribe, user=Depends(get
         "tier": tier,
         "user_id": user["id"],
         "user_email": user["email"],
+        "billing": "one_time",
     })
 
     try:
         _arm_real_stripe()
-        existing_sub = (user.get("scout_access") or {})
-        customer_id = existing_sub.get("stripe_customer_id") or (user.get("subscription") or {}).get("stripe_customer_id")
+        # ONE-TIME payment (not subscription). Uses mode="payment".
         session_kwargs = dict(
-            mode="subscription",
+            mode="payment",
             line_items=[{"price": price_id, "quantity": 1}],
             success_url=success_url,
             cancel_url=cancel_url,
             metadata=metadata,
-            subscription_data={"metadata": metadata},
+            payment_intent_data={"metadata": metadata},
+            customer_email=user["email"],
             allow_promotion_codes=True,
         )
-        if customer_id:
-            session_kwargs["customer"] = customer_id
-        else:
-            session_kwargs["customer_email"] = user["email"]
         session = stripe_sdk.checkout.Session.create(**session_kwargs)
     except Exception as e:
         logger.exception("Stripe scout-access session create failed")
@@ -9469,7 +9496,8 @@ async def subscribe_scout_access(payload: ScoutAccessSubscribe, user=Depends(get
 
 @api_router.get("/scout-access/status/{session_id}")
 async def get_scout_access_status(session_id: str, user=Depends(get_current_user)):
-    """Poll endpoint after Stripe redirect back. Idempotently credits scout_access."""
+    """Poll endpoint after Stripe redirect back. Idempotently credits scout_access.
+    Fase 2 update — one-time payment: no subscription object, lifetime access."""
     txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     if not txn:
         raise HTTPException(404, "Session not found")
@@ -9486,37 +9514,28 @@ async def get_scout_access_status(session_id: str, user=Depends(get_current_user
 
     try:
         _arm_real_stripe()
-        session = stripe_sdk.checkout.Session.retrieve(session_id, expand=["subscription"])
+        session = stripe_sdk.checkout.Session.retrieve(session_id)
     except Exception as e:
         raise HTTPException(500, f"Stripe error: {e}")
 
     ps = getattr(session, "payment_status", None) or session.get("payment_status", None)
     if ps == "paid":
-        # Credit scout access on user doc
-        sub_obj = getattr(session, "subscription", None) or session.get("subscription", None)
-        sub_id = sub_obj.id if hasattr(sub_obj, "id") else (sub_obj.get("id") if isinstance(sub_obj, dict) else None)
         tier_id = txn["tier"]
         tier_conf = SCOUT_ACCESS_TIERS.get(tier_id, {})
-        # Derive period end from the subscription object if present
-        period_end = None
-        if sub_obj:
-            pe = getattr(sub_obj, "current_period_end", None) or (sub_obj.get("current_period_end") if isinstance(sub_obj, dict) else None)
-            if pe:
-                period_end = datetime.fromtimestamp(int(pe), tz=timezone.utc).isoformat()
         scout_access_state = {
             "tier": tier_id,
             "status": "active",
-            "stripe_subscription_id": sub_id,
+            "one_time": True,
             "stripe_customer_id": getattr(session, "customer", None) or session.get("customer", None),
-            "current_period_end": period_end,
+            "stripe_payment_intent": getattr(session, "payment_intent", None) or session.get("payment_intent", None),
+            "current_period_end": None,  # lifetime
             "monthly_reveals": tier_conf.get("monthly_reveals"),
             "seats": tier_conf.get("seats", 1),
             "reveals_used_this_period": 0,
-            "reveal_period_marker": period_end,
             "started_at": now_iso(),
+            "verified": False,  # admin must review + verify
         }
         role_hint = tier_conf.get("role_hint", "scout_client")
-        # Upgrade role only if the user was previously a regular user (never demote admins/scouts)
         set_ops = {"scout_access": scout_access_state}
         u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "role": 1})
         if (u or {}).get("role") in (None, "user"):
@@ -9766,6 +9785,102 @@ async def players_database_reveal(player_id: str, user=Depends(_require_scout_ac
 @app.on_event("shutdown")
 async def on_shutdown():
     client.close()
+
+
+# ============== ADMIN: Scout verification management ==============
+# Fase 2 verification workflow — payment grants access, admin manually adds the
+# "Verified" badge so real professionals stand out from paying-but-unvetted
+# accounts. Admin can also REVOKE access here if abuse is detected.
+
+@api_router.get("/admin/scouts")
+async def admin_list_scouts(_=Depends(get_current_admin)):
+    """List every user with a scout_access record — verified or not."""
+    cursor = db.users.find(
+        {"scout_access.status": {"$in": ["active", "revoked"]}},
+        {"_id": 0, "password_hash": 0},
+    ).sort("scout_access.started_at", -1)
+    out = []
+    async for u in cursor:
+        sa = u.get("scout_access") or {}
+        v = u.get("scout_verification") or {}
+        out.append({
+            "user_id": u.get("id"),
+            "email": u.get("email"),
+            "full_name": u.get("full_name"),
+            "role": u.get("role"),
+            "tier": sa.get("tier"),
+            "status": sa.get("status"),
+            "verified": bool(sa.get("verified")),
+            "started_at": sa.get("started_at"),
+            "revoked_at": sa.get("revoked_at"),
+            "revoked_reason": sa.get("revoked_reason"),
+            "verification": {
+                "organization_name": v.get("organization_name"),
+                "organization_type": v.get("organization_type"),
+                "role_title": v.get("role_title"),
+                "country": v.get("country"),
+                "website": v.get("website"),
+                "linkedin_url": v.get("linkedin_url"),
+                "phone": v.get("phone"),
+                "notes": v.get("notes"),
+                "updated_at": v.get("updated_at"),
+            },
+        })
+    return {"scouts": out, "count": len(out)}
+
+
+class AdminScoutVerifyPayload(BaseModel):
+    verified: bool
+
+
+@api_router.put("/admin/scouts/{user_id}/verify")
+async def admin_toggle_verified(user_id: str, payload: AdminScoutVerifyPayload, _=Depends(get_current_admin)):
+    """Toggle the 'Verified' badge on a scout/club account. Doesn't affect access."""
+    u = await db.users.find_one({"id": user_id}, {"_id": 0, "scout_access": 1})
+    if not u:
+        raise HTTPException(404, "User not found")
+    if not u.get("scout_access"):
+        raise HTTPException(400, "User has no scout_access record")
+    updates = {
+        "scout_access.verified": bool(payload.verified),
+        "scout_access.verified_at": now_iso() if payload.verified else None,
+    }
+    await db.users.update_one({"id": user_id}, {"$set": updates})
+    return {"ok": True, "user_id": user_id, "verified": bool(payload.verified)}
+
+
+class AdminScoutRevokePayload(BaseModel):
+    reason: Optional[str] = None
+
+
+@api_router.put("/admin/scouts/{user_id}/revoke")
+async def admin_revoke_scout(user_id: str, payload: AdminScoutRevokePayload, _=Depends(get_current_admin)):
+    """Immediately revoke a scout/club's database access (e.g. for abuse)."""
+    u = await db.users.find_one({"id": user_id}, {"_id": 0, "scout_access": 1})
+    if not u:
+        raise HTTPException(404, "User not found")
+    if not u.get("scout_access"):
+        raise HTTPException(400, "User has no scout_access record")
+    updates = {
+        "scout_access.status": "revoked",
+        "scout_access.revoked_at": now_iso(),
+        "scout_access.revoked_reason": (payload.reason or "").strip() or None,
+    }
+    await db.users.update_one({"id": user_id}, {"$set": updates})
+    return {"ok": True, "user_id": user_id, "revoked": True}
+
+
+@api_router.put("/admin/scouts/{user_id}/restore")
+async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
+    """Restore a previously revoked scout/club."""
+    u = await db.users.find_one({"id": user_id}, {"_id": 0, "scout_access": 1})
+    if not u or not u.get("scout_access"):
+        raise HTTPException(404, "User or scout access not found")
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"scout_access.status": "active", "scout_access.revoked_at": None, "scout_access.revoked_reason": None}},
+    )
+    return {"ok": True, "user_id": user_id, "restored": True}
 
 
 # Register the API router LAST so it includes every @api_router route defined above
