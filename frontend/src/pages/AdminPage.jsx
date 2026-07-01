@@ -12,6 +12,7 @@ import {
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
 import FAQAdmin from "@/components/admin/FAQAdmin";
+import EmailAdmin from "@/components/admin/EmailAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
@@ -19,6 +20,7 @@ const ALL_TABS = [
   { id: "reports", label: "Reports", role: "admin" },
   { id: "users", label: "Users", role: "admin" },
   { id: "messages", label: "Messages", role: "admin" },
+  { id: "email", label: "Email", role: "admin" },
   { id: "faq", label: "FAQ", role: "admin" },
   { id: "blog", label: "Blog", role: "admin" },
   { id: "payments", label: "Payments", role: "admin" },
@@ -401,6 +403,8 @@ export default function AdminPage() {
               {activeTab === "blog" && <BlogAdmin />}
 
               {activeTab === "faq" && <FAQAdmin />}
+
+              {activeTab === "email" && <EmailAdmin />}
 
               {activeTab === "reports" && (
                 <div className="border border-gray-border overflow-x-auto">

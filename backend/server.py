@@ -21,6 +21,15 @@ import jwt as pyjwt
 from dotenv import load_dotenv
 import httpx
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, status, BackgroundTasks
+
+# ScoutMePlay email service — Gmail SMTP + templates. Modules silently no-op
+# when SMTP env vars are unset, so nothing breaks in dev/preview.
+from email_service import send_email, send_email_async, send_bulk_email, email_enabled
+from email_templates import (
+    render_welcome_email,
+    render_purchase_confirmation,
+    render_bulk_email,
+)
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -3049,7 +3058,7 @@ async def root():
 # ============== ROUTES: AUTH ==============
 
 @api_router.post("/auth/signup", response_model=TokenResponse)
-async def signup(payload: UserSignup):
+async def signup(payload: UserSignup, background_tasks: BackgroundTasks):
     existing = await db.users.find_one({"email": payload.email.lower()})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -3063,6 +3072,13 @@ async def signup(payload: UserSignup):
         "created_at": now_iso(),
     }
     await db.users.insert_one(user_doc)
+    # Fire-and-forget welcome email — never blocks the signup response.
+    # Silently no-ops when SMTP env vars aren't configured (dev / preview).
+    try:
+        html, text, subject = render_welcome_email(user_doc["full_name"])
+        background_tasks.add_task(send_email, user_doc["email"], subject, html, text)
+    except Exception as exc:
+        logger.warning("Could not queue welcome email for %s: %s", user_doc["email"], exc)
     token = create_token(user_id, user_doc["email"], "user")
     return TokenResponse(
         access_token=token,
@@ -7719,7 +7735,49 @@ async def stripe_webhook_embedded(request: Request):
                     }},
                 )
 
-    # --- Recurring subscription lifecycle (renewal, cancel, downgrade) ---
+        # ── Purchase confirmation email — fire-and-forget for every paid kind ──
+        # Runs AFTER we've credited the user in Mongo so if SMTP is slow, the
+        # user's dashboard is already updated. Never blocks the webhook response.
+        try:
+            user_email = None
+            user_name = None
+            user_id_for_email = metadata.get("user_id") or (txn or {}).get("user_id")
+            if user_id_for_email:
+                u = await db.users.find_one({"id": user_id_for_email}, {"email": 1, "full_name": 1, "_id": 0})
+                if u:
+                    user_email = u.get("email")
+                    user_name = u.get("full_name")
+            if not user_email:
+                # Fallback — Stripe attaches the buyer's email to the customer
+                user_email = (session.get("customer_details") or {}).get("email") or session.get("customer_email")
+            if user_email:
+                amount_cents = int(session.get("amount_total") or 0)
+                currency = (session.get("currency") or "USD").upper()
+                product_name = {
+                    "prepay_upload": "Extra Scout Report",
+                    "report_unlock": "Full Scout Report Unlock",
+                    "subscription":  f"{metadata.get('tier', '').title() or 'Premium'} Subscription",
+                    "progress_pass": "Season Progress Pass",
+                }.get(kind, "ScoutMePlay purchase")
+                extra_details = None
+                if kind == "prepay_upload":
+                    price_tier = metadata.get("price_tier") or "single"
+                    extra_details = {
+                        "single":  "One-off single-report purchase",
+                        "premium": "Premium subscriber rate — cheaper than single-report price",
+                        "vip":     "VIP subscriber rate — deepest per-report discount",
+                    }.get(price_tier)
+                html, text, subject = render_purchase_confirmation(
+                    user_name=user_name,
+                    product_name=product_name,
+                    amount_cents=amount_cents,
+                    currency=currency,
+                    extra_details=extra_details,
+                )
+                # Use asyncio.create_task since we're already inside an async webhook
+                asyncio.create_task(send_email_async(user_email, subject, html, text))
+        except Exception as exc:  # noqa: BLE001 — never block webhook on email failure
+            logger.warning("Purchase-confirmation email dispatch failed: %s", exc)
     elif event["type"] in (
         "customer.subscription.updated",
         "customer.subscription.deleted",
@@ -8374,6 +8432,156 @@ async def reorder_faq_items(payload: FAQReorder, user=Depends(get_current_admin)
     cursor = db.faq_items.find({}, {"_id": 0}).sort("order", 1)
     items = [_faq_doc_to_public(d) async for d in cursor]
     return {"items": items}
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Admin bulk-email — Gmail SMTP powered
+# ════════════════════════════════════════════════════════════════════════════
+
+class BulkEmailSend(BaseModel):
+    subject: str
+    body_html: str
+    segment: str = "all"
+    test_email: Optional[str] = None
+    preheader: Optional[str] = None
+
+
+async def _query_recipients_for_segment(segment: str) -> list[str]:
+    segment = (segment or "all").lower()
+    q: dict = {}
+    if segment == "premium":
+        q = {"subscription.tier": "premium"}
+    elif segment == "vip":
+        q = {"subscription.tier": "vip"}
+    elif segment == "admins":
+        q = {"role": "admin"}
+    elif segment == "progress_pass":
+        q = {"progress_pass.credits_remaining": {"$gt": 0}}
+    elif segment == "free":
+        q = {"$or": [
+            {"subscription": {"$exists": False}},
+            {"subscription.tier": {"$in": [None, "", "free"]}},
+        ]}
+    cursor = db.users.find(q, {"email": 1, "_id": 0})
+    return [d["email"] async for d in cursor if d.get("email")]
+
+
+@api_router.get("/admin/bulk-email/segments")
+async def bulk_email_segments(user=Depends(get_current_admin)):
+    segments = ["all", "free", "premium", "vip", "progress_pass", "admins"]
+    out = {}
+    for s in segments:
+        emails = await _query_recipients_for_segment(s)
+        out[s] = len(emails)
+    return {
+        "counts": out,
+        "smtp_enabled": email_enabled(),
+        "note": (
+            "Add SMTP_HOST, SMTP_PORT, SMTP_USERNAME and SMTP_PASSWORD to backend/.env "
+            "to enable actual email sending. Without them, sends are no-ops."
+        ) if not email_enabled() else None,
+    }
+
+
+@api_router.post("/admin/bulk-email/send")
+async def bulk_email_send(payload: BulkEmailSend, user=Depends(get_current_admin)):
+    subject = (payload.subject or "").strip()
+    body = (payload.body_html or "").strip()
+    if not subject or not body:
+        raise HTTPException(status_code=400, detail="subject and body_html are required")
+    if len(subject) > 500:
+        raise HTTPException(status_code=400, detail="subject too long")
+
+    html_wrapped, text_body, _subject = render_bulk_email(subject, body, preheader=payload.preheader or "")
+
+    if payload.test_email:
+        addr = payload.test_email.strip().lower()
+        if "@" not in addr:
+            raise HTTPException(status_code=400, detail="test_email is not a valid address")
+        ok = await send_email_async(addr, subject, html_wrapped, text_body)
+        return {"test_only": True, "sent": 1 if ok else 0, "failed": 0 if ok else 1, "recipient": addr, "smtp_enabled": email_enabled()}
+
+    recipients = await _query_recipients_for_segment(payload.segment)
+    total = len(recipients)
+    if total == 0:
+        raise HTTPException(status_code=400, detail=f"Segment '{payload.segment}' has no recipients")
+
+    job_id = str(uuid.uuid4())
+    now = now_iso()
+    await db.bulk_email_jobs.insert_one({
+        "id": job_id,
+        "admin_id": user["id"],
+        "admin_email": user.get("email"),
+        "subject": subject,
+        "segment": payload.segment,
+        "total": total,
+        "sent": 0,
+        "failed": 0,
+        "status": "queued",
+        "created_at": now,
+        "updated_at": now,
+        "smtp_enabled": email_enabled(),
+    })
+
+    async def _progress_cb(sent, failed, total_):
+        if (sent + failed) % 10 == 0 or (sent + failed) == total_:
+            await db.bulk_email_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"sent": sent, "failed": failed, "status": "sending", "updated_at": now_iso()}},
+            )
+
+    async def _run_job():
+        try:
+            result = await send_bulk_email(
+                recipients=recipients,
+                subject=subject,
+                html_body=html_wrapped,
+                text_body=text_body,
+                delay_seconds=1.0,
+                on_progress=_progress_cb,
+            )
+            await db.bulk_email_jobs.update_one(
+                {"id": job_id},
+                {"$set": {
+                    "sent": result["sent"],
+                    "failed": result["failed"],
+                    "failed_emails": result["failed_emails"],
+                    "status": "complete",
+                    "completed_at": now_iso(),
+                    "updated_at": now_iso(),
+                }},
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Bulk email job %s crashed: %s", job_id, exc)
+            await db.bulk_email_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"status": "error", "error": str(exc), "updated_at": now_iso()}},
+            )
+
+    asyncio.create_task(_run_job())
+
+    return {
+        "job_id": job_id,
+        "queued": total,
+        "segment": payload.segment,
+        "status": "queued",
+        "smtp_enabled": email_enabled(),
+    }
+
+
+@api_router.get("/admin/bulk-email/jobs")
+async def bulk_email_jobs_list(user=Depends(get_current_admin), limit: int = 50):
+    cursor = db.bulk_email_jobs.find({}, {"_id": 0}).sort("created_at", -1).limit(min(limit, 200))
+    items = [d async for d in cursor]
+    return {"items": items}
+
+
+@api_router.get("/admin/bulk-email/jobs/{job_id}")
+async def bulk_email_job_detail(job_id: str, user=Depends(get_current_admin)):
+    doc = await db.bulk_email_jobs.find_one({"id": job_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return doc
 
 
 

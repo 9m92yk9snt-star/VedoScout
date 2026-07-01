@@ -26,6 +26,71 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 105 — Gmail SMTP ACTIVATED (Feb 28 2026)**:
+  - User provided the 16-char Gmail App Password for `scoutmeplay@gmail.com`.
+  - Added `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USERNAME=scoutmeplay@gmail.com`, `SMTP_PASSWORD=****`, `SMTP_FROM_NAME=ScoutMePlay`, `SMTP_FROM_EMAIL=scoutmeplay@gmail.com` to `/app/backend/.env` and restarted backend via supervisor.
+  - **Verified end-to-end**:
+    - `email_enabled()` returns `True`
+    - Sync test send from Python REPL → SMTP handshake + auth OK, email delivered to `scoutmeplay@gmail.com` inbox.
+    - `GET /api/admin/bulk-email/segments` → `{"smtp_enabled": true, "note": null}`.
+    - `POST /api/admin/bulk-email/send` with `test_email` → `{"sent": 1, "failed": 0}`.
+    - Admin UI `/admin → Email` tab now shows **"SMTP ACTIVE"** green banner (was orange "not configured").
+  - Effect: Welcome emails (signup), purchase-confirmation emails (Stripe webhook), and admin bulk broadcasts now dispatch real mail via Gmail. Throttled at 1 email/second inside Gmail's ~100/hour free-tier limit.
+  - **BLOCKER RESOLVED** — no more pending user actions on email.
+
+- ✅ **🆕 Session 104 — Welcome emails + purchase confirmations + admin bulk-email CMS via Gmail SMTP (Feb 27 2026)**:
+  - User feedback (Danish/English): Welcome emails on signup + auto purchase confirmation emails when a user buys something + admin bulk-mail feature using `scoutmeplay@gmail.com`.
+  - **NEW backend module `/app/backend/email_service.py`** (~180 lines):
+    - `send_email()` — stdlib `smtplib.SMTP_SSL` (port 465) + `EmailMessage` with multipart HTML+plaintext bodies. Never raises — returns False on any failure so callers can fire-and-forget from `BackgroundTasks`.
+    - `send_email_async()` — thread-executor wrapper for async endpoints.
+    - `send_bulk_email()` — throttled (1s/message default) sender with progress callback for job tracking. Deduplicates + validates recipients.
+    - `email_enabled()` — returns False when any of `SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD` is missing, so the module silently no-ops in dev/preview without breaking sign-up or checkout.
+    - Full docstring includes step-by-step instructions for generating a Gmail App Password at myaccount.google.com/apppasswords.
+  - **NEW backend module `/app/backend/email_templates.py`** (~180 lines):
+    - `render_welcome_email(user_name)` — HTML + plaintext + subject. Forest+volt branded chrome (forest header with volt underline, "SCOUTMEPLAY" wordmark with volt "ME" accent, "Pro Scout Intelligence" tagline, 3-step upload guide, volt CTA button linking to `/upload`, ink footer).
+    - `render_purchase_confirmation(user_name, product_name, amount_cents, currency, extra_details)` — same chrome, shows a highlighted "Order" panel with product name + tier detail + big forest amount + "Go to dashboard" CTA. Handles all 4 kinds: subscription, single-report, extra-report (Premium $89 / VIP $59), and progress-pass with appropriate `extra_details` strings.
+    - `render_bulk_email(subject, body_html, preheader)` — wraps admin-authored HTML in the same brand chrome. Used by the admin broadcast endpoint.
+    - Fully inline CSS (no external stylesheet) — renders correctly in Gmail, Outlook, Apple Mail, mobile.
+  - **`server.py` — wired into signup + Stripe webhook**:
+    - `POST /api/auth/signup` — now accepts `BackgroundTasks` and fires the welcome email in the background after Mongo insert. Try/except keeps signup working even if email templating fails.
+    - Stripe `checkout.session.completed` webhook — new dispatch block (after all `kind` branches) that resolves the buyer's email from either the user record OR the Stripe session's `customer_details.email`, picks the right product-name label + `extra_details` copy based on `kind` + `metadata.price_tier`, then fires `send_email_async` via `asyncio.create_task`. Non-blocking, non-throwing.
+  - **NEW admin bulk-email endpoints** (all `Depends(get_current_admin)`):
+    - `GET /api/admin/bulk-email/segments` — returns `{segment: count}` for all 6 segments (all/free/premium/vip/progress_pass/admins) + `smtp_enabled` flag.
+    - `POST /api/admin/bulk-email/send` — validates + saves job to `db.bulk_email_jobs`, then fires the actual throttled send via `asyncio.create_task`. Supports `test_email` for a single-recipient preview mode.
+    - `GET /api/admin/bulk-email/jobs` — returns 50 most recent jobs (for the history table).
+    - `GET /api/admin/bulk-email/jobs/{id}` — poll a specific job.
+    - Progress callback writes sent/failed counters back to Mongo every 10 emails so the admin UI can poll for live status.
+  - **NEW frontend `/app/frontend/src/components/admin/EmailAdmin.jsx`** (~320 lines):
+    - Header + refresh button + "SMTP ACTIVE" / "SMTP NOT CONFIGURED" status banner (green vs orange).
+    - **Segment picker** — 6 pill buttons for all/free/premium/vip/progress_pass/admins with LIVE recipient counts. Selected pill goes forest+white.
+    - **Compose form** — subject (500 char), optional preheader, multi-line HTML body (font-mono), all 3 with live char counters.
+    - **Test send** — sub-form with test-email address + "Send test" button → hits backend with `test_email` set → sends ONE email to just that address so admin can preview before broadcasting.
+    - **Broadcast button** — forest CTA "Send to N users" (dynamically shows recipient count). Confirms with a `window.confirm` dialog showing segment + subject.
+    - **Job history table** — Subject / Segment / Sent / Failed / Status pill / Timestamp. Status pill has 4 states (queued / sending / complete / error) each with icon + color. Auto-polls every 6 seconds while any job is queued or sending.
+    - `StatusPill` extracted to module scope to satisfy `react/no-unstable-nested-components` lint rule.
+  - **`AdminPage.jsx`** — added new "Email" tab (between Messages and FAQ) + import + render slot.
+  - **Verified via curl end-to-end**:
+    - `GET /api/admin/bulk-email/segments` returns 6 segments with counts (13 all / 13 free / 0 premium / 0 vip / 0 pass / 1 admin) + `smtp_enabled: false` + helpful setup note.
+    - `POST /api/admin/bulk-email/send` with `test_email` correctly attempts to send + returns `sent: 0, failed: 1, smtp_enabled: false` (expected — App Password not yet added). Once the App Password is in `.env`, the `sent` count will flip to 1.
+  - **Screenshot verified**: Admin "EMAIL" tab renders header, orange "SMTP NOT CONFIGURED" banner, "COMPOSE BROADCAST" card with 6 segment pills (correct counts), subject + preheader + body fields, test-email + broadcast buttons. All UI complete.
+  - **Files**:
+    - NEW `/app/backend/email_service.py`
+    - NEW `/app/backend/email_templates.py`
+    - NEW `/app/frontend/src/components/admin/EmailAdmin.jsx`
+    - MODIFIED `/app/backend/server.py` (imports + signup hook + webhook hook + 4 new bulk-email endpoints)
+    - MODIFIED `/app/frontend/src/pages/AdminPage.jsx` (tab + import + render slot)
+  - **⚠️ Awaiting user**: Gmail App Password for `scoutmeplay@gmail.com`. Once user provides it, we add to `backend/.env`:
+    ```
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=465
+    SMTP_USERNAME=scoutmeplay@gmail.com
+    SMTP_PASSWORD=<16-char Google App Password>
+    SMTP_FROM_NAME=ScoutMePlay
+    SMTP_FROM_EMAIL=scoutmeplay@gmail.com
+    SITE_PUBLIC_URL=https://scoutmeplay.com
+    ```
+    Steps for user: myaccount.google.com/security → enable 2-Step Verification → myaccount.google.com/apppasswords → generate a 16-char password for "ScoutMePlay Backend". No code deploy needed after adding — a single `sudo supervisorctl restart backend` picks up the new env vars.
+
 - ✅ **🆕 Session 103 — Admin CMS for landing-page Common Questions / FAQ (Feb 27 2026)**:
   - User feedback (Danish): admin skal selv kunne skrive og redigere Common Questions — de var indtil nu hardcoded i frontend-koden.
   - **Backend (`server.py`)** — new REST endpoints on `db.faq_items` collection:
