@@ -4212,6 +4212,28 @@ async def upload_video_and_create_preview(
     }
 
 
+def _resolve_video_url(doc: dict) -> Optional[str]:
+    """Resolve the playable video URL for a report doc.
+
+    Priority: explicit override (R2 or full HTTP URL) > legacy `/api/uploads/` path.
+    Reports migrated to R2 have `video_url_override` set to a full URL / proxy path.
+    """
+    override = doc.get("video_url_override")
+    if override:
+        return override
+    vf = doc.get("video_filename")
+    return f"/api/uploads/{vf}" if vf else None
+
+
+def _resolve_poster_url(doc: dict) -> Optional[str]:
+    """Same priority as _resolve_video_url but for the poster thumbnail."""
+    override = doc.get("poster_url_override")
+    if override:
+        return override
+    pf = doc.get("poster_filename")
+    return f"/api/uploads/{pf}" if pf else None
+
+
 @api_router.get("/reports/{report_id}/status")
 async def get_report_status(report_id: str, user=Depends(get_current_user)):
     """Lightweight polling endpoint used by the frontend during async preview generation.
@@ -4246,13 +4268,12 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         "has_full_report": bool(doc.get("full_report")),
     }
     if analysis_status == "ready":
-        poster_filename = doc.get("poster_filename")
         marker_filename = doc.get("marker_filename")
         out.update({
             "preview": doc.get("preview"),
             "player_details": doc.get("player_details"),
-            "video_url": f"/api/uploads/{doc['video_filename']}",
-            "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
+            "video_url": _resolve_video_url(doc),
+            "poster_url": _resolve_poster_url(doc),
             "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
             "is_paid": bool(doc.get("is_paid")),
             "created_at": doc.get("created_at"),
@@ -4605,6 +4626,16 @@ async def analyze_preview_task(report_id: str):
             }},
         )
 
+        # ============== FLUSH VIDEO + POSTER TO R2 ==============
+        # Preview + Gemini calls are done. Push the playable video and poster
+        # to R2 and drop the local copies to keep the container disk clean.
+        # Marker/subject/anchor crops stay local — they're small and may be
+        # re-used by generate_full_report_task or admin re-generation flows.
+        try:
+            await _flush_preview_artifacts_to_r2(report_id)
+        except Exception as e:
+            logger.warning(f"R2 flush post-preview failed for {report_id}: {e}")
+
         # If the upload was prepaid / pass-credit, kick off the full premium report too.
         doc = await db.reports.find_one({"id": report_id})
         if doc and doc.get("is_paid"):
@@ -4645,6 +4676,84 @@ async def _refund_upload_eligibility(report_id: str):
         await db.users.update_one({"id": user_id}, {"$inc": {"progress_pass.credits": 1}})
 
 
+# ─── Report R2 storage helpers ──────────────────────────────────────────────
+async def _flush_preview_artifacts_to_r2(report_id: str):
+    """Push a completed report's playable video + poster to R2 and drop the
+    local copies. Marker + subject + anchor crops stay LOCAL (small, may be
+    re-used by admin flows / re-generation). Best-effort — never raises.
+
+    Idempotent: if the override URLs are already set, or R2 isn't configured,
+    this is a no-op."""
+    if not r2_storage.is_configured():
+        return
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        return
+    updates: dict = {}
+
+    # Video (.web.mp4)
+    if not doc.get("video_url_override"):
+        vf = doc.get("video_filename")
+        if vf:
+            vp = UPLOAD_DIR / vf
+            if vp.exists() and vp.stat().st_size > 0:
+                try:
+                    key = f"reports/{report_id}/{vf}"
+                    url = r2_storage.upload_file(key, vp, "video/mp4")
+                    updates["video_url_override"] = url
+                    vp.unlink(missing_ok=True)
+                except Exception as e:
+                    logger.warning(f"R2 flush video failed {report_id}: {e}")
+
+    # Poster (.web.poster.jpg)
+    if not doc.get("poster_url_override"):
+        pf = doc.get("poster_filename")
+        if pf:
+            pp = UPLOAD_DIR / pf
+            if pp.exists() and pp.stat().st_size > 0:
+                try:
+                    key = f"reports/{report_id}/{pf}"
+                    url = r2_storage.upload_file(key, pp, "image/jpeg")
+                    updates["poster_url_override"] = url
+                    pp.unlink(missing_ok=True)
+                except Exception as e:
+                    logger.warning(f"R2 flush poster failed {report_id}: {e}")
+
+    if updates:
+        await db.reports.update_one({"id": report_id}, {"$set": updates})
+
+
+async def _ensure_report_video_local(report_id: str) -> Optional[Path]:
+    """Return a local Path to the report's playable video for ffmpeg / Gemini.
+    If it's been flushed to R2, download it into /tmp first. Caller MUST NOT
+    delete the file — a stale /tmp file is cheap; the process is short-lived.
+
+    Returns None if the video cannot be located.
+    """
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        return None
+    vf = doc.get("video_filename")
+    if vf:
+        local = UPLOAD_DIR / vf
+        if local.exists() and local.stat().st_size > 0:
+            return local
+    # Try R2 override
+    override = doc.get("video_url_override")
+    key = r2_storage.key_from_url(override) if override else None
+    if not key or not r2_storage.is_configured():
+        return None
+    tmp_dir = Path(tempfile.gettempdir()) / "scoutmeplay_reports" / report_id
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    dest = tmp_dir / (vf or f"{report_id}.web.mp4")
+    if dest.exists() and dest.stat().st_size > 0:
+        return dest
+    ok = r2_storage.download_to_file(key, dest)
+    if not ok:
+        return None
+    return dest
+
+
 @api_router.get("/reports/mine")
 async def my_reports(user=Depends(get_current_user)):
     docs = await db.reports.find(
@@ -4652,8 +4761,8 @@ async def my_reports(user=Depends(get_current_user)):
         {"_id": 0, "full_report": 0},
     ).sort("created_at", -1).to_list(100)
     for d in docs:
-        d["video_url"] = f"/api/uploads/{d['video_filename']}"
-        d["poster_url"] = f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None
+        d["video_url"] = _resolve_video_url(d)
+        d["poster_url"] = _resolve_poster_url(d)
     return docs
 
 
@@ -4699,7 +4808,6 @@ async def _ensure_agent_review(doc: dict) -> dict:
 
 
 async def _serialize_report(doc: dict, include_full: bool) -> dict:
-    poster_filename = doc.get("poster_filename")
     marker_filename = doc.get("marker_filename")
     subject_crop_filename = doc.get("subject_crop_filename")
     out = {
@@ -4707,8 +4815,8 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "user_id": doc["user_id"],
         "user_email": doc.get("user_email"),
         "player_details": doc["player_details"],
-        "video_url": f"/api/uploads/{doc['video_filename']}",
-        "poster_url": f"/api/uploads/{poster_filename}" if poster_filename else None,
+        "video_url": _resolve_video_url(doc),
+        "poster_url": _resolve_poster_url(doc),
         "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
         "subject_crop_url": f"/api/uploads/{subject_crop_filename}" if subject_crop_filename else None,
         "fingerprint": doc.get("fingerprint"),
@@ -4876,8 +4984,8 @@ async def generate_full_report_task(report_id: str) -> None:
             {"id": report_id},
             {"$set": {"full_report_status": "generating", "full_report_error": None}},
         )
-        file_path = UPLOAD_DIR / doc["video_filename"]
-        if not file_path.exists():
+        file_path = await _ensure_report_video_local(report_id)
+        if not file_path or not file_path.exists():
             logger.warning(f"generate_full_report_task: video missing for {report_id}")
             await db.reports.update_one(
                 {"id": report_id},
@@ -5060,8 +5168,8 @@ async def admin_agent_queue(_=Depends(get_current_admin_or_scout)):
             "paid_at": d.get("paid_at"),
             "demo": d.get("demo", False),
             "agent_review": review,
-            "video_url": f"/api/uploads/{d['video_filename']}",
-            "poster_url": f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None,
+            "video_url": _resolve_video_url(d),
+            "poster_url": _resolve_poster_url(d),
             "marker_url": f"/api/uploads/{d['marker_filename']}" if d.get("marker_filename") else None,
         })
     # sort pending first, then by oldest
@@ -9112,9 +9220,8 @@ async def admin_delete_contact(msg_id: str, _=Depends(get_current_admin)):
 async def admin_reports(_=Depends(get_current_admin)):
     docs = await db.reports.find({}, {"_id": 0, "full_report": 0}).sort("created_at", -1).to_list(500)
     for d in docs:
-        vf = d.get("video_filename")
-        d["video_url"] = f"/api/uploads/{vf}" if vf else None
-        d["poster_url"] = f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None
+        d["video_url"] = _resolve_video_url(d)
+        d["poster_url"] = _resolve_poster_url(d)
     return docs
 
 
