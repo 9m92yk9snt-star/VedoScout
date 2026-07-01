@@ -5029,8 +5029,13 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     if current == "generating":
         return {"status": "already_generating", "report_id": report_id, "full_report_status": "generating"}
 
-    file_path = UPLOAD_DIR / doc["video_filename"]
-    if not file_path.exists():
+    # Verify the source video is REACHABLE (local disk OR Cloudflare R2).
+    # After the R2 flush, `video_filename` still exists in the doc but the file
+    # itself lives at `video_url_override` — the old local-only check returned
+    # a false 404 for every prepaid Premium/VIP report. `_ensure_report_video_local`
+    # handles both cases (local first, then downloads from R2 on demand).
+    local_or_r2 = await _ensure_report_video_local(report_id)
+    if not local_or_r2 or not local_or_r2.exists():
         raise HTTPException(status_code=404, detail="Video file missing")
 
     # Mark as queued + clear any previous error and kick off the bg task.
