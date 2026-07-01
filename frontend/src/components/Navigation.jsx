@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: "What's inside", testid: "what-you-get" },
   { label: "Sample", testid: "example-report" },
   { label: "Pricing", testid: "pricing-section" },
+  { label: "For scouts", to: "/scouts" },
   { label: "Blog", to: "/blog" },
   { label: "Methodology", to: "/methodology" },
 ];

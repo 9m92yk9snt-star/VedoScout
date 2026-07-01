@@ -26,6 +26,26 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 107 — Scout Database Fase 1+2 (Feb 28 2026)**:
+  - **Player-side (Fase 1)**:
+    - New `ProfileVisibilityCard` in Dashboard: avatar upload OR auto-generate from bounding-box crop of a video report + "Let scouts find me" toggle + public profile fields (position, foot, height/weight, country, club, bio).
+    - GDPR-safe: minors (<16 based on birth_year) require `parent_consent` checkbox before becoming discoverable — enforced backend (400 error if omitted) and frontend (banner + checkbox).
+    - New backend routes: `GET/PUT /api/profile/me`, `POST /api/profile/avatar/upload`, `POST /api/profile/avatar/from-report/{report_id}`, `DELETE /api/profile/avatar`.
+    - Avatar stored under `/api/uploads/avatars/{user_id}.{ext}` (5 MB max, JPG/PNG/WEBP).
+  - **Scout-side (Fase 2)**:
+    - New paid subscription type `SCOUT_ACCESS_TIERS`: `scout_basic` ($49/mo · 5 reveals), `scout_pro` ($149/mo · unlimited), `club_enterprise` ($499/mo · 5 seats + unlimited). Stripe live products auto-provisioned on startup.
+    - New `/scouts` public landing page — hero + why + 3-tier pricing table with Stripe checkout CTA. `ScoutsLandingPage.jsx`.
+    - New `/players-database` search page (protected). `PlayersDatabasePage.jsx`. Paywall (`Lock` icon + "See pricing" CTA) shown to any user without active scout access.
+    - Filters: search text + position + foot + country + min/max age.
+    - Player card: avatar + poster + name + position + age + overall score + country + club + foot + height + "Contact locked/revealed" pill.
+    - **PlayerDetailDrawer** — slide-in from right: full identity + meta grid + reveal button (deducts from monthly quota) + latest reports list.
+    - New backend routes: `GET /api/scout-access/tiers` (public), `GET /api/scout-access/me`, `POST /api/scout-access/subscribe`, `GET /api/scout-access/status/{session_id}`, `GET /api/players-database/search`, `GET /api/players-database/player/{id}`, `POST /api/players-database/reveal/{player_id}`.
+    - Stripe webhook branch `kind=scout_access` — grants access + elevates role to `scout_client` / `club_client`.
+    - Reveal-flow: emails the player a courtesy notification when a scout reveals their contact (uses existing SMTP infra).
+    - Router fix: moved `app.include_router(api_router)` to the END of server.py so all `@api_router` decorators added below the startup handler get registered.
+  - **Navigation update**: Added "For scouts" link to main nav so scouts/clubs discover the sales page.
+  - **Verified via curl + screenshots**: tiers endpoint returns 3 tiers with correct pricing, admin bypass search returns the seeded Premium Demo User, paywall renders correctly for non-scout users, player detail drawer shows all metadata, reveal button visible when contact locked.
+
 - ✅ **🆕 Session 106 — Realtime admin sale-notification email (Feb 28 2026)**:
   - After every successful Stripe `checkout.session.completed` (subscription, single-report, extra-report, progress-pass), the operator now receives an instant email at `SMTP_FROM_EMAIL` (falls back to `SMTP_USERNAME`, override via `ADMIN_SALES_EMAIL` env var).
   - Subject line: `💸 New sale — $99.00 · Premium · Lukas A.` (dynamic amount + short product + buyer).

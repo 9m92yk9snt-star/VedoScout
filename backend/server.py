@@ -165,6 +165,37 @@ SUBSCRIPTION_TIERS = {
 # A user record's `subscription.tier` will be one of {"free", "premium", "vip"}.
 # Free is implicit (no Stripe price/product); paid tiers are the keys above.
 
+# Single source of truth for the PAID SCOUT ACCESS tiers — a separate subscription
+# type from the player-side Premium/VIP tiers. Grants read access to the /players-database
+# (the paid scout search index of discoverable players). One user can hold BOTH a player
+# subscription and a scout-access subscription simultaneously.
+SCOUT_ACCESS_TIERS = {
+    "scout_basic": {
+        "name": "ScoutMePlay Scout Basic",
+        "description": "Search + view player profiles · 5 contact reveals/month · Individual scouts & agents",
+        "amount": 49.00,
+        "monthly_reveals": 5,
+        "seats": 1,
+        "role_hint": "scout_client",
+    },
+    "scout_pro": {
+        "name": "ScoutMePlay Scout Pro",
+        "description": "Unlimited contact reveals · Saved favourites · CSV export · Priority support",
+        "amount": 149.00,
+        "monthly_reveals": None,  # unlimited
+        "seats": 1,
+        "role_hint": "scout_client",
+    },
+    "club_enterprise": {
+        "name": "ScoutMePlay Club Enterprise",
+        "description": "5 seats · Unlimited reveals · Custom filters · Team dashboard · Priority support",
+        "amount": 499.00,
+        "monthly_reveals": None,  # unlimited
+        "seats": 5,
+        "role_hint": "club_client",
+    },
+}
+
 # ---- App ----
 app = FastAPI(title="Elite Football AI Scout API")
 api_router = APIRouter(prefix="/api")
@@ -3120,6 +3151,221 @@ async def me(user=Depends(get_current_user)):
         role=user["role"],
         created_at=user["created_at"],
     )
+
+
+# ============== ROUTES: PLAYER PROFILE & VISIBILITY ==============
+# Phase 1 of the "Scout Database" feature — every player now has an editable
+# public profile (avatar + position + physical stats + country + club) plus a
+# `discoverable` toggle that opts them in/out of the paid scout search index.
+# Minors (<16 by birth_year) must confirm parental_consent to be discoverable.
+
+_AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+_AVATAR_ALLOWED_MIME = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+
+
+def _public_profile_of(user_doc: dict) -> dict:
+    pp = user_doc.get("public_profile") or {}
+    avatar_filename = user_doc.get("avatar_filename")
+    # avatar_filename is stored as "avatars/<user_id>.<ext>" — pass through as-is
+    # under /api/uploads/ (which is mounted on UPLOAD_DIR).
+    avatar_url = f"/api/uploads/{avatar_filename}" if avatar_filename else None
+    return {
+        "user_id": user_doc.get("id"),
+        "full_name": user_doc.get("full_name"),
+        "email": user_doc.get("email"),
+        "role": user_doc.get("role"),
+        "avatar_url": avatar_url,
+        "avatar_source": user_doc.get("avatar_source"),
+        "discoverable": bool(user_doc.get("discoverable", False)),
+        "parent_consent": bool(user_doc.get("parent_consent", False)),
+        "birth_year": user_doc.get("birth_year"),
+        "public_profile": {
+            "position": pp.get("position"),
+            "preferred_foot": pp.get("preferred_foot"),
+            "height_cm": pp.get("height_cm"),
+            "weight_kg": pp.get("weight_kg"),
+            "country": pp.get("country"),
+            "club": pp.get("club"),
+            "bio": pp.get("bio"),
+        },
+        "discoverable_updated_at": user_doc.get("discoverable_updated_at"),
+    }
+
+
+class PublicProfileUpdate(BaseModel):
+    position: Optional[str] = None
+    preferred_foot: Optional[str] = None  # left / right / both
+    height_cm: Optional[int] = None
+    weight_kg: Optional[int] = None
+    country: Optional[str] = None
+    club: Optional[str] = None
+    bio: Optional[str] = None
+
+
+class ProfileVisibilityUpdate(BaseModel):
+    discoverable: Optional[bool] = None
+    parent_consent: Optional[bool] = None
+    birth_year: Optional[int] = None
+    public_profile: Optional[PublicProfileUpdate] = None
+
+
+def _is_minor(birth_year: Optional[int]) -> bool:
+    if not birth_year:
+        return False
+    try:
+        current_year = datetime.now(timezone.utc).year
+        return (current_year - int(birth_year)) < 16
+    except (TypeError, ValueError):
+        return False
+
+
+@api_router.get("/profile/me")
+async def get_my_profile(user=Depends(get_current_user)):
+    """Returns the caller's full profile (avatar, visibility toggles, public fields)."""
+    full_doc = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    if not full_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _public_profile_of(full_doc)
+
+
+@api_router.put("/profile/me")
+async def update_my_profile(payload: ProfileVisibilityUpdate, user=Depends(get_current_user)):
+    """Update visibility toggles + public profile fields.
+    Enforces parental-consent gate for minors — a discoverable=True from a user
+    with birth_year making them <16 is rejected unless parent_consent is also True.
+    """
+    updates: dict = {}
+    if payload.birth_year is not None:
+        updates["birth_year"] = int(payload.birth_year)
+    if payload.parent_consent is not None:
+        updates["parent_consent"] = bool(payload.parent_consent)
+
+    # discoverable gate: minors require parent_consent
+    if payload.discoverable is not None:
+        want_discoverable = bool(payload.discoverable)
+        if want_discoverable:
+            effective_by = updates.get("birth_year", user.get("birth_year"))
+            effective_pc = updates.get("parent_consent", user.get("parent_consent"))
+            if _is_minor(effective_by) and not effective_pc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Parental consent is required for players under 16 to be discoverable.",
+                )
+        updates["discoverable"] = want_discoverable
+        updates["discoverable_updated_at"] = now_iso()
+
+    if payload.public_profile is not None:
+        existing_pp = user.get("public_profile") or {}
+        merged = dict(existing_pp)
+        for k, v in payload.public_profile.dict(exclude_unset=True).items():
+            merged[k] = v
+        updates["public_profile"] = merged
+
+    if not updates:
+        return _public_profile_of(user)
+
+    await db.users.update_one({"id": user["id"]}, {"$set": updates})
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+    return _public_profile_of(fresh)
+
+
+@api_router.post("/profile/avatar/upload")
+async def upload_avatar(file: UploadFile = File(...), user=Depends(get_current_user)):
+    """Upload a custom avatar. Replaces any previous avatar for this user."""
+    if file.content_type not in _AVATAR_ALLOWED_MIME:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG or WEBP images are allowed.")
+    avatars_dir = UPLOAD_DIR / "avatars"
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    ext = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp"}.get(
+        file.content_type, "jpg"
+    )
+    fname = f"{user['id']}.{ext}"
+    fpath = avatars_dir / fname
+    total = 0
+    with fpath.open("wb") as buf:
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _AVATAR_MAX_BYTES:
+                fpath.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail="Avatar must be 5 MB or smaller.")
+            buf.write(chunk)
+    # Remove any old avatars in a different extension for this user
+    for other in avatars_dir.glob(f"{user['id']}.*"):
+        if other.name != fname:
+            other.unlink(missing_ok=True)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "avatar_filename": f"avatars/{fname}",
+            "avatar_source": "upload",
+            "avatar_updated_at": now_iso(),
+        }},
+    )
+    return {
+        "ok": True,
+        "avatar_url": f"/api/uploads/avatars/{fname}",
+        "avatar_source": "upload",
+    }
+
+
+@api_router.post("/profile/avatar/from-report/{report_id}")
+async def avatar_from_report(report_id: str, user=Depends(get_current_user)):
+    """Auto-generate an avatar from the cropped subject frame of one of the
+    user's own reports. Uses the existing `subject_crop_filename` (already
+    produced by the background pipeline from the 10-tap marked bounding box).
+    """
+    report = await db.reports.find_one({"id": report_id, "user_id": user["id"]}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found for this user")
+    crop_name = report.get("subject_crop_filename")
+    if not crop_name:
+        raise HTTPException(
+            status_code=400,
+            detail="This report has no player crop yet — try again once analysis finishes.",
+        )
+    src = UPLOAD_DIR / crop_name
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Player crop file is missing on disk")
+
+    avatars_dir = UPLOAD_DIR / "avatars"
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    fname = f"{user['id']}.jpg"
+    dst = avatars_dir / fname
+    shutil.copyfile(src, dst)
+    # Clear any other-extension leftovers
+    for other in avatars_dir.glob(f"{user['id']}.*"):
+        if other.name != fname:
+            other.unlink(missing_ok=True)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {
+            "avatar_filename": f"avatars/{fname}",
+            "avatar_source": "auto_video",
+            "avatar_updated_at": now_iso(),
+            "avatar_from_report_id": report_id,
+        }},
+    )
+    return {
+        "ok": True,
+        "avatar_url": f"/api/uploads/avatars/{fname}",
+        "avatar_source": "auto_video",
+        "from_report_id": report_id,
+    }
+
+
+@api_router.delete("/profile/avatar")
+async def delete_avatar(user=Depends(get_current_user)):
+    avatars_dir = UPLOAD_DIR / "avatars"
+    for f in avatars_dir.glob(f"{user['id']}.*"):
+        f.unlink(missing_ok=True)
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$unset": {"avatar_filename": "", "avatar_source": "", "avatar_from_report_id": ""}},
+    )
+    return {"ok": True}
 
 
 # ============== ROUTES: VIDEO UPLOAD & FREE PREVIEW ==============
@@ -6742,6 +6988,98 @@ async def _get_subscription_price_id(tier: str) -> Optional[str]:
     return ((doc or {}).get("value") or {}).get("price_id")
 
 
+# ─── SCOUT ACCESS: idempotent Stripe product provisioning + helpers ───
+
+async def _ensure_scout_access_products():
+    """Mirrors `_ensure_subscription_products` but for the SCOUT ACCESS tiers.
+    Creates a Stripe Product + monthly recurring Price for scout_basic / scout_pro /
+    club_enterprise, cached under settings key `stripe_scout_access_<tier>`.
+    """
+    if not _embedded_ready():
+        return
+    _arm_real_stripe()
+    for tier_id, conf in SCOUT_ACCESS_TIERS.items():
+        settings_key = f"stripe_scout_access_{tier_id}"
+        existing = await db.settings.find_one({"key": settings_key}, {"_id": 0})
+        if existing and existing.get("value", {}).get("price_id"):
+            continue
+        try:
+            product = stripe_sdk.Product.create(
+                name=conf["name"],
+                description=conf["description"],
+                metadata={
+                    **_SCOUTMEPLAY_METADATA,
+                    "tier": tier_id,
+                    "tier_kind": "scout_access",
+                },
+            )
+            price = stripe_sdk.Price.create(
+                unit_amount=int(round(conf["amount"] * 100)),
+                currency=PRICE_CURRENCY,
+                recurring={"interval": "month"},
+                product=product.id,
+                metadata={"tier": tier_id, "kind": "scout_access"},
+            )
+        except Exception:
+            logger.exception(f"Failed to provision Stripe scout-access product+price for '{tier_id}'")
+            continue
+
+        await db.settings.update_one(
+            {"key": settings_key},
+            {"$set": {
+                "key": settings_key,
+                "value": {
+                    "product_id": product.id,
+                    "price_id": price.id,
+                    "amount": conf["amount"],
+                    "currency": PRICE_CURRENCY,
+                },
+                "updated_at": now_iso(),
+            }},
+            upsert=True,
+        )
+        logger.info(f"Stripe provisioned scout-access tier '{tier_id}' → {price.id} (${conf['amount']}/mo)")
+
+
+async def _get_scout_access_price_id(tier: str) -> Optional[str]:
+    doc = await db.settings.find_one({"key": f"stripe_scout_access_{tier}"}, {"_id": 0})
+    return ((doc or {}).get("value") or {}).get("price_id")
+
+
+def _has_active_scout_access(user: dict) -> Optional[dict]:
+    """Returns the active scout_access dict if the user is currently subscribed as a scout/club,
+    otherwise None. Considers status='active' AND the current period not expired."""
+    sa = user.get("scout_access") or {}
+    if sa.get("status") != "active":
+        return None
+    period_end = sa.get("current_period_end")
+    if period_end:
+        try:
+            # Accept both ISO string and epoch int
+            if isinstance(period_end, (int, float)):
+                exp = datetime.fromtimestamp(period_end, tz=timezone.utc)
+            else:
+                exp = datetime.fromisoformat(str(period_end).replace("Z", "+00:00"))
+            if exp < datetime.now(timezone.utc):
+                return None
+        except Exception:
+            pass
+    return sa
+
+
+async def _require_scout_access(user=Depends(get_current_user)) -> dict:
+    """Dependency — 402 Payment Required if the caller has no active scout access."""
+    if user.get("role") == "admin":
+        return user  # admins bypass the paywall for testing/moderation
+    sa = _has_active_scout_access(user)
+    if not sa:
+        raise HTTPException(
+            status_code=402,
+            detail="Scout access subscription required. Subscribe at /scouts to browse the player database.",
+        )
+    return user
+
+
 def _subscription_state_from_stripe(sub) -> Dict[str, Any]:
     """Translate a Stripe Subscription object into the shape we persist on `users.subscription`.
     Accepts either a SDK object or a webhook event dict."""
@@ -7736,6 +8074,56 @@ async def stripe_webhook_embedded(request: Request):
                     }},
                 )
 
+        elif kind == "scout_access":
+            # Fase 2 — grant scout database access. Mirror of the subscription
+            # branch above, but writes to `users.scout_access` instead of
+            # `users.subscription` and (for regular users only) elevates their
+            # role to scout_client / club_client for future authorization.
+            user_id = metadata.get("user_id") or (txn or {}).get("user_id")
+            sub_id = session.get("subscription")
+            tier_id = metadata.get("tier") or (txn or {}).get("tier")
+            if user_id and sub_id and tier_id and not (txn or {}).get("credited"):
+                try:
+                    _arm_real_stripe()
+                    live = stripe_sdk.Subscription.retrieve(sub_id)
+                    period_end_raw = getattr(live, "current_period_end", None) or (
+                        live.get("current_period_end") if isinstance(live, dict) else None
+                    )
+                    period_end = None
+                    if period_end_raw:
+                        period_end = datetime.fromtimestamp(int(period_end_raw), tz=timezone.utc).isoformat()
+                    tier_conf = SCOUT_ACCESS_TIERS.get(tier_id, {})
+                    scout_access_state = {
+                        "tier": tier_id,
+                        "status": "active",
+                        "stripe_subscription_id": sub_id,
+                        "stripe_customer_id": session.get("customer"),
+                        "current_period_end": period_end,
+                        "monthly_reveals": tier_conf.get("monthly_reveals"),
+                        "seats": tier_conf.get("seats", 1),
+                        "reveals_used_this_period": 0,
+                        "reveal_period_marker": period_end,
+                        "started_at": now_iso(),
+                    }
+                    set_ops = {"scout_access": scout_access_state}
+                    role_hint = tier_conf.get("role_hint", "scout_client")
+                    u = await db.users.find_one({"id": user_id}, {"_id": 0, "role": 1})
+                    if (u or {}).get("role") in (None, "user"):
+                        set_ops["role"] = role_hint
+                    await db.users.update_one({"id": user_id}, {"$set": set_ops})
+                except Exception:
+                    logger.exception("Webhook scout-access activation failed")
+            if txn:
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {"$set": {
+                        "payment_status": "paid",
+                        "status": "complete",
+                        "credited": True,
+                        "updated_at": now_iso(),
+                    }},
+                )
+
         # ── Purchase confirmation email — fire-and-forget for every paid kind ──
         # Runs AFTER we've credited the user in Mongo so if SMTP is slow, the
         # user's dashboard is already updated. Never blocks the webhook response.
@@ -7759,6 +8147,7 @@ async def stripe_webhook_embedded(request: Request):
                     "report_unlock": "Full Scout Report Unlock",
                     "subscription":  f"{metadata.get('tier', '').title() or 'Premium'} Subscription",
                     "progress_pass": "Season Progress Pass",
+                    "scout_access":  f"{SCOUT_ACCESS_TIERS.get(metadata.get('tier') or '', {}).get('name') or 'Scout Access'}",
                 }.get(kind, "ScoutMePlay purchase")
                 extra_details = None
                 if kind == "prepay_upload":
@@ -7768,6 +8157,8 @@ async def stripe_webhook_embedded(request: Request):
                         "premium": "Premium subscriber rate — cheaper than single-report price",
                         "vip":     "VIP subscriber rate — deepest per-report discount",
                     }.get(price_tier)
+                elif kind == "scout_access":
+                    extra_details = "Monthly scout database access — search + reveal player contacts"
                 html, text, subject = render_purchase_confirmation(
                     user_name=user_name,
                     product_name=product_name,
@@ -8887,7 +9278,9 @@ api_router.include_router(build_progress_router(
 ))
 mount_blog_uploads(app)
 
-app.include_router(api_router)
+# NOTE: app.include_router(api_router) is called at the very bottom of this
+# file so it captures ALL @api_router routes (including scout-access + players
+# database endpoints added below the startup handler).
 
 app.add_middleware(
     CORSMiddleware,
@@ -8932,7 +9325,449 @@ async def on_startup():
     except Exception:
         logger.exception("Subscription product provisioning failed on startup (will retry lazily)")
 
+    # Provision Stripe scout-access subscription products (Fase 2 — scout database).
+    try:
+        await _ensure_scout_access_products()
+    except Exception:
+        logger.exception("Scout-access product provisioning failed on startup (will retry lazily)")
+
+
+# ============== ROUTES: SCOUT ACCESS SUBSCRIPTION (Fase 2) ==============
+# Separate paid subscription that unlocks the /players-database search index
+# for scouts, agents and clubs. Users can hold both a player subscription
+# (Premium/VIP) and a scout access subscription at the same time.
+
+class ScoutAccessSubscribe(BaseModel):
+    tier: str
+    origin_url: str
+
+
+def _scout_reveal_period_state(user_doc: dict) -> dict:
+    """Rolls reveal-count over on a fresh billing period. Returns updated fields
+    to $set on the user doc so the caller can persist them if desired."""
+    sa = user_doc.get("scout_access") or {}
+    period_end = sa.get("current_period_end")
+    reveal_period_marker = sa.get("reveal_period_marker")
+    if period_end and period_end != reveal_period_marker:
+        # New period started — reset reveals
+        return {"reveals_used_this_period": 0, "reveal_period_marker": period_end}
+    return {}
+
+
+@api_router.get("/scout-access/tiers")
+async def public_scout_access_tiers():
+    """Public — list scout access tiers and prices for the /scouts landing page."""
+    tiers = []
+    for tier_id, conf in SCOUT_ACCESS_TIERS.items():
+        tiers.append({
+            "id": tier_id,
+            "name": conf["name"],
+            "description": conf["description"],
+            "amount": conf["amount"],
+            "currency": PRICE_CURRENCY,
+            "monthly_reveals": conf["monthly_reveals"],
+            "seats": conf["seats"],
+        })
+    return {"tiers": tiers}
+
+
+@api_router.get("/scout-access/me")
+async def get_my_scout_access(user=Depends(get_current_user)):
+    """Returns the caller's active scout access state (or a stub when inactive)."""
+    sa = user.get("scout_access") or {}
+    active = _has_active_scout_access(user) is not None or user.get("role") == "admin"
+    tier_id = sa.get("tier")
+    tier_conf = SCOUT_ACCESS_TIERS.get(tier_id, {}) if tier_id else {}
+    used = int(sa.get("reveals_used_this_period") or 0)
+    limit = tier_conf.get("monthly_reveals")  # None => unlimited
+    remaining = None if limit is None else max(0, limit - used)
+    return {
+        "active": bool(active),
+        "tier": tier_id,
+        "status": sa.get("status", "inactive"),
+        "current_period_end": sa.get("current_period_end"),
+        "monthly_reveals": limit,
+        "reveals_used_this_period": used,
+        "reveals_remaining": remaining,
+        "seats": tier_conf.get("seats", 1),
+        "started_at": sa.get("started_at"),
+    }
+
+
+@api_router.post("/scout-access/subscribe")
+async def subscribe_scout_access(payload: ScoutAccessSubscribe, user=Depends(get_current_user)):
+    """Create a Stripe Checkout Session for a scout access subscription."""
+    tier = (payload.tier or "").lower().strip()
+    if tier not in SCOUT_ACCESS_TIERS:
+        raise HTTPException(400, "Unknown scout access tier")
+    if not _embedded_ready():
+        raise HTTPException(503, "Scout access checkout not configured. Add Stripe live keys to enable.")
+    if _has_active_scout_access(user):
+        raise HTTPException(409, "You already have an active scout access subscription.")
+
+    price_id = await _get_scout_access_price_id(tier)
+    if not price_id:
+        await _ensure_scout_access_products()
+        price_id = await _get_scout_access_price_id(tier)
+        if not price_id:
+            raise HTTPException(503, f"Stripe scout-access price for '{tier}' not provisioned yet — try again.")
+
+    origin = payload.origin_url.rstrip("/")
+    success_url = f"{origin}/players-database?scout_session={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/scouts?scout_canceled=1"
+
+    metadata = _build_embedded_metadata({
+        "kind": "scout_access",
+        "tier": tier,
+        "user_id": user["id"],
+        "user_email": user["email"],
+    })
+
+    try:
+        _arm_real_stripe()
+        existing_sub = (user.get("scout_access") or {})
+        customer_id = existing_sub.get("stripe_customer_id") or (user.get("subscription") or {}).get("stripe_customer_id")
+        session_kwargs = dict(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata=metadata,
+            subscription_data={"metadata": metadata},
+            allow_promotion_codes=True,
+        )
+        if customer_id:
+            session_kwargs["customer"] = customer_id
+        else:
+            session_kwargs["customer_email"] = user["email"]
+        session = stripe_sdk.checkout.Session.create(**session_kwargs)
+    except Exception as e:
+        logger.exception("Stripe scout-access session create failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "report_id": None,
+        "kind": "scout_access",
+        "tier": tier,
+        "ui_mode": "hosted",
+        "brand": "ScoutMePlay",
+        "amount": SCOUT_ACCESS_TIERS[tier]["amount"],
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    })
+
+    return {"url": session.url, "session_id": session.id}
+
+
+@api_router.get("/scout-access/status/{session_id}")
+async def get_scout_access_status(session_id: str, user=Depends(get_current_user)):
+    """Poll endpoint after Stripe redirect back. Idempotently credits scout_access."""
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    if not txn:
+        raise HTTPException(404, "Session not found")
+    if txn["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(403, "Not authorized")
+
+    if txn.get("payment_status") == "paid" and txn.get("credited"):
+        u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+        return {"payment_status": "paid", "status": "complete", "kind": "scout_access",
+                "tier": txn.get("tier"), "scout_access": (u or {}).get("scout_access")}
+
+    if not _embedded_ready():
+        raise HTTPException(503, "Stripe not configured.")
+
+    try:
+        _arm_real_stripe()
+        session = stripe_sdk.checkout.Session.retrieve(session_id, expand=["subscription"])
+    except Exception as e:
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    ps = getattr(session, "payment_status", None) or session.get("payment_status", None)
+    if ps == "paid":
+        # Credit scout access on user doc
+        sub_obj = getattr(session, "subscription", None) or session.get("subscription", None)
+        sub_id = sub_obj.id if hasattr(sub_obj, "id") else (sub_obj.get("id") if isinstance(sub_obj, dict) else None)
+        tier_id = txn["tier"]
+        tier_conf = SCOUT_ACCESS_TIERS.get(tier_id, {})
+        # Derive period end from the subscription object if present
+        period_end = None
+        if sub_obj:
+            pe = getattr(sub_obj, "current_period_end", None) or (sub_obj.get("current_period_end") if isinstance(sub_obj, dict) else None)
+            if pe:
+                period_end = datetime.fromtimestamp(int(pe), tz=timezone.utc).isoformat()
+        scout_access_state = {
+            "tier": tier_id,
+            "status": "active",
+            "stripe_subscription_id": sub_id,
+            "stripe_customer_id": getattr(session, "customer", None) or session.get("customer", None),
+            "current_period_end": period_end,
+            "monthly_reveals": tier_conf.get("monthly_reveals"),
+            "seats": tier_conf.get("seats", 1),
+            "reveals_used_this_period": 0,
+            "reveal_period_marker": period_end,
+            "started_at": now_iso(),
+        }
+        role_hint = tier_conf.get("role_hint", "scout_client")
+        # Upgrade role only if the user was previously a regular user (never demote admins/scouts)
+        set_ops = {"scout_access": scout_access_state}
+        u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "role": 1})
+        if (u or {}).get("role") in (None, "user"):
+            set_ops["role"] = role_hint
+        await db.users.update_one({"id": user["id"]}, {"$set": set_ops})
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"payment_status": "paid", "status": "complete", "credited": True, "updated_at": now_iso()}},
+        )
+        fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
+        return {"payment_status": "paid", "status": "complete", "kind": "scout_access",
+                "tier": tier_id, "scout_access": (fresh or {}).get("scout_access")}
+
+    return {"payment_status": ps or "pending", "status": "open", "kind": "scout_access"}
+
+
+# ============== ROUTES: PLAYERS DATABASE (Scout-facing) ==============
+# Search index of discoverable players. Access-gated behind an active scout access
+# subscription. Contact info is hidden by default and revealed via /reveal endpoint.
+
+def _player_report_summary(reports: list) -> dict:
+    """Aggregates a small stats summary from a player's paid reports."""
+    if not reports:
+        return {"reports_count": 0, "highest_overall": None, "latest_report_id": None,
+                "poster_url": None, "positions": []}
+    scores = []
+    positions = set()
+    latest_report_id = reports[0].get("id")
+    poster_url = None
+    for r in reports:
+        pv = r.get("preview") or {}
+        overall = pv.get("overall") or pv.get("overall_score")
+        if isinstance(overall, (int, float)):
+            scores.append(float(overall))
+        pd = r.get("player_details") or {}
+        if pd.get("position"):
+            positions.add(str(pd["position"]))
+        if not poster_url and r.get("poster_filename"):
+            poster_url = f"/api/uploads/{r['poster_filename']}"
+    return {
+        "reports_count": len(reports),
+        "highest_overall": round(max(scores), 1) if scores else None,
+        "latest_report_id": latest_report_id,
+        "poster_url": poster_url,
+        "positions": sorted(positions),
+    }
+
+
+def _serialize_public_player(user_doc: dict, summary: dict, include_contact: bool = False) -> dict:
+    pp = user_doc.get("public_profile") or {}
+    avatar_filename = user_doc.get("avatar_filename")
+    age = None
+    if user_doc.get("birth_year"):
+        try:
+            age = datetime.now(timezone.utc).year - int(user_doc["birth_year"])
+        except Exception:
+            age = None
+    return {
+        "id": user_doc.get("id"),
+        "display_name": user_doc.get("full_name"),
+        "avatar_url": f"/api/uploads/{avatar_filename}" if avatar_filename else None,
+        "age": age,
+        "birth_year": user_doc.get("birth_year"),
+        "position": pp.get("position"),
+        "preferred_foot": pp.get("preferred_foot"),
+        "height_cm": pp.get("height_cm"),
+        "weight_kg": pp.get("weight_kg"),
+        "country": pp.get("country"),
+        "club": pp.get("club"),
+        "bio": pp.get("bio"),
+        "reports_count": summary.get("reports_count", 0),
+        "highest_overall": summary.get("highest_overall"),
+        "latest_report_id": summary.get("latest_report_id"),
+        "poster_url": summary.get("poster_url"),
+        "positions_played": summary.get("positions", []),
+        "contact_email": user_doc.get("email") if include_contact else None,
+        "contact_revealed": include_contact,
+    }
+
+
+@api_router.get("/players-database/search")
+async def players_database_search(
+    position: Optional[str] = None,
+    country: Optional[str] = None,
+    min_age: Optional[int] = None,
+    max_age: Optional[int] = None,
+    preferred_foot: Optional[str] = None,
+    min_overall: Optional[float] = None,
+    q: Optional[str] = None,
+    limit: int = 24,
+    skip: int = 0,
+    user=Depends(_require_scout_access),
+):
+    """Paid scout search — returns discoverable players filtered by criteria."""
+    limit = max(1, min(int(limit), 60))
+    skip = max(0, int(skip))
+    query = {"discoverable": True}
+    if position:
+        query["public_profile.position"] = position.upper()
+    if country:
+        query["public_profile.country"] = {"$regex": f"^{country}$", "$options": "i"}
+    if preferred_foot:
+        query["public_profile.preferred_foot"] = preferred_foot.lower()
+    if min_age is not None or max_age is not None:
+        current_year = datetime.now(timezone.utc).year
+        by_query = {}
+        if min_age is not None:
+            by_query["$lte"] = current_year - int(min_age)
+        if max_age is not None:
+            by_query["$gte"] = current_year - int(max_age)
+        if by_query:
+            query["birth_year"] = by_query
+    if q:
+        query["$or"] = [
+            {"full_name": {"$regex": q, "$options": "i"}},
+            {"public_profile.club": {"$regex": q, "$options": "i"}},
+            {"public_profile.bio": {"$regex": q, "$options": "i"}},
+        ]
+
+    total = await db.users.count_documents(query)
+    cursor = db.users.find(query, {"_id": 0, "password_hash": 0}).sort("discoverable_updated_at", -1).skip(skip).limit(limit)
+
+    scout_user_id = user["id"]
+    revealed = set(
+        (user.get("scout_access") or {}).get("revealed_player_ids") or []
+    )
+
+    out = []
+    async for u in cursor:
+        # Aggregate report summary
+        r_cursor = db.reports.find(
+            {"user_id": u["id"], "$or": [{"is_paid": True}, {"manually_unlocked": True}]},
+            {"_id": 0, "id": 1, "player_details": 1, "preview": 1, "poster_filename": 1, "created_at": 1},
+        ).sort("created_at", -1).limit(10)
+        reports = [r async for r in r_cursor]
+        summary = _player_report_summary(reports)
+        if min_overall is not None and (summary.get("highest_overall") or 0) < float(min_overall):
+            continue
+        include_contact = u["id"] in revealed
+        out.append(_serialize_public_player(u, summary, include_contact=include_contact))
+
+    return {
+        "total": total,
+        "limit": limit,
+        "skip": skip,
+        "results": out,
+        "filters_applied": {
+            "position": position, "country": country, "min_age": min_age, "max_age": max_age,
+            "preferred_foot": preferred_foot, "min_overall": min_overall, "q": q,
+        },
+        "scout_id": scout_user_id,
+    }
+
+
+@api_router.get("/players-database/player/{player_id}")
+async def players_database_player_detail(player_id: str, user=Depends(_require_scout_access)):
+    p = await db.users.find_one({"id": player_id, "discoverable": True}, {"_id": 0, "password_hash": 0})
+    if not p:
+        raise HTTPException(404, "Player not found or not discoverable")
+    r_cursor = db.reports.find(
+        {"user_id": p["id"], "$or": [{"is_paid": True}, {"manually_unlocked": True}]},
+        {"_id": 0, "id": 1, "player_details": 1, "preview": 1, "poster_filename": 1, "created_at": 1},
+    ).sort("created_at", -1).limit(10)
+    reports = [r async for r in r_cursor]
+    summary = _player_report_summary(reports)
+    revealed = set((user.get("scout_access") or {}).get("revealed_player_ids") or [])
+    include_contact = p["id"] in revealed or user.get("role") == "admin"
+    return {
+        "player": _serialize_public_player(p, summary, include_contact=include_contact),
+        "reports": [
+            {
+                "id": r["id"],
+                "player_details": r.get("player_details"),
+                "poster_url": f"/api/uploads/{r['poster_filename']}" if r.get("poster_filename") else None,
+                "preview_overall": (r.get("preview") or {}).get("overall") or (r.get("preview") or {}).get("overall_score"),
+                "created_at": r.get("created_at"),
+            }
+            for r in reports
+        ],
+    }
+
+
+@api_router.post("/players-database/reveal/{player_id}")
+async def players_database_reveal(player_id: str, user=Depends(_require_scout_access)):
+    """Deduct one reveal from the scout's monthly quota (or unlimited) and mark the
+    player as revealed for THIS scout. Also emails the player that a scout viewed them."""
+    p = await db.users.find_one({"id": player_id, "discoverable": True}, {"_id": 0, "password_hash": 0})
+    if not p:
+        raise HTTPException(404, "Player not found or not discoverable")
+
+    sa = user.get("scout_access") or {}
+    tier_conf = SCOUT_ACCESS_TIERS.get(sa.get("tier") or "", {})
+    limit = tier_conf.get("monthly_reveals")  # None => unlimited
+    revealed = list(sa.get("revealed_player_ids") or [])
+    already_revealed = player_id in revealed
+
+    # Roll over period if needed
+    rollover = _scout_reveal_period_state({"scout_access": sa})
+    used = int(rollover.get("reveals_used_this_period", sa.get("reveals_used_this_period") or 0))
+
+    if not already_revealed:
+        if limit is not None and used >= limit:
+            raise HTTPException(status_code=402, detail=f"Reveal quota reached ({limit}/month). Upgrade to Scout Pro for unlimited reveals.")
+        revealed.append(player_id)
+        used += 1
+
+    updates = {
+        "scout_access.revealed_player_ids": revealed,
+        "scout_access.reveals_used_this_period": used,
+    }
+    if rollover:
+        updates["scout_access.reveal_period_marker"] = rollover.get("reveal_period_marker")
+
+    await db.users.update_one({"id": user["id"]}, {"$set": updates})
+
+    # Fire courtesy notification to the player (never blocks)
+    if not already_revealed:
+        try:
+            scout_name = user.get("full_name") or user.get("email")
+            html_body = f"""
+            <p>A professional scout has viewed your ScoutMePlay profile.</p>
+            <p><strong>{scout_name}</strong> has requested to see your contact information.
+            They found you through the ScoutMePlay Scout Database.</p>
+            <p>You don't need to do anything — this is a heads-up that your visibility is working.</p>
+            <p>If you'd rather not be found by scouts, you can switch off visibility any time from your dashboard.</p>
+            """
+            from email_templates import render_bulk_email
+            html, text, subject = render_bulk_email(
+                subject="A scout viewed your ScoutMePlay profile",
+                body_html=html_body,
+                preheader=f"{scout_name} viewed your profile",
+            )
+            asyncio.create_task(send_email_async(p["email"], subject, html, text))
+        except Exception as exc:
+            logger.warning("Scout-reveal courtesy email failed: %s", exc)
+
+    return {
+        "ok": True,
+        "player_id": player_id,
+        "contact_email": p.get("email"),
+        "reveals_used_this_period": used,
+        "reveals_remaining": None if limit is None else max(0, limit - used),
+        "already_revealed": already_revealed,
+    }
+
 
 @app.on_event("shutdown")
 async def on_shutdown():
     client.close()
+
+
+# Register the API router LAST so it includes every @api_router route defined above
+# (including scout-access + players-database endpoints in Fase 2).
+app.include_router(api_router)

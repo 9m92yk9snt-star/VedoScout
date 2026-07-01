@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { MiniPitch } from "@/components/FootballAccents";
+import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -323,6 +324,10 @@ export default function DashboardPage() {
                   </div>
                 )}
               </section>
+
+              {/* PROFILE & VISIBILITY — Phase 1 of the paid Scout Database.
+                 Players opt in here so scouts can find them via /players-database. */}
+              <ProfileVisibilityCard latestReportId={reports[0]?.id} />
 
               {/* PLAYERS / TRAJECTORIES — moved BELOW reports. */}
               {players.length > 0 && (
