@@ -18,6 +18,7 @@ export default function DemoVideosAdmin() {
   const [videos, setVideos] = useState(null);
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const load = async () => {
     const { data } = await api.get("/admin/demo-videos");
@@ -25,6 +26,14 @@ export default function DemoVideosAdmin() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Auto-cancel pending confirm after 4s so the "Confirm delete?" state
+  // doesn't sit around forever if the admin clicks away.
+  useEffect(() => {
+    if (!confirmDeleteId) return;
+    const t = setTimeout(() => setConfirmDeleteId(null), 4000);
+    return () => clearTimeout(t);
+  }, [confirmDeleteId]);
 
   const createNew = () => {
     setCreating(true);
@@ -56,8 +65,14 @@ export default function DemoVideosAdmin() {
   };
 
   const handleDelete = async (id) => {
-    // Skipping window.confirm — it's often blocked/silent inside preview iframes
-    // (Kubernetes ingress + iframe embedding). Row-level confirm UI handles UX.
+    // Inline "click twice to confirm" — window.confirm() is silently blocked
+    // inside our preview iframe (Kubernetes ingress + sandbox), so we use
+    // a two-state button UX instead.
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id);
+      return;
+    }
+    setConfirmDeleteId(null);
     setBusyId(id);
     try {
       await api.delete(`/admin/demo-videos/${id}`);
@@ -149,6 +164,7 @@ export default function DemoVideosAdmin() {
               key={v.id}
               video={v}
               busy={busyId === v.id}
+              pendingConfirm={confirmDeleteId === v.id}
               onUpdate={(payload) => handleUpdate(v.id, payload)}
               onDelete={() => handleDelete(v.id)}
               onMoveUp={i > 0 ? () => move(v.id, "up") : null}
@@ -163,7 +179,7 @@ export default function DemoVideosAdmin() {
 
 /* ─────────────────────────── ROW ─────────────────────────── */
 
-function DemoVideoRow({ video, busy, onUpdate, onDelete, onMoveUp, onMoveDown }) {
+function DemoVideoRow({ video, busy, pendingConfirm, onUpdate, onDelete, onMoveUp, onMoveDown }) {
   const [title, setTitle] = useState(video.title || "");
   const [subtitle, setSubtitle] = useState(video.subtitle || "");
   const [dirty, setDirty] = useState(false);
@@ -273,9 +289,14 @@ function DemoVideoRow({ video, busy, onUpdate, onDelete, onMoveUp, onMoveDown })
           <button
             type="button" onClick={onDelete} disabled={busy}
             data-testid={`demo-row-delete-${video.id}`}
-            className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-black border border-red-300 text-red-700 hover:bg-red-100 px-3 py-2 transition-colors"
+            className={`inline-flex items-center gap-1.5 text-[11px] uppercase tracking-widest font-black px-3 py-2 transition-colors ${
+              pendingConfirm
+                ? "bg-red-600 text-white border border-red-600 animate-pulse"
+                : "border border-red-300 text-red-700 hover:bg-red-100"
+            }`}
           >
-            <Trash2 className="w-3.5 h-3.5" /> Delete
+            <Trash2 className="w-3.5 h-3.5" />
+            {pendingConfirm ? "Click to confirm" : "Delete"}
           </button>
         </div>
       </div>

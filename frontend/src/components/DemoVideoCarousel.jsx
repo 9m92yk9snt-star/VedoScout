@@ -39,12 +39,12 @@ export default function DemoVideoCarousel() {
     <section
       id="demo-videos"
       data-testid="demo-video-carousel"
-      className="relative py-14 md:py-16 overflow-hidden bg-cream-base border-y border-ink/10 text-ink"
+      className="relative py-8 md:py-10 overflow-hidden bg-cream-base border-y border-ink/10 text-ink"
     >
       {/* Warm Nano Banana halo — sits behind the card, punchy but soft */}
       <div
         aria-hidden
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] -z-10 pointer-events-none opacity-60"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] h-[440px] -z-10 pointer-events-none opacity-50"
         style={{
           backgroundImage: `url(${BACKEND_URL}/api/static/landing/demo-halo-bokeh.png)`,
           backgroundSize: "cover",
@@ -66,26 +66,26 @@ export default function DemoVideoCarousel() {
         }}
       />
 
-      <div className="max-w-6xl mx-auto px-6 md:px-10">
+      <div className="max-w-5xl mx-auto px-6 md:px-10">
         {/* Header — compact, one row */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="flex items-end justify-between flex-wrap gap-3 mb-6 md:mb-8"
+          className="flex items-end justify-between flex-wrap gap-3 mb-4 md:mb-5"
         >
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Video className="w-3.5 h-3.5 text-forest" />
-              <span className="text-[10px] uppercase tracking-[0.24em] font-black text-forest">
+            <div className="flex items-center gap-2 mb-1">
+              <Video className="w-3 h-3 text-forest" />
+              <span className="text-[9px] uppercase tracking-[0.24em] font-black text-forest">
                 Watch the workflow
               </span>
-              <span aria-hidden className="inline-block w-8 h-px bg-forest/40" />
+              <span aria-hidden className="inline-block w-6 h-px bg-forest/40" />
             </div>
-            <h2 className="font-barlow font-black uppercase tracking-tight text-2xl md:text-3xl leading-[0.95]">
+            <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl leading-[0.95]">
               See how <span className="text-forest">it actually works.</span>
             </h2>
-            <p className="mt-1.5 text-ink/55 text-sm leading-snug max-w-md">
+            <p className="mt-1 text-ink/55 text-xs leading-snug max-w-md">
               {videos.length === 0
                 ? "First iPhone workflow demos landing here soon."
                 : "Short walkthroughs. Real screen, real report."}
@@ -99,18 +99,18 @@ export default function DemoVideoCarousel() {
                 onClick={() => scrollBy(-1)}
                 data-testid="demo-carousel-prev"
                 aria-label="Previous video"
-                className="w-9 h-9 border border-ink/20 hover:border-forest hover:bg-forest/5 text-ink flex items-center justify-center transition-colors"
+                className="w-8 h-8 border border-ink/20 hover:border-forest hover:bg-forest/5 text-ink flex items-center justify-center transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => scrollBy(1)}
                 data-testid="demo-carousel-next"
                 aria-label="Next video"
-                className="w-9 h-9 border border-ink/20 hover:border-forest hover:bg-forest/5 text-ink flex items-center justify-center transition-colors"
+                className="w-8 h-8 border border-ink/20 hover:border-forest hover:bg-forest/5 text-ink flex items-center justify-center transition-colors"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
@@ -158,7 +158,7 @@ function ChalkArrow() {
     <svg
       aria-hidden
       viewBox="0 0 900 300"
-      className="hidden md:block absolute left-[38%] top-8 w-[380px] h-[140px] -z-10 pointer-events-none opacity-70"
+      className="hidden md:block absolute left-[38%] top-4 w-[260px] h-[100px] -z-10 pointer-events-none opacity-70"
       preserveAspectRatio="none"
     >
       <defs>
@@ -227,7 +227,7 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
 
   return (
     <FilmFrame testid={`demo-card-${video.id}`}>
-      <div className="relative aspect-[9/14] max-h-[420px] bg-black">
+      <div className="relative aspect-[9/14] max-h-[300px] bg-black">
         {started ? (
           <video
             ref={videoRef}
@@ -282,7 +282,7 @@ function FilmFrame({ children, testid }) {
     <article
       data-demo-card
       data-testid={testid}
-      className="snap-start shrink-0 w-[80%] sm:w-[58%] md:w-[340px] relative"
+      className="snap-start shrink-0 w-[68%] sm:w-[48%] md:w-[240px] relative"
     >
       {/* Film sprocket holes — left edge */}
       <div
