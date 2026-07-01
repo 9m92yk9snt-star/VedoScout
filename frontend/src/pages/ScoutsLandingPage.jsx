@@ -249,7 +249,7 @@ function HeroSection({ access }) {
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </a>
               <a
-                href="#how"
+                href="#faq"
                 className="group inline-flex items-center gap-3 border border-white/20 hover:border-white text-white font-barlow font-black uppercase tracking-widest text-sm px-8 py-4 backdrop-blur-sm transition-colors"
               >
                 <Play className="w-4 h-4" /> How it works
@@ -667,7 +667,7 @@ function FeatureLine({ children }) {
 
 function FaqSection({ openFaq, setOpenFaq }) {
   return (
-    <section className="relative py-24 md:py-36 border-t border-white/5 bg-[#081810]">
+    <section id="faq" className="relative py-24 md:py-36 border-t border-white/5 bg-[#081810]">
       <div className="max-w-3xl mx-auto px-6 md:px-12">
         <motion.div
           initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}

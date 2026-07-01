@@ -122,6 +122,16 @@ export default function Navigation() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    // Per-page override: on /scouts, "How it works" should scroll to the FAQ
+    // section on the same page — not bounce the visitor back to the front page
+    // where the player-facing walkthrough lives.
+    if (location.pathname === "/scouts" && testid === "how-it-works-walkthrough") {
+      const faq = document.getElementById("faq");
+      if (faq) {
+        faq.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
     const el = document.querySelector(`[data-testid="${testid}"]`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
