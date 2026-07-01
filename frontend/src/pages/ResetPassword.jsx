@@ -73,7 +73,10 @@ export default function ResetPassword() {
         if (typeof setAuthFromResponse === "function") setAuthFromResponse(data);
       }
       toast.success("Password updated. You're logged in.");
-      navigate(data?.user?.role === "admin" || data?.user?.role === "scout" ? "/admin" : "/dashboard");
+      const u = data?.user;
+      if (u?.role === "admin" || u?.role === "scout") navigate("/admin");
+      else if (u?.is_paid_scout) navigate("/players-database");
+      else navigate("/dashboard");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Could not reset password");
     } finally {

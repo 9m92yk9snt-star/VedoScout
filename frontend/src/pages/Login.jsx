@@ -30,8 +30,12 @@ export default function Login() {
       toast.success("Welcome back");
       if (resolvedNext) {
         navigate(resolvedNext);
+      } else if (u.role === "admin" || u.role === "scout") {
+        navigate("/admin");
+      } else if (u.is_paid_scout) {
+        navigate("/players-database");
       } else {
-        navigate(u.role === "admin" || u.role === "scout" ? "/admin" : "/dashboard");
+        navigate("/dashboard");
       }
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Login failed");

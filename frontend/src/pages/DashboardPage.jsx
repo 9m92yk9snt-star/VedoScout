@@ -50,6 +50,12 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    // Paid scouts (Club/Business tier) don't belong on the player dashboard —
+    // send them to their workspace: the Player Database search.
+    if (user?.is_paid_scout) {
+      navigate("/players-database", { replace: true });
+      return;
+    }
     fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

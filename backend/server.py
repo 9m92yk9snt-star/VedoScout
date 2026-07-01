@@ -1996,6 +1996,7 @@ class UserPublic(BaseModel):
     full_name: str
     role: str
     created_at: str
+    is_paid_scout: bool = False  # True when user.scout_access.active is True
 
 
 class TokenResponse(BaseModel):
@@ -3261,6 +3262,7 @@ async def login(payload: UserLogin, request: Request):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     await _login_attempt_clear(ip, email)
     token = create_token(user["id"], user["email"], user["role"])
+    is_paid_scout = (user.get("scout_access") or {}).get("status") == "active"
     return TokenResponse(
         access_token=token,
         user=UserPublic(
@@ -3269,6 +3271,7 @@ async def login(payload: UserLogin, request: Request):
             full_name=user["full_name"],
             role=user["role"],
             created_at=user["created_at"],
+            is_paid_scout=is_paid_scout,
         ),
     )
 
@@ -3373,6 +3376,7 @@ async def reset_password(payload: ResetPasswordRequest, request: Request):
 
     # Log the user in immediately (matches "reset → dashboard" UX expectation).
     access_token = create_token(user["id"], user["email"], user["role"])
+    is_paid_scout = (user.get("scout_access") or {}).get("status") == "active"
     return TokenResponse(
         access_token=access_token,
         user=UserPublic(
@@ -3381,18 +3385,21 @@ async def reset_password(payload: ResetPasswordRequest, request: Request):
             full_name=user["full_name"],
             role=user["role"],
             created_at=user["created_at"],
+            is_paid_scout=is_paid_scout,
         ),
     )
 
 
 @api_router.get("/auth/me", response_model=UserPublic)
 async def me(user=Depends(get_current_user)):
+    is_paid_scout = (user.get("scout_access") or {}).get("status") == "active"
     return UserPublic(
         id=user["id"],
         email=user["email"],
         full_name=user["full_name"],
         role=user["role"],
         created_at=user["created_at"],
+        is_paid_scout=is_paid_scout,
     )
 
 
