@@ -550,10 +550,15 @@ function PremiumCard({ price, extraPrice, singlePrice, onCta, loading = false, d
           data-testid="pricing-premium-extra-line"
           className="mt-3 border border-[#A5DD5F]/40 bg-[#A5DD5F]/10 px-3 py-2 flex items-center justify-between gap-2"
         >
-          <div className="text-[10px] uppercase tracking-[0.16em] font-black text-[#A5DD5F]">
-            Need more reports?
+          <div className="leading-tight">
+            <div className="text-[10px] uppercase tracking-[0.16em] font-black text-[#A5DD5F]">
+              Buy extra reports
+            </div>
+            <div className="text-[9.5px] text-white/70 mt-0.5">
+              Subscriber discount price
+            </div>
           </div>
-          <div className="text-[11px] text-white/85 leading-tight">
+          <div className="text-[11px] text-white/85 leading-tight text-right">
             <span className="font-barlow font-black text-[#CCFF00] text-base">{fmtPrice(extraPrice)}</span>
             <span className="ml-1 text-white/60 line-through decoration-white/40 text-[10px] tabular-nums">
               {singlePrice ? fmtPrice(singlePrice) : ""}
@@ -632,10 +637,15 @@ function VipCard({ price, extraPrice, singlePrice, onCta, loading = false, disab
           data-testid="pricing-vip-extra-line"
           className="mt-3 border border-[#F5C443]/40 bg-[#F5C443]/10 px-3 py-2 flex items-center justify-between gap-2"
         >
-          <div className="text-[10px] uppercase tracking-[0.16em] font-black text-[#F5C443]">
-            Need more reports?
+          <div className="leading-tight">
+            <div className="text-[10px] uppercase tracking-[0.16em] font-black text-[#F5C443]">
+              Buy extra reports
+            </div>
+            <div className="text-[9.5px] text-white/70 mt-0.5">
+              Deepest VIP discount price
+            </div>
           </div>
-          <div className="text-[11px] text-white/85 leading-tight">
+          <div className="text-[11px] text-white/85 leading-tight text-right">
             <span className="font-barlow font-black text-[#F5C443] text-base">{fmtPrice(extraPrice)}</span>
             <span className="ml-1 text-white/60 line-through decoration-white/40 text-[10px] tabular-nums">
               {singlePrice ? fmtPrice(singlePrice) : ""}
