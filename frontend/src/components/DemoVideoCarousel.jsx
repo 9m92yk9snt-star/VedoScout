@@ -34,8 +34,11 @@ export default function DemoVideoCarousel() {
     el.scrollBy({ left: dir * step, behavior: "smooth" });
   };
 
-  // Hide the whole section until videos exist (or during first fetch to avoid layout flash)
-  if (loading || videos.length === 0) return null;
+  // Wait for the initial fetch to avoid layout flash. Once loaded, ALWAYS render
+  // the section — even when the admin hasn't uploaded any videos yet — so the
+  // landing page has the anchor visible and the operator can preview the section
+  // while they build up content.
+  if (loading) return null;
 
   return (
     <section
@@ -116,15 +119,19 @@ export default function DemoVideoCarousel() {
           className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-6 px-6 md:mx-0 md:px-0 no-scrollbar"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {videos.map((v) => (
-            <VideoCard
-              key={v.id}
-              video={v}
-              isPlaying={playingId === v.id}
-              onPlay={() => setPlayingId(v.id)}
-              onPause={() => setPlayingId(null)}
-            />
-          ))}
+          {videos.length === 0 ? (
+            <EmptyStateCard />
+          ) : (
+            videos.map((v) => (
+              <VideoCard
+                key={v.id}
+                video={v}
+                isPlaying={playingId === v.id}
+                onPlay={() => setPlayingId(v.id)}
+                onPause={() => setPlayingId(null)}
+              />
+            ))
+          )}
         </div>
 
         {/* Dots */}
@@ -139,6 +146,31 @@ export default function DemoVideoCarousel() {
 
       <style>{`.no-scrollbar::-webkit-scrollbar{display:none;}`}</style>
     </section>
+  );
+}
+
+function EmptyStateCard() {
+  return (
+    <article
+      data-demo-card
+      data-testid="demo-empty-state"
+      className="snap-start shrink-0 w-[85%] sm:w-[70%] md:w-[520px] lg:w-[640px] bg-[#0F1712] border border-dashed border-white/15 overflow-hidden flex items-center justify-center"
+    >
+      <div className="aspect-[16/9] w-full flex flex-col items-center justify-center px-8 text-center">
+        <div className="w-14 h-14 border-2 border-volt/40 bg-volt/5 flex items-center justify-center mb-5">
+          <Video className="w-6 h-6 text-volt" strokeWidth={1.5} />
+        </div>
+        <div className="text-[10px] uppercase tracking-[0.24em] font-black text-volt mb-3">
+          Coming soon
+        </div>
+        <h3 className="font-barlow font-black uppercase text-xl md:text-2xl leading-tight text-white/90 max-w-sm">
+          First workflow clips landing here shortly.
+        </h3>
+        <p className="mt-3 text-sm text-white/50 max-w-md leading-relaxed">
+          Short iPhone demos of the upload → mark → report flow will appear in this carousel.
+        </p>
+      </div>
+    </article>
   );
 }
 
