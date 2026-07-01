@@ -190,7 +190,7 @@ function ChalkArrow() {
 /* ─── EMPTY STATE ─── */
 function EmptyStateCard() {
   return (
-    <FilmFrame testid="demo-empty-state">
+    <PremiumFrame testid="demo-empty-state">
       <div className="aspect-[16/10] w-full flex flex-col items-center justify-center px-6 text-center">
         <div className="w-10 h-10 border border-forest/40 bg-forest/5 flex items-center justify-center mb-3">
           <Video className="w-4 h-4 text-forest" strokeWidth={1.5} />
@@ -202,7 +202,7 @@ function EmptyStateCard() {
           First workflow clips landing here shortly.
         </h3>
       </div>
-    </FilmFrame>
+    </PremiumFrame>
   );
 }
 
