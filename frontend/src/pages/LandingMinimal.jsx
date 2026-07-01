@@ -115,7 +115,7 @@ export default function LandingMinimal() {
         <PricingTiers />
       </div>
       <SocialProof />
-      <FAQSection />
+      <FAQSection faqItems={faqItems} />
       <FinalCta isLoggedIn={!!user} />
       <SiteFooter />
     </div>
@@ -413,7 +413,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
 /* ============================================================ */
 /*  FAQ                                                          */
 /* ============================================================ */
-function FAQSection() {
+function FAQSection({ faqItems }) {
   const [openIdx, setOpenIdx] = useState(0);
   const [price, setPrice] = useState(null);
 
