@@ -8965,7 +8965,8 @@ async def admin_delete_contact(msg_id: str, _=Depends(get_current_admin)):
 async def admin_reports(_=Depends(get_current_admin)):
     docs = await db.reports.find({}, {"_id": 0, "full_report": 0}).sort("created_at", -1).to_list(500)
     for d in docs:
-        d["video_url"] = f"/api/uploads/{d['video_filename']}"
+        vf = d.get("video_filename")
+        d["video_url"] = f"/api/uploads/{vf}" if vf else None
         d["poster_url"] = f"/api/uploads/{d['poster_filename']}" if d.get("poster_filename") else None
     return docs
 

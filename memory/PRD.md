@@ -26,6 +26,16 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 111 — Demo Videos carousel + Admin CMS (Feb 28 2026)**:
+  - New landing-page section directly below "How it works" (`<DemoVideoCarousel/>`) — swipeable carousel with snap-scroll, prev/next arrows on desktop.
+  - Videos are admin-uploaded via new `/admin → Demo Videos` tab (`DemoVideosAdmin.jsx`) — supports iPhone MOV/MP4/WebM up to 100 MB, optional poster image, title (80 chars), subtitle (180 chars), order, active/draft status.
+  - Backend endpoints in `server.py`: `GET /api/demo-videos` (public), `GET/POST /api/admin/demo-videos`, `PUT/DELETE /api/admin/demo-videos/{id}`, `POST /api/admin/demo-videos/upload-video`, `POST /api/admin/demo-videos/upload-poster`. Delete also removes the file from disk when it lives in `/uploads/demo_videos/`.
+  - Nano Banana section background generated (`generate_demo_video_bg.py`) — deep emerald pitch at dusk, floodlight beams, atmospheric fog, dark enough to overlay text.
+  - Section auto-hides when there are 0 active videos so the empty state on `/` looks intentional.
+  - Play button click swaps the poster overlay for a real `<video>` element (playsInline for iOS Safari) — one video plays at a time (pauses siblings).
+  - Testing agent verified 12/12 checkpoints: 100% backend, 100% frontend. `test_demo_videos.py` regression suite added at `/app/backend/tests/`. Nul bugs i selve feature.
+  - **Bonus fix**: Also fixed pre-existing `KeyError: 'video_filename'` 500 on `GET /api/admin/reports` (triggered by seeded fictional players whose fake reports don't carry a video file). Now uses `.get()` and returns `video_url: None` for those rows.
+
 - ✅ **🆕 Session 110 — Auth security hardening (Feb 28 2026)**:
   - **Password strength** enforced on both server (`validate_password_strength` in `server.py`) and client (live strength meter with 5 rules + colored gradient):
     - Min 10 chars, requires lowercase + uppercase + digit + symbol, max 128 chars.
