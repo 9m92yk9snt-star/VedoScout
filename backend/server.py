@@ -1997,6 +1997,32 @@ class SocialLinksUpdate(BaseModel):
     instagram_url: Optional[str] = None
 
 
+class FAQCreate(BaseModel):
+    """Admin creates a new Common Question / FAQ entry.
+    `q` is the visible question, `a` is the visible answer. Both required.
+    Special sentinel `__PRICE_FAQ__` in `a` renders the dynamic pricing copy
+    on the landing page (kept for the legacy behaviour of one existing entry).
+    """
+    q: str
+    a: str
+    published: Optional[bool] = True
+
+
+class FAQUpdate(BaseModel):
+    """PATCH-style — any subset of fields can be updated."""
+    q: Optional[str] = None
+    a: Optional[str] = None
+    published: Optional[bool] = None
+    order: Optional[int] = None
+
+
+class FAQReorder(BaseModel):
+    """POST /api/admin/faq/reorder — send the full ordered list of item IDs.
+    Backend rewrites the `order` field on each so drag-to-reorder is stable.
+    """
+    ordered_ids: list[str]
+
+
 class CheckoutInit(BaseModel):
     report_id: str
     origin_url: str
@@ -8152,6 +8178,203 @@ async def admin_update_pricing(payload: PricingUpdate, _=Depends(get_current_adm
             "stays at the originally configured value until the Stripe Prices are re-created."
         ) if stripe_sync_required else None,
     }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# FAQ / Common Questions CMS
+# ════════════════════════════════════════════════════════════════════════════
+# Admin-editable landing-page FAQ. Stored in `db.faq_items` — one document per
+# question. Public `GET /api/faq` returns only published items sorted by
+# `order`. On first-ever access, the collection is seeded with the same set
+# of default items previously hardcoded in the frontend so existing sites do
+# not lose their FAQ.
+# ────────────────────────────────────────────────────────────────────────────
+
+_DEFAULT_FAQ_ITEMS = [
+    {
+        "q": "How long does it take to get my report?",
+        "a": ("Your Pro Scout Intelligence analysis is delivered instantly — as soon as the AI pipeline "
+              "finishes processing your video (typically 5–15 minutes, depending on clip length). "
+              "If your plan includes a real scout review (VIP Premium), a professional scout responds "
+              "with their personal feedback within 48 hours on top of the instant AI report. "
+              "If we ever miss that 48-hour window on a scout review, your purchase is refunded in full — "
+              "automatically, no support tickets needed."),
+    },
+    {
+        "q": "Is my child too young for this?",
+        "a": ("ScoutMePlay is built for ambitious players aged U7 to U21. The report adjusts to the player's "
+              "age — a 9-year-old is benchmarked against age-appropriate development standards, not against "
+              "a senior pro. You get an honest read of where the player is, and where they could realistically go next."),
+    },
+    {
+        "q": "What if my video isn't great quality?",
+        "a": ("A phone camera at training or a game is perfectly fine. We need to see your player on the "
+              "pitch with the ball. Wider shots (showing more of the pitch) are better than tight close-ups, "
+              "and a clear view of the player's movement helps the scout review. If our scout can't fairly "
+              "assess the video, we contact you and either offer a re-upload or a refund."),
+    },
+    {
+        "q": "How is this different from my child's coach feedback?",
+        "a": ("A coach knows your player from the inside — that's irreplaceable. A scout looks from the outside, "
+              "comparing your player against thousands of others in a structured 4-pillar framework "
+              "(Technical, Tactical, Physical, Mentality). Coaches build your player day by day. "
+              "ScoutMePlay tells you where they stand right now and what to focus on next."),
+    },
+    {
+        "q": "Does this guarantee a trial or contract?",
+        "a": ("No, and we'll never claim that. ScoutMePlay is built to help players grow, not to broker contracts. "
+              "Anyone promising guaranteed trials is selling you something we won't sell. Our job is to give you "
+              "honest, professional feedback so you can train smarter — the rest is up to the player."),
+    },
+    {
+        "q": "Will my video be kept private?",
+        "a": ("Yes. Your video is used only to produce your report and is never published, sold, or shared outside "
+              "the scout reviewing it. You retain full ownership of your video and your report. You can request "
+              "deletion of your account and data at any time from your dashboard."),
+    },
+    {
+        "q": "What's the difference between the single report and the monthly plans?",
+        "a": "__PRICE_FAQ__",
+    },
+    {
+        "q": "Can I get reports for more than one player?",
+        "a": ("Yes — but each player needs their own report (or plan), so the analysis stays fair and personal. "
+              "If you have multiple kids in football, each upload is reviewed independently against age-appropriate benchmarks."),
+    },
+]
+
+
+def _faq_doc_to_public(doc: dict) -> dict:
+    return {
+        "id": doc.get("id"),
+        "q": doc.get("q") or "",
+        "a": doc.get("a") or "",
+        "order": int(doc.get("order", 0)),
+        "published": bool(doc.get("published", True)),
+        "updated_at": doc.get("updated_at"),
+        "created_at": doc.get("created_at"),
+    }
+
+
+async def _seed_faq_if_empty() -> None:
+    """Idempotent seed. Called from the public GET on first hit if the
+    collection is completely empty. Safe to call multiple times — it's a
+    no-op once the collection has any documents."""
+    count = await db.faq_items.count_documents({})
+    if count > 0:
+        return
+    now = now_iso()
+    for idx, item in enumerate(_DEFAULT_FAQ_ITEMS):
+        await db.faq_items.insert_one({
+            "id": str(uuid.uuid4()),
+            "q": item["q"],
+            "a": item["a"],
+            "order": idx,
+            "published": True,
+            "created_at": now,
+            "updated_at": now,
+        })
+
+
+@api_router.get("/faq")
+async def get_public_faq():
+    """Public — returns only published FAQ items, sorted by `order` ascending.
+    Auto-seeds the built-in defaults on first ever access."""
+    await _seed_faq_if_empty()
+    cursor = db.faq_items.find({"published": True}, {"_id": 0}).sort("order", 1)
+    items = [_faq_doc_to_public(d) async for d in cursor]
+    return {"items": items}
+
+
+@api_router.get("/admin/faq")
+async def get_admin_faq(user=Depends(get_current_admin)):
+    """Admin — returns ALL items (including unpublished), sorted by `order`."""
+    await _seed_faq_if_empty()
+    cursor = db.faq_items.find({}, {"_id": 0}).sort("order", 1)
+    items = [_faq_doc_to_public(d) async for d in cursor]
+    return {"items": items}
+
+
+@api_router.post("/admin/faq")
+async def create_faq_item(payload: FAQCreate, user=Depends(get_current_admin)):
+    q = (payload.q or "").strip()
+    a = (payload.a or "").strip()
+    if not q or not a:
+        raise HTTPException(status_code=400, detail="Both 'q' and 'a' are required")
+    if len(q) > 300:
+        raise HTTPException(status_code=400, detail="Question too long (max 300 chars)")
+    if len(a) > 5000:
+        raise HTTPException(status_code=400, detail="Answer too long (max 5000 chars)")
+    # Append at the end
+    max_order_doc = await db.faq_items.find({}, {"order": 1, "_id": 0}).sort("order", -1).limit(1).to_list(length=1)
+    next_order = (max_order_doc[0]["order"] + 1) if max_order_doc else 0
+    now = now_iso()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "q": q,
+        "a": a,
+        "order": next_order,
+        "published": bool(payload.published) if payload.published is not None else True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.faq_items.insert_one(doc)
+    return _faq_doc_to_public(doc)
+
+
+@api_router.put("/admin/faq/{item_id}")
+async def update_faq_item(item_id: str, payload: FAQUpdate, user=Depends(get_current_admin)):
+    existing = await db.faq_items.find_one({"id": item_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="FAQ item not found")
+    updates: dict = {"updated_at": now_iso()}
+    if payload.q is not None:
+        q = payload.q.strip()
+        if not q:
+            raise HTTPException(status_code=400, detail="Question cannot be empty")
+        if len(q) > 300:
+            raise HTTPException(status_code=400, detail="Question too long (max 300 chars)")
+        updates["q"] = q
+    if payload.a is not None:
+        a = payload.a.strip()
+        if not a:
+            raise HTTPException(status_code=400, detail="Answer cannot be empty")
+        if len(a) > 5000:
+            raise HTTPException(status_code=400, detail="Answer too long (max 5000 chars)")
+        updates["a"] = a
+    if payload.published is not None:
+        updates["published"] = bool(payload.published)
+    if payload.order is not None:
+        updates["order"] = int(payload.order)
+    await db.faq_items.update_one({"id": item_id}, {"$set": updates})
+    merged = {**existing, **updates}
+    return _faq_doc_to_public(merged)
+
+
+@api_router.delete("/admin/faq/{item_id}")
+async def delete_faq_item(item_id: str, user=Depends(get_current_admin)):
+    res = await db.faq_items.delete_one({"id": item_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="FAQ item not found")
+    return {"deleted": True, "id": item_id}
+
+
+@api_router.post("/admin/faq/reorder")
+async def reorder_faq_items(payload: FAQReorder, user=Depends(get_current_admin)):
+    """Bulk-set the `order` field on multiple items in a single call — used
+    by the admin UI's up/down arrows and drag-to-reorder."""
+    if not payload.ordered_ids:
+        raise HTTPException(status_code=400, detail="ordered_ids cannot be empty")
+    now = now_iso()
+    for idx, item_id in enumerate(payload.ordered_ids):
+        await db.faq_items.update_one(
+            {"id": item_id},
+            {"$set": {"order": idx, "updated_at": now}},
+        )
+    cursor = db.faq_items.find({}, {"_id": 0}).sort("order", 1)
+    items = [_faq_doc_to_public(d) async for d in cursor]
+    return {"items": items}
+
 
 
 async def get_current_single_price() -> float:

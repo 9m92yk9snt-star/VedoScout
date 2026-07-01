@@ -26,6 +26,42 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 103 — Admin CMS for landing-page Common Questions / FAQ (Feb 27 2026)**:
+  - User feedback (Danish): admin skal selv kunne skrive og redigere Common Questions — de var indtil nu hardcoded i frontend-koden.
+  - **Backend (`server.py`)** — new REST endpoints on `db.faq_items` collection:
+    - `GET /api/faq` (public) — returns published items sorted by `order`. **Auto-seeds** the 8 built-in defaults on first-ever access via `_seed_faq_if_empty()`, so existing sites never render an empty FAQ.
+    - `GET /api/admin/faq` — returns ALL items (including drafts) for the admin panel.
+    - `POST /api/admin/faq` — create new item; appended at end (`order = max+1`); validates length (q ≤ 300 chars, a ≤ 5000).
+    - `PUT /api/admin/faq/{id}` — PATCH-style update; accepts partial `q` / `a` / `published` / `order`.
+    - `DELETE /api/admin/faq/{id}` — hard delete.
+    - `POST /api/admin/faq/reorder` — bulk `order` reassignment from an ordered list of IDs (drives the up/down arrows).
+    - New Pydantic models: `FAQCreate`, `FAQUpdate`, `FAQReorder`. All admin routes protected by `get_current_admin`.
+    - Special sentinel `"__PRICE_FAQ__"` in an answer field is preserved — the frontend still renders the dynamic pricing paragraph when it sees this value.
+  - **Frontend — NEW `/app/frontend/src/components/admin/FAQAdmin.jsx`** (~330 lines) full CMS panel:
+    - Header with "CMS · Landing FAQ" eyebrow + "COMMON QUESTIONS" title + helper copy explaining the `__PRICE_FAQ__` sentinel.
+    - **Add-new form** at top: single question input (300 char cap) + multi-line answer textarea (5000 char cap) + live char counter + volt "Add question" CTA (disabled until both filled).
+    - **Item list** — each row shows: order badge (#01), draft/published pill, "Dynamic pricing" badge for the price-FAQ, up/down arrow buttons, Published toggle button (Eye / EyeOff), delete button (red trash), question input, multi-line answer textarea (auto-sized based on length), char counter with "UNSAVED" marker when dirty, and a contextual Save button that appears only when there are unsaved changes.
+    - **Auto-save on blur** so admin doesn't have to click Save on every edit.
+    - **Confirm dialog** before delete.
+    - Toast feedback on every action ("Saved", "Deleted", "Published", "Hidden from site", validation errors from backend).
+    - "Refresh" button in the header to reload from server.
+    - Loading spinner while initial `GET /admin/faq` is in flight.
+  - **Frontend — `AdminPage.jsx`** integration:
+    - Added new `{ id: "faq", label: "FAQ", role: "admin" }` between `messages` and `blog` in the nav tabs.
+    - Added `{activeTab === "faq" && <FAQAdmin />}` render slot.
+    - Added `import FAQAdmin from "@/components/admin/FAQAdmin"`.
+  - **Frontend — landing pages consume the CMS**:
+    - `LandingMinimal.jsx`: added `[faqItems, setFaqItems] = useState(FAQ_ITEMS)` (fallback to hardcoded array), `useEffect` fetches `/api/faq` on mount, replaces the `.map()` source. Hardcoded array kept as fallback so the page still renders during API downtime.
+    - `Landing.jsx` (long-form): identical treatment on `FAQSection` — added items state, fetches `/api/faq`, uses live items in the `.map()`.
+  - **New data-testids for QA**: `faq-admin`, `faq-admin-loading`, `faq-admin-refresh`, `faq-admin-create-card`, `faq-admin-new-q`, `faq-admin-new-a`, `faq-admin-create-btn`, `faq-admin-list`, `faq-admin-row-{idx}`, `faq-admin-q-{idx}`, `faq-admin-a-{idx}`, `faq-admin-move-up-{idx}`, `faq-admin-move-down-{idx}`, `faq-admin-toggle-{idx}`, `faq-admin-delete-{idx}`, `faq-admin-save-{idx}`
+  - **Verified end-to-end via curl**: seed on first `GET /api/faq` produced 8 items, `POST` created a 9th, `PUT` updated its `q`, `DELETE` removed it (back to 8). Screenshot confirms admin UI renders correctly with header, add-new form, and 8 pre-seeded rows all showing the correct question text.
+  - **Files**:
+    - MODIFIED `/app/backend/server.py` (new models + 5 endpoints + seed helper + defaults constant)
+    - NEW `/app/frontend/src/components/admin/FAQAdmin.jsx`
+    - MODIFIED `/app/frontend/src/pages/AdminPage.jsx` (import + tab + render slot)
+    - MODIFIED `/app/frontend/src/pages/LandingMinimal.jsx` (`useEffect` + state + `.map()` source)
+    - MODIFIED `/app/frontend/src/pages/Landing.jsx` (same treatment on FAQSection)
+
 - ✅ **🆕 Session 102 — Clarified AI-instant vs scout-48h messaging across the site (Feb 27 2026)**:
   - User feedback (Danish): "rigtig scout svare tilbage på rapporten inden for 48 timer men proscout analyse er instant efter analysen er kørt igenem" — The FAQ said "every report is delivered within 48 hours", which was misleading. The Pro Scout Intelligence (AI) analysis is **INSTANT** as soon as the AI pipeline finishes. Only the **real scout review** (VIP + Single Report) takes 48 hours.
   - **FAQ answer rewritten** in all 3 places (`Landing.jsx`, `LandingMinimal.jsx`, `TermsPage.jsx`):

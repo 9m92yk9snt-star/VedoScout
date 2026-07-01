@@ -2567,6 +2567,8 @@ const FAQ_ITEMS = [
 
 function FAQSection() {
   const [openIdx, setOpenIdx] = useState(0);
+  // Admin-editable FAQ from /api/faq (falls back to hardcoded FAQ_ITEMS).
+  const [items, setItems] = useState(FAQ_ITEMS);
   // Load live prices so the pricing FAQ always matches whatever the admin
   // currently has set (same /settings/price endpoint PricingCards uses).
   const [price, setPrice] = useState(null);
@@ -2574,6 +2576,12 @@ function FAQSection() {
   useEffect(() => {
     api.get("/settings/price")
       .then(({ data }) => { setPrice(data.price); setPassPrice(data.pass_price); })
+      .catch(() => {});
+    api.get("/faq")
+      .then(({ data }) => {
+        const list = Array.isArray(data?.items) ? data.items : [];
+        if (list.length > 0) setItems(list.map((it) => ({ q: it.q, a: it.a })));
+      })
       .catch(() => {});
   }, []);
   const priceFaqAnswer = (price && passPrice)
@@ -2641,7 +2649,7 @@ function FAQSection() {
         </div>
 
         <div className="space-y-2">
-          {FAQ_ITEMS.map((item, i) => {
+          {items.map((item, i) => {
             const isOpen = openIdx === i;
             return (
               <div

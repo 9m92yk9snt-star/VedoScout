@@ -75,6 +75,21 @@ export default function LandingMinimal() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Admin-editable FAQ — pulled from /api/faq. Falls back to the hardcoded
+  // FAQ_ITEMS on failure so the landing never renders empty.
+  const [faqItems, setFaqItems] = useState(FAQ_ITEMS);
+  useEffect(() => {
+    let alive = true;
+    api.get("/faq").then(({ data }) => {
+      if (!alive) return;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      if (items.length > 0) {
+        setFaqItems(items.map((it) => ({ q: it.q, a: it.a })));
+      }
+    }).catch(() => { /* keep hardcoded fallback */ });
+    return () => { alive = false; };
+  }, []);
+
   const handlePrimaryCta = () => {
     if (user) navigate("/upload");
     else navigate("/signup?next=/upload");
@@ -448,7 +463,7 @@ function FAQSection() {
         </div>
 
         <div className="space-y-2">
-          {FAQ_ITEMS.map((item, i) => {
+          {faqItems.map((item, i) => {
             const isOpen = openIdx === i;
             return (
               <div
