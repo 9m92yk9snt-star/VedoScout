@@ -9238,110 +9238,149 @@ async def admin_seed_test_accounts(_=Depends(get_current_admin)):
       • testscout@scoutmeplay.com — paid CLUB tier, verified, unlimited reveals
       • testvip@scoutmeplay.com   — VIP subscription, 10 prepaid uploads, discoverable
     Safe to call multiple times — always upserts. Only admin can trigger."""
+    r1 = await _grant_access_impl(
+        email="testscout@scoutmeplay.com",
+        password="TestScout@2026!",
+        full_name="Test Scout McTester",
+        access_type="scout_club",
+    )
+    r2 = await _grant_access_impl(
+        email="testvip@scoutmeplay.com",
+        password="TestVip@2026!",
+        full_name="Test VIP Player",
+        access_type="vip",
+    )
+    return {"ok": True, "seeded": [r1, r2]}
+
+
+class GrantAccessRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    access_type: str  # "scout_club" | "scout_agent" | "vip" | "premium" | "prepaid_5"
+
+
+@api_router.post("/admin/grant-access")
+async def admin_grant_access(req: GrantAccessRequest, _=Depends(get_current_admin)):
+    """Admin-only: create (or upgrade) a user with full paid access — no Stripe.
+    access_type:
+      • scout_club   → CLUB tier: lifetime, unlimited reveals, 5 seats, verified
+      • scout_agent  → AGENT tier: lifetime, 20 reveals/mo, 1 seat, verified
+      • vip          → VIP monthly (30d) + 10 prepaid uploads + discoverable
+      • premium      → Premium monthly (30d) + 5 prepaid uploads
+      • prepaid_5    → free tier + 5 prepaid single-report credits
+    """
+    result = await _grant_access_impl(
+        email=(req.email or "").strip().lower(),
+        password=req.password,
+        full_name=(req.full_name or "").strip(),
+        access_type=(req.access_type or "").strip(),
+    )
+    return {"ok": True, **result}
+
+
+async def _grant_access_impl(email: str, password: str, full_name: str, access_type: str):
+    """Shared upsert helper — used by both `/admin/grant-access` and
+    `/admin/seed-test-accounts`."""
     from datetime import timedelta
+    if not email or "@" not in email:
+        raise HTTPException(400, "Valid email is required")
+    if not password or len(password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    if not full_name:
+        raise HTTPException(400, "Full name is required")
+
     now_iso = datetime.now(timezone.utc).isoformat()
     period_end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
 
-    scout_pw = "TestScout@2026!"
-    vip_pw = "TestVip@2026!"
-
-    scout_doc = {
-        "id": str(uuid.uuid4()),  # only used on insert (upsert with $set won't overwrite existing id)
-        "email": "testscout@scoutmeplay.com",
-        "password_hash": bcrypt.hashpw(scout_pw.encode(), bcrypt.gensalt(rounds=12)).decode(),
-        "full_name": "Test Scout McTester",
-        "role": "club_client",
-        "created_at": now_iso,
+    # Common base fields — always overwritten on upsert
+    base = {
+        "email": email,
+        "password_hash": pw_hash,
+        "full_name": full_name,
         "email_verified": True,
-        "free_preview_used": False,
-        "prepaid_uploads": 0,
-        "scout_access": {
-            "tier": "club",
-            "status": "active",
-            "one_time": True,
-            "stripe_customer_id": "cus_test_manual_seed",
-            "stripe_payment_intent": "pi_test_manual_seed",
-            "current_period_end": None,
-            "monthly_reveals": None,
-            "seats": 5,
-            "reveals_used_this_period": 0,
-            "started_at": now_iso,
-            "verified": True,
-            "organization": "Test FC Academy",
-            "verification": {
-                "status": "approved",
-                "org_name": "Test FC Academy",
-                "role_title": "Head of Recruitment",
-                "requested_at": now_iso,
-                "approved_at": now_iso,
-                "approved_by": "system-seed",
+        "granted_by_admin_at": now_iso,
+    }
+    # Merge per-tier fields
+    if access_type == "scout_club":
+        base.update({
+            "role": "club_client",
+            "scout_access": {
+                "tier": "club", "status": "active", "one_time": True,
+                "stripe_customer_id": None, "stripe_payment_intent": None,
+                "current_period_end": None, "monthly_reveals": None,
+                "seats": 5, "reveals_used_this_period": 0, "started_at": now_iso,
+                "verified": True, "organization": "Admin-granted",
+                "verification": {
+                    "status": "approved", "org_name": "Admin-granted",
+                    "role_title": "Head of Recruitment",
+                    "requested_at": now_iso, "approved_at": now_iso,
+                    "approved_by": "admin-grant",
+                },
             },
-        },
-    }
-    scout_setoninsert = {"id": scout_doc.pop("id")}
+        })
+    elif access_type == "scout_agent":
+        base.update({
+            "role": "scout_client",
+            "scout_access": {
+                "tier": "agent", "status": "active", "one_time": True,
+                "stripe_customer_id": None, "stripe_payment_intent": None,
+                "current_period_end": None, "monthly_reveals": 20,
+                "seats": 1, "reveals_used_this_period": 0, "started_at": now_iso,
+                "verified": True, "organization": "Admin-granted",
+                "verification": {
+                    "status": "approved", "org_name": "Admin-granted",
+                    "role_title": "Agent",
+                    "requested_at": now_iso, "approved_at": now_iso,
+                    "approved_by": "admin-grant",
+                },
+            },
+        })
+    elif access_type == "vip":
+        base.update({
+            "role": "user",
+            "prepaid_uploads": 10,
+            "discoverable": True,
+            "discoverable_updated_at": now_iso,
+            "subscription": {
+                "tier": "vip", "status": "active",
+                "stripe_customer_id": None, "stripe_subscription_id": None,
+                "current_period_end": period_end, "started_at": now_iso,
+                "monthly_reports_included": 4, "reports_used_this_period": 0,
+                "scout_review_included": True,
+            },
+            "progress_pass": {"credits": 5, "started_at": now_iso},
+        })
+    elif access_type == "premium":
+        base.update({
+            "role": "user",
+            "prepaid_uploads": 5,
+            "subscription": {
+                "tier": "premium", "status": "active",
+                "stripe_customer_id": None, "stripe_subscription_id": None,
+                "current_period_end": period_end, "started_at": now_iso,
+                "monthly_reports_included": 2, "reports_used_this_period": 0,
+                "scout_review_included": False,
+            },
+        })
+    elif access_type == "prepaid_5":
+        base.update({"role": "user", "prepaid_uploads": 5})
+    else:
+        raise HTTPException(400, f"Unknown access_type: {access_type}")
+
+    # Upsert — create with an ID on first insert, only overwrite existing user's fields on subsequent calls.
+    set_on_insert = {"id": str(uuid.uuid4()), "created_at": now_iso, "free_preview_used": False}
     await db.users.update_one(
-        {"email": scout_doc["email"]},
-        {"$set": scout_doc, "$setOnInsert": scout_setoninsert},
+        {"email": email},
+        {"$set": base, "$setOnInsert": set_on_insert},
         upsert=True,
     )
-
-    vip_doc = {
-        "id": str(uuid.uuid4()),
-        "email": "testvip@scoutmeplay.com",
-        "password_hash": bcrypt.hashpw(vip_pw.encode(), bcrypt.gensalt(rounds=12)).decode(),
-        "full_name": "Test VIP Player",
-        "role": "user",
-        "created_at": now_iso,
-        "email_verified": True,
-        "free_preview_used": True,
-        "prepaid_uploads": 10,
-        "discoverable": True,
-        "discoverable_updated_at": now_iso,
-        "birth_year": 2010,
-        "public_profile": {
-            "player_name": "Test VIP Player",
-            "position": "AMF",
-            "preferred_foot": "right",
-            "club": "Test FC Youth",
-            "country": "Denmark",
-            "bio": "Ambitious attacking midfielder — VIP test account with all premium features enabled.",
-            "height_cm": 175,
-            "weight_kg": 68,
-        },
-        "profile": {
-            "visible_in_scout_db": True,
-            "player_name": "Test VIP Player",
-            "age": 16,
-            "position": "AMF",
-            "preferred_foot": "right",
-            "current_club": "Test FC Youth",
-        },
-        "subscription": {
-            "tier": "vip",
-            "status": "active",
-            "stripe_customer_id": "cus_test_vip_manual",
-            "stripe_subscription_id": "sub_test_vip_manual",
-            "current_period_end": period_end,
-            "started_at": now_iso,
-            "monthly_reports_included": 4,
-            "reports_used_this_period": 0,
-            "scout_review_included": True,
-        },
-        "progress_pass": {"credits": 5, "started_at": now_iso},
-    }
-    vip_setoninsert = {"id": vip_doc.pop("id")}
-    await db.users.update_one(
-        {"email": vip_doc["email"]},
-        {"$set": vip_doc, "$setOnInsert": vip_setoninsert},
-        upsert=True,
-    )
-
     return {
-        "ok": True,
-        "seeded": [
-            {"email": "testscout@scoutmeplay.com", "password": scout_pw, "role": "club_client", "tier": "club"},
-            {"email": "testvip@scoutmeplay.com", "password": vip_pw, "role": "user", "tier": "vip"},
-        ],
+        "email": email,
+        "password": password,
+        "role": base["role"],
+        "access_type": access_type,
     }
 
 
