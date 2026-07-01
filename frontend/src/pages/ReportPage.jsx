@@ -10,6 +10,7 @@ import ReportChapterNav from "@/components/ReportChapterNav";
 import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 import FullFrameWithBoxCanvas from "@/components/FullFrameWithBoxCanvas";
 import { FootballIcon, MiniPitch, JerseyChip, PitchLineDivider } from "@/components/FootballAccents";
+import { PillarIcon, AnimatedScore, SkillMeter, MomentCard, PitchDecoration } from "@/components/report/FootballReport";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -109,8 +110,19 @@ function scoreColor(s) {
   return "text-red-400";
 }
 
+/* Map SectionGrid `title` → PillarIcon `kind`.
+   Purely presentational — no data/scores change. */
+const _PILLAR_KIND = {
+  technical: "technical",
+  tactical: "tactical",
+  physical: "physical",
+  mindset: "mindset",
+  mentality: "mindset",
+};
+
 function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
   if (!section) return null;
+  const pillarKind = _PILLAR_KIND[String(title).toLowerCase()] || null;
   return (
     <div className="bg-surface border border-gray-border p-6 md:p-8 scroll-mt-20" id={`report-${title.toLowerCase().replace(/\s+/g, "-")}`}>
       {chapter && (
@@ -132,10 +144,16 @@ function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-[0.95]">{title}</h3>
+          <div className="flex items-center gap-2.5">
+            {pillarKind && (
+              <PillarIcon kind={pillarKind} className="w-8 h-8 md:w-9 md:h-9 text-forest shrink-0" />
+            )}
+            <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl text-ink leading-[0.95]">{title}</h3>
+          </div>
           {sub && (
             <p className="mt-1 text-sm text-ink/55">{sub}</p>
           )}
+          <PitchDecoration className="mt-2 w-20 h-6 text-forest/25" />
         </div>
       </div>
       <div className="mt-6 grid sm:grid-cols-2 gap-4">
@@ -167,10 +185,14 @@ function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
                     Need more footage
                   </span>
                 ) : (
-                  <span className={`font-barlow font-black text-3xl shrink-0 ${scoreColor(val?.score)}`}>
-                    {val?.score ?? "-"}
-                    <span className="text-ink/40 text-base">/10</span>
-                  </span>
+                  <AnimatedScore
+                    value={val?.score ?? 0}
+                    max={10}
+                    ring
+                    colorClass={scoreColor(val?.score)}
+                    className="font-barlow font-black text-3xl leading-none"
+                    testid={`attr-score-${key}`}
+                  />
                 )}
               </div>
 
@@ -190,7 +212,17 @@ function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
                   )}
 
                   {benchmarks && tier && (
-                    <BenchmarkBar tier={tier} benchmarks={benchmarks} />
+                    <div className="mt-4" data-testid="skill-meter-wrap">
+                      <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45 mb-1.5">
+                        For his age + position
+                      </div>
+                      <SkillMeter
+                        value={val?.score ?? 0}
+                        max={10}
+                        tiers={["Standard", "Strong", "Pro", "Elite"]}
+                        currentTier={(TIER_META[tier]?.label || "").split(" ")[0]}
+                      />
+                    </div>
                   )}
 
                   {verdict && (
@@ -2238,22 +2270,32 @@ export default function ReportPage() {
               {unlocked && full_report && (
                 <div className="mt-8 grid grid-cols-2 md:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border" data-testid="report-scores-grid">
                   {[
-                    { key: "technical", label: "Technical", v: full_report.scores?.technical },
-                    { key: "tactical", label: "Tactical", v: full_report.scores?.tactical },
-                    { key: "physical", label: "Physical", v: full_report.scores?.physical },
-                    { key: "mentality", label: "Mentality", v: full_report.scores?.mentality },
-                    { key: "overall_development", label: "Overall", v: full_report.scores?.overall_development },
+                    { key: "technical", label: "Technical", v: full_report.scores?.technical, pillar: "technical" },
+                    { key: "tactical", label: "Tactical", v: full_report.scores?.tactical, pillar: "tactical" },
+                    { key: "physical", label: "Physical", v: full_report.scores?.physical, pillar: "physical" },
+                    { key: "mentality", label: "Mentality", v: full_report.scores?.mentality, pillar: "mindset" },
+                    { key: "overall_development", label: "Overall", v: full_report.scores?.overall_development, pillar: null },
                   ].map((s, i) => {
                     const pct = typeof s.v === "number" ? Math.max(0, Math.min(100, (s.v / 10) * 100)) : 0;
                     const barColor = (s.v ?? 0) >= 8 ? "bg-forest-pop" : (s.v ?? 0) >= 6 ? "bg-volt" : (s.v ?? 0) >= 4 ? "bg-amber-500" : "bg-rose-500";
                     return (
                       <div key={i} className="bg-surface p-3 text-center flex flex-col items-center justify-between">
-                        <div className="text-[9.5px] md:text-[10px] uppercase tracking-[0.14em] text-ink/55 font-bold leading-tight">
-                          {s.label}
+                        <div className="flex items-center gap-1.5 justify-center">
+                          {s.pillar && (
+                            <PillarIcon kind={s.pillar} className="w-3.5 h-3.5 text-forest/70 hidden sm:inline-flex" />
+                          )}
+                          <div className="text-[9.5px] md:text-[10px] uppercase tracking-[0.14em] text-ink/55 font-bold leading-tight">
+                            {s.label}
+                          </div>
                         </div>
-                        <div className={`font-barlow font-black text-3xl mt-1.5 tabular-nums ${scoreColor(s.v)}`}>
-                          {s.v ?? "-"}
-                          <span className="text-[10px] text-ink/35 align-top ml-0.5">/10</span>
+                        <div className="mt-1.5">
+                          <AnimatedScore
+                            value={s.v ?? 0}
+                            max={10}
+                            colorClass={scoreColor(s.v)}
+                            className="font-barlow font-black text-3xl leading-none tabular-nums"
+                            testid={`overall-score-${s.key}`}
+                          />
                         </div>
                         {/* Mini progress bar visualises the rating at a glance —
                             colour matches the score band (red < 4 / amber 4-5 / volt 6-7 / forest-pop 8+). */}
@@ -2915,6 +2957,31 @@ export default function ReportPage() {
                       <p className="mt-2 text-sm text-ink/65 max-w-xl">
                         Every note is tied to the exact moment in the video &mdash; so you can rewatch it yourself.
                       </p>
+                      {/* Quick-nav MomentCard strip — horizontal scrollable ribbon,
+                          same click-to-seek behaviour as the full grid below.
+                          Hidden on desktop where the full grid already shows all cards. */}
+                      <div
+                        data-testid="moment-strip"
+                        className="mt-5 md:hidden -mx-6 px-6 flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-none"
+                      >
+                        {full_report.video_comments.slice(0, 8).map((c, i) => {
+                          const ts = c.timestamp;
+                          const tsParsed = ts && /^\s*\d{1,2}:\d{2}/.test(ts);
+                          const m = ts && ts.match(/(\d{1,2}):(\d{2})/);
+                          const seconds = m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 0;
+                          return (
+                            <div key={`strip-${i}`} className="snap-start">
+                              <MomentCard
+                                timestamp={seconds}
+                                label={`Moment ${String(i + 1).padStart(2, "0")}`}
+                                description={c.comment}
+                                onSeek={tsParsed ? () => seekVideoTo(ts) : undefined}
+                                tone={i % 3 === 0 ? "forest" : i % 3 === 1 ? "volt" : "ink"}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
                       {/* Mini timeline ribbon — visualises WHEN in the clip each moment occurred. */}
                       <div className="mt-5 relative h-1.5 bg-cream-soft border border-forest/15 rounded-full overflow-visible" aria-hidden>
                         {full_report.video_comments.map((c, i) => {

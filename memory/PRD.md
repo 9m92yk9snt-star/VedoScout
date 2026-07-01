@@ -26,6 +26,28 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 94 — Premium Report UI/UX Overhaul: animated scores + skill meters + football-native icons (Feb 27 2026)**:
+  - User feedback (Danish): trim overwhelming numbers, make report feel "alive" and "football-native" — add animated score cards (count-ups, progress bars, rings), interactive diagrams, football-native visuals (SVG icons instead of person images, pitch lines), better structural hierarchy. Explicit constraints: **NO backend/data/score changes** and **NO testing agent**.
+  - **NEW `/app/frontend/src/components/report/FootballReport.jsx`** (~320 lines, 5 named-export primitives):
+    - `PillarIcon` — inline SVG football icons for the 4 pillars (Technical = ball with motion arc, Tactical = pitch with X/O + arrow, Physical = lightning bolt with speed lines, Mindset = shield with heart)
+    - `AnimatedScore` — count-up animated `/10` score with optional colored `ScoreRing` (circular progress ring, `useMotionValue` + `animate` from framer-motion, fires on viewport-enter via `useInView`)
+    - `SkillMeter` — animated horizontal skill bar with tier tick marks (STANDARD/STRONG/PRO/ELITE), animated fill, and a "you are here" volt pointer that slides into position on entry
+    - `MomentCard` — clickable video-timestamp tile with hover chalk-line + tone variants (forest/volt/ink)
+    - `PitchDecoration` — small SVG chalk pitch-line ornament for sub-headings
+  - **Surgical integration into `/app/frontend/src/pages/ReportPage.jsx`** (no other logic changes):
+    - Added import for all 5 primitives
+    - `SectionGrid` (all 4 pillar sections): PillarIcon + PitchDecoration added to header; each attribute card's `X/10` static number replaced with `AnimatedScore ring`; `BenchmarkBar` replaced inline with `SkillMeter` (single animated bar with tier pointer, replaces the 4-column benchmark grid the user called a "wall of numbers")
+    - Main 5-column overall scores grid (Technical / Tactical / Physical / Mentality / Overall): each `X/10` static number replaced with `AnimatedScore` count-up; small PillarIcon added next to each label (hidden sm:inline-flex — desktop only, keeps mobile clean)
+    - Video Moments section: added mobile-only horizontal `MomentCard` scroll-strip (first 8 moments) as a quick-nav ribbon above the existing detailed grid (`md:hidden` so desktop layout is untouched)
+  - **New data-testids for QA**: `attr-score-{key}`, `overall-score-{key}`, `skill-meter-wrap`, `moment-strip`, `pillar-icon-{kind}`
+  - **Verified via screenshot tool (per user's instruction to skip testing agent)**:
+    - Desktop 1920×900: overall scores grid displays 5 count-up animated scores with pillar icons; Technical pillar shows ball SVG icon + chalk pitch decoration under heading; each attribute card has a green animated `ScoreRing` next to the score; SkillMeter renders correctly with "you are here" pointer at Pro tier for scores ≥7; Physical pillar shows lightning bolt SVG + all attributes with SkillMeter
+    - Lint clean on new file (0 warnings/errors); pre-existing lint warnings in `ReportPage.jsx` untouched
+  - **Zero backend changes**: no server.py edits, no /api endpoint changes, no data model changes, no AI scores modified. Purely presentational frontend refactor.
+  - **Files**:
+    - NEW `/app/frontend/src/components/report/FootballReport.jsx` (5 named exports)
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (5 surgical edits: import, SectionGrid header, SectionGrid score+skill meter, overall scores grid, moment strip)
+
 - ✅ **🆕 Session 93 — Premium-at-limit UpgradeBanner variant (Feb 27 2026)**:
   - Continuation task from previous backlog: when a Premium subscriber uses all 5/5 monthly uploads, the Dashboard's UpgradeBanner must hide the Premium card and show ONLY the VIP option (as the natural next step). Previously the banner was only shown to users WITHOUT any subscription, so a maxed-out Premium user had no visible upgrade path.
   - **Backend** (`server.py` — `/api/me/subscription`):
