@@ -12,6 +12,7 @@ import FullFrameWithBoxCanvas from "@/components/FullFrameWithBoxCanvas";
 import { FootballIcon, MiniPitch, JerseyChip, PitchLineDivider } from "@/components/FootballAccents";
 import { PillarIcon, AnimatedScore, SkillMeter, MomentCard, PitchDecoration } from "@/components/report/FootballReport";
 import PerformanceRadarHero from "@/components/report/PerformanceRadarHero";
+import SkillsBreakdown from "@/components/report/SkillsBreakdown";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -2666,8 +2667,13 @@ export default function ReportPage() {
                     />
                   )}
 
-                  {/* Player DNA — unique attribute fingerprint */}
-                  <DnaFingerprint fullReport={full_report} ageProfile={age_profile_reference} />
+                  {/* Full skill picture — parent-friendly grouped breakdown with video links */}
+                  <SkillsBreakdown
+                    fullReport={full_report}
+                    videoComments={full_report.video_comments || []}
+                    onSeek={seekVideoTo}
+                    ageProfile={age_profile_reference}
+                  />
 
                   {/* Performance Radar — cinematic dark centrepiece (custom SVG + Nano Banana bg) */}
                   {radarData && (

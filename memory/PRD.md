@@ -26,6 +26,26 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 96 — Skills Breakdown redesign (replaces DNA Fingerprint) — parent-friendly, video-linked (Feb 27 2026)**:
+  - User feedback (Danish): "FINGER PRINT ER SVÆRT AT FORSÅR HVAD DEN VISE OG BETYDER DER ER HELT MASSE TAL RAPPORT SKAL HILETIDEN HENVISE TIL VIDEO ELLER GUIDE HVAD DEN HENTYDER TIL"
+  - Translation: DNA Fingerprint is too hard to understand — too many numbers, no context. Report must always either **link back to the video** OR **explain what a metric means**.
+  - **NEW `/app/frontend/src/components/report/SkillsBreakdown.jsx`** (~445 lines) — full replacement for `DnaFingerprint`:
+    - **25-entry dictionary** (`SKILL_MEANINGS`) mapping every snake_case skill key to a parent-friendly label + one-sentence plain-language meaning (e.g. `first_touch` → "First touch — The very first moment when the ball arrives — does it stay under his control, or does it bounce away?").
+    - **Grouped-by-pillar layout** (4 cards: Technical / Tactical / Physical / Mindset) instead of one wall of 24 bars. Each pillar card has: PillarIcon (SVG), pillar label, pillar description ("What he does with the ball at his feet"), pillar-average score (e.g. 7.3), and skill rows.
+    - **Top 3 Standout cards** at the top — dark ink cards with volt corner-tag ranks (#1/#2/#3), pillar chip, giant volt score, plain-language meaning, and a direct "SEE IT AT 00:24" video CTA.
+    - **Auto video-link matching** — `_timestampFor()` scans `full_report.video_comments` for keyword matches against each skill (label + skill-specific synonyms like "sprint"/"pace" for speed, "shot"/"finish"/"goal" for shooting, "tackle"/"duel"/"header" for courage_in_duels). Matching skills get a small "SEE AT X:XX" volt chip in the row header AND a "WATCH THIS MOMENT · X:XX" CTA when expanded. Verified: 9/24 skills linked on the Lukas A. demo.
+    - **Expandable skill rows** — tap a row to reveal the meaning + video CTA. Only one row expanded at a time (`useState`). Framer-motion height/opacity animation on expand/collapse.
+    - **Score-band legend chip** (top right) — "8-10 Elite/Pro" (forest), "6.5-8 Strong club" (forest-pop), "5-6.5 Standard club" (amber), "<5 Foundation" (ink/40) — teaches parents to read the score without leaving the section.
+    - **Animated skill bars** — each bar draws in via `initial={{ width: 0 }} → whileInView` with staggered delays (0.02s per row).
+    - **Guide footer** — explicit instructions: "Tap any skill row to reveal what we actually looked for. Where you see a [chip], click to jump straight to that clip."
+  - **Wired into `ReportPage.jsx`**: Replaced `<DnaFingerprint fullReport={...} ageProfile={...} />` with `<SkillsBreakdown fullReport={full_report} videoComments={full_report.video_comments || []} onSeek={seekVideoTo} ageProfile={age_profile_reference} />`. Old `DnaFingerprint` function is now dead code (kept in file for now — a future refactor can remove it).
+  - **Zero backend changes**. Scores/data/logic untouched. Only the presentation of the same data has been restructured.
+  - **Verified via screenshot tool** (per user's testing-agent ban): rendered on Lukas A. premium demo — 3 standout cards, 4 pillar groups, 9 auto-linked video chips, expandable-row animation, score-band legend all rendering. Zero console errors. Lint clean.
+  - **Data-testids added**: `skills-breakdown`, `skills-legend`, `standout-grid`, `standout-card-{key}`, `standout-video-cta-{key}`, `skills-grouped-grid`, `skills-group-{pillar}`, `skill-row-{key}`, `skill-row-toggle-{key}`, `skill-row-expanded-{key}`, `skill-video-chip-{key}`, `skill-video-cta-{key}`
+  - **Files**:
+    - NEW `/app/frontend/src/components/report/SkillsBreakdown.jsx`
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (1 import, 1 block replacement)
+
 - ✅ **🆕 Session 95 — Performance Radar Hero: cinematic Nano Banana redesign (Feb 27 2026)**:
   - User feedback (Danish): the Performance Radar looks like something from the 80s — flat, boring, not interactive, not visually expressive. Complete redesign with Nano Banana + cool graphic elements + animations + design agent.
   - **Design agent** (`/app/design_guidelines.json`): specified custom Framer Motion SVG radar replacing Recharts, dark ink hero container with stadium background, floating tactical key panel, axis-anchored score chips, animated shape draw-in with `pathLength: 1`, pulsing Elite ring, hover interactions.
