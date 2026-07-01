@@ -26,6 +26,24 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 97 — Removed ALL stock football-player photos from the report (Feb 27 2026)**:
+  - User feedback (Danish): "FJERNE DISSE BILLDER ALLE STEDER MED FODBOLDSPILLER DE FORVIER LIDT MEN BLIVER I TVIVL HVEM RAPPORTEN HANDLER OM" — remove all stock football-player images from the report; they confuse the reader about **who the report is actually about**.
+  - **Audit** — 6 stock-player image references found in `ReportPage.jsx` and all removed:
+    1. `report-hero-divider.png` — Nano Banana stock player used as a full-width chapter opener
+    2. `pillar-technical.png` — small stock photo next to "Technical" title
+    3. `pillar-tactical.png` — small stock photo next to "Tactical" title
+    4. `pillar-physical.png` — small stock photo next to "Physical" title
+    5. `pillar-mental.png` — small stock photo next to "Mindset" title
+    6. Pexels URL (demo-only fallback background)
+  - **Kept** (these are NOT stock — they are the user's own footage): all `video-moment-frame-*` images (real frames from the user's uploaded video), `MarkedCropCanvas` / `FullFrameWithBoxCanvas` (canvas-drawn from user video), and the `radar-hero-stadium.png` (stadium panorama with NO players — pure decorative scenery).
+  - **`SectionGrid` refactor**: `imageSrc` prop removed entirely from the component signature. Header now uses only PillarIcon + PitchDecoration + title/sub — no more photos.
+  - **New photo-free hero divider** replacing the old stock-player banner: dark ink background, volt lime left-border accent, subtle forest blur-halo top-right, volt scan-line bottom, "─── YOUR FULL SCOUT REPORT" eyebrow, huge "THROUGH / A SCOUT'S EYES." headline (second line in volt), sub-copy + "CHAPTERS 01 → 08 · EVERY NOTE ANCHORED TO THE VIDEO" meta strip. Purely typographic + geometric decoration.
+  - **Demo-mode header** rebuilt: replaced the Pexels player background with a `repeating-linear-gradient` chalk-line pattern + volt blur halo. No photos.
+  - **DOM-verified** via headless browser: 0 stock-player `<img>` elements remain in the rendered report; 6 `video-moment-frame-*` images (user's own footage) still rendering correctly.
+  - **Files**:
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (4 surgical edits: `SectionGrid` signature+body, 4 SectionGrid call sites, hero-divider block, demo header)
+  - **Zero backend changes**. Zero data/score changes. Screenshot-verified per user's ongoing testing-agent ban.
+
 - ✅ **🆕 Session 96 — Skills Breakdown redesign (replaces DNA Fingerprint) — parent-friendly, video-linked (Feb 27 2026)**:
   - User feedback (Danish): "FINGER PRINT ER SVÆRT AT FORSÅR HVAD DEN VISE OG BETYDER DER ER HELT MASSE TAL RAPPORT SKAL HILETIDEN HENVISE TIL VIDEO ELLER GUIDE HVAD DEN HENTYDER TIL"
   - Translation: DNA Fingerprint is too hard to understand — too many numbers, no context. Report must always either **link back to the video** OR **explain what a metric means**.

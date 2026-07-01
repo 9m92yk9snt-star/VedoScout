@@ -122,7 +122,7 @@ const _PILLAR_KIND = {
   mentality: "mindset",
 };
 
-function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
+function SectionGrid({ title, section, onSeek, chapter, sub }) {
   if (!section) return null;
   const pillarKind = _PILLAR_KIND[String(title).toLowerCase()] || null;
   return (
@@ -134,17 +134,6 @@ function SectionGrid({ title, section, onSeek, chapter, sub, imageSrc }) {
         </div>
       )}
       <div className="flex items-start gap-4 mb-1">
-        {imageSrc && (
-          <span className="hidden sm:block shrink-0 w-14 h-14 md:w-16 md:h-16 overflow-hidden border border-forest/20 bg-ink/5">
-            <img
-              src={imageSrc}
-              alt=""
-              loading="lazy"
-              onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }}
-              className="block w-full h-full object-cover"
-            />
-          </span>
-        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             {pillarKind && (
@@ -1943,17 +1932,13 @@ export default function ReportPage() {
           <div className="mt-6 grid lg:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
             <div className="bg-surface p-6 md:p-8 lg:col-span-2">
               {report.demo ? (
-                <div className="relative w-full bg-deepnavy border border-volt/20 aspect-video flex flex-col items-center justify-center text-center p-6">
+                <div className="relative w-full bg-deepnavy border border-volt/20 aspect-video flex flex-col items-center justify-center text-center p-6 overflow-hidden">
                   <div className="absolute top-3 right-3 bg-volt text-white text-[10px] uppercase tracking-widest font-black px-2 py-1">Demo</div>
-                  <div
-                    className="absolute inset-0 opacity-30"
-                    style={{
-                      backgroundImage: "url('https://images.pexels.com/photos/12616082/pexels-photo-12616082.jpeg')",
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-deepnavy via-deepnavy/70 to-transparent" />
+                  {/* Photo-free chalk-pitch decoration — no stock player imagery */}
+                  <div aria-hidden className="absolute inset-0 opacity-[0.08]" style={{
+                    backgroundImage: "repeating-linear-gradient(45deg, #CCFF00 0 1px, transparent 1px 24px)",
+                  }} />
+                  <div aria-hidden className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full bg-volt/20 blur-3xl pointer-events-none" />
                   <div className="relative">
                     <div className="font-barlow font-black uppercase text-3xl text-volt">Sample report</div>
                     <p className="mt-2 text-sm text-ink/70 max-w-sm">
@@ -2531,34 +2516,37 @@ export default function ReportPage() {
             )}
 
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
-              {/* Hero divider — warm football opening shot. Only when unlocked. */}
+              {/* Chapter opener — photo-free typographic divider (no stock player
+                  imagery, so it's always crystal clear whose report this is). */}
               {(unlocked && full_report) && (
                 <div
                   data-testid="report-hero-divider"
-                  className="relative aspect-[21/8] md:aspect-[21/7] w-full overflow-hidden bg-ink border border-gray-border"
+                  className="relative w-full overflow-hidden bg-ink border border-gray-border py-10 md:py-14"
                 >
-                  <img
-                    src={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/report-hero-divider.png`}
-                    alt=""
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                  <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/85 via-ink/45 to-ink/15" />
-                  <div className="absolute inset-0 flex items-center px-6 md:px-12">
-                    <div className="max-w-xl">
-                      <div className="inline-flex items-center gap-2 mb-2">
-                        <span className="w-7 h-px bg-volt" />
-                        <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
-                          Your full scout report
-                        </span>
-                      </div>
-                      <h2 className="font-barlow font-black uppercase tracking-tighter text-3xl md:text-5xl text-cream-base leading-[0.92]">
-                        Through<br /><span className="text-volt">a scout&apos;s eyes.</span>
-                      </h2>
-                      <p className="mt-3 text-cream-base/75 text-sm md:text-base max-w-md leading-relaxed hidden sm:block">
-                        Honest, age-appropriate notes &mdash; what stood out, what to work on, and how to grow next.
-                      </p>
+                  {/* Chalk pitch decorations — subtle, non-distracting */}
+                  <div aria-hidden className="absolute inset-y-0 left-0 w-1 bg-volt/70" />
+                  <div aria-hidden className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-forest/40 blur-3xl pointer-events-none" />
+                  <div aria-hidden className="absolute bottom-0 left-1/3 right-0 h-px bg-gradient-to-r from-transparent via-volt/40 to-transparent" />
+                  {/* Repeating chalk-line pattern top edge */}
+                  <div aria-hidden className="absolute top-0 left-0 right-0 h-px bg-cream-base/10" />
+
+                  <div className="relative px-6 md:px-12 max-w-4xl">
+                    <div className="inline-flex items-center gap-2 mb-3">
+                      <span className="w-8 h-px bg-volt" />
+                      <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.32em] font-black">
+                        Your full scout report
+                      </span>
+                    </div>
+                    <h2 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl text-cream-base leading-[0.9]">
+                      Through<br />
+                      <span className="text-volt">a scout&apos;s eyes.</span>
+                    </h2>
+                    <p className="mt-4 text-cream-base/70 text-sm md:text-base max-w-lg leading-relaxed">
+                      Honest, age-appropriate notes &mdash; what stood out, what to work on, and how to grow next.
+                    </p>
+                    <div className="mt-5 flex items-center gap-4 text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/45">
+                      <span>· Chapters 01 → 08 ·</span>
+                      <span className="hidden sm:inline">Every note anchored to the video</span>
                     </div>
                   </div>
                 </div>
@@ -2686,7 +2674,6 @@ export default function ReportPage() {
                   <SectionGrid
                     title="Technical"
                     sub="Ball, dribbling, passing, shooting"
-                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-technical.png`}
                     section={full_report.technical}
                     onSeek={seekVideoTo}
                     chapter="Chapter · 02 · Technical"
@@ -2694,7 +2681,6 @@ export default function ReportPage() {
                   <SectionGrid
                     title="Tactical"
                     sub="Scanning, decisions, positioning"
-                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-tactical.png`}
                     section={full_report.tactical}
                     onSeek={seekVideoTo}
                     chapter="Chapter · 03 · Tactical"
@@ -2702,7 +2688,6 @@ export default function ReportPage() {
                   <SectionGrid
                     title="Physical"
                     sub="Speed, balance, agility, stamina"
-                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-physical.png`}
                     section={full_report.physical}
                     onSeek={seekVideoTo}
                     chapter="Chapter · 04 · Physical"
@@ -2710,7 +2695,6 @@ export default function ReportPage() {
                   <SectionGrid
                     title="Mindset"
                     sub="Confidence, courage, focus, body language"
-                    imageSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/pillar-mental.png`}
                     section={full_report.mentality}
                     onSeek={seekVideoTo}
                     chapter="Chapter · 05 · Mindset"
