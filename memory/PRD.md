@@ -26,6 +26,22 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 109 — Premium cinematic /scouts landing page redesign (Feb 28 2026)**:
+  - **4 new Nano Banana images generated** (`generate_scouts_landing.py`): scouts-hero-tunnel (silhouettes walking into stadium tunnel with god-rays), scouts-boardroom (top-down war-room table with notebook + tactical printouts + passports), scouts-data-tablet (dashboard on oak wood), scouts-signing-desk (hands over contract with brass fountain pen).
+  - **Complete visual overhaul** of `/scouts` (`ScoutsLandingPage.jsx` rewritten):
+    - Dark cinematic palette: deep forest `#0A1F14` + brass `#B8892C` + soft white. Departs from the standard cream landing to create a "boardroom" / "war-room" feel scouts recognize as premium.
+    - **Hero**: Parallax Nano Banana tunnel background, HUGE 8xl headline "THE PLAYERS **NOBODY** HAS FOUND YET.", scroll cue, animated pulse dot, framer-motion entrance animations, animated gradient/grain overlays.
+    - **Marquee strip**: 8 trust phrases scrolling infinitely (One-time payment · Lifetime access · Verified pros · 48h review · etc.).
+    - **Manifesto section**: "Every year a top-10 kid slips through the cracks." with boardroom Nano Banana image on the right, floating caption card.
+    - **How it works**: 3 dark cards with giant 140px "01/02/03" background numbers, brass icons, hover border-color transitions.
+    - **Database preview**: Tablet Nano Banana image with "Live database" pulse chip + copy explaining 5 unlockables with brass tile icons.
+    - **Trust stats**: 4 huge stat tiles (19+ players, 48h turnaround, 100% refund, 0 renewals) with brass top borders.
+    - **Pricing**: Ambient brass glow behind cards, Scout card in white/10, Club card in brass with corner ornaments + "BEST FOR TEAMS" badge, 6xl-7xl price digits, 7 features per card.
+    - **FAQ**: 5-question accordion with brass hover states + rotating chevrons + smooth expand animation.
+    - **Final CTA**: Signing-desk Nano Banana background darkened to 30%, Trophy icon, "YOUR NEXT **SIGNING** IS IN THE DATABASE." headline, huge brass CTA button.
+    - **Verification modal** upgraded to match dark palette (brass accents, dark inputs, `#B8892C` focus states).
+  - All framer-motion animations use `whileInView` with `once: true` for smooth entrance-only reveals; hero uses `useScroll` + `useTransform` for parallax + fade-on-scroll.
+
 - ✅ **🆕 Session 108 — One-time scout pricing + verification workflow + fake players seed (Feb 28 2026)**:
   - **Pricing overhaul**: Retired 3 monthly tiers (scout_basic $49/mo, scout_pro $149/mo, club_enterprise $499/mo). Replaced with 2 ONE-TIME lifetime tiers: **Scout $399** (individual scouts/agents) and **Club $899** (5 seats, priority support). Old Stripe products auto-cleaned; new one-time products auto-provisioned on backend startup.
   - **Stripe checkout flow**: Changed from `mode="subscription"` to `mode="payment"` for scout access. Access is now marked `one_time: true` and never expires (no `current_period_end` gating).
