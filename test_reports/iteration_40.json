@@ -1,0 +1,57 @@
+{
+  "summary": "Full backend + frontend verification of the Premium-at-limit UpgradeBanner variant. Backend: pytest suite (4/4 PASS) validates GET /api/me/subscription now returns `usage` field with correct shape, usage=null for free/admin/premium-seed users (documented behavior since seed premium has no real Stripe sub), tiers block preserved with premium/vip amount+monthly_upload_limit, endpoint latency <300ms. Frontend: (a) Free user (free@elitescout.com) sees the default banner with data-testid='dashboard-upgrade-banner', both Premium+VIP mini-cards side-by-side (grid-cols-1 sm:grid-cols-2), correct headline/eyebrow copy. (b) Premium-at-limit variant tested via Playwright page.route interception mocking /api/me/subscription with usage.exhausted=true — banner switches to data-testid='dashboard-upgrade-banner-at-limit', Premium card hidden, VIP card only, grid becomes grid-cols-1, all target copy present ('Need more uploads? Go VIP.', 'Premium limit reached · 5 / 5 this month', \"You've used all 5 Premium uploads this month...\"). Regression: Reports library, Players list, Quick Stats row all render; SubscriptionCard also renders in mocked premium state; zero console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter40_subscription_usage.py",
+    "/app/test_reports/pytest/iter40_results.xml",
+    "/app/test_reports/iter40_free_banner.png",
+    "/app/test_reports/iter40_at_limit.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DashboardPage.jsx is 827 lines — over the 700-line guideline. Consider extracting UpgradeBanner and SubscriptionCard into their own files to keep DashboardPage focused on layout+data fetching. Pre-existing.",
+    "The usage.exhausted computation and the /me/upload-eligibility endpoint independently do the same count_documents({user_id, created_at>=period_start}) query. Consider consolidating into a single reusable helper to keep the two code paths in sync if billing period logic ever changes."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter40_subscription_usage.py"],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100%"},
+  "test_credentials": "free@elitescout.com / Free@2026 (real backend). Premium-at-limit tested via Playwright route mock — no real Stripe interaction.",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The Premium-at-limit banner variant (data-testid='dashboard-upgrade-banner-at-limit') can ONLY be seen with a user whose /api/me/subscription returns subscription.tier='premium' + subscription.status='active' + usage.exhausted=true. The test premium seed (premium@elitescout.com) is a legacy prepay-unlock account and does NOT trigger this state — backend correctly returns subscription:null + usage:null for it. Future tests must use Playwright page.route mocking (as done here) or wait until the app has a real premium subscriber with 5/5 uploads consumed. Grid classes to assert: free='grid-cols-1 sm:grid-cols-2', at-limit='grid-cols-1' (no sm: breakpoint). Note that CSS text-transform:uppercase means Playwright innerText assertions must be case-insensitive.",
+  "detailed_results": {
+    "backend_pytest": {
+      "test_subscription_shape_free_user": "PASS — subscription=null, usage=null, tiers.premium.monthly_upload_limit=5, tiers.vip=unlimited",
+      "test_subscription_shape_admin_no_sub": "PASS — usage matches subscription state",
+      "test_subscription_shape_premium_seed": "PASS — seed premium is prepay-only, subscription=null + usage=null (documented)",
+      "test_subscription_endpoint_latency": "PASS — well under 300ms"
+    },
+    "frontend_free_user": {
+      "banner_testid": "dashboard-upgrade-banner PRESENT",
+      "at_limit_testid": "ABSENT (correct)",
+      "headline": "Ready for more? Upgrade your plan.",
+      "eyebrow": "Unlock your full potential",
+      "premium_btn_visible": true,
+      "vip_btn_visible": true,
+      "grid_classes": "mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2"
+    },
+    "frontend_premium_at_limit_mock": {
+      "banner_testid": "dashboard-upgrade-banner-at-limit PRESENT",
+      "free_testid": "ABSENT (correct)",
+      "headline": "Need more uploads? Go VIP.",
+      "eyebrow": "Premium limit reached · 5 / 5 this month",
+      "body_copy": "You've used all 5 Premium uploads this month. Go VIP for unlimited uploads, real scout reviews, and direct scout contact.",
+      "premium_btn_visible": false,
+      "vip_btn_visible": true,
+      "grid_classes": "mt-5 grid gap-3 grid-cols-1"
+    },
+    "regression": {
+      "reports_library_heading_YOUR_REPORTS": "present",
+      "players_list_ALMIN_and_ALMIN_ORMAN": "present (2 tracked)",
+      "quick_stats_row_Total_Uploads_Premium_Reports_Tracked_Players_Current_Plan": "present",
+      "subscription_card_in_mocked_premium": "renders correctly with Premium plan + Next billing + Upgrade to VIP button",
+      "console_errors": 0
+    }
+  }
+}

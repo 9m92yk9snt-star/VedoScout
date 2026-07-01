@@ -26,6 +26,57 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 92 — Report page warm-language refactor + 6 Nano Banana visuals (Feb 27 2026)**:
+  - User feedback (Danish/English): report felt visually FLAT and used COLD/technical words ("anchored", "in module of", "pillar", "evaluation") that parents don't understand. Wanted Nano Banana graphics + warmer football-feel language.
+  - **6 NEW Nano Banana images** generated via `gemini-3.1-flash-image-preview` (saved to `/app/backend/static/landing/`):
+    - `report-hero-divider.png` (~740 KB, 21:9) — golden-hour empty pitch with ball at centre spot
+    - `pillar-technical.png` (~1024×1024) — boot striking ball close-up
+    - `pillar-tactical.png` — youth footballer scanning the pitch
+    - `pillar-physical.png` — mid-sprint dynamic action shot
+    - `pillar-mental.png` — calm focused portrait
+    - `scout-avatar.png` — faceless scout in forest jacket with notebook
+  - **21 old-to-new label transitions** in `ReportPage.jsx` (all parent-friendly, football-feel):
+    - "Executive Summary" → "Scout's Summary"
+    - "Age-anchored evaluation" → "Reviewed for his age"
+    - "Tier landscape" → "Where he stands on the football ladder"
+    - "Pillar overview" → "His game at a glance"
+    - "Locked player · tracked" → "Your player · tracked"
+    - "Mentality" section → "Mindset" (TOC + pillar header + id)
+    - "Mentality / Body Language" score → "Mindset & body language"
+    - "Current Age Score" → "For his age"
+    - "Position-Specific Score" → "For his position"
+    - "Next-Level Readiness" → "Ready for next level"
+    - "Development Priority" → "Room to grow"
+    - "Pro Style Match" → hint "who he reminds us of"
+    - "Scout-grade transparency" → "What we looked at"
+    - "What we evaluated · What we could not" → "What we looked at · What we left for later"
+    - "Evaluated for this stage" → "Reviewed for his age"
+    - "Deliberately not evaluated" → "Saved for his next age group"
+    - "Could not be assessed" → "Couldn't be seen in this particular video"
+    - "Every observation … anchored to the player" → "Every note … about the player inside the lime box"
+    - "Every observation is anchored to the exact frame" → "Every note is tied to the exact moment in the video"
+    - "Each score is anchored against the actual per-90 distribution of" → "Each score is checked against what real professional players actually do per 90 minutes at"
+    - `calibrated for` → `for his age`
+  - **Visual upgrades**:
+    - **NEW hero divider** (`data-testid="report-hero-divider"`, aspect-[21/8] md:aspect-[21/7]) — Nano Banana stadium photo + "YOUR FULL SCOUT REPORT" eyebrow + "THROUGH A SCOUT'S EYES" giant volt headline + supporting copy. Renders at the very top of the premium content area, warms up the whole read.
+    - **Each pillar section** now gets: photographic thumbnail (56-64 px, `hidden sm:block` — clean on mobile), main title + a soft sub-caption ("Ball, dribbling, passing, shooting" / "Scanning, decisions, positioning" / "Speed, balance, agility, stamina" / "Confidence, courage, focus, body language"). Adds warmth and immediate context so parents know what each area covers.
+    - `SectionGrid` component extended with `sub` and `imageSrc` props (backward compatible — old callers still work)
+  - **Verified (testing-agent iteration_39.json — 100 % pass, 0 console errors, 0 regressions)**:
+    - All 21 warm labels visible on the seeded Lukas A. premium demo
+    - All 10 cold labels confirmed removed (`Executive Summary`, `Tier landscape`, `Pillar overview`, `Locked player`, `Development Priority`, `Scout-grade transparency`, `Deliberately not evaluated`, etc.)
+    - 4 pillar sub-captions rendered
+    - 6 Nano Banana assets return `200 image/png`
+    - Hero divider naturalWidth=1584 visible in DOM
+    - `#report-mindset` present, old `#report-mentality-analysis` fully removed
+    - PDF button, radar chart, Top Strengths, timestamped moments — all still render
+    - Mobile 390×844 passes: hero divider scales, thumbnails hidden by design (`hidden sm:block`)
+    - 2 warm labels ("Your player · tracked" + "inside the lime box") are gated behind `marker_url` — will render on any NEW upload done via marker studio (documented expected-absent on legacy Lukas seed)
+  - **Known follow-up**: `ReportPage.jsx` is now 3053 lines — testing agent recommended splitting into `HeroDivider.jsx` / `ScoutSummary.jsx` / `PillarSection.jsx` / `ChartAndScores.jsx`. Non-blocking, deferred to next refactor pass.
+  - **Files**:
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` — 21 targeted label replacements + new hero divider block + `SectionGrid` extended
+    - NEW `/app/backend/scripts/generate_report_assets.py`
+    - 6 NEW PNGs in `/app/backend/static/landing/`
+
 - ✅ **🆕 Session 91 — Disk Space Leak fix: auto-cleanup raw uploads + admin cleanup endpoint (Feb 27 2026)**:
   - User confirmation (Danish): "ok fix det med bonus" → implement both (a) automatic deletion of raw `.mov` files after successful ffmpeg transcoding AND (b) bonus one-shot admin cleanup endpoint for legacy 1.1 GB orphan backlog.
   - **Part A — auto-cleanup on every new upload** (`server.py` lines ~3450-3494, inside `analyze_preview_task`):

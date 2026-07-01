@@ -6862,8 +6862,30 @@ async def get_subscription_status(session_id: str, user=Depends(get_current_user
 
 @api_router.get("/me/subscription")
 async def get_my_subscription(user=Depends(get_current_user)):
-    """Return the user's current subscription block (or null if none)."""
-    return {"subscription": user.get("subscription"), "tiers": SUBSCRIPTION_TIERS}
+    """Return the user's current subscription block (or null if none), plus a
+    `usage` object that tells the frontend how many uploads have been consumed
+    in the current billing period. This drives the dashboard's Premium-at-
+    limit upgrade UI (show only VIP once Premium's 5/5 is used).
+    """
+    sub = user.get("subscription") or None
+    usage = None
+    sub_tier = _has_active_subscription(user)
+    if sub_tier:
+        tier_conf = SUBSCRIPTION_TIERS.get(sub_tier, {})
+        limit = tier_conf.get("monthly_upload_limit")  # None = unlimited
+        period_start = (user.get("subscription") or {}).get("current_period_start") or now_iso()
+        used = await db.reports.count_documents({
+            "user_id": user["id"],
+            "created_at": {"$gte": period_start},
+        })
+        remaining = None if limit is None else max(0, limit - used)
+        usage = {
+            "used_this_period": used,
+            "monthly_limit": limit,
+            "remaining": remaining,
+            "exhausted": (limit is not None and used >= limit),
+        }
+    return {"subscription": sub, "tiers": SUBSCRIPTION_TIERS, "usage": usage}
 
 
 @api_router.post("/me/subscription/cancel")

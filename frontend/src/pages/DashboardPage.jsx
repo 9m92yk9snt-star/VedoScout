@@ -29,16 +29,22 @@ export default function DashboardPage() {
   const [passState, setPassState] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Subscription state — { subscription: {...}, tiers: {...} } from /api/me/subscription
+  // Subscription state — { subscription: {...}, tiers: {...}, usage: {...} } from /api/me/subscription
   const [subscription, setSubscription] = useState(null);
   const [tiers, setTiers] = useState({});
+  // Monthly upload usage — drives the "Premium at limit → VIP only" banner variant
+  const [usage, setUsage] = useState(null);
 
   const fetchAll = () => {
     Promise.allSettled([
       api.get("/reports/mine").then(({ data }) => setReports(data)),
       api.get("/progress/players").then(({ data }) => setPlayers(data.items || [])),
       api.get("/progress/pass/status").then(({ data }) => setPassState(data)),
-      api.get("/me/subscription").then(({ data }) => { setSubscription(data.subscription); setTiers(data.tiers || {}); }),
+      api.get("/me/subscription").then(({ data }) => {
+        setSubscription(data.subscription);
+        setTiers(data.tiers || {});
+        setUsage(data.usage || null);
+      }),
     ]).finally(() => setLoading(false));
   };
 
@@ -203,12 +209,26 @@ export default function DashboardPage() {
                 onChange={(s) => setSubscription(s)}
               />
 
-              {/* UPGRADE BANNER — for free users without a subscription.
-                 Skipped when the user already has a paid subscription OR
-                 an active Progress Pass (legacy) so we never double-promote. */}
-              {!subscription?.tier && !passState?.active && (
-                <UpgradeBanner tiers={tiers} />
-              )}
+              {/* UPGRADE BANNER — shown to:
+                 (a) free users without any subscription, and
+                 (b) Premium subscribers who have hit their 5/5 monthly limit
+                     → banner switches to "VIP only" variant.
+                 Skipped when: user has VIP, or a legacy Progress Pass is active. */}
+              {(() => {
+                const isPremiumAtLimit =
+                  subscription?.tier === "premium" && usage?.exhausted;
+                const showBanner =
+                  (!subscription?.tier && !passState?.active) ||
+                  (isPremiumAtLimit && !passState?.active);
+                if (!showBanner) return null;
+                return (
+                  <UpgradeBanner
+                    tiers={tiers}
+                    mode={isPremiumAtLimit ? "premium-at-limit" : "free"}
+                    usage={usage}
+                  />
+                );
+              })()}
 
               {/* REPORTS (Library) — moved to top: this is the most-used
                  part of the dashboard; users want to jump to a report. */}
@@ -546,8 +566,9 @@ function LegacyPassActiveBanner({ passState }) {
  *  Once the subscription is active <SubscriptionCard /> takes over and
  *  this banner is hidden, so we never double-promote.
  * ──────────────────────────────────────────────────────────────────────── */
-function UpgradeBanner({ tiers }) {
+function UpgradeBanner({ tiers, mode = "free", usage = null }) {
   const [busy, setBusy] = useState(null); // "premium" | "vip" | null
+  const isAtLimit = mode === "premium-at-limit";
 
   const startSubscription = async (tier) => {
     if (busy) return;
@@ -569,26 +590,37 @@ function UpgradeBanner({ tiers }) {
   const vip = tiers?.vip || { amount: 49.99 };
 
   return (
-    <div data-testid="dashboard-upgrade-banner" className="mt-10 relative overflow-hidden bg-cream-card border border-gray-border p-5 md:p-7">
+    <div
+      data-testid={isAtLimit ? "dashboard-upgrade-banner-at-limit" : "dashboard-upgrade-banner"}
+      className="mt-10 relative overflow-hidden bg-cream-card border border-gray-border p-5 md:p-7"
+    >
       <div className="flex items-center gap-2 mb-3">
         <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
-          <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
-          <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
+          <span className={`absolute inset-0 rounded-full ${isAtLimit ? "bg-[#F5C443]" : "bg-volt"} animate-ping opacity-75`} />
+          <span className={`relative rounded-full w-1.5 h-1.5 ${isAtLimit ? "bg-[#F5C443]" : "bg-volt"}`} />
         </span>
         <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
-          Unlock your full potential
+          {isAtLimit
+            ? `Premium limit reached · ${usage?.used_this_period ?? 5} / ${usage?.monthly_limit ?? 5} this month`
+            : "Unlock your full potential"}
         </span>
       </div>
       <h2 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter text-ink leading-[0.95]">
-        Ready for more?<br />
-        <span className="text-forest">Upgrade your plan.</span>
+        {isAtLimit ? (
+          <>Need more uploads?<br /><span className="text-[#0A0F0D]">Go <span className="text-[#B8891C]">VIP</span>.</span></>
+        ) : (
+          <>Ready for more?<br /><span className="text-forest">Upgrade your plan.</span></>
+        )}
       </h2>
       <p className="mt-2 text-sm text-ink/65 max-w-xl">
-        You&apos;re on the Free plan. Upgrade for more uploads, advanced AI analysis, and (with VIP) a real scout reviewing your video.
+        {isAtLimit
+          ? "You've used all 5 Premium uploads this month. Go VIP for unlimited uploads, real scout reviews, and direct scout contact."
+          : "You're on the Free plan. Upgrade for more uploads, advanced AI analysis, and (with VIP) a real scout reviewing your video."}
       </p>
 
-      <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Premium mini-card */}
+      <div className={`mt-5 grid gap-3 ${isAtLimit ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
+        {/* Premium mini-card — hidden when Premium user has hit the limit */}
+        {!isAtLimit && (
         <button
           type="button"
           data-testid="dashboard-upgrade-premium-btn"
@@ -617,6 +649,7 @@ function UpgradeBanner({ tiers }) {
             {busy === "premium" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Start Premium <ArrowRight className="w-3.5 h-3.5" /></>}
           </span>
         </button>
+        )}
 
         {/* VIP mini-card */}
         <button
