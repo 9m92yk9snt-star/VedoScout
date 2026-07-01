@@ -21,6 +21,9 @@ import secrets
 import jwt as pyjwt
 from dotenv import load_dotenv
 import httpx
+
+# Local modules
+import r2_storage
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, status, BackgroundTasks
 
 # ScoutMePlay email service — Gmail SMTP + templates. Modules silently no-op
@@ -3708,12 +3711,16 @@ async def admin_delete_demo_video(video_id: str, _=Depends(get_current_admin)):
     doc = await db.demo_videos.find_one({"id": video_id}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Demo video not found")
-    # Best-effort file cleanup — only if the file lives inside our uploads dir
+    # Best-effort cleanup — remove both local files (legacy) and R2 objects (new).
     for url_key in ("video_url", "poster_url"):
         url = doc.get(url_key) or ""
         if url.startswith("/api/uploads/demo_videos/"):
             local = UPLOAD_DIR / url.replace("/api/uploads/", "", 1)
             local.unlink(missing_ok=True)
+        elif r2_storage.is_configured():
+            key = r2_storage.key_from_url(url)
+            if key:
+                r2_storage.delete_object(key)
     await db.demo_videos.delete_one({"id": video_id})
     return {"ok": True, "deleted_id": video_id}
 
@@ -3721,8 +3728,8 @@ async def admin_delete_demo_video(video_id: str, _=Depends(get_current_admin)):
 @api_router.post("/admin/demo-videos/upload-video")
 async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(get_current_admin)):
     """Upload an iPhone MOV / MP4 video file. Re-encodes to browser-safe H.264 8-bit
-    (Chrome/Firefox can't decode HEVC/10-bit iPhone footage), auto-generates a poster
-    from the first frame, and returns the public /api/uploads/... URL."""
+    (Chrome/Firefox can't decode HEVC/10-bit iPhone footage), auto-generates a poster,
+    and pushes both to Cloudflare R2 (fallback: local disk if R2 is not configured)."""
     if file.content_type not in _DEMO_VIDEO_ALLOWED:
         raise HTTPException(400, f"Only MP4 / MOV / WebM videos are allowed (got {file.content_type})")
     demo_dir = UPLOAD_DIR / "demo_videos"
@@ -3755,6 +3762,7 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
     poster_path = demo_dir / f"{stem}.poster.jpg"
     final_url = f"/api/uploads/demo_videos/{fname}"  # fallback if ffmpeg fails
     poster_url = None
+    web_created = False
     try:
         import subprocess
         r = subprocess.run(
@@ -3771,9 +3779,9 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
             capture_output=True, timeout=180,
         )
         if r.returncode == 0 and web_path.exists() and web_path.stat().st_size > 0:
-            # keep original mov/mp4 around briefly; delete to save disk
-            fpath.unlink(missing_ok=True)
+            fpath.unlink(missing_ok=True)  # drop the original — .web.mp4 is what we serve
             final_url = f"/api/uploads/demo_videos/{stem}.web.mp4"
+            web_created = True
             # Auto-extract a poster from ~1s in (avoids all-black first frame)
             try:
                 pr = subprocess.run(
@@ -3793,6 +3801,26 @@ async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(g
             logger.warning(f"demo-video ffmpeg transcode rc={r.returncode} stderr={r.stderr[:200]}")
     except Exception as e:
         logger.warning(f"demo-video ffmpeg transcode failed: {e}")
+
+    # ── Push to Cloudflare R2 (only new uploads; existing local files untouched) ──
+    if r2_storage.is_configured() and web_created:
+        try:
+            video_key = f"demo_videos/{stem}.web.mp4"
+            uploaded_url = r2_storage.upload_file(video_key, web_path, "video/mp4")
+            final_url = uploaded_url
+            web_path.unlink(missing_ok=True)  # free container disk
+
+            if poster_path.exists() and poster_path.stat().st_size > 0:
+                poster_key = f"demo_videos/{stem}.poster.jpg"
+                uploaded_poster = r2_storage.upload_file(poster_key, poster_path, "image/jpeg")
+                poster_url = uploaded_poster
+                poster_path.unlink(missing_ok=True)
+
+            logger.info(f"[R2] demo-video uploaded key={video_key} url={final_url}")
+        except Exception as e:
+            # Never fail the upload if R2 has a hiccup — keep the local file so
+            # the admin can still create the video row.
+            logger.warning(f"[R2] demo-video upload failed, keeping local: {e}")
 
     return {
         "ok": True,
