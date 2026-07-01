@@ -51,20 +51,20 @@ const FREE_FEATURES = [
 
 const SINGLE_FEATURES = [
   { label: "Full 4-Pillar Premium Report", included: true },
-  { label: "Pro Scout Intelligence Analysis", included: true },
-  { label: "Real Scout Review",               included: true },
+  { label: "Pro Scout Intelligence Analysis (instant)", included: true },
+  { label: "Real Scout Review (within 48h)",  included: true },
   { label: "Downloadable PDF Report",         included: true },
   { label: "Personalised Feedback",           included: true },
   { label: "Timestamped Key Moments",         included: true },
   { label: "7 / 30 / 90-Day Training Plan",  included: true },
-  { label: "48-Hour Delivery Guarantee",     included: true },
+  { label: "48-Hour Scout Review Guarantee",  included: true },
 ];
 
 const PREMIUM_FEATURES = [
   { label: "Professional Player Profile",      included: true },
   { label: "2 Video Reports Monthly",          included: true },
   { label: "Extra Reports at Subscriber Rate", included: true, hint: "cheaper than a single report" },
-  { label: "Advanced AI Football Analysis",    included: true },
+  { label: "Instant AI Analysis",              included: true, hint: "delivered as soon as the pipeline finishes" },
   { label: "Progress Tracking Over Time",      included: true },
   { label: "Personal Development Plan",        included: true },
   { label: "Download PDF Reports",             included: true },
@@ -76,8 +76,7 @@ const VIP_FEATURES = [
   { label: "Everything in Premium",                  included: true },
   { label: "4 Video Reports Monthly",                 included: true },
   { label: "Extra Reports at Deepest Discount",       included: true, hint: "cheapest per-report rate" },
-  { label: "Elite AI Football Analysis",              included: true },
-  { label: "Real Scout Reviews Your Videos",          included: true },
+  { label: "Instant AI + Real Scout Review (48h)",    included: true, hint: "AI report is instant, scout responds within 48h" },
   { label: "Direct Contact with Professional Scouts", included: true },
   { label: "Personalised Scout Feedback Report",      included: true },
   { label: "Maximum Exposure for Opportunities",      included: true },

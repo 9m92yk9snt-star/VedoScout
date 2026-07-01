@@ -26,6 +26,29 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 102 — Clarified AI-instant vs scout-48h messaging across the site (Feb 27 2026)**:
+  - User feedback (Danish): "rigtig scout svare tilbage på rapporten inden for 48 timer men proscout analyse er instant efter analysen er kørt igenem" — The FAQ said "every report is delivered within 48 hours", which was misleading. The Pro Scout Intelligence (AI) analysis is **INSTANT** as soon as the AI pipeline finishes. Only the **real scout review** (VIP + Single Report) takes 48 hours.
+  - **FAQ answer rewritten** in all 3 places (`Landing.jsx`, `LandingMinimal.jsx`, `TermsPage.jsx`):
+    > *"Your Pro Scout Intelligence analysis is delivered **instantly** — as soon as the AI pipeline finishes processing your video (typically 5–15 minutes). If your plan includes a real scout review (VIP Premium), a professional scout responds with their personal feedback **within 48 hours** on top of the instant AI report. If we ever miss that 48-hour window on a scout review, your purchase is refunded in full — automatically."*
+  - **Pricing tier feature lists** (`PricingTiers.jsx`):
+    - Single Report: "Pro Scout Intelligence Analysis" → "**Pro Scout Intelligence Analysis (instant)**"; "Real Scout Review" → "**Real Scout Review (within 48h)**"; "48-Hour Delivery Guarantee" → "**48-Hour Scout Review Guarantee**".
+    - Premium: added "**Instant AI Analysis**" feature with hint "delivered as soon as the pipeline finishes"; kept "Real Scout Review: false" (Premium has NO scout review — this was already correct).
+    - VIP: replaced "Elite AI Football Analysis" + separate "Real Scout Reviews Your Videos" with unified "**Instant AI + Real Scout Review (48h)**" line with clarifying hint.
+  - **Landing hero (`LandingMinimal.jsx` — active landing)**:
+    - Eyebrow: "Pro Scout Intelligence · 48h delivery" → "**Pro Scout Intelligence · Instant AI · 48h scout review**"
+    - Subtitle: "Get an honest professional scout report in 48 hours" → "Get an **instant AI scout report**, plus a real professional scout's written follow-up within 48 hours (VIP)"
+    - Hero image caption: "Analysed in 48h" → "**Instant AI + 48h scout**"
+    - Floating report card badge: "4-pillar · 48h" → "**4-pillar · Instant AI**"
+    - SEO description updated to same distinction.
+  - **Chatbot pricing copy** in LandingMinimal — rewritten to explicitly split AI (instant) from scout follow-up (48h) for both single-report + monthly plans.
+  - **3-step refund journey (`Landing.jsx`)**: "You pay → Scout reviews → Report sent (Within 48 hours flat)" → "You pay → **Instant AI report** (Delivered right after upload) → **Scout follow-up** (Real scout within 48h)".
+  - **Verified via headless browser**: Landing hero now displays "PRO SCOUT INTELLIGENCE · INSTANT AI · 48H SCOUT REVIEW" eyebrow. FAQ DOM check confirms the new answer containing both "Pro Scout Intelligence" and "instant" is live. Lint clean.
+  - **Files**:
+    - MODIFIED `/app/frontend/src/pages/Landing.jsx` (FAQ answer + 3-step refund journey)
+    - MODIFIED `/app/frontend/src/pages/LandingMinimal.jsx` (SEO desc, hero eyebrow, subtitle, image caption, badge, chatbot copy, FAQ answer)
+    - MODIFIED `/app/frontend/src/pages/TermsPage.jsx` (refund clause)
+    - MODIFIED `/app/frontend/src/components/PricingTiers.jsx` (all 3 tier feature lists)
+
 - ✅ **🆕 Session 101 — New subscription model: monthly quota + admin-editable per-report extra prices (Feb 27 2026)**:
   - User feedback (Danish/English hybrid): Premium = 2 reports/month + extra reports at $89 (cheaper than $129 single); VIP = 4 reports/month + extra reports at $59; both extra-prices admin-editable; dashboard surfaces the "buy extra report" CTA when quota is used up.
   - **Backend (`server.py`)**:

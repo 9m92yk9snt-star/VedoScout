@@ -39,7 +39,7 @@ const ASSET_BASE = process.env.REACT_APP_BACKEND_URL;
 const FAQ_ITEMS = [
   {
     q: "How long does it take to get my report?",
-    a: "Every report is delivered within 48 hours of payment. If we miss that window for any reason, your purchase is refunded in full — automatically, no support tickets needed.",
+    a: "Your Pro Scout Intelligence analysis is delivered instantly — as soon as the AI pipeline finishes processing your video (typically 5–15 minutes, depending on clip length). If your plan includes a real scout review (VIP Premium), a professional scout responds with their personal feedback within 48 hours on top of the instant AI report. If we ever miss that 48-hour window on a scout review, your purchase is refunded in full — automatically, no support tickets needed.",
   },
   {
     q: "Is my child too young for this?",
@@ -84,7 +84,7 @@ export default function LandingMinimal() {
     <div data-testid="landing-minimal" className="min-h-screen bg-cream-base text-ink overflow-x-clip">
       <SEO
         title="ScoutMePlay — Discover your true football level"
-        description="Upload your football video and get an honest professional scout review in 48 hours. Built for ambitious U7–U21 players."
+        description="Upload your football video and get an instant AI scout report — plus a real professional scout review within 48h (VIP). Built for ambitious U7–U21 players."
         canonical="/"
         jsonLd={organizationJsonLd()}
       />
@@ -163,7 +163,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
             </span>
             <span className="text-forest text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
-              Pro Scout Intelligence · 48h delivery
+              Pro Scout Intelligence · Instant AI · 48h scout review
             </span>
             <span aria-hidden className="h-px w-8 bg-forest/35" />
           </motion.div>
@@ -204,7 +204,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             transition={{ duration: 0.5, delay: 0.15 }}
             className="mt-6 text-base md:text-lg text-ink/70 leading-relaxed max-w-xl mx-auto lg:mx-0"
           >
-            Upload your video. Get an honest professional scout report in 48 hours.
+            Upload your video. Get an <span className="text-forest font-semibold">instant AI scout report</span>, plus a real professional scout&apos;s written follow-up within 48 hours (VIP).
             Built for ambitious U7&ndash;U21 players chasing the next level.
           </motion.p>
 
@@ -305,7 +305,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               <div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-volt/95 font-bold">Match footage</div>
                 <div className="font-barlow font-black uppercase text-white text-xl md:text-2xl leading-tight">
-                  Analysed in 48h
+                  Instant AI + 48h scout
                 </div>
               </div>
             </div>
@@ -348,7 +348,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               <div className="bg-forest text-white px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-between border-t border-ink">
                 <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold">Scout report</span>
                 <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold text-volt">
-                  4-pillar · 48h
+                  4-pillar · Instant AI
                 </span>
               </div>
             </div>
@@ -409,8 +409,8 @@ function FAQSection() {
   }, []);
 
   const priceFaqAnswer = price
-    ? `The $${price} single report is a one-off purchase — one complete scout report for one player, delivered in 48 hours. The monthly plans (Premium $29.99/mo, VIP $49.99/mo) give you ongoing access: more uploads per month, advanced AI analysis, progress tracking, and (with VIP) a real scout reviewing your videos. Pick the single report if you just want to try once; pick a monthly plan if you want to keep tracking progress.`
-    : "The single report is a one-off purchase — one complete scout report for one player, delivered in 48 hours. The monthly plans (Premium $29.99/mo, VIP $49.99/mo) give you ongoing access: more uploads per month, advanced AI analysis, progress tracking, and (with VIP) a real scout reviewing your videos.";
+    ? `The $${price} single report is a one-off purchase — one complete scout report for one player. The AI analysis is delivered instantly, and a real professional scout follows up with written feedback within 48 hours. The monthly plans (Premium $29.99/mo, VIP $49.99/mo) give you ongoing access: more uploads per month, advanced AI analysis (instant), progress tracking, and (with VIP) a real scout reviewing your videos within 48h. Pick the single report if you just want to try once; pick a monthly plan if you want to keep tracking progress.`
+    : "The single report is a one-off purchase — one complete scout report for one player. The AI analysis is instant; a real professional scout follows up within 48 hours. The monthly plans (Premium $29.99/mo, VIP $49.99/mo) give you ongoing access: more uploads per month, advanced AI analysis (instant), progress tracking, and (with VIP) a real scout reviewing your videos within 48h.";
 
   return (
     <section
