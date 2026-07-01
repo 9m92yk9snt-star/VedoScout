@@ -56,7 +56,8 @@ export default function DemoVideosAdmin() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this demo video? The file is removed from disk too.")) return;
+    // Skipping window.confirm — it's often blocked/silent inside preview iframes
+    // (Kubernetes ingress + iframe embedding). Row-level confirm UI handles UX.
     setBusyId(id);
     try {
       await api.delete(`/admin/demo-videos/${id}`);
