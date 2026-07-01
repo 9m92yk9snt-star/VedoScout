@@ -9232,6 +9232,119 @@ async def admin_reports(_=Depends(get_current_admin)):
     return docs
 
 
+@api_router.post("/admin/seed-test-accounts")
+async def admin_seed_test_accounts(_=Depends(get_current_admin)):
+    """Idempotent: creates (or updates) two demo accounts used for QA:
+      • testscout@scoutmeplay.com — paid CLUB tier, verified, unlimited reveals
+      • testvip@scoutmeplay.com   — VIP subscription, 10 prepaid uploads, discoverable
+    Safe to call multiple times — always upserts. Only admin can trigger."""
+    from datetime import timedelta
+    now_iso = datetime.now(timezone.utc).isoformat()
+    period_end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+
+    scout_pw = "TestScout@2026!"
+    vip_pw = "TestVip@2026!"
+
+    scout_doc = {
+        "id": str(uuid.uuid4()),  # only used on insert (upsert with $set won't overwrite existing id)
+        "email": "testscout@scoutmeplay.com",
+        "password_hash": bcrypt.hashpw(scout_pw.encode(), bcrypt.gensalt(rounds=12)).decode(),
+        "full_name": "Test Scout McTester",
+        "role": "club_client",
+        "created_at": now_iso,
+        "email_verified": True,
+        "free_preview_used": False,
+        "prepaid_uploads": 0,
+        "scout_access": {
+            "tier": "club",
+            "status": "active",
+            "one_time": True,
+            "stripe_customer_id": "cus_test_manual_seed",
+            "stripe_payment_intent": "pi_test_manual_seed",
+            "current_period_end": None,
+            "monthly_reveals": None,
+            "seats": 5,
+            "reveals_used_this_period": 0,
+            "started_at": now_iso,
+            "verified": True,
+            "organization": "Test FC Academy",
+            "verification": {
+                "status": "approved",
+                "org_name": "Test FC Academy",
+                "role_title": "Head of Recruitment",
+                "requested_at": now_iso,
+                "approved_at": now_iso,
+                "approved_by": "system-seed",
+            },
+        },
+    }
+    scout_setoninsert = {"id": scout_doc.pop("id")}
+    await db.users.update_one(
+        {"email": scout_doc["email"]},
+        {"$set": scout_doc, "$setOnInsert": scout_setoninsert},
+        upsert=True,
+    )
+
+    vip_doc = {
+        "id": str(uuid.uuid4()),
+        "email": "testvip@scoutmeplay.com",
+        "password_hash": bcrypt.hashpw(vip_pw.encode(), bcrypt.gensalt(rounds=12)).decode(),
+        "full_name": "Test VIP Player",
+        "role": "user",
+        "created_at": now_iso,
+        "email_verified": True,
+        "free_preview_used": True,
+        "prepaid_uploads": 10,
+        "discoverable": True,
+        "discoverable_updated_at": now_iso,
+        "birth_year": 2010,
+        "public_profile": {
+            "player_name": "Test VIP Player",
+            "position": "AMF",
+            "preferred_foot": "right",
+            "club": "Test FC Youth",
+            "country": "Denmark",
+            "bio": "Ambitious attacking midfielder — VIP test account with all premium features enabled.",
+            "height_cm": 175,
+            "weight_kg": 68,
+        },
+        "profile": {
+            "visible_in_scout_db": True,
+            "player_name": "Test VIP Player",
+            "age": 16,
+            "position": "AMF",
+            "preferred_foot": "right",
+            "current_club": "Test FC Youth",
+        },
+        "subscription": {
+            "tier": "vip",
+            "status": "active",
+            "stripe_customer_id": "cus_test_vip_manual",
+            "stripe_subscription_id": "sub_test_vip_manual",
+            "current_period_end": period_end,
+            "started_at": now_iso,
+            "monthly_reports_included": 4,
+            "reports_used_this_period": 0,
+            "scout_review_included": True,
+        },
+        "progress_pass": {"credits": 5, "started_at": now_iso},
+    }
+    vip_setoninsert = {"id": vip_doc.pop("id")}
+    await db.users.update_one(
+        {"email": vip_doc["email"]},
+        {"$set": vip_doc, "$setOnInsert": vip_setoninsert},
+        upsert=True,
+    )
+
+    return {
+        "ok": True,
+        "seeded": [
+            {"email": "testscout@scoutmeplay.com", "password": scout_pw, "role": "club_client", "tier": "club"},
+            {"email": "testvip@scoutmeplay.com", "password": vip_pw, "role": "user", "tier": "vip"},
+        ],
+    }
+
+
 @api_router.get("/admin/payments")
 async def admin_payments(_=Depends(get_current_admin)):
     docs = await db.payment_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
