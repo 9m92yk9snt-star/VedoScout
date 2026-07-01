@@ -1,125 +1,77 @@
 {
-  "theme": {
-    "archetype": "Archetype 2: Performance Pro",
-    "mode": "Hybrid (Light Base with Dark Tactical Elements)",
-    "description": "Football-native aesthetic, boutique pro academy feel, high contrast. Inspired by Whoop, Polar, On Running. Premium, serious, aggressive but grounded. Elite athleticism & precision."
+  "theme": "Light",
+  "archetype": "2 (Performance Pro) - Adapted for Tactical Football Scouting",
+  "domain": "Premium Football Scout Report (SaaS)",
+  "typography": {
+    "headings": {
+      "family": "Barlow Condensed",
+      "classes": "font-barlow font-black uppercase tracking-tight",
+      "usage": "Section titles, Axis labels, and major numerical callouts."
+    },
+    "body": {
+      "family": "DM Sans",
+      "classes": "font-sans text-base leading-relaxed text-ink/70",
+      "usage": "Descriptions, scout notes, tactical key."
+    },
+    "hierarchy": {
+      "section_header": "text-5xl md:text-6xl text-[#F5F1E8] mb-4 drop-shadow-lg",
+      "axis_labels": "text-xl md:text-2xl text-[#CCFF00] tracking-widest",
+      "scores": "text-3xl md:text-4xl text-[#CCFF00]"
+    }
   },
   "colors": {
-    "background": {
-      "cream_base": "#F6EFE3",
-      "cream_card": "#FFFAF1",
-      "ink_black": "#0A1A12",
-      "forest_dark": "#1F4F2F"
-    },
-    "primary": {
-      "forest": "#1F4F2F",
-      "forest_pop": "#2A6B3F"
-    },
-    "accent": {
-      "volt": "#CCFF00",
-      "lime": "#A5DD5F",
-      "gold": "#F5C443"
-    },
-    "text": {
-      "ink": "#0A1A12",
-      "ink_muted": "rgba(10,26,18,0.65)",
-      "white": "#FFFFFF"
+    "background": "#F5F1E8",
+    "primary": "#1F4F2F",
+    "accent": "#2D6B3D",
+    "highlight": "#CCFF00",
+    "dark": "#0A0F0D",
+    "radar_tiers": {
+      "standard": "stroke-[#F5F1E8]/20",
+      "strong": "stroke-[#F5F1E8]/40",
+      "pro": "stroke-[#2D6B3D]",
+      "elite": "stroke-[#CCFF00]/60"
     }
   },
-  "recipes": {
-    "buttons": {
-      "primary": "bg-[#1F4F2F] hover:bg-[#2A6B3F] text-[#FFFFFF] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all shadow-[4px_4px_0_0_#0A1A12] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0A1A12] active:shadow-none active:translate-x-[4px] active:translate-y-[4px] border border-[#0A1A12]",
-      "secondary_outline": "bg-transparent text-[#0A1A12] border-2 border-[#0A1A12] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all hover:bg-[#0A1A12] hover:text-[#F6EFE3] shadow-[4px_4px_0_0_#0A1A12] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0A1A12]",
-      "vip_gold": "bg-[#F5C443] hover:bg-[#FFD661] text-[#0A1A12] border border-[#0A1A12] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all shadow-[4px_4px_0_0_#0A1A12] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#0A1A12]",
-      "volt_accent": "bg-[#CCFF00] hover:bg-[#D8FF33] text-[#0A1A12] border border-[#0A1A12] font-barlow font-black uppercase tracking-[0.18em] px-8 py-4 transition-all shadow-[4px_4px_0_0_#1F4F2F] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_0_#1F4F2F]"
+  "layout": {
+    "section_container": "relative w-full max-w-none px-6 py-24 md:py-32 overflow-hidden bg-[#0A0F0D] my-16 rounded-3xl shadow-2xl",
+    "grid_structure": "grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center max-w-7xl mx-auto relative z-10",
+    "left_content": "lg:col-span-4 flex flex-col justify-center",
+    "right_radar": "lg:col-span-8 relative aspect-square w-full max-w-2xl mx-auto"
+  },
+  "motion_and_interactions": {
+    "radar_entrance": "Framer Motion: `staggerChildren` to draw the axes first, then fade in the reference rings, then animate the player shape.",
+    "shape_draw_in": "Animate the player's polygon path using Framer Motion `initial={{ pathLength: 0, fillOpacity: 0 }} animate={{ pathLength: 1, fillOpacity: 0.25 }}` with an `easeOut` duration of 1.5s.",
+    "rings_shimmer": "Apply a subtle infinite pulse to the 'Elite' and 'Pro' reference rings: `animate={{ opacity: [0.4, 0.8, 0.4] }} transition={{ duration: 4, repeat: Infinity }}`.",
+    "hover_states": "Hovering over a score callout or axis label scales the label up (`scale: 1.1`), brightens the #CCFF00 stroke, and highlights the specific vertex point."
+  },
+  "component_instructions": {
+    "radar_implementation": "REPLACE Recharts. Build a custom 4-axis SVG radar using `framer-motion`. A 4-axis radar is mathematically simple (a diamond). This is MANDATORY to achieve the requested cinematic path drawing and precise score positioning.",
+    "score_callouts": "Anchor the 4 scores (Technical, Tactical, Physical, Mental) directly at the poles of the SVG (Top, Right, Bottom, Left) using absolute positioning. Do NOT put them in a separate grid. Format them as bold tactical badges.",
+    "legend_and_tiers": "Design a 'Tactical Key' floating panel (backdrop-blur) in the bottom corner. Do not use standard colored squares. Use dashed line segments that match the SVG strokes for Standard (4), Strong (6), Pro (8), Elite (9.5)."
+  },
+  "media": {
+    "background_image": {
+      "url": "https://images.unsplash.com/photo-1706675780107-7c43cc487928?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwyfHxmb290YmFsbCUyMHN0YWRpdW0lMjBsaWdodHMlMjBuaWdodHxlbnwwfHx8fDE3ODI4NjYyOTF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Cinematic night football stadium with floodlights. Used as absolute background for the radar section, heavily overlaid with #0A0F0D (Ink) at 85% opacity to make it a moody, dramatic centerpiece.",
+      "category": "section_background"
     },
-    "cards": {
-      "base": "bg-[#FFFAF1] border-2 border-[#0A1A12] rounded-none p-6 md:p-8 hover:bg-[#FFFFFF] transition-colors",
-      "premium": "bg-[#0F3A22] border-2 border-[#A5DD5F] rounded-none p-6 md:p-8 text-[#FFFFFF] relative overflow-hidden shadow-[8px_8px_0_0_#0A1A12]",
-      "vip": "bg-[#0A0F0D] border-2 border-[#F5C443] rounded-none p-6 md:p-8 text-[#FFFFFF] relative overflow-hidden shadow-[8px_8px_0_0_#0A1A12]"
-    },
-    "typography": {
-      "h1_hero": "font-barlow font-black uppercase tracking-tighter text-6xl md:text-7xl lg:text-[5.5rem] leading-[0.85] text-[#0A1A12]",
-      "h2_section": "font-barlow font-black uppercase tracking-tighter text-4xl md:text-5xl lg:text-6xl leading-[0.9] text-[#0A1A12]",
-      "h3_card": "font-barlow font-black uppercase tracking-tight text-2xl md:text-3xl text-[#0A1A12] leading-none",
-      "eyebrow": "text-[#1F4F2F] text-[11px] md:text-xs uppercase tracking-[0.25em] font-bold"
-    },
-    "spacing": {
-      "section_y": "py-24 md:py-32",
-      "container_px": "px-6 md:px-12",
-      "grid_gap_bento": "gap-4 md:gap-6",
-      "grid_gap_loose": "gap-8 md:gap-12"
+    "tactical_texture": {
+      "url": "https://images.unsplash.com/photo-1546608235-3310a2494cdf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHx0YWN0aWNzJTIwYm9hcmQlMjBmb290YmFsbHxlbnwwfHx8fDE3ODI4NjYyOTF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Tactics board green. Can be used with mix-blend-overlay at 5-10% opacity over the right-side radar container to give it a 'chalkboard' feel.",
+      "category": "texture_overlay"
     }
   },
-  "components_upgrades": {
-    "LandingMinimal": {
-      "HeroSection": [
-        "Incorporate a 'Control Room' / Tactical feel. Remove the faint circular svg and replace it with a full-bleed cinematic background image (from image_urls.hero_fallback) with a heavy bg-[#F6EFE3]/90 overlay to maintain the cream theme but add aggressive grit.",
-        "Change CTA button to recipes.buttons.primary to introduce the solid offset brutalist shadow.",
-        "Enhance eyebrow: Add an animated 'Tracing Beam' or tactical line under the eyebrow text.",
-        "Make the 'Pro Scout Intelligence' text pop with #2A6B3F."
-      ],
-      "PricingTiers": [
-        "Apply Archetype 2 Tactical Minimalism: Remove soft drop shadows. Replace them with solid brutalist borders (border-2) and offset shadows (`shadow-[8px_8px_0_0_#0A1A12]`).",
-        "Retain 3-col on mobile, but use gap-1 sm:gap-4.",
-        "Add a subtle grain/noise texture overlay to the Premium and VIP cards to make them feel less flat.",
-        "Ensure all inner dividers inside pricing cards are sharp (h-[2px] bg-ink or bg-white/20)."
-      ],
-      "FAQSection": [
-        "Change accordion toggle from soft rotation to a sharp snap animation.",
-        "Add a 4px left border (border-l-4 border-[#1F4F2F]) to the open state instead of full box shadow.",
-        "Update font sizes to match recipes.typography.h3_card for the questions to give them weight."
-      ]
-    },
-    "DashboardPage": {
-      "WelcomeHeader": [
-        "Increase padding top to pt-32 pb-24 for breathing room.",
-        "Make headline text massive (text-5xl md:text-6xl).",
-        "Place the 'New upload' button inline with the title using flex-wrap, styling it with recipes.buttons.primary."
-      ],
-      "UpgradeBanner": [
-        "Use dark tactical cards for both mini-cards. Premium = #0F3A22, VIP = #0A0F0D.",
-        "Add 1px neon inner borders (border-[#A5DD5F]/50 and border-[#F5C443]/50).",
-        "Remove soft shadows, add sharp inner glows (shadow-[inset_0_0_20px_rgba(204,255,0,0.05)])."
-      ],
-      "ReportsLibrary": [
-        "Change the grid to dense 'Control Room' style: gap-0 border-y border-x border-[#0A1A12]/10. Items share borders (border-r border-b).",
-        "Make the preview/premium badges razor-sharp with no rounded corners. bg-[#1F4F2F] text-white or bg-[#0A1A12] text-[#CCFF00].",
-        "Ensure image thumbnails have a grayscale filter by default, revealing full color on group-hover (group-hover:grayscale-0 transition-all duration-500) to feel like scout analysis footage."
-      ],
-      "PlayersList": [
-        "Convert rows into technical 'register' lines. Use 1px border-b border-[#0A1A12]/10.",
-        "Hover state: from bg-[#FFFAF1] to bg-[#CCFF00]/10 transition.",
-        "Align Premium/Upgrade badges strictly to the right edge with monospaced positioning."
-      ]
-    }
-  },
-  "image_generation_prompts_nano_banana": {
-    "LandingHeroBackground": "Cinematic wide-angle photography of a pristine football pitch at night. Heavy mist, blinding stadium floodlights cutting through the dark. Monochromatic forest green and deep black tones. High contrast, gritty, professional sports documentary style. Leave negative space in the center.",
-    "PricingPremiumTexture": "Macro close-up photography of technical sports fabric, like a high-end football jersey or modern running shoe mesh. Deep forest green color, tactical, minimalist, with subtle diagonal striations. Low lighting, premium.",
-    "VIPCardAccent": "A glowing golden crown insignia rendered in 3D wireframe style, floating against pitch black. Subtle metallic highlights.",
-    "DashboardEmptyState": "A cinematic close-up of a professional scout's clipboard and stopwatch resting on artificial turf. Shallow depth of field, moody lighting, forest green color grading."
-  },
-  "image_urls": {
-    "hero_fallback": {
-      "url": "https://images.pexels.com/photos/15779126/pexels-photo-15779126.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-      "description": "Aerial stadium night for hero background or VIP card texture. Apply a heavy cream overlay in CSS to preserve the text contrast."
-    },
-    "dashboard_coach": {
-      "url": "https://images.unsplash.com/photo-1585757318177-0570a997dc3a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxzb2NjZXIlMjBjb2FjaCUyMG5vdGVib29rfGVufDB8fHx8MTc4MjgyOTg3Mnww&ixlib=rb-4.1.0&q=85",
-      "description": "Coach notebook image for dashboard empty state or welcome banner."
-    }
-  },
-  "micro_interactions": {
-    "buttons": "Hover: rigid translation translate-y-[2px] translate-x-[2px] with a sharp, dense shadow shadow-[2px_2px_0_0_#0A1A12]. Active: translate-y-[4px] translate-x-[4px] with no shadow.",
-    "cards": "Hover: subtle 2px border color shift (e.g., border-[#0A1A12]/10 -> border-[#0A1A12]). Do NOT use soft blurring shadow. Use rigid translation if elevated.",
-    "grid_items": "Staggered fade-in on load using framer-motion. duration 0.4, delay 0.05 increments.",
-    "thumbnails": "Grayscale by default. group-hover:grayscale-0 group-hover:scale-105 duration-700 ease-out."
-  },
-  "implementation_priority": [
-    "1. Landing Hero: Update spacing, inject tactical background image logic, apply brutalist button shadows.",
-    "2. Landing Pricing: Adjust borders to solid 2px, apply solid offset shadows, remove all soft drop shadows.",
-    "3. Dashboard Welcome & Banner: Refine the grid, add tactical notebook imagery to empty states.",
-    "4. Dashboard Reports & Players: Convert cards to sharp-edged Control Room grid items, implement grayscale hover effects on thumbnails."
+  "instructions_to_main_agent": [
+    "In /app/frontend/src/pages/ReportPage.jsx, locate the performance radar block inside the unlocked content (around line 2673).",
+    "Discard the Recharts `<RadarChart>` implementation. It is too rigid for the required cinematic feel.",
+    "Break the container out of the standard card `bg-surface`. Make it a massive dark centerpiece: `bg-ink text-[#F5F1E8] my-16 rounded-3xl overflow-hidden relative`.",
+    "Implement the stadium background image as an absolute positioned layer with object-cover and a heavy dark overlay (`bg-ink/85`).",
+    "Create a grid layout: Left side contains the section title 'Performance Radar' (Barlow, text-6xl, text-white) and the 'Tactical Key' legend. Right side contains the custom SVG radar.",
+    "Build the custom SVG radar with Framer Motion. 4 axes = simple coordinate math (e.g., center is 50%,50%, top is 50%,0%, right is 100%,50%, etc). Scale the 0-10 data to these coordinates.",
+    "Draw the 4 reference rings (Standard 4, Strong 6, Pro 8, Elite 9.5) as dashed SVG paths behind the main shape. Add subtle pulse animation to the Elite ring.",
+    "Draw the player's shape with `stroke='#CCFF00' fill='#CCFF00'` and animate it in using `pathLength: 1`.",
+    "Place the 4 axis labels and scores absolutely at the ends of the axes, utilizing `text-volt` (#CCFF00) for the scores.",
+    "Add hover interactions to the axis labels to highlight the corresponding point on the radar.",
+    "Ensure all new interactive or key elements have `data-testid` attributes."
   ]
 }
