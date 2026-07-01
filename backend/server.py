@@ -35,7 +35,7 @@ from email_templates import (
     render_bulk_email,
     render_admin_sale_notification,
 )
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
@@ -3659,6 +3659,76 @@ async def public_list_demo_videos():
     cursor = db.demo_videos.find({"status": "active"}, {"_id": 0}).sort("order", 1)
     items = [_serialize_demo_video(d) async for d in cursor]
     return {"items": items}
+
+
+# ─── Cloudflare R2 streaming proxy ──────────────────────────────────────────
+# Streams objects from R2 through the backend. Used when the R2 bucket isn't
+# exposed via a public URL (no r2.dev subdomain + no custom domain). Supports
+# HTTP Range requests so <video> elements can seek. Keys are always safe:
+# they only reference objects the backend itself wrote via r2_storage.
+@api_router.get("/media/{key:path}")
+@api_router.head("/media/{key:path}")
+async def stream_r2_media(key: str, request: Request):
+    if not r2_storage.is_configured():
+        raise HTTPException(404, "Media not found")
+    # Basic safety: block obvious traversal / control chars. R2 keys are
+    # forward-slash-separated but never absolute.
+    if key.startswith("/") or ".." in key or "\x00" in key:
+        raise HTTPException(400, "Bad media key")
+
+    range_header = request.headers.get("range") or request.headers.get("Range")
+    try:
+        obj = r2_storage.get_stream(key, range_header=range_header)
+    except Exception as e:
+        # Distinguish "object doesn't exist" (return 404) from real errors (502).
+        err_response = getattr(e, "response", None) or {}
+        code = ""
+        if isinstance(err_response, dict):
+            code = err_response.get("Error", {}).get("Code", "") or str(err_response.get("ResponseMetadata", {}).get("HTTPStatusCode", ""))
+        err_str = str(e)
+        logger.info(f"[R2 stream] key={key} err_code={code!r} err={err_str[:200]}")
+        if code in ("NoSuchKey", "NoSuchBucket", "404") or "NoSuchKey" in err_str or "Not Found" in err_str:
+            raise HTTPException(404, "Media not found") from None
+        raise HTTPException(502, f"Upstream media error: {code or err_str[:80]}") from None
+
+    headers = {
+        "Content-Type": obj.get("ContentType") or "application/octet-stream",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": obj.get("CacheControl") or "public, max-age=31536000, immutable",
+    }
+    content_length = obj.get("ContentLength")
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    content_range = obj.get("ContentRange")
+    status_code = 200
+    if content_range:
+        headers["Content-Range"] = content_range
+        status_code = 206  # partial content
+    etag = obj.get("ETag")
+    if etag:
+        headers["ETag"] = etag
+
+    # HEAD requests: return headers only, no body.
+    if request.method.upper() == "HEAD":
+        try:
+            obj["Body"].close()
+        except Exception:
+            pass
+        return Response(status_code=status_code, headers=headers)
+
+    body = obj["Body"]  # botocore StreamingBody
+    def iter_chunks():
+        try:
+            for chunk in body.iter_chunks(chunk_size=64 * 1024):
+                if chunk:
+                    yield chunk
+        finally:
+            try:
+                body.close()
+            except Exception:
+                pass
+
+    return StreamingResponse(iter_chunks(), status_code=status_code, headers=headers)
 
 
 @api_router.get("/admin/demo-videos")
