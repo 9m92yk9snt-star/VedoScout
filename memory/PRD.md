@@ -26,6 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 99 — Extended Nano Banana bg treatment to Overall Benchmark & Archetype heroes (Feb 27 2026)**:
+  - User said YES to the proposed enhancement — extend the same photo-atmosphere treatment to the remaining big forest-green hero panels so the whole report has consistent premium cinematic feel.
+  - **2 new Nano Banana images** generated (`generate_football_bgs_2.py`), forest-green-friendly palette, strict "NO PEOPLE" system + user prompts:
+    1. `bg-benchmark-tunnel.png` (698 KB, 21:9) — dramatic stadium tunnel from inside looking out at a brightly-lit empty pitch. Ceremonial, "next-level" feel.
+    2. `bg-archetype-aerial.png` (701 KB, 21:9) — top-down floodlit aerial view of an empty pitch with all white markings (center circle, penalty boxes, corner arcs). Analytical geometric layout.
+  - **`OverallBenchmarkBanner`** — added `bg-benchmark-tunnel.png` at opacity 0.35, layered with a dual-forest overlay (`from-forest via-forest/85 to-forest/95` + `from-forest/70 via-transparent to-forest/40`). Preserves the forest-green identity while adding cinematic depth. Kept all existing decorative accents (right-edge forest-pop stripe, blur halo).
+  - **`ArchetypeCard`** — added `bg-archetype-aerial.png` at opacity 0.30, layered with `from-forest/90 via-forest/85 to-forest/95` + horizontal fade. The aerial pitch geometry shows through subtly behind the crest / archetype name / evidence chips.
+  - **Verified via screenshot tool** (per user's ongoing testing-agent ban): both banners render correctly on the Lukas A. Modric-type premium demo. Forest colour identity preserved, tunnel and pitch geometry visible through the wash, all text remains readable. Combined with Session 98 (radar chalkboard + scout-hero touchline + 3 standout objects), the entire premium report now has consistent Nano Banana football-object atmosphere on every major dark/forest hero — zero people in any image.
+  - **Files**:
+    - NEW `/app/backend/scripts/generate_football_bgs_2.py`
+    - NEW `/app/backend/static/landing/bg-benchmark-tunnel.png`
+    - NEW `/app/backend/static/landing/bg-archetype-aerial.png`
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (2 surgical edits in `OverallBenchmarkBanner` + `ArchetypeCard` — bg img + forest gradient overlays)
+  - **Zero backend / data / score changes**.
+
 - ✅ **🆕 Session 98 — Nano Banana football-object backgrounds (NO PEOPLE) replacing flat dark ink (Feb 27 2026)**:
   - User feedback (Danish): the flat dark ink backgrounds looked boring. Wanted cool Nano Banana football elements added — objects only, NO real people.
   - **5 new Nano Banana images** generated via `gemini-3.1-flash-image-preview` (`generate_football_bgs.py`), all with strict "NO PEOPLE" system prompt + explicit anti-people constraints in every user prompt:

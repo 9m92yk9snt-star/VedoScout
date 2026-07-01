@@ -282,6 +282,18 @@ function OverallBenchmarkBanner({ ob, overallScore }) {
       data-testid="overall-benchmark-banner"
       className="relative overflow-hidden bg-forest p-6 md:p-10"
     >
+      {/* Nano Banana — dark stadium tunnel emerging into pitch (NO people) */}
+      <img
+        src={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/bg-benchmark-tunnel.png`}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="absolute inset-0 w-full h-full object-cover opacity-35"
+      />
+      {/* Forest wash + depth overlay keeps the forest-green identity + text readable */}
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-forest via-forest/85 to-forest/95" />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-forest/70 via-transparent to-forest/40" />
       {/* Decorative diagonal accent stripe */}
       <div className="absolute top-0 right-0 h-full w-1 bg-forest-pop" />
       <div className="absolute -top-16 -right-16 w-56 h-56 bg-forest-pop/40 blur-3xl rounded-full pointer-events-none" />
@@ -647,6 +659,17 @@ function ArchetypeCard({ archetype }) {
       data-testid="archetype-card"
       className="relative overflow-hidden bg-forest text-cream-base"
     >
+      {/* Nano Banana — aerial floodlit empty pitch (NO people) */}
+      <img
+        src={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/bg-archetype-aerial.png`}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="absolute inset-0 w-full h-full object-cover opacity-30"
+      />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-forest/90 via-forest/85 to-forest/95" />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-forest/95 via-transparent to-forest/50" />
       {/* Decorative diagonal accent */}
       <div className="absolute -top-24 -right-24 w-72 h-72 bg-forest-pop/30 blur-3xl rounded-full pointer-events-none" />
 
