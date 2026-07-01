@@ -3085,8 +3085,12 @@ def gate_rejection_message(gate: dict) -> Optional[str]:
 
 def transcode_to_web_mp4(src_path: Path) -> Path:
     """
-    Convert the uploaded video to a browser-friendly MP4 (H.264 + AAC, faststart).
+    Convert the uploaded video to a browser-friendly MP4 (H.264 8-bit yuv420p + AAC, faststart).
     Returns the new file path. Falls back to original if ffmpeg fails.
+
+    IMPORTANT: `-pix_fmt yuv420p` is critical — iPhones default to HEVC + yuv420p10le
+    (10-bit HDR) which ONLY Safari can decode. Chrome/Firefox/most in-app browsers
+    render audio-only or "preview unavailable on this device" without this flag.
     """
     import subprocess
     out_path = src_path.with_suffix(".web.mp4")
@@ -3095,6 +3099,7 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
             [
                 "ffmpeg", "-y", "-i", str(src_path),
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "26",
+                "-pix_fmt", "yuv420p",
                 "-vf", "scale='min(1280,iw)':-2",
                 "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
@@ -3415,10 +3420,17 @@ _AVATAR_ALLOWED_MIME = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 def _public_profile_of(user_doc: dict) -> dict:
     pp = user_doc.get("public_profile") or {}
+    avatar_url_override = user_doc.get("avatar_url_override")
     avatar_filename = user_doc.get("avatar_filename")
-    # avatar_filename is stored as "avatars/<user_id>.<ext>" — pass through as-is
-    # under /api/uploads/ (which is mounted on UPLOAD_DIR).
-    avatar_url = f"/api/uploads/{avatar_filename}" if avatar_filename else None
+    # Priority: R2 override URL > legacy local /api/uploads/ path.
+    # Local disk is EPHEMERAL in Kubernetes — files are lost on deploy.
+    # avatar_url_override holds the R2 URL when the file has been flushed.
+    if avatar_url_override:
+        avatar_url = avatar_url_override
+    elif avatar_filename:
+        avatar_url = f"/api/uploads/{avatar_filename}"
+    else:
+        avatar_url = None
     return {
         "user_id": user_doc.get("id"),
         "full_name": user_doc.get("full_name"),
@@ -3546,17 +3558,32 @@ async def upload_avatar(file: UploadFile = File(...), user=Depends(get_current_u
     for other in avatars_dir.glob(f"{user['id']}.*"):
         if other.name != fname:
             other.unlink(missing_ok=True)
+
+    # Push to Cloudflare R2 so the avatar survives container redeploys
+    # (local disk is EPHEMERAL in Kubernetes). Falls back to local URL if
+    # R2 isn't configured or the upload fails.
+    r2_url = None
+    if r2_storage.is_configured():
+        try:
+            content_type_map = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+            r2_key = f"avatars/{fname}"
+            r2_url = r2_storage.upload_file(r2_key, fpath, content_type_map.get(ext, "image/jpeg"), cache_seconds=3600)
+            logger.info(f"[R2] avatar uploaded key={r2_key} url={r2_url}")
+        except Exception as e:
+            logger.warning(f"[R2] avatar upload failed, keeping local: {e}")
+
     await db.users.update_one(
         {"id": user["id"]},
         {"$set": {
             "avatar_filename": f"avatars/{fname}",
+            "avatar_url_override": r2_url,   # None → serve local (legacy fallback)
             "avatar_source": "upload",
             "avatar_updated_at": now_iso(),
         }},
     )
     return {
         "ok": True,
-        "avatar_url": f"/api/uploads/avatars/{fname}",
+        "avatar_url": r2_url or f"/api/uploads/avatars/{fname}",
         "avatar_source": "upload",
     }
 
@@ -3589,10 +3616,22 @@ async def avatar_from_report(report_id: str, user=Depends(get_current_user)):
     for other in avatars_dir.glob(f"{user['id']}.*"):
         if other.name != fname:
             other.unlink(missing_ok=True)
+
+    # Push to R2 to survive container redeploys
+    r2_url = None
+    if r2_storage.is_configured():
+        try:
+            r2_key = f"avatars/{fname}"
+            r2_url = r2_storage.upload_file(r2_key, dst, "image/jpeg", cache_seconds=3600)
+            logger.info(f"[R2] avatar (auto) uploaded key={r2_key} url={r2_url}")
+        except Exception as e:
+            logger.warning(f"[R2] avatar (auto) upload failed, keeping local: {e}")
+
     await db.users.update_one(
         {"id": user["id"]},
         {"$set": {
             "avatar_filename": f"avatars/{fname}",
+            "avatar_url_override": r2_url,
             "avatar_source": "auto_video",
             "avatar_updated_at": now_iso(),
             "avatar_from_report_id": report_id,
@@ -3600,7 +3639,7 @@ async def avatar_from_report(report_id: str, user=Depends(get_current_user)):
     )
     return {
         "ok": True,
-        "avatar_url": f"/api/uploads/avatars/{fname}",
+        "avatar_url": r2_url or f"/api/uploads/avatars/{fname}",
         "avatar_source": "auto_video",
         "from_report_id": report_id,
     }
@@ -3611,9 +3650,18 @@ async def delete_avatar(user=Depends(get_current_user)):
     avatars_dir = UPLOAD_DIR / "avatars"
     for f in avatars_dir.glob(f"{user['id']}.*"):
         f.unlink(missing_ok=True)
+    # Also delete from R2 if configured
+    if r2_storage.is_configured():
+        fresh = await db.users.find_one({"id": user["id"]}, {"avatar_url_override": 1, "_id": 0})
+        r2_key = r2_storage.key_from_url((fresh or {}).get("avatar_url_override"))
+        if r2_key:
+            try:
+                r2_storage.delete_object(r2_key)
+            except Exception as e:
+                logger.warning(f"[R2] avatar delete failed key={r2_key}: {e}")
     await db.users.update_one(
         {"id": user["id"]},
-        {"$unset": {"avatar_filename": "", "avatar_source": "", "avatar_from_report_id": ""}},
+        {"$unset": {"avatar_filename": "", "avatar_url_override": "", "avatar_source": "", "avatar_from_report_id": ""}},
     )
     return {"ok": True}
 
@@ -4035,8 +4083,10 @@ async def upload_video_and_create_preview(
     free_used = bool(user.get("free_preview_used"))
     prepaid = int(user.get("prepaid_uploads", 0) or 0)
     pass_state = _progress_pass_active(user)
-    sub = user.get("subscription") or {}
-    active_sub_tier = sub.get("tier") if sub.get("status") == "active" else None
+    # Use the shared helper so we recognize active / trialing / past_due
+    # subscriptions consistently with the rest of the app (fixes VIP/Premium
+    # users hitting the $159 paywall when their Stripe status is "trialing").
+    active_sub_tier = _has_active_subscription(user)
     is_paid_subscriber = active_sub_tier in ("premium", "vip")
     used_pass_credit = False
     used_subscription_slot = False
