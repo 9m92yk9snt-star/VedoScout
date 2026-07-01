@@ -227,7 +227,7 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
 
   return (
     <FilmFrame testid={`demo-card-${video.id}`}>
-      <div className="relative aspect-[9/14] max-h-[420px] bg-ink">
+      <div className="relative aspect-[9/14] max-h-[420px] bg-black">
         {started ? (
           <video
             ref={videoRef}
@@ -237,7 +237,7 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
             playsInline
             preload="metadata"
             onPause={onPause}
-            className="w-full h-full object-cover bg-black"
+            className="w-full h-full object-contain bg-black"
             data-testid={`demo-video-el-${video.id}`}
           />
         ) : (
@@ -252,12 +252,12 @@ function VideoCard({ video, isPlaying, onPlay, onPause }) {
               <img
                 src={abs(video.poster_url)}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-contain bg-black"
               />
             ) : (
               <div className="absolute inset-0 bg-gradient-to-br from-forest/40 to-ink" />
             )}
-            <div className="absolute inset-0 bg-black/30 group-hover/play:bg-black/10 transition-colors" />
+            <div className="absolute inset-0 bg-black/25 group-hover/play:bg-black/10 transition-colors" />
             <div className="relative w-12 h-12 md:w-14 md:h-14 bg-volt text-ink rounded-full flex items-center justify-center transition-transform group-hover/play:scale-110 shadow-lg shadow-black/30">
               <Play className="w-5 h-5 md:w-6 md:h-6 ml-0.5" fill="currentColor" />
             </div>
