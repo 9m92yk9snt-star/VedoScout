@@ -26,6 +26,29 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb 2026 — current session)
+- ✅ **🆕 Session 98 — Nano Banana football-object backgrounds (NO PEOPLE) replacing flat dark ink (Feb 27 2026)**:
+  - User feedback (Danish): the flat dark ink backgrounds looked boring. Wanted cool Nano Banana football elements added — objects only, NO real people.
+  - **5 new Nano Banana images** generated via `gemini-3.1-flash-image-preview` (`generate_football_bgs.py`), all with strict "NO PEOPLE" system prompt + explicit anti-people constraints in every user prompt:
+    1. `bg-radar-tactics.png` (901 KB) — extreme macro of coach's dark green chalkboard with white-chalk 4-3-3 tactical diagram (X's, O's, arrows, one volt-lime chalk highlight). Replaces the previous stadium bg on the Performance Radar hero.
+    2. `bg-scout-hero.png` (769 KB) — dramatic ground-level shot of a fresh white chalk touchline on wet night grass. Used behind the "Through a scout's eyes" divider.
+    3. `bg-standout-boots.png` (820 KB) — single empty football boot on grass (no leg inside). Background for standout card #1.
+    4. `bg-standout-ball.png` (863 KB) — classic black-and-white football sitting on a chalk pitch line. Background for standout card #2.
+    5. `bg-standout-net.png` (773 KB) — dramatic close-up of a white goal-net diamond mesh. Background for standout card #3.
+  - **`PerformanceRadarHero.jsx`** — swapped `bgSrc` from stadium to tactics chalkboard, bumped background opacity from 0.45 → 0.60, and softened the multi-layer ink overlays (from `ink/60→ink/85→ink` to `ink/55→ink/70→ink/95`) so the chalk tactics show through cinematically while still keeping the volt diamond radar the primary focal point.
+  - **`SkillsBreakdown.jsx`** — added a `_STANDOUT_BGS` array (boots / ball / net) and refactored `StandoutCard` to layer the appropriate football-object background image with dual-gradient overlays (`ink/70→ink/60→ink/95` vertical + `ink/80→transparent→ink/40` horizontal) so text stays readable while each card feels like a mini poster. Also added a `min-h-[280px]` to keep card heights consistent even when the shortest card has no video CTA, and added `drop-shadow-[0_0_18px_rgba(204,255,0,0.35)]` glow to the volt score numbers for extra depth against the new textured bgs.
+  - **Scout hero divider** — added the `bg-scout-hero.png` (chalk touchline on wet night grass) as a background image behind the "Through / A scout's eyes." typography, layered with a horizontal ink gradient (`ink/95→ink/75→ink/30`) and a vertical ink gradient (`ink/40→transparent→ink/60`) so the football scene is atmospheric without obscuring the huge Barlow Condensed headline.
+  - **Verified via screenshot tool**: all 3 sections now feel like scout-command-centre panels — chalkboard tactics behind the radar, wet-grass-and-chalk-line behind the hero divider, and per-card football-object atmosphere on each standout. No people appear in any Nano Banana image (verified visually + generated with double-lock system-prompt + user-prompt constraints).
+  - **Files**:
+    - NEW `/app/backend/scripts/generate_football_bgs.py`
+    - NEW `/app/backend/static/landing/bg-radar-tactics.png`
+    - NEW `/app/backend/static/landing/bg-scout-hero.png`
+    - NEW `/app/backend/static/landing/bg-standout-boots.png`
+    - NEW `/app/backend/static/landing/bg-standout-ball.png`
+    - NEW `/app/backend/static/landing/bg-standout-net.png`
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` (radar bgSrc swap + hero-divider bg img added)
+    - MODIFIED `/app/frontend/src/components/report/PerformanceRadarHero.jsx` (bg opacity + overlays)
+    - MODIFIED `/app/frontend/src/components/report/SkillsBreakdown.jsx` (StandoutCard + `_STANDOUT_BGS`)
+
 - ✅ **🆕 Session 97 — Removed ALL stock football-player photos from the report (Feb 27 2026)**:
   - User feedback (Danish): "FJERNE DISSE BILLDER ALLE STEDER MED FODBOLDSPILLER DE FORVIER LIDT MEN BLIVER I TVIVL HVEM RAPPORTEN HANDLER OM" — remove all stock football-player images from the report; they confuse the reader about **who the report is actually about**.
   - **Audit** — 6 stock-player image references found in `ReportPage.jsx` and all removed:

@@ -131,7 +131,7 @@ export default function PerformanceRadarHero({
       data-testid="performance-radar-hero"
       className="relative w-full overflow-hidden bg-ink text-cream-base"
     >
-      {/* Background — cinematic Nano Banana stadium */}
+      {/* Background — cinematic Nano Banana football object (tactics chalkboard, no people) */}
       {bgSrc && (
         <img
           src={bgSrc}
@@ -139,12 +139,12 @@ export default function PerformanceRadarHero({
           aria-hidden
           loading="lazy"
           onError={(e) => { e.currentTarget.style.display = "none"; }}
-          className="absolute inset-0 w-full h-full object-cover opacity-45"
+          className="absolute inset-0 w-full h-full object-cover opacity-60"
         />
       )}
       {/* Heavy overlays — depth + focus on radar */}
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/60 via-ink/85 to-ink" />
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink via-ink/40 to-transparent" />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/55 via-ink/70 to-ink/95" />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/35 to-ink/10" />
       {/* Volt glow behind the radar */}
       <div aria-hidden className="hidden lg:block absolute right-[6%] top-1/2 -translate-y-1/2 w-[520px] h-[520px] rounded-full bg-forest/25 blur-[110px] pointer-events-none" />
       <div aria-hidden className="absolute right-[15%] top-1/2 -translate-y-1/2 w-[300px] h-[300px] rounded-full bg-volt/8 blur-[80px] pointer-events-none" />

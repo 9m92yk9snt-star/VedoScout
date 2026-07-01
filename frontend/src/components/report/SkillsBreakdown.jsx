@@ -192,12 +192,20 @@ function SkillRow({ skillKey, score, pillar, videoComments, onSeek, expanded, on
 }
 
 /* ── Standout-skill hero card ──────────────────────────────────────────── */
+const _STANDOUT_BGS = [
+  "bg-standout-boots.png", // #1 — football boots on grass (no player)
+  "bg-standout-ball.png",  // #2 — ball on white chalk line (no player)
+  "bg-standout-net.png",   // #3 — goal net close-up (no player)
+];
+
 function StandoutCard({ skillKey, score, pillar, rank, videoComments, onSeek }) {
   const meta = SKILL_MEANINGS[skillKey];
   if (!meta) return null;
   const pMeta = PILLAR_META[pillar];
   const ts = _timestampFor(skillKey, videoComments);
   const tsParsed = ts && /^\s*\d{1,2}:\d{2}/.test(ts);
+  const bg = _STANDOUT_BGS[rank % _STANDOUT_BGS.length];
+  const bgUrl = `${process.env.REACT_APP_BACKEND_URL}/api/static/landing/${bg}`;
 
   return (
     <motion.div
@@ -205,47 +213,62 @@ function StandoutCard({ skillKey, score, pillar, rank, videoComments, onSeek }) 
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.45, delay: rank * 0.08 }}
-      className="relative bg-ink text-cream-base p-4 md:p-5 overflow-hidden"
+      className="relative bg-ink text-cream-base p-4 md:p-5 overflow-hidden min-h-[280px]"
       data-testid={`standout-card-${skillKey}`}
     >
+      {/* Nano Banana football-object background (no people) */}
+      <img
+        src={bgUrl}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="absolute inset-0 w-full h-full object-cover opacity-45 scale-[1.02]"
+      />
+      {/* Depth overlays — keep the text readable while the texture shows */}
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/60 to-ink/95" />
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/80 via-transparent to-ink/40" />
+
       {/* Volt corner accent */}
-      <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-t-volt border-l-transparent pointer-events-none" />
-      <div className="absolute top-1 right-1.5 text-[9px] font-barlow font-black text-ink z-10 leading-none">
+      <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-t-volt border-l-transparent pointer-events-none z-10" />
+      <div className="absolute top-1 right-1.5 text-[9px] font-barlow font-black text-ink z-20 leading-none">
         #{rank + 1}
       </div>
 
-      <div className="flex items-center gap-2 mb-2">
-        <PillarIcon kind={pMeta.kind} className="w-4 h-4 text-volt" />
-        <span className="text-[9px] uppercase tracking-[0.28em] font-black text-volt">Standout skill</span>
-      </div>
+      <div className="relative z-10">
+        <div className="flex items-center gap-2 mb-2">
+          <PillarIcon kind={pMeta.kind} className="w-4 h-4 text-volt" />
+          <span className="text-[9px] uppercase tracking-[0.28em] font-black text-volt">Standout skill</span>
+        </div>
 
-      <div className="font-barlow font-black uppercase text-xl md:text-2xl leading-tight text-cream-base">
-        {meta.label}
-      </div>
-      <div className="mt-1 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-base/55">
-        {pMeta.label}
-      </div>
+        <div className="font-barlow font-black uppercase text-xl md:text-2xl leading-tight text-cream-base drop-shadow-sm">
+          {meta.label}
+        </div>
+        <div className="mt-1 text-[10px] uppercase tracking-[0.22em] font-bold text-cream-base/70">
+          {pMeta.label}
+        </div>
 
-      <div className="mt-3 flex items-baseline gap-2">
-        <span className="font-barlow font-black text-4xl md:text-5xl text-volt leading-none tabular-nums">
-          {score}
-        </span>
-        <span className="text-cream-base/40 font-barlow font-black text-lg">/10</span>
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="font-barlow font-black text-4xl md:text-5xl text-volt leading-none tabular-nums drop-shadow-[0_0_18px_rgba(204,255,0,0.35)]">
+            {score}
+          </span>
+          <span className="text-cream-base/40 font-barlow font-black text-lg">/10</span>
+        </div>
+
+        <p className="mt-3 text-[12px] text-cream-base/80 leading-snug">{meta.meaning}</p>
+
+        {tsParsed && (
+          <button
+            type="button"
+            onClick={() => onSeek && onSeek(ts)}
+            className="mt-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] font-black text-volt hover:text-cream-base transition-colors border-b border-volt/40 pb-0.5"
+            data-testid={`standout-video-cta-${skillKey}`}
+          >
+            <PlayCircle className="w-3.5 h-3.5" />
+            See it at {ts}
+          </button>
+        )}
       </div>
-
-      <p className="mt-3 text-[12px] text-cream-base/75 leading-snug">{meta.meaning}</p>
-
-      {tsParsed && (
-        <button
-          type="button"
-          onClick={() => onSeek && onSeek(ts)}
-          className="mt-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] font-black text-volt hover:text-cream-base transition-colors border-b border-volt/40 pb-0.5"
-          data-testid={`standout-video-cta-${skillKey}`}
-        >
-          <PlayCircle className="w-3.5 h-3.5" />
-          See it at {ts}
-        </button>
-      )}
     </motion.div>
   );
 }

@@ -2516,13 +2516,26 @@ export default function ReportPage() {
             )}
 
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
-              {/* Chapter opener — photo-free typographic divider (no stock player
-                  imagery, so it's always crystal clear whose report this is). */}
+              {/* Chapter opener — moody Nano Banana chalk-touchline background,
+                  NO people, only objects. Ensures clarity about who the report is about. */}
               {(unlocked && full_report) && (
                 <div
                   data-testid="report-hero-divider"
                   className="relative w-full overflow-hidden bg-ink border border-gray-border py-10 md:py-14"
                 >
+                  {/* Nano Banana — chalk touchline on wet night grass (no people) */}
+                  <img
+                    src={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/bg-scout-hero.png`}
+                    alt=""
+                    aria-hidden
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    className="absolute inset-0 w-full h-full object-cover opacity-55 scale-105"
+                  />
+                  {/* Layered overlays — ensure text stays readable while the
+                      texture shows through cinematically. */}
+                  <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ink/95 via-ink/75 to-ink/30" />
+                  <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-ink/40 via-transparent to-ink/60" />
                   {/* Chalk pitch decorations — subtle, non-distracting */}
                   <div aria-hidden className="absolute inset-y-0 left-0 w-1 bg-volt/70" />
                   <div aria-hidden className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-forest/40 blur-3xl pointer-events-none" />
@@ -2541,10 +2554,10 @@ export default function ReportPage() {
                       Through<br />
                       <span className="text-volt">a scout&apos;s eyes.</span>
                     </h2>
-                    <p className="mt-4 text-cream-base/70 text-sm md:text-base max-w-lg leading-relaxed">
+                    <p className="mt-4 text-cream-base/80 text-sm md:text-base max-w-lg leading-relaxed">
                       Honest, age-appropriate notes &mdash; what stood out, what to work on, and how to grow next.
                     </p>
-                    <div className="mt-5 flex items-center gap-4 text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/45">
+                    <div className="mt-5 flex items-center gap-4 text-[9px] uppercase tracking-[0.28em] font-bold text-cream-base/55">
                       <span>· Chapters 01 → 08 ·</span>
                       <span className="hidden sm:inline">Every note anchored to the video</span>
                     </div>
@@ -2667,7 +2680,7 @@ export default function ReportPage() {
                   {radarData && (
                     <PerformanceRadarHero
                       scores={full_report.scores}
-                      bgSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/radar-hero-stadium.png`}
+                      bgSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/bg-radar-tactics.png`}
                     />
                   )}
 
