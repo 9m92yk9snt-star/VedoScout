@@ -25,8 +25,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Frontend**: React 19 + Tailwind + Framer Motion + Recharts
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
-## Implemented (Feb 2026 — current session)
-- ✅ **🆕 Session 111 — Demo Videos carousel + Admin CMS (Feb 28 2026)**:
+## Implemented (Feb–Mar 2026 — current session)
+- ✅ **🆕 Session 112 — Admin demo-video delete bug + landing carousel shrink (Mar 01 2026)**:
+  - **Bug fixed**: Admin `Delete` button on `/admin → Demo Videos` was silently doing nothing because `window.confirm()` is blocked inside the Emergent preview iframe. Replaced with a two-step inline confirm UX in `DemoVideosAdmin.jsx`: first click flips the button to red-bg + `animate-pulse` with label `Click to confirm`, second click within 4 s actually calls `DELETE /api/admin/demo-videos/{id}`. Auto-cancels after 4 s via `useEffect` + `setTimeout` cleanup.
+  - **Landing carousel shrunk** in `DemoVideoCarousel.jsx` per user request ("stadigvæk for stort"): section padding `py-14 md:py-16` → `py-8 md:py-10`, halo bokeh 720px → 440px (opacity 60→50), headline `text-2xl md:text-3xl` → `text-lg md:text-xl`, prev/next arrows 36px → 32px, film-frame cards `md:w-[340px]` → `md:w-[240px]`, video area `max-h-[420px]` → `max-h-[300px]`, chalk-arrow decoration shrunk 380×140 → 260×100. Total section height ~555px on desktop (measured).
+  - Verified end-to-end via `testing_agent_v3_fork` iteration_44: 100% backend (4/4 pytest — `test_demo_videos_delete.py` new) and 100% frontend (3/3 UI tests: sizing + 2-click delete + auto-cancel).
+
+- ✅ **Session 111 — Demo Videos carousel + Admin CMS (Feb 28 2026)**:
   - New landing-page section directly below "How it works" (`<DemoVideoCarousel/>`) — swipeable carousel with snap-scroll, prev/next arrows on desktop.
   - Videos are admin-uploaded via new `/admin → Demo Videos` tab (`DemoVideosAdmin.jsx`) — supports iPhone MOV/MP4/WebM up to 100 MB, optional poster image, title (80 chars), subtitle (180 chars), order, active/draft status.
   - Backend endpoints in `server.py`: `GET /api/demo-videos` (public), `GET/POST /api/admin/demo-videos`, `PUT/DELETE /api/admin/demo-videos/{id}`, `POST /api/admin/demo-videos/upload-video`, `POST /api/admin/demo-videos/upload-poster`. Delete also removes the file from disk when it lives in `/uploads/demo_videos/`.
