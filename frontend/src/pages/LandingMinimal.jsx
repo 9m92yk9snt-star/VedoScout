@@ -31,6 +31,7 @@ import {
   SocialProof,
   FinalCta,
 } from "@/components/LandingSections";
+import DemoVideoCarousel from "@/components/DemoVideoCarousel";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -109,6 +110,7 @@ export default function LandingMinimal() {
       <HeroSection onPrimaryCta={handlePrimaryCta} isLoggedIn={!!user} />
       <TrustStrip />
       <HowItWorks />
+      <DemoVideoCarousel />
       <WhatsInside />
       <ImageStrip />
       <div id="pricing-section" data-testid="pricing-section">

@@ -14,11 +14,13 @@ import BlogAdmin from "@/components/BlogAdmin";
 import FAQAdmin from "@/components/admin/FAQAdmin";
 import EmailAdmin from "@/components/admin/EmailAdmin";
 import ScoutVerificationAdmin from "@/components/admin/ScoutVerificationAdmin";
+import DemoVideosAdmin from "@/components/admin/DemoVideosAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
   { id: "scouts", label: "Scout Queue", role: "both" },
   { id: "scout-db", label: "Scout DB Verify", role: "admin" },
+  { id: "demo-videos", label: "Demo Videos", role: "admin" },
   { id: "reports", label: "Reports", role: "admin" },
   { id: "users", label: "Users", role: "admin" },
   { id: "messages", label: "Messages", role: "admin" },
@@ -403,6 +405,8 @@ export default function AdminPage() {
               {activeTab === "scouts" && <ScoutQueue />}
 
               {activeTab === "scout-db" && <ScoutVerificationAdmin />}
+
+              {activeTab === "demo-videos" && <DemoVideosAdmin />}
 
               {activeTab === "blog" && <BlogAdmin />}
 

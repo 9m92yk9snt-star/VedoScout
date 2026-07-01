@@ -3608,6 +3608,179 @@ async def delete_avatar(user=Depends(get_current_user)):
     return {"ok": True}
 
 
+# ============== ROUTES: DEMO VIDEOS (Landing "How it works" carousel) ==============
+# Admin-uploaded short iPhone videos that demo the workflow (upload → mark →
+# report). Displayed in a swipeable carousel on the landing page directly
+# below the "How it works" section.
+
+_DEMO_VIDEO_MAX_BYTES = 100 * 1024 * 1024  # 100 MB — plenty for a 30-60s iPhone clip
+_DEMO_VIDEO_ALLOWED = {"video/mp4", "video/quicktime", "video/webm", "video/x-m4v"}
+_DEMO_POSTER_ALLOWED = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+
+
+class DemoVideoCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    subtitle: Optional[str] = Field(default=None, max_length=180)
+    video_url: str = Field(min_length=1, max_length=500)
+    poster_url: Optional[str] = Field(default=None, max_length=500)
+    order: Optional[int] = 0
+    status: Optional[str] = "active"  # "active" | "draft"
+
+
+class DemoVideoUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=80)
+    subtitle: Optional[str] = Field(default=None, max_length=180)
+    video_url: Optional[str] = Field(default=None, max_length=500)
+    poster_url: Optional[str] = Field(default=None, max_length=500)
+    order: Optional[int] = None
+    status: Optional[str] = None
+
+
+def _serialize_demo_video(doc: dict) -> dict:
+    return {
+        "id": doc.get("id"),
+        "title": doc.get("title"),
+        "subtitle": doc.get("subtitle"),
+        "video_url": doc.get("video_url"),
+        "poster_url": doc.get("poster_url"),
+        "order": int(doc.get("order") or 0),
+        "status": doc.get("status") or "active",
+        "created_at": doc.get("created_at"),
+        "updated_at": doc.get("updated_at"),
+    }
+
+
+@api_router.get("/demo-videos")
+async def public_list_demo_videos():
+    """Public — landing page fetches this. Only active videos, ordered."""
+    cursor = db.demo_videos.find({"status": "active"}, {"_id": 0}).sort("order", 1)
+    items = [_serialize_demo_video(d) async for d in cursor]
+    return {"items": items}
+
+
+@api_router.get("/admin/demo-videos")
+async def admin_list_demo_videos(_=Depends(get_current_admin)):
+    cursor = db.demo_videos.find({}, {"_id": 0}).sort("order", 1)
+    items = [_serialize_demo_video(d) async for d in cursor]
+    return {"items": items}
+
+
+@api_router.post("/admin/demo-videos")
+async def admin_create_demo_video(payload: DemoVideoCreate, _=Depends(get_current_admin)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "title": payload.title.strip(),
+        "subtitle": (payload.subtitle or "").strip() or None,
+        "video_url": payload.video_url.strip(),
+        "poster_url": (payload.poster_url or "").strip() or None,
+        "order": int(payload.order or 0),
+        "status": payload.status if payload.status in ("active", "draft") else "active",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.demo_videos.insert_one(doc)
+    return _serialize_demo_video(doc)
+
+
+@api_router.put("/admin/demo-videos/{video_id}")
+async def admin_update_demo_video(video_id: str, payload: DemoVideoUpdate, _=Depends(get_current_admin)):
+    updates = {}
+    for field in ("title", "subtitle", "video_url", "poster_url"):
+        v = getattr(payload, field)
+        if v is not None:
+            updates[field] = v.strip() if isinstance(v, str) else v
+    if payload.order is not None:
+        updates["order"] = int(payload.order)
+    if payload.status in ("active", "draft"):
+        updates["status"] = payload.status
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+    updates["updated_at"] = now_iso()
+    result = await db.demo_videos.update_one({"id": video_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Demo video not found")
+    fresh = await db.demo_videos.find_one({"id": video_id}, {"_id": 0})
+    return _serialize_demo_video(fresh)
+
+
+@api_router.delete("/admin/demo-videos/{video_id}")
+async def admin_delete_demo_video(video_id: str, _=Depends(get_current_admin)):
+    doc = await db.demo_videos.find_one({"id": video_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Demo video not found")
+    # Best-effort file cleanup — only if the file lives inside our uploads dir
+    for url_key in ("video_url", "poster_url"):
+        url = doc.get(url_key) or ""
+        if url.startswith("/api/uploads/demo_videos/"):
+            local = UPLOAD_DIR / url.replace("/api/uploads/", "", 1)
+            local.unlink(missing_ok=True)
+    await db.demo_videos.delete_one({"id": video_id})
+    return {"ok": True, "deleted_id": video_id}
+
+
+@api_router.post("/admin/demo-videos/upload-video")
+async def admin_upload_demo_video_file(file: UploadFile = File(...), _=Depends(get_current_admin)):
+    """Upload an iPhone MOV / MP4 video file. Returns the public /api/uploads/... URL
+    which the admin can then paste into the create-video form's video_url field."""
+    if file.content_type not in _DEMO_VIDEO_ALLOWED:
+        raise HTTPException(400, f"Only MP4 / MOV / WebM videos are allowed (got {file.content_type})")
+    demo_dir = UPLOAD_DIR / "demo_videos"
+    demo_dir.mkdir(parents=True, exist_ok=True)
+    ext_by_mime = {
+        "video/mp4": "mp4",
+        "video/quicktime": "mov",
+        "video/webm": "webm",
+        "video/x-m4v": "m4v",
+    }
+    ext = ext_by_mime.get(file.content_type, "mp4")
+    fname = f"{uuid.uuid4().hex}.{ext}"
+    fpath = demo_dir / fname
+    total = 0
+    with fpath.open("wb") as buf:
+        while True:
+            chunk = await file.read(1024 * 1024)  # 1 MB chunks
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > _DEMO_VIDEO_MAX_BYTES:
+                fpath.unlink(missing_ok=True)
+                raise HTTPException(413, "Video is too large (max 100 MB).")
+            buf.write(chunk)
+    return {
+        "ok": True,
+        "url": f"/api/uploads/demo_videos/{fname}",
+        "size_bytes": total,
+        "content_type": file.content_type,
+    }
+
+
+@api_router.post("/admin/demo-videos/upload-poster")
+async def admin_upload_demo_poster(file: UploadFile = File(...), _=Depends(get_current_admin)):
+    """Optional poster/thumbnail image for a demo video."""
+    if file.content_type not in _DEMO_POSTER_ALLOWED:
+        raise HTTPException(400, "Only JPG, PNG or WEBP posters are allowed")
+    demo_dir = UPLOAD_DIR / "demo_videos"
+    demo_dir.mkdir(parents=True, exist_ok=True)
+    ext = {"image/jpeg": "jpg", "image/jpg": "jpg", "image/png": "png", "image/webp": "webp"}.get(file.content_type, "jpg")
+    fname = f"poster-{uuid.uuid4().hex}.{ext}"
+    fpath = demo_dir / fname
+    total = 0
+    with fpath.open("wb") as buf:
+        while True:
+            chunk = await file.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > 5 * 1024 * 1024:
+                fpath.unlink(missing_ok=True)
+                raise HTTPException(413, "Poster is too large (max 5 MB).")
+            buf.write(chunk)
+    return {
+        "ok": True,
+        "url": f"/api/uploads/demo_videos/{fname}",
+    }
+
+
 # ============== ROUTES: VIDEO UPLOAD & FREE PREVIEW ==============
 
 @api_router.get("/settings/price")
