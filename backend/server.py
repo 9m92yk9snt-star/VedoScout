@@ -2602,18 +2602,95 @@ CRITICAL:
 
 
 def extract_json(text: str) -> dict:
-    """Extract first JSON object from text."""
-    # Try fenced code first
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if fenced:
-        text = fenced.group(1)
-    # Find first '{' and matching last '}'
-    start = text.find("{")
-    end = text.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("No JSON object found in model response")
-    candidate = text[start:end + 1]
-    return json.loads(candidate)
+    """Extract the first JSON object from a Gemini response, tolerating the
+    long list of malformations we've seen in production:
+
+      • ```json … ``` fenced blocks (with or without the language tag)
+      • Multiple fenced blocks — take the biggest one
+      • Preamble/postamble prose around the JSON
+      • Trailing commas before ] or } (Python-legal, JSON-illegal)
+      • Smart quotes ("…") that some Gemini versions emit
+      • Response containing SIDECAR text like "Here is the JSON:\n{…}\n\nHope this helps!"
+      • Nested braces (walk until the matching closing brace, not just the last `}`)
+
+    Raises ValueError with a categorized reason if extraction fails, so the
+    caller can decide whether to retry.
+    """
+    if not text or not text.strip():
+        raise ValueError("EMPTY_RESPONSE: Gemini returned no text")
+
+    # 1) Strip zero-width / BOM garbage sometimes seen from safety-refused calls
+    cleaned = text.replace("\ufeff", "").replace("\u200b", "").strip()
+
+    # 2) Normalize smart quotes → regular quotes (JSON-safe)
+    cleaned = (cleaned
+               .replace("\u201c", '"').replace("\u201d", '"')
+               .replace("\u2018", "'").replace("\u2019", "'"))
+
+    # 3) Prefer the LARGEST fenced code block if present. Gemini sometimes
+    #    emits an example fence THEN a real one — the real one is usually longer.
+    fences = re.findall(r"```(?:json|JSON)?\s*(\{.*?\})\s*```", cleaned, re.DOTALL)
+    candidates: list[str] = []
+    if fences:
+        candidates.append(max(fences, key=len))
+
+    # 4) Balanced-brace walker — find every `{…}` that has matching brace count,
+    #    then try the LARGEST first (top-level object usually is).
+    def _balanced_scan(s: str) -> list[str]:
+        out, depth, start = [], 0, -1
+        in_string = False
+        escape = False
+        for i, ch in enumerate(s):
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == "{":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == "}":
+                if depth > 0:
+                    depth -= 1
+                    if depth == 0 and start != -1:
+                        out.append(s[start:i + 1])
+                        start = -1
+        return out
+
+    balanced = _balanced_scan(cleaned)
+    balanced.sort(key=len, reverse=True)
+    candidates.extend(balanced)
+
+    if not candidates:
+        # Last-ditch — the naive first-{ to last-} slice we used to do
+        s_idx, e_idx = cleaned.find("{"), cleaned.rfind("}")
+        if s_idx != -1 and e_idx != -1 and e_idx > s_idx:
+            candidates.append(cleaned[s_idx:e_idx + 1])
+
+    if not candidates:
+        raise ValueError(f"NO_JSON_FOUND: model response contained no JSON object. First 200 chars: {cleaned[:200]!r}")
+
+    last_err = None
+    for cand in candidates:
+        # 5) Kill trailing commas before } or ] which many LLMs emit
+        cand_fixed = re.sub(r",(\s*[}\]])", r"\1", cand)
+        try:
+            parsed = json.loads(cand_fixed)
+            if isinstance(parsed, dict):
+                return parsed
+            last_err = "PARSED_NOT_DICT: model returned a non-object (list/string/number)"
+        except json.JSONDecodeError as e:
+            last_err = f"JSON_DECODE: {e.msg} at pos {e.pos}"
+            continue
+
+    raise ValueError(f"ALL_CANDIDATES_FAILED: tried {len(candidates)} candidate(s); last error: {last_err}. First 300 chars: {cleaned[:300]!r}")
 
 
 async def call_gemini_with_video(
@@ -2687,11 +2764,69 @@ async def call_gemini_with_video(
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
         raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
     response_text = response if isinstance(response, str) else str(response)
+
+    # First parse attempt — the tolerant extract_json handles fenced code
+    # blocks, smart quotes, trailing commas, nested braces, and preamble prose.
+    first_err: Optional[Exception] = None
     try:
         return extract_json(response_text)
-    except Exception as e:
-        logger.error(f"Failed to parse Gemini response: {e}\n{response_text[:500]}")
-        raise HTTPException(status_code=500, detail="AI analysis returned invalid format. Please try again.")
+    except ValueError as e:
+        first_err = e
+        logger.warning(
+            f"Gemini response parse failed (session={session_id}): {e}. "
+            f"Full response length={len(response_text)}. First 800 chars: {response_text[:800]!r}"
+        )
+
+    # Retry ONCE with a stronger "JSON only, no prose" nudge. The retry uses
+    # a fresh session so the failed turn doesn't poison the context. Keep the
+    # same video + prompt but prepend a hard-line instruction.
+    strict_prompt = (
+        "IMPORTANT: Your previous response could not be parsed as JSON. "
+        "This time, respond with ONLY a single valid JSON object. "
+        "Do NOT wrap it in markdown code fences. Do NOT add any prose "
+        "before or after the object. Start your response with `{` and "
+        "end with `}`. No exceptions.\n\n"
+        + prompt
+    )
+    retry_chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=f"{session_id}-retry",
+        system_message=(
+            "You are an experienced football scout. Respond with a SINGLE "
+            "valid JSON object — nothing else. No prose, no code fences, no "
+            "commentary."
+        ),
+    ).with_model("gemini", "gemini-2.5-pro")
+    retry_chat.extra_params = {"timeout": 240.0}
+    retry_message = UserMessage(text=strict_prompt, file_contents=file_contents)
+    try:
+        retry_response = await asyncio.wait_for(retry_chat.send_message(retry_message), timeout=300)
+    except asyncio.TimeoutError:
+        logger.error(f"call_gemini_with_video retry timeout (session={session_id})")
+        raise HTTPException(status_code=504, detail="AI analysis timed out on retry. Please try again with a shorter clip.")
+
+    retry_text = retry_response if isinstance(retry_response, str) else str(retry_response)
+    try:
+        parsed = extract_json(retry_text)
+        logger.info(f"Gemini response parsed on RETRY (session={session_id})")
+        return parsed
+    except ValueError as retry_err:
+        # Both attempts failed — surface a specific, actionable error.
+        # The `str(first_err)` prefix (EMPTY_RESPONSE / NO_JSON_FOUND / JSON_DECODE /
+        # ALL_CANDIDATES_FAILED / PARSED_NOT_DICT) tells us WHICH failure mode hit.
+        logger.error(
+            f"Gemini response invalid on BOTH attempts (session={session_id}). "
+            f"First: {first_err}. Retry: {retry_err}. Retry text (first 800): {retry_text[:800]!r}"
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "The AI couldn't produce a valid scout report for this clip on two attempts. "
+                "This can happen with very short videos, unusual angles, or heavy motion blur. "
+                "Please try again with a clearer clip (10-60 seconds, steady camera)."
+            ),
+        )
+
 
 
 # ── Scout Mode helper — Gemini Vision frame detection ────────────────

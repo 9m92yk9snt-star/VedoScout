@@ -16,7 +16,7 @@ import SkillsBreakdown from "@/components/report/SkillsBreakdown";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail,
+  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
@@ -2718,10 +2718,97 @@ export default function ReportPage() {
 
                   {/* Performance Radar — cinematic dark centrepiece (custom SVG + Nano Banana bg) */}
                   {radarData && (
-                    <PerformanceRadarHero
-                      scores={full_report.scores}
-                      bgSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/bg-radar-tactics.png`}
-                    />
+                    <>
+                      {/* PINNED TOP-3 CARDS — Session 123 P1
+                          Two compact cards immediately above the radar showing
+                          the top-3 strengths (green) and top-3 development
+                          priorities (amber). Full lists still shown in the
+                          Scout View block further down; these cards are the
+                          "at-a-glance" verdict for the parent/player. */}
+                      {full_report.scout_view && (
+                        (full_report.scout_view.key_strengths?.length ||
+                         full_report.scout_view.development_priorities?.length ||
+                         full_report.scout_view.areas_of_concern?.length) && (
+                          <div
+                            className="grid md:grid-cols-2 gap-4 mb-6"
+                            data-testid="report-pinned-top3-cards"
+                          >
+                            {/* Card 1 — Top 3 Styrker */}
+                            <div
+                              className="relative bg-surface border-l-4 border-l-emerald-400 border border-gray-border p-5"
+                              data-testid="report-pinned-strengths"
+                            >
+                              <div className="flex items-center gap-2 mb-3">
+                                <Zap className="w-4 h-4 text-emerald-400" />
+                                <div className="text-[10px] uppercase tracking-[0.24em] font-bold text-emerald-400">
+                                  Top 3 Styrker
+                                </div>
+                              </div>
+                              <ul className="space-y-2.5 text-sm text-ink/85">
+                                {(full_report.scout_view.key_strengths || [])
+                                  .slice(0, 3)
+                                  .map((s, i) => (
+                                    <li
+                                      key={i}
+                                      className="flex gap-2 leading-snug"
+                                      data-testid={`pinned-strength-${i}`}
+                                    >
+                                      <span className="text-emerald-400 mt-0.5 flex-shrink-0">✓</span>
+                                      <span>{s}</span>
+                                    </li>
+                                  ))}
+                                {(!full_report.scout_view.key_strengths ||
+                                  full_report.scout_view.key_strengths.length === 0) && (
+                                  <li className="text-ink/40 italic">Ingen styrker registreret endnu</li>
+                                )}
+                              </ul>
+                            </div>
+
+                            {/* Card 2 — Top 3 Fokusområder (development priorities first, fall back to areas_of_concern) */}
+                            <div
+                              className="relative bg-surface border-l-4 border-l-amber-400 border border-gray-border p-5"
+                              data-testid="report-pinned-focus"
+                            >
+                              <div className="flex items-center gap-2 mb-3">
+                                <Target className="w-4 h-4 text-amber-400" />
+                                <div className="text-[10px] uppercase tracking-[0.24em] font-bold text-amber-400">
+                                  Top 3 Fokusområder
+                                </div>
+                              </div>
+                              <ul className="space-y-2.5 text-sm text-ink/85">
+                                {(
+                                  (full_report.scout_view.development_priorities?.length
+                                    ? full_report.scout_view.development_priorities
+                                    : full_report.scout_view.areas_of_concern) || []
+                                )
+                                  .slice(0, 3)
+                                  .map((s, i) => (
+                                    <li
+                                      key={i}
+                                      className="flex gap-2 leading-snug"
+                                      data-testid={`pinned-focus-${i}`}
+                                    >
+                                      <span className="text-amber-400 mt-0.5 flex-shrink-0">→</span>
+                                      <span>{s}</span>
+                                    </li>
+                                  ))}
+                                {!(
+                                  full_report.scout_view.development_priorities?.length ||
+                                  full_report.scout_view.areas_of_concern?.length
+                                ) && (
+                                  <li className="text-ink/40 italic">Ingen fokusområder registreret endnu</li>
+                                )}
+                              </ul>
+                            </div>
+                          </div>
+                        )
+                      )}
+
+                      <PerformanceRadarHero
+                        scores={full_report.scores}
+                        bgSrc={`${process.env.REACT_APP_BACKEND_URL}/api/static/landing/bg-radar-tactics.png`}
+                      />
+                    </>
                   )}
 
                   <SectionGrid

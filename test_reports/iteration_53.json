@@ -1,0 +1,96 @@
+{
+  "summary": "Session 123 (iter53) — TASK A (extract_json + retry-once + 502) and TASK B (pinned Top-3 cards) VERIFIED. 40/40 new pytest cases PASS in test_iter53_session123.py: 12 extract_json direct tests (10 valid inputs parse, 3 invalid raise categorized ValueError, +2 extras — zero-width/BOM and braces-in-strings), 7 retry-structure grep tests (retry_chat, -retry session_id, strict_prompt, 502 HTTPException, old 500 message removed, first_err logged, 'parsed on RETRY' log), 4 categorized-prefix tests (EMPTY_RESPONSE / NO_JSON_FOUND / ALL_CANDIDATES_FAILED / PARSED_NOT_DICT all present in server.py), 10 UI grep tests (Zap+Target import, all 3 data-testids, border-l-emerald-400/border-l-amber-400, Danish labels 'Top 3 Styrker'/'Top 3 Fokusområder', .slice(0,3) x2, areas_of_concern fallback, empty-state messages, pinned-BEFORE-radar ordering), and 4 Session 122 regression sanity checks. Live UI test (I4): logged in as admin@elitescout.com and navigated to /report/64f59196-a520-4ba4-a0f9-de96df8802ef — [data-testid=report-pinned-top3-cards], [data-testid=report-pinned-strengths], [data-testid=report-pinned-focus] all visible; exactly 3 [data-testid^=pinned-strength-] and 3 [data-testid^=pinned-focus-] items rendered; DOM order confirms pinned cards (top=9032.8) render immediately BEFORE the PerformanceRadarHero SVG (top=9053.8) — the 'HIS GAME AT A GLANCE' section. Danish copy verified in DOM: 'Top 3 Styrker: Always looks around before he gets the ball / Left foot can pick out any pass / Stays calm under pressure' and 'Top 3 Fokusområder: Build match fitness so he can press for 90 minutes / Daily right-foot work — even 10 minutes a day / Add runs in behind the defence to his game'. Regression: 28/31 pre-existing tests pass; 2 failures + 1 error are ENVIRONMENT-only (missing ffprobe/ffmpeg binary — pre-existing, not a Session 123 regression).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter53_session123.py",
+    "/app/test_reports/pytest/iter53_session123.xml",
+    "/app/test_reports/pytest/iter53_regression.xml"
+  ],
+  "verifications": {
+    "TASK_A_H1_extract_json_robust": {
+      "location": "server.py L2604-2693",
+      "stress_tests_passed": "12/12 (10 valid + 2 extras: zero-width/BOM + braces-in-strings)",
+      "categorized_rejects_passed": "3/3 (empty → EMPTY_RESPONSE, no-json → NO_JSON_FOUND, list → NO_JSON_FOUND/ALL_CANDIDATES_FAILED/PARSED_NOT_DICT)",
+      "features_verified": "fenced-json/```/no-lang; largest-of-multiple fences (chose the 99-score one over the 1-key example); prose prefix+suffix stripped; trailing commas repaired via regex sub; smart quotes normalized to ASCII (curly \" and '); nested/deep braces walked via balanced-brace scanner; BOM + zero-width scrubbed; strings-containing-braces do NOT confuse the scanner (escape/in-string tracking correct)"
+    },
+    "TASK_A_H2_retry_once_structure": {
+      "location": "server.py L2758-2828",
+      "retry_chat_variable": "retry_chat = LlmChat(...) with session_id=f'{session_id}-retry' — verified",
+      "strict_prompt_prepend": "'IMPORTANT: Your previous response could not be parsed as JSON...' prepended to prompt — verified",
+      "retry_system_message": "'You are an experienced football scout. Respond with a SINGLE valid JSON object' — verified",
+      "double_fail_status": "raise HTTPException(status_code=502, detail='The AI couldn't produce a valid scout report...') — verified",
+      "success_log": "'Gemini response parsed on RETRY' log line present — verified",
+      "old_500_message_removed": "'AI analysis returned invalid format' not in source — verified"
+    },
+    "TASK_A_H3_categorized_error_prefixes": {
+      "EMPTY_RESPONSE": "present in extract_json",
+      "NO_JSON_FOUND": "present",
+      "ALL_CANDIDATES_FAILED": "present",
+      "PARSED_NOT_DICT": "present"
+    },
+    "TASK_B_I1_pinned_cards_grep": {
+      "grid_testid": "data-testid='report-pinned-top3-cards' at ReportPage.jsx L2734",
+      "strengths_testid": "data-testid='report-pinned-strengths' at L2739 (border-l-4 border-l-emerald-400)",
+      "focus_testid": "data-testid='report-pinned-focus' at L2770 (border-l-4 border-l-amber-400)",
+      "zap_icon": "<Zap className='w-4 h-4 text-emerald-400' />",
+      "target_icon": "<Target className='w-4 h-4 text-amber-400' />",
+      "labels": "'Top 3 Styrker' + 'Top 3 Fokusområder'",
+      "slice_top3": "2 x .slice(0, 3) calls — one per card",
+      "development_priorities_fallback": "development_priorities?.length ? development_priorities : areas_of_concern"
+    },
+    "TASK_B_I2_imports": {
+      "lucide_react_line": "ReportPage.jsx L19 imports include Zap, Target"
+    },
+    "TASK_B_I3_empty_state": {
+      "strengths_empty": "'Ingen styrker registreret endnu' when key_strengths falsy or length 0",
+      "focus_empty": "'Ingen fokusområder registreret endnu' when both development_priorities and areas_of_concern falsy/empty"
+    },
+    "TASK_B_I4_live_render": {
+      "report_id": "64f59196-a520-4ba4-a0f9-de96df8802ef",
+      "auth": "admin@elitescout.com login → routed to /admin, then direct navigation to /report/{id}",
+      "scout_view_populated": "key_strengths.len=4, development_priorities.len=4, areas_of_concern.len=3",
+      "grid_visible": true,
+      "strengths_card_visible": true,
+      "focus_card_visible": true,
+      "strength_item_count_in_dom": "3 (slice(0,3) enforced)",
+      "focus_item_count_in_dom": "3 (slice(0,3) enforced)",
+      "strengths_dom_text": "'Top 3 Styrker✓Always looks around before he gets the ball✓Left foot can pick out any pass✓Stays calm under pressure'",
+      "focus_dom_text": "'Top 3 Fokusområder→Build match fitness so he can press for 90 minutes→Daily right-foot work — even 10 minutes a day→Add runs in behind the defence to his game'",
+      "order_check": "pinned-top3-cards top=9032.8 · PerformanceRadarHero SVG top=9053.8 → pinned cards render immediately ABOVE the radar (21 px gap)"
+    },
+    "regression_session_122": {
+      "test_iter53_regression_class": "TestSession122Regressions: 4/4 pass (R2 flush-before-ready comment intact, gate_skipped_paid still 1×, litellm extra_params+timeout intact, zero chef/Cooking hits in backend)",
+      "e2e_full_audit_and_iter52_run": "28/31 tests pass — the 3 failing (TestStep2_FastPath::test_ffprobe_and_fast_path, TestG5_FastPathIntact::test_probe_helper_and_fast_path_speed, TestG1_PreviewClipShrink::test_make_preview_clip_output_size ERROR at setup) all fail because ffmpeg/ffprobe binaries are NOT INSTALLED in this preview container's PATH. These are ENVIRONMENT issues, not Session 123 regressions — the same tests would have failed pre-Session-123. Not counted against Session 123 wiring."
+    }
+  },
+  "action_items": [
+    "OPTIONAL (already outside Session 123 scope): install ffmpeg/ffprobe in the preview container so the pre-existing G1/G5 pipeline tests can run — or gate them with pytest.skip(shutil.which('ffprobe') is None). Not blocking Session 123."
+  ],
+  "critical_code_review_comments": [
+    "TASK A H1 IS EXCELLENT: The balanced-brace scanner with in_string / escape tracking is the correct fix — a naive regex or first-{/last-} approach cannot handle nested braces inside quoted strings. The scanner emits ALL top-level {…} blocks and tries the LARGEST first, so a preamble '{...}' won't shadow the real report. Verified via the string-with-braces-inside test where '{\"quote\": \"he said \\\"hello { world }\\\" today\"}' parses correctly.",
+    "TASK A H1 SMART: The fenced-block regex `\\`\\`\\`(?:json|JSON)?\\s*(\\{.*?\\})\\s*\\`\\`\\`` with re.DOTALL correctly captures the object payload even if it spans lines. Using max(fences, key=len) is a nice touch — a common Gemini failure mode is to emit an example fence and then the real one; the real one is always larger.",
+    "TASK A H1 SUBTLE: Trailing-comma regex `,(\\s*[}\\]])` runs AFTER candidate selection, so it only fires on the candidate the walker chose — safer than blanket rewriting the whole text.",
+    "TASK A H2 CORRECT: Retry uses a fresh LlmChat with a NEW session_id (`{session_id}-retry`), preventing the poisoned previous turn from being re-sent as context. The strict prompt front-loads the constraint. Retry timeout is preserved (240 s extra_params + 300 s wait_for), matching the primary call.",
+    "TASK A H2 GOOD ERROR SHAPE: 502 is semantically correct here — Gemini is an upstream dependency, and its bad output IS a bad gateway response. The user-facing message ('short videos, unusual angles, or heavy motion blur') is actionable — much better than the old opaque 500. Frontend can safely render analysis_error verbatim.",
+    "MINOR SUGGESTION (not blocking): The retry path re-uses `file_contents` (the base64-encoded video is re-sent). For a rate-limited failure mode this doubles bandwidth. Acceptable because JSON-formatting failures are rare and the retry is bounded to 1 attempt.",
+    "TASK B I1 CLEAN: The conditional `(strengths?.length || dev?.length || concern?.length)` correctly gates rendering — if scout_view has all three arrays empty we hide the whole grid rather than showing two 'empty' cards. Empty-state italic fallback INSIDE each card handles the case where ONLY one of the two lists is empty. Good defensive UX.",
+    "TASK B I1 GOOD: Fallback chain is `development_priorities?.length ? development_priorities : areas_of_concern` — using ?.length (not just ?) means an empty array falls through to concerns. This matches the semantic: 'if we have proper development priorities, use them; otherwise show the older areas_of_concern'.",
+    "TASK B I4 VISUAL: Screenshot shows the pinned cards land visually between the 8-pillar breakdown and the radar hero. That's actually a nicer position than 'immediately above the radar' — parents scanning the report land on the two pinned verdicts right after the pillars, and the radar reinforces them. Session 123 delivered.",
+    "MINOR (carried from prior sessions): server.py is ~11,081 lines. Extract_json + retry adds ~130 useful lines. Refactor into gemini_client.py at some point.",
+    "MINOR (carried from iter52): ffmpeg/ffprobe not in preview container PATH — pre-existing environment gap that fails G1/G5 in test_iter52 and TestStep2 in e2e_full_audit. Not a Session 123 issue."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter53_session123.py (new — 40 pytest cases across 7 classes: extract_json happy-path, extract_json reject, extract_json extras, retry-once structure, categorized prefixes, pinned Top-3 cards, Session 122 regression sanity)"
+  ],
+  "success_rate": {
+    "backend": "100% for Session 123 code (40/40 iter53 + 4/4 regression checks). 90% overall (28/31 pre-existing pass; 3 pre-existing environment-only failures due to missing ffmpeg/ffprobe binary — NOT Session 123 regressions).",
+    "frontend": "100% for TASK B (all 4 I1-I4 verifications green — grid + both cards visible, exactly 3 items each via slice(0,3), pinned above radar in DOM order, Danish copy correct)"
+  },
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (used for I4 live render), premium@elitescout.com (owner of report 64f59196-...), testvip@scoutmeplay.com / TestVip@2026! (regression VIP eligibility)",
+  "seed_data_creation": "None. Report 64f59196-a520-4ba4-a0f9-de96df8802ef is pre-seeded in the preview DB with 4 key_strengths / 4 development_priorities / 3 areas_of_concern. No new writes.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Session 123 delivers a tolerant extract_json (13 stress-test coverage) + retry-once path (fresh LlmChat with stricter prompt) + 502 HTTPException on double-fail — the old generic 500 'invalid format' is fully removed. The pinned Top-3 cards on ReportPage.jsx are wired above PerformanceRadarHero with a nested fragment inside the `{radarData && ...}` guard and a `scout_view && (strengths || priorities || concerns)?.length` sub-guard, so they safely hide on reports lacking scout_view. Note per user instruction the live Gemini call was NOT exercised — the retry code path is verified structurally via source inspection (retry_chat variable, -retry session_id, strict_prompt, 502 HTTPException). If future sessions want to fault-inject a bad Gemini response to exercise the retry branch end-to-end, monkey-patch chat.send_message to return known-bad text; the current test file has a stub in mind but is not necessary for wiring verification. The 3 environment-only failures (G1 make_preview_clip, G5 fast-path, TestStep2 ffprobe) are ffmpeg-missing — see action item. Reusable harness at /app/backend/tests/test_iter53_session123.py is idempotent, deterministic, and takes ~2.3 s.",
+  "rca of the issue": "Original production bug 46c460d8: extract_json used naive text.find('{')..text.rfind('}'), which fails on ANY response with prose containing curly braces (e.g. 'The {player} showed …'), smart quotes ('vs \"), trailing commas (Python-legal, JSON-illegal), or multiple fences (grabbed the wrong one). Fix (verified): tolerant scanner with (a) BOM/zero-width strip, (b) smart-quote normalization to ASCII, (c) largest-fence preference, (d) balanced-brace walker with in-string/escape tracking so string-embedded { doesn't confuse depth, (e) trailing-comma repair via regex sub, (f) categorized ValueError with prefix so caller can decide retry policy, (g) retry-once with fresh LlmChat + stricter system_message + prepended IMPORTANT: instruction, (h) HTTPException(502) with actionable user-facing message on double-fail. Any of the 46c460d8-class responses would now either (i) parse on first attempt, (ii) parse on retry after the strict prompt, or (iii) return an actionable 502 telling the user 'try again with a clearer clip' instead of the useless 500 'invalid format'."
+}
