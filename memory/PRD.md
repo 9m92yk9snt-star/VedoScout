@@ -26,6 +26,19 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
+- ✅ **🆕 Session 122 — Speed + Reliability: 20x smaller Gemini payload + skip content-gate for paid users + explicit httpx timeout (Jul 02 2026)**:
+  - **P0 G1 — Aggressive preview-clip shrinking**. RCA: `FileContentWithMimeType` reads the entire clip into RAM, base64-encodes it, and inlines it as a data URI in the JSON message body. Old code produced ~3 MB clips → ~4 MB HTTP body → Emergent LLM proxy stalled buffering the request before Gemini even saw it. Fix: `make_preview_clip` in server.py now encodes with `-vf scale='min(854,iw)':-2,fps=15 -crf 32 -pix_fmt yuv420p -c:a aac -b:a 32k -ac 1 -movflags +faststart`. Also handles the whole-video-shorter-than-window branch by still downscaling (was previously shipping the raw original). **Measured: 1.71 MB source → 143 KB clip → 192 KB base64 body (~20× reduction).**
+  - **P0 G2 — Skip content-gate Gemini call for PAID users**. RCA: `run_content_gate` fires a full Gemini video call to reject non-football / low-quality uploads — legitimate for free-tier abuse prevention, wasteful for paying users. Fix: at server.py L4746 the pipeline computes `is_paid_upload = doc.get('is_paid') OR doc.get('eligibility_consumed') in ('subscription','prepaid','progress_pass')`. When true, the code assigns a permissive stub gate dict (`is_football=True, quality='good', gate_skipped_paid=True, …`) and skips `run_content_gate` entirely. **Removes 30-60 s from every Premium/VIP/prepaid upload's critical path.** Free-tier uploads still go through the gate.
+  - **P0 G3 — Explicit LiteLLM httpx timeout**. RCA: `asyncio.wait_for` only cancels the asyncio future — the underlying httpx socket may still be blocked buffering a large POST body into the LLM proxy's ingest, causing observed 14+ min stalls where the outer 480 s wait_for never fired. Fix: at server.py L2684 we now set `chat.extra_params = {**(chat.extra_params or {}), 'timeout': 240.0}` BEFORE `asyncio.wait_for(chat.send_message(user_message), timeout=300)`. LiteLLM plumbs `timeout` through to `litellm.acompletion(...)` which propagates it to httpx as the socket-level read/write timeout. 60 s buffer between httpx timeout (240 s) and asyncio timeout (300 s) allows clean cancel propagation.
+  - **Verified via `testing_agent_v3_fork` iteration_52** — **31/31 pytest cases PASS** (21 new Session 122 + 10 Session 121 e2e regression). Measurements: clip shrink 143,680 B (42.5% under 250 KB budget) → 191,573 B base64 (43.7% under 340 KB budget). Fast-path speed 79.8 ms on 2 MB demo-sample.mp4 (18.8× under 1500 ms bar). Zero regressions on Sessions 116-121.
+  - **Files modified**:
+    - MODIFIED `/app/backend/server.py`:
+      - L3195-3245 — `make_preview_clip` now targets 480p/15fps/CRF32/mono 32k AAC + always downscales even for short whole-video branch.
+      - L2678-2687 — `call_gemini_with_video` now sets `chat.extra_params["timeout"] = 240.0` before `asyncio.wait_for(..., timeout=300)`.
+      - L4712-4770 — new `is_paid_upload` branch skips `run_content_gate` with permissive stub for paid tiers.
+    - NEW `/app/backend/tests/test_iter52_session122.py` — 21-case regression suite (G1-G8).
+  - **Deployment required**: fixes live in preview only. User must redeploy for prod scoutmeplay.com to benefit.
+
 - ✅ **🆕 Session 121 — End-to-End Bug Audit — full flow VERIFIED bug-free (Jul 02 2026)**:
   - Wrote and ran comprehensive 10-case integration suite `/app/backend/tests/test_e2e_full_audit.py` covering every step of the upload → report flow:
     - **Step 1 Upload**: POST /api/reports/upload returns HTTP 200 with `id`, `analysis_status='analyzing'`, `progress_step=1`, and full `player_details`. Rejects non-video MIME (test uploaded text/plain → 400). ✅
