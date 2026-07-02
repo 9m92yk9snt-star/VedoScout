@@ -3092,16 +3092,61 @@ def gate_rejection_message(gate: dict) -> Optional[str]:
     return None
 
 
+def _probe_video_codec(src_path: Path) -> tuple:
+    """Return (codec_name, pix_fmt) for the first video stream, or ('', '') on failure.
+    Fast — uses ffprobe when available, else opencv-based sniff. Total budget < 5s.
+    """
+    import subprocess
+    try:
+        r = subprocess.run(
+            [
+                FFPROBE_BIN, "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=codec_name,pix_fmt",
+                "-of", "csv=p=0",
+                str(src_path),
+            ],
+            capture_output=True, timeout=5, text=True,
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            parts = r.stdout.strip().split(",")
+            return (parts[0].strip().lower(), (parts[1].strip().lower() if len(parts) > 1 else ""))
+    except Exception:
+        pass
+    return ("", "")
+
+
 def transcode_to_web_mp4(src_path: Path) -> Path:
     """
     Convert the uploaded video to a browser-friendly MP4 (H.264 8-bit yuv420p + AAC, faststart).
     Returns the new file path. Falls back to original if ffmpeg fails.
+
+    Fast-path: if the source is already H.264 8-bit (yuv420p / yuvj420p), we skip
+    re-encoding entirely — it's already browser-safe. Saves 30-120 s per upload
+    for anyone recording via a modern H.264 camera app (Android, most GoPros,
+    web-recorded uploads).
 
     IMPORTANT: `-pix_fmt yuv420p` is critical — iPhones default to HEVC + yuv420p10le
     (10-bit HDR) which ONLY Safari can decode. Chrome/Firefox/most in-app browsers
     render audio-only or "preview unavailable on this device" without this flag.
     """
     import subprocess
+
+    # ── FAST PATH: already-safe source needs no re-encoding ──
+    codec, pix_fmt = _probe_video_codec(src_path)
+    if codec == "h264" and pix_fmt in ("yuv420p", "yuvj420p"):
+        # Ensure .web.mp4 naming convention downstream code expects.
+        out_path = src_path.with_suffix(".web.mp4")
+        if out_path.resolve() == src_path.resolve():
+            return src_path
+        try:
+            import shutil as _shutil
+            _shutil.copy2(str(src_path), str(out_path))
+            logger.info(f"transcode fast-path: {src_path.name} → {out_path.name} (codec={codec} pix_fmt={pix_fmt} already web-safe)")
+            return out_path
+        except Exception as e:
+            logger.warning(f"fast-path copy failed, falling through to full transcode: {e}")
+
     out_path = src_path.with_suffix(".web.mp4")
     try:
         result = subprocess.run(

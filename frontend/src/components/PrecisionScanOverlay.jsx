@@ -7,25 +7,30 @@ import KnowledgeCarousel from "./KnowledgeCarousel";
  * PrecisionScanOverlay
  * Full-screen premium loader with three phases:
  *   • UPLOADING — real upload-progress percentage from XHR.upload.onprogress
- *   • ANALYZING — 5-step Precision Scout ladder (auto-progressing)
+ *   • ANALYZING — 5-step Precision Scout ladder driven by the REAL backend
+ *                 `progress_step` polled from /api/reports/{id}/status. Falls
+ *                 back to a slow wall-clock tick if backendStep isn't wired.
  *   • DONE      — celebratory "report ready" confirmation with primary CTA
  * Beneath uploading/analyzing, a rotating KnowledgeCarousel keeps the user engaged.
  *
  * Props
- *   open      — boolean
- *   phase     — 'uploading' | 'analyzing' | 'done' (defaults to analyzing)
- *   uploadPct — 0..100 number, used only when phase === 'uploading'
- *   onViewReport — () => void, called when the user taps the done-phase CTA
+ *   open        — boolean
+ *   phase       — 'uploading' | 'analyzing' | 'done' (defaults to analyzing)
+ *   uploadPct   — 0..100 number, used only when phase === 'uploading'
+ *   backendStep — 1..5 real backend progress_step; overlay clamps to this
+ *                 so we never show fake progress ahead of reality.
+ *   onViewReport         — () => void, DONE-phase CTA
+ *   onContinueInBackground — () => void, ANALYZING-phase secondary CTA
  */
 const ANALYSE_STEPS = [
-  { id: 1, title: "Locking onto your player", caption: "Reading jersey + shorts colour and body shape", icon: Crosshair, dur: 5 },
-  { id: 2, title: "Tracking across every frame", caption: "Following only the player in your anchors", icon: ScanSearch, dur: 9 },
-  { id: 3, title: "Listening for crowd peaks", caption: "Cross-checking goals against the audio timeline", icon: Volume2, dur: 5 },
-  { id: 4, title: "Detecting actions on the ball", caption: "Goals, shots, dribbles, key passes, tackles", icon: Activity, dur: 9 },
-  { id: 5, title: "Writing your scout report", caption: "Confident voice — no guesses, no hedging", icon: Brain, dur: 8 },
+  { id: 1, title: "Receiving your video", caption: "Uploading securely to our scout servers", icon: UploadCloud, dur: 6 },
+  { id: 2, title: "Preparing the footage", caption: "Transcoding to 8-bit H.264 so every browser can play it", icon: ScanSearch, dur: 60 },
+  { id: 3, title: "Checking the content", caption: "Confirming a real football clip with your player in frame", icon: Volume2, dur: 45 },
+  { id: 4, title: "Watching every touch", caption: "Tracking passes, shots, dribbles, and defensive work", icon: Activity, dur: 90 },
+  { id: 5, title: "Writing your scout report", caption: "Confident voice — no guesses, no hedging", icon: Brain, dur: 60 },
 ];
 
-export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, onViewReport, onContinueInBackground }) {
+export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, backendStep = 0, onViewReport, onContinueInBackground }) {
   const [stepIdx, setStepIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -43,17 +48,29 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
       t += 1;
       setElapsed(t);
       if (phase === "analyzing") {
+        // PREFER real backend progress. When the poller reports progress_step
+        // it means the pipeline actually finished that stage — show it truthfully.
+        // Backend steps: 1=received, 2=preparing, 3=content-gate, 4=building,
+        // 5=ready. We map 1:1 to overlay ANALYSE_STEPS indexes.
+        if (typeof backendStep === "number" && backendStep >= 1) {
+          setStepIdx(Math.max(0, Math.min(ANALYSE_STEPS.length - 1, backendStep - 1)));
+          return;
+        }
+        // Fallback wall-clock ticker (only used when backend hasn't reported yet).
         let acc = 0;
         for (let i = 0; i < ANALYSE_STEPS.length; i++) {
           acc += ANALYSE_STEPS[i].dur;
           if (t < acc) { setStepIdx(i); return; }
         }
-        setStepIdx(ANALYSE_STEPS.length - 1);
+        // Reached the end of fake durations — hold at the second-to-last step
+        // rather than jumping to the "writing scout report" step, so we don't
+        // lie about progress. Real backendStep will kick in on the next tick.
+        setStepIdx(Math.max(0, ANALYSE_STEPS.length - 2));
       }
     };
     const id = setInterval(tick, 1000);
     return () => { cancelled = true; clearInterval(id); };
-  }, [open, phase]);
+  }, [open, phase, backendStep]);
   /* eslint-enable */
 
   if (!open) return null;

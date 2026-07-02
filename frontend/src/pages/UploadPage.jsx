@@ -54,6 +54,7 @@ export default function UploadPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
+  const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
   const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser
   // Holds the completed upload response while the "done" celebration is on
@@ -385,8 +386,11 @@ export default function UploadPage() {
           try {
             const { data: statusResp } = await api.get(`/reports/${data.id}/status`);
             setUploadPhase("analyzing");
-            // Reflect the real backend progress step (1..5) on the overlay
+            // Feed the REAL backend progress into the overlay so the ladder
+            // reflects reality (instead of the old client-side wall-clock lie
+            // that jumped to step 5 in 36 s even when backend was still at 2).
             if (typeof statusResp.progress_step === "number") {
+              setBackendStep(statusResp.progress_step);
               setUploadPct(Math.min(100, Math.round((statusResp.progress_step / 5) * 100)));
             }
             if (statusResp.status === "failed") {
@@ -462,6 +466,7 @@ export default function UploadPage() {
         open={submitting && !heroReport}
         phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
+        backendStep={backendStep}
         onContinueInBackground={() => {
           // Set the flag — the poll loop in handleSubmit will detect it on its next
           // tick, hand off to startBackgroundAnalysis(), close the overlay, and
