@@ -4273,7 +4273,7 @@ async def upload_video_and_create_preview(
             )
 
     # ============== KICK OFF THE BACKGROUND TASK ==============
-    background.add_task(analyze_preview_task, report_id)
+    background.add_task(_analyze_preview_task_with_timeout, report_id)
 
     # Return IMMEDIATELY so the HTTP request never holds RAM longer than ~10 s
     # (just enough to save the file). This is the structural fix for Cloudflare
@@ -4357,6 +4357,33 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
             "created_at": doc.get("created_at"),
         })
     return out
+
+
+async def _analyze_preview_task_with_timeout(report_id: str):
+    """Wall-clock guard around `analyze_preview_task`. If the whole pipeline
+    (ffmpeg + Gemini calls + R2 flush) takes longer than 15 minutes we force-
+    fail the report with a clear error so the frontend can stop polling
+    instead of showing an eternal 'Step 2 of 5 · Analyzing' spinner.
+
+    15 min = 8-min Gemini timeout × 2 (content gate + preview) + 3 min buffer
+    for ffmpeg / R2 uploads. In practice most reports finish in 2-5 min.
+    """
+    try:
+        await asyncio.wait_for(analyze_preview_task(report_id), timeout=900)
+    except asyncio.TimeoutError:
+        logger.error(f"analyze_preview_task hard-timeout for {report_id} after 900s")
+        try:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {
+                    "analysis_status": "failed",
+                    "analysis_error": "Analysis took too long. Try again with a shorter clip (under 2 minutes).",
+                    "progress_step": 5,
+                }},
+            )
+            await _refund_upload_eligibility(report_id)
+        except Exception as e:
+            logger.warning(f"Failed to mark report {report_id} as timed-out: {e}")
 
 
 async def analyze_preview_task(report_id: str):
@@ -4694,6 +4721,22 @@ async def analyze_preview_task(report_id: str):
         preview = scrub_hedging(preview)
 
         # ============== PERSIST ==============
+        # ============== FLUSH VIDEO + POSTER TO R2 ==============
+        # Push the playable video and poster to R2 BEFORE marking the report
+        # ready — this closes a race where the frontend could poll /status
+        # right after status=ready, receive the local `/api/uploads/…` URL,
+        # start streaming it, and then have the file yanked out from under
+        # it when the R2 flush deletes the local copy. By flushing first
+        # we guarantee `video_url_override` is set by the time the frontend
+        # sees `analysis_status: "ready"`, so it always gets the R2 URL.
+        try:
+            await _flush_preview_artifacts_to_r2(report_id)
+        except Exception as e:
+            logger.warning(f"R2 flush post-preview failed for {report_id}: {e}")
+
+        # ============== PERSIST READY STATE ==============
+        # Now that R2 URLs are in the doc, flipping the status flag makes
+        # every future poller see a coherent playable URL.
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -4703,16 +4746,6 @@ async def analyze_preview_task(report_id: str):
                 "analysis_error": None,
             }},
         )
-
-        # ============== FLUSH VIDEO + POSTER TO R2 ==============
-        # Preview + Gemini calls are done. Push the playable video and poster
-        # to R2 and drop the local copies to keep the container disk clean.
-        # Marker/subject/anchor crops stay local — they're small and may be
-        # re-used by generate_full_report_task or admin re-generation flows.
-        try:
-            await _flush_preview_artifacts_to_r2(report_id)
-        except Exception as e:
-            logger.warning(f"R2 flush post-preview failed for {report_id}: {e}")
 
         # If the upload was prepaid / pass-credit, kick off the full premium report too.
         doc = await db.reports.find_one({"id": report_id})

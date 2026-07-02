@@ -26,10 +26,10 @@ const STORAGE_KEY = "scoutmeplay.activeAnalysis";
 const POLL_INTERVAL_MS = 5000;
 const STAGE_LABELS = {
   1: "Receiving your video",
-  2: "Checking the content",
-  3: "Building your analysis",
-  4: "Writing your scout report",
-  5: "Finishing up",
+  2: "Preparing your video",
+  3: "Checking the content",
+  4: "Writing the scout report",
+  5: "Finalising",
 };
 
 /* ---------- Public API: start tracking from anywhere ---------- */
@@ -163,7 +163,7 @@ export default function BackgroundAnalysisTracker() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt mb-0.5">
-              Step {step} of 5 · Cooking
+              Step {step} of 5 · Analyzing
             </div>
             <div className="text-[13px] font-bold text-cream-card truncate leading-tight">{label}</div>
             <div className="mt-1.5 h-1 bg-white/15 overflow-hidden rounded-full">
