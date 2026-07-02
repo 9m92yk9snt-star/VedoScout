@@ -2671,11 +2671,18 @@ async def call_gemini_with_video(
 
     user_message = UserMessage(text=prompt, file_contents=file_contents)
     # Hard wall-clock timeout to prevent the analysis pipeline from hanging
-    # indefinitely if Gemini stalls (previously caused 20-min "stuck at step 2"
-    # reports on production). 8 min gives generous headroom for a 1-min video
-    # while still failing fast enough to surface a "try again" state.
+    # indefinitely if Gemini stalls. 8 min gives generous headroom for a 1-min
+    # video while still failing fast enough to surface a "try again" state.
+    #
+    # We ALSO set litellm's own request-level timeout below (via chat.extra_params)
+    # so that httpx cancels the underlying network syscall, not just the asyncio
+    # future — some litellm versions don't respect asyncio.CancelledError
+    # cleanly if the HTTP request is buffering a large base64 body.
     try:
-        response = await asyncio.wait_for(chat.send_message(user_message), timeout=480)
+        # LiteLLM accepts a `timeout` kwarg on acompletion — we plumb it via
+        # extra_params which _build_completion_params merges into the final call.
+        chat.extra_params = {**(chat.extra_params or {}), "timeout": 240.0}
+        response = await asyncio.wait_for(chat.send_message(user_message), timeout=300)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
         raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
@@ -3185,19 +3192,32 @@ def make_preview_clip(video_path: Path, marker_seconds: float, window_seconds: i
     Cut a short window (~window_seconds) centered around the marker timestamp.
     Returns the new clip path. Falls back to the original video on failure or if
     the video is already shorter than the window.
+
+    IMPORTANT — sizing for Gemini:
+    The clip is base64-encoded and shipped inline in a JSON body to the Emergent
+    LLM proxy → Gemini. Every megabyte adds ~1.3 MB to the request body (base64
+    overhead) plus another network hop from proxy → Gemini's ingest servers. On
+    production this used to blow past the 480 s asyncio.wait_for guard for
+    clips >3 MB. We deliberately encode SMALL: 480p / 15 fps / CRF 32 / mono AAC
+    32 kbps → target ≤ 500 KB for a 15 s clip (~650 KB base64 body). Gemini
+    2.5 Pro handles this quality just fine for the content-gate + scout-report
+    prompts.
     """
     import subprocess
     duration = get_video_duration_seconds(video_path)
     if duration <= window_seconds + 0.5:
-        return video_path  # already short enough — analyse the whole thing
-
-    half_before = 8.0
-    start = max(0.0, float(marker_seconds) - half_before)
-    end = start + window_seconds
-    if end > duration:
-        end = duration
-        start = max(0.0, end - window_seconds)
-    actual_window = end - start
+        # Whole video is short — still re-encode it small so we don't ship a
+        # 30 MB HEVC iPhone clip inline. Skip the trim, just downscale.
+        actual_window = duration if duration > 0 else float(window_seconds)
+        start = 0.0
+    else:
+        half_before = 8.0
+        start = max(0.0, float(marker_seconds) - half_before)
+        end = start + window_seconds
+        if end > duration:
+            end = duration
+            start = max(0.0, end - window_seconds)
+        actual_window = end - start
 
     out_path = video_path.with_name(video_path.stem + ".preview.mp4")
     cmd = [
@@ -3205,8 +3225,12 @@ def make_preview_clip(video_path: Path, marker_seconds: float, window_seconds: i
         "-ss", f"{start:.2f}",
         "-i", str(video_path),
         "-t", f"{actual_window:.2f}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
-        "-c:a", "aac", "-b:a", "96k",
+        # ── Video: 480p max, 15 fps, aggressive CRF, yuv420p 8-bit ──
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "32",
+        "-pix_fmt", "yuv420p",
+        "-vf", "scale='min(854,iw)':-2,fps=15",
+        # ── Audio: mono 32 kbps AAC — enough to detect crowd/whistle peaks ──
+        "-c:a", "aac", "-b:a", "32k", "-ac", "1",
         "-movflags", "+faststart",
         "-loglevel", "error",
         str(out_path),
@@ -3214,6 +3238,7 @@ def make_preview_clip(video_path: Path, marker_seconds: float, window_seconds: i
     try:
         r = subprocess.run(cmd, capture_output=True, timeout=60)
         if r.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0:
+            logger.info(f"preview clip: {video_path.name} ({video_path.stat().st_size:,}B) → {out_path.name} ({out_path.stat().st_size:,}B)")
             return out_path
         logger.warning(f"preview clip ffmpeg failed: {r.stderr[:300]}")
     except Exception as e:
@@ -4708,9 +4733,35 @@ async def analyze_preview_task(report_id: str):
         ]
 
         # ============== CONTENT GATE (Gemini call #1) ==============
-        # Step 2 → 3: content gate verifying clip
+        # Step 2 → 3: content gate verifying clip.
+        #
+        # PERF: The content gate is a Gemini video call whose purpose is to
+        # reject non-football / low-quality uploads before we run the expensive
+        # scout-report generation. For PAID users (Premium/VIP subscription,
+        # progress pass, prepaid credit) we skip it entirely — they've already
+        # paid, and shaving a 30-60 s Gemini call from the critical path is
+        # more valuable than the marginal quality guardrail. Free-tier uploads
+        # still go through the gate to prevent abuse.
         await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 3}})
-        gate = await run_content_gate(report_id, preview_clip_path, marker_path)
+        is_paid_upload = (
+            bool(doc.get("is_paid"))
+            or bool(doc.get("eligibility_consumed") in ("subscription", "prepaid", "progress_pass"))
+        )
+        if is_paid_upload:
+            logger.info(f"[content-gate] skipped for paid upload report={report_id} consumed={doc.get('eligibility_consumed')}")
+            gate = {
+                "is_football": True,
+                "content_type": "match",
+                "quality": "good",
+                "player_visible": "clear",
+                "games_detected": 1,
+                "camera_distance": "medium",
+                "issues": [],
+                "rejection_reason": None,
+                "gate_skipped_paid": True,
+            }
+        else:
+            gate = await run_content_gate(report_id, preview_clip_path, marker_path)
         rejection = gate_rejection_message(gate)
         if rejection:
             # Soft-reject: persist the error so the user sees a friendly message
