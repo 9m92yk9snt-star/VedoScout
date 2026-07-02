@@ -4,6 +4,14 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0A0F0D" />
+        <!-- Force browsers + Cloudflare edge to always fetch a fresh index.html
+             so users pick up the latest hashed JS bundle after every deploy.
+             The bundle itself is immutable (hash-in-filename), so it's safe
+             to only bust the shell. Without this, users can see "Cooking"
+             or other old strings for up to Cloudflare's 5-min HTML TTL. -->
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta http-equiv="Pragma" content="no-cache" />
+        <meta http-equiv="Expires" content="0" />
         <link rel="canonical" href="https://scoutmeplay.com/" />
         <meta name="description" content="ScoutMePlay — Where talent gets noticed. A premium football scouting platform that gives ambitious young players honest, professional feedback. For U7–U21." />
         <meta name="keywords" content="football scouting, soccer scouting, youth football report, scouting report for kids, U7 U21 football, ScoutMePlay" />
