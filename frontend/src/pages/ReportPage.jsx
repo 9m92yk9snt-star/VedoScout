@@ -1907,7 +1907,8 @@ export default function ReportPage() {
   if (!report) return null;
 
   const { preview, full_report, player_details, video_url, poster_url, marker_url, fingerprint, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration, age_intelligence, statsbomb_calibration_gated_message, trial_readiness_gated_message } = report;
-  const unlocked = is_paid || manually_unlocked || user?.role === "admin";
+  const premiumRole = ["admin", "premium", "vip", "scout"].includes(user?.role);
+  const unlocked = is_paid || manually_unlocked || premiumRole;
 
   const radarData = full_report ? [
     { axis: "Technical", score: full_report.scores?.technical },

@@ -4556,6 +4556,30 @@ def _resolve_poster_url(doc: dict) -> Optional[str]:
     return f"/api/uploads/{pf}" if pf else None
 
 
+def _resolve_marker_url(doc: dict) -> Optional[str]:
+    """Resolve the marker frame URL for a report doc.
+
+    Priority: R2 override (set by `_flush_preview_artifacts_to_r2`) > legacy
+    `/api/uploads/` path. The K8s local disk is ephemeral, so once the R2
+    override is set the local JPEG may have been evicted — always trust the
+    override first.
+    """
+    override = doc.get("marker_url_override")
+    if override:
+        return override
+    mf = doc.get("marker_filename")
+    return f"/api/uploads/{mf}" if mf else None
+
+
+def _resolve_subject_crop_url(doc: dict) -> Optional[str]:
+    """Resolve the tracked-subject crop URL. Same priority rules as marker."""
+    override = doc.get("subject_crop_url_override")
+    if override:
+        return override
+    sf = doc.get("subject_crop_filename")
+    return f"/api/uploads/{sf}" if sf else None
+
+
 @api_router.get("/reports/{report_id}/status")
 async def get_report_status(report_id: str, user=Depends(get_current_user)):
     """Lightweight polling endpoint used by the frontend during async preview generation.
@@ -4594,13 +4618,13 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         "has_full_report": bool(doc.get("full_report")),
     }
     if analysis_status == "ready":
-        marker_filename = doc.get("marker_filename")
         out.update({
             "preview": doc.get("preview"),
             "player_details": doc.get("player_details"),
             "video_url": _resolve_video_url(doc),
             "poster_url": _resolve_poster_url(doc),
-            "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
+            "marker_url": _resolve_marker_url(doc),
+            "subject_crop_url": _resolve_subject_crop_url(doc),
             "is_paid": bool(doc.get("is_paid")),
             "created_at": doc.get("created_at"),
         })
@@ -5104,6 +5128,36 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
                 except Exception as e:
                     logger.warning(f"R2 flush poster failed {report_id}: {e}")
 
+    # Session 125 — also flush the marker frame + subject crop. These are the
+    # "Your Player · Tracked" images the report page renders. On Kubernetes
+    # the local disk is EPHEMERAL — after a pod rollover the JPEGs are gone
+    # but the DB still points at /api/uploads/{marker_filename} → 404 → black
+    # box in the report. Same fix pattern as avatar R2 flush (Session 116).
+    if not doc.get("marker_url_override"):
+        mf = doc.get("marker_filename")
+        if mf:
+            mp = UPLOAD_DIR / mf
+            if mp.exists() and mp.stat().st_size > 0:
+                try:
+                    key = f"reports/{report_id}/{mf}"
+                    url = r2_storage.upload_file(key, mp, "image/jpeg")
+                    updates["marker_url_override"] = url
+                    # Keep the local marker for admin re-runs — small file (~50 KB)
+                except Exception as e:
+                    logger.warning(f"R2 flush marker failed {report_id}: {e}")
+
+    if not doc.get("subject_crop_url_override"):
+        sf = doc.get("subject_crop_filename")
+        if sf:
+            sp = UPLOAD_DIR / sf
+            if sp.exists() and sp.stat().st_size > 0:
+                try:
+                    key = f"reports/{report_id}/{sf}"
+                    url = r2_storage.upload_file(key, sp, "image/jpeg")
+                    updates["subject_crop_url_override"] = url
+                except Exception as e:
+                    logger.warning(f"R2 flush subject_crop failed {report_id}: {e}")
+
     if updates:
         await db.reports.update_one({"id": report_id}, {"$set": updates})
 
@@ -5193,8 +5247,6 @@ async def _ensure_agent_review(doc: dict) -> dict:
 
 
 async def _serialize_report(doc: dict, include_full: bool) -> dict:
-    marker_filename = doc.get("marker_filename")
-    subject_crop_filename = doc.get("subject_crop_filename")
     out = {
         "id": doc["id"],
         "user_id": doc["user_id"],
@@ -5202,8 +5254,8 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "player_details": doc["player_details"],
         "video_url": _resolve_video_url(doc),
         "poster_url": _resolve_poster_url(doc),
-        "marker_url": f"/api/uploads/{marker_filename}" if marker_filename else None,
-        "subject_crop_url": f"/api/uploads/{subject_crop_filename}" if subject_crop_filename else None,
+        "marker_url": _resolve_marker_url(doc),
+        "subject_crop_url": _resolve_subject_crop_url(doc),
         "fingerprint": doc.get("fingerprint"),
         "anchors": doc.get("anchors", []),
         "audio_events_preview": doc.get("audio_events_preview", []),
@@ -5560,7 +5612,7 @@ async def admin_agent_queue(_=Depends(get_current_admin_or_scout)):
             "agent_review": review,
             "video_url": _resolve_video_url(d),
             "poster_url": _resolve_poster_url(d),
-            "marker_url": f"/api/uploads/{d['marker_filename']}" if d.get("marker_filename") else None,
+            "marker_url": _resolve_marker_url(d),
         })
     # sort pending first, then by oldest
     out.sort(key=lambda x: (x["agent_review"].get("status") != "pending", x.get("paid_at") or ""))

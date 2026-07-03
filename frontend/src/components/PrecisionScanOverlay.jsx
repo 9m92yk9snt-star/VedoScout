@@ -30,7 +30,7 @@ const ANALYSE_STEPS = [
   { id: 5, title: "Writing your scout report", caption: "Confident voice — no guesses, no hedging", icon: Brain, dur: 60 },
 ];
 
-export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, backendStep = 0, onViewReport, onContinueInBackground }) {
+export default function PrecisionScanOverlay({ open, phase = "analyzing", uploadPct = 0, backendStep = 0, hideTimers = false, onViewReport, onContinueInBackground }) {
   const [stepIdx, setStepIdx] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
@@ -270,7 +270,9 @@ export default function PrecisionScanOverlay({ open, phase = "analyzing", upload
               </div>
 
               <p className="mt-6 text-center text-forest/70 text-[10px] uppercase tracking-[0.3em] font-bold">
-                Elapsed · {Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}
+                {hideTimers
+                  ? "Working in the background"
+                  : `Elapsed · ${Math.floor(elapsed / 60).toString().padStart(2, "0")}:${(elapsed % 60).toString().padStart(2, "0")}`}
               </p>
 
               {/* "Continue in background" — appears for the analysing phase only,

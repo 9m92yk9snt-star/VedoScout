@@ -9,12 +9,15 @@ import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import { startBackgroundAnalysis } from "@/components/BackgroundAnalysisTracker";
 import MarkerStudio from "@/components/MarkerStudio";
 import HeroTeaser from "@/components/HeroTeaser";
+import { useAuth } from "@/lib/auth-context";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp } from "lucide-react";
 
 export default function UploadPage() {
+  const { user } = useAuth();
+  const isPaidTier = ["admin", "premium", "vip", "scout"].includes(user?.role);
   const [searchParams, setSearchParams] = useSearchParams();
   const [eligibility, setEligibility] = useState(null);   // { eligible, reason, free_preview_used, prepaid_uploads }
   const [eligibilityLoading, setEligibilityLoading] = useState(true);
@@ -467,6 +470,7 @@ export default function UploadPage() {
         phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
         backendStep={backendStep}
+        hideTimers={isPaidTier}
         onContinueInBackground={() => {
           // Set the flag — the poll loop in handleSubmit will detect it on its next
           // tick, hand off to startBackgroundAnalysis(), close the overlay, and
