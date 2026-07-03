@@ -24,7 +24,7 @@ import httpx
 
 # Local modules
 import r2_storage
-from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds
+from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds, probe_codec_pixfmt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, status, BackgroundTasks
 
 # ScoutMePlay email service — Gmail SMTP + templates. Modules silently no-op
@@ -3275,26 +3275,11 @@ def gate_rejection_message(gate: dict) -> Optional[str]:
 
 def _probe_video_codec(src_path: Path) -> tuple:
     """Return (codec_name, pix_fmt) for the first video stream, or ('', '') on failure.
-    Fast — uses ffprobe when available, else opencv-based sniff. Total budget < 5s.
+    Fast — uses ffprobe when available, else parses `ffmpeg -i` stderr banner.
+    Total budget < 6s. Guarantees fast-path works even without system ffprobe
+    (e.g. Emergent K8s base image which only has our bundled imageio-ffmpeg).
     """
-    import subprocess
-    try:
-        r = subprocess.run(
-            [
-                FFPROBE_BIN, "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=codec_name,pix_fmt",
-                "-of", "csv=p=0",
-                str(src_path),
-            ],
-            capture_output=True, timeout=5, text=True,
-        )
-        if r.returncode == 0 and r.stdout.strip():
-            parts = r.stdout.strip().split(",")
-            return (parts[0].strip().lower(), (parts[1].strip().lower() if len(parts) > 1 else ""))
-    except Exception:
-        pass
-    return ("", "")
+    return probe_codec_pixfmt(src_path)
 
 
 def transcode_to_web_mp4(src_path: Path) -> Path:

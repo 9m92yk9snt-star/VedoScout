@@ -26,7 +26,23 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 127 — HeroTeaser paywall bypass for premium users on post-upload flow (Jul 03 2026)**:
+- ✅ **🆕 Session 128 — Fast-path ffprobe fallback: Step 2 hang RCA + fix (Jul 03 2026)**:
+  - **RCA of IMG_7372 "Preparing the footage" 8+ min hang**: `_probe_video_codec()` in `server.py` L3276 called `FFPROBE_BIN` directly via subprocess. `imageio-ffmpeg` bundles ONLY `ffmpeg`, NOT `ffprobe`. When the Emergent K8s base image ships without system `ffprobe` (verified: `shutil.which('ffprobe')` returns `None` on this pod), the codec probe silently returns `("", "")` → the fast-path check `codec == "h264" and pix_fmt in ("yuv420p",...)` always evaluates False → every upload falls through to a full libx264 re-encode. On aarch64 K8s pods a 1:20 mobile clip re-encode takes 8+ min or subprocess-times-out at 180s and hangs the analysis pipeline at step 2.
+  - **Fix**: 3-tier fallback in `media_binaries.py`:
+    1. System `ffprobe` (CSV output, fastest).
+    2. Parse `ffmpeg -i <src>` stderr banner (regex `Stream #0:0.*Video:\s*(codec).*,\s*(pix_fmt)`) — ffmpeg ALWAYS dumps codec/pix_fmt/duration to stderr on every invocation, works everywhere the bundled ffmpeg does.
+    3. opencv `VideoCapture` (duration only, last-resort).
+  - New public helper `probe_codec_pixfmt(path) -> (codec, pix_fmt)` and hardened `get_duration_seconds()`. `server.py` `_probe_video_codec` now just delegates.
+  - **Verified live (preview)** — on preview pod where `shutil.which('ffprobe')` is `None`: successfully detects `codec='h264' pix_fmt='yuv420p'` for all 3 sample mp4s from `/app/backend/uploads/`. Fast-path completes in <1s (shutil.copy2), NOT 3+ minute re-encode.
+  - **Regression tests**: `/app/backend/tests/test_fastpath_ffprobe_fallback.py` — 4 pytest cases (4/4 PASS in 2.31s), including `monkeypatch(_FFPROBE_RESOLVED, None)` to force the fallback path, guaranteeing this bug can never silently re-appear.
+  - **Persistence**: `imageio-ffmpeg==0.6.0` is pinned in `/app/backend/requirements.txt` — the bundled `ffmpeg-linux-aarch64-v7.0.2` binary lives inside the pip wheel at `/root/.venv/lib/python3.11/site-packages/imageio_ffmpeg/binaries/` and survives every container rebuild. NO `apt-get install ffmpeg` needed in Dockerfile — the Python package is self-contained.
+  - **⚠️ Production caveat**: This fix is on **preview**. User must **redeploy** to push it to `scoutmeplay.com`. Also: if any user has an active analysis job stuck at step 2 on production RIGHT NOW, it will resolve itself once the retry / re-upload happens post-deploy — the underlying video files are unaffected.
+  - **Files modified**:
+    - REWRITTEN `/app/backend/media_binaries.py` — added `probe_codec_pixfmt()` + `_ffmpeg_stderr_banner()` + 3-tier `get_duration_seconds()`. Kept `FFPROBE_BIN` name for backwards-compat.
+    - MODIFIED `/app/backend/server.py` L27 (import `probe_codec_pixfmt`), L3276-3282 (`_probe_video_codec` now delegates).
+    - NEW `/app/backend/tests/test_fastpath_ffprobe_fallback.py` — 4 regression tests.
+
+- ✅ **Session 127 — HeroTeaser paywall bypass for premium users on post-upload flow (Jul 03 2026)**:
   - **RCA of the IMG_7367 regression**: The "UNLOCK TO READ THE FULL BREAKDOWN / UNLOCK THE FULL REPORT — $159" screen the user reported was NOT from `ReportPage.jsx` (already fixed in Session 125/126 — 0 blur, 0 LockedOverlay for premium/vip/admin roles, verified live). It was from the `HeroTeaser` modal (`/app/frontend/src/components/HeroTeaser.jsx`) that fires on `UploadPage.jsx` right after a video finishes analysing. The old gate on `UploadPage.jsx` L420-425 + L484 was `if (eligibility?.reason !== "prepaid") setHeroReport(finalData)` — premium/vip/admin roles never carry `reason=prepaid` (they're role-tier, not credit-based) so they ALWAYS hit the paywall modal even though their role granted full access.
   - **Fix**: Bundled the isPaidTier check into the guard: `const skipHeroTeaser = isPaidTier || eligibility?.reason === "prepaid"`. Both the timer-driven completion path (L426) AND the manual "View Report" click (L486) now consult `pending.skipHeroTeaser`. Result: premium users go straight to `/report/{id}` where the auto-gen useEffect from Session 126 fires and renders the full unblurred dossier.
   - **Verified live (preview)**: Admin @ `/report/0153da80-...` — 0 LockedOverlay, 0 unlock button, 0 "$159" text, 0 "UNLOCK" text, 4 chapters visible (Technical/Tactical/Physical/Mindset), 0 `.blur-locked` elements.

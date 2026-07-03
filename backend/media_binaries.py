@@ -10,21 +10,26 @@ environments, we prefer:
      wheel — always present after `pip install imageio-ffmpeg`).
   2. System `/usr/bin/ffmpeg` when available.
 
-For ffprobe (not bundled by imageio-ffmpeg), we fall back to:
+For ffprobe (NOT bundled by imageio-ffmpeg) we use a 3-tier fallback:
   1. System `/usr/bin/ffprobe`.
-  2. Duration extraction via opencv (cv2.VideoCapture) — see get_duration_seconds().
+  2. Parse `ffmpeg -i <src>` stderr output (ffmpeg itself dumps codec/duration
+     metadata to stderr on every invocation — no ffprobe needed).
+  3. opencv (cv2.VideoCapture) — last-resort for duration only.
 
 Usage:
-    from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds
+    from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds,
+                               probe_codec_pixfmt
     subprocess.run([FFMPEG_BIN, "-i", src, ...])
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import shutil
+import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -47,45 +52,127 @@ def _resolve_ffmpeg() -> str:
     return "ffmpeg"
 
 
-def _resolve_ffprobe() -> str:
+def _resolve_ffprobe() -> Optional[str]:
     """Resolve ffprobe binary path. imageio-ffmpeg does NOT bundle ffprobe,
-    so we only look for the system one. Callers should also implement a
-    non-ffprobe fallback (e.g. opencv-based duration)."""
-    system = shutil.which("ffprobe")
-    if system:
-        return system
-    return "ffprobe"
+    so we only look for the system one. Returns None if unavailable — all
+    callers must use `probe_codec_pixfmt()` / `get_duration_seconds()` which
+    fall back to `ffmpeg -i` stderr parsing when this is None."""
+    return shutil.which("ffprobe")
 
 
 FFMPEG_BIN = _resolve_ffmpeg()
-FFPROBE_BIN = _resolve_ffprobe()
+_FFPROBE_RESOLVED = _resolve_ffprobe()
+# Kept for backwards-compat — modules import this by name. When ffprobe is
+# missing on the host the fallback helpers below still work via ffmpeg -i.
+FFPROBE_BIN = _FFPROBE_RESOLVED or "ffprobe"
+
+
+# ── ffmpeg -i stderr parsing helpers ────────────────────────────────────────
+# ffmpeg dumps stream metadata to stderr and exits non-zero because we don't
+# give it an output file. That's fine — we just want the diagnostic banner.
+# Sample banner line we parse:
+#   Stream #0:0(und): Video: h264 (High) (avc1 / 0x31637661), yuv420p, 1920x1080
+_CODEC_LINE_RE = re.compile(
+    r"Stream #\d+:\d+.*?: Video:\s*([A-Za-z0-9_]+)"     # codec (h264, hevc, vp9, …)
+    r".*?,\s*([a-z0-9]+p?[0-9]*(?:le)?)",               # pix_fmt (yuv420p, yuv420p10le, …)
+    re.IGNORECASE,
+)
+_DURATION_LINE_RE = re.compile(
+    r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", re.IGNORECASE
+)
+
+
+def _ffmpeg_stderr_banner(video_path) -> str:
+    """Run `ffmpeg -i <src>` and capture its stderr banner. ffmpeg exits with
+    code 1 because no output is provided — that's expected; we only want the
+    metadata dump. 6 s hard cap so pathological inputs never block."""
+    try:
+        r = subprocess.run(
+            [FFMPEG_BIN, "-hide_banner", "-i", str(video_path)],
+            capture_output=True, timeout=6, text=True,
+        )
+        # stderr is where ffmpeg dumps stream info even on error exit
+        return (r.stderr or "") + (r.stdout or "")
+    except Exception as e:
+        logger.info(f"ffmpeg banner probe failed: {e}")
+        return ""
+
+
+def probe_codec_pixfmt(video_path) -> Tuple[str, str]:
+    """Return (codec_name, pix_fmt) for the first video stream, or ('', '')
+    on failure. 3-tier fallback:
+      1. System ffprobe (fastest, exact CSV output).
+      2. `ffmpeg -i` stderr banner parsing — works everywhere ffmpeg does.
+      3. Empty tuple → caller treats it as "unknown, always re-encode".
+    """
+    # Tier 1: system ffprobe
+    if _FFPROBE_RESOLVED:
+        try:
+            r = subprocess.run(
+                [
+                    _FFPROBE_RESOLVED, "-v", "error",
+                    "-select_streams", "v:0",
+                    "-show_entries", "stream=codec_name,pix_fmt",
+                    "-of", "csv=p=0",
+                    str(video_path),
+                ],
+                capture_output=True, timeout=5, text=True,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                parts = r.stdout.strip().split(",")
+                return (
+                    parts[0].strip().lower(),
+                    (parts[1].strip().lower() if len(parts) > 1 else ""),
+                )
+        except Exception as e:
+            logger.info(f"ffprobe direct call failed, falling back to ffmpeg -i: {e}")
+
+    # Tier 2: parse ffmpeg -i stderr banner
+    banner = _ffmpeg_stderr_banner(video_path)
+    m = _CODEC_LINE_RE.search(banner)
+    if m:
+        codec = m.group(1).strip().lower()
+        pix_fmt = m.group(2).strip().lower()
+        return (codec, pix_fmt)
+
+    # Tier 3: unknown — caller will fall through to full re-encode
+    return ("", "")
 
 
 def get_duration_seconds(video_path) -> float:
     """Return video duration in seconds — works with or without ffprobe.
 
-    Try ffprobe first (fast); fall back to opencv (already imported by
-    precision_engine, so no extra runtime cost) if ffprobe is unavailable.
-    Returns 0.0 on total failure.
+    Try ffprobe first (fast); fall back to `ffmpeg -i` banner parsing; final
+    fallback to opencv. Returns 0.0 on total failure.
     """
-    import subprocess
-    # Attempt 1: ffprobe (fast, exact)
-    try:
-        r = subprocess.run(
-            [
-                FFPROBE_BIN, "-v", "error",
-                "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1",
-                str(video_path),
-            ],
-            capture_output=True, timeout=15, text=True,
-        )
-        if r.returncode == 0 and r.stdout.strip():
-            return float(r.stdout.strip())
-    except Exception as e:
-        logger.info(f"ffprobe unavailable, falling back to opencv: {e}")
+    # Tier 1: system ffprobe
+    if _FFPROBE_RESOLVED:
+        try:
+            r = subprocess.run(
+                [
+                    _FFPROBE_RESOLVED, "-v", "error",
+                    "-show_entries", "format=duration",
+                    "-of", "default=noprint_wrappers=1:nokey=1",
+                    str(video_path),
+                ],
+                capture_output=True, timeout=15, text=True,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                return float(r.stdout.strip())
+        except Exception as e:
+            logger.info(f"ffprobe duration failed, falling back to ffmpeg -i: {e}")
 
-    # Attempt 2: opencv (imports cv2 lazily — precision_engine already loads it)
+    # Tier 2: ffmpeg -i banner
+    banner = _ffmpeg_stderr_banner(video_path)
+    m = _DURATION_LINE_RE.search(banner)
+    if m:
+        try:
+            h, m_, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+            return h * 3600 + m_ * 60 + s
+        except Exception:
+            pass
+
+    # Tier 3: opencv (imports cv2 lazily — precision_engine already loads it)
     try:
         import cv2  # type: ignore
         cap = cv2.VideoCapture(str(video_path))
