@@ -417,11 +417,18 @@ export default function UploadPage() {
       setUploadPhase("done");
       // Remember the response so the CTA on the success overlay can fire it
       // straight away (otherwise we wait ~1.8 s for the celebration to land).
-      pendingDoneRef.current = { data: finalData, isPrepaid: eligibility?.reason === "prepaid" };
+      // Session 127 — Premium tier users (admin/premium/vip/scout) NEVER see
+      // the HeroTeaser paywall modal ("Unlock the full report — $159"). It's
+      // reserved for free users only. Their reason may not be "prepaid" but
+      // they still have full access via their role. Bundle the check into the
+      // ref so both the timer-driven path AND the manual "View report" click
+      // route them straight to the report.
+      const skipHeroTeaser = isPaidTier || eligibility?.reason === "prepaid";
+      pendingDoneRef.current = { data: finalData, skipHeroTeaser };
       await new Promise((r) => setTimeout(r, 1800));
       if (!pendingDoneRef.current) return;
       pendingDoneRef.current = null;
-      if (eligibility?.reason !== "prepaid") {
+      if (!skipHeroTeaser) {
         setHeroReport(finalData);
         return; // HeroTeaser modal will navigate on dismiss
       }
@@ -481,7 +488,7 @@ export default function UploadPage() {
           const pending = pendingDoneRef.current;
           if (!pending) return;
           pendingDoneRef.current = null;
-          if (!pending.isPrepaid) {
+          if (!pending.skipHeroTeaser) {
             // Free preview: show the HeroTeaser (mirrors the timer-driven path).
             setHeroReport(pending.data);
           } else {
