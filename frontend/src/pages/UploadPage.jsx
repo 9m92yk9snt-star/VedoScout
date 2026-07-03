@@ -9,6 +9,7 @@ import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import { startBackgroundAnalysis } from "@/components/BackgroundAnalysisTracker";
 import MarkerStudio from "@/components/MarkerStudio";
 import HeroTeaser from "@/components/HeroTeaser";
+import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
@@ -59,7 +60,8 @@ export default function UploadPage() {
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
   const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
-  const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser
+  const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser (free-tier)
+  const [premiumReadyReport, setPremiumReadyReport] = useState(null); // Session 130 — premium-tier celebration screen
   // Holds the completed upload response while the "done" celebration is on
   // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
   const pendingDoneRef = useRef(null);
@@ -433,18 +435,20 @@ export default function UploadPage() {
       // reserved for free users only. Their reason may not be "prepaid" but
       // they still have full access via their role. Bundle the check into the
       // ref so both the timer-driven path AND the manual "View report" click
-      // route them straight to the report.
+      // route them straight to the premium celebration screen.
       const skipHeroTeaser = isPaidTier || eligibility?.reason === "prepaid";
       pendingDoneRef.current = { data: finalData, skipHeroTeaser };
       await new Promise((r) => setTimeout(r, 1800));
       if (!pendingDoneRef.current) return;
       pendingDoneRef.current = null;
       if (!skipHeroTeaser) {
+        // Free-tier flow: HeroTeaser (blur + PricingCards) — modal navigates on dismiss.
         setHeroReport(finalData);
-        return; // HeroTeaser modal will navigate on dismiss
+        return;
       }
-      toast.success("Upload received — generating your premium report.");
-      navigate(`/report/${finalData.id}`);
+      // Session 130 — Premium-tier flow: dedicated PremiumReadyOverlay
+      // celebration screen. NO blur, NO pricing, NO upgrade prompts.
+      setPremiumReadyReport(finalData);
     } catch (err) {
       // 402 with structured detail = pre-pay required
       const detail = err?.response?.data?.detail;
@@ -494,7 +498,7 @@ export default function UploadPage() {
         onClose={() => setEmbeddedOpen(false)}
       />
       <PrecisionScanOverlay
-        open={submitting && !heroReport}
+        open={submitting && !heroReport && !premiumReadyReport}
         phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
         backendStep={backendStep}
@@ -513,7 +517,8 @@ export default function UploadPage() {
             // Free preview: show the HeroTeaser (mirrors the timer-driven path).
             setHeroReport(pending.data);
           } else {
-            navigate(`/report/${pending.data.id}`);
+            // Session 130 — Premium celebration screen instead of instant nav.
+            setPremiumReadyReport(pending.data);
           }
         }}
       />
@@ -530,6 +535,25 @@ export default function UploadPage() {
         onDismiss={() => {
           setHeroReport(null);
           if (heroReport?.id) navigate(`/report/${heroReport.id}`);
+        }}
+      />
+      {/* Session 130 — Premium-tier celebration overlay. Deliberately separate
+          from HeroTeaser (which is the free-tier paywall). Zero blur, zero
+          pricing, single "Open Full Premium Report" CTA that navigates to the
+          full dossier where the auto-gen useEffect kicks in. */}
+      <PremiumReadyOverlay
+        open={!!premiumReadyReport}
+        report={premiumReadyReport}
+        assetBase={ASSET_BASE}
+        onOpenReport={() => {
+          const target = premiumReadyReport?.id;
+          setPremiumReadyReport(null);
+          if (target) navigate(`/report/${target}`);
+        }}
+        onDismiss={() => {
+          const target = premiumReadyReport?.id;
+          setPremiumReadyReport(null);
+          if (target) navigate(`/report/${target}`);
         }}
       />
       <MarkerStudio

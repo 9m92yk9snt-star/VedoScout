@@ -23,6 +23,7 @@ import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
 import PricingCards from "@/components/PricingCards";
+import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 
 /* Tier visual treatment — 4 levels mapped to colour + label */
 const TIER_META = {
@@ -1994,6 +1995,23 @@ export default function ReportPage() {
             <ChevronLeft className="w-4 h-4" />
             Dashboard
           </button>
+
+          {/* Session 130 — Dedicated Premium Ready banner. Rendered ONLY for
+              unlocked/premium users (admin/premium/vip/scout OR is_paid/manually_unlocked).
+              Free users never see this — they get the blur + PricingCards flow below. */}
+          {unlocked && (
+            <PremiumReadyBanner
+              playerName={player_details?.player_name}
+              onOpenReport={() => {
+                const target = document.querySelector('[data-testid="report-scores-grid"]');
+                if (target) {
+                  target.scrollIntoView({ behavior: "smooth", block: "start" });
+                } else {
+                  window.scrollTo({ top: window.innerHeight * 0.5, behavior: "smooth" });
+                }
+              }}
+            />
+          )}
 
           {/* ===== Header ===== */}
           <div className="mt-6 grid lg:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
