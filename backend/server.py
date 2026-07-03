@@ -25,6 +25,12 @@ import httpx
 # Local modules
 import r2_storage
 from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds, probe_codec_pixfmt
+from analysis_watchdog import (
+    heartbeat as _wd_heartbeat,
+    stamp_progress as _wd_stamp,
+    sweep_stalled_reports as _wd_sweep,
+    start_watchdog as _wd_start,
+)
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File, Form, Request, status, BackgroundTasks
 
 # ScoutMePlay email service — Gmail SMTP + templates. Modules silently no-op
@@ -4664,9 +4670,10 @@ async def analyze_preview_task(report_id: str):
         # ------------------------------------------------------------------
         # Step 1 → Step 2: preparing video
         # ------------------------------------------------------------------
+        logger.info(f"[pipeline] {report_id} step 1→2 · preparing video")
         await db.reports.update_one(
             {"id": report_id},
-            {"$set": {"analysis_status": "analyzing", "progress_step": 2}},
+            {"$set": {"analysis_status": "analyzing", **_wd_heartbeat(step=2)}},
         )
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
@@ -4929,7 +4936,8 @@ async def analyze_preview_task(report_id: str):
         # paid, and shaving a 30-60 s Gemini call from the critical path is
         # more valuable than the marginal quality guardrail. Free-tier uploads
         # still go through the gate to prevent abuse.
-        await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 3}})
+        await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat(step=3)})
+        logger.info(f"[pipeline] {report_id} step 2→3 · content gate")
         is_paid_upload = (
             bool(doc.get("is_paid"))
             or bool(doc.get("eligibility_consumed") in ("subscription", "prepaid", "progress_pass"))
@@ -4992,7 +5000,8 @@ async def analyze_preview_task(report_id: str):
 
         # ============== PREVIEW GEMINI CALL (#2) ==============
         # Step 3 → 4: building preview report
-        await db.reports.update_one({"id": report_id}, {"$set": {"progress_step": 4}})
+        await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat(step=4)})
+        logger.info(f"[pipeline] {report_id} step 3→4 · Gemini preview call starting")
         preview = await call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=preview_prompt,
@@ -5020,13 +5029,14 @@ async def analyze_preview_task(report_id: str):
         # ============== PERSIST READY STATE ==============
         # Now that R2 URLs are in the doc, flipping the status flag makes
         # every future poller see a coherent playable URL.
+        logger.info(f"[pipeline] {report_id} step 4→5 · analysis complete")
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
                 "preview": preview,
                 "analysis_status": "ready",
-                "progress_step": 5,
                 "analysis_error": None,
+                **_wd_heartbeat(step=5),
             }},
         )
 
@@ -10599,6 +10609,24 @@ async def on_startup():
         await _ensure_scout_access_products()
     except Exception:
         logger.exception("Scout-access product provisioning failed on startup (will retry lazily)")
+
+    # ── Session 131 — analysis pipeline watchdog ──
+    # ROOT CAUSE FIX for "stuck at step 4" recurrence: `background.add_task`
+    # runs in-memory only, so a worker restart mid-analysis (deploy rollout,
+    # hot-reload, OOM kill, k8s pod cycle) leaves the report doc at
+    # `status=analyzing / step=4` FOREVER with no recovery.
+    #
+    # First, sweep ANY report left over from the previous worker instance —
+    # they are, by definition, orphaned. Then start the periodic loop that
+    # catches future stalls within ~5 min instead of 15 min.
+    try:
+        rescued = await _wd_sweep(db, refund_cb=_refund_upload_eligibility)
+        if rescued:
+            logger.warning(f"[startup-sweep] rescued {rescued} orphaned analyzing report(s)")
+        _wd_start(db, refund_cb=_refund_upload_eligibility)
+        logger.info("[watchdog] periodic sweep loop started")
+    except Exception:
+        logger.exception("Analysis watchdog failed to start (non-fatal)")
 
 
 # ============== ROUTES: SCOUT ACCESS SUBSCRIPTION (Fase 2) ==============

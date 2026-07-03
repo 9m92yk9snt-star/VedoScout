@@ -26,7 +26,27 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 130 — Full Premium vs Free experience separation: dedicated components on both UploadPage and ReportPage (Jul 03 2026)**:
+- ✅ **🆕 Session 131 — Permanent fix for recurring "stuck at step 4" bug: analysis pipeline watchdog (Jul 03 2026)**:
+  - **RCA of the recurring "Watching Every Touch" hang**: `background.add_task(...)` and `asyncio.create_task(...)` are IN-MEMORY only. When the FastAPI worker restarts mid-analysis — deploy rollout, hot-reload on code edit, OOM kill, k8s pod cycle, `supervisorctl restart backend`, or the process crashes — the in-flight `analyze_preview_task` disappears without a trace. The Mongo doc stays at `analysis_status="analyzing"` + `progress_step=4` FOREVER because there was no watchdog to detect the orphan. This is why the bug keeps returning: any code edit triggering uvicorn hot-reload kills active analyses.
+  - **Permanent fix — 3-layer defence in `/app/backend/analysis_watchdog.py`**:
+    1. **Heartbeat** (`heartbeat()` / `stamp_progress()`): every progress-step transition now writes `last_progress_at` ISO timestamp alongside `progress_step`. Wired into all 4 in-flight transitions in `server.py` (step 1→2, 2→3, 3→4, 4→5).
+    2. **Startup sweep** (`sweep_stalled_reports`): on every FastAPI boot, scan for `status=analyzing` reports whose `last_progress_at` is older than 5 min (`STALL_THRESHOLD_SECONDS`) OR reports predating S131 whose `created_at` is older than 15 min (`LEGACY_ANALYZING_AGE_SECONDS`). Mark them `failed` + refund upload eligibility. Compare-and-swap on `analysis_status="analyzing"` guarantees the sweeper never clobbers a racing legitimate completion.
+    3. **Periodic watchdog** (`start_watchdog`): asyncio background loop wakes every 60s and repeats the sweep. Belt + suspenders for stalls that happen while the worker is up (Gemini network stall, cancelled task, etc). Cancellation-safe on shutdown.
+  - **Structured logging**: every pipeline stage now logs `[pipeline] {report_id} step X→Y · <what>` for easy tracing. Watchdog logs `[watchdog] STALLED REPORT DETECTED — marked failed: <id>` on every rescue.
+  - **Refund path**: reused existing `_refund_upload_eligibility(report_id)` — the user's credit / eligibility is restored so they can retry without paying twice.
+  - **Verified end-to-end in preview**:
+    - Real upload from 0→ready in 18 s with `last_progress_at` correctly written at every stage.
+    - Seeded orphan (fake `analyzing` doc with `last_progress_at` 400 s stale) was **automatically rescued by the periodic loop within 60 s**: doc flipped to `status=failed` + `stalled_at` recorded + clear user-facing error message stored. Log confirms `STALLED REPORT DETECTED — marked failed: watchdog-e2e-orphan`.
+  - **Regression tests**: `/app/backend/tests/test_analysis_watchdog.py` — 6/6 PASS covering heartbeat semantics, sweeper matching (both heartbeat-based + legacy-createdAt fallback), compareAndSwap race safety, stamp_progress merging.
+  - **Files modified**:
+    - NEW `/app/backend/analysis_watchdog.py` (~180 lines, self-contained module).
+    - MODIFIED `/app/backend/server.py` L27 (import), L4993-4996 / L5005 / L5017-5019 / L5051-5058 (heartbeat + logging at each step transition), L10556-10570 (startup sweep + watchdog kick-off).
+    - MODIFIED `/app/backend/tests/conftest.py` — auto-mark async tests with `@pytest.mark.asyncio` (pytest-asyncio was installed).
+    - NEW `/app/backend/tests/test_analysis_watchdog.py` — 6 regression cases.
+  - **Existing functionality preserved**: no changes to the Gemini calls, R2 pipeline, transcoding, or user-facing UI. Only additive: heartbeats + a sweeper thread. The 15-min hard timeout at `_analyze_preview_task_with_timeout` is untouched.
+  - **⚠️ Preview only** — please **redeploy** to push to https://scoutmeplay.com.
+
+- ✅ **Session 130 — Full Premium vs Free experience separation: dedicated components on both UploadPage and ReportPage (Jul 03 2026)**:
   - **Two new components created (no conditional hiding of shared layouts anymore)**:
     - `/app/frontend/src/components/PremiumReadyBanner.jsx` — top-of-report banner rendered ONLY when `unlocked` is true. Displays: Crown "PREMIUM READY" pill · "✅ YOUR PREMIUM SCOUT REPORT IS READY" headline · "Your analysis has been completed successfully." sub-text (personalised with player name) · Technical/Tactical/Physical/Mentality strip · big volt "OPEN FULL PREMIUM REPORT" CTA that smooth-scrolls to `[data-testid=report-scores-grid]` · "Elite-tier access · Included in your plan" footer.
     - `/app/frontend/src/components/PremiumReadyOverlay.jsx` — full-screen celebration modal shown on UploadPage completion for premium users. Same visual DNA as the banner (deliberate consistency) with additional player marker crop preview, spring-animated entrance, and a subtle "Close" dismiss. Sibling to `HeroTeaser` — the two never render simultaneously (branching in `handleSubmit` sets EITHER `heroReport` OR `premiumReadyReport`).
