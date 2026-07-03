@@ -16,12 +16,13 @@ import SkillsBreakdown from "@/components/report/SkillsBreakdown";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target,
+  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
+import PricingCards from "@/components/PricingCards";
 
 /* Tier visual treatment — 4 levels mapped to colour + label */
 const TIER_META = {
@@ -1577,43 +1578,32 @@ function AgeProfileCard({ ref: profile }) {
 }
 
 
-function LockedOverlay({ price, onUnlock, loading }) {
+function LockedOverlay({ isLoggedIn }) {
+  // Session 126 — Replaced the old single-button "Unlock full premium report"
+  // paywall with the modern PricingCards component used on the landing page.
+  // This keeps a consistent brand experience across every touchpoint and lets
+  // free users choose between a single report OR the multi-report plan.
   return (
-    <div className="absolute inset-0 z-20 backdrop-blur-xl bg-cream-card border border-gray-border flex flex-col items-center justify-center text-center p-6 md:p-12">
-      <Lock className="w-10 h-10 text-volt mb-5" strokeWidth={1.5} />
-      <span className="text-volt text-xs uppercase tracking-[0.3em] font-bold">Premium</span>
-      <h3 className="mt-3 font-barlow font-black uppercase text-3xl md:text-5xl text-ink tracking-tighter">
-        Unlock full premium report
-      </h3>
-      <p className="mt-4 text-ink/70 text-sm md:text-base max-w-xl">
-        Full scout analysis across technical, tactical, physical & mental dimensions. Scout view, training plan & a premium PDF.
-      </p>
-      <div className="mt-6 flex items-baseline gap-2">
-        <span className="font-barlow font-black text-6xl md:text-7xl text-volt">${price}</span>
-        <span className="text-ink/65 uppercase tracking-widest font-bold">USD</span>
+    <div
+      className="absolute inset-0 z-20 backdrop-blur-xl bg-cream-card/95 border border-gray-border overflow-y-auto"
+      data-testid="locked-overlay"
+    >
+      <div className="max-w-6xl mx-auto p-6 md:p-10">
+        <div className="text-center mb-8 md:mb-10">
+          <div className="inline-flex items-center gap-2 mb-3">
+            <Lock className="w-4 h-4 text-volt" strokeWidth={1.8} />
+            <span className="text-volt text-[11px] uppercase tracking-[0.35em] font-black">Unlock the full report</span>
+          </div>
+          <h3 className="font-barlow font-black uppercase text-3xl md:text-5xl text-ink tracking-tight leading-[0.95]">
+            Choose your<br />
+            <span className="text-forest">scout package</span>
+          </h3>
+          <p className="mt-4 text-ink/70 text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+            Get the complete technical, tactical, physical &amp; mental breakdown — plus a real scout&apos;s written review.
+          </p>
+        </div>
+        <PricingCards variant="landing" isLoggedIn={isLoggedIn} />
       </div>
-      <p className="text-xs text-ink/50 uppercase tracking-widest font-bold">One-time payment · No subscription</p>
-      <button
-        onClick={onUnlock}
-        disabled={loading}
-        data-testid="unlock-report-btn"
-        className="mt-8 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-10 py-4 transition-colors disabled:opacity-50 flex items-center gap-3"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Redirecting to Stripe...
-          </>
-        ) : (
-          <>
-            <Unlock className="w-5 h-5" />
-            Unlock full premium report
-          </>
-        )}
-      </button>
-      <p className="mt-4 text-xs text-ink/50 flex items-center gap-2">
-        <ShieldCheck className="w-3.5 h-3.5" /> Secure payment via Stripe
-      </p>
     </div>
   );
 }
@@ -1687,6 +1677,42 @@ export default function ReportPage() {
   }, [id, navigate]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  // Session 126 — Auto-generate the full scout dossier for premium tiers
+  // (admin/premium/vip/scout) OR any report that's already paid/unlocked but
+  // hasn't materialised the full_report yet. Was previously a manual button-
+  // click flow (line 3138 "Report unlocked · Generate full report"). Premium
+  // users should never see a "click to generate" prompt — the dossier just
+  // renders. Guard against re-triggering with a ref so React StrictMode's
+  // double-effect doesn't fire two Gemini jobs.
+  const autoGenTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (!report || generatingFull || autoGenTriggeredRef.current) return;
+    const premiumRoleNow = ["admin", "premium", "vip", "scout"].includes(user?.role);
+    const alreadyUnlocked = report.is_paid || report.manually_unlocked || premiumRoleNow;
+    const needsFullReport = alreadyUnlocked && !report.full_report;
+    // Don't auto-fire if the backend is already generating (e.g. right after
+    // a successful checkout). The Stripe success path sets generatingFull.
+    if (needsFullReport && report.full_report_status !== "generating") {
+      autoGenTriggeredRef.current = true;
+      (async () => {
+        setGeneratingFull(true);
+        try {
+          await api.post(`/reports/${id}/generate-full`);
+          await pollFullReportReady();
+          await fetchReport();
+        } catch (err) {
+          // Silent fail — the "OPEN FULL SCOUT DOSSIER" button below stays
+          // available for a manual retry. No toast to avoid noise on mount.
+          // eslint-disable-next-line no-console
+          console.warn("Auto full-report generation failed:", err?.message);
+        } finally {
+          setGeneratingFull(false);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report, user]);
 
   // Auto-open the embedded checkout when ?unlock=1 (Hero Teaser navigates here with this param)
   /* eslint-disable */
@@ -2549,11 +2575,7 @@ export default function ReportPage() {
           )}
           <div className="mt-10 relative">
             {!unlocked && (
-              <LockedOverlay
-                price={price}
-                onUnlock={handleUnlock}
-                loading={unlocking}
-              />
+              <LockedOverlay isLoggedIn={!!user} />
             )}
 
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
@@ -3135,25 +3157,69 @@ export default function ReportPage() {
                 <ScoutReview reportId={id} />
               )}
 
-              {/* If unlocked but report not yet generated */}
+              {/* Session 126 — Premium tier landing card. Shown when the report
+                  is unlocked (paid OR premium/vip/admin role) but the full
+                  dossier hasn't been generated yet. Replaces the old plain
+                  "Report unlocked · Generate full report" prompt with a high-
+                  end "PREMIUM ACCESS · OPEN FULL SCOUT DOSSIER" panel that
+                  matches the rest of the premium UI language. */}
               {unlocked && !full_report && !generatingFull && (
-                <div className="bg-surface border border-volt/30 p-8 text-center">
-                  <Unlock className="w-10 h-10 text-volt mx-auto mb-4" strokeWidth={1.5} />
-                  <h3 className="font-barlow font-black uppercase text-2xl text-ink">Report unlocked</h3>
-                  <p className="mt-2 text-ink/65 text-sm">Generate your premium analysis now.</p>
-                  <button
-                    onClick={handleGenerateFull}
-                    data-testid="generate-full-report-btn"
-                    className="mt-6 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors"
-                  >
-                    Generate full report
-                  </button>
+                <div
+                  data-testid="premium-access-panel"
+                  className="relative bg-gradient-to-br from-deepnavy via-ink to-deepnavy border-2 border-volt/50 p-8 md:p-12 text-center overflow-hidden"
+                  style={{ boxShadow: "0 32px 60px -20px rgba(204,255,0,0.22), 0 0 0 1px rgba(204,255,0,0.08) inset" }}
+                >
+                  <div aria-hidden className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-volt/20 blur-3xl pointer-events-none" />
+                  <div aria-hidden className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-forest/25 blur-3xl pointer-events-none" />
+                  <div className="relative">
+                    <div className="inline-flex items-center gap-2 mb-5">
+                      <Crown className="w-4 h-4 text-volt" strokeWidth={1.8} />
+                      <span className="text-volt text-[11px] uppercase tracking-[0.35em] font-black">Premium Access</span>
+                      <Crown className="w-4 h-4 text-volt" strokeWidth={1.8} />
+                    </div>
+                    <h3 className="font-barlow font-black uppercase text-4xl md:text-5xl text-cream-base tracking-tight leading-[0.95]">
+                      Your Full<br />
+                      <span className="text-volt">Scout Dossier</span>
+                    </h3>
+                    <p className="mt-4 text-cream-base/70 text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+                      Technical · Tactical · Physical · Mentality — with age-calibrated benchmarks, evidence &amp; a personal scout review.
+                    </p>
+                    <button
+                      onClick={handleGenerateFull}
+                      data-testid="open-full-dossier-btn"
+                      className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-forest-pop text-ink hover:text-white font-barlow font-black uppercase tracking-[0.22em] text-sm md:text-base px-8 py-4 transition-all group"
+                      style={{ boxShadow: "0 12px 32px -8px rgba(204,255,0,0.5)" }}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Open Full Scout Dossier
+                      <Sparkles className="w-4 h-4 transition-transform group-hover:rotate-12" />
+                    </button>
+                    <p className="mt-4 text-[10px] text-cream-base/45 uppercase tracking-[0.22em] font-bold flex items-center justify-center gap-1.5">
+                      <ShieldCheck className="w-3 h-3" /> Elite-tier access · Included in your plan
+                    </p>
+                  </div>
                 </div>
               )}
               {generatingFull && (
-                <div className="bg-surface border border-volt/30 p-8 text-center">
-                  <Loader2 className="w-8 h-8 animate-spin text-volt mx-auto" />
-                  <p className="mt-4 text-ink/70 uppercase tracking-widest font-bold text-sm">Generating full premium report... a few minutes</p>
+                <div
+                  data-testid="premium-generating-panel"
+                  className="relative bg-gradient-to-br from-deepnavy via-ink to-deepnavy border-2 border-volt/50 p-8 md:p-12 text-center overflow-hidden"
+                  style={{ boxShadow: "0 32px 60px -20px rgba(204,255,0,0.22), 0 0 0 1px rgba(204,255,0,0.08) inset" }}
+                >
+                  <div aria-hidden className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-volt/20 blur-3xl pointer-events-none animate-pulse" />
+                  <div className="relative">
+                    <div className="inline-flex items-center gap-2 mb-5">
+                      <Crown className="w-4 h-4 text-volt" strokeWidth={1.8} />
+                      <span className="text-volt text-[11px] uppercase tracking-[0.35em] font-black">Premium Access</span>
+                    </div>
+                    <Loader2 className="w-10 h-10 animate-spin text-volt mx-auto" strokeWidth={1.5} />
+                    <p className="mt-5 text-cream-base/85 font-barlow font-black uppercase tracking-[0.22em] text-base">
+                      Building Your Scout Dossier
+                    </p>
+                    <p className="mt-2 text-cream-base/55 text-xs uppercase tracking-[0.22em] font-bold">
+                      Technical · Tactical · Physical · Mentality — a few minutes
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
