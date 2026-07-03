@@ -186,8 +186,19 @@ export default function UploadPage() {
 
   const handleFile = (f) => {
     if (!f) return;
-    if (f.size > 200 * 1024 * 1024) {
-      toast.error("Video too large. Please upload under 200MB for best results.");
+    // Session 129 — the Emergent K8s ingress nginx caps request bodies at
+    // ~100 MB (verified live: >100 MB → HTTP 413 Request Entity Too Large
+    // from the ingress, never reaches our FastAPI). Modern phone footage is
+    // easily above this — iPhone 4K @ 30 fps is ~350 MB/min. Reject before
+    // upload with a clear, actionable message instead of a generic "Upload
+    // failed" toast after wasted upload time.
+    const MAX_UPLOAD_BYTES = 95 * 1024 * 1024; // 95 MB — 5 MB safety margin
+    if (f.size > MAX_UPLOAD_BYTES) {
+      const sizeMb = (f.size / 1024 / 1024).toFixed(0);
+      toast.error(
+        `Video is ${sizeMb} MB — our upload limit is 95 MB. Compress the clip (or trim to <2 min) and try again. Tip: iPhone → Settings › Camera › Record Video → 1080p HD at 30 fps.`,
+        { duration: 12000 },
+      );
       return;
     }
     if (videoUrl) URL.revokeObjectURL(videoUrl);
@@ -437,7 +448,17 @@ export default function UploadPage() {
     } catch (err) {
       // 402 with structured detail = pre-pay required
       const detail = err?.response?.data?.detail;
-      if (err?.response?.status === 402 && (detail?.code === "PREPAY_REQUIRED" || typeof detail === "object")) {
+      const status = err?.response?.status;
+      // Session 129 — 413 Request Entity Too Large. The Emergent K8s ingress
+      // nginx caps bodies at ~100 MB. Show a clear, actionable message.
+      // Kicks in on the rare edge where a URL-fetched video slips past the
+      // client-side 95 MB guard in handleFile().
+      if (status === 413) {
+        toast.error(
+          "That clip is over the 100 MB upload limit. Compress it (or trim to under 2 minutes) and try again.",
+          { duration: 12000 },
+        );
+      } else if (status === 402 && (detail?.code === "PREPAY_REQUIRED" || typeof detail === "object")) {
         toast.info(detail?.message || `Pay $${price} to upload your next video.`);
         await refreshEligibility();
       } else {
@@ -678,7 +699,7 @@ export default function UploadPage() {
                       <span className="block mt-1 text-forest font-bold">
                         Veo &amp; YouTube links can&apos;t be fetched directly — download the clip to your device, then use &ldquo;Upload File&rdquo; above.
                       </span>
-                      Max 200 MB · max 5 min.
+                      Max 95 MB · max 5 min.
                     </p>
                   </div>
                 )}

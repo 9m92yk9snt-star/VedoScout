@@ -26,7 +26,23 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 128 — Fast-path ffprobe fallback: Step 2 hang RCA + fix (Jul 03 2026)**:
+- ✅ **🆕 Session 129 — Root cause of IMG_7376 "Upload failed" identified: Emergent K8s ingress body cap (Jul 03 2026)**:
+  - **NOT a code mismatch, NOT a Session 128 regression.** Frontend/backend field names verified 100% aligned via raw line-by-line comparison (documented in PRD Session 128 evidence table).
+  - **RCA via direct production probe (`curl` against `https://scoutmeplay.com`)**:
+    - 90 MB body → HTTP 200 (ingress passes it through, backend responds normally)
+    - 110 MB body → **HTTP 413 Request Entity Too Large from `nginx/1.26.3`** (Emergent K8s ingress)
+    - Modern phone footage easily exceeds 100 MB: iPhone 4K@30fps = ~350 MB/min. A 1:20 clip = 470 MB.
+    - Frontend catch-all handler at `UploadPage.jsx:444` was showing generic "Upload failed. Please try again." for the 413 → user has no clue why.
+    - The old client-side guard was 200 MB — worse than useless since it lets through 100-200 MB files that the ingress then rejects, wasting minutes of upload time before the toast.
+  - **Fix (frontend-only, no backend change needed)**:
+    - `handleFile()` at L187-203 — hard-cap raised to 95 MB (5 MB safety margin under ingress) with a clear actionable toast: `"Video is X MB — our upload limit is 95 MB. Compress the clip (or trim to <2 min) and try again. Tip: iPhone → Settings › Camera › Record Video → 1080p HD at 30 fps."` (12s duration).
+    - Submit-error catch at L456-462 — dedicated 413 branch: `"That clip is over the 100 MB upload limit. Compress it (or trim to under 2 minutes) and try again."` (edge case for URL-fetched videos that bypass handleFile).
+    - Drop-zone hint text L702 — "Max 95 MB · max 5 min." (was 200 MB).
+  - **⚠️ Real solution (P2, next session)**: Direct-to-R2 presigned uploads bypass the ingress entirely (browser → R2 direct, backend receives only the URL). Removes the 100 MB cap and enables 1 GB+ files. Chunked uploads is another approach.
+  - **Files modified**:
+    - MODIFIED `/app/frontend/src/pages/UploadPage.jsx` L187-203, 456-462, 702.
+
+- ✅ **Session 128 — Fast-path ffprobe fallback: Step 2 hang RCA + fix (Jul 03 2026)**:
   - **RCA of IMG_7372 "Preparing the footage" 8+ min hang**: `_probe_video_codec()` in `server.py` L3276 called `FFPROBE_BIN` directly via subprocess. `imageio-ffmpeg` bundles ONLY `ffmpeg`, NOT `ffprobe`. When the Emergent K8s base image ships without system `ffprobe` (verified: `shutil.which('ffprobe')` returns `None` on this pod), the codec probe silently returns `("", "")` → the fast-path check `codec == "h264" and pix_fmt in ("yuv420p",...)` always evaluates False → every upload falls through to a full libx264 re-encode. On aarch64 K8s pods a 1:20 mobile clip re-encode takes 8+ min or subprocess-times-out at 180s and hangs the analysis pipeline at step 2.
   - **Fix**: 3-tier fallback in `media_binaries.py`:
     1. System `ffprobe` (CSV output, fastest).
