@@ -26,7 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 129 — Root cause of IMG_7376 "Upload failed" identified: Emergent K8s ingress body cap (Jul 03 2026)**:
+- ✅ **🆕 Session 130 — Full Premium vs Free experience separation: dedicated components on both UploadPage and ReportPage (Jul 03 2026)**:
+  - **Two new components created (no conditional hiding of shared layouts anymore)**:
+    - `/app/frontend/src/components/PremiumReadyBanner.jsx` — top-of-report banner rendered ONLY when `unlocked` is true. Displays: Crown "PREMIUM READY" pill · "✅ YOUR PREMIUM SCOUT REPORT IS READY" headline · "Your analysis has been completed successfully." sub-text (personalised with player name) · Technical/Tactical/Physical/Mentality strip · big volt "OPEN FULL PREMIUM REPORT" CTA that smooth-scrolls to `[data-testid=report-scores-grid]` · "Elite-tier access · Included in your plan" footer.
+    - `/app/frontend/src/components/PremiumReadyOverlay.jsx` — full-screen celebration modal shown on UploadPage completion for premium users. Same visual DNA as the banner (deliberate consistency) with additional player marker crop preview, spring-animated entrance, and a subtle "Close" dismiss. Sibling to `HeroTeaser` — the two never render simultaneously (branching in `handleSubmit` sets EITHER `heroReport` OR `premiumReadyReport`).
+  - **Wiring** — `UploadPage.jsx` L444-451 branches at completion: `skipHeroTeaser=false → setHeroReport(finalData)` (free tier), `skipHeroTeaser=true → setPremiumReadyReport(finalData)` (paid tier). Same branch mirrored in the manual "View Report" click handler (L515-524). `ReportPage.jsx` L2002-2014 renders `PremiumReadyBanner` wrapped in `{unlocked && (...)}` at the very top of the report container.
+  - **Free tier is unchanged and still works**: HeroTeaser + LockedOverlay > PricingCards flow verified live (Session 126). Zero legacy "$159" button, zero "Unlock full premium report" string. Full test cloned an admin report to `free@elitescout.com` and verified `PremiumReadyBanner` is absent + `pricing-card-single` + `pricing-card-pass` are present.
+  - **Player image (Task 3)**: Confirmed working via existing Session 125 R2 proxy resolvers — marker JPEG renders with naturalWidth=720, HTTP 200 from `/api/media/reports/.../<id>-marker.jpg`, content-length 291 KB. Same URL used by both the report page's "YOUR PLAYER · TRACKED" card AND the new `PremiumReadyOverlay.jsx` player-image slot.
+  - **Verified via `testing_agent_v3_fork` iteration_57 — 7/7 PASS**: (1) banner testids + copy + smooth-scroll, (2) 0 blur + 0 LockedOverlay for admin, (3) marker naturalWidth=720, (4) overlay source + bundle contains all testids/copy (component not visually triggerable without a real upload + Gemini wait — verified statically instead), (5) free-tier LockedOverlay > PricingCards intact + banner absent, (6) S125 R2 proxy still 200, (7) S128 fast-path healthy — 0 reports stuck at step 2.
+  - **Files modified**:
+    - NEW `/app/frontend/src/components/PremiumReadyOverlay.jsx`
+    - NEW `/app/frontend/src/components/PremiumReadyBanner.jsx`
+    - MODIFIED `/app/frontend/src/pages/UploadPage.jsx` — import + state + branching in handleSubmit + view-report handler + JSX sibling render.
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx` — import + top-of-report banner render gated on `unlocked`.
+
+- ✅ **Session 129 — Root cause of IMG_7376 "Upload failed" identified: Emergent K8s ingress body cap (Jul 03 2026)**:
   - **NOT a code mismatch, NOT a Session 128 regression.** Frontend/backend field names verified 100% aligned via raw line-by-line comparison (documented in PRD Session 128 evidence table).
   - **RCA via direct production probe (`curl` against `https://scoutmeplay.com`)**:
     - 90 MB body → HTTP 200 (ingress passes it through, backend responds normally)
