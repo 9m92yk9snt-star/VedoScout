@@ -26,7 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 125 — 3 UI/Logic Regressions Fixed: marker image + premium unlock + timers hidden for paid (Jul 03 2026)**:
+- ✅ **🆕 Session 126 — Premium Report UX Overhaul + Free-tier PricingCards (Jul 03 2026)**:
+  - **Auto-generate full report for premium tier on mount** — added `autoGenTriggeredRef` useEffect at `ReportPage.jsx` L1691-1727. When admin/premium/vip/scout opens a report that is unlocked but has no `full_report`, the effect fires `POST /reports/{id}/generate-full` + polls to completion. StrictMode-safe via useRef guard (verified exactly one POST per page load).
+  - **PREMIUM ACCESS branded panels** — replaced the plain "Report unlocked · Generate full report" CTA with two new panels: `[data-testid=premium-access-panel]` (Crown icon, "PREMIUM ACCESS" label, "Your Full Scout Dossier" heading, "OPEN FULL SCOUT DOSSIER" volt-CTA button) shown when unlocked && !full_report && !generatingFull, and `[data-testid=premium-generating-panel]` shown during Gemini generation. Both feature volt/forest gradient blobs + shadow glow.
+  - **LockedOverlay now embeds PricingCards** — swapped the legacy single-price/$-USD/Unlock-Full-Premium-Report form for the same `<PricingCards variant="landing" />` used on the landing page. Free users now see the 2-tier layout ($129 Single + $399 12-month Pass) with "Choose your scout package" header, "Most parents pick this" ribbon, PDF report checklist, and 48h delivery / Real scouts / Stripe badges — brand-consistent with landing.
+  - **Verified via `testing_agent_v3_fork` iteration_56 — 7/7 PASS**: (1) auto-gen fires exactly 1× per mount, (2) PREMIUM ACCESS panel renders correctly with all copy + open-full-dossier-btn testid, (3) admin sees full unblurred report with 0 LockedOverlay + 0 legacy CTAs, (4) free user sees locked-overlay > pricing-cards > pricing-card-single + pricing-card-pass with correct prices, (5) legacy `generate-full-report-btn` + `unlock-report-btn` selectors completely removed from DOM, (6) Session 125 marker image regression stays fixed, (7) auto-gen guard survives React 18 StrictMode.
+  - **Files modified**:
+    - MODIFIED `/app/frontend/src/pages/ReportPage.jsx`:
+      - L18-25 — added Crown, Sparkles lucide icons + PricingCards import.
+      - L1580-1608 — LockedOverlay rebuilt as thin wrapper around PricingCards.
+      - L1691-1727 — new autoGenTriggeredRef useEffect for premium auto-gen.
+      - L2589 — LockedOverlay call now only passes `isLoggedIn={!!user}`.
+      - L3166-3224 — 2 new premium branded panels replacing legacy CTA.
+    - NEW `/app/backend/tests/seed_iter56.py` — idempotent seed/cleanup helper for future frontend testing.
+
+- ✅ **Session 125 — 3 UI/Logic Regressions Fixed: marker image + premium unlock + timers hidden for paid (Jul 03 2026)**:
   - **Fix 1 — Missing player image**. RCA: pod-local `/uploads/{report_id}-marker.jpg` + `{report_id}-subject.jpg` were evicted after K8s pod rollover (ephemeral disk); DB pointed at `/api/uploads/{filename}` → 404 → white box on report page. Only video.mp4 + poster.jpg were flushed to R2. Fix: added marker + subject_crop R2-upload blocks inside `_flush_preview_artifacts_to_r2` (server.py L5136-5159, idempotent via `_url_override` guard); added `_resolve_marker_url` / `_resolve_subject_crop_url` helpers (L4559 / L4574) that prefer R2 override, fall back to legacy `/api/uploads/`. Wired into `/api/reports/{id}`, `/api/reports/{id}/status`, `_serialize_report`, admin agent-review listing. Ran `/app/backend/tests/backfill_r2_marker.py` on **25 legacy reports** to flush their JPEGs to R2.
   - **Fix 2 — Blurred report for premium/VIP users**. RCA: `ReportPage.jsx` L1910 gate was `is_paid || manually_unlocked || user?.role === 'admin'` — premium/vip/scout roles hit the paywall/blur overlay. Fix: added `premiumRole = ['admin','premium','vip','scout'].includes(user?.role)`, then `unlocked = is_paid || manually_unlocked || premiumRole` (L1910-1911). One-line change, used 15+ times downstream.
   - **Fix 3 — Elapsed timer visible to paid users**. RCA: `PrecisionScanOverlay` unconditionally rendered `Elapsed · MM:SS`. Fix: added `hideTimers` prop (default false); when true renders `Working in the background` label instead. `UploadPage.jsx` derives `isPaidTier` from same role whitelist and passes `hideTimers={isPaidTier}` to overlay.
