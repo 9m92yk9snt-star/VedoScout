@@ -168,25 +168,25 @@ class TestG2_ContentGateSkipPaid:
 
 
 # ═════════════════════════════════════════════════════════════════
-# G3 — explicit LiteLLM timeout=240 + asyncio.wait_for=300
+# G3 — explicit LiteLLM timeout + asyncio.wait_for
+# NOTE (Session 124): timeouts tightened 240 → 150 s (httpx) and
+# 300 → 180 s (asyncio) so worst-case retry is 6 min not 10.
 # ═════════════════════════════════════════════════════════════════
 class TestG3_LiteLLMTimeout:
-    def test_extra_params_timeout_240(self):
+    def test_extra_params_timeout_150(self):
         src = SERVER_PY.read_text()
-        # Loose match — both "chat.extra_params =" and "timeout": 240.0 within 200 chars
-        pat = re.compile(r'chat\.extra_params\s*=.{0,200}"timeout":\s*240\.0', re.DOTALL)
-        assert pat.search(src), "chat.extra_params timeout=240.0 assignment missing"
+        pat = re.compile(r'chat\.extra_params\s*=.{0,200}"timeout":\s*150\.0', re.DOTALL)
+        assert pat.search(src), "chat.extra_params timeout=150.0 assignment missing (Session 124)"
 
-    def test_asyncio_wait_for_timeout_300(self):
+    def test_asyncio_wait_for_timeout_180(self):
         src = SERVER_PY.read_text()
-        # Match asyncio.wait_for(chat.send_message(...), timeout=300)
-        pat = re.compile(r"asyncio\.wait_for\(\s*chat\.send_message\([^\)]*\)\s*,\s*timeout=300\)")
-        assert pat.search(src), "asyncio.wait_for(chat.send_message(...), timeout=300) missing"
+        pat = re.compile(r"asyncio\.wait_for\(\s*chat\.send_message\([^\)]*\)\s*,\s*timeout=180\)")
+        assert pat.search(src), "asyncio.wait_for(chat.send_message(...), timeout=180) missing (Session 124)"
 
     def test_extra_params_before_wait_for(self):
-        """Ordering: extra_params timeout=240 MUST come BEFORE asyncio.wait_for(..., 300)."""
+        """Ordering: extra_params timeout=150 MUST come BEFORE asyncio.wait_for(..., 180)."""
         src = SERVER_PY.read_text()
-        i_ep = src.find('"timeout": 240.0')
+        i_ep = src.find('"timeout": 150.0')
         i_wf = src.find("asyncio.wait_for(chat.send_message")
         assert 0 < i_ep < i_wf, (
             f"ordering wrong: extra_params idx={i_ep}, wait_for idx={i_wf} — must be extra_params first"

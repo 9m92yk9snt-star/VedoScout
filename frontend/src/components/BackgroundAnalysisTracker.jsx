@@ -166,6 +166,14 @@ export default function BackgroundAnalysisTracker() {
               Step {step} of 5 · Analyzing
             </div>
             <div className="text-[13px] font-bold text-cream-card truncate leading-tight">{label}</div>
+            {status?.retry_in_progress && (
+              <div
+                className="mt-1 text-[10px] text-amber-300/90 leading-tight italic"
+                data-testid="bg-analysis-retry-hint"
+              >
+                Prøver igen for bedste kvalitet…
+              </div>
+            )}
             <div className="mt-1.5 h-1 bg-white/15 overflow-hidden rounded-full">
               <div
                 className="h-full bg-gradient-to-r from-forest via-forest-pop to-volt transition-all duration-700"

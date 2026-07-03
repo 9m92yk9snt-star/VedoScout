@@ -2758,8 +2758,10 @@ async def call_gemini_with_video(
     try:
         # LiteLLM accepts a `timeout` kwarg on acompletion — we plumb it via
         # extra_params which _build_completion_params merges into the final call.
-        chat.extra_params = {**(chat.extra_params or {}), "timeout": 240.0}
-        response = await asyncio.wait_for(chat.send_message(user_message), timeout=300)
+        # Session 124: tightened from 240 → 150 s (httpx socket timeout) and
+        # 300 → 180 s (asyncio outer cancel) so worst-case retry is 6 min not 10.
+        chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0}
+        response = await asyncio.wait_for(chat.send_message(user_message), timeout=180)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
         raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
@@ -2797,15 +2799,52 @@ async def call_gemini_with_video(
             "commentary."
         ),
     ).with_model("gemini", "gemini-2.5-pro")
-    retry_chat.extra_params = {"timeout": 240.0}
+    retry_chat.extra_params = {"timeout": 150.0}
     retry_message = UserMessage(text=strict_prompt, file_contents=file_contents)
+
+    # Session 124: retry-transparency — surface to the frontend that we are
+    # doing a second attempt. The parent `analyze_preview_task` scope has the
+    # report_id available; we read it from the session_id which follows the
+    # convention `gate-{report_id}` / `preview-{report_id}` / `full-{report_id}`.
+    _report_id = None
+    for prefix in ("gate-", "preview-", "full-"):
+        if session_id.startswith(prefix):
+            _report_id = session_id[len(prefix):]
+            break
+    if _report_id:
+        try:
+            await db.reports.update_one(
+                {"id": _report_id},
+                {"$set": {"retry_in_progress": True, "retry_started_at": now_iso()}},
+            )
+        except Exception as e:
+            logger.warning(f"could not set retry flag for {_report_id}: {e}")
+
     try:
-        retry_response = await asyncio.wait_for(retry_chat.send_message(retry_message), timeout=300)
+        retry_response = await asyncio.wait_for(retry_chat.send_message(retry_message), timeout=180)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video retry timeout (session={session_id})")
+        if _report_id:
+            try:
+                await db.reports.update_one(
+                    {"id": _report_id},
+                    {"$set": {"retry_in_progress": False}},
+                )
+            except Exception:
+                pass
         raise HTTPException(status_code=504, detail="AI analysis timed out on retry. Please try again with a shorter clip.")
 
     retry_text = retry_response if isinstance(retry_response, str) else str(retry_response)
+    # Clear the retry flag regardless of whether the parse succeeds — the
+    # network round-trip is over, we just don't know yet if the payload is good.
+    if _report_id:
+        try:
+            await db.reports.update_one(
+                {"id": _report_id},
+                {"$set": {"retry_in_progress": False}},
+            )
+        except Exception:
+            pass
     try:
         parsed = extract_json(retry_text)
         logger.info(f"Gemini response parsed on RETRY (session={session_id})")
@@ -4543,6 +4582,10 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         "status": analysis_status,
         "progress_step": step,
         "error": error,
+        # Session 124 — surface retry state to the frontend so the pill/overlay
+        # can show a "Prøver igen for bedste kvalitet…" hint instead of looking
+        # like it's silently hanging when the second Gemini attempt is running.
+        "retry_in_progress": bool(doc.get("retry_in_progress")),
         # Full-report generation runs as its own background task after the
         # preview is ready; the frontend polls this same endpoint and just
         # reads `full_report_status` so it can show the right loading state.
