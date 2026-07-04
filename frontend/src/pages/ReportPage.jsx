@@ -15,6 +15,7 @@ import PerformanceRadarHero from "@/components/report/PerformanceRadarHero";
 import SkillsBreakdown from "@/components/report/SkillsBreakdown";
 import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { isPremiumUser } from "@/lib/premium";
 import {
   Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles,
 } from "lucide-react";
@@ -1689,7 +1690,7 @@ export default function ReportPage() {
   const autoGenTriggeredRef = useRef(false);
   useEffect(() => {
     if (!report || generatingFull || autoGenTriggeredRef.current) return;
-    const premiumRoleNow = ["admin", "premium", "vip", "scout"].includes(user?.role);
+    const premiumRoleNow = isPremiumUser(user);
     const alreadyUnlocked = report.is_paid || report.manually_unlocked || premiumRoleNow;
     const needsFullReport = alreadyUnlocked && !report.full_report;
     // Don't auto-fire if the backend is already generating (e.g. right after
@@ -1934,7 +1935,7 @@ export default function ReportPage() {
   if (!report) return null;
 
   const { preview, full_report, player_details, video_url, poster_url, marker_url, fingerprint, is_paid, manually_unlocked, content_gate, trial_readiness, archetype, age_profile_reference, statsbomb_calibration, age_intelligence, statsbomb_calibration_gated_message, trial_readiness_gated_message } = report;
-  const premiumRole = ["admin", "premium", "vip", "scout"].includes(user?.role);
+  const premiumRole = isPremiumUser(user);
   const unlocked = is_paid || manually_unlocked || premiumRole;
 
   const radarData = full_report ? [

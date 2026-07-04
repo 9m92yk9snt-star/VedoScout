@@ -11,6 +11,7 @@ import MarkerStudio from "@/components/MarkerStudio";
 import HeroTeaser from "@/components/HeroTeaser";
 import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
+import { isPremiumUser } from "@/lib/premium";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
@@ -18,7 +19,7 @@ import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, Al
 
 export default function UploadPage() {
   const { user } = useAuth();
-  const isPaidTier = ["admin", "premium", "vip", "scout"].includes(user?.role);
+  const isPaidTier = isPremiumUser(user);
   const [searchParams, setSearchParams] = useSearchParams();
   const [eligibility, setEligibility] = useState(null);   // { eligible, reason, free_preview_used, prepaid_uploads }
   const [eligibilityLoading, setEligibilityLoading] = useState(true);
@@ -436,7 +437,13 @@ export default function UploadPage() {
       // they still have full access via their role. Bundle the check into the
       // ref so both the timer-driven path AND the manual "View report" click
       // route them straight to the premium celebration screen.
-      const skipHeroTeaser = isPaidTier || eligibility?.reason === "prepaid";
+      // Subscription-based premium (reason "subscription") and any report the
+      // backend already marked paid must ALSO bypass the free-tier HeroTeaser.
+      const skipHeroTeaser =
+        isPaidTier ||
+        eligibility?.reason === "prepaid" ||
+        eligibility?.reason === "subscription" ||
+        !!finalData?.is_paid;
       pendingDoneRef.current = { data: finalData, skipHeroTeaser };
       await new Promise((r) => setTimeout(r, 1800));
       if (!pendingDoneRef.current) return;
@@ -551,9 +558,8 @@ export default function UploadPage() {
           if (target) navigate(`/report/${target}`);
         }}
         onDismiss={() => {
-          const target = premiumReadyReport?.id;
           setPremiumReadyReport(null);
-          if (target) navigate(`/report/${target}`);
+          navigate("/dashboard");
         }}
       />
       <MarkerStudio

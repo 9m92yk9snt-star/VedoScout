@@ -644,36 +644,45 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
           ? "dashboard-upgrade-banner-at-limit"
           : "dashboard-upgrade-banner"
       }
-      className="mt-10 relative overflow-hidden bg-cream-card border border-gray-border p-5 md:p-7"
+      className={`mt-10 relative overflow-hidden p-5 md:p-7 ${
+        isAtLimit ? "border border-[#F5C443]/25 text-white" : "bg-cream-card border border-gray-border"
+      }`}
     >
-      <div className="flex items-center gap-2 mb-3">
+      {isAtLimit && (
+        <>
+          <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url(/assets/premium-dash-gold.jpg)" }} />
+          <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-[#06120B]/[0.97] via-[#06120B]/90 to-[#06120B]/75" />
+          <div aria-hidden className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#F5C443]/70 to-transparent" />
+        </>
+      )}
+      <div className="relative flex items-center gap-2 mb-3">
         <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
           <span className={`absolute inset-0 rounded-full ${isAtLimit ? "bg-[#F5C443]" : "bg-volt"} animate-ping opacity-75`} />
           <span className={`relative rounded-full w-1.5 h-1.5 ${isAtLimit ? "bg-[#F5C443]" : "bg-volt"}`} />
         </span>
-        <span className="text-forest text-[10px] uppercase tracking-[0.28em] font-bold">
+        <span className={`text-[10px] uppercase tracking-[0.28em] font-bold ${isAtLimit ? "text-[#F5C443]" : "text-forest"}`}>
           {isAtLimit
-            ? `${extraTierLabel} limit reached · ${usedThisPeriod} / ${monthlyLimit} this month`
+            ? `${extraTierLabel} quota · ${usedThisPeriod} / ${monthlyLimit} reports used this month`
             : "Unlock your full potential"}
         </span>
       </div>
-      <h2 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter text-ink leading-[0.95]">
+      <h2 className={`relative font-barlow font-black uppercase text-2xl md:text-3xl tracking-tighter leading-[0.95] ${isAtLimit ? "text-white" : "text-ink"}`}>
         {isAtLimit ? (
-          <>Need more reports?<br /><span className="text-forest">Buy 1 extra{extraPrice ? <> · <span className="text-volt">${extraPrice}</span></> : null}</span></>
+          <>Keep the momentum.<br /><span className="bg-gradient-to-r from-[#F5C443] to-[#FFE08A] bg-clip-text text-transparent">Add one extra report{extraPrice ? <> · <span className="text-[#CCFF00]">${extraPrice}</span></> : null}</span></>
         ) : (
           <>Ready for more?<br /><span className="text-forest">Upgrade your plan.</span></>
         )}
       </h2>
-      <p className="mt-2 text-sm text-ink/65 max-w-xl">
+      <p className={`relative mt-2 text-sm max-w-xl ${isAtLimit ? "text-white/70" : "text-ink/65"}`}>
         {isVipAtLimit
-          ? `You've used all ${monthlyLimit} VIP reports this month. Buy 1 extra at your subscriber rate — cheaper than the single-report price. Quota resets next billing cycle.`
+          ? `All ${monthlyLimit} VIP reports used — that's elite-level commitment. Add one extra at your private VIP rate and keep the scouts watching. Quota resets next billing cycle.`
           : isPremiumAtLimit
-          ? `You've used all ${monthlyLimit} Premium reports this month. Buy 1 extra at your subscriber rate — or step up to VIP for 4 reports/month and the deepest per-report discount.`
+          ? `All ${monthlyLimit} Premium reports used — proof you're putting in the work. Add one extra at your private member rate, or step up to VIP for 4 reports a month and a real scout's eyes on your game.`
           : "You're on the Free plan. Upgrade for more uploads, advanced AI analysis, and (with VIP) a real scout reviewing your video."}
       </p>
 
       {isAtLimit ? (
-        <div className={`mt-5 grid gap-3 ${isPremiumAtLimit ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+        <div className={`relative mt-5 grid gap-3 ${isPremiumAtLimit ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
           {/* Buy-1-extra-report card — primary action for at-limit subscribers */}
           <button
             type="button"
@@ -737,7 +746,7 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
           )}
         </div>
       ) : (
-        <div className="mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2">
+        <div className="relative mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2">
         {/* Premium mini-card — hidden when Premium user has hit the limit */}
         <button
           type="button"
@@ -800,8 +809,8 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
       </div>
       )}
 
-      <p className="mt-3 text-[10px] uppercase tracking-[0.18em] font-bold text-ink/45 flex items-center gap-1.5">
-        <Lock className="w-3 h-3 text-forest" />
+      <p className={`relative mt-3 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center gap-1.5 ${isAtLimit ? "text-white/50" : "text-ink/45"}`}>
+        <Lock className={`w-3 h-3 ${isAtLimit ? "text-[#F5C443]" : "text-forest"}`} />
         Secure Stripe · Cancel anytime from your dashboard
       </p>
     </div>
@@ -856,35 +865,50 @@ function SubscriptionCard({ subscription, tiers, onChange }) {
   return (
     <div
       data-testid="dashboard-subscription-card"
-      className={`mt-10 relative overflow-hidden border p-5 md:p-7 grid md:grid-cols-3 gap-5 items-center ${
-        isVip ? "bg-[#0A0F0D] border-[#1F2724] text-white" : "bg-[#0F3A22] border-forest text-white"
-      }`}
+      className="mt-10 relative overflow-hidden border border-[#F5C443]/25 text-white"
     >
-      <div className="md:col-span-2">
-        <div className="flex items-center gap-2 mb-1">
-          {isVip ? <Crown className="w-4 h-4 text-[#F5C443]" fill="#F5C443" /> : <TrendingUp className="w-4 h-4 text-[#CCFF00]" />}
-          <span className={`text-[10px] uppercase tracking-[0.22em] font-bold ${isVip ? "text-[#F5C443]" : "text-[#CCFF00]"}`}>
-            Your subscription · {subscription.status}
-          </span>
-        </div>
-        <h3 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tight">
-          {isVip ? "VIP Premium" : "Premium"}
-        </h3>
-        <p className="mt-1 text-sm text-white/70">
-          ${conf.amount?.toFixed(2) ?? "—"} / month ·{" "}
-          {isVip
-            ? "4 reports per month, scout review, direct contact, deepest discount"
-            : `${conf.monthly_upload_limit ?? "—"} uploads per month, advanced AI analysis`}
-        </p>
-        {periodEnd && (
-          <p className={`mt-3 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] font-bold px-2.5 py-1 ${
-            willCancel ? "bg-amber-500/20 text-amber-200" : "bg-white/10 text-white/85"
-          }`}>
-            <Calendar className="w-3 h-3" />
-            {willCancel ? `Ends on ${periodEnd}` : `Next billing ${periodEnd}`}
+      {/* Nano Banana gold pitch texture + tier-tinted overlay */}
+      <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url(/assets/premium-dash-gold.jpg)" }} />
+      <div aria-hidden className={`absolute inset-0 ${isVip ? "bg-gradient-to-r from-[#050807]/[0.97] via-[#050807]/90 to-[#050807]/70" : "bg-gradient-to-r from-[#06180E]/[0.97] via-[#06180E]/90 to-[#06180E]/70"}`} />
+      <div aria-hidden className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#F5C443]/70 to-transparent" />
+
+      <div className="relative p-6 md:p-8 grid md:grid-cols-3 gap-6 items-center">
+        <div className="md:col-span-2">
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <span className="w-8 h-8 flex items-center justify-center border border-[#F5C443]/40 bg-[#F5C443]/10">
+              <Crown className="w-4 h-4 text-[#F5C443]" fill="#F5C443" />
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.3em] font-black text-[#F5C443]">
+              Active plan · {subscription.status}
+            </span>
+          </div>
+          <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tight leading-none">
+            {isVip
+              ? <>VIP <span className="bg-gradient-to-r from-[#F5C443] to-[#FFE08A] bg-clip-text text-transparent">Premium</span></>
+              : <>Premium <span className="text-[#CCFF00]">Member</span></>}
+          </h3>
+          <p className="mt-2 text-sm text-white/70">
+            ${conf.amount?.toFixed(2) ?? "—"} / month — full scout-grade analysis on every upload.
           </p>
-        )}
-      </div>
+          <div className="mt-3.5 flex flex-wrap gap-2">
+            {(isVip
+              ? ["4 reports / month", "Real scout review", "Direct contact", "Deepest discount"]
+              : [`${conf.monthly_upload_limit ?? "—"} reports / month`, "Advanced AI analysis", "Full premium dossier"]
+            ).map((perk) => (
+              <span key={perk} className="inline-flex items-center gap-1.5 border border-white/15 bg-white/[0.06] px-3 py-1 text-[10px] uppercase tracking-[0.18em] font-bold text-white/80">
+                <CheckCircle2 className={`w-3 h-3 ${isVip ? "text-[#F5C443]" : "text-[#CCFF00]"}`} /> {perk}
+              </span>
+            ))}
+          </div>
+          {periodEnd && (
+            <p className={`mt-4 inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] font-bold px-2.5 py-1 ${
+              willCancel ? "bg-amber-500/20 text-amber-200" : "bg-white/10 text-white/85"
+            }`}>
+              <Calendar className="w-3 h-3" />
+              {willCancel ? `Ends on ${periodEnd}` : `Next billing ${periodEnd}`}
+            </p>
+          )}
+        </div>
 
       <div className="flex flex-col gap-2 md:items-end">
         {isActive && !willCancel && (
@@ -938,6 +962,7 @@ function SubscriptionCard({ subscription, tiers, onChange }) {
             ${otherConf.amount.toFixed(2)}/mo · proration applied
           </p>
         )}
+        </div>
       </div>
     </div>
   );

@@ -2004,6 +2004,10 @@ class UserPublic(BaseModel):
     role: str
     created_at: str
     is_paid_scout: bool = False  # True when user.scout_access.active is True
+    # Active subscription tier ("premium" / "vip") or None — lets the frontend
+    # recognise subscription-based premium users whose role is still "user"
+    # (e.g. admin-granted Premium/VIP accounts).
+    subscription_tier: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -3573,6 +3577,7 @@ async def login(payload: UserLogin, request: Request):
             role=user["role"],
             created_at=user["created_at"],
             is_paid_scout=is_paid_scout,
+            subscription_tier=_has_active_subscription(user),
         ),
     )
 
@@ -3687,6 +3692,7 @@ async def reset_password(payload: ResetPasswordRequest, request: Request):
             role=user["role"],
             created_at=user["created_at"],
             is_paid_scout=is_paid_scout,
+            subscription_tier=_has_active_subscription(user),
         ),
     )
 
@@ -3701,6 +3707,7 @@ async def me(user=Depends(get_current_user)):
         role=user["role"],
         created_at=user["created_at"],
         is_paid_scout=is_paid_scout,
+        subscription_tier=_has_active_subscription(user),
     )
 
 
