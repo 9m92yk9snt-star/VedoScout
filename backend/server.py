@@ -2771,6 +2771,37 @@ async def call_gemini_with_video(
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
         raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
+    except Exception as e:
+        # Session 132 — Emergent LLM Key budget exhausted / provider quota / auth.
+        # BudgetExceededError from litellm surfaces as a plain Exception here (the
+        # emergentintegrations proxy re-raises upstream errors). Detect by message
+        # so we're not tied to a specific class import path, and convert to a
+        # clean user-visible HTTPException the pipeline can catch and refund.
+        msg = str(e)
+        low = msg.lower()
+        if (
+            "budget has been exceeded" in low
+            or "budgetexceedederror" in low
+            or "insufficient_quota" in low
+            or "quota" in low and "exceed" in low
+        ):
+            logger.error(
+                f"[llm-budget] Emergent LLM Key balance depleted "
+                f"(session={session_id}). Raw: {msg[:300]}. "
+                f"ACTION FOR OPERATOR: top up at Profile → Universal Key → Add Balance."
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Our AI service is temporarily unavailable while we top up "
+                    "capacity. Please try again in a few minutes — your credit "
+                    "has been refunded."
+                ),
+            )
+        # Unknown error — bubble up so the outer catch in analyze_preview_task
+        # marks the report failed and refunds. Keep original stack for logs.
+        logger.exception(f"call_gemini_with_video unexpected error (session={session_id}): {msg[:300]}")
+        raise
     response_text = response if isinstance(response, str) else str(response)
 
     # First parse attempt — the tolerant extract_json handles fenced code
@@ -2839,6 +2870,37 @@ async def call_gemini_with_video(
             except Exception:
                 pass
         raise HTTPException(status_code=504, detail="AI analysis timed out on retry. Please try again with a shorter clip.")
+    except Exception as e:
+        # Session 132 — same budget/quota detection on retry path.
+        msg = str(e)
+        low = msg.lower()
+        if _report_id:
+            try:
+                await db.reports.update_one(
+                    {"id": _report_id},
+                    {"$set": {"retry_in_progress": False}},
+                )
+            except Exception:
+                pass
+        if (
+            "budget has been exceeded" in low
+            or "budgetexceedederror" in low
+            or "insufficient_quota" in low
+            or ("quota" in low and "exceed" in low)
+        ):
+            logger.error(
+                f"[llm-budget] Emergent LLM Key balance depleted on retry "
+                f"(session={session_id}). Raw: {msg[:300]}"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Our AI service is temporarily unavailable while we top up "
+                    "capacity. Please try again in a few minutes — your credit "
+                    "has been refunded."
+                ),
+            )
+        raise
 
     retry_text = retry_response if isinstance(retry_response, str) else str(retry_response)
     # Clear the retry flag regardless of whether the parse succeeds — the
@@ -5046,12 +5108,20 @@ async def analyze_preview_task(report_id: str):
             asyncio.create_task(generate_full_report_task(report_id))
     except Exception as e:
         logger.exception(f"analyze_preview_task failed for {report_id}")
+        # Session 132 — surface the *clean* detail message when the failure was
+        # a curated HTTPException (budget exhausted, timeout, retry-parse). Only
+        # fall back to stringifying `e` for uncurated exceptions.
+        if isinstance(e, HTTPException) and getattr(e, "detail", None):
+            user_msg = str(e.detail)[:400]
+        else:
+            user_msg = f"AI preview generation failed: {str(e)[:200]}"
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
                 "analysis_status": "failed",
-                "analysis_error": f"AI preview generation failed: {str(e)[:200]}",
+                "analysis_error": user_msg,
                 "progress_step": 5,
+                **_wd_heartbeat(step=5),
             }},
         )
         try:

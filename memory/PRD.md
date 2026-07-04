@@ -26,7 +26,21 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
-- ✅ **🆕 Session 131 — Permanent fix for recurring "stuck at step 4" bug: analysis pipeline watchdog (Jul 03 2026)**:
+- ✅ **🆕 Session 132 — Graceful handling of Emergent LLM Key budget exhaustion (Jul 04 2026)**:
+  - **Investigation finding**: The `"Budget has been exceeded! Current cost: 15.07, Max budget: 15.0"` error is NOT hardcoded in our codebase. It originates from **`litellm.utils.py:1159` inside the Emergent LLM proxy server** — the Universal Key's balance is set on Emergent's server-side, not ours. `litellm.max_budget` is `0.0` in our env (verified). Grep of both `emergentintegrations` and `server.py` for `max_budget` returned zero matches. **Fix requires the operator to top up at Profile → Universal Key → Add Balance** — I cannot patch a server we don't own.
+  - **What I CAN and DID fix**: turn the raw litellm exception into a clean, user-friendly experience so the report doesn't hang and users don't see technical strings like "Current cost: 15.07":
+    - Added `Exception` catch in `call_gemini_with_video` (primary path L2771-2802) that detects budget-signal strings (`"budget has been exceeded"`, `"budgetexceedederror"`, `"insufficient_quota"`, and `"quota" ∧ "exceed"`) via case-insensitive substring match — resilient to future litellm phrasing changes. Converts to HTTP 503 with copy: *"Our AI service is temporarily unavailable while we top up capacity. Please try again in a few minutes — your credit has been refunded."*
+    - Same catch mirrored on the retry path (L2860-2905) — clears the `retry_in_progress` DB flag before raising so the frontend doesn't display a stale spinner.
+    - Improved `analyze_preview_task` outer catch (L5109-5127) to extract the CLEAN `HTTPException.detail` instead of stringifying `"AI preview generation failed: 503: ..."`. Users now see the friendly message verbatim.
+    - Structured operator-facing log: `[llm-budget] Emergent LLM Key balance depleted (session=...). ACTION FOR OPERATOR: top up at Profile → Universal Key → Add Balance.` — turns the next occurrence into a one-line signal.
+  - **Refund guarantee**: since the 503 bubbles into `analyze_preview_task`'s catch, the existing `_refund_upload_eligibility(report_id)` fires automatically — the user's upload credit is restored so they can retry after the operator tops up.
+  - **Regression tests**: `/app/backend/tests/test_budget_error_handling.py` — 3/3 PASS covering (1) budget error → 503 with clean detail (no litellm strings leak), (2) unrelated exceptions bubble up unchanged, (3) budget-signal string-matcher accepts 4 variants + rejects 4 false-positives (rate-limit, timeout, JSON errors).
+  - **⚠️ Note for the user**: to make analyses succeed again, top up the Emergent LLM Key. This code fix ensures the failure is GRACEFUL, but does not add balance — that's a platform-side action only you can take.
+  - **Files modified**:
+    - MODIFIED `/app/backend/server.py` — L2771-2802 (primary budget catch), L2860-2905 (retry budget catch), L5109-5127 (clean detail extraction in outer catch).
+    - NEW `/app/backend/tests/test_budget_error_handling.py` — 3 regression tests.
+
+- ✅ **Session 131 — Permanent fix for recurring "stuck at step 4" bug: analysis pipeline watchdog (Jul 03 2026)**:
   - **RCA of the recurring "Watching Every Touch" hang**: `background.add_task(...)` and `asyncio.create_task(...)` are IN-MEMORY only. When the FastAPI worker restarts mid-analysis — deploy rollout, hot-reload on code edit, OOM kill, k8s pod cycle, `supervisorctl restart backend`, or the process crashes — the in-flight `analyze_preview_task` disappears without a trace. The Mongo doc stays at `analysis_status="analyzing"` + `progress_step=4` FOREVER because there was no watchdog to detect the orphan. This is why the bug keeps returning: any code edit triggering uvicorn hot-reload kills active analyses.
   - **Permanent fix — 3-layer defence in `/app/backend/analysis_watchdog.py`**:
     1. **Heartbeat** (`heartbeat()` / `stamp_progress()`): every progress-step transition now writes `last_progress_at` ISO timestamp alongside `progress_step`. Wired into all 4 in-flight transitions in `server.py` (step 1→2, 2→3, 3→4, 4→5).
