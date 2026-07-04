@@ -72,9 +72,9 @@ def test_subscription_shape_free_user(free_token):
         assert t in tiers, f"tier {t} missing"
         assert "amount" in tiers[t], f"amount missing for {t}"
         assert "monthly_upload_limit" in tiers[t], f"monthly_upload_limit missing for {t}"
-    # Premium 5, VIP unlimited (None) — sanity
-    assert tiers["premium"]["monthly_upload_limit"] == 5
-    assert tiers["vip"]["monthly_upload_limit"] in (None, 0) or tiers["vip"]["monthly_upload_limit"] > 5
+    # Premium 2/month, VIP 4/month — current product spec
+    assert tiers["premium"]["monthly_upload_limit"] == 2
+    assert tiers["vip"]["monthly_upload_limit"] == 4
     # Free user: no subscription → usage null
     assert data["subscription"] is None, f"free user should have subscription=null: {data['subscription']}"
     assert data["usage"] is None, f"free user should have usage=null but got {data['usage']}"

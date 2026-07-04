@@ -8337,7 +8337,8 @@ async def get_upload_eligibility(user=Depends(get_current_user)):
         tier_conf = SUBSCRIPTION_TIERS.get(sub_tier, {})
         limit = tier_conf.get("monthly_upload_limit")  # None = unlimited
         # Count how many uploads in the current billing period
-        period_start = (user.get("subscription") or {}).get("current_period_start") or now_iso()
+        _sub = user.get("subscription") or {}
+        period_start = _sub.get("current_period_start") or _sub.get("started_at") or now_iso()
         used = await db.reports.count_documents({
             "user_id": user["id"],
             "created_at": {"$gte": period_start},
@@ -8609,7 +8610,8 @@ async def get_my_subscription(user=Depends(get_current_user)):
     if sub_tier:
         tier_conf = SUBSCRIPTION_TIERS.get(sub_tier, {})
         limit = tier_conf.get("monthly_upload_limit")  # None = unlimited
-        period_start = (user.get("subscription") or {}).get("current_period_start") or now_iso()
+        _sub2 = user.get("subscription") or {}
+        period_start = _sub2.get("current_period_start") or _sub2.get("started_at") or now_iso()
         used = await db.reports.count_documents({
             "user_id": user["id"],
             "created_at": {"$gte": period_start},
@@ -9854,6 +9856,7 @@ async def _grant_access_impl(email: str, password: str, full_name: str, access_t
                 "tier": "vip", "status": "active",
                 "stripe_customer_id": None, "stripe_subscription_id": None,
                 "current_period_end": period_end, "started_at": now_iso,
+                "current_period_start": now_iso,
                 "monthly_reports_included": 4, "reports_used_this_period": 0,
                 "scout_review_included": True,
             },
@@ -9867,6 +9870,7 @@ async def _grant_access_impl(email: str, password: str, full_name: str, access_t
                 "tier": "premium", "status": "active",
                 "stripe_customer_id": None, "stripe_subscription_id": None,
                 "current_period_end": period_end, "started_at": now_iso,
+                "current_period_start": now_iso,
                 "monthly_reports_included": 2, "reports_used_this_period": 0,
                 "scout_review_included": False,
             },

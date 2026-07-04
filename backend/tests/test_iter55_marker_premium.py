@@ -209,11 +209,15 @@ class TestFrontendSourceInvariants:
 
     def test_upload_page_passes_hidetimers(self):
         src = Path("/app/frontend/src/pages/UploadPage.jsx").read_text()
-        # `isPaidTier` computed from role list
-        assert re.search(
-            r'isPaidTier\s*=\s*\[[^\]]*"admin"[^\]]*"premium"[^\]]*"vip"[^\]]*"scout"[^\]]*\]\.includes\(\s*user\?\.role\s*\)',
-            src,
-        ), "isPaidTier not derived from role whitelist"
+        # `isPaidTier` computed via the shared isPremiumUser helper (role OR subscription_tier)
+        assert re.search(r"isPaidTier\s*=\s*isPremiumUser\(\s*user\s*\)", src), (
+            "isPaidTier not derived from isPremiumUser helper"
+        )
+        helper = Path("/app/frontend/src/lib/premium.js").read_text()
+        assert '"admin"' in helper and '"premium"' in helper and '"vip"' in helper and '"scout"' in helper, (
+            "premium.js role whitelist incomplete"
+        )
+        assert "subscription_tier" in helper, "premium.js must also honor subscription_tier"
         # `hideTimers={isPaidTier}` passed to PrecisionScanOverlay
         assert "hideTimers={isPaidTier}" in src, "UploadPage does not forward hideTimers to PrecisionScanOverlay"
 
@@ -231,11 +235,10 @@ class TestFrontendSourceInvariants:
 
     def test_report_page_role_gates_unlocked(self):
         src = Path("/app/frontend/src/pages/ReportPage.jsx").read_text()
-        # premiumRole includes admin/premium/vip/scout
-        assert re.search(
-            r'premiumRole\s*=\s*\[[^\]]*"admin"[^\]]*"premium"[^\]]*"vip"[^\]]*"scout"[^\]]*\]\.includes\(\s*user\?\.role\s*\)',
-            src,
-        ), "premiumRole not derived from role whitelist"
+        # premiumRole computed via the shared isPremiumUser helper (role OR subscription_tier)
+        assert re.search(r"premiumRole\s*=\s*isPremiumUser\(\s*user\s*\)", src), (
+            "premiumRole not derived from isPremiumUser helper"
+        )
         # unlocked = is_paid || manually_unlocked || premiumRole
         assert re.search(
             r"unlocked\s*=\s*is_paid\s*\|\|\s*manually_unlocked\s*\|\|\s*premiumRole",

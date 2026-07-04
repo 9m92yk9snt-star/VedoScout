@@ -26,6 +26,19 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 - **Design**: Volt Green (#CCFF00) on Deep Navy (#050A0F), Barlow Condensed + DM Sans
 
 ## Implemented (Feb–Mar 2026 — current session)
+
+### Session (Jul 4, 2026) — Admin-granted Premium fix + Premium UI polish
+- **ROOT-CAUSE FIX (recurring "blurred page for Premium users")**: Admin "Grant Access" premium/vip users keep `role="user"` with premium stored in `user.subscription.tier`. All frontend premium checks only inspected `user.role` → those users got the blurred free-tier HeroTeaser after analysis. Fixed in 3 layers:
+  1. Backend: `UserPublic` now returns `subscription_tier` (login, /auth/me, reset-password) via `_has_active_subscription(user)`.
+  2. Frontend: new single source of truth `/app/frontend/src/lib/premium.js` → `isPremiumUser(user)` (role whitelist OR subscription_tier). Consumed by UploadPage (`isPaidTier`) and ReportPage (`premiumRole`, `premiumRoleNow`).
+  3. UploadPage `skipHeroTeaser` additionally honors `eligibility.reason === "subscription"` and `finalData.is_paid`.
+  Verified with a full live browser E2E (Scout Mode marking → upload → Gemini analysis → PremiumReadyOverlay shown, HeroTeaser never rendered, CTA → unlocked report).
+- **Usage-counting fix**: admin-granted subscriptions had no `current_period_start`, so `/me/subscription` + `/me/upload-eligibility` counted 0 used (never exhausted). Fallback chain now `current_period_start → started_at → now`; grant-access also writes `current_period_start`.
+- **PremiumReadyOverlay redesign**: cinematic Nano Banana stadium backdrop (`/assets/premium-ready-stadium.jpg`), gold crest badge, gold-ring player marker, pillar chips, volt CTA + "Go to Dashboard" secondary (dismiss now navigates to /dashboard).
+- **Dashboard premium banners redesign**: SubscriptionCard + UpgradeBanner(at-limit) now use Nano Banana gold pitch texture (`/assets/premium-dash-gold.jpg`), gold crown/eyebrow, perk chips, premium copy. Free-tier UpgradeBanner unchanged.
+- Tests: `tests/test_iter58_premium_subscription_tier.py` (7 pass) + updated stale source-invariant/limit assertions in iter55/iter40/iter32 tests. 52 targeted tests green.
+- ⚠️ Fix verified in PREVIEW — user must REDEPLOY to scoutmeplay.com.
+
 - ✅ **🆕 Session 132 — Graceful handling of Emergent LLM Key budget exhaustion (Jul 04 2026)**:
   - **Investigation finding**: The `"Budget has been exceeded! Current cost: 15.07, Max budget: 15.0"` error is NOT hardcoded in our codebase. It originates from **`litellm.utils.py:1159` inside the Emergent LLM proxy server** — the Universal Key's balance is set on Emergent's server-side, not ours. `litellm.max_budget` is `0.0` in our env (verified). Grep of both `emergentintegrations` and `server.py` for `max_budget` returned zero matches. **Fix requires the operator to top up at Profile → Universal Key → Add Balance** — I cannot patch a server we don't own.
   - **What I CAN and DID fix**: turn the raw litellm exception into a clean, user-friendly experience so the report doesn't hang and users don't see technical strings like "Current cost: 15.07":

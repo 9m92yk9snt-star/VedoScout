@@ -54,9 +54,9 @@ class TestGetMySubscription:
         tiers = data.get("tiers") or {}
         assert "premium" in tiers and "vip" in tiers, f"tiers missing keys: {tiers}"
         assert tiers["premium"]["amount"] == 29.99
-        assert tiers["premium"]["monthly_upload_limit"] == 5
+        assert tiers["premium"]["monthly_upload_limit"] == 2
         assert tiers["vip"]["amount"] == 49.99
-        assert tiers["vip"]["monthly_upload_limit"] in (None,)
+        assert tiers["vip"]["monthly_upload_limit"] == 4
 
     def test_requires_auth(self):
         r = requests.get(f"{BASE_URL}/api/me/subscription", timeout=20)
