@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScoutMePlay — Premium Player Report (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Barlow:wght@400;500;600;700;800&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{
+    --bg:#F2EDE2; --card:#FFFFFF; --card-soft:#FBF9F3;
+    --green:#1E5B3C; --green-deep:#12402A; --green-ink:#174A30;
+    --green-tint:#E9F1E6; --green-tint2:#F0F5EC;
+    --orange:#DD6B20; --orange-tint:#FDF3EA; --orange-border:#F3D9BF;
+    --gold:#E8B32C; --ink:#1C2B21; --muted:#68766B; --line:#E5DFCE;
+    --radius:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);font-family:'Barlow',sans-serif;color:var(--ink);padding:26px 30px 0}
+  .wrap{max-width:1440px;margin:0 auto}
+  .hd{font-family:'Barlow Condensed',sans-serif;font-weight:800;letter-spacing:.02em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:0 2px 10px rgba(30,50,35,.06);padding:22px}
+  .sec-title{display:flex;align-items:center;gap:9px;font-family:'Barlow',sans-serif;font-weight:800;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--green-deep);margin-bottom:14px}
+  .sec-title .ic{width:26px;height:26px;border-radius:7px;background:var(--green-tint);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:12px}
+  .grid{display:grid;gap:18px;margin-bottom:18px}
+
+  /* HEADER */
+  .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .logo{display:flex;align-items:center;gap:11px}
+  .logo .mark{width:44px;height:44px;border-radius:50%;background:var(--green-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px}
+  .logo .nm{font-family:'Barlow Condensed';font-weight:900;font-size:27px;letter-spacing:.03em;color:var(--green-deep)}
+  .logo .nm span{color:#7BA05B}
+  .logo .tag{font-size:10px;letter-spacing:.24em;font-weight:700;color:#8B957F;text-transform:uppercase}
+  .title-c{text-align:center}
+  .title-c h1{font-family:'Barlow Condensed';font-weight:900;font-size:31px;letter-spacing:.04em;color:#101B12}
+  .title-c .pill{display:inline-block;background:var(--green-deep);color:#F0EAD8;font-size:10.5px;font-weight:700;letter-spacing:.22em;padding:5px 18px;border-radius:4px;margin-top:5px}
+  .date{text-align:right;font-size:12px;letter-spacing:.14em;font-weight:700;color:#8B957F;text-transform:uppercase}
+  .date b{display:block;color:var(--ink);font-size:14.5px;margin-top:3px}
+
+  /* ROW 1 */
+  .r1{grid-template-columns:1fr 1.22fr 1fr}
+  .player-card{padding:0;overflow:hidden;display:flex;flex-direction:column}
+  .p-photo{position:relative;height:305px;background:#0F2A1A}
+  .p-photo img{width:100%;height:100%;object-fit:cover;object-position:top}
+  .p-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,rgba(18,64,42,.18),transparent 55%)}
+  .p-num{position:absolute;top:20px;right:22px;text-align:center;background:rgba(255,255,255,.93);border-radius:12px;padding:10px 16px 12px;z-index:2}
+  .p-num .n{font-family:'Barlow Condensed';font-weight:900;font-size:44px;line-height:.9;color:var(--green-deep)}
+  .p-num .lbl{font-size:8.5px;letter-spacing:.14em;color:#8B957F;font-weight:700;margin-top:4px}
+  .p-num .pos{font-family:'Barlow Condensed';font-weight:800;font-size:16px;color:var(--ink)}
+  .p-meta{padding:18px 22px 20px}
+  .p-meta h2{font-family:'Barlow Condensed';font-weight:900;font-size:34px;letter-spacing:.02em;line-height:.95}
+  .p-meta .role{font-size:12.5px;font-weight:700;letter-spacing:.18em;color:var(--green);margin-top:2px}
+  .p-attrs{display:flex;gap:0;margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+  .p-attrs div{flex:1;padding-right:10px}
+  .p-attrs div+div{border-left:1px solid var(--line);padding-left:12px}
+  .p-attrs .k{font-size:9px;letter-spacing:.14em;color:#8B957F;font-weight:700;text-transform:uppercase}
+  .p-attrs .v{font-size:13.5px;font-weight:700;margin-top:3px;white-space:nowrap}
+  .script{font-family:'Caveat',cursive;font-size:22px;color:var(--green);margin-top:14px}
+
+  .psum .lead{font-size:17.5px;font-weight:800;color:var(--green-ink);line-height:1.35;margin-bottom:12px}
+  .psum p{font-size:13.5px;line-height:1.62;color:#3C4A40;margin-bottom:11px}
+  .goodnews{background:var(--green-tint2);border:1px solid #DCE8D6;border-radius:11px;padding:15px 17px;display:flex;gap:13px;margin-top:4px}
+  .goodnews .st{width:34px;height:34px;border-radius:9px;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .goodnews b{font-size:12px;letter-spacing:.14em;color:var(--green-deep);display:block;margin-bottom:4px}
+  .goodnews span{font-size:13px;line-height:1.55;color:#3C4A40}
+
+  .score-card{text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .score-card h3{font-size:14.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--green-deep);margin-bottom:18px}
+  .gauge{position:relative;width:196px;height:196px;border-radius:50%;background:conic-gradient(var(--green-deep) 0 55%, #6E9E63 55% 80%, #C9D8C0 80% 100%);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  .gauge::before{content:"";position:absolute;inset:16px;background:#fff;border-radius:50%}
+  .gauge .val{position:relative;font-family:'Barlow Condensed';font-weight:900;font-size:62px;color:#101B12;line-height:1}
+  .gauge .of{position:relative;font-size:15px;color:#8B957F;font-weight:700}
+  .score-card .arch{font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#101B12}
+  .stars{color:var(--gold);font-size:19px;letter-spacing:3px;margin:9px 0 11px}
+  .score-card p{font-size:12.5px;color:var(--muted);line-height:1.55;max-width:300px}
+
+  /* ROW 2 */
+  .r2{grid-template-columns:1fr .96fr 1.04fr}
+  .snap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+  .snap{background:var(--card-soft);border:1px solid var(--line);border-radius:11px;padding:14px 10px;text-align:center}
+  .snap .ic{width:36px;height:36px;border-radius:50%;margin:0 auto 9px;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .snap .k{font-size:9px;font-weight:800;letter-spacing:.09em;color:#75816F;text-transform:uppercase;line-height:1.45}
+  .snap .v{font-size:12px;font-weight:700;color:var(--ink);margin-top:7px;line-height:1.4}
+  .progress-strip{margin-top:13px;background:var(--green-tint2);border:1px solid #DCE8D6;border-radius:11px;padding:13px 17px;display:flex;align-items:center;gap:14px}
+  .progress-strip b{font-size:11.5px;letter-spacing:.12em;color:var(--green-deep)}
+  .progress-strip .fa-arrow-trend-up{color:var(--green);font-size:20px}
+  .progress-strip .t1{font-size:13px;font-weight:700}
+  .progress-strip .t2{font-size:11.5px;color:var(--muted)}
+
+  .statrow{display:flex;align-items:center;gap:12px;padding:10.5px 0;border-bottom:1px solid #EFEADB}
+  .statrow:last-child{border-bottom:none}
+  .statrow .k{font-size:11px;font-weight:700;letter-spacing:.09em;color:#5B695E;text-transform:uppercase;width:150px;flex-shrink:0}
+  .statrow .bar{flex:1;height:5px;background:#EDE8DA;border-radius:4px;overflow:hidden}
+  .statrow .bar i{display:block;height:100%;background:var(--green);border-radius:4px}
+  .statrow .v{font-family:'Barlow Condensed';font-weight:800;font-size:19px;width:48px;text-align:right}
+
+  .cmprow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #EFEADB}
+  .cmprow:last-child{border-bottom:none}
+  .cmprow .k{font-size:13px;font-weight:600;width:130px;flex-shrink:0}
+  .cmprow .bar{flex:1;height:6px;background:#EDE8DA;border-radius:4px;overflow:hidden}
+  .cmprow .bar i{display:block;height:100%;background:linear-gradient(90deg,#7BA05B,var(--green-deep));border-radius:4px}
+  .cmprow .v{font-size:13px;font-weight:800;color:var(--green-deep);width:68px;text-align:right}
+  .foot-note{font-size:10.5px;color:#93A08F;margin-top:10px}
+
+  /* ROW 3 */
+  .r3{grid-template-columns:1.16fr 1fr}
+  .str-row{display:flex;align-items:center;gap:15px;padding:14px 0;border-bottom:1px solid #EFEADB}
+  .str-row:last-child{border-bottom:none}
+  .str-ic{width:44px;height:44px;border-radius:50%;background:var(--green-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  .str-bd{flex:1}
+  .str-bd b{font-size:14px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+  .str-bd p{font-size:12px;color:var(--muted);line-height:1.5;margin-top:3px;max-width:250px}
+  .str-score{font-family:'Barlow Condensed';font-weight:900;font-size:23px;color:var(--green-deep);width:64px}
+  .str-score span{font-size:13px;color:#A5AF9E;font-weight:700}
+  .str-ts{font-family:'Barlow Condensed';font-weight:800;font-size:16px;color:#5B695E;width:52px}
+  .ev-head{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--green);width:150px;text-align:center}
+  .thumb{position:relative;width:150px;height:84px;border-radius:9px;overflow:hidden;flex-shrink:0;border:1px solid var(--line)}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .thumb .play i{width:31px;height:31px;background:rgba(10,25,15,.72);border:1.5px solid rgba(255,255,255,.85);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10.5px;padding-left:2px}
+
+  .dp-card .sec-title .ic{background:var(--orange-tint);color:var(--orange)}
+  .dp-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:20px}
+  .dp-row{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid #F4E9DC}
+  .dp-row:last-child{border-bottom:none}
+  .dp-ic{width:44px;height:44px;border-radius:50%;border:2px solid var(--orange);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--orange-tint)}
+  .dp-bd b{font-size:14px;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+  .dp-bd .sc{font-family:'Barlow Condensed';font-weight:900;font-size:20px;color:var(--orange);margin-left:9px}
+  .dp-bd .sc span{font-size:12px;color:#C9B49C}
+  .dp-bd p{font-size:12px;color:var(--muted);line-height:1.55;margin-top:4px;max-width:270px}
+  .hti{border-left:1px dashed #EBD9C4;padding-left:20px}
+  .hti-h{font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--orange);margin-bottom:14px}
+  .hti-h i{margin-right:6px}
+  .hti-row{display:flex;gap:13px;margin-bottom:17px}
+  .hti-row .ic{width:38px;height:38px;border-radius:10px;background:var(--orange-tint);border:1px solid var(--orange-border);color:var(--orange);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .hti-row p{font-size:12.5px;line-height:1.55;color:#3C4A40}
+
+  /* ROW 4 */
+  .r4{grid-template-columns:1.05fr 1fr .95fr}
+  .road{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-top:8px}
+  .mile{text-align:center;flex:1}
+  .mile .ic{width:52px;height:52px;border-radius:50%;background:var(--green-deep);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;margin:0 auto 9px}
+  .mile .t{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--ink)}
+  .mile p{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:5px}
+  .m-arrow{color:#B9C4AE;font-size:14px;margin-top:19px}
+
+  .tp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+  .tp-day{background:var(--card-soft);border:1px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center}
+  .tp-day .d{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--green-deep)}
+  .tp-day .w{font-size:11.5px;font-weight:700;margin-top:5px;line-height:1.35}
+  .tp-day .m{font-size:10.5px;color:var(--muted);margin-top:2px}
+  .tp-day .ic{font-size:19px;color:var(--green);margin-top:9px}
+  .tp-note{margin-top:12px;text-align:center;font-size:11.5px;color:var(--muted);line-height:1.5}
+  .tp-note b{color:var(--green-deep)}
+
+  .tip{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #EFEADB}
+  .tip:last-child{border-bottom:none}
+  .tip .ic{width:30px;height:30px;border-radius:50%;background:var(--green-tint);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+  .tip p{font-size:12.5px;line-height:1.5;color:#3C4A40;font-weight:500;padding-top:5px}
+
+  /* ROW 5 */
+  .r5{grid-template-columns:1.08fr 1fr 1.1fr}
+  .vh-thumb{position:relative;border-radius:11px;overflow:hidden;height:218px;border:1px solid var(--line)}
+  .vh-thumb img{width:100%;height:100%;object-fit:cover}
+  .vh-thumb .play i{width:52px;height:52px;background:rgba(10,25,15,.72);border:2px solid rgba(255,255,255,.9);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;padding-left:3px}
+  .vh-thumb .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .vh-ts{position:absolute;left:12px;bottom:12px;background:rgba(10,25,15,.82);color:#fff;font-family:'Barlow Condensed';font-weight:800;font-size:14px;padding:3px 10px;border-radius:5px}
+  .vh-cap{font-size:12.5px;color:#3C4A40;line-height:1.55;margin-top:12px}
+
+  .cn li{font-size:13px;line-height:1.55;color:#3C4A40;margin-bottom:10px;list-style:none;display:flex;gap:10px}
+  .cn li::before{content:"•";color:var(--green);font-weight:900}
+
+  .so-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:18px}
+  .so-item{margin-bottom:14px}
+  .so-item .k{font-size:10px;font-weight:800;letter-spacing:.13em;color:#8B957F;text-transform:uppercase}
+  .so-item .v{font-size:14px;font-weight:800;margin-top:3px}
+  .dots{margin-top:6px;display:flex;gap:5px}
+  .dots i{width:11px;height:11px;border-radius:50%;background:#DCE3D2}
+  .dots i.on{background:var(--green-deep)}
+  .so-right{border-left:1px solid var(--line);padding-left:18px;text-align:center}
+  .so-right .k{font-size:10px;font-weight:800;letter-spacing:.13em;color:#8B957F;text-transform:uppercase}
+  .so-right .stars{font-size:17px;margin:8px 0 4px}
+  .so-right .v{font-size:16px;font-weight:800;color:var(--green-deep)}
+  .so-right p{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:7px}
+
+  /* FOOTER */
+  .ftr{background:var(--green-deep);border-radius:14px 14px 0 0;color:#E9EFE2;display:flex;align-items:center;justify-content:space-between;padding:20px 30px;margin-top:4px}
+  .ftr .q{font-size:12.5px;line-height:1.5;max-width:280px}
+  .ftr .q i{color:#7BA05B;margin-right:8px}
+  .ftr .mid{text-align:center}
+  .ftr .mid .nm{font-family:'Barlow Condensed';font-weight:900;font-size:20px;letter-spacing:.06em}
+  .ftr .mid .tg{font-size:9.5px;letter-spacing:.24em;color:#A9BC9C;margin-top:3px}
+  .ftr .rt{font-size:12px;text-align:right;line-height:1.55;max-width:270px}
+  .ftr .rt i{color:#E8837E;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="top">
+    <div class="logo">
+      <div class="mark"><i class="fa-solid fa-s"></i></div>
+      <div>
+        <div class="nm">SCOUT<span>ME</span>PLAY</div>
+        <div class="tag">AI Powered Player Analysis</div>
+      </div>
+    </div>
+    <div class="title-c">
+      <h1>PREMIUM PLAYER REPORT</h1>
+      <div class="pill">INDEPENDENT &nbsp;·&nbsp; EVIDENCE-BASED</div>
+    </div>
+    <div class="date">Report Date<b>03 JULY 2026</b></div>
+  </div>
+
+  <!-- ROW 1 -->
+  <div class="grid r1">
+    <div class="card player-card">
+      <div class="p-photo">
+        <img src="/mockup-assets/player.jpg" alt="player">
+        <div class="p-num"><div class="n">10</div><div class="lbl">PREFERRED POSITION</div><div class="pos">LW / RW</div></div>
+      </div>
+      <div class="p-meta">
+        <h2>ORMANI</h2>
+        <div class="role">WINGER</div>
+        <div class="p-attrs">
+          <div><div class="k">Age</div><div class="v">11</div></div>
+          <div><div class="k">Foot</div><div class="v">Right</div></div>
+          <div><div class="k">Height</div><div class="v">–</div></div>
+          <div><div class="k">Club</div><div class="v">MENTALKIDS</div></div>
+          <div><div class="k">Nationality</div><div class="v">🇩🇰 Denmark</div></div>
+        </div>
+        <div class="script">Keep inspiring.</div>
+      </div>
+    </div>
+
+    <div class="card psum">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-people-roof"></i></span> Parent Summary</div>
+      <div class="lead">Your child is a brave and exciting attacking player with great potential.</div>
+      <p>He enjoys taking on defenders, is confident in 1v1 situations and never gives up. He already shows qualities seen in strong academy wingers.</p>
+      <p>The biggest opportunity right now is improving his first touch and weaker foot. This will help him play faster, create more space and become even harder to stop.</p>
+      <div class="goodnews">
+        <div class="st"><i class="fa-solid fa-star"></i></div>
+        <div><b>THE GOOD NEWS</b><span>You are building a very strong foundation. With consistent training and the right guidance, he can achieve a high level.</span></div>
+      </div>
+    </div>
+
+    <div class="card score-card">
+      <h3>Overall Development Score</h3>
+      <div class="gauge"><span class="val">8.0</span><span class="of">/10</span></div>
+      <div class="arch">Creative &amp; Determined Winger</div>
+      <div class="stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-regular fa-star"></i></div>
+      <p>This score reflects his current level compared to other players his age in his position.</p>
+    </div>
+  </div>
+
+  <!-- ROW 2 -->
+  <div class="grid r2">
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-camera"></i></span> Snapshot</div>
+      <div class="snap-grid">
+        <div class="snap"><div class="ic" style="background:var(--green-tint);color:var(--green)"><i class="fa-solid fa-star"></i></div><div class="k">Biggest<br>Strength</div><div class="v">1v1 Ability &amp; Ball Control</div></div>
+        <div class="snap"><div class="ic" style="background:#FDECEC;color:#D9534F"><i class="fa-solid fa-bullseye"></i></div><div class="k">Biggest<br>Development Area</div><div class="v">First Touch &amp; Weak Foot</div></div>
+        <div class="snap"><div class="ic" style="background:#FDF3EA;color:var(--orange)"><i class="fa-solid fa-fire"></i></div><div class="k">Hidden<br>Talent</div><div class="v">Creates chances for teammates</div></div>
+        <div class="snap"><div class="ic" style="background:#FBF4DE;color:#C89B18"><i class="fa-solid fa-trophy"></i></div><div class="k">Next<br>Milestone</div><div class="v">More consistent decision making</div></div>
+      </div>
+      <div class="progress-strip">
+        <b>OVERALL PROGRESS</b>
+        <i class="fa-solid fa-arrow-trend-up"></i>
+        <div><div class="t1">On the right track!</div><div class="t2">Keep working and enjoying the game.</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:6px"><span class="ic"><i class="fa-solid fa-chart-simple"></i></span> Key Stats From This Match</div>
+      <div class="statrow"><div class="k">Total Actions</div><div class="bar"><i style="width:88%"></i></div><div class="v">62</div></div>
+      <div class="statrow"><div class="k">Successful Dribbles</div><div class="bar"><i style="width:62%"></i></div><div class="v">7</div></div>
+      <div class="statrow"><div class="k">Key Passes</div><div class="bar"><i style="width:40%"></i></div><div class="v">3</div></div>
+      <div class="statrow"><div class="k">Shots</div><div class="bar"><i style="width:28%"></i></div><div class="v">2</div></div>
+      <div class="statrow"><div class="k">Duels Won</div><div class="bar"><i style="width:70%"></i></div><div class="v">9/13</div></div>
+      <div class="statrow"><div class="k">Minutes Analysed</div><div class="bar"><i style="width:80%"></i></div><div class="v">67'</div></div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:6px"><span class="ic"><i class="fa-solid fa-ranking-star"></i></span> Comparison To Players Your Age (U11–U12)</div>
+      <div class="cmprow"><div class="k">Ball Control</div><div class="bar"><i style="width:90%"></i></div><div class="v">Top 10%</div></div>
+      <div class="cmprow"><div class="k">1v1 Attacking</div><div class="bar"><i style="width:90%"></i></div><div class="v">Top 10%</div></div>
+      <div class="cmprow"><div class="k">Creativity</div><div class="bar"><i style="width:85%"></i></div><div class="v">Top 15%</div></div>
+      <div class="cmprow"><div class="k">Work Rate</div><div class="bar"><i style="width:80%"></i></div><div class="v">Top 20%</div></div>
+      <div class="cmprow"><div class="k">Passing</div><div class="bar"><i style="width:75%"></i></div><div class="v">Top 25%</div></div>
+      <div class="cmprow"><div class="k">Defensive Work</div><div class="bar"><i style="width:65%"></i></div><div class="v">Top 35%</div></div>
+      <div class="foot-note">Percentiles show how your child compares to other players his age.</div>
+    </div>
+  </div>
+
+  <!-- ROW 3 -->
+  <div class="grid r3">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="sec-title" style="margin-bottom:4px"><span class="ic"><i class="fa-solid fa-star"></i></span> Top Strengths</div>
+        <div class="ev-head">EVIDENCE</div>
+      </div>
+      <div class="str-row">
+        <div class="str-ic"><i class="fa-solid fa-person-running"></i></div>
+        <div class="str-bd"><b>1v1 Attacking</b><p>Confident and fearless when taking on defenders. Enjoys creating chances.</p></div>
+        <div class="str-score">8.5<span>/10</span></div><div class="str-ts"></div>
+        <div class="thumb"><img src="/mockup-assets/thumb1.jpg"><div class="play"><i class="fa-solid fa-play"></i></div></div>
+      </div>
+      <div class="str-row">
+        <div class="str-ic"><i class="fa-solid fa-futbol"></i></div>
+        <div class="str-bd"><b>Ball Control</b><p>Keeps the ball close and stays calm under pressure. Hard to dispossess.</p></div>
+        <div class="str-score">8.0<span>/10</span></div><div class="str-ts">00:23</div>
+        <div class="thumb"><img src="/mockup-assets/thumb2.jpg"><div class="play"><i class="fa-solid fa-play"></i></div></div>
+      </div>
+      <div class="str-row">
+        <div class="str-ic"><i class="fa-solid fa-heart-pulse"></i></div>
+        <div class="str-bd"><b>Competitive Drive</b><p>Never gives up. Fights for the ball and stays focused in every moment.</p></div>
+        <div class="str-score">8.5<span>/10</span></div><div class="str-ts">00:35</div>
+        <div class="thumb"><img src="/mockup-assets/thumb3.jpg"><div class="play"><i class="fa-solid fa-play"></i></div></div>
+      </div>
+      <div class="str-row">
+        <div class="str-ic"><i class="fa-solid fa-lightbulb"></i></div>
+        <div class="str-bd"><b>Creativity</b><p>Looks for clever passes and makes good decisions in the final third.</p></div>
+        <div class="str-score">7.5<span>/10</span></div><div class="str-ts">00:52</div>
+        <div class="thumb"><img src="/mockup-assets/thumb4.jpg"><div class="play"><i class="fa-solid fa-play"></i></div></div>
+      </div>
+    </div>
+
+    <div class="card dp-card" style="background:#FFFBF6">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-person-walking"></i></span> Development Priorities</div>
+      <div class="dp-grid">
+        <div>
+          <div class="dp-row">
+            <div class="dp-ic"><i class="fa-solid fa-bell"></i></div>
+            <div class="dp-bd"><b>First Touch</b><span class="sc">6.0<span>/10</span></span><p>Sometimes the ball is not fully under control, especially when receiving at speed.</p></div>
+          </div>
+          <div class="dp-row">
+            <div class="dp-ic"><i class="fa-solid fa-shoe-prints"></i></div>
+            <div class="dp-bd"><b>Weak Foot</b><span class="sc">5.5<span>/10</span></span><p>Needs more confidence and accuracy when using his left foot in passes and shots.</p></div>
+          </div>
+          <div class="dp-row">
+            <div class="dp-ic"><i class="fa-solid fa-chess"></i></div>
+            <div class="dp-bd"><b>Decision Making</b><span class="sc">6.5<span>/10</span></span><p>Can improve choices in the final third, especially when to pass or to dribble.</p></div>
+          </div>
+        </div>
+        <div class="hti">
+          <div class="hti-h"><i class="fa-solid fa-wand-magic-sparkles"></i>HOW TO IMPROVE</div>
+          <div class="hti-row"><div class="ic"><i class="fa-solid fa-dumbbell"></i></div><p>Practice receiving the ball and touching it into space. Use both feet.</p></div>
+          <div class="hti-row"><div class="ic"><i class="fa-solid fa-stopwatch"></i></div><p>Daily 10–15 minutes of weak foot passing, shooting and dribbling.</p></div>
+          <div class="hti-row"><div class="ic"><i class="fa-solid fa-chalkboard-user"></i></div><p>Watch game situations, learn when to play simple and when to take risks.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4 -->
+  <div class="grid r4">
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-route"></i></span> Development Roadmap</div>
+      <div class="road">
+        <div class="mile"><div class="ic"><i class="fa-solid fa-person-running"></i></div><div class="t">NOW</div><p>Build confidence and technical foundation</p></div>
+        <div class="m-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        <div class="mile"><div class="ic"><i class="fa-solid fa-stopwatch"></i></div><div class="t">3 MONTHS</div><p>Better first touch and weak foot comfort</p></div>
+        <div class="m-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        <div class="mile"><div class="ic"><i class="fa-solid fa-person-walking"></i></div><div class="t">6 MONTHS</div><p>More consistent decision making in matches</p></div>
+        <div class="m-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+        <div class="mile"><div class="ic"><i class="fa-solid fa-trophy"></i></div><div class="t">12 MONTHS</div><p>Complete winger with high impact in games</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-clipboard-list"></i></span> Training Plan <span style="font-weight:600;color:#8B957F;text-transform:none;letter-spacing:0;font-size:12px">(Weekly example)</span></div>
+      <div class="tp-grid">
+        <div class="tp-day"><div class="d">MON</div><div class="w">First Touch</div><div class="m">15 min</div><div class="ic"><i class="fa-solid fa-futbol"></i></div></div>
+        <div class="tp-day"><div class="d">WED</div><div class="w">Weak Foot</div><div class="m">20 min</div><div class="ic"><i class="fa-solid fa-shoe-prints"></i></div></div>
+        <div class="tp-day"><div class="d">FRI</div><div class="w">1v1 Moves</div><div class="m">15 min</div><div class="ic"><i class="fa-solid fa-person-running"></i></div></div>
+        <div class="tp-day"><div class="d">WEEKEND</div><div class="w">Match Challenge</div><div class="m">&nbsp;</div><div class="ic"><i class="fa-solid fa-trophy"></i></div></div>
+      </div>
+      <div class="tp-note"><b>Consistency is more important than perfection.</b><br>Small steps every day = Big progress.</div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-hands-holding-child"></i></span> Parent Tips</div>
+      <div class="tip"><div class="ic"><i class="fa-solid fa-check"></i></div><p>Praise effort and brave decisions, not just goals.</p></div>
+      <div class="tip"><div class="ic"><i class="fa-solid fa-seedling"></i></div><p>Encourage him to try new skills in games.</p></div>
+      <div class="tip"><div class="ic"><i class="fa-solid fa-bed"></i></div><p>Support training, rest and healthy habits.</p></div>
+      <div class="tip"><div class="ic"><i class="fa-solid fa-heart"></i></div><p>Be his biggest fan and enjoy the journey together!</p></div>
+    </div>
+  </div>
+
+  <!-- ROW 5 -->
+  <div class="grid r5">
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-shield-halved"></i></span> Video Evidence Highlight</div>
+      <div class="vh-thumb">
+        <img src="/mockup-assets/hero-clip.jpg">
+        <div class="play"><i class="fa-solid fa-play"></i></div>
+        <div class="vh-ts">00:07</div>
+      </div>
+      <div class="vh-cap">Ormani beats the defender with a strong burst of pace and a great touch towards the goal.</div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-clipboard"></i></span> Coach Notes</div>
+      <ul class="cn">
+        <li>Encourage him to keep taking on defenders.</li>
+        <li>Give him the freedom to express himself in the final third.</li>
+        <li>Help him improve first touch with different types of balls.</li>
+        <li>Perfect role: Inverted winger / Wide playmaker.</li>
+        <li>Focus in training: First touch, weak foot, decision making.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="sec-title"><span class="ic"><i class="fa-solid fa-binoculars"></i></span> Scout Outlook</div>
+      <div class="so-grid">
+        <div>
+          <div class="so-item"><div class="k">Current Level</div><div class="v">Strong Academy</div>
+            <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div></div>
+          <div class="so-item"><div class="k">Potential Level</div><div class="v">Elite Academy</div>
+            <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+          <div class="so-item"><div class="k">Recruitment Readiness</div><div class="v">Medium — Keep Developing</div></div>
+        </div>
+        <div class="so-right">
+          <div class="k">Long-Term Potential</div>
+          <div class="stars" style="color:var(--gold)"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+          <div class="v">High</div>
+          <p>With consistent training and the right environment, he can reach an elite level.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="ftr">
+    <div class="q"><i class="fa-solid fa-quote-left"></i>Talent gets you noticed. Character makes you unforgettable.</div>
+    <div class="mid">
+      <div class="nm"><i class="fa-solid fa-circle" style="font-size:11px;color:#7BA05B;margin-right:7px"></i>SCOUTMEPLAY</div>
+      <div class="tg">YOUR JOURNEY. OUR ANALYSIS. YOUR FUTURE.</div>
+    </div>
+    <div class="rt">Thank you for trusting ScoutMePlay. We are excited to be part of your journey!<i class="fa-solid fa-heart"></i></div>
+  </div>
+
+</div>
+</body>
+</html>
