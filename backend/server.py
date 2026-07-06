@@ -1748,7 +1748,7 @@ def _extract_video_frame(video_path: Path, seconds: int, out_path: Path) -> bool
         return False
 
 
-def ensure_video_frames(report_doc: dict) -> list:
+def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
     """For every video_comments entry, ensure a frame JPEG exists on disk and
     attach a `frame_url` to the comment. Falls back to a branded placeholder
     when the video file is missing or ffmpeg fails.
@@ -1772,7 +1772,10 @@ def ensure_video_frames(report_doc: dict) -> list:
     frames_dir.mkdir(parents=True, exist_ok=True)
 
     video_filename = report_doc.get("video_filename")
-    video_path = UPLOAD_DIR / video_filename if video_filename else None
+    if video_path_override:
+        video_path = Path(video_path_override)
+    else:
+        video_path = UPLOAD_DIR / video_filename if video_filename else None
     have_video = bool(video_path and video_path.exists())
 
     # Try to reconstruct the player fingerprint for thumbnail re-verification.
@@ -1798,6 +1801,11 @@ def ensure_video_frames(report_doc: dict) -> list:
     enriched = []
     for idx, c in enumerate(comments):
         if not isinstance(c, dict):
+            enriched.append(c)
+            continue
+        # Durable URL already persisted (R2 flush at generation time) — keep it.
+        existing_url = c.get("frame_url") or ""
+        if existing_url.startswith("http") or existing_url.startswith("/api/media/"):
             enriched.append(c)
             continue
         ts = c.get("timestamp", "")
@@ -2567,6 +2575,48 @@ Produce a JSON object EXACTLY in this format:
     "ninety_day_plan": "<paragraph>"
   },
   "video_comments": [{"timestamp": "MM:SS", "comment": "<specific moment observation in plain words>"}],
+  "match_stats": {
+    "total_actions": <integer — DISTINCT observable involvements of THIS PLAYER (touches, passes, shots, duels, runs) you actually counted in the footage>,
+    "successful_dribbles": <integer>,
+    "key_passes": <integer — passes that directly created a shooting chance>,
+    "shots": <integer>,
+    "duels_won": "<won>/<contested>, e.g. '9/13' — count ONLY duels with a visibly resolved outcome",
+    "minutes_analysed": <integer — same value as content_analysis.minutes_observed>
+  },
+  "parent_summary": {
+    "headline": "<ONE warm plain-language sentence addressed to the parents, e.g. 'Your child is a brave and exciting attacking player with great potential.'>",
+    "paragraphs": ["<2-3 sentences about what he does well, addressed to the parent about their child>", "<2-3 sentences about the biggest opportunity right now and why improving it helps>"],
+    "good_news": "<2 encouraging, honest sentences — no hype>"
+  },
+  "parent_tips": ["<tip 1>", "<tip 2>", "<tip 3>", "<tip 4>"],
+  "coach_notes": ["<4-6 short practical bullets addressed to the player's coach — include one 'Perfect role: …' bullet and one 'Focus in training: …' bullet>"],
+  "snapshot": {
+    "biggest_strength": "<3-6 words>",
+    "biggest_development_area": "<3-6 words>",
+    "hidden_talent": "<3-6 words — a subtle quality you noticed>",
+    "next_milestone": "<3-6 words>",
+    "overall_progress_note": "<ONE short encouraging line, e.g. 'On the right track!'>"
+  },
+  "development_roadmap": {
+    "now": "<5-9 words — current focus>",
+    "three_months": "<5-9 words>",
+    "six_months": "<5-9 words>",
+    "twelve_months": "<5-9 words>"
+  },
+  "development_priorities_detailed": [
+    {"name": "<skill name>", "score": <number consistent with that skill's score above, or null>, "issue": "<1-2 plain sentences on what limits him now>", "how_to_improve": "<1-2 plain sentences of concrete practice advice>"},
+    {"name": "...", "score": ..., "issue": "...", "how_to_improve": "..."},
+    {"name": "...", "score": ..., "issue": "...", "how_to_improve": "..."}
+  ],
+  "scout_outlook": {
+    "current_level_label": "<e.g. 'Strong Academy' — MUST be consistent with overall_benchmark.tier>",
+    "current_level_dots": <integer 1-5>,
+    "potential_level_label": "<e.g. 'Elite Academy'>",
+    "potential_level_dots": <integer 1-5>,
+    "recruitment_readiness": "<e.g. 'Medium — Keep Developing'>",
+    "long_term_potential": "High" | "Medium" | "Developing",
+    "long_term_note": "<ONE sentence>"
+  },
   "scores": {
     "technical": <integer 1-10>,
     "tactical": <integer 1-10>,
@@ -2602,6 +2652,15 @@ RULES FOR "overall_benchmark":
 - The tier_label MUST match the AGE BRACKET RUBRIC above. Compare the overall_development score against the rubric for the player's age bracket.
 - "percentile" should reference the EXACT age bracket and position used in the rubric, e.g. "Top 15-20% of U15 wingers".
 - "realistic_next_step" must be calibrated to the player's CURRENT tier, not aspirational. If they're standard_club, the next step is strong_club — NOT pro academy. If they're already pro_academy, next step is elite_academy.
+
+RULES FOR "match_stats":
+- COUNT only actions you visibly observed for THE CIRCLED PLAYER. Short clips produce small numbers — small honest numbers are correct.
+- "duels_won" must respect the outcome-claim guardrails: count a duel as won ONLY when the player visibly ends up with the ball.
+
+RULES FOR PRESENTATION SECTIONS ("parent_summary", "parent_tips", "coach_notes", "snapshot", "development_roadmap", "development_priorities_detailed", "scout_outlook"):
+- These sections are a PRESENTATION of the SAME analysis above. They MUST be consistent with the scores, tiers and evidence you already produced. Do NOT introduce new claims or new evidence.
+- "development_priorities_detailed" MUST contain EXACTLY 3 items chosen from the lowest-scoring observable sub-skills (or the most position-critical cannot_evaluate areas).
+- "scout_outlook" level dots map from overall_benchmark.tier: standard_club→2, strong_club→3, pro_academy→4, elite_academy→5. potential_level is at most ONE tier above current level.
 
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
@@ -5477,6 +5536,35 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     return {"status": "generating", "report_id": report_id, "full_report_status": "generating"}
 
 
+async def _persist_video_frames(report_id: str, video_path) -> None:
+    """Extract REAL evidence frames right after full-report generation (while the
+    video is guaranteed local), then flush them to R2 and persist the durable
+    URLs directly on full_report.video_comments. Best-effort — never raises."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc or not (doc.get("full_report") or {}).get("video_comments"):
+        return
+    frames_dir = UPLOAD_DIR / "frames" / str(report_id)
+    shutil.rmtree(frames_dir, ignore_errors=True)  # drop any cached placeholders
+    enriched = await asyncio.to_thread(ensure_video_frames, doc, str(video_path))
+    if r2_storage.is_configured():
+        for c in enriched:
+            if not isinstance(c, dict):
+                continue
+            fu = c.get("frame_url") or ""
+            if fu.startswith("/api/uploads/frames/"):
+                p = frames_dir / Path(fu).name
+                if p.exists() and p.stat().st_size > 0:
+                    try:
+                        key = f"reports/{report_id}/frames/{p.name}"
+                        c["frame_url"] = r2_storage.upload_file(key, p, "image/jpeg")
+                    except Exception as e:
+                        logger.warning(f"R2 flush frame failed {report_id}/{p.name}: {e}")
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"full_report.video_comments": enriched}},
+    )
+
+
 async def generate_full_report_task(report_id: str) -> None:
     """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads).
 
@@ -5599,6 +5687,10 @@ async def generate_full_report_task(report_id: str) -> None:
             }},
         )
         # Ensure scout review is queued for every paid/unlocked report
+        try:
+            await _persist_video_frames(report_id, file_path)
+        except Exception:
+            logger.exception(f"evidence frame persist failed for {report_id}")
         try:
             fresh = await db.reports.find_one({"id": report_id})
             if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):

@@ -25,6 +25,7 @@ import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
 import PricingCards from "@/components/PricingCards";
 import PremiumReadyBanner from "@/components/PremiumReadyBanner";
+import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 
 /* Tier visual treatment — 4 levels mapped to colour + label */
 const TIER_META = {
@@ -1963,6 +1964,44 @@ export default function ReportPage() {
   })();
   const evidenceQualityNote = full_report?.evidence_quality_note;
   const couldNotAssess = full_report?.scout_view?.what_we_could_not_assess;
+
+  // ===== Premium Report V2 — the pixel-perfect report design fully REPLACES
+  // the old premium layout once the full dossier exists. Locked/free-preview
+  // and "generating" states keep the original flow below. =====
+  if (unlocked && full_report) {
+    return (
+      <div className="min-h-screen bg-[#F2EDE2] pb-16">
+        <Navigation />
+        <div className="pt-24 md:pt-28 px-4 md:px-8">
+          <div className="max-w-[1440px] mx-auto mb-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => navigate("/dashboard")}
+              data-testid="back-to-dashboard"
+              className="flex items-center gap-2 text-[#12402A]/70 hover:text-[#12402A] uppercase tracking-widest text-xs font-bold transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Dashboard
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+                data-testid="download-pdf-btn"
+                className="bg-[#12402A] hover:bg-[#1E5B3C] text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2 rounded"
+              >
+                {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                Download PDF
+              </button>
+            </div>
+          </div>
+          <PremiumReportV2 report={report} assetBase={ASSET_BASE} />
+          <div className="max-w-[1440px] mx-auto mt-6">
+            <ScoutReview reportId={id} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-deepnavy text-ink pb-20">

@@ -1,0 +1,236 @@
+// Derivation layer for the pixel-perfect Premium Report V2.
+// Maps the existing full_report JSON (+ new presentation fields) into the
+// exact data shapes the V2 sections render. NEVER touches scores or logic —
+// pure read-only mapping with graceful fallbacks for missing fields.
+
+export const SKILL_LABELS = {
+  first_touch: "First Touch", ball_control: "Ball Control", dribbling: "Dribbling",
+  passing: "Passing", shooting: "Shooting", weak_foot: "Weak Foot", one_v_one: "1v1 Attacking",
+  positioning: "Positioning", off_ball_movement: "Off-Ball Movement", scanning: "Scanning",
+  decision_making: "Decision Making", timing_of_runs: "Timing of Runs", game_understanding: "Game Understanding",
+  acceleration: "Acceleration", speed: "Speed", balance: "Balance", agility: "Agility",
+  intensity: "Intensity", body_control: "Body Control",
+  confidence: "Confidence", work_rate: "Work Rate", courage_in_duels: "Courage in Duels",
+  response_to_mistakes: "Response to Mistakes", competitive_mindset: "Competitive Drive", focus: "Focus",
+};
+
+const TIER_PERCENTILE = {
+  elite_academy: { label: "Top 10%", width: 90 },
+  pro_academy: { label: "Top 20%", width: 80 },
+  strong_club: { label: "Top 40%", width: 60 },
+  standard_club: { label: "Top 60%", width: 40 },
+};
+
+const TIER_DOTS = { standard_club: 2, strong_club: 3, pro_academy: 4, elite_academy: 5 };
+const TIER_LABELS = { standard_club: "Grassroots Club", strong_club: "Strong Club", pro_academy: "Strong Academy", elite_academy: "Elite Academy" };
+const NEXT_TIER = { standard_club: "strong_club", strong_club: "pro_academy", pro_academy: "elite_academy", elite_academy: "elite_academy" };
+
+const POSITION_ABBR = {
+  Goalkeeper: "GK", "Centre-back": "CB", "Full-back": "FB", "Wing-back": "WB",
+  "Defensive Midfielder": "DM", "Central Midfielder": "CM", "Attacking Midfielder": "AM",
+  Winger: "LW / RW", Striker: "ST",
+};
+
+export function tsToSeconds(ts) {
+  if (!ts || typeof ts !== "string" || !ts.includes(":")) return null;
+  const [m, s] = ts.split(":").map((x) => parseInt(x, 10));
+  if (Number.isNaN(m) || Number.isNaN(s)) return null;
+  return m * 60 + s;
+}
+
+function firstSentences(text, max = 160) {
+  if (!text) return "";
+  const clean = String(text).trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastDot = cut.lastIndexOf(". ");
+  return lastDot > 60 ? cut.slice(0, lastDot + 1) : cut.trimEnd() + "…";
+}
+
+function collectSkills(full) {
+  const out = [];
+  for (const cat of ["technical", "tactical", "physical", "mentality"]) {
+    const sec = full?.[cat] || {};
+    for (const [key, sk] of Object.entries(sec)) {
+      if (!sk || typeof sk !== "object") continue;
+      if (sk.cannot_evaluate || typeof sk.score !== "number") continue;
+      out.push({
+        key, category: cat,
+        label: SKILL_LABELS[key] || key.replace(/_/g, " "),
+        score: sk.score,
+        notes: sk.notes || "",
+        confidence: String(sk.confidence || "").toLowerCase(),
+        tier: String(sk.tier_for_age || "").toLowerCase(),
+        evidence: Array.isArray(sk.evidence) ? sk.evidence : [],
+        verdict: sk.verdict || "",
+      });
+    }
+  }
+  return out;
+}
+
+function buildFrameLookup(full) {
+  const comments = Array.isArray(full?.video_comments) ? full.video_comments : [];
+  const entries = comments
+    .filter((c) => c && c.frame_url)
+    .map((c) => ({ ts: c.timestamp, sec: tsToSeconds(c.timestamp), url: c.frame_url }));
+  const used = new Set();
+  const find = (ts) => {
+    const sec = tsToSeconds(ts);
+    let best = null;
+    for (const e of entries) {
+      if (used.has(e.url)) continue;
+      if (ts && e.ts === ts) { best = e; break; }
+      if (sec != null && e.sec != null) {
+        const d = Math.abs(e.sec - sec);
+        if (d <= 8 && (!best || d < Math.abs((best.sec ?? 999) - sec))) best = e;
+      }
+    }
+    if (!best) best = entries.find((e) => !used.has(e.url)) || null;
+    if (best) used.add(best.url);
+    return best ? best.url : null;
+  };
+  return { entries, find };
+}
+
+export function deriveV2(report) {
+  const full = report?.full_report || {};
+  const pd = report?.player_details || {};
+  const skills = collectSkills(full);
+  const frames = buildFrameLookup(full);
+  const scoutView = full.scout_view || {};
+  const pa = full.potential_assessment || {};
+  const ob = full.overall_benchmark || {};
+  const obTier = String(ob.tier || "").toLowerCase();
+
+  // ---- Top strengths (4 highest observed skills) ----
+  const confRank = { high: 2, medium: 1, low: 0 };
+  const topStrengths = [...skills]
+    .sort((a, b) => b.score - a.score || (confRank[b.confidence] ?? 0) - (confRank[a.confidence] ?? 0))
+    .slice(0, 4)
+    .map((s) => {
+      const ev = s.evidence.find((e) => e && e.timestamp && e.timestamp !== "General");
+      return {
+        name: s.label, score: s.score, category: s.category,
+        note: firstSentences(s.notes, 130),
+        timestamp: ev?.timestamp || null,
+        thumb: frames.find(ev?.timestamp),
+      };
+    });
+
+  // ---- Development priorities ----
+  let devPriorities = Array.isArray(full.development_priorities_detailed) && full.development_priorities_detailed.length
+    ? full.development_priorities_detailed.slice(0, 3).map((p) => ({
+        name: p.name, score: typeof p.score === "number" ? p.score : null,
+        issue: firstSentences(p.issue, 150), howTo: firstSentences(p.how_to_improve, 150),
+      }))
+    : [...skills].sort((a, b) => a.score - b.score).slice(0, 3).map((s) => ({
+        name: s.label, score: s.score,
+        issue: firstSentences(s.notes, 150),
+        howTo: firstSentences(s.verdict.split("focus on")[1] || s.verdict, 150),
+      }));
+
+  // ---- Age comparison (6 skills, best percentile first) ----
+  const ageComparison = [...skills]
+    .filter((s) => TIER_PERCENTILE[s.tier])
+    .sort((a, b) => (TIER_PERCENTILE[b.tier]?.width ?? 0) - (TIER_PERCENTILE[a.tier]?.width ?? 0) || b.score - a.score)
+    .slice(0, 6)
+    .map((s) => ({ name: s.label, ...TIER_PERCENTILE[s.tier] }));
+
+  // ---- Snapshot ----
+  const snap = full.snapshot || {};
+  const snapshot = {
+    biggestStrength: snap.biggest_strength || firstSentences(scoutView.key_strengths?.[0], 45) || "—",
+    developmentArea: snap.biggest_development_area || firstSentences(scoutView.development_priorities?.[0], 45) || "—",
+    hiddenTalent: snap.hidden_talent || firstSentences(scoutView.key_strengths?.slice(-1)[0], 45) || "—",
+    nextMilestone: snap.next_milestone || firstSentences(pa.three_month_focus, 45) || "—",
+    progressNote: snap.overall_progress_note || "On the right track!",
+  };
+
+  // ---- Roadmap ----
+  const rm = full.development_roadmap || {};
+  const roadmap = [
+    { key: "NOW", text: rm.now || "Build confidence and technical foundation" },
+    { key: "3 MONTHS", text: rm.three_months || firstSentences(pa.three_month_focus, 60) || "Sharpen the main development area" },
+    { key: "6 MONTHS", text: rm.six_months || firstSentences(ob.what_separates_from_next_tier, 60) || "Close the gap to the next level" },
+    { key: "12 MONTHS", text: rm.twelve_months || firstSentences(pa.recommended_next_step, 60) || "High impact in matches" },
+  ];
+
+  // ---- Training week (map plan exercises onto days) ----
+  const exercises = full.training_plan?.exercises || [];
+  const trainingWeek = [
+    { day: "MON", name: exercises[0]?.name || "Technical work", mins: exercises[0]?.duration || "" },
+    { day: "WED", name: exercises[1]?.name || "Skill drills", mins: exercises[1]?.duration || "" },
+    { day: "FRI", name: exercises[2]?.name || "Game moves", mins: exercises[2]?.duration || "" },
+    { day: "WEEKEND", name: exercises[3]?.name || "Match Challenge", mins: exercises[3]?.duration || "" },
+  ];
+
+  // ---- Parent summary / tips / coach notes ----
+  const ps = full.parent_summary || {};
+  const parentSummary = {
+    headline: ps.headline || firstSentences(full.executive_summary, 110),
+    paragraphs: Array.isArray(ps.paragraphs) && ps.paragraphs.length
+      ? ps.paragraphs.slice(0, 2)
+      : [firstSentences(full.executive_summary, 260), firstSentences(full.final_summary, 260)].filter(Boolean),
+    goodNews: ps.good_news || firstSentences(pa.development_potential, 220),
+  };
+  const parentTips = Array.isArray(full.parent_tips) && full.parent_tips.length
+    ? full.parent_tips.slice(0, 4)
+    : [
+        "Praise effort and brave decisions, not just goals.",
+        "Encourage trying new skills in games.",
+        "Support training, rest and healthy habits.",
+        "Be the biggest fan and enjoy the journey together!",
+      ];
+  const coachNotes = Array.isArray(full.coach_notes) && full.coach_notes.length
+    ? full.coach_notes.slice(0, 6)
+    : [
+        ...(scoutView.development_priorities || []).slice(0, 3),
+        scoutView.positional_suitability ? `Perfect role: ${scoutView.positional_suitability}` : null,
+        pa.three_month_focus ? `Focus in training: ${firstSentences(pa.three_month_focus, 90)}` : null,
+      ].filter(Boolean);
+
+  // ---- Scout outlook ----
+  const so = full.scout_outlook || {};
+  const nextTier = NEXT_TIER[obTier] || obTier;
+  const scoutOutlook = {
+    currentLabel: so.current_level_label || ob.tier_label || TIER_LABELS[obTier] || "—",
+    currentDots: so.current_level_dots || TIER_DOTS[obTier] || 3,
+    potentialLabel: so.potential_level_label || TIER_LABELS[nextTier] || "—",
+    potentialDots: so.potential_level_dots || Math.min(5, (TIER_DOTS[obTier] || 3) + 1),
+    readiness: so.recruitment_readiness || (obTier === "elite_academy" ? "High — Trial Ready" : obTier === "pro_academy" ? "Medium — Keep Developing" : "Early — Keep Building"),
+    longTerm: so.long_term_potential || (/very high|high/i.test(pa.development_potential || "") ? "High" : "Medium"),
+    longTermNote: so.long_term_note || firstSentences(pa.development_potential, 140),
+  };
+
+  // ---- Match stats ----
+  const ms = full.match_stats || null;
+  const matchStats = ms ? [
+    { label: "Total Actions", value: ms.total_actions, pct: Math.min(100, ((ms.total_actions || 0) / 80) * 100) },
+    { label: "Successful Dribbles", value: ms.successful_dribbles, pct: Math.min(100, ((ms.successful_dribbles || 0) / 12) * 100) },
+    { label: "Key Passes", value: ms.key_passes, pct: Math.min(100, ((ms.key_passes || 0) / 8) * 100) },
+    { label: "Shots", value: ms.shots, pct: Math.min(100, ((ms.shots || 0) / 8) * 100) },
+    { label: "Duels Won", value: ms.duels_won, pct: (() => { const m = String(ms.duels_won || "").match(/(\d+)\s*\/\s*(\d+)/); return m && +m[2] > 0 ? (+m[1] / +m[2]) * 100 : 50; })() },
+    { label: "Minutes Analysed", value: `${ms.minutes_analysed ?? "—"}'`, pct: Math.min(100, ((ms.minutes_analysed || 0) / 90) * 100) },
+  ].filter((r) => r.value !== undefined && r.value !== null) : null;
+
+  // ---- Video highlight ----
+  const vc = (full.video_comments || []).filter((c) => c && c.timestamp);
+  const videoHighlight = vc.length
+    ? { timestamp: vc[0].timestamp, caption: vc[0].comment, thumb: vc[0].frame_url || null }
+    : null;
+
+  // ---- Overall gauge ----
+  const overall = typeof full.scores?.overall_development === "number" ? full.scores.overall_development : null;
+  const ageBracket = ob.age_bracket_used || null;
+
+  return {
+    playerType: full.player_type || "",
+    overall, ageBracket,
+    stars: overall != null ? Math.round(overall / 2) : 0,
+    positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
+    topStrengths, devPriorities, ageComparison, snapshot, roadmap,
+    trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
+    matchStats, videoHighlight,
+  };
+}
