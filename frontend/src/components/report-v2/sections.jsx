@@ -134,7 +134,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
                 data-testid={`v2-strength-play-${i}`}
                 className="relative w-[140px] h-[80px] rounded-[9px] overflow-hidden border border-[#E5DFCE] shrink-0 hidden md:block group"
               >
-                <img src={thumb} alt={s.name} className="w-full h-full object-cover" />
+                <img src={thumb} alt={s.name} loading="lazy" className="w-full h-full object-cover" />
                 <span className="absolute inset-0 flex items-center justify-center">
                   <span className="w-8 h-8 rounded-full bg-[#0A190F]/75 border-[1.5px] border-white/85 flex items-center justify-center transition-transform group-hover:scale-110">
                     <Play className="w-3 h-3 text-white fill-white ml-0.5" />
@@ -298,7 +298,7 @@ export function VideoHighlightCard({ videoHighlight, videoUrl, posterUrl, videoR
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
-          videoHighlight?.thumb && <img src={videoHighlight.thumb} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          videoHighlight?.thumb && <img src={videoHighlight.thumb} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         )}
         {videoHighlight?.timestamp && (
           <span className="absolute left-3 bottom-12 bg-[#0A190F]/85 text-white font-barlow font-extrabold text-[13px] px-2.5 py-0.5 rounded-[5px] pointer-events-none">

@@ -27,6 +27,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 5-6, 2026) — Premium Report V2 (pixel-perfect redesign, user-approved)
+- **Premium Report V2 REPLACES the old premium report layout** whenever `unlocked && full_report` (ReportPage.jsx early-return ~line 1968). Locked/free-preview + generating states keep the original layout. Old reports render V2 via fallbacks (user declared them irrelevant).
+- New files: `frontend/src/components/report-v2/PremiumReportV2.jsx` (header wordmark-only — user required NO "S" logo mark; Row1 hero/parent-summary/gauge; footer), `sections.jsx` (Snapshot, MatchStats, AgeComparison, TopStrengths w/ real video-frame thumbnails + play-seek, DevPriorities + HowToImprove, Roadmap, TrainingPlan, ParentTips, VideoHighlight w/ real <video>, CoachNotes, ScoutOutlook), `derive.js` (maps full_report → V2 shapes w/ graceful fallbacks).
+- **Backend prompt extension (presentation-only, evaluation logic untouched)**: FULL_REPORT_PROMPT now also outputs match_stats, parent_summary, parent_tips, coach_notes, snapshot, development_roadmap, development_priorities_detailed (exactly 3), scout_outlook + consistency rules.
+- **Durable evidence frames**: new `_persist_video_frames` runs at end of `generate_full_report_task` — extracts REAL player-verified frames while video is local, flushes to R2, persists `/api/media/...` URLs into full_report.video_comments (ensure_video_frames now skips durable URLs + accepts video_path_override).
+- UX fixes post-test: hero photo falls back subject_crop→marker→poster when crop is a degenerate sliver (<120px or aspect<0.45); strength-thumb click waits for loadedmetadata, retries muted on autoplay rejection; lazy-loaded thumbs.
+- Static approved mockup kept at `/frontend/public/mockup-report.html` (+ /mockup-assets) — the pixel spec.
+- Tested: iteration_59.json — 100% pass (18/18 V2 sections, PDF 200, seek verified in real Chrome, old-format fallback zero console errors, 52/52 regression pytest). ⚠️ Verified in PREVIEW — user must REDEPLOY to scoutmeplay.com.
+
 ### Session (Jul 4, 2026) — Admin-granted Premium fix + Premium UI polish
 - **ROOT-CAUSE FIX (recurring "blurred page for Premium users")**: Admin "Grant Access" premium/vip users keep `role="user"` with premium stored in `user.subscription.tier`. All frontend premium checks only inspected `user.role` → those users got the blurred free-tier HeroTeaser after analysis. Fixed in 3 layers:
   1. Backend: `UserPublic` now returns `subscription_tier` (login, /auth/me, reset-password) via `_has_active_subscription(user)`.

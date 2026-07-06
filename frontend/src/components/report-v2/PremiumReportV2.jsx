@@ -2,7 +2,7 @@
 // design (see /public/mockup-report.html for the spec mockup). Pure presentation:
 // all values come from the existing full_report analysis via derive.js.
 
-import React, { useRef, useCallback } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { Star, Users } from "lucide-react";
 import { deriveV2, tsToSeconds } from "./derive";
 import {
@@ -47,11 +47,33 @@ function V2PageHeader({ reportDate }) {
   );
 }
 
-function PlayerHeroCard({ playerDetails, photo, positionAbbr }) {
+function HeroPhoto({ candidates, alt }) {
+  const [idx, setIdx] = useState(0);
+  const src = candidates[idx];
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      data-testid="v2-player-photo"
+      className="w-full h-full object-cover"
+      onError={() => setIdx((i) => i + 1)}
+      onLoad={(e) => {
+        const im = e.currentTarget;
+        // Degenerate crops (tiny or extreme slivers) can't carry the hero —
+        // step to the next candidate (marker frame, then poster).
+        const w = im.naturalWidth, h = im.naturalHeight;
+        if (w < 120 || h < 120 || w / h < 0.45) setIdx((i) => i + 1);
+      }}
+    />
+  );
+}
+
+function PlayerHeroCard({ playerDetails, photoCandidates, positionAbbr }) {
   return (
     <div className="bg-white border border-[#E5DFCE] rounded-[14px] shadow-[0_2px_10px_rgba(30,50,35,0.06)] overflow-hidden flex flex-col" data-testid="v2-player-hero-card">
       <div className="relative h-[260px] md:h-[280px] bg-[#0F2A1A]">
-        {photo && <img src={photo} alt={playerDetails.player_name} className="w-full h-full object-cover" data-testid="v2-player-photo" />}
+        <HeroPhoto candidates={photoCandidates} alt={playerDetails.player_name} />
         <div aria-hidden className="absolute inset-0 bg-gradient-to-tr from-[#12402A]/25 to-transparent" />
         <div className="absolute top-4 right-4 bg-white/95 rounded-[12px] px-4 py-2.5 text-center">
           <div className="font-barlow font-black text-[30px] leading-[0.9] text-[#12402A]">{positionAbbr}</div>
@@ -157,7 +179,11 @@ export default function PremiumReportV2({ report, assetBase }) {
   const pd = report.player_details || {};
   const videoRef = useRef(null);
 
-  const photo = resolveUrl(report.subject_crop_url, assetBase) || resolveUrl(report.marker_url, assetBase) || resolveUrl(report.poster_url, assetBase);
+  const photoCandidates = [
+    resolveUrl(report.subject_crop_url, assetBase),
+    resolveUrl(report.marker_url, assetBase),
+    resolveUrl(report.poster_url, assetBase),
+  ].filter(Boolean);
   const videoUrl = report.demo ? null : resolveUrl(report.video_url, assetBase);
   const posterUrl = resolveUrl(report.poster_url, assetBase) || resolveUrl(report.marker_url, assetBase);
 
@@ -167,10 +193,18 @@ export default function PremiumReportV2({ report, assetBase }) {
     const v = videoRef.current;
     if (!v) return;
     const sec = tsToSeconds(ts);
-    if (sec != null) { try { v.currentTime = sec; } catch { /* noop */ } }
+    const seekPlay = () => {
+      if (sec != null) { try { v.currentTime = sec; } catch { /* noop */ } }
+      const p = v.play();
+      // Unmuted autoplay can be rejected — retry muted so playback always starts.
+      if (p?.catch) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
+    };
     v.scrollIntoView({ behavior: "smooth", block: "center" });
-    const p = v.play();
-    if (p?.catch) p.catch(() => {});
+    if (v.readyState >= 1) seekPlay();
+    else {
+      v.addEventListener("loadedmetadata", seekPlay, { once: true });
+      try { v.load(); } catch { /* noop */ }
+    }
   }, []);
 
   // Resolve derived thumbnail URLs against the API base
@@ -183,7 +217,7 @@ export default function PremiumReportV2({ report, assetBase }) {
 
       {/* Row 1 — hero / parent summary / score */}
       <div className="grid lg:grid-cols-[1fr_1.22fr_1fr] gap-4 mb-4">
-        <PlayerHeroCard playerDetails={pd} photo={photo} positionAbbr={d.positionAbbr} />
+        <PlayerHeroCard playerDetails={pd} photoCandidates={photoCandidates} positionAbbr={d.positionAbbr} />
         <ParentSummaryCard parentSummary={d.parentSummary} />
         <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} />
       </div>
