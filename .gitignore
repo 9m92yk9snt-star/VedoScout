@@ -88,8 +88,6 @@ frontend/node_modules/.cache/default-development/3.pack
 frontend/node_modules/.cache/default-development/4.pack_
 frontend/node_modules/.cache/default-development/6.pack
 frontend/node_modules/.cache/default-development/8.pack
-backend/uploads/f43b0b89-112d-4767-9588-d8955d131930.mp4
-backend/uploads/f43b0b89-112d-4767-9588-d8955d131930.mp4
 frontend/node_modules/.cache/default-development/7.pack_
 frontend/node_modules/.cache/default-development/10.pack
 frontend/node_modules/.cache/default-development/11.pack
@@ -114,19 +112,10 @@ frontend/node_modules/.cache/default-development/30.pack
 frontend/node_modules/.cache/default-development/40.pack
 frontend/node_modules/.cache/default-development/49.pack
 frontend/node_modules/.cache/default-development/54.pack
-backend/uploads/ffe249b4-f298-47a7-9cb8-7502345fef37.mov
-backend/uploads/f4a3ec33-2779-4ba3-89da-202b98be2ce0.mov
-backend/uploads/9ad1b87c-d665-4af9-b8eb-112008ce0fe8.mov
-backend/uploads/56f06cbb-1d4e-4f3c-bfa3-2ed6c848a2e9.mov
-backend/uploads/a97ba69a-e8e4-45ff-ac84-c061a1436da2.mov
-backend/uploads/a97ba69a-e8e4-45ff-ac84-c061a1436da2.mov
-backend/uploads/a97ba69a-e8e4-45ff-ac84-c061a1436da2.mov
-backend/uploads/68bd1d0e-db3e-42b4-bf2c-ed8897acf164.mov
 frontend/node_modules/.cache/default-development/22.pack
 frontend/node_modules/.cache/default-development/29.pack
 frontend/node_modules/.cache/default-development/23.pack
 frontend/node_modules/.cache/default-development/31.pack
-backend/uploads/18910462-8e10-41b3-a952-24d9dcd3e0ba.mov
 frontend/node_modules/.cache/default-development/32.pack
 frontend/node_modules/.cache/default-development/34.pack
 frontend/node_modules/.cache/default-development/35.pack
@@ -204,3 +193,9 @@ frontend/node_modules/.cache/default-development/166.pack
 frontend/node_modules/.cache/default-development/164.pack
 frontend/node_modules/.cache/default-development/165.pack
 frontend/node_modules/.cache/default-development/167.pack
+
+# Runtime artifacts — never ship preview-generated media in the repo
+backend/uploads/*
+!backend/uploads/demo_videos/
+backend/pdfs/
+backend/uploads/f43b0b89-112d-4767-9588-d8955d131930.mp4
