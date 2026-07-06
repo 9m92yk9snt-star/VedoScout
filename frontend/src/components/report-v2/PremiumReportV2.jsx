@@ -231,7 +231,7 @@ export default function PremiumReportV2({ report, assetBase }) {
 
       {/* Row 3 — top strengths / development priorities */}
       <div className="grid lg:grid-cols-[1.16fr_1fr] gap-4 mb-4">
-        <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={posterUrl} />
+        <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl} />
         <DevPrioritiesCard devPriorities={d.devPriorities} />
       </div>
 

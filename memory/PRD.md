@@ -27,6 +27,12 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 6, 2026) — Player Identity Tracking A+B (P0) DONE ✅
+- **Problem**: Gemini occasionally evaluated/showed the WRONG player in evidence clips (recurred 2+ times). User approved plan "A+B".
+- **A — stronger anchors**: `precision_engine.py` now accepts up to 10 marker taps (was 6) and doubles the player crop size. All anchor crops are uploaded to Cloudflare R2 (`crop_r2_url`) so they survive pod restarts; `_try_restore_from_r2` re-downloads on demand.
+- **B — cross-model verification layer**: new `backend/identity_verify.py` — after full-report generation, every evidence frame is checked by GPT-4o vision (Emergent LLM key, `emergentintegrations`): "is the tapped player from the reference crops visible in this frame?" Conservative policy: only HIGH-confidence rejection drops a frame; low-confidence approval never counts as verified. Failing frames are re-windowed (±3/±6 s) then dropped (`frame_url=None`) — no thumbnail beats the wrong player. Integration in `server.py` `_verify_enriched_frames` (~line 5599), called from `_persist_video_frames` before R2 flush; fully best-effort (any error → pipeline behaves as before).
+- **VERIFIED (Jul 6)**: live production-like run (report fb357d3a…) — pipeline steps 3→4→5 completed, `[identity] 3 frames checked · 3 verified · 0 dropped` (all high-confidence GPT-4o matches), Mongo doc shows `identity_verified: true` on all video_comments + 8 anchors with R2 crop URLs. Login + frontend smoke-tested OK. ⚠️ User must REDEPLOY to scoutmeplay.com for production effect.
+
 ### Session (Jul 6, 2026) — Chunked Video Uploads (P0 — Cloudflare 100 MB bypass) DONE
 - New self-contained `backend/chunked_upload.py` (pattern-matches url_video_fetch.py): `POST /api/me/chunked-upload/init|chunk|complete|abort`. Chunks ≤32 MB staged in `uploads/chunks/{upload_id}` (per-user ownership via meta.json, stale sweep >12h on init), assembled into `url-fetch-{token}.{ext}` so the EXISTING `/reports/upload` `temp_video_token` path consumes it — zero changes to the upload pipeline. Caps: 500 MB total, 64 chunks.
 - Frontend UploadPage: files >80 MB automatically slice into 24 MB chunks (init → sequential chunk posts w/ aggregate progress → complete → submit form with temp_video_token). ≤80 MB keeps the old direct path. Guard raised 95→500 MB; UI copy + 413 message updated.

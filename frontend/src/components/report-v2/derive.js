@@ -72,7 +72,7 @@ function collectSkills(full) {
 function buildFrameLookup(full) {
   const comments = Array.isArray(full?.video_comments) ? full.video_comments : [];
   const entries = comments
-    .filter((c) => c && c.frame_url)
+    .filter((c) => c && c.frame_url && c.identity_verified !== false)
     .map((c) => ({ ts: c.timestamp, sec: tsToSeconds(c.timestamp), url: c.frame_url }));
   const used = new Set();
   const find = (ts) => {
@@ -214,10 +214,11 @@ export function deriveV2(report) {
     { label: "Minutes Analysed", value: `${ms.minutes_analysed ?? "—"}'`, pct: Math.min(100, ((ms.minutes_analysed || 0) / 90) * 100) },
   ].filter((r) => r.value !== undefined && r.value !== null) : null;
 
-  // ---- Video highlight ----
+  // ---- Video highlight (prefer an identity-verified frame) ----
   const vc = (full.video_comments || []).filter((c) => c && c.timestamp);
-  const videoHighlight = vc.length
-    ? { timestamp: vc[0].timestamp, caption: vc[0].comment, thumb: vc[0].frame_url || null }
+  const vcBest = vc.find((c) => c.frame_url && c.identity_verified !== false) || vc[0];
+  const videoHighlight = vcBest
+    ? { timestamp: vcBest.timestamp, caption: vcBest.comment, thumb: vcBest.identity_verified === false ? null : vcBest.frame_url || null }
     : null;
 
   // ---- Overall gauge ----

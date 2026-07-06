@@ -239,7 +239,23 @@ def extract_player_fingerprint(
     crop_path_out: Optional[str] = None
     if crop_save_path:
         try:
-            cv2.imwrite(str(crop_save_path), crop, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+            # B2 — save a CONTEXT-PADDED, upscaled crop as the visual identity
+            # reference (colour extraction above still uses the tight box, so
+            # the fingerprint is unaffected by the extra background pixels).
+            ih, iw = img.shape[:2]
+            bw, bh = (x1 - x0), (y1 - y0)
+            px0 = max(0, int(x0 - bw * 0.55))
+            py0 = max(0, int(y0 - bh * 0.30))
+            px1 = min(iw, int(x1 + bw * 0.55))
+            py1 = min(ih, int(y1 + bh * 0.30))
+            visual = img[py0:py1, px0:px1]
+            if visual.size == 0:
+                visual = crop
+            vh, vw = visual.shape[:2]
+            if 0 < vh < 300:
+                scale = 300.0 / vh
+                visual = cv2.resize(visual, (max(1, int(vw * scale)), 300), interpolation=cv2.INTER_CUBIC)
+            cv2.imwrite(str(crop_save_path), visual, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
             crop_path_out = str(crop_save_path)
         except Exception as e:
             logger.warning(f"Could not save subject crop: {e}")

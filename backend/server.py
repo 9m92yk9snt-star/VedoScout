@@ -4963,7 +4963,9 @@ async def analyze_preview_task(report_id: str):
                     all_anchors = []
             except Exception:
                 all_anchors = []
-            for idx, a in enumerate(all_anchors[1:6], start=2):
+            # B1 — use ALL Scout Mode taps (up to 10) as identity anchors,
+            # not just the first six. More sightings = stronger lock.
+            for idx, a in enumerate(all_anchors[1:10], start=2):
                 try:
                     t_anchor = float(a.get("t", 0.0))
                     box_anchor = a.get("box") or {}
@@ -4999,6 +5001,19 @@ async def analyze_preview_task(report_id: str):
                     logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
 
         # Persist fingerprint + anchors
+        # B3 — flush anchor crops to R2 so full-report regenerations after a
+        # pod restart still have the visual identity references.
+        if r2_storage.is_configured():
+            for a in extra_anchors_payload:
+                cf = a.get("crop_filename")
+                p = (UPLOAD_DIR / cf) if cf else None
+                if p and p.exists():
+                    try:
+                        a["crop_r2_url"] = r2_storage.upload_file(
+                            f"reports/{report_id}/anchors/{cf}", p, "image/jpeg",
+                        )
+                    except Exception as e:
+                        logger.warning(f"R2 anchor crop flush failed {report_id}/{cf}: {e}")
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -5536,6 +5551,110 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     return {"status": "generating", "report_id": report_id, "full_report_status": "generating"}
 
 
+def _try_restore_from_r2(url: Optional[str], dest: Path) -> bool:
+    """Best-effort re-download of a small artifact (marker / crop) from R2
+    when the local copy was lost to a pod restart. Never raises."""
+    try:
+        if not url or not r2_storage.is_configured():
+            return False
+        key = r2_storage.key_from_url(url)
+        if not key:
+            return False
+        return r2_storage.download_to_file(key, dest)
+    except Exception:
+        return False
+
+
+def _identity_ref_crops(doc: dict) -> list[str]:
+    """Reference crops of the tapped player for identity verification —
+    subject crop + up to two extra anchors (anchor 1 IS the subject crop)."""
+    out: list[str] = []
+    cf = doc.get("subject_crop_filename")
+    if cf:
+        p = UPLOAD_DIR / cf
+        if not p.exists():
+            _try_restore_from_r2(doc.get("subject_crop_url_override"), p)
+        if p.exists():
+            out.append(str(p))
+    for a in (doc.get("anchors") or [])[1:3]:
+        cf = a.get("crop_filename") if isinstance(a, dict) else None
+        if not cf:
+            continue
+        p = UPLOAD_DIR / cf
+        if not p.exists() and isinstance(a, dict):
+            _try_restore_from_r2(a.get("crop_r2_url"), p)
+        if p.exists():
+            out.append(str(p))
+    return out[:3]
+
+
+def _mmss_to_secs(ts) -> Optional[float]:
+    try:
+        m, s = str(ts).split(":")
+        return int(m) * 60 + int(s)
+    except Exception:
+        return None
+
+
+async def _verify_enriched_frames(
+    report_id: str, doc: dict, video_path: Path, frames_dir: Path,
+    enriched: list, ref_crops: list[str],
+) -> None:
+    """Layer A — cross-model (GPT vision) identity check of every evidence frame.
+    Failing frames are re-windowed (±3/±6 s); still-unverified frames are dropped."""
+    fp = doc.get("fingerprint") or {}
+    jersey = fp.get("jersey_name", "unclear")
+    shorts = fp.get("shorts_name", "unclear")
+    checked = 0
+    for i, c in enumerate(enriched):
+        if not isinstance(c, dict):
+            continue
+        fu = c.get("frame_url") or ""
+        if not fu.startswith("/api/uploads/frames/") or checked >= 8:
+            continue
+        checked += 1
+        frame_path = frames_dir / Path(fu).name
+        if not frame_path.exists():
+            continue
+        verdict = await verify_frame_identity(
+            EMERGENT_LLM_KEY, f"idv-{report_id}-{i}", ref_crops, str(frame_path), jersey, shorts,
+        )
+        if verdict is None:
+            c["identity_verified"] = None
+            continue
+        if verdict:
+            c["identity_verified"] = True
+            continue
+        # Wrong player at the claimed second — try nearby frames for the same moment.
+        sec = _mmss_to_secs(c.get("timestamp"))
+        fixed = False
+        if sec is not None and video_path.exists():
+            for off in (3.0, -3.0, 6.0):
+                ts2 = max(0.0, sec + off)
+                cand = frames_dir / f".idv_{i}_{ts2:.1f}.jpg"
+                if not extract_frame_at(video_path, ts2, cand):
+                    continue
+                v2 = await verify_frame_identity(
+                    EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-{off:+.0f}", ref_crops, str(cand), jersey, shorts,
+                )
+                if v2:
+                    shutil.move(str(cand), str(frame_path))
+                    c["identity_verified"] = True
+                    c["frame_ts_adjusted"] = off
+                    fixed = True
+                    break
+                cand.unlink(missing_ok=True)
+        if not fixed:
+            # Honest fallback: no thumbnail is better than the wrong player.
+            c["identity_verified"] = False
+            c["frame_url"] = None
+            frame_path.unlink(missing_ok=True)
+    if checked:
+        verified = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is True)
+        dropped = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is False)
+        logger.info(f"[identity] {report_id}: {checked} frames checked · {verified} verified · {dropped} dropped")
+
+
 async def _persist_video_frames(report_id: str, video_path) -> None:
     """Extract REAL evidence frames right after full-report generation (while the
     video is guaranteed local), then flush them to R2 and persist the durable
@@ -5546,6 +5665,13 @@ async def _persist_video_frames(report_id: str, video_path) -> None:
     frames_dir = UPLOAD_DIR / "frames" / str(report_id)
     shutil.rmtree(frames_dir, ignore_errors=True)  # drop any cached placeholders
     enriched = await asyncio.to_thread(ensure_video_frames, doc, str(video_path))
+    # Layer A — GPT-vision identity gate before the frames are published.
+    try:
+        ref_crops = _identity_ref_crops(doc)
+        if ref_crops:
+            await _verify_enriched_frames(report_id, doc, Path(str(video_path)), frames_dir, enriched, ref_crops)
+    except Exception:
+        logger.exception(f"identity verification layer failed for {report_id}")
     if r2_storage.is_configured():
         for c in enriched:
             if not isinstance(c, dict):
@@ -5598,12 +5724,16 @@ async def generate_full_report_task(report_id: str) -> None:
         marker_path = None
         if doc.get("marker_filename"):
             mp = UPLOAD_DIR / doc["marker_filename"]
+            if not mp.exists():
+                _try_restore_from_r2(doc.get("marker_url_override"), mp)
             if mp.exists():
                 marker_path = str(mp)
 
         crop_path_str = None
         if doc.get("subject_crop_filename"):
             cp = UPLOAD_DIR / doc["subject_crop_filename"]
+            if not cp.exists():
+                _try_restore_from_r2(doc.get("subject_crop_url_override"), cp)
             if cp.exists():
                 crop_path_str = str(cp)
 
@@ -5614,6 +5744,8 @@ async def generate_full_report_task(report_id: str) -> None:
             if not cf:
                 continue
             p = UPLOAD_DIR / cf
+            if not p.exists() and isinstance(a, dict):
+                _try_restore_from_r2(a.get("crop_r2_url"), p)
             if p.exists():
                 anchor_crops_full.append(str(p))
 
@@ -10683,6 +10815,7 @@ from blog_routes import build_blog_router, mount_blog_uploads
 from blog_seo import build_seo_router
 from url_video_fetch import build_url_fetch_router, resolve_temp_token_path
 from chunked_upload import build_chunked_upload_router
+from identity_verify import verify_frame_identity
 from progress_tracking import (
     build_progress_router,
     find_or_create_profile,
