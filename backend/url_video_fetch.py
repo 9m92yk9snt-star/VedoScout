@@ -258,4 +258,16 @@ def resolve_temp_token_path(*, upload_dir: Path, token: str) -> Optional[Path]:
         candidate = upload_dir / f"url-fetch-{safe}.{ext}"
         if candidate.exists():
             return candidate
+    # R2 fallback — chunked uploads mirror the assembled file to `tmp/…` so it
+    # survives multi-pod routing / restarts in production.
+    try:
+        import r2_storage
+        if r2_storage.is_configured():
+            for ext in ("mp4", "mkv", "webm", "mov", "m4v"):
+                candidate = upload_dir / f"url-fetch-{safe}.{ext}"
+                if r2_storage.download_to_file(f"tmp/url-fetch-{safe}.{ext}", candidate):
+                    return candidate
+                candidate.unlink(missing_ok=True)
+    except Exception:
+        pass
     return None

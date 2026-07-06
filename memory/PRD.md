@@ -27,6 +27,11 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 6, 2026) — Chunked upload PRODUCTION fix: R2+Mongo sessions (P0) DONE ✅
+- **Bug (production only)**: upload reached ~45% then "Upload session not found or expired". Cause: chunk sessions were staged on LOCAL pod disk; production requests hit different pods/restarts → session invisible. Preview (single pod) never reproduced it.
+- **Fix**: `chunked_upload.py` rewritten — when R2 is configured, session meta lives in Mongo (`chunk_upload_sessions`, `_id`=upload_id) and chunk bytes in R2 (`chunks/{upload_id}/part_NNNNN`, 24h cache). `complete` assembles from R2 → local `url-fetch-{token}.{ext}` AND mirrors it to R2 `tmp/url-fetch-{token}.{ext}` so `/reports/upload` on ANY pod can consume the token: `resolve_temp_token_path` (url_video_fetch.py) now falls back to downloading `tmp/…` from R2; server.py deletes the tmp object after consumption. Local-disk mode kept as dev fallback. Stale sweep (12h) moved to Mongo + R2 delete.
+- **VERIFIED e2e via external URL**: 101 MB → 5 chunks → assembled SHA byte-identical; cross-pod simulated (local file deleted → R2 restore, SHA match); Mongo session + R2 parts cleaned after complete. ⚠️ REQUIRES REDEPLOY to take effect on scoutmeplay.com.
+
 ### Session (Jul 6, 2026) — Player Identity Tracking A+B (P0) DONE ✅
 - **Problem**: Gemini occasionally evaluated/showed the WRONG player in evidence clips (recurred 2+ times). User approved plan "A+B".
 - **A — stronger anchors**: `precision_engine.py` now accepts up to 10 marker taps (was 6) and doubles the player crop size. All anchor crops are uploaded to Cloudflare R2 (`crop_r2_url`) so they survive pod restarts; `_try_restore_from_r2` re-downloads on demand.

@@ -4515,7 +4515,13 @@ async def upload_video_and_create_preview(
 
     if using_temp_token:
         # Move the pre-downloaded temp file into the report-id naming convention
+        temp_r2_key = f"tmp/{temp_file_path.name}"
         shutil.move(str(temp_file_path), str(file_path))
+        try:
+            if r2_storage.is_configured():
+                r2_storage.delete_object(temp_r2_key)
+        except Exception:
+            pass
     else:
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -10837,6 +10843,7 @@ api_router.include_router(build_url_fetch_router(
 api_router.include_router(build_chunked_upload_router(
     upload_dir=UPLOAD_DIR,
     get_current_user=get_current_user,
+    db=db,
 ))
 api_router.include_router(build_progress_router(
     db=db,
