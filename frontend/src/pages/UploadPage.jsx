@@ -189,17 +189,14 @@ export default function UploadPage() {
 
   const handleFile = (f) => {
     if (!f) return;
-    // Session 129 — the Emergent K8s ingress nginx caps request bodies at
-    // ~100 MB (verified live: >100 MB → HTTP 413 Request Entity Too Large
-    // from the ingress, never reaches our FastAPI). Modern phone footage is
-    // easily above this — iPhone 4K @ 30 fps is ~350 MB/min. Reject before
-    // upload with a clear, actionable message instead of a generic "Upload
-    // failed" toast after wasted upload time.
-    const MAX_UPLOAD_BYTES = 95 * 1024 * 1024; // 95 MB — 5 MB safety margin
+    // Files above ~80 MB are sent as ≤24 MB chunks (see chunkedUpload below)
+    // to bypass the Cloudflare/ingress ~100 MB request-body cap. The hard
+    // ceiling is now 500 MB (matches the backend chunked-upload cap).
+    const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB
     if (f.size > MAX_UPLOAD_BYTES) {
       const sizeMb = (f.size / 1024 / 1024).toFixed(0);
       toast.error(
-        `Video is ${sizeMb} MB — our upload limit is 95 MB. Compress the clip (or trim to <2 min) and try again. Tip: iPhone → Settings › Camera › Record Video → 1080p HD at 30 fps.`,
+        `Video is ${sizeMb} MB — our upload limit is 500 MB. Trim the clip (max 5 min) and try again. Tip: iPhone → Settings › Camera › Record Video → 1080p HD at 30 fps.`,
         { duration: 12000 },
       );
       return;
@@ -299,6 +296,41 @@ export default function UploadPage() {
     setStudioOpen(true);
   };
 
+  // ── Chunked upload — bypasses the Cloudflare/ingress ~100 MB body cap ──
+  // Slices the file into ≤24 MB chunks, then assembles server-side into a
+  // temp video consumed via the existing `temp_video_token` upload path.
+  const CHUNK_SIZE = 24 * 1024 * 1024;
+  const DIRECT_LIMIT = 80 * 1024 * 1024; // ≤80 MB still goes as one request
+
+  const chunkedUpload = async (f) => {
+    const initFd = new FormData();
+    initFd.append("filename", f.name || "video.mp4");
+    initFd.append("total_size", String(f.size));
+    const { data: init } = await api.post("/me/chunked-upload/init", initFd);
+    const total = Math.ceil(f.size / CHUNK_SIZE);
+    let sent = 0;
+    for (let i = 0; i < total; i++) {
+      const blob = f.slice(i * CHUNK_SIZE, Math.min(f.size, (i + 1) * CHUNK_SIZE));
+      const cfd = new FormData();
+      cfd.append("upload_id", init.upload_id);
+      cfd.append("index", String(i));
+      cfd.append("chunk", blob, `part_${i}`);
+      await api.post("/me/chunked-upload/chunk", cfd, {
+        timeout: 300000,
+        onUploadProgress: (ev) => {
+          const done = sent + (ev.loaded || 0);
+          setUploadPct(Math.min(99, Math.round((done * 100) / f.size)));
+        },
+      });
+      sent += blob.size;
+    }
+    const doneFd = new FormData();
+    doneFd.append("upload_id", init.upload_id);
+    doneFd.append("total_chunks", String(total));
+    const { data: fin } = await api.post("/me/chunked-upload/complete", doneFd, { timeout: 300000 });
+    return fin.token;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
@@ -318,6 +350,21 @@ export default function UploadPage() {
     const fd = new FormData();
     if (file?._fromUrl && tempVideoToken) {
       fd.append("temp_video_token", tempVideoToken);
+    } else if (file.size > DIRECT_LIMIT) {
+      // Large file → chunked upload first, then submit only the token.
+      setUploadPhase("uploading");
+      setUploadPct(0);
+      let chunkToken = null;
+      try {
+        chunkToken = await chunkedUpload(file);
+      } catch (err) {
+        const msg = err?.response?.data?.detail || "Upload failed while sending the video. Please check your connection and try again.";
+        toast.error(typeof msg === "string" ? msg : "Upload failed. Please try again.");
+        setSubmitting(false);
+        setUploadPhase("idle");
+        return;
+      }
+      fd.append("temp_video_token", chunkToken);
     } else {
       fd.append("file", file);
     }
@@ -460,13 +507,11 @@ export default function UploadPage() {
       // 402 with structured detail = pre-pay required
       const detail = err?.response?.data?.detail;
       const status = err?.response?.status;
-      // Session 129 — 413 Request Entity Too Large. The Emergent K8s ingress
-      // nginx caps bodies at ~100 MB. Show a clear, actionable message.
-      // Kicks in on the rare edge where a URL-fetched video slips past the
-      // client-side 95 MB guard in handleFile().
+      // 413 Request Entity Too Large — a URL-fetched video slipped past the
+      // client-side guard (direct uploads >80 MB now go through chunking).
       if (status === 413) {
         toast.error(
-          "That clip is over the 100 MB upload limit. Compress it (or trim to under 2 minutes) and try again.",
+          "That clip is too large for a single request. Please use the Upload File tab — large files are sent in chunks automatically.",
           { duration: 12000 },
         );
       } else if (status === 402 && (detail?.code === "PREPAY_REQUIRED" || typeof detail === "object")) {
@@ -729,7 +774,7 @@ export default function UploadPage() {
                       <span className="block mt-1 text-forest font-bold">
                         Veo &amp; YouTube links can&apos;t be fetched directly — download the clip to your device, then use &ldquo;Upload File&rdquo; above.
                       </span>
-                      Max 95 MB · max 5 min.
+                      Max 500 MB · max 5 min.
                     </p>
                   </div>
                 )}

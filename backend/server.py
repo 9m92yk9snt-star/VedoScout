@@ -10682,6 +10682,7 @@ async def admin_delete_report(report_id: str, _=Depends(get_current_admin)):
 from blog_routes import build_blog_router, mount_blog_uploads
 from blog_seo import build_seo_router
 from url_video_fetch import build_url_fetch_router, resolve_temp_token_path
+from chunked_upload import build_chunked_upload_router
 from progress_tracking import (
     build_progress_router,
     find_or_create_profile,
@@ -10697,6 +10698,10 @@ api_router.include_router(build_blog_router(
 ))
 api_router.include_router(build_seo_router(db=db))
 api_router.include_router(build_url_fetch_router(
+    upload_dir=UPLOAD_DIR,
+    get_current_user=get_current_user,
+))
+api_router.include_router(build_chunked_upload_router(
     upload_dir=UPLOAD_DIR,
     get_current_user=get_current_user,
 ))

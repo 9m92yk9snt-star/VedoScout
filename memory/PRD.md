@@ -27,6 +27,11 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 6, 2026) — Chunked Video Uploads (P0 — Cloudflare 100 MB bypass) DONE
+- New self-contained `backend/chunked_upload.py` (pattern-matches url_video_fetch.py): `POST /api/me/chunked-upload/init|chunk|complete|abort`. Chunks ≤32 MB staged in `uploads/chunks/{upload_id}` (per-user ownership via meta.json, stale sweep >12h on init), assembled into `url-fetch-{token}.{ext}` so the EXISTING `/reports/upload` `temp_video_token` path consumes it — zero changes to the upload pipeline. Caps: 500 MB total, 64 chunks.
+- Frontend UploadPage: files >80 MB automatically slice into 24 MB chunks (init → sequential chunk posts w/ aggregate progress → complete → submit form with temp_video_token). ≤80 MB keeps the old direct path. Guard raised 95→500 MB; UI copy + 413 message updated.
+- VERIFIED: (1) curl through EXTERNAL URL — 116 MB in 5 chunks, assembled SHA256 byte-identical; (2) full browser e2e with 116 MB video — frontend fired init:1/chunks:5/complete:1, analysis ran, PremiumReadyOverlay shown; (3) chunks dir auto-cleaned. ⚠️ User must REDEPLOY to scoutmeplay.com.
+
 ### Session (Jul 5-6, 2026) — Premium Report V2 (pixel-perfect redesign, user-approved)
 - **Premium Report V2 REPLACES the old premium report layout** whenever `unlocked && full_report` (ReportPage.jsx early-return ~line 1968). Locked/free-preview + generating states keep the original layout. Old reports render V2 via fallbacks (user declared them irrelevant).
 - New files: `frontend/src/components/report-v2/PremiumReportV2.jsx` (header wordmark-only — user required NO "S" logo mark; Row1 hero/parent-summary/gauge; footer), `sections.jsx` (Snapshot, MatchStats, AgeComparison, TopStrengths w/ real video-frame thumbnails + play-seek, DevPriorities + HowToImprove, Roadmap, TrainingPlan, ParentTips, VideoHighlight w/ real <video>, CoachNotes, ScoutOutlook), `derive.js` (maps full_report → V2 shapes w/ graceful fallbacks).
