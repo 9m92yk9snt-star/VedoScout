@@ -3457,7 +3457,7 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
                 "-loglevel", "error",
                 str(out_path),
             ],
-            capture_output=True, timeout=180,
+            capture_output=True, timeout=420,
         )
         if result.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0:
             return out_path
@@ -4783,6 +4783,21 @@ async def _analyze_preview_task_with_timeout(report_id: str):
             logger.warning(f"Failed to mark report {report_id} as timed-out: {e}")
 
 
+async def _await_with_heartbeat(report_id: str, awaitable, interval: int = 45):
+    """Run a long task while stamping a watchdog heartbeat every `interval`s
+    so slow production CPUs (long ffmpeg / Gemini calls) aren't falsely swept
+    as stalled. Returns the task result; re-raises its exception."""
+    task = asyncio.ensure_future(awaitable)
+    while True:
+        done, _ = await asyncio.wait({task}, timeout=interval)
+        try:
+            await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat()})
+        except Exception:
+            pass
+        if done:
+            return task.result()
+
+
 async def analyze_preview_task(report_id: str):
     """Background task — runs ALL heavy work (ffmpeg transcoding, fingerprinting,
     poster, preview clip, audio peaks, content gate, preview generation) OUTSIDE
@@ -4842,7 +4857,11 @@ async def analyze_preview_task(report_id: str):
         # ============== TRANSCODE TO WEB-FRIENDLY MP4 ==============
         # Convert to H.264/AAC so the clip plays in every browser. Heavy ffmpeg —
         # was the #1 contributor to the Cloudflare 100 s timeout on production.
-        web_path = transcode_to_web_mp4(raw_path)
+        # Heavy ffmpeg in a worker thread + heartbeat every 45 s — a blocking
+        # run on the event loop froze /health in production → k8s killed the pod.
+        web_path = await _await_with_heartbeat(
+            report_id, asyncio.to_thread(transcode_to_web_mp4, raw_path)
+        )
         web_filename = web_path.name
         # If the transcode produced a NEW file (different name), update the doc so
         # the status endpoint can serve the playable file. If transcoding fell
@@ -4870,7 +4889,7 @@ async def analyze_preview_task(report_id: str):
                 logger.warning(f"raw-upload cleanup failed for {report_id}: {cleanup_err}")
 
         # ============== DURATION VALIDATION (5-min cap) ==============
-        duration_sec = get_video_duration_seconds(web_path)
+        duration_sec = await asyncio.to_thread(get_video_duration_seconds, web_path)
         if duration_sec > 305:  # buffer for rounding
             await db.reports.update_one(
                 {"id": report_id},
@@ -4901,7 +4920,7 @@ async def analyze_preview_task(report_id: str):
         )
 
         # ============== POSTER THUMBNAIL ==============
-        poster_path = generate_poster(web_path)
+        poster_path = await asyncio.to_thread(generate_poster, web_path)
         poster_filename = poster_path.name if poster_path else None
         if poster_filename:
             await db.reports.update_one(
@@ -4927,7 +4946,8 @@ async def analyze_preview_task(report_id: str):
 
             crop_filename = f"{report_id}-subject.jpg"
             crop_path = UPLOAD_DIR / crop_filename
-            fp = extract_player_fingerprint(
+            fp = await asyncio.to_thread(
+                extract_player_fingerprint,
                 marker_image_path=str(marker_path),
                 box=primary_box_data,
                 crop_save_path=str(crop_path),
@@ -4979,11 +4999,12 @@ async def analyze_preview_task(report_id: str):
                         continue
                     frame_filename = f"{report_id}-anchor-frame-{idx}.jpg"
                     frame_path = UPLOAD_DIR / frame_filename
-                    if not extract_frame_at(web_path, t_anchor, frame_path):
+                    if not await asyncio.to_thread(extract_frame_at, web_path, t_anchor, frame_path):
                         continue
                     crop_filename_a = f"{report_id}-anchor-{idx}.jpg"
                     crop_path_a = UPLOAD_DIR / crop_filename_a
-                    fp_a = extract_player_fingerprint(
+                    fp_a = await asyncio.to_thread(
+                        extract_player_fingerprint,
                         marker_image_path=str(frame_path),
                         box=box_anchor,
                         crop_save_path=str(crop_path_a),
@@ -5015,7 +5036,8 @@ async def analyze_preview_task(report_id: str):
                 p = (UPLOAD_DIR / cf) if cf else None
                 if p and p.exists():
                     try:
-                        a["crop_r2_url"] = r2_storage.upload_file(
+                        a["crop_r2_url"] = await asyncio.to_thread(
+                            r2_storage.upload_file,
                             f"reports/{report_id}/anchors/{cf}", p, "image/jpeg",
                         )
                     except Exception as e:
@@ -5026,13 +5048,17 @@ async def analyze_preview_task(report_id: str):
                 "fingerprint": fingerprint_payload,
                 "subject_crop_filename": crop_filename,
                 "anchors": extra_anchors_payload,
+                **_wd_heartbeat(),
             }},
         )
 
         # ============== PREVIEW CLIP + AUDIO PEAKS ==============
-        preview_clip_path = make_preview_clip(web_path, marker_seconds=marker_timestamp, window_seconds=15)
+        preview_clip_path = await _await_with_heartbeat(
+            report_id,
+            asyncio.to_thread(make_preview_clip, web_path, marker_seconds=marker_timestamp, window_seconds=15),
+        )
         try:
-            audio_events_preview = extract_audio_events(preview_clip_path, top_n=5)
+            audio_events_preview = await asyncio.to_thread(extract_audio_events, preview_clip_path, top_n=5)
         except Exception as e:
             logger.warning(f"Audio extraction failed (preview) for {report_id}: {e}")
             audio_events_preview = []
@@ -5042,6 +5068,7 @@ async def analyze_preview_task(report_id: str):
                 "audio_events_preview": [
                     {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_preview
                 ],
+                **_wd_heartbeat(),
             }},
         )
 
@@ -5105,7 +5132,9 @@ async def analyze_preview_task(report_id: str):
                 "gate_skipped_paid": True,
             }
         else:
-            gate = await run_content_gate(report_id, preview_clip_path, marker_path)
+            gate = await _await_with_heartbeat(
+                report_id, run_content_gate(report_id, preview_clip_path, marker_path)
+            )
         rejection = gate_rejection_message(gate)
         if rejection:
             # Soft-reject: persist the error so the user sees a friendly message
@@ -5151,14 +5180,14 @@ async def analyze_preview_task(report_id: str):
         # Step 3 → 4: building preview report
         await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat(step=4)})
         logger.info(f"[pipeline] {report_id} step 3→4 · Gemini preview call starting")
-        preview = await call_gemini_with_video(
+        preview = await _await_with_heartbeat(report_id, call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=preview_prompt,
             video_path=str(preview_clip_path),
             marker_path=str(marker_path),
             crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
             anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
-        )
+        ))
         preview = scrub_hedging(preview)
 
         # ============== PERSIST ==============
@@ -5260,7 +5289,7 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
             if vp.exists() and vp.stat().st_size > 0:
                 try:
                     key = f"reports/{report_id}/{vf}"
-                    url = r2_storage.upload_file(key, vp, "video/mp4")
+                    url = await asyncio.to_thread(r2_storage.upload_file, key, vp, "video/mp4")
                     updates["video_url_override"] = url
                     vp.unlink(missing_ok=True)
                 except Exception as e:
@@ -5274,7 +5303,7 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
             if pp.exists() and pp.stat().st_size > 0:
                 try:
                     key = f"reports/{report_id}/{pf}"
-                    url = r2_storage.upload_file(key, pp, "image/jpeg")
+                    url = await asyncio.to_thread(r2_storage.upload_file, key, pp, "image/jpeg")
                     updates["poster_url_override"] = url
                     pp.unlink(missing_ok=True)
                 except Exception as e:
@@ -5292,7 +5321,7 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
             if mp.exists() and mp.stat().st_size > 0:
                 try:
                     key = f"reports/{report_id}/{mf}"
-                    url = r2_storage.upload_file(key, mp, "image/jpeg")
+                    url = await asyncio.to_thread(r2_storage.upload_file, key, mp, "image/jpeg")
                     updates["marker_url_override"] = url
                     # Keep the local marker for admin re-runs — small file (~50 KB)
                 except Exception as e:
@@ -5305,7 +5334,7 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
             if sp.exists() and sp.stat().st_size > 0:
                 try:
                     key = f"reports/{report_id}/{sf}"
-                    url = r2_storage.upload_file(key, sp, "image/jpeg")
+                    url = await asyncio.to_thread(r2_storage.upload_file, key, sp, "image/jpeg")
                     updates["subject_crop_url_override"] = url
                 except Exception as e:
                     logger.warning(f"R2 flush subject_crop failed {report_id}: {e}")
@@ -5339,7 +5368,7 @@ async def _ensure_report_video_local(report_id: str) -> Optional[Path]:
     dest = tmp_dir / (vf or f"{report_id}.web.mp4")
     if dest.exists() and dest.stat().st_size > 0:
         return dest
-    ok = r2_storage.download_to_file(key, dest)
+    ok = await asyncio.to_thread(r2_storage.download_to_file, key, dest)
     if not ok:
         return None
     return dest
@@ -5638,7 +5667,7 @@ async def _verify_enriched_frames(
             for off in (3.0, -3.0, 6.0):
                 ts2 = max(0.0, sec + off)
                 cand = frames_dir / f".idv_{i}_{ts2:.1f}.jpg"
-                if not extract_frame_at(video_path, ts2, cand):
+                if not await asyncio.to_thread(extract_frame_at, video_path, ts2, cand):
                     continue
                 v2 = await verify_frame_identity(
                     EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-{off:+.0f}", ref_crops, str(cand), jersey, shorts,
@@ -5688,7 +5717,7 @@ async def _persist_video_frames(report_id: str, video_path) -> None:
                 if p.exists() and p.stat().st_size > 0:
                     try:
                         key = f"reports/{report_id}/frames/{p.name}"
-                        c["frame_url"] = r2_storage.upload_file(key, p, "image/jpeg")
+                        c["frame_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "image/jpeg")
                     except Exception as e:
                         logger.warning(f"R2 flush frame failed {report_id}/{p.name}: {e}")
     await db.reports.update_one(
@@ -5776,7 +5805,7 @@ async def generate_full_report_task(report_id: str) -> None:
             except Exception:
                 fp_obj = None
         try:
-            audio_events_full = extract_audio_events(file_path, top_n=10)
+            audio_events_full = await asyncio.to_thread(extract_audio_events, file_path, top_n=10)
         except Exception:
             audio_events_full = []
 
