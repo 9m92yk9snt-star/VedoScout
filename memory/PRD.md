@@ -27,6 +27,16 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 7, 2026) — Identity Tracking spec: occlusion + re-identification + GPT gate (P0) DONE ✅
+- **User spec implemented in full** (taps on partially hidden players must never be mistaken for the most visible player):
+  1. **Occlusion rules in ALL prompts**: `build_anchor_ensemble_block` (precision_engine) + FULL_REPORT_PROMPT + PREVIEW identification now state THE TAP IS THE TRUTH — tapped player may be behind opponents/teammates, half-body/legs-only; NEVER pick biggest/clearest/most-central/nearest-ball/numbered player; match across ALL tap crops + movement + kit + pitch position + continuity.
+  2. **Wide context crops**: new `save_context_crop()` (3× tap box, centred on tap, min 520 px) per anchor → `{report_id}-anchor-{i}-wide.jpg`, stored in anchors payload (`wide_filename`/`wide_r2_url`, flushed to R2). Up to 3 wide crops attached to BOTH Gemini calls with `WIDE_CROPS_NOTE` ("tapped player is at the CENTRE of each wide crop").
+  3. **Forced re-identification per evidence timestamp**: video_comments schema now requires `player_check` (where/visibility/who in front-behind) + `identity_confidence` high|medium|low; prompt orders "if you cannot re-identify, DO NOT cite the moment". `_filter_low_identity_evidence()` strips low-confidence rows before publishing.
+  4. **GPT identity gate + ONE corrective re-analysis**: `_verify_enriched_frames` returns stats {checked,verified,dropped}; `_persist_video_frames` persists `identity_stats` on doc. In generate_full_report_task: if ≥50% of ≥2 checked frames rejected → one retry with 🚨 IDENTITY CORRECTION appendix (lists failed timestamps), guarded by `identity_retry_done`; still failing → `identity_flagged: true`. All try/except-wrapped (can never break generation).
+  5. **GPT verifier prompt** (identity_verify.py): partial occlusion now counts as visible; explicitly checks build/hair/socks/boots vs identical-kit teammates.
+- **VERIFIED e2e on REAL football footage** (demo b5979130, 4 taps): 4 anchors + 3 wide crops in R2; video_comments carry player_check + High confidence; GPT-4o verified frame (match=true, high); identity_stats persisted; gate correctly NOT triggered. Honesty check: non-football walkthrough video → 0 video_comments (correct refusal). ⚠️ REQUIRES REDEPLOY.
+- NOTE: production pod confirmed **Starter tier (0.05 vCPU / 200-512 MB)** via Diagnostics — user upgrading tier (Grow recommended). OOM during ffmpeg was the proven cause of "worker restarted mid-processing".
+
 ### Session (Jul 7, 2026) — Production diagnostics tooling (P0 investigation) DONE ✅
 - **Context**: production analyses die at step 2 for ALL sizes (user tested 30 MB direct-path too → chunked upload EXONERATED as mechanism since <80 MB never chunks). Preview passes everything (95 MB HEVC e2e: ready in 58 s, peak RAM backend 438 MB + ffmpeg 361 MB = 799 MB). Root cause remains environmental (suspects: pod memory/CPU limits, OOMKill, platform infra). User demanded exact root cause — no blind fixes.
 - **NEW `GET /api/admin/diagnostics`** (read-only): pod hostname/process-start, cgroup memory limit+usage (v1+v2), CPU count + cgroup core limit, disk usage + uploads dir size, ffmpeg presence, last 10 reports with pipeline traces.

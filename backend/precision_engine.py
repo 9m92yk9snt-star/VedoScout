@@ -180,6 +180,41 @@ def _crop_box_from_image(
     return img_bgr[y0:y1, x0:x1].copy(), (x0, y0, x1, y1)
 
 
+def save_context_crop(
+    image_path: str | Path,
+    box: dict,
+    save_path: str | Path,
+    scale: float = 3.0,
+) -> bool:
+    """Save a WIDE crop centred on the tap box (~scale× the box) showing the
+    tapped player among the surrounding players (who is in front/behind).
+    Returns True when the file was written."""
+    try:
+        img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if img is None:
+            return False
+        ih, iw = img.shape[:2]
+        bx = max(0.0, min(1.0, float(box.get("x", 0))))
+        by = max(0.0, min(1.0, float(box.get("y", 0))))
+        bw = max(0.01, min(1.0 - bx, float(box.get("w", 0.2))))
+        bh = max(0.01, min(1.0 - by, float(box.get("h", 0.3))))
+        cx, cy = (bx + bw / 2) * iw, (by + bh / 2) * ih
+        half_w = max(bw * iw, 80.0) * scale / 2
+        half_h = max(bh * ih, 80.0) * scale / 2
+        px0, py0 = int(max(0, cx - half_w)), int(max(0, cy - half_h))
+        px1, py1 = int(min(iw, cx + half_w)), int(min(ih, cy + half_h))
+        crop = img[py0:py1, px0:px1]
+        if crop.size == 0:
+            return False
+        ch, cw = crop.shape[:2]
+        if cw < 520:
+            f = 520.0 / cw
+            crop = cv2.resize(crop, (int(cw * f), int(ch * f)), interpolation=cv2.INTER_CUBIC)
+        return bool(cv2.imwrite(str(save_path), crop, [int(cv2.IMWRITE_JPEG_QUALITY), 88]))
+    except Exception:
+        return False
+
+
 def extract_player_fingerprint(
     marker_image_path: str | Path,
     box: dict,
@@ -447,8 +482,15 @@ def build_anchor_ensemble_block(anchor_descriptions: list[dict]) -> str:
     return (
         f"MULTI-ANCHOR LOCK — {len(anchor_descriptions)} confirmed sightings of the SAME player "
         "at different moments in the video. The first N images attached are these anchors in order. "
-        "Use ALL of them as the visual reference — the player you must analyse is the one matching "
+        "Use ALL of them together as the visual reference — the player you must analyse is the one matching "
         "every anchor. Ignore all other players.\n"
+        "THE TAP IS THE TRUTH: every anchor comes from the user tapping precisely on THEIR player. "
+        "The tapped player may be PARTIALLY HIDDEN in an anchor — behind an opponent, behind a teammate, "
+        "between several players, or with only part of the body visible (legs only, torso only, half the body). "
+        "NEVER assume the biggest, clearest or most central figure in a crop is the target. "
+        "NEVER prefer the player nearest the ball, or a player with a visible shirt number, just because they "
+        "stand out. The target is the player at the CENTRE of each crop who stays consistent across ALL anchors: "
+        "kit, build, hair, socks, boots, movement direction, pitch position and visual continuity over time.\n"
         + "\n".join(rows)
     )
 

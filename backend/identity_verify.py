@@ -63,8 +63,13 @@ async def verify_frame_identity(
             "First, identify the player's distinctive features from the reference crops yourself "
             "(kit colours, headwear, sleeves, socks, build). An automated kit-colour read said "
             f"'{jersey_name} jersey, {shorts_name} shorts' but it MAY BE INACCURATE — trust the images.\n"
+            "NOTE: the player may be PARTIALLY HIDDEN in a reference crop (behind another player, only part "
+            "of the body visible) — the player at the CENTRE of each crop is the target, not necessarily the "
+            "most visible person in it.\n"
             "The LAST image is a frame from the match video.\n"
-            "Question: is that SAME individual player visible anywhere in the frame, even if small?\n"
+            "Question: is that SAME individual player visible anywhere in the frame, even if small or "
+            "partially occluded behind other players? A partial but plausible presence counts as visible. "
+            "Do not confuse them with teammates in an identical kit — check build, hair, socks, boots.\n"
             'Respond ONLY with JSON: {"match": true|false, "confidence": "high"|"medium"|"low", '
             '"why": "<one short sentence>"}'
         )

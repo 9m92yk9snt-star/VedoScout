@@ -62,6 +62,7 @@ from precision_engine import (
     extract_player_fingerprint,
     extract_audio_events,
     extract_frame_at,
+    save_context_crop,
     build_preview_prompt as precision_build_preview_prompt,
     build_full_prompt as precision_build_full_prompt,
     scrub_hedging,
@@ -2370,7 +2371,7 @@ Every observation must come from what you actually SAW in the clip. If you can't
 Plain, natural football coach language. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking", "half-turn", "high-intensity transitions", "vertical progression". Use phrases like "stays calm under pressure", "always looks around before the ball arrives", "his left foot is dangerous", "gets tired late in the game".
 
 🎯 PLAYER IDENTIFICATION
-A reference frame is attached. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER". Track ONLY that player. Note their jersey colour, number, body type, hair, distinguishing features. Ignore everyone else.
+A reference frame is attached. The player to analyse is the ONE CIRCLED IN BRIGHT GREEN with the label "THIS PLAYER". Track ONLY that player. Note their jersey colour, number, body type, hair, distinguishing features. Ignore everyone else. The tapped player may be PARTIALLY HIDDEN in the reference crops (behind another player, only part of the body visible) — the partially hidden player at the centre of each crop IS the target; never switch to the most visible player.
 
 🎯 CONTENT CONTEXT (from pre-analysis — THIS IS THE TRUTH OF WHAT'S IN THE VIDEO)
 CONTENT_TYPE: {content_type}
@@ -2439,7 +2440,12 @@ scored sub-skill.
 Plain, natural football coach language. AVOID jargon like "press-resistant", "scanning frequency", "line-breaking passes", "half-turn", "high-intensity transitions", "vertical progression", "false-9 in possession systems". Use plain phrases: "stays calm when defenders close him down", "always looks around before getting the ball", "his left foot can find any pass", "gets tired late in matches", "ready to step up to a stronger team".
 
 🎯 PLAYER IDENTIFICATION
-A reference frame is attached showing the player CIRCLED in bright green with the label "THIS PLAYER". Track ONLY that player across the video. Note their jersey colour, number, body type, hair, and distinguishing features. If you lose sight of them in some moments, only score what you actually saw.
+A reference frame is attached showing the player CIRCLED in bright green with the label "THIS PLAYER". Additional reference crops from the user's tap moments may be attached — they ALL show the SAME player at different moments; use EVERY one of them together (not just the first or last) to build the player's identity: kit, build, hair, socks, boots.
+THE TAP IS THE TRUTH: the user tapped precisely on their player. The tapped player may be PARTIALLY HIDDEN at a tap moment — behind an opponent, behind a teammate, between several players, or with only part of the body visible (legs only, torso only, half the body). NEVER assume the biggest, clearest or most central player in a crop is the target. NEVER prefer the player nearest the ball, or one with a visible shirt number, just because they stand out. Pick the player who best matches the tap position, the OTHER tap crops, movement direction, kit/body profile, pitch position and visual continuity across the video.
+Track ONLY that player across the video. If you lose sight of them in some moments, only score what you actually saw.
+
+🎯 EVIDENCE IDENTITY CHECK (mandatory before EVERY cited timestamp)
+Before writing ANY evidence timestamp (in video_comments or a sub-skill evidence list), silently re-identify the player at that exact moment: where are they in the frame, are they fully or partially visible, who stands in front of/behind them, and why is this the SAME player the user tapped. If you cannot re-identify the tapped player with reasonable certainty at a moment, DO NOT cite that moment. For every video_comments entry, fill in the player_check and identity_confidence fields honestly.
 
 🎯 CONTENT AWARENESS (from pre-analysis)
 CONTENT_TYPE: {content_type}
@@ -2574,7 +2580,7 @@ Produce a JSON object EXACTLY in this format:
     "thirty_day_plan": "<paragraph>",
     "ninety_day_plan": "<paragraph>"
   },
-  "video_comments": [{"timestamp": "MM:SS", "comment": "<specific moment observation in plain words>"}],
+  "video_comments": [{"timestamp": "MM:SS", "comment": "<specific moment observation in plain words>", "player_check": "<where the tapped player is in the frame at this exact moment — pitch position, fully or partially visible, who is in front/behind>", "identity_confidence": "high" | "medium" | "low"}],
   "match_stats": {
     "total_actions": <integer — DISTINCT observable involvements of THIS PLAYER (touches, passes, shots, duels, runs) you actually counted in the footage>,
     "successful_dribbles": <integer>,
@@ -4990,6 +4996,7 @@ async def analyze_preview_task(report_id: str):
         # ============== EXTRA ANCHOR CROPS (anchors 2..5) ==============
         extra_anchors_payload: list[dict] = []
         anchor_crop_paths: list[str] = []
+        wide_crop_paths: list[str] = []
         if fp is not None and crop_path and Path(crop_path).exists():
             anchor_crop_paths.append(str(crop_path))
             extra_anchors_payload.append({
@@ -5028,12 +5035,19 @@ async def analyze_preview_task(report_id: str):
                         box=box_anchor,
                         crop_save_path=str(crop_path_a),
                     )
+                    wide_filename_a = f"{report_id}-anchor-{idx}-wide.jpg"
+                    wide_path_a = UPLOAD_DIR / wide_filename_a
+                    has_wide = await asyncio.to_thread(
+                        save_context_crop, str(frame_path), box_anchor, str(wide_path_a),
+                    )
                     try:
                         frame_path.unlink(missing_ok=True)
                     except Exception:
                         pass
                     if fp_a.crop_path and Path(fp_a.crop_path).exists():
                         anchor_crop_paths.append(str(crop_path_a))
+                        if has_wide:
+                            wide_crop_paths.append(str(wide_path_a))
                         extra_anchors_payload.append({
                             "i": idx,
                             "t": t_anchor,
@@ -5042,6 +5056,7 @@ async def analyze_preview_task(report_id: str):
                             "shorts_name": fp_a.shorts_name,
                             "body_ratio": fp_a.body_ratio,
                             "crop_filename": crop_filename_a,
+                            "wide_filename": wide_filename_a if has_wide else None,
                         })
                 except Exception as e:
                     logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
@@ -5061,6 +5076,16 @@ async def analyze_preview_task(report_id: str):
                         )
                     except Exception as e:
                         logger.warning(f"R2 anchor crop flush failed {report_id}/{cf}: {e}")
+                wf = a.get("wide_filename")
+                wp = (UPLOAD_DIR / wf) if wf else None
+                if wp and wp.exists():
+                    try:
+                        a["wide_r2_url"] = await asyncio.to_thread(
+                            r2_storage.upload_file,
+                            f"reports/{report_id}/anchors/{wf}", wp, "image/jpeg",
+                        )
+                    except Exception as e:
+                        logger.warning(f"R2 wide crop flush failed {report_id}/{wf}: {e}")
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -5202,6 +5227,8 @@ async def analyze_preview_task(report_id: str):
         # Step 3 → 4: building preview report
         await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat(step=4)})
         logger.info(f"[pipeline] {report_id} step 3→4 · Gemini preview call starting")
+        if wide_crop_paths:
+            preview_prompt += WIDE_CROPS_NOTE
         await _trace(report_id, "gemini_preview_start")
         preview = await _await_with_heartbeat(report_id, call_gemini_with_video(
             session_id=f"preview-{report_id}",
@@ -5209,7 +5236,7 @@ async def analyze_preview_task(report_id: str):
             video_path=str(preview_clip_path),
             marker_path=str(marker_path),
             crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
-            anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
+            anchor_crops=(anchor_crop_paths + wide_crop_paths[:3]) if len(anchor_crop_paths) > 1 else None,
         ))
         await _trace(report_id, "gemini_preview_done")
         preview = scrub_hedging(preview)
@@ -5660,7 +5687,7 @@ def _mmss_to_secs(ts) -> Optional[float]:
 async def _verify_enriched_frames(
     report_id: str, doc: dict, video_path: Path, frames_dir: Path,
     enriched: list, ref_crops: list[str],
-) -> None:
+) -> dict:
     """Layer A — cross-model (GPT vision) identity check of every evidence frame.
     Failing frames are re-windowed (±3/±6 s); still-unverified frames are dropped."""
     fp = doc.get("fingerprint") or {}
@@ -5710,27 +5737,31 @@ async def _verify_enriched_frames(
             c["identity_verified"] = False
             c["frame_url"] = None
             frame_path.unlink(missing_ok=True)
+    verified = dropped = 0
     if checked:
         verified = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is True)
         dropped = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is False)
         logger.info(f"[identity] {report_id}: {checked} frames checked · {verified} verified · {dropped} dropped")
+    return {"checked": checked, "verified": verified, "dropped": dropped}
 
 
-async def _persist_video_frames(report_id: str, video_path) -> None:
+async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
     """Extract REAL evidence frames right after full-report generation (while the
     video is guaranteed local), then flush them to R2 and persist the durable
-    URLs directly on full_report.video_comments. Best-effort — never raises."""
+    URLs directly on full_report.video_comments. Best-effort — never raises.
+    Returns GPT identity-verification stats when the check ran."""
     doc = await db.reports.find_one({"id": report_id})
     if not doc or not (doc.get("full_report") or {}).get("video_comments"):
-        return
+        return None
     frames_dir = UPLOAD_DIR / "frames" / str(report_id)
     shutil.rmtree(frames_dir, ignore_errors=True)  # drop any cached placeholders
     enriched = await asyncio.to_thread(ensure_video_frames, doc, str(video_path))
     # Layer A — GPT-vision identity gate before the frames are published.
+    stats = None
     try:
         ref_crops = _identity_ref_crops(doc)
         if ref_crops:
-            await _verify_enriched_frames(report_id, doc, Path(str(video_path)), frames_dir, enriched, ref_crops)
+            stats = await _verify_enriched_frames(report_id, doc, Path(str(video_path)), frames_dir, enriched, ref_crops)
     except Exception:
         logger.exception(f"identity verification layer failed for {report_id}")
     if r2_storage.is_configured():
@@ -5748,8 +5779,35 @@ async def _persist_video_frames(report_id: str, video_path) -> None:
                         logger.warning(f"R2 flush frame failed {report_id}/{p.name}: {e}")
     await db.reports.update_one(
         {"id": report_id},
-        {"$set": {"full_report.video_comments": enriched}},
+        {"$set": {
+            "full_report.video_comments": enriched,
+            **({"identity_stats": stats} if stats else {}),
+        }},
     )
+    return stats
+
+
+WIDE_CROPS_NOTE = (
+    "\n\nWIDE CONTEXT CROPS — among the attached reference images are WIDE crops (wider field of view "
+    "with several players visible) taken at the user's tap moments. The tapped player is at the CENTRE "
+    "of each wide crop, shown among the surrounding players so you can see who stands in front of or "
+    "behind them. The tapped player may be partially hidden in these crops — that partially hidden "
+    "player at the centre IS the target, NOT the most visible player in the crop."
+)
+
+
+def _filter_low_identity_evidence(full: dict, report_id: str) -> dict:
+    """Remove video_comments rows the model itself marked identity_confidence=low.
+    No evidence beats evidence from the wrong player."""
+    try:
+        vcs = full.get("video_comments") or []
+        kept = [c for c in vcs if not (isinstance(c, dict) and str(c.get("identity_confidence", "")).lower() == "low")]
+        if len(kept) != len(vcs):
+            logger.info(f"[identity] {report_id}: removed {len(vcs) - len(kept)} low-confidence evidence rows")
+            full["video_comments"] = kept
+    except Exception:
+        pass
+    return full
 
 
 async def generate_full_report_task(report_id: str) -> None:
@@ -5809,6 +5867,18 @@ async def generate_full_report_task(report_id: str) -> None:
                 _try_restore_from_r2(a.get("crop_r2_url"), p)
             if p.exists():
                 anchor_crops_full.append(str(p))
+
+        wide_crops_full: list[str] = []
+        for a in anchor_payload_list:
+            wf = a.get("wide_filename") if isinstance(a, dict) else None
+            if not wf:
+                continue
+            p = UPLOAD_DIR / wf
+            if not p.exists() and isinstance(a, dict):
+                _try_restore_from_r2(a.get("wide_r2_url"), p)
+            if p.exists():
+                wide_crops_full.append(str(p))
+        wide_crops_full = wide_crops_full[:3]
 
         details_str = json.dumps(doc["player_details"], ensure_ascii=False)
         gate = doc.get("content_gate") or {}
@@ -5881,9 +5951,58 @@ async def generate_full_report_task(report_id: str) -> None:
         )
         # Ensure scout review is queued for every paid/unlocked report
         try:
-            await _persist_video_frames(report_id, file_path)
+            identity_stats = await _persist_video_frames(report_id, file_path)
         except Exception:
+            identity_stats = None
             logger.exception(f"evidence frame persist failed for {report_id}")
+        # ── IDENTITY GATE — one corrective re-analysis when GPT-vision rejects
+        # most evidence frames (Gemini most likely switched player mid-video).
+        try:
+            checked = (identity_stats or {}).get("checked", 0)
+            dropped = (identity_stats or {}).get("dropped", 0)
+            if checked >= 2 and dropped / checked >= 0.5:
+                fresh = await db.reports.find_one({"id": report_id})
+                if fresh and not fresh.get("identity_retry_done"):
+                    await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
+                    bad_ts = [
+                        str(c.get("timestamp"))
+                        for c in (fresh.get("full_report") or {}).get("video_comments", [])
+                        if isinstance(c, dict) and c.get("identity_verified") is False and c.get("timestamp")
+                    ]
+                    correction = (
+                        "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact video FAILED an "
+                        "independent vision verification. The tapped player was confirmed NOT to be the subject "
+                        f"at these timestamps: {', '.join(bad_ts) if bad_ts else 'several cited moments'}. "
+                        "You most likely switched to a DIFFERENT player at some point. Re-analyse from scratch "
+                        "with strict focus on the attached reference crops (the tapped player may be partially "
+                        "hidden in them). Re-identify the tapped player at EVERY timestamp you cite; if you are "
+                        "not certain at a moment, do NOT cite it."
+                    )
+                    logger.warning(f"[identity-gate] {report_id}: {dropped}/{checked} frames rejected — running ONE corrective re-analysis")
+                    retry = await call_gemini_with_video(
+                        session_id=f"full-retry-{report_id}",
+                        prompt=full_prompt + correction,
+                        video_path=str(file_path),
+                        marker_path=marker_path,
+                        crop_path=crop_path_str,
+                        anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+                    )
+                    retry = scrub_hedging(retry)
+                    retry = _filter_low_identity_evidence(retry, report_id)
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
+                    )
+                    stats2 = await _persist_video_frames(report_id, file_path)
+                    checked2 = (stats2 or {}).get("checked", 0)
+                    dropped2 = (stats2 or {}).get("dropped", 0)
+                    if checked2 >= 2 and dropped2 / checked2 >= 0.5:
+                        await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
+                        logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
+                    else:
+                        logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
+        except Exception:
+            logger.exception(f"identity gate failed for {report_id}")
         try:
             fresh = await db.reports.find_one({"id": report_id})
             if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
