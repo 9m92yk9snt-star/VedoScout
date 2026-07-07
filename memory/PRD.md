@@ -27,6 +27,17 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 7, 2026) — Production diagnostics tooling (P0 investigation) DONE ✅
+- **Context**: production analyses die at step 2 for ALL sizes (user tested 30 MB direct-path too → chunked upload EXONERATED as mechanism since <80 MB never chunks). Preview passes everything (95 MB HEVC e2e: ready in 58 s, peak RAM backend 438 MB + ffmpeg 361 MB = 799 MB). Root cause remains environmental (suspects: pod memory/CPU limits, OOMKill, platform infra). User demanded exact root cause — no blind fixes.
+- **NEW `GET /api/admin/diagnostics`** (read-only): pod hostname/process-start, cgroup memory limit+usage (v1+v2), CPU count + cgroup core limit, disk usage + uploads dir size, ffmpeg presence, last 10 reports with pipeline traces.
+- **NEW pipeline_trace**: `_trace(report_id, stage)` $pushes capped stage markers through analyze_preview_task (transcode_start/done, poster_done, anchors_persisted:N, clip_done, gate_done, gemini_preview_start/done, ready, failed:msg). The LAST stage of a failed production run pinpoints the death location.
+- **NEW Admin → Diagnostics tab** (`DiagnosticsAdmin.jsx`): resource cards (memory/CPU/disk, low-memory warning <1.5 GB) + recent runs with stage chips.
+- VERIFIED: e2e trace complete on test upload; UI screenshot OK. Preview pod facts revealed: 8 GB mem limit, **2-core CPU limit**, 10 GB disk.
+- **Measured lean-transcode option (NOT yet implemented, awaiting data)**: `-threads 2` cuts ffmpeg peak RAM 361→181 MB at identical quality/speed.
+- **Fixed**: stray duplicated lines at server.py EOF (`app.include_router` corruption) causing IndentationError.
+- **User workflow**: deploy → re-upload failing 30 MB video → screenshot Admin→Diagnostics → definitive diagnosis.
+- User process directives (STANDING): never modify working code without approval; investigate before implementing; propose options first. Backlog noted: N+1 query in /players-database/search (deployment agent WARN).
+
 ### Session (Jul 6, 2026) — PRODUCTION freeze fix: event-loop blocking pipeline (P0) DONE ✅
 - **Bug (production)**: analysis froze at step 2 "Preparing the footage", then failed with watchdog message "worker restarted mid-processing" + credit refund. Root cause: ALL heavy sync work (ffmpeg transcode ≤180 s, poster, preview clip, fingerprint+anchor loop, boto3 R2 up/downloads, audio peaks) ran BLOCKING on the asyncio event loop inside `analyze_preview_task`. In production, k8s health probes got no response during the block → pod killed mid-analysis. Preview (no probes) never showed it.
 - **Fix (server.py)**: every heavy call wrapped in `asyncio.to_thread` (transcode, get_video_duration, generate_poster, extract_player_fingerprint, anchor loop extract_frame_at+fingerprints, R2 upload_file/download_to_file in `_flush_preview_artifacts_to_r2`/`_ensure_report_video_local`/anchor+frame flushes, make_preview_clip, extract_audio_events ×2, `_verify_enriched_frames` extract_frame_at). New `_await_with_heartbeat(report_id, awaitable, interval=45)` stamps a watchdog heartbeat every 45 s during long ops (transcode, content gate, Gemini preview call) so slow production CPUs aren't falsely swept as stalled (threshold 300 s). ffmpeg transcode timeout raised 180→420 s. Extra heartbeats added to anchor-persist and audio-persist updates.

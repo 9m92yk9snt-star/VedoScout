@@ -4798,6 +4798,22 @@ async def _await_with_heartbeat(report_id: str, awaitable, interval: int = 45):
             return task.result()
 
 
+async def _trace(report_id: str, stage: str) -> None:
+    """Append a pipeline-stage marker to the report doc (capped at 50 entries).
+    Read-only diagnostics — the LAST entry tells exactly where a production
+    pipeline died. Best-effort, never raises."""
+    try:
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$push": {"pipeline_trace": {
+                "$each": [{"s": stage, "at": datetime.now(timezone.utc).isoformat()}],
+                "$slice": -50,
+            }}},
+        )
+    except Exception:
+        pass
+
+
 async def analyze_preview_task(report_id: str):
     """Background task — runs ALL heavy work (ffmpeg transcoding, fingerprinting,
     poster, preview clip, audio peaks, content gate, preview generation) OUTSIDE
@@ -4859,9 +4875,11 @@ async def analyze_preview_task(report_id: str):
         # was the #1 contributor to the Cloudflare 100 s timeout on production.
         # Heavy ffmpeg in a worker thread + heartbeat every 45 s — a blocking
         # run on the event loop froze /health in production → k8s killed the pod.
+        await _trace(report_id, "transcode_start")
         web_path = await _await_with_heartbeat(
             report_id, asyncio.to_thread(transcode_to_web_mp4, raw_path)
         )
+        await _trace(report_id, "transcode_done")
         web_filename = web_path.name
         # If the transcode produced a NEW file (different name), update the doc so
         # the status endpoint can serve the playable file. If transcoding fell
@@ -4921,6 +4939,7 @@ async def analyze_preview_task(report_id: str):
 
         # ============== POSTER THUMBNAIL ==============
         poster_path = await asyncio.to_thread(generate_poster, web_path)
+        await _trace(report_id, "poster_done")
         poster_filename = poster_path.name if poster_path else None
         if poster_filename:
             await db.reports.update_one(
@@ -5051,12 +5070,14 @@ async def analyze_preview_task(report_id: str):
                 **_wd_heartbeat(),
             }},
         )
+        await _trace(report_id, f"anchors_persisted:{len(extra_anchors_payload)}")
 
         # ============== PREVIEW CLIP + AUDIO PEAKS ==============
         preview_clip_path = await _await_with_heartbeat(
             report_id,
             asyncio.to_thread(make_preview_clip, web_path, marker_seconds=marker_timestamp, window_seconds=15),
         )
+        await _trace(report_id, "clip_done")
         try:
             audio_events_preview = await asyncio.to_thread(extract_audio_events, preview_clip_path, top_n=5)
         except Exception as e:
@@ -5135,6 +5156,7 @@ async def analyze_preview_task(report_id: str):
             gate = await _await_with_heartbeat(
                 report_id, run_content_gate(report_id, preview_clip_path, marker_path)
             )
+            await _trace(report_id, "gate_done")
         rejection = gate_rejection_message(gate)
         if rejection:
             # Soft-reject: persist the error so the user sees a friendly message
@@ -5180,6 +5202,7 @@ async def analyze_preview_task(report_id: str):
         # Step 3 → 4: building preview report
         await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat(step=4)})
         logger.info(f"[pipeline] {report_id} step 3→4 · Gemini preview call starting")
+        await _trace(report_id, "gemini_preview_start")
         preview = await _await_with_heartbeat(report_id, call_gemini_with_video(
             session_id=f"preview-{report_id}",
             prompt=preview_prompt,
@@ -5188,6 +5211,7 @@ async def analyze_preview_task(report_id: str):
             crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
             anchor_crops=anchor_crop_paths if len(anchor_crop_paths) > 1 else None,
         ))
+        await _trace(report_id, "gemini_preview_done")
         preview = scrub_hedging(preview)
 
         # ============== PERSIST ==============
@@ -5208,6 +5232,7 @@ async def analyze_preview_task(report_id: str):
         # Now that R2 URLs are in the doc, flipping the status flag makes
         # every future poller see a coherent playable URL.
         logger.info(f"[pipeline] {report_id} step 4→5 · analysis complete")
+        await _trace(report_id, "ready")
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -5231,6 +5256,7 @@ async def analyze_preview_task(report_id: str):
             user_msg = str(e.detail)[:400]
         else:
             user_msg = f"AI preview generation failed: {str(e)[:200]}"
+        await _trace(report_id, f"failed:{str(e)[:80]}")
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -9703,6 +9729,108 @@ async def stripe_webhook_embedded(request: Request):
 
 
 # ============== ADMIN ROUTES ==============
+
+@api_router.get("/admin/diagnostics")
+async def admin_diagnostics(_=Depends(get_current_admin)):
+    """Read-only pod + pipeline diagnostics. Lets the admin see the PRODUCTION
+    pod's real resource limits and where recent analyses died — from inside
+    the pod, no platform access needed."""
+    def _read_first(paths: list[str]) -> Optional[str]:
+        for p in paths:
+            try:
+                v = Path(p).read_text().strip()
+                if v:
+                    return v
+            except Exception:
+                pass
+        return None
+
+    def _bytes_h(v) -> str:
+        try:
+            v = float(v)
+        except Exception:
+            return str(v)
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if v < 1024:
+                return f"{v:.0f} {unit}"
+            v /= 1024
+        return f"{v:.1f} PB"
+
+    mem_limit = _read_first(["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"])
+    mem_used = _read_first(["/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"])
+    cpu_max = _read_first(["/sys/fs/cgroup/cpu.max"])
+    cpu_quota_v1 = _read_first(["/sys/fs/cgroup/cpu/cpu.cfs_quota_us"])
+    cpu_period_v1 = _read_first(["/sys/fs/cgroup/cpu/cpu.cfs_period_us"])
+    cpu_effective = None
+    try:
+        if cpu_max and cpu_max != "max":
+            q, per = cpu_max.split()
+            if q != "max":
+                cpu_effective = round(int(q) / int(per), 2)
+        elif cpu_quota_v1 and int(cpu_quota_v1) > 0 and cpu_period_v1:
+            cpu_effective = round(int(cpu_quota_v1) / int(cpu_period_v1), 2)
+    except Exception:
+        pass
+
+    rss_mb = None
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            if line.startswith("VmRSS:"):
+                rss_mb = int(line.split()[1]) // 1024
+                break
+    except Exception:
+        pass
+
+    try:
+        du = shutil.disk_usage(str(UPLOAD_DIR))
+        disk = {"total": _bytes_h(du.total), "used": _bytes_h(du.used), "free": _bytes_h(du.free),
+                "used_pct": round(du.used / du.total * 100, 1)}
+    except Exception:
+        disk = {}
+    uploads_size = 0
+    try:
+        for p in UPLOAD_DIR.rglob("*"):
+            if p.is_file():
+                uploads_size += p.stat().st_size
+    except Exception:
+        pass
+
+    try:
+        proc_started = datetime.fromtimestamp(Path("/proc/self").stat().st_mtime, tz=timezone.utc).isoformat()
+    except Exception:
+        proc_started = None
+
+    recent = await db.reports.find(
+        {},
+        {"_id": 0, "id": 1, "player_name": 1, "analysis_status": 1, "progress_step": 1,
+         "last_progress_at": 1, "created_at": 1, "analysis_error": 1, "pipeline_trace": 1,
+         "video_duration_sec": 1, "full_report_status": 1},
+    ).sort("created_at", -1).to_list(10)
+    for r in recent:
+        tr = r.get("pipeline_trace") or []
+        r["last_stage"] = tr[-1]["s"] if tr else None
+        r["trace"] = tr[-12:]
+        r.pop("pipeline_trace", None)
+
+    return {
+        "pod": {
+            "hostname": os.uname().nodename,
+            "process_started_utc": proc_started,
+            "now_utc": datetime.now(timezone.utc).isoformat(),
+            "cpu_count": os.cpu_count(),
+            "cpu_limit_cores": cpu_effective,
+        },
+        "memory": {
+            "cgroup_limit": _bytes_h(mem_limit) if mem_limit and mem_limit != "max" else (mem_limit or "unknown"),
+            "cgroup_used": _bytes_h(mem_used) if mem_used else "unknown",
+            "backend_rss_mb": rss_mb,
+        },
+        "disk": {**disk, "uploads_dir_size": _bytes_h(uploads_size)},
+        "ffmpeg": {"binary": str(FFMPEG_BIN), "exists": Path(str(FFMPEG_BIN)).exists()},
+        "watchdog": {"stall_threshold_sec": 300, "heartbeat_interval_sec": 45},
+        "recent_reports": recent,
+    }
+
 
 @api_router.get("/admin/stats")
 async def admin_stats(_=Depends(get_current_admin)):
