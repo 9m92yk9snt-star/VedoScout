@@ -34,7 +34,7 @@ const Feat = ({ children, highlight = false, dark = false }) => (
   </li>
 );
 
-export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle }) {
+export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle, singleTitle = "Unlock this report" }) {
   const navigate = useNavigate();
   const [busyTier, setBusyTier] = useState(null);
   const [prices, setPrices] = useState({ single: null, premium: null, vip: null, premiumExtra: null, vipExtra: null });
@@ -103,7 +103,7 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle 
             <FileCheck2 className="w-4 h-4 text-forest" strokeWidth={1.8} />
             <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-forest">Single report</span>
           </div>
-          <h4 className="font-barlow font-black uppercase text-2xl tracking-tight text-ink leading-none">Unlock this report</h4>
+          <h4 className="font-barlow font-black uppercase text-2xl tracking-tight text-ink leading-none">{singleTitle}</h4>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="font-barlow font-black text-4xl md:text-5xl text-forest leading-none">{fmtPrice(prices.single)}</span>
             <span className="text-ink/50 uppercase tracking-widest font-bold text-xs">one-time</span>

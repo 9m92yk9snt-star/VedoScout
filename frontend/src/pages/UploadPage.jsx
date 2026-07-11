@@ -24,7 +24,7 @@ export default function UploadPage() {
   const [eligibility, setEligibility] = useState(null);   // { eligible, reason, free_preview_used, prepaid_uploads }
   const [eligibilityLoading, setEligibilityLoading] = useState(true);
   const [prepaying, setPrepaying] = useState(false);
-  const [price, setPrice] = useState(1);
+  const [price, setPrice] = useState(null);
 
   // Embedded checkout state (preferred when Stripe keys are configured)
   const [embeddedOpen, setEmbeddedOpen] = useState(false);
@@ -82,6 +82,9 @@ export default function UploadPage() {
     try {
       const { data } = await api.get("/me/upload-eligibility");
       setEligibility(data);
+      // Tier-aware price for one extra report — matches what Stripe charges
+      // (single_price for free users, premium/vip extra rate for subscribers).
+      if (data?.extra_report_price) setPrice(Number(data.extra_report_price));
     } catch (err) {
       // If unauthorized, just leave eligibility null
       console.error("Eligibility check failed", err);
@@ -93,7 +96,10 @@ export default function UploadPage() {
   /* eslint-disable */
   useEffect(() => {
     refreshEligibility();
-    api.get("/settings/price").then(({ data }) => setPrice(data.price)).catch(() => {});
+    api.get("/settings/price").then(({ data }) => {
+      // Fallback only — eligibility's tier-aware extra_report_price wins
+      setPrice((p) => p ?? (Number(data.single_price) || 129));
+    }).catch(() => {});
   }, []);
   /* eslint-enable */
 
@@ -578,7 +584,6 @@ export default function UploadPage() {
         open={!!heroReport}
         report={heroReport}
         assetBase={ASSET_BASE}
-        price={price || 159}
         onUnlock={() => {
           if (heroReport?.id) {
             navigate(`/report/${heroReport.id}?unlock=1`);

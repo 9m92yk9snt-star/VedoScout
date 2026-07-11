@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { MiniPitch } from "@/components/FootballAccents";
 import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
+import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -243,6 +244,7 @@ export default function DashboardPage() {
                     tiers={tiers}
                     mode={mode}
                     usage={usage}
+                    latestLockedReportId={reports.find((r) => !(r.is_paid || r.manually_unlocked))?.id}
                   />
                 );
               })()}
@@ -484,8 +486,8 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
             type="button"
             onClick={onUpgradeClick}
             data-testid={`player-row-upgrade-${p.id}`}
-            aria-label={`Unlock Progress Pass to track ${p.name}`}
-            title="Unlock Progress Pass"
+            aria-label={`Upgrade to unlock progress tracking for ${p.name}`}
+            title="Upgrade to unlock"
             className={`${pulse ? "scoutme-unlock-pulse " : ""}hidden sm:flex absolute z-10 right-9 top-1/2 -translate-y-1/2 items-center gap-1 bg-cream-soft hover:bg-forest hover:text-white hover:border-forest border border-ink/15 text-ink/65 text-[9px] uppercase tracking-widest font-bold px-2 py-1 transition-colors cursor-pointer`}
           >
             <Lock className="w-3 h-3" strokeWidth={2.4} /> Unlock
@@ -494,7 +496,7 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
             type="button"
             onClick={onUpgradeClick}
             data-testid={`player-row-upgrade-mobile-${p.id}`}
-            aria-label={`Unlock Progress Pass to track ${p.name}`}
+            aria-label={`Upgrade to unlock progress tracking for ${p.name}`}
             className={`${pulse ? "scoutme-unlock-pulse " : ""}sm:hidden absolute z-10 right-8 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-ink/45 hover:text-forest active:text-forest transition-colors cursor-pointer`}
           >
             <Lock className="w-3.5 h-3.5" strokeWidth={2.4} />
@@ -587,7 +589,8 @@ function LegacyPassActiveBanner({ passState }) {
  *  Once the subscription is active <SubscriptionCard /> takes over and
  *  this banner is hidden, so we never double-promote.
  * ──────────────────────────────────────────────────────────────────────── */
-function UpgradeBanner({ tiers, mode = "free", usage = null }) {
+function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportId = null }) {
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(null); // "premium" | "vip" | "extra" | null
   const isPremiumAtLimit = mode === "premium-at-limit";
   const isVipAtLimit = mode === "vip-at-limit";
@@ -630,7 +633,6 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
     }
   };
 
-  const premium = tiers?.premium || { amount: 29.99 };
   const vip = tiers?.vip || { amount: 49.99 };
   const monthlyLimit = usage?.monthly_limit ?? (isVipAtLimit ? 4 : 2);
   const usedThisPeriod = usage?.used_this_period ?? monthlyLimit;
@@ -746,73 +748,27 @@ function UpgradeBanner({ tiers, mode = "free", usage = null }) {
           )}
         </div>
       ) : (
-        <div className="relative mt-5 grid gap-3 grid-cols-1 sm:grid-cols-2">
-        {/* Premium mini-card — hidden when Premium user has hit the limit */}
-        <button
-          type="button"
-          data-testid="dashboard-upgrade-premium-btn"
-          onClick={() => startSubscription("premium")}
-          disabled={busy !== null}
-          className="relative text-left bg-[#0F3A22] border border-forest p-5 hover:shadow-[0_18px_36px_-12px_rgba(15,58,34,0.55)] transition-all disabled:opacity-60 disabled:cursor-wait"
-        >
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="inline-flex items-center gap-1.5 text-[#A5DD5F] text-[10px] uppercase tracking-[0.18em] font-black">
-              <TrendingUp className="w-3.5 h-3.5" /> Premium
-            </span>
-            <span className="text-[9px] uppercase tracking-[0.16em] font-bold text-[#A5DD5F]/80 bg-[#A5DD5F]/10 px-2 py-0.5 rounded-full">
-              Most popular
-            </span>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-barlow font-black text-3xl text-[#CCFF00]">${premium.amount?.toFixed(2)}</span>
-            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
-          </div>
-          <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> 2 video reports per month</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Extra reports at subscriber rate</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#A5DD5F]" /> Advanced AI analysis + PDF</li>
-          </ul>
-          <span className="mt-4 inline-flex items-center gap-1.5 bg-[#A5DD5F] text-[#0F3A22] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
-            {busy === "premium" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Start Premium <ArrowRight className="w-3.5 h-3.5" /></>}
-          </span>
-        </button>
-
-        {/* VIP mini-card */}
-        <button
-          type="button"
-          data-testid="dashboard-upgrade-vip-btn"
-          onClick={() => startSubscription("vip")}
-          disabled={busy !== null}
-          className="relative text-left bg-[#0A0F0D] border border-[#1F2724] p-5 hover:shadow-[0_18px_36px_-12px_rgba(0,0,0,0.65)] transition-all disabled:opacity-60 disabled:cursor-wait"
-        >
-          <div className="flex items-center justify-between gap-3 mb-2">
-            <span className="inline-flex items-center gap-1.5 text-[#F5C443] text-[10px] uppercase tracking-[0.18em] font-black">
-              <Crown className="w-3.5 h-3.5" fill="#F5C443" /> VIP Premium
-            </span>
-            <span className="text-[9px] uppercase tracking-[0.16em] font-bold text-[#F5C443]/80 bg-[#F5C443]/10 px-2 py-0.5 rounded-full">
-              Best value
-            </span>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-barlow font-black text-3xl text-[#F5C443]">${vip.amount?.toFixed(2)}</span>
-            <span className="text-[10px] uppercase tracking-[0.22em] font-bold text-white/70">/ month</span>
-          </div>
-          <ul className="mt-3 space-y-1.5 text-[12px] text-white/85 leading-snug">
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> 4 video reports per month</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Real scout review + direct contact</li>
-            <li className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-[#F5C443]" /> Deepest per-report discount</li>
-          </ul>
-          <span className="mt-4 inline-flex items-center gap-1.5 bg-[#F5C443] text-[#0A0F0D] font-barlow font-black uppercase tracking-[0.18em] text-xs px-4 py-2">
-            {busy === "vip" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <>Go VIP <ArrowRight className="w-3.5 h-3.5" /></>}
-          </span>
-        </button>
-      </div>
+        <div className="relative mt-6">
+          {/* Unified 3-tier pricing (Single / Premium / VIP) — same component
+              as the report paywall and the post-analysis HeroTeaser so free
+              users see ONE consistent offer everywhere. */}
+          <ReportPaywallTiers
+            isLoggedIn
+            singleTitle="Unlock a full report"
+            onUnlockSingle={() => {
+              if (latestLockedReportId) navigate(`/report/${latestLockedReportId}?unlock=1`);
+              else navigate("/upload");
+            }}
+          />
+        </div>
       )}
 
-      <p className={`relative mt-3 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center gap-1.5 ${isAtLimit ? "text-white/50" : "text-ink/45"}`}>
-        <Lock className={`w-3 h-3 ${isAtLimit ? "text-[#F5C443]" : "text-forest"}`} />
-        Secure Stripe · Cancel anytime from your dashboard
-      </p>
+      {isAtLimit && (
+        <p className="relative mt-3 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center gap-1.5 text-white/50">
+          <Lock className="w-3 h-3 text-[#F5C443]" />
+          Secure Stripe · Cancel anytime from your dashboard
+        </p>
+      )}
     </div>
   );
 }

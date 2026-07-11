@@ -27,6 +27,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 11, 2026) — Free-user teaser + dashboard aligned to new tier model (P0) DONE ✅
+- **Bug (user-reported)**: post-analysis popup (`HeroTeaser.jsx`) still showed the OLD single CTA with hardcoded `$159` fallback; free-user dashboard `UpgradeBanner` showed legacy dark volt Premium/VIP mini-cards (no Single tier); UploadPage read the DEAD legacy `price` key from `/settings/price` ($1 locally) for the prepay paywall while Stripe actually charges `single_price`/tier extras.
+- **Fix (user-approved: all 3 tiers + compact blurred teaser)**:
+  - `HeroTeaser.jsx`: kept the staged reveal (marker → name → score → blurred summary/strengths/locked sections, max-w-md column) and replaced the single `$159` CTA with the unified `<ReportPaywallTiers/>` ("Choose how you want in", container widened to max-w-5xl). `price` prop removed. Single CTA → `/report/{id}?unlock=1` (auto-opens embedded checkout).
+  - `ReportPaywallTiers.jsx`: new optional `singleTitle` prop (default "Unlock this report").
+  - `DashboardPage.jsx`: free-mode `UpgradeBanner` now renders `<ReportPaywallTiers singleTitle="Unlock a full report"/>` — Single CTA navigates to the user's newest LOCKED report with `?unlock=1` (or `/upload` if none). At-limit banners (premium/vip extras) untouched. Legacy "Unlock Progress Pass" aria/title labels on PlayerRow → "Upgrade to unlock".
+  - `UploadPage.jsx`: `price` now comes from `eligibility.extra_report_price` (tier-aware, matches Stripe charge) with `single_price` fallback — legacy `data.price` no longer read.
+- **VERIFIED e2e (freeuser_paywall@test.com)**: dashboard shows 3 tiers with live prices ($129/$29.99/$49.99); Single CTA → locked report → embedded Stripe checkout at **US$129.00**; HeroTeaser visually verified (staged teaser intact + 3 tiers + dismiss link) via temporary preview hook (removed after check). ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 11, 2026) — Speed optimisation: parallel transcode pipeline (user-approved) DONE ✅
 - **Restructured analyze_preview_task (outputs 100% identical, only ordering changed)**: browser-transcode now runs as a BACKGROUND task while duration check, anchor crops, wide crops, preview clip, content gate and the Gemini preview call all run from the RAW file (identical content). Transcode is JOINED (with heartbeats) right before publishing — the report still goes ready with the same playable web.mp4, poster (same web-based naming), R2 flush and cleanup as before. Early-exit branches (>5 min, gate rejection) attach `_drop_transcode_output` callback so orphan transcodes clean up raw+web files.
 - **MEASURED (preview env)**: HEVC 10-bit source → preview ready in **46 s** — trace shows Gemini ran 06:02:06→06:02:33 WHILE ffmpeg was still encoding; join cost 0 s. H.264 fast-path → 33 s. On production Launch-tier CPU the saving is minutes per report. Full reports on both runs: ready, identity verification 3/3 & 2/3 verified, evidence rows present.

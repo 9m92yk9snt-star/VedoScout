@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, Crown, Sparkles, ArrowRight, X, Star, ShieldCheck } from "lucide-react";
+import { Lock, X, Star, ShieldCheck } from "lucide-react";
+import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 
 /**
  * HeroTeaser — the "must-buy" reveal shown to free users right after the AI finishes.
@@ -10,7 +11,8 @@ import { Lock, Crown, Sparkles, ArrowRight, X, Star, ShieldCheck } from "lucide-
  *   - The locked-player marker frame sits inside a forest-green halo
  *   - Real preview data is revealed in stages: name → score → top traits → snippet → locks
  *   - 4 locked sections shown with blurred placeholders behind 🔒 icons
- *   - A loud, forest CTA opens the embedded Stripe checkout
+ *   - Closes with the unified 3-tier pricing (Single / Premium / VIP) via
+ *     <ReportPaywallTiers /> — live prices from /settings/price
  *   - Subtle "Take me to dashboard" link beneath for users not ready to buy
  *
  * Props
@@ -18,11 +20,10 @@ import { Lock, Crown, Sparkles, ArrowRight, X, Star, ShieldCheck } from "lucide-
  *   report      — the API response from POST /api/reports/upload (has player_details,
  *                 preview, marker_url, fingerprint, etc.)
  *   assetBase   — REACT_APP_BACKEND_URL prefix for image URLs
- *   price       — number, USD price for the unlock CTA
- *   onUnlock    — () => void  — opens embedded Stripe checkout
+ *   onUnlock    — () => void  — Single-report CTA (navigates to the report with ?unlock=1)
  *   onDismiss   — () => void  — navigates to dashboard
  */
-export default function HeroTeaser({ open, report, assetBase, price = 159, onUnlock, onDismiss }) {
+export default function HeroTeaser({ open, report, assetBase, onUnlock, onDismiss }) {
   const [stage, setStage] = useState(0); // 0..5 reveal stages
 
   /* eslint-disable */
@@ -90,7 +91,7 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
           ))}
         </div>
 
-        <div className="relative max-w-md mx-auto px-6 pt-10 pb-8 min-h-screen flex flex-col">
+        <div className="relative max-w-5xl mx-auto px-6 pt-10 pb-8 min-h-screen flex flex-col">
           {/* Close-X corner so user is never trapped */}
           <button
             type="button"
@@ -102,6 +103,7 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
             <X className="w-4 h-4" />
           </button>
 
+          <div className="max-w-md mx-auto w-full">
           {/* Marker frame with forest halo + Pro Scout badge */}
           {markerUrl && (
             <div className="relative mx-auto mb-5" style={{ width: 200 }}>
@@ -363,37 +365,27 @@ export default function HeroTeaser({ open, report, assetBase, price = 159, onUnl
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
 
-          {/* The forest CTA */}
+          {/* Unified 3-tier pricing (Single / Premium / VIP) — live prices */}
           {stage >= 5 && (
-            <motion.button
-              type="button"
-              onClick={onUnlock}
-              data-testid="hero-teaser-unlock"
+            <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="w-full relative bg-forest text-white py-4 px-5 mb-2 group overflow-hidden rounded-sm shadow-xl active:scale-[0.99] transition-transform"
-              style={{ boxShadow: "0 14px 30px -10px rgba(31,79,47,0.55), 0 0 0 1px rgba(31,79,47,0.5)" }}
+              className="w-full mb-2"
+              data-testid="hero-teaser-tiers"
             >
-              <motion.span
-                aria-hidden
-                className="absolute inset-0 bg-white/15"
-                animate={{ x: ["-100%", "200%"] }}
-                transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1.5, ease: "easeInOut" }}
-                style={{ width: "50%", skewX: "-20deg" }}
-              />
-              <span className="relative flex items-center justify-center gap-2">
-                <Crown className="w-5 h-5" fill="currentColor" />
-                <span className="font-barlow font-black uppercase tracking-tight text-lg">
-                  Unlock the full report — ${price}
-                </span>
-                <ArrowRight className="w-5 h-5" />
-              </span>
-              <span className="relative block mt-1 text-[10px] uppercase tracking-widest font-black text-white/80">
-                <Sparkles className="inline w-3 h-3 -mt-0.5" /> 48-hour refund guarantee · One-time payment
-              </span>
-            </motion.button>
+              <div className="text-center mb-6">
+                <p className="text-forest text-[10px] uppercase tracking-[0.4em] font-black mb-2">
+                  Unlock the full report
+                </p>
+                <h2 className="font-barlow font-black uppercase text-ink tracking-tighter text-2xl md:text-3xl leading-none">
+                  Choose how you want in
+                </h2>
+              </div>
+              <ReportPaywallTiers isLoggedIn onUnlockSingle={onUnlock} />
+            </motion.div>
           )}
 
           {/* Skip link */}
