@@ -27,6 +27,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 11, 2026) — Report paywall aligned to new tier model (P0) DONE ✅
+- **Bug**: report-page paywall (LockedOverlay) still showed the OLD packages (Single via legacy `price` key + "$399 12-month pass") while the active landing showed the NEW tiers (Single/Premium/VIP). Backend unlock endpoints also charged the legacy `price` key.
+- **Fix (user-approved Option A)**: new compact `ReportPaywallTiers.jsx` (3 cards: Single unlock-this-report / Premium "Most popular" / VIP gold-on-ink #F5C443 matching the landing VIP card). Prices live from `/settings/price` (`single_price`, `premium_price`, `vip_price`, extras) → admin Dashboard changes propagate everywhere instantly. Single CTA → existing embedded Stripe checkout for THIS report; Premium/VIP → existing `/payments/subscribe` flow. Both backend unlock endpoints (hosted + embedded) now charge `get_current_single_price()`. `PricingCards` untouched (still used by the inactive legacy Landing only). ReportPage `price` state now reads `single_price`.
+- **VERIFIED e2e**: free user (freeuser_paywall@test.com / FreeTest#2026) + real-football report → paywall renders 3 tiers with admin prices; Unlock click opens embedded Stripe checkout at **US$129.00**; txn amount 129.0 == single_price. Content gate still blocks non-football for free users. ⚠️ REQUIRES REDEPLOY.
+- NOTE: recurring file-tail corruption struck ReportPage.jsx + server.py EOF twice (duplicate fragments appended by tooling) — both repaired; always check file tails after batch edits.
+- STANDING RULE: user requires explicit approval before ANY code change.
+
 ### Session (Jul 7, 2026) — Identity Tracking spec: occlusion + re-identification + GPT gate (P0) DONE ✅
 - **User spec implemented in full** (taps on partially hidden players must never be mistaken for the most visible player):
   1. **Occlusion rules in ALL prompts**: `build_anchor_ensemble_block` (precision_engine) + FULL_REPORT_PROMPT + PREVIEW identification now state THE TAP IS THE TRUTH — tapped player may be behind opponents/teammates, half-body/legs-only; NEVER pick biggest/clearest/most-central/nearest-ball/numbered player; match across ALL tap crops + movement + kit + pitch position + continuity.

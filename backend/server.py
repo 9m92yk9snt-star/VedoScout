@@ -9134,7 +9134,7 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
     if report.get("is_paid"):
         raise HTTPException(status_code=400, detail="Report already paid")
 
-    price = await get_current_price()
+    price = await get_current_single_price()
 
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
@@ -9418,7 +9418,7 @@ async def embedded_unlock(payload: CheckoutInit, user=Depends(get_current_user))
     if report.get("is_paid"):
         raise HTTPException(status_code=400, detail="Report already paid")
 
-    price = await get_current_price()
+    price = await get_current_single_price()
     amount_cents = int(round(float(price) * 100))
 
     origin = payload.origin_url.rstrip("/")

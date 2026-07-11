@@ -23,7 +23,7 @@ import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
-import PricingCards from "@/components/PricingCards";
+import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 
@@ -1581,11 +1581,10 @@ function AgeProfileCard({ ref: profile }) {
 }
 
 
-function LockedOverlay({ isLoggedIn }) {
-  // Session 126 — Replaced the old single-button "Unlock full premium report"
-  // paywall with the modern PricingCards component used on the landing page.
-  // This keeps a consistent brand experience across every touchpoint and lets
-  // free users choose between a single report OR the multi-report plan.
+function LockedOverlay({ isLoggedIn, onUnlockSingle }) {
+  // Paywall mirrors the front-page tier model (Single / Premium / VIP) so the
+  // offer and admin-set prices are identical on every touchpoint. "Free" is
+  // omitted — the visitor is already looking at their free preview.
   return (
     <div
       className="absolute inset-0 z-20 backdrop-blur-xl bg-cream-card/95 border border-gray-border overflow-y-auto"
@@ -1605,7 +1604,7 @@ function LockedOverlay({ isLoggedIn }) {
             Get the complete technical, tactical, physical &amp; mental breakdown — plus a real scout&apos;s written review.
           </p>
         </div>
-        <PricingCards variant="landing" isLoggedIn={isLoggedIn} />
+        <ReportPaywallTiers isLoggedIn={isLoggedIn} onUnlockSingle={onUnlockSingle} />
       </div>
     </div>
   );
@@ -1670,7 +1669,7 @@ export default function ReportPage() {
         api.get("/settings/price"),
       ]);
       setReport(r.data);
-      setPrice(p.data.price);
+      setPrice(Number(p.data.single_price) || p.data.price);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to load report");
       navigate("/dashboard");
@@ -2633,7 +2632,7 @@ export default function ReportPage() {
           )}
           <div className="mt-10 relative">
             {!unlocked && (
-              <LockedOverlay isLoggedIn={!!user} />
+              <LockedOverlay isLoggedIn={!!user} onUnlockSingle={() => setEmbeddedOpen(true)} />
             )}
 
             <div className={`${!unlocked ? "blur-locked" : ""} space-y-6`} data-testid="premium-content">
