@@ -63,6 +63,7 @@ from precision_engine import (
     extract_audio_events,
     extract_frame_at,
     save_context_crop,
+    save_display_crop,
     build_preview_prompt as precision_build_preview_prompt,
     build_full_prompt as precision_build_full_prompt,
     scrub_hedging,
@@ -4711,6 +4712,15 @@ def _resolve_subject_crop_url(doc: dict) -> Optional[str]:
     return f"/api/uploads/{sf}" if sf else None
 
 
+def _resolve_display_crop_url(doc: dict) -> Optional[str]:
+    """Resolve the high-quality square display crop URL (UI hero image)."""
+    override = doc.get("display_crop_url_override")
+    if override:
+        return override
+    df = doc.get("display_crop_filename")
+    return f"/api/uploads/{df}" if df else None
+
+
 @api_router.get("/reports/{report_id}/status")
 async def get_report_status(report_id: str, user=Depends(get_current_user)):
     """Lightweight polling endpoint used by the frontend during async preview generation.
@@ -4756,6 +4766,7 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
             "poster_url": _resolve_poster_url(doc),
             "marker_url": _resolve_marker_url(doc),
             "subject_crop_url": _resolve_subject_crop_url(doc),
+            "display_crop_url": _resolve_display_crop_url(doc),
             "is_paid": bool(doc.get("is_paid")),
             "created_at": doc.get("created_at"),
         })
@@ -4969,6 +4980,18 @@ async def analyze_preview_task(report_id: str):
             fp = None
             fingerprint_payload = None
 
+        # ============== DISPLAY CROP (UI-only, high quality, square) ==============
+        display_crop_filename = None
+        try:
+            if primary_box_data:
+                _df = f"{report_id}-display.jpg"
+                if await asyncio.to_thread(
+                    save_display_crop, str(marker_path), primary_box_data, str(UPLOAD_DIR / _df),
+                ):
+                    display_crop_filename = _df
+        except Exception as e:
+            logger.warning(f"Display crop failed for {report_id}: {e}")
+
         # ============== EXTRA ANCHOR CROPS (anchors 2..5) ==============
         extra_anchors_payload: list[dict] = []
         anchor_crop_paths: list[str] = []
@@ -5067,6 +5090,7 @@ async def analyze_preview_task(report_id: str):
             {"$set": {
                 "fingerprint": fingerprint_payload,
                 "subject_crop_filename": crop_filename,
+                "display_crop_filename": display_crop_filename,
                 "anchors": extra_anchors_payload,
                 **_wd_heartbeat(),
             }},
@@ -5487,6 +5511,18 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
                 except Exception as e:
                     logger.warning(f"R2 flush subject_crop failed {report_id}: {e}")
 
+    if not doc.get("display_crop_url_override"):
+        df = doc.get("display_crop_filename")
+        if df:
+            dp = UPLOAD_DIR / df
+            if dp.exists() and dp.stat().st_size > 0:
+                try:
+                    key = f"reports/{report_id}/{df}"
+                    url = await asyncio.to_thread(r2_storage.upload_file, key, dp, "image/jpeg")
+                    updates["display_crop_url_override"] = url
+                except Exception as e:
+                    logger.warning(f"R2 flush display_crop failed {report_id}: {e}")
+
     if updates:
         await db.reports.update_one({"id": report_id}, {"$set": updates})
 
@@ -5585,6 +5621,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "poster_url": _resolve_poster_url(doc),
         "marker_url": _resolve_marker_url(doc),
         "subject_crop_url": _resolve_subject_crop_url(doc),
+        "display_crop_url": _resolve_display_crop_url(doc),
         "fingerprint": doc.get("fingerprint"),
         "anchors": doc.get("anchors", []),
         "audio_events_preview": doc.get("audio_events_preview", []),

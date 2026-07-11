@@ -215,6 +215,43 @@ def save_context_crop(
         return False
 
 
+def save_display_crop(
+    image_path: str | Path,
+    box: dict,
+    save_path: str | Path,
+    zoom: float = 1.8,
+    out_size: int = 640,
+) -> bool:
+    """Save a SQUARE high-quality display crop centred on the tapped player.
+    Purely for UI (teaser/report hero image) — never sent to the AI. The square
+    is `zoom`× the tap box (context, no stretching), clamped inside the frame,
+    then resized to out_size×out_size with Lanczos for a crisp upscale."""
+    try:
+        img = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if img is None:
+            return False
+        ih, iw = img.shape[:2]
+        bx = max(0.0, min(1.0, float(box.get("x", 0))))
+        by = max(0.0, min(1.0, float(box.get("y", 0))))
+        bw = max(0.01, min(1.0 - bx, float(box.get("w", 0.2))))
+        bh = max(0.01, min(1.0 - by, float(box.get("h", 0.3))))
+        cx, cy = (bx + bw / 2) * iw, (by + bh / 2) * ih
+        side = max(bw * iw, bh * ih, 120.0) * zoom
+        side = min(side, float(min(iw, ih)))
+        half = side / 2
+        x0 = int(round(min(max(0.0, cx - half), iw - side)))
+        y0 = int(round(min(max(0.0, cy - half), ih - side)))
+        s = int(round(side))
+        crop = img[y0:y0 + s, x0:x0 + s]
+        if crop.size == 0:
+            return False
+        interp = cv2.INTER_LANCZOS4 if crop.shape[1] < out_size else cv2.INTER_AREA
+        crop = cv2.resize(crop, (out_size, out_size), interpolation=interp)
+        return bool(cv2.imwrite(str(save_path), crop, [int(cv2.IMWRITE_JPEG_QUALITY), 92]))
+    except Exception:
+        return False
+
+
 def extract_player_fingerprint(
     marker_image_path: str | Path,
     box: dict,
@@ -606,6 +643,7 @@ __all__ = [
     "AudioEvent",
     "extract_frame_at",
     "extract_player_fingerprint",
+    "save_display_crop",
     "extract_audio_events",
     "audio_events_to_prompt_block",
     "build_anchor_ensemble_block",

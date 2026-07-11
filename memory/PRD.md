@@ -27,6 +27,14 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 11, 2026) — High-quality player display crop in teaser (P0 follow-up) DONE ✅
+- **User report**: teaser image showed the WRONG player — root cause: HeroTeaser rendered the FULL marker frame center-cropped to a square (`object-cover`), so the player in the MIDDLE of the frame (ball-carrier) was shown instead of the tapped player at the edge. User also flagged that raw crops look ugly/stretched.
+- **Fix (user-approved)**:
+  - NEW `save_display_crop()` (precision_engine.py): SQUARE high-quality crop centred on the user's tap box (1.8× zoom for context, clamped to frame, Lanczos resize to 640×640, JPEG q92) — UI-only, never sent to AI.
+  - Pipeline: generated right after fingerprint (step 2), persisted as `display_crop_filename`, flushed to R2 (`display_crop_url_override`), exposed as `display_crop_url` in BOTH `/reports/{id}/status` (ready payload) and the full report GET payload via `_resolve_display_crop_url`.
+  - `HeroTeaser.jsx`: hero image now `display_crop_url → subject_crop_url → marker_url` with `absUrl()` handling (R2 override URLs are absolute; also fixed latent bug where absolute override URLs would have been wrongly prefixed with assetBase).
+- **VERIFIED e2e**: real upload → ready → `display_crop_url` = R2-proxied `/api/media/...` URL served 200 (46 KB, 640×640 sharp square showing exactly the tapped box). Test data cleaned. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 11, 2026) — Preview-level identity verification (P0, user-mandated) DONE ✅
 - **User report (production)**: tapped 4× on the goal-scoring winger, but the preview summary + teaser described the TEAMMATE who dribbled through midfield and assisted (ball-carrier bias, same-kit confusion). User mandate: "preview must verify identity exactly like the full report".
 - **Implemented (identity_verify.py + server.py)**:

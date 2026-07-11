@@ -43,7 +43,13 @@ export default function HeroTeaser({ open, report, assetBase, onUnlock, onDismis
   const player = report.player_details || {};
   const preview = report.preview || {};
   const fingerprint = report.fingerprint || {};
-  const markerUrl = report.marker_url ? `${assetBase}${report.marker_url}` : null;
+  // Player hero image: the high-quality square DISPLAY crop centred on the
+  // exact box the user drew (guaranteed to show THEIR player) → fallback to
+  // the tight subject crop → legacy full marker frame. Override URLs from R2
+  // are absolute; legacy /api/uploads paths need the backend prefix.
+  const absUrl = (u) => (u && u.startsWith("http") ? u : `${assetBase}${u}`);
+  const playerImg = report.display_crop_url || report.subject_crop_url || report.marker_url;
+  const markerUrl = playerImg ? absUrl(playerImg) : null;
 
   // Pull real preview content with graceful fallbacks
   const overall = preview.overall_score
