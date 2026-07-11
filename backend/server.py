@@ -4876,44 +4876,30 @@ async def analyze_preview_task(report_id: str):
                 pass
             return
 
-        # ============== TRANSCODE TO WEB-FRIENDLY MP4 ==============
-        # Convert to H.264/AAC so the clip plays in every browser. Heavy ffmpeg —
-        # was the #1 contributor to the Cloudflare 100 s timeout on production.
-        # Heavy ffmpeg in a worker thread + heartbeat every 45 s — a blocking
-        # run on the event loop froze /health in production → k8s killed the pod.
+        # ============== TRANSCODE (BACKGROUND) + FAST DURATION CHECK ==============
+        # Speed optimisation (user-approved): the heavy browser-transcode runs in
+        # the BACKGROUND while every Gemini-facing artifact (crops, preview clip,
+        # content gate, preview analysis) is produced from the RAW file — the
+        # content is identical, so the analysis input is unchanged. We JOIN the
+        # transcode right before publishing (the report page needs playable MP4).
         await _trace(report_id, "transcode_start")
-        web_path = await _await_with_heartbeat(
-            report_id, asyncio.to_thread(transcode_to_web_mp4, raw_path)
-        )
-        await _trace(report_id, "transcode_done")
-        web_filename = web_path.name
-        # If the transcode produced a NEW file (different name), update the doc so
-        # the status endpoint can serve the playable file. If transcoding fell
-        # back to the original, video_filename stays as-is.
-        if web_filename != raw_filename:
-            await db.reports.update_one(
-                {"id": report_id},
-                {"$set": {"video_filename": web_filename}},
-            )
-            # ── DISK CLEANUP: now that the web-friendly .web.mp4 is saved AND
-            # ── the report doc points at it, the original raw upload (.mov /
-            # ── source .mp4) is no longer needed. Removing it here saves
-            # ── ~60 % disk per upload and prevents the container disk from
-            # ── filling. Best-effort only — failure to unlink is logged, not
-            # ── fatal (transcode already succeeded, user impact is zero).
-            try:
-                if raw_path.exists() and raw_path.resolve() != web_path.resolve():
-                    raw_bytes = raw_path.stat().st_size
-                    raw_path.unlink()
-                    logger.info(
-                        f"raw-upload cleanup: removed {raw_path.name} "
-                        f"({raw_bytes // 1024} KB) after successful transcode of {web_filename}"
-                    )
-            except Exception as cleanup_err:
-                logger.warning(f"raw-upload cleanup failed for {report_id}: {cleanup_err}")
+        transcode_task = asyncio.ensure_future(asyncio.to_thread(transcode_to_web_mp4, raw_path))
 
-        # ============== DURATION VALIDATION (5-min cap) ==============
-        duration_sec = await asyncio.to_thread(get_video_duration_seconds, web_path)
+        def _drop_transcode_output(t):
+            # cleanup helper for early-exit branches (rejection paths)
+            try:
+                p = t.result()
+                if p and Path(p).exists() and Path(p).resolve() != raw_path.resolve():
+                    Path(p).unlink()
+            except Exception:
+                pass
+            try:
+                raw_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        # ============== DURATION VALIDATION (5-min cap, on the raw file) ==============
+        duration_sec = await asyncio.to_thread(get_video_duration_seconds, raw_path)
         if duration_sec > 305:  # buffer for rounding
             await db.reports.update_one(
                 {"id": report_id},
@@ -4931,27 +4917,17 @@ async def analyze_preview_task(report_id: str):
                 await _refund_upload_eligibility(report_id)
             except Exception as re:
                 logger.warning(f"Eligibility refund failed for {report_id}: {re}")
-            # Best-effort cleanup of the giant clip
-            for p in {raw_path, web_path, marker_path}:
-                try:
-                    p.unlink()
-                except Exception:
-                    pass
+            # Best-effort cleanup of the giant clip (web copy dropped when done)
+            transcode_task.add_done_callback(_drop_transcode_output)
+            try:
+                marker_path.unlink(missing_ok=True)
+            except Exception:
+                pass
             return
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {"video_duration_sec": duration_sec}},
         )
-
-        # ============== POSTER THUMBNAIL ==============
-        poster_path = await asyncio.to_thread(generate_poster, web_path)
-        await _trace(report_id, "poster_done")
-        poster_filename = poster_path.name if poster_path else None
-        if poster_filename:
-            await db.reports.update_one(
-                {"id": report_id},
-                {"$set": {"poster_filename": poster_filename}},
-            )
 
         # ============== PRECISION SCOUT — VISUAL FINGERPRINT (anchor 1) ==============
         fingerprint_payload = None
@@ -5025,7 +5001,7 @@ async def analyze_preview_task(report_id: str):
                         continue
                     frame_filename = f"{report_id}-anchor-frame-{idx}.jpg"
                     frame_path = UPLOAD_DIR / frame_filename
-                    if not await asyncio.to_thread(extract_frame_at, web_path, t_anchor, frame_path):
+                    if not await asyncio.to_thread(extract_frame_at, raw_path, t_anchor, frame_path):
                         continue
                     crop_filename_a = f"{report_id}-anchor-{idx}.jpg"
                     crop_path_a = UPLOAD_DIR / crop_filename_a
@@ -5097,10 +5073,10 @@ async def analyze_preview_task(report_id: str):
         )
         await _trace(report_id, f"anchors_persisted:{len(extra_anchors_payload)}")
 
-        # ============== PREVIEW CLIP + AUDIO PEAKS ==============
+        # ============== PREVIEW CLIP + AUDIO PEAKS (cut from the raw file) ==============
         preview_clip_path = await _await_with_heartbeat(
             report_id,
-            asyncio.to_thread(make_preview_clip, web_path, marker_seconds=marker_timestamp, window_seconds=15),
+            asyncio.to_thread(make_preview_clip, raw_path, marker_seconds=marker_timestamp, window_seconds=15),
         )
         await _trace(report_id, "clip_done")
         try:
@@ -5199,6 +5175,7 @@ async def analyze_preview_task(report_id: str):
                 await _refund_upload_eligibility(report_id)
             except Exception as e:
                 logger.warning(f"Eligibility refund failed for {report_id}: {e}")
+            transcode_task.add_done_callback(_drop_transcode_output)
             return
         await db.reports.update_one({"id": report_id}, {"$set": {"content_gate": gate}})
 
@@ -5240,6 +5217,39 @@ async def analyze_preview_task(report_id: str):
         ))
         await _trace(report_id, "gemini_preview_done")
         preview = scrub_hedging(preview)
+
+        # ============== JOIN BACKGROUND TRANSCODE ==============
+        # The playable MP4 must exist before we publish — but by now it has been
+        # encoding in parallel with everything above, so this wait is usually 0 s.
+        web_path = await _await_with_heartbeat(report_id, transcode_task)
+        await _trace(report_id, "transcode_done")
+        web_filename = web_path.name
+        if web_filename != raw_filename:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"video_filename": web_filename}},
+            )
+            # ── DISK CLEANUP: the original raw upload is no longer needed.
+            try:
+                if raw_path.exists() and raw_path.resolve() != web_path.resolve():
+                    raw_bytes = raw_path.stat().st_size
+                    raw_path.unlink()
+                    logger.info(
+                        f"raw-upload cleanup: removed {raw_path.name} "
+                        f"({raw_bytes // 1024} KB) after successful transcode of {web_filename}"
+                    )
+            except Exception as cleanup_err:
+                logger.warning(f"raw-upload cleanup failed for {report_id}: {cleanup_err}")
+
+        # ============== POSTER THUMBNAIL (same source & naming as before) ==============
+        poster_path = await asyncio.to_thread(generate_poster, web_path)
+        await _trace(report_id, "poster_done")
+        poster_filename = poster_path.name if poster_path else None
+        if poster_filename:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"poster_filename": poster_filename}},
+            )
 
         # ============== PERSIST ==============
         # ============== FLUSH VIDEO + POSTER TO R2 ==============
