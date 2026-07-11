@@ -27,6 +27,17 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 11, 2026) — Preview-level identity verification (P0, user-mandated) DONE ✅
+- **User report (production)**: tapped 4× on the goal-scoring winger, but the preview summary + teaser described the TEAMMATE who dribbled through midfield and assisted (ball-carrier bias, same-kit confusion). User mandate: "preview must verify identity exactly like the full report".
+- **Implemented (identity_verify.py + server.py)**:
+  1. **Pre-analysis identity profile** (`build_identity_profile`): GPT-4o examines tap crops + wide crops IN PARALLEL with clip/gate (zero added latency for free users) → verified physical description + per-tap-moment ball status (`target_has_ball: yes/no/unclear`) + confusion risk. Persisted as `identity_profile` on the report doc.
+  2. **Prompt injection** (`identity_profile_block`): block added to BOTH the preview prompt and the full-report prompt with HARD RULES: "if the target does NOT have the ball at a tap moment, the on-ball action belongs to a DIFFERENT player — never credit it to the target; the eye-catching ball-carrier is often NOT the target."
+  3. **Preview identity gate** (`verify_preview_summary`, mirrors the full-report gate): after Gemini's preview, GPT-4o cross-checks summary vs crops. HIGH-confidence rejection → ONE corrective re-analysis with 🚨 IDENTITY CORRECTION appendix (`preview_identity_retry_done` guard); still failing → `preview.identity_flagged=true` + confidence forced to "low" with honest reason.
+  4. **Calibration**: verifier ONLY rejects on POSITIVE contradiction (wrong-player narrative) — never because an action isn't visible in the stills (prevents false rejections on free-kick/finishing clips). Verified both directions in isolated tests.
+- **VERIFIED e2e ×3** (admin upload, real clip): profile built+injected; gate rejected fabricated-anchor run → retry → flag+low-confidence path all executed; legit summary passed True; wrong-player summary rejected False; budget-failure resilience confirmed (profile fails → pipeline proceeds unchanged). ⚠️ REQUIRES REDEPLOY.
+- **⚠️ EMERGENT LLM KEY BUDGET EXCEEDED during testing (20.13/20.0)** — user must top up (Profile → Universal Key → Add Balance) or production analyses will fail.
+- NOTE: recurring server.py EOF corruption struck again (duplicate fragment after `app.include_router`) — repaired. Also: parallel search_replace batches on the SAME file can drop an edit — re-verify with grep after batch edits to server.py.
+
 ### Session (Jul 11, 2026) — Free-user teaser + dashboard aligned to new tier model (P0) DONE ✅
 - **Bug (user-reported)**: post-analysis popup (`HeroTeaser.jsx`) still showed the OLD single CTA with hardcoded `$159` fallback; free-user dashboard `UpgradeBanner` showed legacy dark volt Premium/VIP mini-cards (no Single tier); UploadPage read the DEAD legacy `price` key from `/settings/price` ($1 locally) for the prepay paywall while Stripe actually charges `single_price`/tier extras.
 - **Fix (user-approved: all 3 tiers + compact blurred teaser)**:

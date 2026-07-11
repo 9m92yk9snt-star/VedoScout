@@ -5073,6 +5073,18 @@ async def analyze_preview_task(report_id: str):
         )
         await _trace(report_id, f"anchors_persisted:{len(extra_anchors_payload)}")
 
+        # ============== IDENTITY PROFILE (GPT-vision, PARALLEL with clip/gate) ==============
+        # Preview-level identity guarantee (user-mandated: preview must verify
+        # identity exactly like the full report). An independent vision model
+        # examines the tap crops NOW — the result is injected into the preview
+        # prompt so Gemini knows precisely WHO the target is and whether the
+        # target has the ball at each tap moment.
+        identity_profile_task = None
+        if anchor_crop_paths:
+            identity_profile_task = asyncio.ensure_future(build_identity_profile(
+                EMERGENT_LLM_KEY, f"idp-{report_id}", anchor_crop_paths, wide_crop_paths,
+            ))
+
         # ============== PREVIEW CLIP + AUDIO PEAKS (cut from the raw file) ==============
         preview_clip_path = await _await_with_heartbeat(
             report_id,
@@ -5206,6 +5218,19 @@ async def analyze_preview_task(report_id: str):
         logger.info(f"[pipeline] {report_id} step 3→4 · Gemini preview call starting")
         if wide_crop_paths:
             preview_prompt += WIDE_CROPS_NOTE
+        # Join the parallel identity profile and inject the verified block.
+        identity_profile = None
+        if identity_profile_task is not None:
+            try:
+                identity_profile = await asyncio.wait_for(identity_profile_task, timeout=90)
+            except Exception:
+                identity_profile = None
+        if identity_profile:
+            await db.reports.update_one(
+                {"id": report_id}, {"$set": {"identity_profile": identity_profile}}
+            )
+            preview_prompt += identity_profile_block(identity_profile)
+            await _trace(report_id, "identity_profile_done")
         await _trace(report_id, "gemini_preview_start")
         preview = await _await_with_heartbeat(report_id, call_gemini_with_video(
             session_id=f"preview-{report_id}",
@@ -5217,6 +5242,66 @@ async def analyze_preview_task(report_id: str):
         ))
         await _trace(report_id, "gemini_preview_done")
         preview = scrub_hedging(preview)
+
+        # ============== PREVIEW IDENTITY GATE (mirrors the full-report gate) ==============
+        # Cross-model check that the preview narrative describes the TAPPED player.
+        # A HIGH-confidence rejection triggers ONE corrective re-analysis.
+        try:
+            if anchor_crop_paths and isinstance(preview, dict):
+                summary_txt = " ".join(filter(None, [
+                    str(preview.get("player_type") or ""),
+                    str(preview.get("brief_summary") or ""),
+                    " ".join(str(s) for s in (preview.get("top_strengths") or [])),
+                ]))
+                verdict = await verify_preview_summary(
+                    EMERGENT_LLM_KEY, f"pidv-{report_id}",
+                    anchor_crop_paths, wide_crop_paths, summary_txt,
+                )
+                if verdict is False:
+                    await _trace(report_id, "preview_identity_retry")
+                    logger.warning(f"[preview-identity] {report_id}: summary rejected — running ONE corrective re-analysis")
+                    correction = (
+                        "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact clip FAILED an "
+                        "independent identity verification: it described a DIFFERENT player (most likely "
+                        "the ball-carrier), NOT the tapped target. Re-analyse from scratch. The tapped "
+                        "target is the player at the CENTRE of the attached tap crops"
+                        + (f" — verified description: {identity_profile.get('description')}" if identity_profile else "")
+                        + ". At tap moments where the target does NOT have the ball, the on-ball action "
+                        "belongs to another player. Describe ONLY the tapped target: his receptions, his "
+                        "off-ball runs, and what HE does with the ball when HE has it."
+                    )
+                    retry_preview = await _await_with_heartbeat(report_id, call_gemini_with_video(
+                        session_id=f"preview-retry-{report_id}",
+                        prompt=preview_prompt + correction,
+                        video_path=str(preview_clip_path),
+                        marker_path=str(marker_path),
+                        crop_path=str(crop_path) if crop_path and Path(crop_path).exists() else None,
+                        anchor_crops=(anchor_crop_paths + wide_crop_paths[:3]) if len(anchor_crop_paths) > 1 else None,
+                    ))
+                    retry_preview = scrub_hedging(retry_preview)
+                    if isinstance(retry_preview, dict):
+                        retry_txt = " ".join(filter(None, [
+                            str(retry_preview.get("player_type") or ""),
+                            str(retry_preview.get("brief_summary") or ""),
+                            " ".join(str(s) for s in (retry_preview.get("top_strengths") or [])),
+                        ]))
+                        v2 = await verify_preview_summary(
+                            EMERGENT_LLM_KEY, f"pidv-retry-{report_id}",
+                            anchor_crop_paths, wide_crop_paths, retry_txt,
+                        )
+                        if v2 is False:
+                            retry_preview["identity_flagged"] = True
+                            retry_preview["confidence"] = "low"
+                            retry_preview["confidence_reason"] = (
+                                "Identity verification could not confirm the tapped player with certainty in this clip."
+                            )
+                            logger.warning(f"[preview-identity] {report_id}: STILL failing after retry — flagged")
+                        preview = retry_preview
+                        await db.reports.update_one(
+                            {"id": report_id}, {"$set": {"preview_identity_retry_done": True}}
+                        )
+        except Exception:
+            logger.exception(f"preview identity gate failed for {report_id}")
 
         # ============== JOIN BACKGROUND TRANSCODE ==============
         # The playable MP4 must exist before we publish — but by now it has been
@@ -5938,6 +6023,13 @@ async def generate_full_report_task(report_id: str) -> None:
                 .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
                 .replace("{games_detected}", str(gate.get("games_detected", 1)))
             )
+        # Inject the pre-analysis identity profile (same block as the preview).
+        try:
+            _idp = doc.get("identity_profile")
+            if _idp:
+                full_prompt += identity_profile_block(_idp)
+        except Exception:
+            pass
         full = await call_gemini_with_video(
             session_id=f"full-{report_id}",
             prompt=full_prompt,
@@ -11107,7 +11199,12 @@ from blog_routes import build_blog_router, mount_blog_uploads
 from blog_seo import build_seo_router
 from url_video_fetch import build_url_fetch_router, resolve_temp_token_path
 from chunked_upload import build_chunked_upload_router
-from identity_verify import verify_frame_identity
+from identity_verify import (
+    verify_frame_identity,
+    build_identity_profile,
+    identity_profile_block,
+    verify_preview_summary,
+)
 from progress_tracking import (
     build_progress_router,
     find_or_create_profile,
