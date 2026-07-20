@@ -11,7 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Crown, ArrowRight, LayoutDashboard, Target, Brain, Zap, Activity } from "lucide-react";
 
 const RESOLVE_IMG = (report, assetBase) => {
-  const src = report?.marker_url || report?.subject_crop_url || report?.poster_url;
+  // Prefer the high-quality square DISPLAY crop (centred on the tapped player)
+  const src = report?.display_crop_url || report?.subject_crop_url || report?.marker_url || report?.poster_url;
   if (!src) return null;
   if (/^https?:\/\//i.test(src)) return src;
   return `${assetBase || ""}${src}`;

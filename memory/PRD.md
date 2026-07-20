@@ -27,6 +27,12 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 11, 2026) — Display crop rolled out platform-wide (user-approved enhancement) DONE ✅
+- **PremiumReadyOverlay**: hero image now `display_crop_url → subject_crop_url → marker_url → poster_url`.
+- **Scout Database avatars**: `POST /profile/avatar/from-report/{id}` now prefers `display_crop_filename` (square 640×640) over the stretched subject crop, with R2 restore (`_try_restore_from_r2`) when the ephemeral pod disk lost the local file. Players-database cards/detail read `avatar_url` → automatically get the sharp square image.
+- **ReportPage untouched** (deliberate): the "Your player · tracked" card is already pixel-perfect canvas (frame + box + zoomed crop) and the user is happy with the report.
+- **VERIFIED**: avatar generated from display crop → served 200 from R2 at exactly 640×640; admin test avatar cleaned up after. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 11, 2026) — High-quality player display crop in teaser (P0 follow-up) DONE ✅
 - **User report**: teaser image showed the WRONG player — root cause: HeroTeaser rendered the FULL marker frame center-cropped to a square (`object-cover`), so the player in the MIDDLE of the frame (ball-carrier) was shown instead of the tapped player at the edge. User also flagged that raw crops look ugly/stretched.
 - **Fix (user-approved)**:

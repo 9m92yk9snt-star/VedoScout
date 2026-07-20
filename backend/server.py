@@ -3966,15 +3966,27 @@ async def avatar_from_report(report_id: str, user=Depends(get_current_user)):
     report = await db.reports.find_one({"id": report_id, "user_id": user["id"]}, {"_id": 0})
     if not report:
         raise HTTPException(status_code=404, detail="Report not found for this user")
-    crop_name = report.get("subject_crop_filename")
-    if not crop_name:
+    # Prefer the high-quality square DISPLAY crop (640×640, centred on the
+    # tapped player) — falls back to the legacy tight subject crop. Restore
+    # from R2 when the ephemeral pod disk no longer has the local file.
+    src = None
+    for name, override in (
+        (report.get("display_crop_filename"), report.get("display_crop_url_override")),
+        (report.get("subject_crop_filename"), report.get("subject_crop_url_override")),
+    ):
+        if not name:
+            continue
+        p = UPLOAD_DIR / name
+        if not p.exists() and override:
+            _try_restore_from_r2(override, p)
+        if p.exists():
+            src = p
+            break
+    if src is None:
         raise HTTPException(
             status_code=400,
             detail="This report has no player crop yet — try again once analysis finishes.",
         )
-    src = UPLOAD_DIR / crop_name
-    if not src.exists():
-        raise HTTPException(status_code=404, detail="Player crop file is missing on disk")
 
     avatars_dir = UPLOAD_DIR / "avatars"
     avatars_dir.mkdir(parents=True, exist_ok=True)
