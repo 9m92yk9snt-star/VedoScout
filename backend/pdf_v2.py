@@ -45,6 +45,8 @@ CREAM_TEXT = HexColor("#F0EAD8")
 FOOT_TEXT = HexColor("#E9EFE2")
 FOOT_MUTED = HexColor("#A9BC9C")
 
+PROMO_URL = "https://scoutmeplay.com"
+
 W, H = A4
 M = 26.0            # page margin
 GAP = 9.0           # card gap
@@ -1002,6 +1004,40 @@ def _forest_footer(c, x, y, w, h):
     c.restoreState()
 
 
+def _promo_strip(c, x, y, w, h):
+    """Marketing strip for SHARED PDFs only — QR + pro-scout CTA."""
+    c.saveState()
+    c.setFillColor(CARD)
+    c.setStrokeColor(BORDER)
+    c.setLineWidth(0.8)
+    c.roundRect(x, y, w, h, 9, stroke=1, fill=1)
+    qr_side = h - 16
+    try:
+        import qrcode
+        qr = qrcode.QRCode(border=1, box_size=8)
+        qr.add_data(PROMO_URL)
+        qr.make(fit=True)
+        raw = qr.make_image(fill_color=(18, 64, 42), back_color="white")
+        img = (raw.get_image() if hasattr(raw, "get_image") else raw).convert("RGB")
+        c.drawImage(ImageReader(img), x + w - qr_side - 8, y + 8, qr_side, qr_side)
+    except Exception:
+        qr_side = 0
+    tx = x + 16
+    c.setFillColor(FOREST)
+    c.setFont(F_BLACK, 11)
+    c.drawString(tx, y + h - 26, "PRO SCOUT ANALYSIS FOR EVERY PLAYER")
+    c.setFillColor(BODY)
+    c.setFont(F_BODY, 7.6)
+    c.drawString(tx, y + h - 40, "This report was produced by ScoutMePlay's professional-grade scouting engine.")
+    c.setFont(F_BODY, 7.6)
+    c.drawString(tx, y + h - 51, "Get your own player report at ")
+    lw = c.stringWidth("Get your own player report at ", F_BODY, 7.6)
+    c.setFillColor(GREEN)
+    c.setFont(F_BOLD, 7.8)
+    c.drawString(tx + lw, y + h - 51, "scoutmeplay.com")
+    c.restoreState()
+
+
 def _photo_candidates(doc):
     cands = []
     for ov, fn in (("display_crop_url_override", "display_crop_filename"),
@@ -1032,8 +1068,9 @@ def _pick_hero_photo(doc, resolve):
 
 # ═══════════════════════ main builder ═══════════════════════
 
-def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None):
-    """Render the Premium Report V2 card layout to a 3-page A4 PDF."""
+def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo: bool = False):
+    """Render the Premium Report V2 card layout to a 3-page A4 PDF.
+    promo=True adds the shared-link marketing strip (QR + CTA) on page 3."""
     resolve = image_resolver or (lambda _u: None)
     d = derive_v2(report_doc)
     pd = report_doc.get("player_details") or {}
@@ -1119,9 +1156,13 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None):
 
     fy = row5_top - h5 - GAP - 78
     _forest_footer(c, M, fy, CW, 78)
+    dy = fy - 14
+    if promo:
+        _promo_strip(c, M, fy - GAP - 66, CW, 66)
+        dy = fy - GAP - 66 - 14
     c.setFillColor(MUTED)
     c.setFont(F_BODY, 6.2)
-    c.drawCentredString(W / 2, fy - 14,
+    c.drawCentredString(W / 2, dy,
                         "Independent player development analysis based on submitted video. Not a recruitment guarantee.")
     _page_footer(c, 3)
     c.showPage()

@@ -27,6 +27,11 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 20, 2026) — QR promo strip on SHARED PDFs (user-approved; wording per user: "pro scout", NOT "AI scout") DONE ✅
+- `_promo_strip()` in pdf_v2.py: white card on page 3 (between forest footer and disclaimer) — "PRO SCOUT ANALYSIS FOR EVERY PLAYER" + "produced by ScoutMePlay's professional-grade scouting engine" + "Get your own player report at scoutmeplay.com" + forest QR code (qrcode lib, links to https://scoutmeplay.com).
+- ONLY on shared links: `_ensure_report_pdf(doc, shared=True)` renders a separate cache variant `{id}.v14.shared.pdf` (owner download unchanged, verified byte-identical). `_purge_stale_pdfs` keeps both variants.
+- `qrcode` added to requirements.txt. GOTCHA fixed: qrcode's `make_image()` returns a PilImage wrapper — must `.get_image()` before ImageReader; and a parallel-edit race dropped the `PROMO_URL` constant (silent NameError swallowed by try/except → QR missing). Both fixed; page 3 rasterised and QR visually confirmed.
+
 ### Session (Jul 20, 2026) — Share report via public PDF link (user-approved) DONE ✅
 - **Backend**: `POST /reports/{id}/share` (idempotent while enabled; fresh token after revoke), `DELETE /reports/{id}/share` (revoke, old links die), public `GET /api/shared/{token}/report.pdf` (no auth; requires share_enabled + paid + full_report). Extracted `_ensure_report_pdf(doc)` helper — now shared by authed download, public sample and share links (removed the duplicated enrichment blocks). Report GET payload exposes `share_enabled`/`share_token`.
 - **Frontend (ReportPage V2 toolbar)**: "Share report" button (→ "Copy share link" once active) copies `{BACKEND}/api/shared/{token}/report.pdf` to clipboard with toast + prompt fallback; "Disable link" revoke action beside it. data-testids: `share-report-btn`, `disable-share-btn`.

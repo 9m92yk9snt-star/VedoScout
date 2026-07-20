@@ -98,15 +98,17 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 PDF_RENDER_VERSION = 14  # v14 = Premium Report V2 card layout (mirrors web report)
 
 
-def _pdf_cache_path(report_id: str) -> Path:
-    return PDF_DIR / f"{report_id}.v{PDF_RENDER_VERSION}.pdf"
+def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
+    suffix = ".shared" if shared else ""
+    return PDF_DIR / f"{report_id}.v{PDF_RENDER_VERSION}{suffix}.pdf"
 
 
 def _purge_stale_pdfs(report_id: str) -> None:
     """Delete older-version cached PDFs for a given report id so disk doesn't
     leak. Safe no-op if none exist."""
+    keep = {_pdf_cache_path(report_id).name, _pdf_cache_path(report_id, shared=True).name}
     for old in PDF_DIR.glob(f"{report_id}*.pdf"):
-        if old.name != _pdf_cache_path(report_id).name:
+        if old.name not in keep:
             try:
                 old.unlink()
             except Exception:
@@ -8539,11 +8541,12 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
     return FileResponse(str(pdf_path), media_type="application/pdf", filename=filename)
 
 
-def _ensure_report_pdf(doc: dict) -> Path:
+def _ensure_report_pdf(doc: dict, shared: bool = False) -> Path:
     """Build (or reuse) the cached V2 PDF for a report doc. Shared by the
-    authenticated download, the public sample and public share links."""
+    authenticated download, the public sample and public share links.
+    shared=True renders the variant with the marketing strip on page 3."""
     report_id = doc["id"]
-    pdf_path = _pdf_cache_path(report_id)
+    pdf_path = _pdf_cache_path(report_id, shared=shared)
     if pdf_path.exists():
         return pdf_path
     _purge_stale_pdfs(report_id)
@@ -8578,7 +8581,7 @@ def _ensure_report_pdf(doc: dict) -> Path:
     enriched_comments = ensure_video_frames(doc)
     if enriched_comments and isinstance(doc.get("full_report"), dict):
         doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
-    build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver)
+    build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver, promo=shared)
     return pdf_path
 
 
@@ -8679,7 +8682,7 @@ async def download_shared_pdf(token: str):
     if not doc or not doc.get("full_report") or not (doc.get("is_paid") or doc.get("manually_unlocked")):
         raise HTTPException(status_code=404, detail="This share link is no longer active")
 
-    pdf_path = _ensure_report_pdf(doc)
+    pdf_path = _ensure_report_pdf(doc, shared=True)
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
     return FileResponse(
