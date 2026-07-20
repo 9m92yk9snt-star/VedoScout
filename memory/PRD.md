@@ -27,6 +27,11 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 20, 2026) — Share report via public PDF link (user-approved) DONE ✅
+- **Backend**: `POST /reports/{id}/share` (idempotent while enabled; fresh token after revoke), `DELETE /reports/{id}/share` (revoke, old links die), public `GET /api/shared/{token}/report.pdf` (no auth; requires share_enabled + paid + full_report). Extracted `_ensure_report_pdf(doc)` helper — now shared by authed download, public sample and share links (removed the duplicated enrichment blocks). Report GET payload exposes `share_enabled`/`share_token`.
+- **Frontend (ReportPage V2 toolbar)**: "Share report" button (→ "Copy share link" once active) copies `{BACKEND}/api/shared/{token}/report.pdf` to clipboard with toast + prompt fallback; "Disable link" revoke action beside it. data-testids: `share-report-btn`, `disable-share-btn`.
+- **VERIFIED e2e**: create → public PDF 200 (1.28 MB V2 PDF) → idempotent second call → revoke → 404 → invalid token 404; UI screenshot confirms button states. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 20, 2026) — PDF rebuilt to match Premium Report V2 (user-requested) DONE ✅
 - **User report**: downloadable PDF still used the OLD multi-page layout/data; must mirror the new V2 analysis.
 - **Implemented**: NEW module `/app/backend/pdf_v2.py` (~900 lines):

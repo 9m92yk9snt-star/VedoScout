@@ -1623,6 +1623,8 @@ export default function ReportPage() {
   const [embeddedOpen, setEmbeddedOpen] = useState(false);
   const [generatingFull, setGeneratingFull] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareState, setShareState] = useState(null); // null → follow report doc; {token} local override
   const [videoFailed, setVideoFailed] = useState(false);  // graceful fallback when the uploaded clip can't be decoded on this device
   const pollingRef = useRef(null);
   // ── Timestamped video evidence ────────────────────────────────────
@@ -1886,6 +1888,37 @@ export default function ReportPage() {
     }
   };
 
+  const shareToken = shareState ? shareState.token : (report?.share_enabled ? report?.share_token : null);
+
+  const handleShareReport = async () => {
+    setShareBusy(true);
+    try {
+      const { data } = await api.post(`/reports/${id}/share`);
+      const url = `${ASSET_BASE}${data.share_path}`;
+      setShareState({ token: data.share_token });
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Share link copied — anyone with the link can download the PDF");
+      } catch {
+        window.prompt("Copy the share link:", url);
+      }
+    } catch (err) {
+      toast.error(String(err?.response?.data?.detail || "Could not create share link"));
+    } finally {
+      setShareBusy(false);
+    }
+  };
+
+  const handleRevokeShare = async () => {
+    try {
+      await api.delete(`/reports/${id}/share`);
+      setShareState({ token: null });
+      toast.success("Share link disabled — old links no longer work");
+    } catch {
+      toast.error("Could not disable the link");
+    }
+  };
+
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
@@ -1981,7 +2014,25 @@ export default function ReportPage() {
               <ChevronLeft className="w-4 h-4" />
               Dashboard
             </button>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-3">
+              <button
+                onClick={handleShareReport}
+                disabled={shareBusy}
+                data-testid="share-report-btn"
+                className="bg-white border border-[#12402A]/25 text-[#12402A] hover:bg-[#12402A]/5 font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2 rounded"
+              >
+                {shareBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                {shareToken ? "Copy share link" : "Share report"}
+              </button>
+              {shareToken && (
+                <button
+                  onClick={handleRevokeShare}
+                  data-testid="disable-share-btn"
+                  className="text-[#12402A]/55 hover:text-red-700 uppercase tracking-widest text-[10px] font-bold flex items-center gap-1 transition-colors"
+                >
+                  <Link2 className="w-3 h-3" /> Disable link
+                </button>
+              )}
               <button
                 onClick={handleDownloadPdf}
                 disabled={downloadingPdf}

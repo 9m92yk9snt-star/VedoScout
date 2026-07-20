@@ -5635,6 +5635,8 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "marker_url": _resolve_marker_url(doc),
         "subject_crop_url": _resolve_subject_crop_url(doc),
         "display_crop_url": _resolve_display_crop_url(doc),
+        "share_enabled": bool(doc.get("share_enabled")),
+        "share_token": doc.get("share_token") if doc.get("share_enabled") else None,
         "fingerprint": doc.get("fingerprint"),
         "anchors": doc.get("anchors", []),
         "audio_events_preview": doc.get("audio_events_preview", []),
@@ -8530,48 +8532,54 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
     if not doc.get("full_report"):
         raise HTTPException(status_code=400, detail="Full report not generated yet")
 
-    pdf_path = _pdf_cache_path(report_id)
-    if not pdf_path.exists():
-        _purge_stale_pdfs(report_id)
-        # Compute deterministic enrichment so PDF == web report.
-        doc["trial_readiness"] = compute_trial_readiness(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        doc["archetype"] = match_archetype(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        # Attach the cached narrative (if any) so the PDF mirrors the web report
-        if isinstance(doc.get("archetype"), dict) and doc.get("archetype_narrative"):
-            if doc.get("archetype_narrative_archetype_id") == doc["archetype"].get("id"):
-                doc["archetype"]["narrative"] = doc["archetype_narrative"]
-        doc["age_profile_reference"] = compute_age_profile_reference(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        # Step 2 — StatsBomb calibration for the PDF mirror
-        doc["statsbomb_calibration"] = compute_statsbomb_calibration(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        # Age Intelligence — drives stage-gated rendering in the PDF too
-        age_intel = compute_age_intelligence(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        if age_intel:
-            apply_stage_gating(doc, age_intel)
-            doc["age_intelligence"] = age_intel
-        # Extract / placeholder frames so the PDF can embed them too.
-        enriched_comments = ensure_video_frames(doc)
-        if enriched_comments and isinstance(doc.get("full_report"), dict):
-            doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
-        build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver)
+    pdf_path = _ensure_report_pdf(doc)
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"]["player_name"])
     filename = f"EliteScout_{player_name_safe}_Report.pdf"
     return FileResponse(str(pdf_path), media_type="application/pdf", filename=filename)
+
+
+def _ensure_report_pdf(doc: dict) -> Path:
+    """Build (or reuse) the cached V2 PDF for a report doc. Shared by the
+    authenticated download, the public sample and public share links."""
+    report_id = doc["id"]
+    pdf_path = _pdf_cache_path(report_id)
+    if pdf_path.exists():
+        return pdf_path
+    _purge_stale_pdfs(report_id)
+    # Deterministic enrichment so PDF == web report.
+    doc["trial_readiness"] = compute_trial_readiness(
+        doc.get("full_report") or {},
+        doc.get("player_details") or {},
+    )
+    doc["archetype"] = match_archetype(
+        doc.get("full_report") or {},
+        doc.get("player_details") or {},
+    )
+    if isinstance(doc.get("archetype"), dict) and doc.get("archetype_narrative"):
+        if doc.get("archetype_narrative_archetype_id") == doc["archetype"].get("id"):
+            doc["archetype"]["narrative"] = doc["archetype_narrative"]
+    doc["age_profile_reference"] = compute_age_profile_reference(
+        doc.get("full_report") or {},
+        doc.get("player_details") or {},
+    )
+    doc["statsbomb_calibration"] = compute_statsbomb_calibration(
+        doc.get("full_report") or {},
+        doc.get("player_details") or {},
+    )
+    age_intel = compute_age_intelligence(
+        doc.get("full_report") or {},
+        doc.get("player_details") or {},
+    )
+    if age_intel:
+        apply_stage_gating(doc, age_intel)
+        doc["age_intelligence"] = age_intel
+    # Extract / placeholder frames so the PDF can embed them too.
+    enriched_comments = ensure_video_frames(doc)
+    if enriched_comments and isinstance(doc.get("full_report"), dict):
+        doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
+    build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver)
+    return pdf_path
 
 
 # Cached path of the public sample PDF (built once on first hit).
@@ -8609,49 +8617,76 @@ async def download_public_sample_pdf():
     doc = await _resolve_sample_report()
     if not doc:
         raise HTTPException(status_code=404, detail="Sample report not available yet")
-    src_id = doc["id"]
 
-    # Use the same per-report PDF cache that the authenticated download uses, so
-    # admin tweaks propagate. Then expose it under a public filename.
-    pdf_path = _pdf_cache_path(src_id)
-    if not pdf_path.exists():
-        _purge_stale_pdfs(src_id)
-        doc["trial_readiness"] = compute_trial_readiness(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        doc["archetype"] = match_archetype(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        if isinstance(doc.get("archetype"), dict) and doc.get("archetype_narrative"):
-            if doc.get("archetype_narrative_archetype_id") == doc["archetype"].get("id"):
-                doc["archetype"]["narrative"] = doc["archetype_narrative"]
-        doc["age_profile_reference"] = compute_age_profile_reference(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        doc["statsbomb_calibration"] = compute_statsbomb_calibration(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        age_intel = compute_age_intelligence(
-            doc.get("full_report") or {},
-            doc.get("player_details") or {},
-        )
-        if age_intel:
-            apply_stage_gating(doc, age_intel)
-            doc["age_intelligence"] = age_intel
-        enriched_comments = ensure_video_frames(doc)
-        if enriched_comments and isinstance(doc.get("full_report"), dict):
-            doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
-        build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver)
+    pdf_path = _ensure_report_pdf(doc)
 
     return FileResponse(
         str(pdf_path),
         media_type="application/pdf",
         filename="ScoutMePlay_Sample_Report.pdf",
         headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+# ============== SHARE REPORT (public PDF link) ==============
+
+@api_router.post("/reports/{report_id}/share")
+async def create_share_link(report_id: str, user=Depends(get_current_user)):
+    """Enable (or return the existing) public share link for a premium report.
+    Idempotent while enabled; a fresh token is issued after a revoke so old
+    links stay dead."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"):
+        raise HTTPException(status_code=402, detail="Payment required")
+    if not doc.get("full_report"):
+        raise HTTPException(status_code=400, detail="Full report not generated yet")
+
+    if doc.get("share_enabled") and doc.get("share_token"):
+        token = doc["share_token"]
+    else:
+        token = secrets.token_urlsafe(16)
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"share_enabled": True, "share_token": token, "shared_at": now_iso()}},
+        )
+    return {"ok": True, "share_token": token, "share_path": f"/api/shared/{token}/report.pdf"}
+
+
+@api_router.delete("/reports/{report_id}/share")
+async def revoke_share_link(report_id: str, user=Depends(get_current_user)):
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"share_enabled": False}, "$unset": {"share_token": ""}},
+    )
+    return {"ok": True}
+
+
+@api_router.get("/shared/{token}/report.pdf")
+async def download_shared_pdf(token: str):
+    """Public, no-auth PDF download via a share token created by the owner."""
+    if not token or len(token) < 12:
+        raise HTTPException(status_code=404, detail="Invalid link")
+    doc = await db.reports.find_one({"share_token": token, "share_enabled": True})
+    if not doc or not doc.get("full_report") or not (doc.get("is_paid") or doc.get("manually_unlocked")):
+        raise HTTPException(status_code=404, detail="This share link is no longer active")
+
+    pdf_path = _ensure_report_pdf(doc)
+
+    player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
+    return FileResponse(
+        str(pdf_path),
+        media_type="application/pdf",
+        filename=f"ScoutMePlay_{player_name_safe}_Report.pdf",
+        headers={"Cache-Control": "no-store"},
     )
 
 
