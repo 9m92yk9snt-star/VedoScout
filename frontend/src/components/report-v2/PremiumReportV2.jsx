@@ -180,6 +180,7 @@ export default function PremiumReportV2({ report, assetBase }) {
   const videoRef = useRef(null);
 
   const photoCandidates = [
+    resolveUrl(report.display_crop_url, assetBase),
     resolveUrl(report.subject_crop_url, assetBase),
     resolveUrl(report.marker_url, assetBase),
     resolveUrl(report.poster_url, assetBase),

@@ -5,6 +5,7 @@ import os
 import uuid
 import json
 import math
+import hashlib
 import logging
 import shutil
 import re
@@ -94,7 +95,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 13  # v13 = Nano Banana cover + section header hero bands (Feb 27 2026)
+PDF_RENDER_VERSION = 14  # v14 = Premium Report V2 card layout (mirrors web report)
 
 
 def _pdf_cache_path(report_id: str) -> Path:
@@ -8566,7 +8567,7 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
         enriched_comments = ensure_video_frames(doc)
         if enriched_comments and isinstance(doc.get("full_report"), dict):
             doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
-        build_pdf(doc, str(pdf_path))
+        build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver)
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"]["player_name"])
     filename = f"EliteScout_{player_name_safe}_Report.pdf"
@@ -8644,7 +8645,7 @@ async def download_public_sample_pdf():
         enriched_comments = ensure_video_frames(doc)
         if enriched_comments and isinstance(doc.get("full_report"), dict):
             doc["full_report"] = {**doc["full_report"], "video_comments": enriched_comments}
-        build_pdf(doc, str(pdf_path))
+        build_pdf_v2(doc, str(pdf_path), image_resolver=_pdf_image_resolver)
 
     return FileResponse(
         str(pdf_path),
@@ -11254,6 +11255,35 @@ from identity_verify import (
     identity_profile_block,
     verify_preview_summary,
 )
+from pdf_v2 import build_pdf_v2
+
+
+def _pdf_image_resolver(url):
+    """Map a report image URL (/api/uploads, /api/media R2 proxy, or absolute)
+    to a local file path the PDF builder can embed. Best-effort → None."""
+    if not url:
+        return None
+    try:
+        if url.startswith("/api/uploads/"):
+            p = UPLOAD_DIR / url[len("/api/uploads/"):]
+            return str(p) if p.exists() and p.stat().st_size > 0 else None
+        cache_dir = Path("/tmp/pdf_img_cache")
+        cache_dir.mkdir(exist_ok=True)
+        dest = cache_dir / (hashlib.md5(url.encode()).hexdigest() + ".img")
+        if dest.exists() and dest.stat().st_size > 0:
+            return str(dest)
+        if url.startswith("/api/media/"):
+            if r2_storage.download_to_file(url[len("/api/media/"):], dest):
+                return str(dest)
+            return None
+        if url.startswith("http"):
+            import urllib.request
+            with urllib.request.urlopen(url, timeout=10) as resp, open(dest, "wb") as f:
+                f.write(resp.read())
+            return str(dest) if dest.stat().st_size > 0 else None
+    except Exception:
+        return None
+    return None
 from progress_tracking import (
     build_progress_router,
     find_or_create_profile,

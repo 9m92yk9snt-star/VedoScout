@@ -27,6 +27,17 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 20, 2026) — PDF rebuilt to match Premium Report V2 (user-requested) DONE ✅
+- **User report**: downloadable PDF still used the OLD multi-page layout/data; must mirror the new V2 analysis.
+- **Implemented**: NEW module `/app/backend/pdf_v2.py` (~900 lines):
+  - `derive_v2()` — faithful Python port of frontend `report-v2/derive.js` (same tops/priorities/snapshot/roadmap/parent summary/scout outlook/match stats/video highlight logic).
+  - `build_pdf_v2()` — 3-page A4 canvas render mirroring the V2 card grid: P1 hero card (display-crop photo + position chip) / parent summary + Good News box / donut score + stars · snapshot / match stats / age-comparison bars + Caveat quote strip; P2 top strengths (frame thumbnails) / development priorities · roadmap timeline / weekly plan / parent tips; P3 video highlight / coach notes / scout outlook dots + forest footer band + disclaimer.
+  - Real V2 fonts committed to `/app/backend/fonts/` (Barlow-Black/Bold, DM Sans, Caveat) with Helvetica fallback.
+  - `_pdf_image_resolver` in server.py: maps `/api/uploads`, `/api/media` (R2 proxy) and absolute URLs to local files (R2 download + /tmp cache) for thumbnails/hero photo.
+  - `PDF_RENDER_VERSION` 13→14 (auto-invalidates every cached old PDF). Both endpoints switched: `/reports/{id}/pdf` + public `/sample/scoutmeplay-report.pdf`. Old `build_pdf` left dormant (removal deferred to refactor phase).
+  - Bonus: web `PremiumReportV2.jsx` photoCandidates now prefers `display_crop_url`.
+- **VERIFIED**: built from a real paid report; all 3 pages rasterised + visually inspected (parent-summary overflow fixed, JS-matching star rounding); both endpoints return 200 with the new PDF. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 11, 2026) — Display crop rolled out platform-wide (user-approved enhancement) DONE ✅
 - **PremiumReadyOverlay**: hero image now `display_crop_url → subject_crop_url → marker_url → poster_url`.
 - **Scout Database avatars**: `POST /profile/avatar/from-report/{id}` now prefers `display_crop_filename` (square 640×640) over the stretched subject crop, with R2 restore (`_try_restore_from_r2`) when the ephemeral pod disk lost the local file. Players-database cards/detail read `avatar_url` → automatically get the sharp square image.
