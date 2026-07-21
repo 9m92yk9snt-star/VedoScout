@@ -27,6 +27,12 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 21, 2026) — Shareable FIFA-style Player Card (user-approved pick #2) DONE ✅
+- **NEW `/app/backend/player_card.py`**: PIL-rendered 1080×1920 Instagram-story PNG — cream backdrop with brand glows, wordmark, dark forest gradient card with gold inner border, huge gold overall score + OVERALL label, position abbr, AGE chip (outline), rounded player photo (display crop via `_pick_hero_photo`), auto-shrinking name, Caveat player-type accent in lime, 5-star row, TEC/TAC/PHY/MEN category averages (computed from full_report skills), "SCOUTMEPLAY · PRO SCOUT REPORT" footer + "GET YOUR OWN PLAYER REPORT / scoutmeplay.com" CTA below card.
+- **Endpoint**: `GET /api/reports/{id}/player-card.png` (auth owner/admin, unlocked + full_report) with cache `cards/{id}.v{CARD_RENDER_VERSION}.png`, built via `asyncio.to_thread`.
+- **Frontend (V2 toolbar)**: gold "Player card" button (`player-card-btn`, IdCard icon) — mobile one-tap share via Web Share API (`navigator.share` with file, AbortError ignored), desktop fallback = PNG download + toast.
+- **VERIFIED**: card generated from real report + visually inspected (score 7.0 gold, 4 stars, stats 9.0/—/7.7/8.0, photo, CTA); endpoint 200; toolbar screenshot OK. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 20, 2026) — QR promo strip on SHARED PDFs (user-approved; wording per user: "pro scout", NOT "AI scout") DONE ✅
 - `_promo_strip()` in pdf_v2.py: white card on page 3 (between forest footer and disclaimer) — "PRO SCOUT ANALYSIS FOR EVERY PLAYER" + "produced by ScoutMePlay's professional-grade scouting engine" + "Get your own player report at scoutmeplay.com" + forest QR code (qrcode lib, links to https://scoutmeplay.com).
 - ONLY on shared links: `_ensure_report_pdf(doc, shared=True)` renders a separate cache variant `{id}.v14.shared.pdf` (owner download unchanged, verified byte-identical). `_purge_stale_pdfs` keeps both variants.

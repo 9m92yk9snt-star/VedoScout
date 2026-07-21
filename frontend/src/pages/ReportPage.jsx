@@ -17,7 +17,7 @@ import api, { ASSET_BASE } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { isPremiumUser } from "@/lib/premium";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles,
+  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles, IdCard,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
@@ -1919,6 +1919,35 @@ export default function ReportPage() {
     }
   };
 
+  const [cardBusy, setCardBusy] = useState(false);
+  const handlePlayerCard = async () => {
+    setCardBusy(true);
+    try {
+      const resp = await api.get(`/reports/${id}/player-card.png`, { responseType: "blob" });
+      const fname = `ScoutMePlay_${(report?.player_details?.player_name || "player").replace(/\s+/g, "_")}_Card.png`;
+      const file = new File([resp.data], fname, { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: "ScoutMePlay Player Card" });
+        } catch (err) {
+          if (err?.name !== "AbortError") throw err;
+        }
+      } else {
+        const url = URL.createObjectURL(resp.data);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fname;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Player card downloaded — ready to share");
+      }
+    } catch {
+      toast.error("Could not generate the player card");
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
@@ -2015,6 +2044,15 @@ export default function ReportPage() {
               Dashboard
             </button>
             <div className="ml-auto flex items-center gap-3">
+              <button
+                onClick={handlePlayerCard}
+                disabled={cardBusy}
+                data-testid="player-card-btn"
+                className="bg-[#E8B32C] hover:bg-[#d9a418] text-[#12402A] font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2 rounded"
+              >
+                {cardBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <IdCard className="w-4 h-4" />}
+                Player card
+              </button>
               <button
                 onClick={handleShareReport}
                 disabled={shareBusy}

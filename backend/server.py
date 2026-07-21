@@ -8631,6 +8631,41 @@ async def download_public_sample_pdf():
     )
 
 
+# ============== SHAREABLE PLAYER CARD (PNG, story format) ==============
+
+CARD_RENDER_VERSION = 1
+CARDS_DIR = ROOT_DIR / "cards"
+CARDS_DIR.mkdir(exist_ok=True)
+
+
+@api_router.get("/reports/{report_id}/player-card.png")
+async def download_player_card(report_id: str, user=Depends(get_current_user)):
+    """FIFA-style shareable player card (1080×1920 PNG) for a premium report."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"):
+        raise HTTPException(status_code=402, detail="Payment required")
+    if not doc.get("full_report"):
+        raise HTTPException(status_code=400, detail="Full report not generated yet")
+
+    card_path = CARDS_DIR / f"{report_id}.v{CARD_RENDER_VERSION}.png"
+    if not card_path.exists():
+        from pdf_v2 import _pick_hero_photo
+        from player_card import build_player_card
+        photo = _pick_hero_photo(doc, _pdf_image_resolver)
+        await asyncio.to_thread(build_player_card, doc, str(card_path), photo)
+
+    player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
+    return FileResponse(
+        str(card_path),
+        media_type="image/png",
+        filename=f"ScoutMePlay_{player_name_safe}_Card.png",
+    )
+
+
 # ============== SHARE REPORT (public PDF link) ==============
 
 @api_router.post("/reports/{report_id}/share")
