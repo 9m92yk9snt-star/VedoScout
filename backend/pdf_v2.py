@@ -1149,6 +1149,332 @@ def _pick_hero_photo(doc, resolve):
     return None
 
 
+def _movement_map_card(c, mm, x, y, w, h):
+    """Measured optical-tracking movement map: dark trail panel + metric chips."""
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "Movement Map · Measured Data", w - 2 * PAD)
+    # measured chip on the title line
+    chip = "MEASURED · OPTICAL TRACKING"
+    cw2 = c.stringWidth(chip, F_BLACK, 5.6) + 12
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(x + w - PAD - cw2, ty + 8, cw2, 11, 3, stroke=0, fill=1)
+    c.setFillColor(HexColor("#CCFF00"))
+    c.setFont(F_BLACK, 5.6)
+    c.drawCentredString(x + w - PAD - cw2 / 2, ty + 11.4, chip)
+    c.restoreState()
+
+    trail = mm.get("trail") or []
+    pl_x, pl_top = x + PAD, ty - 4
+    pl_w = (w - 3 * PAD) * 0.56
+    pl_h = min(pl_w * 9 / 16, pl_top - y - PAD)
+    pl_y = pl_top - pl_h
+    c.saveState()
+    p = c.beginPath()
+    p.roundRect(pl_x, pl_y, pl_w, pl_h, 8)
+    c.clipPath(p, stroke=0, fill=0)
+    c.setFillColor(HexColor("#0D2818"))
+    c.rect(pl_x, pl_y, pl_w, pl_h, stroke=0, fill=1)
+    c.setStrokeColor(HexColor("#1D4230"))
+    c.setLineWidth(0.5)
+    for fx in (0.25, 0.5, 0.75):
+        c.line(pl_x + pl_w * fx, pl_y, pl_x + pl_w * fx, pl_y + pl_h)
+    for fy in (1 / 3, 2 / 3):
+        c.line(pl_x, pl_y + pl_h * fy, pl_x + pl_w, pl_y + pl_h * fy)
+
+    def _px(pt):
+        return pl_x + float(pt["x"]) * pl_w, pl_y + pl_h - float(pt["y"]) * pl_h
+
+    c.setFillColor(HexColor("#CCFF00"))
+    c.setFillAlpha(0.055)
+    for pt in trail:
+        cx2, cy2 = _px(pt)
+        c.circle(cx2, cy2, 13, stroke=0, fill=1)
+    c.setFillAlpha(1)
+    c.setStrokeColor(HexColor("#CCFF00"))
+    c.setStrokeAlpha(0.85)
+    c.setLineWidth(1.1)
+    c.setLineCap(1)
+    prev = None
+    for pt in trail:
+        cur = _px(pt)
+        if prev is not None and pt["t"] - prev[2] <= 0.6:
+            c.line(prev[0], prev[1], cur[0], cur[1])
+        prev = (cur[0], cur[1], pt["t"])
+    c.setStrokeAlpha(1)
+    for pt in trail:
+        if not pt.get("tap"):
+            continue
+        cx2, cy2 = _px(pt)
+        c.setStrokeColor(HexColor("#FFFFFF"))
+        c.setLineWidth(0.9)
+        c.circle(cx2, cy2, 3.4, stroke=1, fill=0)
+        c.setFillColor(HexColor("#FFFFFF"))
+        c.circle(cx2, cy2, 1.1, stroke=0, fill=1)
+    c.restoreState()
+    c.saveState()
+    c.setFillColor(HexColor("#5F7A66"))
+    c.setFont(F_BOLD, 5.2)
+    c.drawString(pl_x + 6, pl_y + 5, "PLAYER PATH IN FRAME · WHITE RINGS = YOUR TAPS")
+    c.restoreState()
+
+    rx = pl_x + pl_w + PAD
+    rw = x + w - PAD - rx
+    chip_w = (rw - 12) / 3
+    stats = [
+        (str(mm.get("bursts", 0)), "EXPLOSIVE", "ACTIONS"),
+        (f"{mm.get('tracked_seconds', 0)}s", "TRACKED", "PLAY"),
+        (str(mm.get("intensity", 0)), "INTENSITY", "INDEX /100"),
+    ]
+    ch = 52
+    for i, (val, l1, l2) in enumerate(stats):
+        bx = rx + i * (chip_w + 6)
+        card(c, bx, pl_top - ch, chip_w, ch, fill=HexColor("#FBF9F3"), r=7)
+        c.setFillColor(INK)
+        c.setFont(F_BLACK, 14)
+        c.drawCentredString(bx + chip_w / 2, pl_top - ch + 26, val)
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 5)
+        c.drawCentredString(bx + chip_w / 2, pl_top - ch + 15, l1)
+        c.drawCentredString(bx + chip_w / 2, pl_top - ch + 8, l2)
+    fy2 = pl_top - ch - 10
+    fh = 38
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(rx, fy2 - fh, rw, fh, 8, stroke=0, fill=1)
+    c.setFillColor(HexColor("#A9BC9C"))
+    c.setFont(F_BOLD, 5.6)
+    c.drawString(rx + 10, fy2 - 13, "FASTEST MEASURED MOMENT")
+    c.setFillColor(HexColor("#CCFF00"))
+    c.setFont(F_BLACK, 13)
+    c.drawString(rx + 10, fy2 - 29, f"{mm.get('top_speed_t', '—')}  ·  {mm.get('top_speed_idx', 0)}/100 PACE")
+    c.restoreState()
+    draw_par(
+        c,
+        esc("Measured frame-by-frame with optical tracking seeded by the parent's own player taps — "
+            "mathematical data, not AI estimates."),
+        rx, fy2 - fh - 8, rw, _style(F_BODY, 6.6, MUTED, leading=9.4),
+    )
+
+
+def _player_twin_card(c, lens, neighbors, x, y, w, h):
+    """FIFA Pro similarity — the player's 'style twin' + top-5 nearest pros."""
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "Player Twin · FIFA Pro Similarity", w - 2 * PAD)
+    lx = x + PAD
+    lw2 = (w - 3 * PAD) * 0.46
+    pct = float(lens.get("similarity_pct") or 0)
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6)
+    c.drawString(lx, ty - 8, "YOUR CLOSEST SENIOR-PRO STYLE MATCH")
+    c.setFillColor(INK)
+    c.setFont(F_BLACK, 20)
+    c.drawString(lx, ty - 28, str(lens.get("name") or "—"))
+    sub = " · ".join(s for s in (lens.get("club"), lens.get("league")) if s)
+    c.setFillColor(BODY)
+    c.setFont(F_BODY, 7.4)
+    c.drawString(lx, ty - 40, sub)
+    c.setFillColor(FOREST)
+    c.setFont(F_BLACK, 30)
+    c.drawString(lx, ty - 74, f"{pct:.0f}%")
+    pw2 = c.stringWidth(f"{pct:.0f}%", F_BLACK, 30)
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 7)
+    c.drawString(lx + pw2 + 6, ty - 74, "STYLE MATCH")
+    draw_bar(c, lx, ty - 86, lw2, 7, pct)
+    attrs = [str(a).replace("_", " ").title() for a in (lens.get("nearest_attrs") or [])[:3]]
+    if attrs:
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 5.6)
+        c.drawString(lx, ty - 100, "CLOSEST ATTRIBUTES")
+        ax = lx
+        for a in attrs:
+            aw = c.stringWidth(a.upper(), F_BOLD, 6) + 12
+            c.saveState()
+            c.setFillColor(SOFT)
+            c.setStrokeColor(SOFT_BORDER)
+            c.roundRect(ax, ty - 116, aw, 12, 6, stroke=1, fill=1)
+            c.setFillColor(GREEN)
+            c.setFont(F_BOLD, 6)
+            c.drawCentredString(ax + aw / 2, ty - 112, a.upper())
+            c.restoreState()
+            ax += aw + 5
+    draw_par(
+        c,
+        esc(lens.get("why") or ""),
+        lx, ty - 126, lw2, _style(F_BODY, 6.6, MUTED, leading=9.4),
+    )
+
+    rx = lx + lw2 + PAD
+    rw = x + w - PAD - rx
+    c.setFillColor(FOREST)
+    c.setFont(F_BOLD, 6.4)
+    c.drawString(rx, ty - 8, "TOP 5 CLOSEST PROS — REAL SIMILARITY SEARCH")
+    ry = ty - 20
+    row_h = min(24.0, (ry - y - PAD - 14) / max(1, len(neighbors[:5])))
+    for i, n in enumerate(neighbors[:5]):
+        cy2 = ry - i * row_h - row_h / 2
+        c.saveState()
+        c.setFillColor(FOREST if i == 0 else HexColor("#DCE3D2"))
+        c.circle(rx + 6, cy2, 6, stroke=0, fill=1)
+        c.setFillColor(HexColor("#FFFFFF") if i == 0 else BODY)
+        c.setFont(F_BLACK, 6.4)
+        c.drawCentredString(rx + 6, cy2 - 2.2, str(i + 1))
+        c.setFillColor(INK)
+        c.setFont(F_BOLD, 7.6)
+        c.drawString(rx + 17, cy2 + 1, str(n.get("name") or ""))
+        c.setFillColor(MUTED)
+        c.setFont(F_BODY, 5.8)
+        club = " · ".join(s for s in (n.get("club"), n.get("position")) if s)
+        c.drawString(rx + 17, cy2 - 7, club[:52])
+        npct = float(n.get("similarity_pct") or 0)
+        draw_bar(c, rx + rw - 74, cy2 - 2.4, 46, 5, npct)
+        c.setFillColor(FOREST)
+        c.setFont(F_BLACK, 7.6)
+        c.drawRightString(rx + rw, cy2 - 2, f"{npct:.0f}%")
+        c.restoreState()
+    draw_par(
+        c,
+        esc("Similarity search across 7,473 FIFA-rated senior pros (22 attributes). Style similarity — "
+            "not a career prediction. Capped at 92% for honesty."),
+        rx, ry - len(neighbors[:5]) * row_h - 4, rw, _style(F_BODY, 6, MUTED, leading=8.6),
+    )
+
+
+def _seal(c, cx, cy, r, label1, label2):
+    c.saveState()
+    c.setStrokeColor(FOREST)
+    c.setLineWidth(1.6)
+    c.circle(cx, cy, r, stroke=1, fill=0)
+    c.setLineWidth(0.7)
+    c.circle(cx, cy, r - 3.5, stroke=1, fill=0)
+    draw_star(c, cx, cy + r * 0.36, r * 0.22, GOLD)
+    c.setFillColor(FOREST)
+    c.setFont(F_BLACK, 6.2)
+    c.drawCentredString(cx, cy - 4, label1)
+    c.setFont(F_BOLD, 4.6)
+    c.drawCentredString(cx, cy - 11.5, label2)
+    c.restoreState()
+
+
+def _diploma_page(c, d, pd, report_date, tracked=False):
+    """Full-page certificate the player can print and hang on the wall."""
+    _page_bg(c)
+    c.saveState()
+    c.setStrokeColor(FOREST)
+    c.setLineWidth(2.2)
+    c.roundRect(M, M + 8, W - 2 * M, H - 2 * M - 8, 14, stroke=1, fill=0)
+    c.setStrokeColor(GOLD)
+    c.setLineWidth(0.9)
+    c.roundRect(M + 7, M + 15, W - 2 * M - 14, H - 2 * M - 22, 10, stroke=1, fill=0)
+    c.restoreState()
+
+    wm_size = 22
+    wm_w = sum(c.stringWidth(s, F_BLACK, wm_size) for s in ("SCOUT", "ME", "PLAY"))
+    _wordmark(c, (W - wm_w) / 2, H - 96, size=wm_size)
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6.4)
+    c.drawCentredString(W / 2, H - 108, "AI POWERED PLAYER ANALYSIS")
+
+    c.saveState()
+    c.setStrokeColor(GOLD)
+    c.setLineWidth(1)
+    c.line(W / 2 - 110, H - 128, W / 2 - 14, H - 128)
+    c.line(W / 2 + 14, H - 128, W / 2 + 110, H - 128)
+    draw_star(c, W / 2, H - 128, 6, GOLD)
+    c.restoreState()
+
+    c.setFillColor(INK)
+    c.setFont(F_BLACK, 30)
+    c.drawCentredString(W / 2, H - 168, "CERTIFICATE OF ANALYSIS")
+    chip = "OFFICIAL SCOUTMEPLAY PLAYER ANALYSIS"
+    cw2 = c.stringWidth(chip, F_BOLD, 6.4) + 22
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(W / 2 - cw2 / 2, H - 190, cw2, 14, 4, stroke=0, fill=1)
+    c.setFillColor(CREAM_TEXT)
+    c.setFont(F_BOLD, 6.4)
+    c.drawCentredString(W / 2, H - 185.4, chip)
+    c.restoreState()
+
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 8)
+    c.drawCentredString(W / 2, H - 238, "T H I S   C E R T I F I E S   T H A T")
+    name = str(pd.get("player_name") or "Player")
+    c.setFillColor(GREEN)
+    c.setFont(F_SCRIPT, 52)
+    c.drawCentredString(W / 2, H - 296, name)
+    c.saveState()
+    c.setStrokeColor(GOLD)
+    c.setLineWidth(1)
+    nw = max(220.0, c.stringWidth(name, F_SCRIPT, 52) + 40)
+    c.line(W / 2 - nw / 2, H - 310, W / 2 + nw / 2, H - 310)
+    c.restoreState()
+    bits = [str(pd.get("position") or "").strip()]
+    if pd.get("age"):
+        bits.append(f"age {pd['age']}")
+    if pd.get("current_club"):
+        bits.append(str(pd["current_club"]))
+    c.setFillColor(BODY)
+    c.setFont(F_BODY, 10.5)
+    c.drawCentredString(W / 2, H - 332,
+                        "has completed a full AI scouting analysis as " + ", ".join(b for b in bits if b))
+
+    # overall score donut + stars
+    dcy = H - 448
+    overall = d.get("overall")
+    pct = (float(overall) / 10 * 100) if isinstance(overall, (int, float)) else 0
+    draw_donut(c, W / 2, dcy, 56, pct, thickness=12)
+    c.setFillColor(INK)
+    c.setFont(F_BLACK, 32)
+    c.drawCentredString(W / 2, dcy - 8, f"{overall:.1f}" if isinstance(overall, (int, float)) else "—")
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 8)
+    c.drawCentredString(W / 2, dcy - 24, "/10")
+    draw_stars_row(c, W / 2, dcy - 84, int(d.get("stars") or 0), r=7, gap=6)
+    if d.get("playerType"):
+        c.setFillColor(INK)
+        c.setFont(F_BLACK, 11)
+        c.drawCentredString(W / 2, dcy - 108, str(d["playerType"]).upper())
+
+    # seals
+    seals = [("AI SCOUT", "ANALYSED")]
+    if tracked:
+        seals.append(("OPTICAL", "TRACKING VERIFIED"))
+    seals.append(("EVIDENCE", "BASED REPORT"))
+    scy = 246
+    total_w = len(seals) * 64 + (len(seals) - 1) * 40
+    sx = W / 2 - total_w / 2 + 32
+    for l1, l2 in seals:
+        _seal(c, sx, scy, 32, l1, l2)
+        sx += 104
+
+    # date + signature
+    base_y = 158
+    c.saveState()
+    c.setStrokeColor(HexColor("#B9B29A"))
+    c.setLineWidth(0.8)
+    c.line(M + 70, base_y, M + 210, base_y)
+    c.line(W - M - 210, base_y, W - M - 70, base_y)
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6.2)
+    c.drawCentredString(M + 140, base_y - 11, "DATE OF ANALYSIS")
+    c.drawCentredString(W - M - 140, base_y - 11, "SCOUTMEPLAY SCOUTING INTELLIGENCE")
+    c.setFillColor(INK)
+    c.setFont(F_BOLD, 9)
+    c.drawCentredString(M + 140, base_y + 6, report_date)
+    c.setFillColor(GREEN)
+    c.setFont(F_SCRIPT, 19)
+    c.drawCentredString(W - M - 140, base_y + 4, "ScoutMePlay")
+    c.restoreState()
+
+    c.setFillColor(MUTED)
+    c.setFont(F_SCRIPT, 13)
+    c.drawCentredString(W / 2, 104, "Talent gets you noticed. Character makes you unforgettable.")
+
+
 # ═══════════════════════ main builder ═══════════════════════
 
 def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo: bool = False):
@@ -1158,6 +1484,14 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     d = derive_v2(report_doc)
     pd = report_doc.get("player_details") or {}
     player_name = pd.get("player_name") or "Player"
+
+    mm = report_doc.get("movement_map") or {}
+    _arch = report_doc.get("archetype") or {}
+    _lenses = _arch.get("lenses") if isinstance(_arch.get("lenses"), dict) else {}
+    fifa_lens = _lenses.get("fifa") if isinstance(_lenses, dict) else None
+    fifa_neighbors = _arch.get("fifa_neighbors") or []
+    has_p4 = bool(mm.get("trail") or fifa_lens)
+    total_pages = 5 if has_p4 else 4
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -1205,7 +1539,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         c.drawCentredString(W / 2, strip_top - sh / 2 - 6,
                             f"Every session is a step. Keep going, {player_name.split()[0]}!")
         c.restoreState()
-    _page_footer(c, 1)
+    _page_footer(c, 1, total_pages)
     c.showPage()
 
     # ── PAGE 2 — top strengths / dev priorities · roadmap / training / tips ──
@@ -1223,7 +1557,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _roadmap_card(c, d["roadmap"], M, row4_top - h4, cw3, h4)
     _training_week_card(c, d["trainingWeek"], M + cw3 + GAP, row4_top - h4, cw3, h4)
     _parent_tips_card(c, d["parentTips"], M + 2 * (cw3 + GAP), row4_top - h4, cw3, h4)
-    _page_footer(c, 2)
+    _page_footer(c, 2, total_pages)
     c.showPage()
 
     # ── PAGE 3 — video highlight / coach notes / scout outlook + footer ──
@@ -1259,7 +1593,32 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         dy -= 9
     c.drawCentredString(W / 2, dy,
                         "Independent player development analysis based on submitted video. Not a recruitment guarantee.")
-    _page_footer(c, 3)
+    _page_footer(c, 3, total_pages)
+    c.showPage()
+
+    # ── PAGE 4 — measured movement map + FIFA player twin (data permitting) ──
+    if has_p4:
+        _page_bg(c)
+        mh = _mini_header(c, player_name)
+        yy = H - M - mh - 4
+        h_mm = 235
+        if mm.get("trail") and fifa_lens:
+            _movement_map_card(c, mm, M, yy - h_mm, CW, h_mm)
+            yy -= h_mm + GAP
+            h_tw = min(255.0, yy - M - 30)
+            if h_tw > 150:
+                _player_twin_card(c, fifa_lens, fifa_neighbors, M, yy - h_tw, CW, h_tw)
+        elif mm.get("trail"):
+            _movement_map_card(c, mm, M, (H - h_mm) / 2, CW, h_mm)
+        elif fifa_lens:
+            h_tw = 255
+            _player_twin_card(c, fifa_lens, fifa_neighbors, M, (H - h_tw) / 2, CW, h_tw)
+        _page_footer(c, 4, total_pages)
+        c.showPage()
+
+    # ── FINAL PAGE — printable certificate / diploma ──
+    _diploma_page(c, d, pd, report_date, tracked=bool(mm.get("trail")))
+    _page_footer(c, total_pages, total_pages)
     c.showPage()
     c.save()
 

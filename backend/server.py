@@ -99,7 +99,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 16  # v16 = tracking-verified badge on Action Timeline
+PDF_RENDER_VERSION = 17  # v17 = movement map + player twin page + diploma page
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -5764,6 +5764,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         out["full_report"] = doc.get("full_report")
         out["agent_review"] = doc.get("agent_review")
         out["identity_stats"] = doc.get("identity_stats")
+        out["movement_map"] = doc.get("movement_map")
         out["trial_readiness"] = compute_trial_readiness(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
@@ -6328,7 +6329,11 @@ async def generate_full_report_task(report_id: str) -> None:
                 gt_track = await asyncio.to_thread(track_player, str(file_path), valid_anchors, gt_t_off)
                 await db.reports.update_one(
                     {"id": report_id},
-                    {"$set": {"player_track": gt_track, "anchor_time_offset": gt_t_off}},
+                    {"$set": {
+                        "player_track": gt_track,
+                        "anchor_time_offset": gt_t_off,
+                        "movement_map": compute_movement_map(gt_track),
+                    }},
                 )
                 logger.info(
                     f"[track] {report_id}: {len(gt_track.get('points') or [])} points, "
@@ -11644,6 +11649,7 @@ from identity_verify import (
 )
 from telestration import render_telestration
 from player_tracking import track_player, track_at
+from movement_metrics import compute_movement_map
 from pdf_v2 import build_pdf_v2
 
 

@@ -11,6 +11,7 @@ import {
   ParentTipsCard, VideoHighlightCard, CoachNotesCard, ScoutOutlookCard,
   ActionTimelineCard,
 } from "./sections";
+import { MovementMapCard } from "./movement";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -247,6 +248,12 @@ export default function PremiumReportV2({ report, assetBase }) {
       {d.actionTimeline?.length > 0 && (
         <div className="mb-4">
           <ActionTimelineCard actions={d.actionTimeline} onPlayAt={playAt} />
+        </div>
+      )}
+
+      {report.movement_map?.trail?.length > 0 && (
+        <div className="mb-4">
+          <MovementMapCard movement={report.movement_map} onPlayAt={playAt} />
         </div>
       )}
 

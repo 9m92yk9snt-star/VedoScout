@@ -27,6 +27,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026 — night) — MOVEMENT MAP + PLAYER TWIN PDF + DIPLOMA PAGE ✅
+- **Movement Map (måld data)**: new `movement_metrics.py` computes measured stats from `player_track` (bursts/explosive actions with adaptive threshold 1.7×median speed, tracked seconds, intensity index = median_v×180, top-speed moment = vmax×65, downsampled trail ≤90 pts with tap flags). Computed in `generate_full_report_task` → stored as `movement_map` on report doc; exposed via `_serialize_report` (include_full). Web: `report-v2/movement.jsx` (`MovementMapCard`, SVG heat+trail+tap-rings, testids `v2-movement-map-card`, `v2-mm-*`) rendered in PremiumReportV2 below Action Timeline. PDF: `_movement_map_card` on new page 4.
+- **Player Twin PDF card**: `_player_twin_card` in pdf_v2.py — FIFA k-NN top-1 (name, club, similarity%, closest attributes chips) + top-5 pros table. Reads `report["archetype"]["lenses"]["fifa"]` + `fifa_neighbors` (already set by `_ensure_report_pdf`). Respects U6-U11 age gating (fifa lens stripped → card skipped). Web already had FifaDataTwinPanel.
+- **Diploma page**: `_diploma_page` — full-page printable certificate (double border, Caveat name, score donut, stars, seals: AI SCOUT / OPTICAL TRACKING (if tracked) / EVIDENCE BASED, date+signature). Always last PDF page. PDF is now 4-5 pages; `PDF_RENDER_VERSION` 16→17.
+- Verified visually: AOrman (movement map centered, no twin — age 11 gated; diploma w/ 3 seals) + Lukas A. age 14 (twin card: E. Reynoso 88%; diploma w/ 2 seals). Web card verified via screenshot; regression: reports without movement_map unaffected.
+- Backfilled `movement_map` on report 11533a13. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 22, 2026 — evening) — PACKAGE D COMPLETE + TRACKING-VERIFIED BADGE ✅
 - **Package D verified end-to-end** (optical tracking + prompt ground truth + timeline cross-check). Handoff feared a broken `search_replace`, but code was complete: `player_tracking.py` (NCC template tracker, ±4s per tap, drift-guarded, fail-safe) runs in `generate_full_report_task` (~line 6315), stores `player_track` + `anchor_time_offset` on the report; `_ground_truth_positions_block` (line 6182) appends tap positions + tracking segments to the Gemini prompt; `_apply_tracking_verification` (line 6219) marks each `action_timeline` row `tracking_verified` (tap within ANCHOR_SNAP_WINDOW or track conf ≥0.55).
 - **Live functional test** (report 11533a13, 7 taps): Δt=−0.03s @1.00 score; 98 track points / 6 segments in 15.3s; all 7 taps recovered at conf 1.0; prompt block + cross-check correct (4/5 timeline rows verified, 00:02 correctly outside window — fail-safe honest).
