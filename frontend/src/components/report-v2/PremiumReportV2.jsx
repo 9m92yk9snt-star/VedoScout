@@ -12,6 +12,7 @@ import {
   ActionTimelineCard,
 } from "./sections";
 import { MovementMapCard } from "./movement";
+import { ParentsPackageSection } from "./parents";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -263,6 +264,12 @@ export default function PremiumReportV2({ report, assetBase }) {
         <TrainingPlanCard trainingWeek={d.trainingWeek} />
         <ParentTipsCard parentTips={d.parentTips} />
       </div>
+
+      {d.parentsPackage && (
+        <div className="mb-4">
+          <ParentsPackageSection pack={d.parentsPackage} playerName={pd.player_name} onPlayAt={playAt} />
+        </div>
+      )}
 
       {/* Row 5 — video highlight / coach notes / scout outlook */}
       <div className="grid lg:grid-cols-[1.08fr_1fr_1.1fr] gap-4">

@@ -27,6 +27,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026 — late night) — FORÆLDRE-PAKKEN (Parents Package) ✅
+- **Prompt**: `FULL_REPORT_PROMPT` extended with `parents_package` schema + rules (same Gemini call — no extra cost): `home_drills` (EXACTLY 3, home-only, ball+wall max, child-readable), `watch_together` (intro + 2-3 moments ONLY at timestamps already in timeline/comments, praise DECISIONS not outcomes + 2 avoid-tips), `message_to_player` (age-calibrated letter directly to the child, references real timestamps).
+- **Web**: new `report-v2/parents.jsx` (`ParentsPackageSection`: HomeDrillsCard / WatchTogetherCard with clickable timestamp chips → video seek / LetterCard in Caveat handwriting on cream). Rendered in PremiumReportV2 after row 4. derive.js adds `parentsPackage`. Testids: `v2-parents-package`, `v2-home-drill-{i}`, `v2-wt-moment-{i}`, `v2-letter-body`.
+- **PDF**: new page (between movement/twin page and diploma) with `_home_drills_card` (3 columns), `_watch_together_card`, `_letter_card` (Caveat, wrapped signoff). `_parents_package` derive helper. Dynamic page count 4-6; `PDF_RENDER_VERSION` 17→18.
+- **All conditional** — old reports without the package render exactly as before (verified: Lukas PDF 5 pages, diploma still last).
+- Verified: sample package injected into TEST report 11533a13 (admin test data) → web screenshot (3 drills, 3 moments, letter) + PDF page 5/6 rendered. Signoff overflow bug found & fixed (drawRightString → wrapped TA_RIGHT paragraph).
+- NOTE: only NEW uploads get real AI-generated packages; existing reports keep none (by design, per user's "change nothing that works").
+- ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 22, 2026 — night) — MOVEMENT MAP + PLAYER TWIN PDF + DIPLOMA PAGE ✅
 - **Movement Map (måld data)**: new `movement_metrics.py` computes measured stats from `player_track` (bursts/explosive actions with adaptive threshold 1.7×median speed, tracked seconds, intensity index = median_v×180, top-speed moment = vmax×65, downsampled trail ≤90 pts with tap flags). Computed in `generate_full_report_task` → stored as `movement_map` on report doc; exposed via `_serialize_report` (include_full). Web: `report-v2/movement.jsx` (`MovementMapCard`, SVG heat+trail+tap-rings, testids `v2-movement-map-card`, `v2-mm-*`) rendered in PremiumReportV2 below Action Timeline. PDF: `_movement_map_card` on new page 4.
 - **Player Twin PDF card**: `_player_twin_card` in pdf_v2.py — FIFA k-NN top-1 (name, club, similarity%, closest attributes chips) + top-5 pros table. Reads `report["archetype"]["lenses"]["fifa"]` + `fifa_neighbors` (already set by `_ensure_report_pdf`). Respects U6-U11 age gating (fifa lens stripped → card skipped). Web already had FifaDataTwinPanel.

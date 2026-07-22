@@ -340,7 +340,23 @@ def derive_v2(report):
         "matchStats": match_stats, "videoHighlight": video_highlight,
         "identityNote": _identity_note(report),
         "actionTimeline": _action_timeline(full),
+        "parentsPackage": _parents_package(full),
     }
+
+
+def _parents_package(full):
+    pp = full.get("parents_package")
+    if not isinstance(pp, dict):
+        return None
+    drills = [d for d in (pp.get("home_drills") or [])
+              if isinstance(d, dict) and d.get("name") and isinstance(d.get("steps"), list)][:3]
+    wt = pp.get("watch_together")
+    wt = wt if isinstance(wt, dict) and isinstance(wt.get("moments"), list) else None
+    msg = pp.get("message_to_player")
+    msg = msg if isinstance(msg, dict) and msg.get("body") else None
+    if not (drills or wt or msg):
+        return None
+    return {"drills": drills, "watch": wt, "message": msg}
 
 
 def _action_timeline(full):
@@ -1343,6 +1359,125 @@ def _player_twin_card(c, lens, neighbors, x, y, w, h):
     )
 
 
+def _home_drills_card(c, drills, x, y, w, h):
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "Home Training · 10 Minutes a Day", w - 2 * PAD)
+    c.setFillColor(GREEN)
+    c.setFont(F_BOLD, 6)
+    c.drawRightString(x + w - PAD, ty + 10, "NO PITCH NEEDED · JUST A BALL")
+    cw3 = (w - 2 * PAD - 2 * GAP) / 3
+    for i, dr in enumerate(drills[:3]):
+        bx = x + PAD + i * (cw3 + GAP)
+        card(c, bx, y + PAD, cw3, ty - y - PAD - 4, fill=HexColor("#FBF9F3"), r=8)
+        iy = ty - 14
+        mins = f"{dr.get('minutes')} MIN" if dr.get("minutes") else ""
+        mw = c.stringWidth(mins, F_BLACK, 6.4) + 10 if mins else 0
+        c.setFillColor(INK)
+        name_h = draw_par(c, f"<b>{esc(str(dr.get('name', '')).upper())}</b>", bx + 8, iy + 8,
+                          cw3 - 16 - mw - 4, _style(F_BOLD, 7.4, INK, leading=9.4))
+        if mins:
+            c.saveState()
+            c.setFillColor(FOREST)
+            c.roundRect(bx + cw3 - 8 - mw, iy - 3, mw, 11, 3, stroke=0, fill=1)
+            c.setFillColor(HexColor("#CCFF00"))
+            c.setFont(F_BLACK, 6.4)
+            c.drawCentredString(bx + cw3 - 8 - mw / 2, iy + 0.4, mins)
+            c.restoreState()
+        iy -= max(name_h, 11) + 2
+        if dr.get("equipment"):
+            c.setFillColor(MUTED)
+            c.setFont(F_BODY, 6)
+            c.drawString(bx + 8, iy - 4, f"You need: {dr['equipment']}"[:46])
+            iy -= 11
+        steps = [s for s in (dr.get("steps") or []) if s][:4]
+        steps_html = "<br/>".join(f"<b>{j + 1}.</b> {esc(s)}" for j, s in enumerate(steps))
+        sh = draw_par(c, steps_html, bx + 8, iy - 2, cw3 - 16, _style(F_BODY, 6.4, BODY, leading=8.8),
+                      max_h=iy - y - PAD - 40)
+        iy -= sh + 8
+        if dr.get("success_sign") and iy - 30 > y + PAD + 12:
+            box_h = min(30.0, iy - y - PAD - 14)
+            c.saveState()
+            c.setFillColor(SOFT)
+            c.setStrokeColor(SOFT_BORDER)
+            c.roundRect(bx + 6, iy - box_h, cw3 - 12, box_h, 5, stroke=1, fill=1)
+            c.restoreState()
+            draw_par(c, esc(dr["success_sign"]), bx + 11, iy - 5, cw3 - 22,
+                     _style(F_BODY, 5.8, HexColor("#3C4A40"), leading=7.6), max_h=box_h - 8)
+            iy -= box_h + 6
+        if dr.get("targets"):
+            c.setFillColor(HexColor("#DD6B20"))
+            c.setFont(F_BLACK, 5.4)
+            c.drawString(bx + 8, y + PAD + 6, f"TRAINS: {str(dr['targets']).upper()}"[:44])
+
+
+def _watch_together_card(c, wt, x, y, w, h):
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "Watch the Video Together", w - 2 * PAD)
+    iy = ty
+    if wt.get("intro"):
+        ih = draw_par(c, esc(wt["intro"]), x + PAD, iy - 2, w - 2 * PAD,
+                      _style(F_BODY, 6.8, MUTED, leading=9.2))
+        iy -= ih + 8
+    for m in (wt.get("moments") or [])[:3]:
+        if not isinstance(m, dict) or not m.get("timestamp"):
+            continue
+        ts = str(m["timestamp"])
+        chip_w = c.stringWidth(ts, F_BLACK, 7) + 12
+        txt = f"<b>Pause and say:</b> \u201c{esc(m.get('say_this') or '')}\u201d"
+        p = Paragraph(txt, _style(F_BODY, 6.8, BODY, leading=9.2))
+        _, phh = p.wrap(w - 2 * PAD - chip_w - 22, 200)
+        row_h = max(phh + 12, 24)
+        if iy - row_h < y + PAD + 34:
+            break
+        c.saveState()
+        c.setFillColor(HexColor("#FBF9F3"))
+        c.setStrokeColor(BORDER)
+        c.roundRect(x + PAD, iy - row_h, w - 2 * PAD, row_h, 7, stroke=1, fill=1)
+        c.setFillColor(FOREST)
+        c.roundRect(x + PAD + 7, iy - row_h / 2 - 6, chip_w, 12, 4, stroke=0, fill=1)
+        c.setFillColor(HexColor("#CCFF00"))
+        c.setFont(F_BLACK, 7)
+        c.drawCentredString(x + PAD + 7 + chip_w / 2, iy - row_h / 2 - 2.2, ts)
+        c.restoreState()
+        p.drawOn(c, x + PAD + chip_w + 15, iy - row_h / 2 - phh / 2)
+        iy -= row_h + 6
+    avoid = [a for a in (wt.get("avoid") or []) if a][:2]
+    if avoid and iy - 34 > y + PAD:
+        box_h = min(40.0, iy - y - PAD - 2)
+        c.saveState()
+        c.setFillColor(HexColor("#FFF8E9"))
+        c.setStrokeColor(HexColor("#F0E3C4"))
+        c.roundRect(x + PAD, iy - box_h, w - 2 * PAD, box_h, 7, stroke=1, fill=1)
+        c.setFillColor(HexColor("#8A6D3B"))
+        c.setFont(F_BLACK, 5.6)
+        c.drawString(x + PAD + 9, iy - 11, "GOOD TO AVOID")
+        c.restoreState()
+        draw_par(c, "<br/>".join(f"× {esc(a)}" for a in avoid), x + PAD + 9, iy - 15,
+                 w - 2 * PAD - 18, _style(F_BODY, 6.2, HexColor("#6B5A35"), leading=8.6), max_h=box_h - 16)
+
+
+def _letter_card(c, msg, x, y, w, h, player_name):
+    first = str(player_name or "").split(" ")[0]
+    card(c, x, y, w, h, fill=HexColor("#FFFDF2"))
+    ty = y + h - PAD
+    title = f"A Message for {first}" if first else "A Message for You"
+    ty -= card_title(c, x + PAD, ty, title, w - 2 * PAD)
+    iy = ty - 2
+    if msg.get("greeting"):
+        c.setFillColor(FOREST)
+        c.setFont(F_SCRIPT, 16)
+        c.drawString(x + PAD + 2, iy - 12, str(msg["greeting"]))
+        iy -= 20
+    bh = draw_par(c, esc(msg.get("body") or ""), x + PAD + 2, iy - 2, w - 2 * PAD - 4,
+                  _style(F_SCRIPT, 13, HexColor("#2C3B31"), leading=16.5), max_h=iy - y - PAD - 22)
+    iy -= bh + 8
+    if msg.get("signoff") and iy > y + PAD + 10:
+        draw_par(c, esc(str(msg["signoff"])), x + PAD + 2, iy - 2, w - 2 * PAD - 4,
+                 _style(F_SCRIPT, 12, GREEN, leading=15, align=TA_RIGHT), max_h=iy - y - PAD)
+
+
 def _seal(c, cx, cy, r, label1, label2):
     c.saveState()
     c.setStrokeColor(FOREST)
@@ -1491,7 +1626,8 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     fifa_lens = _lenses.get("fifa") if isinstance(_lenses, dict) else None
     fifa_neighbors = _arch.get("fifa_neighbors") or []
     has_p4 = bool(mm.get("trail") or fifa_lens)
-    total_pages = 5 if has_p4 else 4
+    pp = d.get("parentsPackage")
+    total_pages = 4 + (1 if has_p4 else 0) + (1 if pp else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -1614,6 +1750,29 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
             h_tw = 255
             _player_twin_card(c, fifa_lens, fifa_neighbors, M, (H - h_tw) / 2, CW, h_tw)
         _page_footer(c, 4, total_pages)
+        c.showPage()
+
+    # ── PAGE — Parents Package (home drills / watch together / letter) ──
+    if pp:
+        _page_bg(c)
+        mh = _mini_header(c, player_name)
+        yy = H - M - mh - 4
+        if pp.get("drills"):
+            h_hd = 258
+            _home_drills_card(c, pp["drills"], M, yy - h_hd, CW, h_hd)
+            yy -= h_hd + GAP
+        if pp.get("watch") or pp.get("message"):
+            cols_h = min(300.0, yy - M - 30)
+            if cols_h > 140:
+                if pp.get("watch") and pp.get("message"):
+                    lw3 = (CW - GAP) * 0.53
+                    _watch_together_card(c, pp["watch"], M, yy - cols_h, lw3, cols_h)
+                    _letter_card(c, pp["message"], M + lw3 + GAP, yy - cols_h, CW - lw3 - GAP, cols_h, player_name)
+                elif pp.get("watch"):
+                    _watch_together_card(c, pp["watch"], M, yy - cols_h, CW, cols_h)
+                else:
+                    _letter_card(c, pp["message"], M, yy - cols_h, CW, cols_h, player_name)
+        _page_footer(c, 4 + (1 if has_p4 else 0), total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──

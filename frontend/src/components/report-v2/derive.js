@@ -250,6 +250,17 @@ export function deriveV2(report) {
       };
     });
 
+  // ---- Parents package (home drills / watch together / letter) ----
+  const pp = full.parents_package || null;
+  const homeDrills = (Array.isArray(pp?.home_drills) ? pp.home_drills : [])
+    .filter((x) => x && x.name && Array.isArray(x.steps)).slice(0, 3);
+  const watchTogether = pp?.watch_together && Array.isArray(pp.watch_together.moments)
+    ? pp.watch_together : null;
+  const playerMessage = pp?.message_to_player?.body ? pp.message_to_player : null;
+  const parentsPackage = (homeDrills.length || watchTogether || playerMessage)
+    ? { homeDrills, watchTogether, playerMessage }
+    : null;
+
   // ---- Evidence-integrity note (strict image policy) ----
   const ist = report?.identity_stats;
   const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
@@ -263,6 +274,6 @@ export function deriveV2(report) {
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
-    matchStats, videoHighlight, identityNote, actionTimeline,
+    matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage,
   };
 }

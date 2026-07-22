@@ -99,7 +99,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 17  # v17 = movement map + player twin page + diploma page
+PDF_RENDER_VERSION = 18  # v18 = parents package page (home drills / watch together / letter)
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -2722,7 +2722,24 @@ Produce a JSON object EXACTLY in this format:
     "age_bracket_used": "U11-U12" | "U13-U14" | "U15-U16" | "U17-U18" | "U19-U21" | "Senior_22+"
   },
   "final_summary": "<3-5 sentence encouraging closing summary about THIS PLAYER, plain football language>",
-  "evidence_quality_note": "<one paragraph explaining the overall evidence quality of this video — what was strong, what was missing, what kind of follow-up footage would strengthen the report>"
+  "evidence_quality_note": "<one paragraph explaining the overall evidence quality of this video — what was strong, what was missing, what kind of follow-up footage would strengthen the report>",
+  "parents_package": {
+    "home_drills": [
+      {"name": "<fun, short drill name>", "minutes": <integer 5-10>, "equipment": "<e.g. 'a ball and a wall'>", "steps": ["<step 1>", "<step 2>", "<step 3>"], "success_sign": "<ONE sentence — how the child knows it is working>", "targets": "<the development priority this trains, e.g. 'Weak foot'>"},
+      {"name": "...", "minutes": ..., "equipment": "...", "steps": ["...", "...", "..."], "success_sign": "...", "targets": "..."},
+      {"name": "...", "minutes": ..., "equipment": "...", "steps": ["...", "...", "..."], "success_sign": "...", "targets": "..."}
+    ],
+    "watch_together": {
+      "intro": "<ONE sentence to the parent about how to watch this video together with their child>",
+      "moments": [{"timestamp": "MM:SS", "say_this": "<the exact words the parent can say at this moment — praising a DECISION or EFFORT, not the outcome>"}],
+      "avoid": ["<one short 'avoid doing/saying' tip>", "<one more>"]
+    },
+    "message_to_player": {
+      "greeting": "<e.g. 'Hey Lukas,'>",
+      "body": "<4-6 short sentences written DIRECTLY TO THE CHILD in age-appropriate language. Mention 2-3 concrete moments from THEIR video (with timestamps). Warm, honest, zero hype. Never mention scores or tiers.>",
+      "signoff": "<e.g. 'Keep playing YOUR way. — Your scout'>"
+    }
+  }
 }
 
 RULES FOR TOP-LEVEL "scores":
@@ -2743,6 +2760,12 @@ RULES FOR PRESENTATION SECTIONS ("parent_summary", "parent_tips", "coach_notes",
 - These sections are a PRESENTATION of the SAME analysis above. They MUST be consistent with the scores, tiers and evidence you already produced. Do NOT introduce new claims or new evidence.
 - "development_priorities_detailed" MUST contain EXACTLY 3 items chosen from the lowest-scoring observable sub-skills (or the most position-critical cannot_evaluate areas).
 - "scout_outlook" level dots map from overall_benchmark.tier: standard_club→2, strong_club→3, pro_academy→4, elite_academy→5. potential_level is at most ONE tier above current level.
+
+RULES FOR "parents_package" (family-facing — tone matters):
+- home_drills: EXACTLY 3 drills. Each trains one of the development_priorities_detailed items. Must be doable AT HOME (garden, driveway or living room) with at most a ball and a wall — NO pitch, NO partner, NO cones. 5-10 minutes each. Written so the CHILD can read and follow them alone.
+- watch_together.moments: 2-3 moments. ONLY use timestamps that already appear in your action_timeline or video_comments — never introduce new moments. Each say_this praises a DECISION or EFFORT (not the outcome), in warm plain words a parent would naturally say out loud.
+- watch_together.avoid: EXACTLY 2 short honest anti-tips (e.g. comparing to teammates, coaching from the sofa, only talking about goals).
+- message_to_player: written DIRECTLY to the child and calibrated to their age: under 10 → very short playful sentences with ONE single focus; 10-13 → encouraging, concrete, simple; 14+ → respectful scout-to-player tone. Reference 2-3 real moments from THIS video with their timestamps. This is the section the child will read again and again — make it feel personal and true.
 
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
