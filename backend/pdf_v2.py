@@ -1359,6 +1359,241 @@ def _player_twin_card(c, lens, neighbors, x, y, w, h):
     )
 
 
+PROG_COLORS = {
+    "overall": HexColor("#CCFF00"), "technical": HexColor("#7BA05B"),
+    "tactical": HexColor("#E8B32C"), "physical": HexColor("#7FB6C9"),
+    "mentality": HexColor("#DE8A5A"),
+}
+ORANGE_DOWN = HexColor("#DD6B20")
+
+
+def _ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suf = "TH"
+    else:
+        suf = {1: "ST", 2: "ND", 3: "RD"}.get(n % 10, "TH")
+    return f"{n}{suf}"
+
+
+def _tri(c, cx, cy, s, up=True, color=FOREST):
+    c.saveState()
+    p = c.beginPath()
+    if up:
+        p.moveTo(cx - s, cy - s / 1.6)
+        p.lineTo(cx + s, cy - s / 1.6)
+        p.lineTo(cx, cy + s)
+    else:
+        p.moveTo(cx - s, cy + s / 1.6)
+        p.lineTo(cx + s, cy + s / 1.6)
+        p.lineTo(cx, cy - s)
+    p.close()
+    c.setFillColor(color)
+    c.drawPath(p, stroke=0, fill=1)
+    c.restoreState()
+
+
+def _delta_mark(c, cx, cy, direction, color):
+    if direction == "flat":
+        c.saveState()
+        c.setStrokeColor(color)
+        c.setLineWidth(1.6)
+        c.line(cx - 3, cy, cx + 3, cy)
+        c.restoreState()
+    else:
+        _tri(c, cx, cy, 3.4, up=(direction == "up"), color=color)
+
+
+def _progress_strip(c, prog, x, y, w, h):
+    """Compact page-1 banner: since-date + 5 category delta chips."""
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(x, y, w, h, 9, stroke=0, fill=1)
+    c.setFillColor(HexColor("#CCFF00"))
+    c.setFont(F_BLACK, 8)
+    c.drawString(x + 14, y + h - 17, "DEVELOPMENT CURVE")
+    sub = f"{_ordinal(prog.get('analysis_number', 2))} ANALYSIS"
+    if prog.get("prev_date_label"):
+        sub += f" · SINCE {prog['prev_date_label']}"
+    if prog.get("days_since") is not None:
+        sub += f" ({prog['days_since']} DAYS)"
+    c.setFillColor(HexColor("#A9BC9C"))
+    c.setFont(F_BOLD, 5.6)
+    c.drawString(x + 14, y + h - 27, sub)
+    cats = prog.get("categories") or []
+    chip_w, gap = 62, 6
+    cx0 = x + w - 12 - len(cats) * chip_w - (len(cats) - 1) * gap
+    for i, cat in enumerate(cats):
+        bx = cx0 + i * (chip_w + gap)
+        c.setFillColor(HexColor("#1C5236"))
+        c.roundRect(bx, y + 7, chip_w, h - 14, 6, stroke=0, fill=1)
+        c.setFillColor(HexColor("#A9BC9C"))
+        c.setFont(F_BOLD, 4.6)
+        c.drawCentredString(bx + chip_w / 2, y + h - 16, str(cat["label"]).upper())
+        c.setFillColor(HexColor("#FFFFFF"))
+        c.setFont(F_BLACK, 8)
+        txt = f"{cat['prev']:.1f} > {cat['cur']:.1f}"
+        c.drawCentredString(bx + chip_w / 2 - 5, y + 12, txt)
+        col = HexColor("#CCFF00") if cat["dir"] == "up" else (ORANGE_DOWN if cat["dir"] == "down" else HexColor("#A9BC9C"))
+        _delta_mark(c, bx + chip_w / 2 + c.stringWidth(txt, F_BLACK, 8) / 2 + 6, y + 15, cat["dir"], col)
+    c.restoreState()
+
+
+def _progress_curve(c, series, x, y, w, h):
+    """Dark line-chart panel: one line per category + bold lime overall."""
+    c.saveState()
+    p = c.beginPath()
+    p.roundRect(x, y, w, h, 8)
+    c.clipPath(p, stroke=0, fill=0)
+    c.setFillColor(HexColor("#0D2818"))
+    c.rect(x, y, w, h, stroke=0, fill=1)
+    L, R, T, B = 26, 10, 8, 16
+    n = len(series)
+    vals = [s[k] for s in series for k in ("technical", "tactical", "physical", "mentality", "overall")
+            if isinstance(s.get(k), (int, float))]
+    lo = max(0, int(min(vals) - 1)) if vals else 2
+    hi = min(10, int(max(vals) + 1) + 1) if vals else 10
+    if hi - lo < 3:
+        lo = max(0, hi - 3)
+    span = hi - lo
+
+    def X(i):
+        return x + L + i * (w - L - R) / max(1, n - 1)
+
+    def Y(v):
+        return y + B + (max(lo, min(hi, v)) - lo) * (h - T - B) / span
+
+    c.setStrokeColor(HexColor("#1D4230"))
+    c.setLineWidth(0.5)
+    c.setFont(F_BOLD, 5)
+    for g in range(lo, hi + 1):
+        c.line(x + L, Y(g), x + w - R, Y(g))
+        c.setFillColor(HexColor("#5F7A66"))
+        c.drawRightString(x + L - 4, Y(g) - 1.6, str(g))
+    for key in ("technical", "tactical", "physical", "mentality", "overall"):
+        pts = [(X(i), Y(s[key])) for i, s in enumerate(series) if isinstance(s.get(key), (int, float))]
+        if len(pts) < 2:
+            continue
+        c.setStrokeColor(PROG_COLORS[key])
+        c.setLineWidth(1.8 if key == "overall" else 0.9)
+        c.setLineCap(1)
+        for a, b in zip(pts, pts[1:]):
+            c.line(a[0], a[1], b[0], b[1])
+        if key == "overall":
+            for px, py in pts:
+                c.setFillColor(PROG_COLORS["overall"])
+                c.circle(px, py, 2.2, stroke=0, fill=1)
+    c.setFillColor(HexColor("#8FA896"))
+    c.setFont(F_BOLD, 5.4)
+    for i, s in enumerate(series):
+        if s.get("label"):
+            c.drawCentredString(X(i), y + 4, s["label"])
+    c.restoreState()
+
+
+def _progress_card(c, prog, x, y, w, h):
+    """Full development-curve card: delta chips, improvements, watch, curve."""
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, f"Development Curve · {_ordinal(prog.get('analysis_number', 2))} Analysis", w - 2 * PAD)
+    sub = f"SINCE {prog.get('prev_date_label') or 'LAST REPORT'}"
+    if prog.get("days_since") is not None:
+        sub += f" · {prog['days_since']} DAYS"
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6)
+    c.drawRightString(x + w - PAD, ty + 10, sub)
+
+    cats = prog.get("categories") or []
+    chip_w = (w - 2 * PAD - (len(cats) - 1) * 6) / max(1, len(cats))
+    ch = 42
+    for i, cat in enumerate(cats):
+        bx = x + PAD + i * (chip_w + 6)
+        is_ov = cat["key"] == "overall_development"
+        card(c, bx, ty - ch, chip_w, ch, fill=FOREST if is_ov else HexColor("#FBF9F3"),
+             stroke=FOREST if is_ov else BORDER, r=7)
+        c.setFillColor(HexColor("#A9BC9C") if is_ov else MUTED)
+        c.setFont(F_BOLD, 5)
+        c.drawCentredString(bx + chip_w / 2, ty - 11, str(cat["label"]).upper())
+        c.setFillColor(HexColor("#FFFFFF") if is_ov else INK)
+        c.setFont(F_BLACK, 10)
+        txt = f"{cat['prev']:.1f} > {cat['cur']:.1f}"
+        c.drawCentredString(bx + chip_w / 2, ty - 24, txt)
+        col = (HexColor("#CCFF00") if is_ov else GREEN) if cat["dir"] == "up" else \
+            (ORANGE_DOWN if cat["dir"] == "down" else (HexColor("#A9BC9C") if is_ov else MUTED))
+        lbl = "stable" if cat["dir"] == "flat" else f"{'+' if cat['delta'] > 0 else ''}{cat['delta']:.1f}"
+        c.setFillColor(col)
+        c.setFont(F_BLACK, 6.6)
+        lw2 = c.stringWidth(lbl, F_BLACK, 6.6)
+        c.drawCentredString(bx + chip_w / 2 + 4, ty - 35, lbl)
+        _delta_mark(c, bx + chip_w / 2 - lw2 / 2 - 3, ty - 32.6, cat["dir"], col)
+    yy = ty - ch - 8
+
+    improvements = prog.get("improvements") or []
+    watch = prog.get("watch") or []
+    col_h = 30 + max(len(improvements), 1) * 22
+    if improvements or watch:
+        lw3 = (w - 3 * PAD) * (0.56 if watch else 1.0)
+        if improvements:
+            card(c, x + PAD, yy - col_h, lw3, col_h, fill=SOFT, stroke=SOFT_BORDER, r=8)
+            c.setFillColor(FOREST)
+            c.setFont(F_BLACK, 6.6)
+            c.drawString(x + PAD + 9, yy - 13, "BIGGEST IMPROVEMENTS")
+            iy = yy - 24
+            trained_shown = False
+            for im in improvements:
+                c.setFillColor(INK)
+                c.setFont(F_BOLD, 7.4)
+                c.drawString(x + PAD + 9, iy - 6, str(im["label"]).upper())
+                pill = f"+{im['delta']:.1f}"
+                pw2 = c.stringWidth(pill, F_BLACK, 7) + 10
+                c.saveState()
+                c.setFillColor(GREEN)
+                c.roundRect(x + PAD + lw3 - 9 - pw2, iy - 9, pw2, 11, 5.5, stroke=0, fill=1)
+                c.setFillColor(HexColor("#FFFFFF"))
+                c.setFont(F_BLACK, 7)
+                c.drawCentredString(x + PAD + lw3 - 9 - pw2 / 2, iy - 5.6, pill)
+                c.restoreState()
+                c.setFillColor(MUTED)
+                c.setFont(F_BODY, 6.6)
+                c.drawRightString(x + PAD + lw3 - 14 - pw2, iy - 5.6, f"{im['prev']:.1f} > {im['cur']:.1f}")
+                if im.get("trained") and not trained_shown:
+                    trained_shown = True
+                    c.setFillColor(GREEN)
+                    c.setFont(F_BODY, 5.6)
+                    c.drawString(x + PAD + 9, iy - 14.5, "Exactly what your last report asked you to train — and it shows.")
+                iy -= 22
+        if watch:
+            wx = x + PAD + (lw3 + PAD if improvements else 0)
+            ww = x + w - PAD - wx
+            card(c, wx, yy - col_h, ww, col_h, fill=HexColor("#FFF8E9"), stroke=HexColor("#F0E3C4"), r=8)
+            c.setFillColor(HexColor("#8A6D3B"))
+            c.setFont(F_BLACK, 6.6)
+            c.drawString(wx + 9, yy - 13, "KEEP AN EYE ON")
+            iy = yy - 24
+            for wd in watch:
+                c.setFillColor(HexColor("#6B5A35"))
+                c.setFont(F_BOLD, 7.2)
+                c.drawString(wx + 9, iy - 6, str(wd["label"]).upper())
+                c.setFillColor(HexColor("#8A6D3B"))
+                c.setFont(F_BODY, 6.8)
+                c.drawRightString(wx + ww - 9, iy - 6, f"{wd['prev']:.1f} > {wd['cur']:.1f}")
+                iy -= 15
+            draw_par(c, esc("Normal fluctuation — often fewer situations of this type in the new footage."),
+                     wx + 9, iy - 2, ww - 18, _style(F_BODY, 5.6, HexColor("#8A6D3B"), leading=7.6),
+                     max_h=max(10, iy - (yy - col_h) - 4))
+        yy -= col_h + 8
+
+    series = [s for s in (prog.get("series") or []) if isinstance(s.get("overall"), (int, float))]
+    if len(series) >= 3 and yy - y - PAD - 14 > 70:
+        cv_h = min(105.0, yy - y - PAD - 14)
+        _progress_curve(c, series, x + PAD, yy - cv_h, w - 2 * PAD, cv_h)
+        yy -= cv_h + 4
+    note = (f"Compared: {prog.get('compared_skills', 0)} skills observed in BOTH videos · "
+            f"{prog.get('not_comparable', 0)} not comparable · changes under ±0.3 shown as stable.")
+    c.setFillColor(MUTED)
+    c.setFont(F_BODY, 5.6)
+    c.drawString(x + PAD, y + PAD - 4, note)
+
+
 def _home_drills_card(c, drills, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD
@@ -1494,7 +1729,7 @@ def _seal(c, cx, cy, r, label1, label2):
     c.restoreState()
 
 
-def _diploma_page(c, d, pd, report_date, tracked=False):
+def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     """Full-page certificate the player can print and hang on the wall."""
     _page_bg(c)
     c.saveState()
@@ -1556,6 +1791,17 @@ def _diploma_page(c, d, pd, report_date, tracked=False):
     c.setFont(F_BODY, 10.5)
     c.drawCentredString(W / 2, H - 332,
                         "has completed a full AI scouting analysis as " + ", ".join(b for b in bits if b))
+    if prog:
+        ov = next((cat for cat in (prog.get("categories") or []) if cat.get("key") == "overall_development"), None)
+        line = f"{_ordinal(prog.get('analysis_number', 2))} ANALYSIS"
+        if ov and ov.get("dir") in ("up", "flat"):
+            line += " · OVERALL TREND: " + ("IMPROVING" if ov["dir"] == "up" else "STEADY")
+        c.setFillColor(GREEN)
+        c.setFont(F_BLACK, 8)
+        c.drawCentredString(W / 2 + (5 if ov and ov.get("dir") == "up" else 0), H - 350, line)
+        if ov and ov.get("dir") == "up":
+            tw2 = c.stringWidth(line, F_BLACK, 8)
+            _delta_mark(c, W / 2 - tw2 / 2 - 4, H - 347.4, "up", GREEN)
 
     # overall score donut + stars
     dcy = H - 448
@@ -1625,8 +1871,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _lenses = _arch.get("lenses") if isinstance(_arch.get("lenses"), dict) else {}
     fifa_lens = _lenses.get("fifa") if isinstance(_lenses, dict) else None
     fifa_neighbors = _arch.get("fifa_neighbors") or []
-    has_p4 = bool(mm.get("trail") or fifa_lens)
     pp = d.get("parentsPackage")
+    prog = report_doc.get("progression")
+    prog = prog if isinstance(prog, dict) and prog.get("categories") else None
+    has_p4 = bool(mm.get("trail") or fifa_lens or prog)
     total_pages = 4 + (1 if has_p4 else 0) + (1 if pp else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
@@ -1663,18 +1911,21 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         _snapshot_card(c, d["snapshot"], M, row2_top - h2, cw2, h2)
         _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2)
 
-    # signature quote strip in remaining space
+    # signature quote strip in remaining space (progress strip when a curve exists)
     strip_top = row2_top - h2 - GAP
     if strip_top - M > 46:
         sh = 44
-        c.saveState()
-        c.setFillColor(HexColor("#EDE8D6"))
-        c.roundRect(M, strip_top - sh, CW, sh, 9, stroke=0, fill=1)
-        c.setFillColor(GREEN)
-        c.setFont(F_SCRIPT, 17)
-        c.drawCentredString(W / 2, strip_top - sh / 2 - 6,
-                            f"Every session is a step. Keep going, {player_name.split()[0]}!")
-        c.restoreState()
+        if prog:
+            _progress_strip(c, prog, M, strip_top - sh, CW, sh)
+        else:
+            c.saveState()
+            c.setFillColor(HexColor("#EDE8D6"))
+            c.roundRect(M, strip_top - sh, CW, sh, 9, stroke=0, fill=1)
+            c.setFillColor(GREEN)
+            c.setFont(F_SCRIPT, 17)
+            c.drawCentredString(W / 2, strip_top - sh / 2 - 6,
+                                f"Every session is a step. Keep going, {player_name.split()[0]}!")
+            c.restoreState()
     _page_footer(c, 1, total_pages)
     c.showPage()
 
@@ -1732,23 +1983,38 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _page_footer(c, 3, total_pages)
     c.showPage()
 
-    # ── PAGE 4 — measured movement map + FIFA player twin (data permitting) ──
+    # ── PAGE 4 — development curve + measured movement map + FIFA player twin ──
     if has_p4:
         _page_bg(c)
         mh = _mini_header(c, player_name)
         yy = H - M - mh - 4
-        h_mm = 235
-        if mm.get("trail") and fifa_lens:
-            _movement_map_card(c, mm, M, yy - h_mm, CW, h_mm)
-            yy -= h_mm + GAP
-            h_tw = min(255.0, yy - M - 30)
-            if h_tw > 150:
-                _player_twin_card(c, fifa_lens, fifa_neighbors, M, yy - h_tw, CW, h_tw)
-        elif mm.get("trail"):
-            _movement_map_card(c, mm, M, (H - h_mm) / 2, CW, h_mm)
-        elif fifa_lens:
-            h_tw = 255
-            _player_twin_card(c, fifa_lens, fifa_neighbors, M, (H - h_tw) / 2, CW, h_tw)
+        blocks = int(bool(prog)) + int(bool(mm.get("trail"))) + int(bool(fifa_lens))
+        if prog:
+            series_ok = len([s for s in (prog.get("series") or [])
+                             if isinstance(s.get("overall"), (int, float))]) >= 3
+            h_pg = 305 if series_ok else 200
+            if blocks == 1:
+                _progress_card(c, prog, M, (H - h_pg) / 2, CW, h_pg)
+            else:
+                _progress_card(c, prog, M, yy - h_pg, CW, h_pg)
+                yy -= h_pg + GAP
+        if mm.get("trail"):
+            if blocks == 1:
+                h_mm = 235
+                _movement_map_card(c, mm, M, (H - h_mm) / 2, CW, h_mm)
+            else:
+                h_mm = min(235.0, yy - M - 30 - (160 + GAP if fifa_lens else 0))
+                if h_mm > 120:
+                    _movement_map_card(c, mm, M, yy - h_mm, CW, h_mm)
+                    yy -= h_mm + GAP
+        if fifa_lens:
+            if blocks == 1:
+                h_tw = 255
+                _player_twin_card(c, fifa_lens, fifa_neighbors, M, (H - h_tw) / 2, CW, h_tw)
+            else:
+                h_tw = min(255.0, yy - M - 30)
+                if h_tw > 150:
+                    _player_twin_card(c, fifa_lens, fifa_neighbors, M, yy - h_tw, CW, h_tw)
         _page_footer(c, 4, total_pages)
         c.showPage()
 
@@ -1776,7 +2042,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──
-    _diploma_page(c, d, pd, report_date, tracked=bool(mm.get("trail")))
+    _diploma_page(c, d, pd, report_date, tracked=bool(mm.get("trail")), prog=prog)
     _page_footer(c, total_pages, total_pages)
     c.showPage()
     c.save()

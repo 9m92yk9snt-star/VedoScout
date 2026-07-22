@@ -13,6 +13,7 @@ import {
 } from "./sections";
 import { MovementMapCard } from "./movement";
 import { ParentsPackageSection } from "./parents";
+import { ProgressCard, ProgressTeaser } from "./progress";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -225,6 +226,14 @@ export default function PremiumReportV2({ report, assetBase }) {
         <ParentSummaryCard parentSummary={d.parentSummary} />
         <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} />
       </div>
+
+      {report.progression?.categories?.length > 0 ? (
+        <div className="mb-4">
+          <ProgressCard prog={report.progression} />
+        </div>
+      ) : (
+        !report.demo && <ProgressTeaser playerName={pd.player_name} />
+      )}
 
       {/* Row 2 — snapshot / match stats / age comparison */}
       <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-[1fr_0.96fr_1.04fr]" : "lg:grid-cols-2"}`}>

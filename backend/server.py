@@ -99,7 +99,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 18  # v18 = parents package page (home drills / watch together / letter)
+PDF_RENDER_VERSION = 19  # v19 = development curve (progress strip, progress card, diploma trend)
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -5758,6 +5758,48 @@ async def _ensure_agent_review(doc: dict) -> dict:
     return review
 
 
+def _norm_player_name(n) -> str:
+    return " ".join(str(n or "").strip().lower().split())
+
+
+async def compute_progression_for_report(doc: dict):
+    """Development curve: match this player's earlier full reports on the same
+    account (same normalized name, age within ±1) and diff the scores."""
+    try:
+        pd = doc.get("player_details") or {}
+        name = _norm_player_name(pd.get("player_name"))
+        if not name or not doc.get("full_report"):
+            return None
+        age = pd.get("age")
+        cursor = db.reports.find(
+            {
+                "user_id": doc["user_id"],
+                "id": {"$ne": doc["id"]},
+                "full_report": {"$ne": None},
+                "created_at": {"$lt": doc.get("created_at") or ""},
+            },
+            {
+                "full_report.scores": 1, "full_report.technical": 1, "full_report.tactical": 1,
+                "full_report.physical": 1, "full_report.mentality": 1,
+                "full_report.development_priorities_detailed": 1,
+                "player_details.player_name": 1, "player_details.age": 1, "created_at": 1,
+            },
+        ).sort("created_at", 1)
+        history = []
+        async for p in cursor:
+            ppd = p.get("player_details") or {}
+            if _norm_player_name(ppd.get("player_name")) != name:
+                continue
+            pa = ppd.get("age")
+            if isinstance(age, (int, float)) and isinstance(pa, (int, float)) and abs(float(age) - float(pa)) > 1:
+                continue
+            history.append(p)
+        return build_progression(doc, history[-8:])
+    except Exception:
+        logger.exception("progression computation failed")
+        return None
+
+
 async def _serialize_report(doc: dict, include_full: bool) -> dict:
     out = {
         "id": doc["id"],
@@ -5788,6 +5830,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         out["agent_review"] = doc.get("agent_review")
         out["identity_stats"] = doc.get("identity_stats")
         out["movement_map"] = doc.get("movement_map")
+        out["progression"] = await compute_progression_for_report(doc)
         out["trial_readiness"] = compute_trial_readiness(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
@@ -8876,6 +8919,7 @@ async def download_pdf(report_id: str, user=Depends(get_current_user)):
     if not doc.get("full_report"):
         raise HTTPException(status_code=400, detail="Full report not generated yet")
 
+    doc["progression"] = await compute_progression_for_report(doc)
     pdf_path = _ensure_report_pdf(doc)
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"]["player_name"])
@@ -8963,6 +9007,7 @@ async def download_public_sample_pdf():
     if not doc:
         raise HTTPException(status_code=404, detail="Sample report not available yet")
 
+    doc["progression"] = await compute_progression_for_report(doc)
     pdf_path = _ensure_report_pdf(doc)
 
     return FileResponse(
@@ -9059,6 +9104,7 @@ async def download_shared_pdf(token: str):
     if not doc or not doc.get("full_report") or not (doc.get("is_paid") or doc.get("manually_unlocked")):
         raise HTTPException(status_code=404, detail="This share link is no longer active")
 
+    doc["progression"] = await compute_progression_for_report(doc)
     pdf_path = _ensure_report_pdf(doc, shared=True)
 
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
@@ -11673,6 +11719,7 @@ from identity_verify import (
 from telestration import render_telestration
 from player_tracking import track_player, track_at
 from movement_metrics import compute_movement_map
+from progression import build_progression
 from pdf_v2 import build_pdf_v2
 
 
