@@ -1824,23 +1824,32 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                 best = a
         return best
 
+    def _nearest_anchor_any(sec: float):
+        return min(anchors, key=lambda a: abs(float(a["t"]) - sec), default=None)
+
+    track_pts = ((report_doc.get("player_track") or {}).get("points")) or []
+
     # Timestamp-drift calibration: match the user's pixel-true marker capture
     # against the processed video to find the systematic VFR→CFR drift Δ.
     t_off = 0.0
     if anchors and have_video:
-        try:
-            mt = report_doc.get("marker_timestamp")
-            mf = report_doc.get("marker_filename")
-            mp = (UPLOAD_DIR / mf) if mf else None
-            if isinstance(mt, (int, float)) and mp is not None and mp.exists():
-                t_off, m_score = estimate_time_offset(video_path, str(mp), float(mt))
-                if abs(t_off) > 0.03:
-                    logging.info(
-                        f"[anchors] timestamp drift {t_off:+.2f}s (match {m_score:.2f}) — auto-corrected"
-                    )
-        except Exception as e:
-            logging.warning(f"time-offset calibration failed: {e}")
-            t_off = 0.0
+        stored_off = report_doc.get("anchor_time_offset")
+        if isinstance(stored_off, (int, float)):
+            t_off = float(stored_off)
+        else:
+            try:
+                mt = report_doc.get("marker_timestamp")
+                mf = report_doc.get("marker_filename")
+                mp = (UPLOAD_DIR / mf) if mf else None
+                if isinstance(mt, (int, float)) and mp is not None and mp.exists():
+                    t_off, m_score = estimate_time_offset(video_path, str(mp), float(mt))
+                    if abs(t_off) > 0.03:
+                        logging.info(
+                            f"[anchors] timestamp drift {t_off:+.2f}s (match {m_score:.2f}) — auto-corrected"
+                        )
+            except Exception as e:
+                logging.warning(f"time-offset calibration failed: {e}")
+                t_off = 0.0
 
     for idx, c in enumerate(comments):
         if not isinstance(c, dict):
@@ -1896,6 +1905,7 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             out["frame_reticle"] = frame_meta.get("reticle")
             if frame_meta.get("anchor_locked"):
                 out["anchor_locked"] = True
+                out["track_locked"] = bool(frame_meta.get("track_locked"))
                 out["anchor_box"] = frame_meta.get("anchor_box")
                 out["anchor_thumb_filename"] = frame_meta.get("anchor_thumb_filename")
                 out["anchor_crop_filename"] = frame_meta.get("anchor_crop_filename")
@@ -6169,6 +6179,66 @@ def _filter_low_identity_evidence(full: dict, report_id: str) -> dict:
     return full
 
 
+def _ground_truth_positions_block(anchors: list, track: dict | None, t_off: float) -> str:
+    """Feed the user's tap positions (+ tracking coverage) into the analysis
+    prompt so the model anchors its identification to ground truth."""
+    rows = []
+    for a in (anchors or [])[:10]:
+        if not (isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)):
+            continue
+        b = a["box"]
+        t = float(a["t"]) + (t_off or 0.0)
+        cx = int((float(b.get("x", 0)) + float(b.get("w", 0)) / 2) * 100)
+        cy = int((float(b.get("y", 0)) + float(b.get("h", 0)) / 2) * 100)
+        hh = int(float(b.get("h", 0)) * 100)
+        mm, ss = divmod(int(t), 60)
+        rows.append(
+            f"- At {mm:02d}:{ss:02d} ({t:.1f}s): centred ~{cx}% from the left, ~{cy}% from the top, "
+            f"body height ≈ {hh}% of the frame."
+        )
+    if not rows:
+        return ""
+    seg_line = ""
+    segs = (track or {}).get("segments") or []
+    if segs:
+        parts = ", ".join(f"{s[0]:.1f}s–{s[1]:.1f}s" for s in segs[:8])
+        seg_line = (
+            f"\nContinuous optical tracking additionally confirms the player's on-screen position throughout: {parts}."
+        )
+    return (
+        "\n\n🎯 USER-CONFIRMED PLAYER POSITIONS (GROUND TRUTH — the parent tapped the player at these exact "
+        "moments; this is never wrong):\n"
+        + "\n".join(rows)
+        + seg_line
+        + "\nUse these fixed positions to anchor your identification of the tapped player at every moment you cite. "
+        "If what you believe you see contradicts a confirmed position above, YOU have the wrong player — re-examine "
+        "before writing. Never attribute an action to the tapped player if it conflicts with these positions."
+    )
+
+
+def _apply_tracking_verification(full: dict, anchors: list, track: dict | None, t_off: float = 0.0) -> None:
+    """Cross-check every timeline action against measured data: a row is marked
+    tracking_verified when its timestamp falls at a tap or inside a confident
+    tracking window."""
+    try:
+        pts = (track or {}).get("points") or []
+        for a in (full or {}).get("action_timeline") or []:
+            if not isinstance(a, dict):
+                continue
+            sec = _mmss_to_secs(a.get("timestamp"))
+            if sec is None:
+                continue
+            near_anchor = any(
+                isinstance(x, dict) and isinstance(x.get("t"), (int, float))
+                and abs(float(x["t"]) + (t_off or 0.0) - sec) <= ANCHOR_SNAP_WINDOW
+                for x in anchors or []
+            )
+            tp = track_at(pts, sec) if pts else None
+            a["tracking_verified"] = bool(near_anchor or (tp and tp.get("conf", 0) >= 0.55))
+    except Exception:
+        pass
+
+
 async def generate_full_report_task(report_id: str) -> None:
     """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads).
 
@@ -6242,6 +6312,31 @@ async def generate_full_report_task(report_id: str) -> None:
         details_str = json.dumps(doc["player_details"], ensure_ascii=False)
         gate = doc.get("content_gate") or {}
 
+        # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
+        gt_track = None
+        gt_t_off = 0.0
+        try:
+            valid_anchors = [
+                a for a in anchor_payload_list
+                if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
+            ]
+            if valid_anchors:
+                if marker_path and isinstance(doc.get("marker_timestamp"), (int, float)):
+                    gt_t_off, _ms = await asyncio.to_thread(
+                        estimate_time_offset, str(file_path), marker_path, float(doc["marker_timestamp"]),
+                    )
+                gt_track = await asyncio.to_thread(track_player, str(file_path), valid_anchors, gt_t_off)
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"player_track": gt_track, "anchor_time_offset": gt_t_off}},
+                )
+                logger.info(
+                    f"[track] {report_id}: {len(gt_track.get('points') or [])} points, "
+                    f"{len(gt_track.get('segments') or [])} segments (Δ={gt_t_off:+.2f}s)"
+                )
+        except Exception:
+            logger.exception(f"player tracking failed for {report_id}")
+
         # ── Precision priors ──
         fp_obj = None
         fp_payload = doc.get("fingerprint")
@@ -6294,6 +6389,13 @@ async def generate_full_report_task(report_id: str) -> None:
                 full_prompt += identity_profile_block(_idp)
         except Exception:
             pass
+        # Inject the ground-truth tap positions + tracking coverage.
+        try:
+            gt_block = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
+            if gt_block:
+                full_prompt += gt_block
+        except Exception:
+            pass
         full = await call_gemini_with_video(
             session_id=f"full-{report_id}",
             prompt=full_prompt,
@@ -6303,6 +6405,7 @@ async def generate_full_report_task(report_id: str) -> None:
             anchor_crops=anchor_crops_full if anchor_crops_full else None,
         )
         full = scrub_hedging(full)
+        _apply_tracking_verification(full, anchor_payload_list, gt_track, gt_t_off)
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -6355,6 +6458,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     )
                     retry = scrub_hedging(retry)
                     retry = _filter_low_identity_evidence(retry, report_id)
+                    _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
                     await db.reports.update_one(
                         {"id": report_id},
                         {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
@@ -11539,6 +11643,7 @@ from identity_verify import (
     verify_preview_summary,
 )
 from telestration import render_telestration
+from player_tracking import track_player, track_at
 from pdf_v2 import build_pdf_v2
 
 
