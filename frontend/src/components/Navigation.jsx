@@ -11,7 +11,6 @@ const LIME = "#ccff00";
 const CORE_LINKS = [
   { label: "How it works", testid: "how-it-works-walkthrough" },
   { label: "What's inside", testid: "what-you-get" },
-  { label: "Sample", to: "/sample" },
   { label: "Pricing", testid: "pricing-section" },
 ];
 

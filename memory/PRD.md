@@ -1,6 +1,10 @@
 # ScoutMePlay — PRD & Status
 
-## Session (Jul 22, 2026 — Sample page) — PUBLIC /sample DEMO REPORT PAGE ✅
+## Session (Jul 22, 2026 — Sample REMOVED) — /sample PAGE + NAV BUTTON DELETED (user request) ✅
+- User asked to delete the sample page + Sample button. REVERTED everything from the "Sample page" session below: `SampleReportPage.jsx` deleted, `/sample` route + import removed from App.js (now redirects to /), "Sample" removed from Navigation CORE_LINKS (desktop+mobile), public `GET /api/sample/report` endpoint + `_anonymize_sample_payload` removed from server.py, `sample_demo_report_id` settings pin deleted (sample PDF endpoint restored to prior fallback behaviour and still returns 200).
+- VERIFIED: nav has 0 sample links, /sample redirects to /, /api/sample/report = 404, sample PDF = 200.
+
+## Session (Jul 22, 2026 — Sample page) — PUBLIC /sample DEMO REPORT PAGE ✅ (REVERTED — see above)
 - **User request**: public page w/ FULL anonymized premium report as sales demo, connected to "Sample" nav button, own page, cool layout.
 - **Backend (server.py, next to sample PDF endpoint)**: NEW public `GET /api/sample/report` — resolves via existing `_resolve_sample_report()` (settings pin `sample_demo_report_id` → PINNED to rich report `11533a13-d25e-4a30-bc73-782b5f69c388`: tracking, movement map, parents package, missions, timeline), serializes with `_serialize_report(include_full=True)`, then `_anonymize_sample_payload`: strips user_id/user_email/share fields, player_name→"Alex", description→None, deep regex-replace of ALL real-name mentions (case-insensitive, ≥3-char variants) across the whole payload, adds `sample: true`. NOTE: pinning also upgraded the public sample PDF to the same rich report.
 - **Frontend**: NEW `pages/SampleReportPage.jsx` at route `/sample` (public, App.js). Layout: dark ink hero ("This is what you get." + volt CTA → /signup + Sample PDF link + 4 feature chips + overall-score teaser card 8.0 ALEX·WINGER·U12), volt demo ribbon ("Anonymized demo — real report…"), full `<PremiumReportV2 report assetBase>` render on cream bg, bottom conversion block, sticky bottom CTA bar (appears >700px scroll). Testids: `sample-report-page`, `sample-hero-cta`, `sample-pdf-link`, `sample-demo-ribbon`, `sample-bottom-cta(-btn)`, `sample-sticky-cta(-btn)`, `sample-hero-score`.
