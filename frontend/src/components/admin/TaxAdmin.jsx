@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Loader2, RefreshCw, Landmark, Plus, Trash2, Paperclip, Download,
-  TrendingUp, TrendingDown, Receipt, Percent, ChevronDown, FileText,
+  TrendingUp, TrendingDown, Receipt, Percent, ChevronDown, FileText, Upload, EyeOff, Eye,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -100,6 +100,63 @@ export default function TaxAdmin() {
     }
   };
 
+  // ===== Revolut import =====
+  const [revHidden, setRevHidden] = useState(() => localStorage.getItem("tax_revolut_hidden") === "1");
+  const [revRows, setRevRows] = useState(null);
+  const [revSel, setRevSel] = useState({});
+  const [revLoading, setRevLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const revFileRef = useRef(null);
+
+  const toggleRevolut = () => {
+    const next = !revHidden;
+    setRevHidden(next);
+    localStorage.setItem("tax_revolut_hidden", next ? "1" : "0");
+  };
+
+  const previewRevolut = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRevLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("statement", file);
+      const r = await api.post(`/admin/tax/revolut/preview?year=${year}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setRevRows(r.data.rows);
+      const sel = {};
+      r.data.rows.forEach((row) => { sel[row.hash] = { checked: !row.already_imported, category: row.suggested_category, vat: false }; });
+      setRevSel(sel);
+      if (!r.data.rows.length) toast.info(`Ingen udgifter fundet i filen for ${year}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Kunne ikke læse filen");
+    } finally {
+      setRevLoading(false);
+      if (revFileRef.current) revFileRef.current.value = "";
+    }
+  };
+
+  const importRevolut = async () => {
+    const rows = (revRows || [])
+      .filter((r) => revSel[r.hash]?.checked && !r.already_imported)
+      .map((r) => ({
+        hash: r.hash, date: r.date, amount_dkk: r.amount_dkk,
+        category: revSel[r.hash].category, note: r.description, vat_included: revSel[r.hash].vat,
+      }));
+    if (!rows.length) { toast.error("Vælg mindst én udgift"); return; }
+    setImporting(true);
+    try {
+      const r = await api.post("/admin/tax/revolut/import", { rows });
+      toast.success(`${r.data.imported} udgifter importeret`);
+      setRevRows(null);
+      setRevSel({});
+      load();
+    } catch {
+      toast.error("Import fejlede");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (loading && !data) return <div className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin text-volt mx-auto" /></div>;
   if (!data) return null;
 
@@ -191,6 +248,87 @@ export default function TaxAdmin() {
         </form>
       </div>
 
+      {/* ===== Revolut import ===== */}
+      {revHidden ? (
+        <button data-testid="tax-revolut-show" type="button" onClick={toggleRevolut}
+          className="flex items-center gap-2 text-xs text-ink/45 hover:text-ink uppercase tracking-widest font-bold transition-colors">
+          <Eye className="w-3.5 h-3.5" /> Vis Revolut-import
+        </button>
+      ) : (
+        <div className="border border-gray-border p-5" data-testid="tax-revolut-section">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-widest font-bold text-volt">Importér fra Revolut Business</p>
+            <button data-testid="tax-revolut-hide" type="button" onClick={toggleRevolut}
+              className="flex items-center gap-1.5 text-[10px] text-ink/40 hover:text-ink uppercase tracking-widest font-bold transition-colors">
+              <EyeOff className="w-3 h-3" /> Slå fra
+            </button>
+          </div>
+          <p className="text-xs text-ink/55 mb-4">
+            I Revolut Business: vælg din konto → <b>Statement</b> → eksportér som <b>CSV</b> — og upload filen her.
+            Jeg finder alle udgifter, foreslår kategori, og du vælger med flueben hvad der skal bogføres.
+            Samme fil kan uploades flere gange — allerede importerede poster springes over.
+          </p>
+          <label className="inline-flex items-center gap-2 cursor-pointer border border-gray-border px-4 py-2.5 text-xs uppercase tracking-widest font-bold hover:border-volt hover:text-volt transition-colors">
+            {revLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            Vælg CSV-fil
+            <input data-testid="tax-revolut-file" ref={revFileRef} type="file" accept=".csv" className="hidden" onChange={previewRevolut} />
+          </label>
+
+          {revRows && revRows.length > 0 && (
+            <div className="mt-5">
+              <div className="max-h-[380px] overflow-y-auto border border-gray-border/60" data-testid="tax-revolut-preview">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-cream">
+                    <tr className="text-left text-[10px] uppercase tracking-widest text-ink/50">
+                      <th className="p-2"></th>
+                      <th className="p-2">Dato</th>
+                      <th className="p-2">Beskrivelse</th>
+                      <th className="p-2">Kategori</th>
+                      <th className="p-2 text-center">Moms</th>
+                      <th className="p-2 text-right">Beløb DKK</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revRows.map((r) => (
+                      <tr key={r.hash} data-testid={`tax-revolut-row-${r.hash}`}
+                        className={`border-t border-gray-border/40 ${r.already_imported ? "opacity-40" : ""}`}>
+                        <td className="p-2">
+                          <input type="checkbox" className="accent-[#ccff00]"
+                            checked={!!revSel[r.hash]?.checked} disabled={r.already_imported}
+                            onChange={(e) => setRevSel({ ...revSel, [r.hash]: { ...revSel[r.hash], checked: e.target.checked } })} />
+                        </td>
+                        <td className="p-2 font-mono text-xs whitespace-nowrap">{r.date}</td>
+                        <td className="p-2 text-xs max-w-[220px] truncate">{r.description}{r.already_imported && <span className="ml-1 text-[10px] text-ink/40">(importeret)</span>}</td>
+                        <td className="p-2">
+                          <select value={revSel[r.hash]?.category || "other"} disabled={r.already_imported}
+                            onChange={(e) => setRevSel({ ...revSel, [r.hash]: { ...revSel[r.hash], category: e.target.value } })}
+                            className="border border-gray-border bg-transparent px-2 py-1 text-xs">
+                            {Object.entries(data.categories).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                          </select>
+                        </td>
+                        <td className="p-2 text-center">
+                          <input type="checkbox" className="accent-[#ccff00]" title="Dansk køb med moms"
+                            checked={!!revSel[r.hash]?.vat} disabled={r.already_imported}
+                            onChange={(e) => setRevSel({ ...revSel, [r.hash]: { ...revSel[r.hash], vat: e.target.checked } })} />
+                        </td>
+                        <td className="p-2 text-right font-mono whitespace-nowrap">{kr(r.amount_dkk)}{r.currency !== "DKK" && <span className="block text-[10px] text-ink/40">{r.orig_amount} {r.currency}</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-ink/45">{(revRows || []).filter((r) => revSel[r.hash]?.checked && !r.already_imported).length} valgt af {revRows.length}</p>
+                <button data-testid="tax-revolut-import-btn" onClick={importRevolut} disabled={importing}
+                  className="flex items-center gap-2 bg-forest hover:bg-forest-pop text-white text-xs uppercase tracking-widest font-black px-5 py-2.5 transition-colors disabled:opacity-50">
+                  {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Importér valgte
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ===== Two-column: monthly income + expense list ===== */}
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="border border-gray-border p-5">
@@ -245,20 +383,26 @@ export default function TaxAdmin() {
         </div>
       </div>
 
-      {/* ===== VAT ===== */}
+      {/* ===== VAT — quarterly ===== */}
       <div className="border border-gray-border p-5" data-testid="tax-vat-section">
-        <p className="text-xs uppercase tracking-widest font-bold text-volt mb-3">Moms-overblik</p>
-        <div className="grid sm:grid-cols-2 gap-4 mb-3">
-          {vat.half_year.map((h) => (
-            <div key={h.label} className="bg-ink/5 p-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-ink/60">{h.label}</p>
-              <p className="font-barlow font-black text-xl mt-1">{kr(h.revenue_dkk)}</p>
-              <p className="text-xs text-ink/45 mt-1">Indberetningsfrist: {h.deadline}</p>
+        <p className="text-xs uppercase tracking-widest font-bold text-volt mb-3">Moms — hvert kvartal · tast disse tal i TastSelv Erhverv</p>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-3">
+          {vat.quarters.map((q, i) => (
+            <div key={q.label} className="bg-ink/5 p-4" data-testid={`tax-vat-q${i + 1}`}>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink/60">{q.label}</p>
+              <p className="text-[10px] text-ink/45 mb-3">Omsætning: {kr(q.revenue_dkk)} · Frist: <b>{q.deadline}</b></p>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between"><span className="text-ink/55">Salgsmoms (udgående)</span><span className="font-mono font-bold">{kr(q.salgsmoms)}</span></div>
+                <div className="flex justify-between"><span className="text-ink/55">Købsmoms (indgående)</span><span className="font-mono font-bold">{kr(q.koebsmoms)}</span></div>
+                <div className="flex justify-between border-t border-gray-border/50 pt-1.5">
+                  <span className="font-bold">Momstilsvar (du betaler)</span>
+                  <span className={`font-mono font-black ${q.tilsvar < 0 ? "text-forest" : ""}`}>{kr(q.tilsvar)}</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-ink/60">Fradragsberettiget købsmoms (danske køb markeret med moms): <b>{kr(vat.koebsmoms_deductible)}</b></p>
-        <p className="text-xs text-ink/45 mt-2">{vat.note}</p>
+        <p className="text-xs text-ink/45">{vat.note}</p>
       </div>
 
       {/* ===== Guide ===== */}

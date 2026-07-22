@@ -1,5 +1,18 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jul 22, 2026 — Skat-hjælper v2) — QUARTERLY VAT + TASTSELV NUMBERS + REVOLUT CSV IMPORT ✅
+- **User follow-up**: reports VAT quarterly, has NO accountant, has Revolut Business account, wants it EASY. Wanted Revolut import to be toggleable off.
+- **Backend (tax_helper.py)**:
+  - `_vat_block(income, expenses, year)` → 4 quarters w/ Danish deadlines (Q1→1. juni, Q2→1. sep, Q3→1. dec, Q4→1. marts året efter), each with revenue, salgsmoms (20% of gross, all-DK assumption), købsmoms (from vat_included expenses in quarter), **momstilsvar** = ready-to-type TastSelv numbers.
+  - `_usd_dkk_rate` generalized → `_rate_to_dkk(db, date, currency)` (any ECB currency → DKK, cache key `{cur}-dkk-{date}`).
+  - GUIDE_STEPS rewritten: quarterly TastSelv walk-through (which field gets which number), no-revisor tone, Skattestyrelsen 72 22 18 18 references, Revolut import mention.
+  - NEW `POST /admin/tax/revolut/preview?year=` (multipart CSV ≤10MB) — tolerant parser (`_parse_revolut_csv`: sniffs ,/; delimiter, business+personal header variants, skips non-COMPLETED + money-in + other years, adds fee, EU decimal handling) → rows w/ FX-converted amount_dkk, keyword-suggested category (`_suggest_category`: emergent→hosting, openai→ai, google ads→marketing etc.), `already_imported` flag (md5 hash date|desc|amount|cur → `import_hash`).
+  - NEW `POST /admin/tax/revolut/import` (pydantic `RevolutImportPayload`) — bulk insert w/ dedupe on import_hash, source:"revolut". PDF moms section → quarterly w/ tilsvar.
+- **Frontend (TaxAdmin.jsx)**: VAT section → 4 quarter cards ("tast disse tal i TastSelv Erhverv": salgsmoms/købsmoms/momstilsvar + frist, testids `tax-vat-q1..4`); NEW Revolut section (`tax-revolut-section`): CSV upload → preview table (checkbox default-on for new rows, per-row category select + moms checkbox, greyed "(importeret)" rows) → "Importér valgte"; **"Slå fra" toggle** (`tax-revolut-hide`/`tax-revolut-show`, localStorage `tax_revolut_hidden`) per user request.
+- **GOTCHA recurrence**: parallel search_replace batch on TaxAdmin.jsx DROPPED the lucide import edit (EyeOff undefined runtime error) despite "success" — re-applied + grep-verified. ALWAYS grep after parallel batches on same file.
+- **VERIFIED e2e**: CSV parse (3/6 rows correct — PENDING/TOPUP/2025 filtered, USD+fee→DKK 170.06 via ECB), import 3 → re-import dedupe (0/3), preview marks imported, quarterly tilsvar correct (Q2: 81.08), PDF asserts quarters, UI: upload via file input → 3 rows "(importeret)", toggle hide/show both ways, screenshots clean. Test expenses deleted — clean ledger.
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Session (Jul 22, 2026 — Skat-hjælper) — DANISH TAX HELPER ADMIN TAB ✅
 - **User request**: admin section that helps him report Danish taxes (SKAT) — income + expenses easily, he has CVR, no accounting knowledge. Choices: has CVR (1b), auto Stripe income (2a), 2026 only (3a).
 - **Backend**: NEW `/app/backend/tax_helper.py` (`build_tax_router(db, get_current_admin, upload_dir)`, wired in server.py after chunked_upload router). Endpoints (all admin-only, prefix `/api/admin/tax`):

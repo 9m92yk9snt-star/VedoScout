@@ -10,6 +10,7 @@ sole proprietorship (enkeltmandsvirksomhed). NOT professional tax advice.
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import logging
 import uuid
@@ -19,6 +20,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel
 
 import r2_storage
 
@@ -49,22 +51,24 @@ KIND_LABELS = {
 GUIDE_STEPS = [
     {
         "title": "1. Bogføring — det klarer denne side",
-        "body": "Alle indtægter hentes automatisk fra Stripe, og du taster dine udgifter ind her. "
-                "Gem kvitteringer (upload dem her) — bogføringsloven kræver 5 års opbevaring.",
+        "body": "Alle indtægter hentes automatisk fra Stripe. Udgifter taster du ind ovenfor — eller endnu nemmere: "
+                "eksportér dit kontoudtog fra Revolut Business som CSV og brug 'Importér fra Revolut', så er det få klik. "
+                "Upload kvitteringer her — bogføringsloven kræver 5 års opbevaring.",
     },
     {
-        "title": "2. Moms — indberettes via TastSelv Erhverv",
-        "body": "Log ind på skat.dk/erhverv → Moms. Nye/små virksomheder indberetter typisk halvårligt: "
-                "1. halvår senest 1. september, 2. halvår senest 1. marts året efter. "
-                "OBS: Moms på digitale ydelser afhænger af kundens land — danske kunder: 25% dansk moms; "
-                "forbrugere i andre EU-lande: OSS-ordningen (One Stop Shop); kunder uden for EU: ingen dansk moms. "
-                "Da dine Stripe-kunder kan komme fra hele verden, så afklar fordelingen med Skattestyrelsen (72 22 18 18) eller en revisor.",
+        "title": "2. Moms — hvert kvartal via TastSelv Erhverv",
+        "body": "Du indberetter kvartalsvis. Sådan gør du: 1) Log ind på skat.dk/erhverv med MitID → vælg 'Moms'. "
+                "2) Tast tallene fra kvartals-boksen ovenfor: Salgsmoms i feltet 'Salgsmoms (udgående moms)', købsmoms i "
+                "'Købsmoms (indgående moms)'. 3) Godkend — momstilsvaret er det beløb du skal betale. "
+                "Frister: 1. kvt. → 1. juni · 2. kvt. → 1. september · 3. kvt. → 1. december · 4. kvt. → 1. marts. "
+                "OBS: Salgsmoms-tallene her antager danske kunder. Har du mange kunder i andre EU-lande kan OSS-ordningen være "
+                "relevant — ring gratis til Skattestyrelsen på 72 22 18 18, de hjælper med præcis dét.",
     },
     {
         "title": "3. Skat af årets resultat — oplysningsskema",
         "body": "Årets resultat (indtægter minus udgifter) skrives i dit oplysningsskema på skat.dk: "
                 "overskud i rubrik 111, underskud i rubrik 112. Frist: 1. juli året efter indkomståret. "
-                "Brug PDF-eksporten fra denne side som dokumentation.",
+                "Download PDF-rapporten fra denne side og gem den som dokumentation — så har du alt på ét sted.",
     },
     {
         "title": "4. Forskudsopgørelse — undgå restskat",
@@ -75,12 +79,118 @@ GUIDE_STEPS = [
         "title": "5. Opstartsudgifter",
         "body": "Udgifter afholdt for at starte virksomheden (fx udvikling af ScoutMePlay) kan som udgangspunkt "
                 "fratrækkes, når de er afholdt i tilknytning til opstarten — gem al dokumentation. "
-                "Er beløbene store, så få en revisor til at bekræfte periodisering.",
+                "Er du i tvivl om en konkret udgift, så ring til Skattestyrelsen på 72 22 18 18 — det er gratis.",
     },
 ]
 
 DISCLAIMER = ("Vejledende værktøj — ikke professionel skatterådgivning. "
-              "Bekræft altid moms- og skatteforhold med Skattestyrelsen eller en revisor.")
+              "Er du i tvivl, så ring gratis til Skattestyrelsen på 72 22 18 18.")
+
+
+# ===== Revolut Business CSV import =====
+
+CATEGORY_KEYWORDS = {
+    "hosting": ["emergent", "aws", "amazon web", "hetzner", "digitalocean", "cloudflare", "vercel", "railway", "render", "one.com", "simply"],
+    "ai": ["openai", "anthropic", "gemini", "elevenlabs", "google cloud", "replicate", "fal.ai"],
+    "domain": ["godaddy", "namecheap", "dk hostmaster", "gratisdns", "domain", "punktum"],
+    "marketing": ["facebook", "meta plat", "google ads", "tiktok", "instagram", "linkedin", "mailchimp"],
+    "software": ["adobe", "figma", "canva", "notion", "github", "apple.com/bill", "microsoft", "dropbox", "zoom"],
+}
+
+
+def _suggest_category(description: str) -> str:
+    d = (description or "").lower()
+    for cat, words in CATEGORY_KEYWORDS.items():
+        if any(w in d for w in words):
+            return cat
+    return "other"
+
+
+def _num(s) -> float | None:
+    s = str(s or "").strip().replace("\u00a0", "").replace(" ", "")
+    if not s:
+        return None
+    if s.count(",") == 1 and s.count(".") == 0:
+        s = s.replace(",", ".")
+    else:
+        s = s.replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _parse_date(s: str) -> str | None:
+    s = str(s or "").strip()
+    for cand in (s, s[:19], s[:16], s[:10]):
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d",
+                    "%d/%m/%Y %H:%M", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(cand, fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+    return None
+
+
+def _parse_revolut_csv(data: bytes) -> list[dict]:
+    """Tolerant parser for Revolut (Business & personal) CSV statements.
+    Returns money-OUT rows as expense candidates."""
+    text = data.decode("utf-8-sig", errors="replace")
+    first = text.splitlines()[0] if text.splitlines() else ""
+    delim = ";" if first.count(";") > first.count(",") else ","
+    reader = csv.DictReader(io.StringIO(text), delimiter=delim)
+    headers = {(h or "").lower().strip(): h for h in (reader.fieldnames or [])}
+
+    def col(*names):
+        for n in names:
+            if n in headers:
+                return headers[n]
+        return None
+
+    c_date = col("date completed (utc)", "completed date", "date completed", "date started (utc)", "started date", "date")
+    c_desc = col("description", "reference", "payee", "beneficiary")
+    c_amount = col("amount", "total amount")
+    c_cur = col("payment currency", "currency")
+    c_state = col("state")
+    c_fee = col("fee")
+    if not (c_date and c_amount):
+        raise HTTPException(400, "Kunne ikke genkende kolonnerne i filen — eksportér kontoudtoget som CSV (Statement → Excel/CSV) fra Revolut og prøv igen")
+
+    rows = []
+    for r in reader:
+        if c_state and str(r.get(c_state, "")).strip().lower() not in ("completed", "complete", ""):
+            continue
+        amt = _num(r.get(c_amount))
+        if amt is None or amt >= 0:
+            continue
+        date = _parse_date(r.get(c_date))
+        if not date:
+            continue
+        fee = abs(_num(r.get(c_fee)) or 0) if c_fee else 0.0
+        desc = str(r.get(c_desc, "") or "").strip()[:200]
+        cur = str(r.get(c_cur, "") or "DKK").strip().upper() or "DKK"
+        rows.append({
+            "date": date,
+            "description": desc,
+            "orig_amount": round(abs(amt) + fee, 2),
+            "currency": cur,
+        })
+        if len(rows) >= 500:
+            break
+    return rows
+
+
+class RevolutRow(BaseModel):
+    hash: str
+    date: str
+    amount_dkk: float
+    category: str = "other"
+    note: str = ""
+    vat_included: bool = False
+
+
+class RevolutImportPayload(BaseModel):
+    rows: list[RevolutRow]
 
 
 def _month_key(iso: str) -> int:
@@ -90,23 +200,26 @@ def _month_key(iso: str) -> int:
         return 0
 
 
-async def _usd_dkk_rate(db, date_str: str) -> tuple[float, str]:
-    """Daily USD→DKK rate (ECB via frankfurter.app), cached in Mongo.
+async def _rate_to_dkk(db, date_str: str, currency: str) -> tuple[float, str]:
+    """Daily {currency}→DKK rate (ECB via frankfurter.dev), cached in Mongo.
     Returns (rate, source). Falls back to newest cached rate, then a constant."""
-    key = f"usd-dkk-{date_str}"
+    cur = (currency or "usd").lower()
+    if cur == "dkk":
+        return 1.0, "native"
+    key = f"{cur}-dkk-{date_str}"
     cached = await db[FX_COLL].find_one({"_id": key})
     if cached:
         return float(cached["rate"]), cached.get("source", "cache")
     try:
         async with httpx.AsyncClient(timeout=6, follow_redirects=True) as client:
-            r = await client.get(f"https://api.frankfurter.dev/v1/{date_str}", params={"base": "USD", "symbols": "DKK"})
+            r = await client.get(f"https://api.frankfurter.dev/v1/{date_str}", params={"base": cur.upper(), "symbols": "DKK"})
             r.raise_for_status()
             rate = float(r.json()["rates"]["DKK"])
         await db[FX_COLL].update_one({"_id": key}, {"$set": {"rate": rate, "source": "ecb"}}, upsert=True)
         return rate, "ecb"
     except Exception as e:
-        logger.warning("FX fetch failed for %s: %s", date_str, e)
-    newest = await db[FX_COLL].find_one({"_id": {"$regex": "^usd-dkk-"}}, sort=[("_id", -1)])
+        logger.warning("FX fetch failed for %s %s: %s", cur, date_str, e)
+    newest = await db[FX_COLL].find_one({"_id": {"$regex": f"^{cur}-dkk-"}}, sort=[("_id", -1)])
     if newest:
         return float(newest["rate"]), "nearest-cache"
     return FALLBACK_USD_DKK, "fallback"
@@ -128,7 +241,7 @@ async def _year_income(db, year: int) -> dict:
         if cur == "dkk":
             dkk, rate, source = amount, 1.0, "native"
         else:
-            rate, source = await _usd_dkk_rate(db, date_str)
+            rate, source = await _rate_to_dkk(db, date_str, cur)
             dkk = round(amount * rate, 2)
         if source in ("nearest-cache", "fallback"):
             approx_fx = True
@@ -181,19 +294,38 @@ async def _year_expenses(db, year: int) -> dict:
     }
 
 
-def _vat_block(income: dict, expenses: dict) -> dict:
-    h1 = sum(m["gross_dkk"] for m in income["monthly"][:6])
-    h2 = sum(m["gross_dkk"] for m in income["monthly"][6:])
+def _vat_block(income: dict, expenses: dict, year: int) -> dict:
+    q_rev = [0.0, 0.0, 0.0, 0.0]
+    for m in income["monthly"]:
+        q_rev[(m["month"] - 1) // 3] += m["gross_dkk"]
+    q_kob = [0.0, 0.0, 0.0, 0.0]
+    for e in expenses["expenses"]:
+        if e.get("vat_included"):
+            try:
+                q_kob[(int(e["date"][5:7]) - 1) // 3] += float(e.get("amount_dkk") or 0) * 0.20
+            except (ValueError, TypeError, IndexError):
+                continue
+    labels = ["1. kvartal (jan–mar)", "2. kvartal (apr–jun)", "3. kvartal (jul–sep)", "4. kvartal (okt–dec)"]
+    deadlines = ["1. juni", "1. september", "1. december", f"1. marts {year + 1}"]
+    quarters = []
+    for i in range(4):
+        salg = round(q_rev[i] * 0.20, 2)
+        kob = round(q_kob[i], 2)
+        quarters.append({
+            "label": labels[i],
+            "deadline": deadlines[i],
+            "revenue_dkk": round(q_rev[i], 2),
+            "salgsmoms": salg,
+            "koebsmoms": kob,
+            "tilsvar": round(salg - kob, 2),
+        })
     return {
-        "half_year": [
-            {"label": "1. halvår (jan–jun)", "revenue_dkk": round(h1, 2), "deadline": "1. september"},
-            {"label": "2. halvår (jul–dec)", "revenue_dkk": round(h2, 2), "deadline": "1. marts (året efter)"},
-        ],
+        "quarters": quarters,
         "salgsmoms_if_all_dk": round(income["total_dkk"] * 0.20, 2),
         "koebsmoms_deductible": expenses["vat_deductible_dkk"],
-        "note": ("Salgsmoms-tallet er VEJLEDENDE og gælder kun hvis alle kunder er danske "
-                 "(25% moms = 20% af bruttobeløbet). EU-forbrugere kræver OSS-ordningen; "
-                 "kunder uden for EU er uden dansk moms."),
+        "note": ("Salgsmoms-tallene er VEJLEDENDE og antager at alle kunder er danske "
+                 "(25% moms = 20% af bruttobeløbet). Har du mange EU-kunder, så spørg "
+                 "Skattestyrelsen (72 22 18 18) om OSS-ordningen."),
     }
 
 
@@ -254,10 +386,11 @@ def _build_tax_pdf(year: int, income: dict, expenses: dict, vat: dict) -> bytes:
              f"{_kr(float(e.get('amount_dkk') or 0))} kr. — {e.get('note') or ''}{vat_tag}", 8, dy=4.6 * mm)
     y -= 4 * mm
 
-    line("MOMS (VEJLEDENDE)", 12, True, 7 * mm)
-    for h in vat["half_year"]:
-        line(f"{h['label']}: omsætning {_kr(h['revenue_dkk'])} kr. — frist {h['deadline']}")
-    line(f"Salgsmoms hvis alle kunder er danske: {_kr(vat['salgsmoms_if_all_dk'])} kr.")
+    line("MOMS PR. KVARTAL (VEJLEDENDE)", 12, True, 7 * mm)
+    for q in vat["quarters"]:
+        line(f"{q['label']}: omsætning {_kr(q['revenue_dkk'])} kr. · salgsmoms {_kr(q['salgsmoms'])} kr. · "
+             f"købsmoms {_kr(q['koebsmoms'])} kr. · momstilsvar {_kr(q['tilsvar'])} kr. — frist {q['deadline']}", 8, dy=4.8 * mm)
+    line(f"Salgsmoms i alt hvis alle kunder er danske: {_kr(vat['salgsmoms_if_all_dk'])} kr.")
     line(f"Fradragsberettiget købsmoms (danske køb): {_kr(vat['koebsmoms_deductible'])} kr.")
     y -= 6 * mm
     line(DISCLAIMER, 7, False, 4 * mm, color=(0.4, 0.4, 0.4))
@@ -283,7 +416,7 @@ def build_tax_router(db, get_current_admin, upload_dir: Path) -> APIRouter:
             "expenses": expenses,
             "result_dkk": result,
             "rubrik": "111" if result >= 0 else "112",
-            "vat": _vat_block(income, expenses),
+            "vat": _vat_block(income, expenses, year),
             "categories": CATEGORIES,
             "guide": GUIDE_STEPS,
             "disclaimer": DISCLAIMER,
@@ -385,8 +518,64 @@ def build_tax_router(db, get_current_admin, upload_dir: Path) -> APIRouter:
     async def export_pdf(year: int = 2026, _=Depends(get_current_admin)):
         income = await _year_income(db, year)
         expenses = await _year_expenses(db, year)
-        pdf = _build_tax_pdf(year, income, expenses, _vat_block(income, expenses))
+        pdf = _build_tax_pdf(year, income, expenses, _vat_block(income, expenses, year))
         return Response(content=pdf, media_type="application/pdf",
                         headers={"Content-Disposition": f'attachment; filename="scoutmeplay-skat-{year}.pdf"'})
+
+    @router.post("/revolut/preview")
+    async def revolut_preview(year: int = 2026, statement: UploadFile = File(...), _=Depends(get_current_admin)):
+        data = await statement.read()
+        if len(data) > 10 * 1024 * 1024:
+            raise HTTPException(400, "Filen må max være 10 MB")
+        parsed = _parse_revolut_csv(data)
+        parsed = [r for r in parsed if r["date"].startswith(str(year))]
+        hashes = [hashlib.md5(f"{r['date']}|{r['description']}|{r['orig_amount']:.2f}|{r['currency']}".encode()).hexdigest()[:16] for r in parsed]
+        existing = set()
+        if hashes:
+            async for doc in db[EXPENSE_COLL].find({"import_hash": {"$in": hashes}}, {"_id": 0, "import_hash": 1}):
+                existing.add(doc["import_hash"])
+        out = []
+        for r, h in zip(parsed, hashes):
+            rate, _src = await _rate_to_dkk(db, r["date"], r["currency"])
+            out.append({
+                "hash": h,
+                "date": r["date"],
+                "description": r["description"],
+                "orig_amount": r["orig_amount"],
+                "currency": r["currency"],
+                "amount_dkk": round(r["orig_amount"] * rate, 2),
+                "suggested_category": _suggest_category(r["description"]),
+                "already_imported": h in existing,
+            })
+        return {"rows": out, "count": len(out)}
+
+    @router.post("/revolut/import")
+    async def revolut_import(payload: RevolutImportPayload, _=Depends(get_current_admin)):
+        hashes = [r.hash for r in payload.rows]
+        existing = set()
+        if hashes:
+            async for doc in db[EXPENSE_COLL].find({"import_hash": {"$in": hashes}}, {"_id": 0, "import_hash": 1}):
+                existing.add(doc["import_hash"])
+        imported = skipped = 0
+        for r in payload.rows:
+            if r.hash in existing or r.amount_dkk <= 0 or r.category not in CATEGORIES:
+                skipped += 1
+                continue
+            await db[EXPENSE_COLL].insert_one({
+                "id": str(uuid.uuid4())[:12],
+                "date": r.date,
+                "amount_dkk": round(float(r.amount_dkk), 2),
+                "category": r.category,
+                "note": (r.note or "").strip()[:300],
+                "vat_included": bool(r.vat_included),
+                "receipt_filename": None,
+                "receipt_url": None,
+                "source": "revolut",
+                "import_hash": r.hash,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            existing.add(r.hash)
+            imported += 1
+        return {"imported": imported, "skipped": skipped}
 
     return router
