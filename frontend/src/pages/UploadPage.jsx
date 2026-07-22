@@ -399,6 +399,7 @@ export default function UploadPage() {
               w: Number(a.box.w.toFixed(4)),
               h: Number(a.box.h.toFixed(4)),
             },
+            thumb: a.thumb || undefined,
           })),
         ),
       );

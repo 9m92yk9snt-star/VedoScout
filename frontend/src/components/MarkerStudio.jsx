@@ -1102,6 +1102,7 @@ export default function MarkerStudio({
             t: a.t,
             box: a.box,
             segment: a.segment ?? 0,
+            thumb: a.thumb || undefined,
           })),
           sceneCuts: sceneCuts || [],
           scoutMode: true,
@@ -1145,7 +1146,7 @@ export default function MarkerStudio({
         markerBlob: blob,
         markerTimestamp: first.t,
         markerBox: first.box, // legacy single-box field
-        markerAnchors: finalAnchors.map((a) => ({ t: a.t, box: a.box })),
+        markerAnchors: finalAnchors.map((a) => ({ t: a.t, box: a.box, thumb: a.thumb || undefined })),
       });
     });
   };

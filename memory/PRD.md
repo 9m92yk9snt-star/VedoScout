@@ -27,6 +27,18 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026 — late PM) — PIXEL-TRUE TEMPLATE RE-LOCATION (user 2nd bug report) DONE ✅
+- **User feedback**: ring still on wrong player at 00:04; user believed their own taps were imprecise ("the green box drifted from the player I tapped").
+- **DIAGNOSIS (verified with images)**: taps were actually PERFECT — the stored tap box drawn on the marker JPG sits exactly on the yellow-marked player. Time drift measured with new `estimate_time_offset` (marker canvas vs web.mp4 NCC scan): only −0.027 s @ 0.996 match → time is fine. The failure was the kit-colour blob step (white jersey vs white van/banners) placing the ring wrong INSIDE the box.
+- **NEW PRECISION CHAIN** (in `_telestrate_verified_frames`):
+  1. **Pixel-true template**: user's tap-box content is template-matched (multi-scale NCC ≥0.45) in a 1.9x neighbourhood → relocates the exact framed region. Template source: (a) NEW uploads: per-anchor 96px thumbs now sent from MarkerStudio/UploadPage (`thumb` in marker_anchors JSON), saved at upload as `{id}-anchor-{i}-thumb.jpg`, flushed to R2, carried through anchors payload as `thumb_filename`; (b) OLD reports: `synth_thumb_from_context_crop` reverses the deterministic 0.55/0.30 padding of anchor crops → exact box content.
+  2. Blob-refine inside the matched rect for feet precision; fallback = matched rect itself.
+  3. Blob-in-tap-box (margin 0.30); 4. spotlight+chip only.
+- **Also**: `estimate_time_offset` auto-corrects VFR→CFR timestamp drift per report (marker vs video, ±1.2 s scan) — applied to all anchor extractions in `ensure_video_frames` (`t_use = t + Δ`); `anchor_crop_filename`/`anchor_thumb_filename` carried on comments.
+- **GOTCHA**: a parallel edit duplicated the file tail (`app.include_router` x2 + stray text) → SyntaxError at line 12253. Fixed. CHECK server.py TAIL after parallel batches.
+- **VERIFIED**: report 11533a13 regenerated — all 4 rings visually confirmed on the exact user-tapped player (incl. the 00:04 van-player the user yellow-marked). Synth template visually verified (full-body player). 48 regression tests pass, frontend compiles, backend 200.
+- ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 22, 2026 — PM) — ANCHOR-LOCKED EVIDENCE: wrong-player fix (user bug report) DONE ✅
 - **User bug**: new production-style test (report 11533a13, AOrman) — ALL evidence screenshots showed the wrong player / rings on empty grass.
 - **ROOT CAUSES FOUND**:

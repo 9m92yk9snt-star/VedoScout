@@ -687,6 +687,128 @@ def _color_match_mask_bgr(frame_bgr: np.ndarray, target_rgb: tuple[int, int, int
     return dist2 < (tol * tol)
 
 
+def estimate_time_offset(
+    video_path: str | Path,
+    marker_image_path: str | Path,
+    t_marker: float,
+    search: float = 1.2,
+) -> tuple[float, float]:
+    """The marker JPG is a pixel-true canvas capture of the frame the user SAW
+    when tapping. Phone videos are often VFR; after transcode the same wall
+    time can show a different frame. Scan the processed video around t_marker
+    and find the frame that actually matches → (drift Δ seconds, match score)."""
+    try:
+        marker = cv2.imread(str(marker_image_path))
+        if marker is None:
+            return 0.0, 0.0
+        tgt_w = 160
+
+        def prep(im):
+            g = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+            h, w = g.shape[:2]
+            return cv2.resize(g, (tgt_w, max(2, int(h * tgt_w / w))))
+
+        mg = prep(marker)
+        cap = cv2.VideoCapture(str(video_path))
+        if not cap.isOpened():
+            return 0.0, 0.0
+        start = max(0.0, float(t_marker) - search)
+        cap.set(cv2.CAP_PROP_POS_MSEC, start * 1000.0)
+        best_dt, best_score = 0.0, -1.0
+        while True:
+            pos = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            okf, frame = cap.read()
+            if not okf or pos > float(t_marker) + search:
+                break
+            fg = prep(frame)
+            if fg.shape != mg.shape:
+                fg = cv2.resize(fg, (mg.shape[1], mg.shape[0]))
+            score = float(cv2.matchTemplate(fg, mg, cv2.TM_CCOEFF_NORMED)[0][0])
+            if score > best_score:
+                best_score, best_dt = score, pos - float(t_marker)
+        cap.release()
+        if best_score < 0.35:
+            return 0.0, best_score
+        return best_dt, best_score
+    except Exception:
+        return 0.0, 0.0
+
+
+def locate_player_by_thumb(frame_path: str | Path, box: dict, thumb_path: str | Path) -> dict | None:
+    """Template-match the user's own tap thumbnail (pixel-true capture of the
+    exact region they framed) inside an expanded neighbourhood of the tap box.
+    Finds the player even when the box has drifted. Returns normalized
+    {x0,y0,x1,y1,score} or None."""
+    try:
+        img = cv2.imread(str(frame_path))
+        th = cv2.imread(str(thumb_path))
+        if img is None or th is None:
+            return None
+        H, W = img.shape[:2]
+        if th.shape[0] > 12 and th.shape[1] > 12:
+            th = th[3:-3, 3:-3]  # strip the volt border baked into the thumb
+        bw_px = max(8, int(float(box["w"]) * W))
+        bh_px = max(8, int(float(box["h"]) * H))
+        gx, gy = float(box["w"]) * 0.45, float(box["h"]) * 0.45
+        rx0 = max(0, int((float(box["x"]) - gx) * W))
+        ry0 = max(0, int((float(box["y"]) - gy) * H))
+        rx1 = min(W, int((float(box["x"]) + float(box["w"]) + gx) * W))
+        ry1 = min(H, int((float(box["y"]) + float(box["h"]) + gy) * H))
+        region = img[ry0:ry1, rx0:rx1]
+        best = None
+        for s in (1.0, 0.85, 1.15):
+            tw, thh = int(bw_px * s), int(bh_px * s)
+            if tw < 8 or thh < 8 or thh >= region.shape[0] or tw >= region.shape[1]:
+                continue
+            tpl = cv2.resize(th, (tw, thh), interpolation=cv2.INTER_AREA)
+            res = cv2.matchTemplate(region, tpl, cv2.TM_CCOEFF_NORMED)
+            _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+            if best is None or mx > best[0]:
+                best = (float(mx), ml, tw, thh)
+        if best is None or best[0] < 0.45:
+            return None
+        score, (mx_, my_), tw, thh = best
+        return {
+            "x0": (rx0 + mx_) / W, "y0": (ry0 + my_) / H,
+            "x1": (rx0 + mx_ + tw) / W, "y1": (ry0 + my_ + thh) / H,
+            "score": score,
+        }
+    except Exception:
+        return None
+
+
+def synth_thumb_from_context_crop(crop_path: str | Path, box: dict, out_path: str | Path) -> bool:
+    """Anchor crops are context-padded (0.55·w, 0.30·h, edge-clamped, normalized
+    geometry). Recover the EXACT tap-box content from the crop → a pixel-true
+    template for player re-location on reports uploaded before thumbs existed."""
+    try:
+        crop = cv2.imread(str(crop_path))
+        if crop is None:
+            return False
+        bx, by = float(box["x"]), float(box["y"])
+        bw, bh = float(box["w"]), float(box["h"])
+        nx0 = max(0.0, bx - 0.55 * bw)
+        ny0 = max(0.0, by - 0.30 * bh)
+        nx1 = min(1.0, bx + bw + 0.55 * bw)
+        ny1 = min(1.0, by + bh + 0.30 * bh)
+        if nx1 <= nx0 or ny1 <= ny0:
+            return False
+        ch, cw = crop.shape[:2]
+        ix = int((bx - nx0) / (nx1 - nx0) * cw)
+        iy = int((by - ny0) / (ny1 - ny0) * ch)
+        iw = int(bw / (nx1 - nx0) * cw)
+        ih = int(bh / (ny1 - ny0) * ch)
+        if iw < 8 or ih < 8:
+            return False
+        inner = crop[max(0, iy):min(ch, iy + ih), max(0, ix):min(cw, ix + iw)]
+        if inner.size == 0:
+            return False
+        cv2.imwrite(str(out_path), inner, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        return True
+    except Exception:
+        return False
+
+
 def locate_player_in_box(
     frame_path: str | Path,
     box: dict,
@@ -701,7 +823,7 @@ def locate_player_in_box(
         if img is None:
             return None
         H, W = img.shape[:2]
-        mx, my = float(box["w"]) * 0.15, float(box["h"]) * 0.15
+        mx, my = float(box["w"]) * 0.30, float(box["h"]) * 0.30
         rx0 = max(0, int((float(box["x"]) - mx) * W))
         ry0 = max(0, int((float(box["y"]) - my) * H))
         rx1 = min(W, int((float(box["x"]) + float(box["w"]) + mx) * W))

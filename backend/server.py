@@ -66,6 +66,9 @@ from precision_engine import (
     save_context_crop,
     save_display_crop,
     locate_player_in_box,
+    locate_player_by_thumb,
+    estimate_time_offset,
+    synth_thumb_from_context_crop,
     build_preview_prompt as precision_build_preview_prompt,
     build_full_prompt as precision_build_full_prompt,
     scrub_hedging,
@@ -1821,6 +1824,24 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                 best = a
         return best
 
+    # Timestamp-drift calibration: match the user's pixel-true marker capture
+    # against the processed video to find the systematic VFR→CFR drift Δ.
+    t_off = 0.0
+    if anchors and have_video:
+        try:
+            mt = report_doc.get("marker_timestamp")
+            mf = report_doc.get("marker_filename")
+            mp = (UPLOAD_DIR / mf) if mf else None
+            if isinstance(mt, (int, float)) and mp is not None and mp.exists():
+                t_off, m_score = estimate_time_offset(video_path, str(mp), float(mt))
+                if abs(t_off) > 0.03:
+                    logging.info(
+                        f"[anchors] timestamp drift {t_off:+.2f}s (match {m_score:.2f}) — auto-corrected"
+                    )
+        except Exception as e:
+            logging.warning(f"time-offset calibration failed: {e}")
+            t_off = 0.0
+
     for idx, c in enumerate(comments):
         if not isinstance(c, dict):
             enriched.append(c)
@@ -1841,13 +1862,15 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                     # 1) Ground truth first: snap to the user's own tap moment.
                     anchor = _nearest_anchor(float(seconds))
                     if anchor is not None:
-                        ok = _extract_video_frame(video_path, float(anchor["t"]), out_path)
+                        t_use = max(0.0, float(anchor["t"]) + t_off)
+                        ok = _extract_video_frame(video_path, t_use, out_path)
                         if ok:
                             frame_meta = {
                                 "ok": True,
-                                "picked_ts": float(anchor["t"]),
+                                "picked_ts": t_use,
                                 "anchor_locked": True,
                                 "anchor_box": anchor["box"],
+                                "anchor_thumb_filename": anchor.get("thumb_filename"),
                             }
                     # 2) Otherwise the fingerprint-verified window pick
                     if not ok and fingerprint_obj is not None:
@@ -1874,6 +1897,8 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             if frame_meta.get("anchor_locked"):
                 out["anchor_locked"] = True
                 out["anchor_box"] = frame_meta.get("anchor_box")
+                out["anchor_thumb_filename"] = frame_meta.get("anchor_thumb_filename")
+                out["anchor_crop_filename"] = frame_meta.get("anchor_crop_filename")
                 out["identity_verified"] = True
         enriched.append(out)
     return enriched
@@ -4605,6 +4630,26 @@ async def upload_video_and_create_preview(
     # to PUT the raw bytes plus a single Mongo insert.
     raw_marker_box = marker_box  # JSON string or None
     raw_marker_anchors = marker_anchors  # JSON string or None
+    # Detach per-anchor thumbnails (pixel-true captures of what the user framed)
+    # into files — used later for template-based player re-location.
+    if raw_marker_anchors:
+        try:
+            _al = json.loads(raw_marker_anchors)
+            if isinstance(_al, list):
+                for _i, _a in enumerate(_al[:10]):
+                    if not isinstance(_a, dict):
+                        continue
+                    _td = _a.pop("thumb", None)
+                    if isinstance(_td, str) and _td.startswith("data:image"):
+                        try:
+                            _tf = f"{report_id}-anchor-{_i + 1}-thumb.jpg"
+                            (UPLOAD_DIR / _tf).write_bytes(base64.b64decode(_td.split(",", 1)[1]))
+                            _a["thumb_filename"] = _tf
+                        except Exception:
+                            pass
+                raw_marker_anchors = json.dumps(_al)
+        except Exception:
+            pass
 
     # Build player details summary
     details = {
@@ -5060,6 +5105,10 @@ async def analyze_preview_task(report_id: str):
                 "shorts_name": fp.shorts_name,
                 "body_ratio": fp.body_ratio,
                 "crop_filename": crop_filename,
+                "thumb_filename": (
+                    f"{report_id}-anchor-1-thumb.jpg"
+                    if (UPLOAD_DIR / f"{report_id}-anchor-1-thumb.jpg").exists() else None
+                ),
             })
         if raw_marker_anchors:
             try:
@@ -5110,6 +5159,7 @@ async def analyze_preview_task(report_id: str):
                             "body_ratio": fp_a.body_ratio,
                             "crop_filename": crop_filename_a,
                             "wide_filename": wide_filename_a if has_wide else None,
+                            "thumb_filename": a.get("thumb_filename"),
                         })
                 except Exception as e:
                     logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
@@ -5139,6 +5189,16 @@ async def analyze_preview_task(report_id: str):
                         )
                     except Exception as e:
                         logger.warning(f"R2 wide crop flush failed {report_id}/{wf}: {e}")
+                tf = a.get("thumb_filename")
+                tp = (UPLOAD_DIR / tf) if tf else None
+                if tp and tp.exists():
+                    try:
+                        a["thumb_r2_url"] = await asyncio.to_thread(
+                            r2_storage.upload_file,
+                            f"reports/{report_id}/anchors/{tf}", tp, "image/jpeg",
+                        )
+                    except Exception as e:
+                        logger.warning(f"R2 thumb flush failed {report_id}/{tf}: {e}")
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -5978,11 +6038,37 @@ async def _telestrate_verified_frames(
         if not frame_path.exists():
             continue
         b = c["anchor_box"]
-        # Refine the tap box to the player's kit-colour blob INSIDE the box.
-        refined = await asyncio.to_thread(
-            locate_player_in_box, str(frame_path), b,
-            fp.get("jersey_hex", "#888888"), fp.get("shorts_hex", "#888888"),
-        )
+        # 1) Pixel-true template of the user's exact tap-box content: uploaded
+        #    thumb (new reports) or synthesized from the padded anchor crop.
+        tpl_path = None
+        tf = c.get("anchor_thumb_filename")
+        if tf and (UPLOAD_DIR / tf).exists():
+            tpl_path = UPLOAD_DIR / tf
+        else:
+            cf = c.get("anchor_crop_filename")
+            if cf and (UPLOAD_DIR / cf).exists():
+                synth = frames_dir / f".synth_{Path(cf).stem}.jpg"
+                if await asyncio.to_thread(synth_thumb_from_context_crop, str(UPLOAD_DIR / cf), b, str(synth)):
+                    tpl_path = synth
+        refined = None
+        matched = None
+        if tpl_path is not None:
+            matched = await asyncio.to_thread(locate_player_by_thumb, str(frame_path), b, str(tpl_path))
+        if matched:
+            # Template relocated the exact framed region — blob-refine inside it
+            # for the feet; fall back to the matched rect itself.
+            mb = {"x": matched["x0"], "y": matched["y0"],
+                  "w": matched["x1"] - matched["x0"], "h": matched["y1"] - matched["y0"]}
+            refined = await asyncio.to_thread(
+                locate_player_in_box, str(frame_path), mb,
+                fp.get("jersey_hex", "#888888"), fp.get("shorts_hex", "#888888"),
+            ) or {k: matched[k] for k in ("x0", "y0", "x1", "y1")}
+        if refined is None:
+            # 2) Kit-colour blob search inside the tap box.
+            refined = await asyncio.to_thread(
+                locate_player_in_box, str(frame_path), b,
+                fp.get("jersey_hex", "#888888"), fp.get("shorts_hex", "#888888"),
+            )
         if refined:
             box, ring = refined, True
         else:
