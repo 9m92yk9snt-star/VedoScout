@@ -27,6 +27,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026 — evening) — PACKAGE D COMPLETE + TRACKING-VERIFIED BADGE ✅
+- **Package D verified end-to-end** (optical tracking + prompt ground truth + timeline cross-check). Handoff feared a broken `search_replace`, but code was complete: `player_tracking.py` (NCC template tracker, ±4s per tap, drift-guarded, fail-safe) runs in `generate_full_report_task` (~line 6315), stores `player_track` + `anchor_time_offset` on the report; `_ground_truth_positions_block` (line 6182) appends tap positions + tracking segments to the Gemini prompt; `_apply_tracking_verification` (line 6219) marks each `action_timeline` row `tracking_verified` (tap within ANCHOR_SNAP_WINDOW or track conf ≥0.55).
+- **Live functional test** (report 11533a13, 7 taps): Δt=−0.03s @1.00 score; 98 track points / 6 segments in 15.3s; all 7 taps recovered at conf 1.0; prompt block + cross-check correct (4/5 timeline rows verified, 00:02 correctly outside window — fail-safe honest).
+- **NEW: "✓ TRACKING-VERIFIED" badge** on Action Timeline rows (user-approved): web `sections.jsx` (`v2-action-tracked-{i}`, derive.js passes `tracked`), PDF `pdf_v2.py` (`✓ TRACKED` forest/lime chip). `PDF_RENDER_VERSION` bumped 15→16 to bust PDF cache. Visually verified on web + PDF page 3.
+- Report 11533a13 backfilled with `player_track` + `tracking_verified` flags for demo purposes.
+- ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 22, 2026 — late PM) — PIXEL-TRUE TEMPLATE RE-LOCATION (user 2nd bug report) DONE ✅
 - **User feedback**: ring still on wrong player at 00:04; user believed their own taps were imprecise ("the green box drifted from the player I tapped").
 - **DIAGNOSIS (verified with images)**: taps were actually PERFECT — the stored tap box drawn on the marker JPG sits exactly on the yellow-marked player. Time drift measured with new `estimate_time_offset` (marker canvas vs web.mp4 NCC scan): only −0.027 s @ 0.996 match → time is fine. The failure was the kit-colour blob step (white jersey vs white van/banners) placing the ring wrong INSIDE the box.

@@ -182,7 +182,14 @@ export function ActionTimelineCard({ actions, onPlayAt }) {
             />
             <span className="bg-[#12402A] text-[#CCFF00] font-barlow font-extrabold text-[12px] px-2 py-0.5 rounded-[6px] tabular-nums shrink-0">{a.timestamp}</span>
             <span className="flex-1 min-w-0">
-              <span className="block text-[12.5px] font-extrabold tracking-[0.04em] uppercase text-[#1C2B21] group-hover:text-[#12402A] transition-colors">{a.title}</span>
+              <span className="block text-[12.5px] font-extrabold tracking-[0.04em] uppercase text-[#1C2B21] group-hover:text-[#12402A] transition-colors">
+                {a.title}
+                {a.tracked && (
+                  <span data-testid={`v2-action-tracked-${i}`} className="inline-flex items-center gap-[3px] align-middle ml-2 bg-[#12402A] text-[#CCFF00] text-[8px] font-extrabold tracking-[0.08em] px-1.5 py-[2px] rounded-[4px] normal-case">
+                    <ShieldCheck className="w-2.5 h-2.5" /> TRACKING-VERIFIED
+                  </span>
+                )}
+              </span>
               {a.description && <span className="block text-[11.5px] text-[#68766B] leading-[1.45] line-clamp-1">{a.description}</span>}
             </span>
             {a.rating != null && (

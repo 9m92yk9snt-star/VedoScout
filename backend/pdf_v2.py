@@ -359,6 +359,7 @@ def _action_timeline(full):
             "description": first_sentences(a.get("description"), 110),
             "rating": a.get("rating") if isinstance(a.get("rating"), (int, float)) else None,
             "outcome": oc if oc in ("positive", "neutral", "negative") else "neutral",
+            "tracked": bool(a.get("tracking_verified")),
         })
     return out[:15]
 
@@ -885,7 +886,20 @@ def _action_timeline_card(c, actions, x, y, w, h):
         tx0 = lx + 16 + chip_w
         c.setFillColor(INK)
         c.setFont(F_BOLD, 7.6)
-        c.drawString(tx0, cy + 1.5, str(a.get("title") or "").upper())
+        title_txt = str(a.get("title") or "").upper()
+        c.drawString(tx0, cy + 1.5, title_txt)
+        if a.get("tracked"):
+            bx = tx0 + c.stringWidth(title_txt, F_BOLD, 7.6) + 5
+            lbl = "TRACKED"
+            bw2 = c.stringWidth(lbl, F_BLACK, 5.2) + 15
+            c.setFillColor(FOREST)
+            c.roundRect(bx, cy + 0.2, bw2, 8.5, 3, stroke=0, fill=1)
+            c.setStrokeColor(LIME)
+            c.setLineWidth(0.9)
+            c.lines([(bx + 4, cy + 4.2, bx + 5.4, cy + 2.8), (bx + 5.4, cy + 2.8, bx + 8, cy + 6.2)])
+            c.setFillColor(LIME)
+            c.setFont(F_BLACK, 5.2)
+            c.drawString(bx + 10.5, cy + 3, lbl)
         desc = str(a.get("description") or "")
         max_w = w - PAD - tx0 - 40
         c.setFont(F_BODY, 6.6)

@@ -99,7 +99,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 15  # v15 = strict evidence policy (no placeholder boxes, integrity note)
+PDF_RENDER_VERSION = 16  # v16 = tracking-verified badge on Action Timeline
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:

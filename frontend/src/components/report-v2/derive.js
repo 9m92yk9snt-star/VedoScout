@@ -246,6 +246,7 @@ export function deriveV2(report) {
         description: firstSentences(a.description, 110),
         rating: typeof a.rating === "number" ? a.rating : null,
         outcome: ["positive", "neutral", "negative"].includes(oc) ? oc : "neutral",
+        tracked: !!a.tracking_verified,
       };
     });
 
