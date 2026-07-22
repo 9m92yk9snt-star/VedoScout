@@ -137,6 +137,59 @@ def render_welcome_email(user_name: Optional[str] = None) -> tuple[str, str, str
     return _wrap_html(inner, preheader), plaintext, subject
 
 
+# ── CURVE REMINDER ─────────────────────────────────────────────────────────
+def render_curve_reminder_email(
+    parent_name: Optional[str],
+    player_name: Optional[str],
+    weeks_since: int,
+) -> tuple[str, str, str]:
+    site = _site_url()
+    player = (player_name or "your player").strip() or "your player"
+    first = player.split(" ")[0]
+    greet = (parent_name or "").strip()
+    greet_line = f"Hi {greet}," if greet else "Hi,"
+    subject = f"{first}'s development curve is waiting for its next point"
+    preheader = f"It's been {weeks_since} weeks — upload a new video and see exactly how much {first} has grown."
+    inner = f"""
+    <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      {first}&apos;s next chapter is ready to be measured.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      {greet_line}
+    </p>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      It&apos;s been <strong>{weeks_since} weeks</strong> since {first}&apos;s last analysis &mdash; the perfect window for real, visible development.
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      Upload a new video and your next report will <strong>automatically compare every skill</strong> against last time:
+    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" width="100%" style="margin:0 0 24px 0; background:#F5F1E8; border-left:3px solid #CCFF00;">
+      <tr><td style="padding:16px 18px;">
+        <p style="margin:0 0 8px 0; font-size:14px; color:#1F4F2F; font-weight:800; letter-spacing:1px; text-transform:uppercase;">The Development Curve shows you</p>
+        <p style="margin:0 0 6px 0; font-size:14px; color:#1F2724;">&#9650;&nbsp; Category deltas &mdash; e.g. <strong>Technical 6.2 &rarr; 7.0</strong></p>
+        <p style="margin:0 0 6px 0; font-size:14px; color:#1F2724;">&#127942;&nbsp; Biggest improvements &mdash; did the home drills pay off?</p>
+        <p style="margin:0; font-size:14px; color:#1F2724;">&#128200;&nbsp; From the 3rd analysis: {first}&apos;s full progress chart over time</p>
+      </td></tr>
+    </table>
+    {_btn("Upload a new video", f"{site}/upload")}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      Tip: film the same type of footage as last time (match or training) &mdash; it makes the comparison strongest.
+      You receive this because {first} has a ScoutMePlay analysis. Reply to this email to opt out of reminders.
+    </p>
+    """
+    plaintext = (
+        f"{greet_line}\n\n"
+        f"It's been {weeks_since} weeks since {player}'s last ScoutMePlay analysis — the perfect window for visible development.\n\n"
+        f"Upload a new video and the next report automatically compares every skill against last time: "
+        f"category deltas (e.g. Technical 6.2 -> 7.0), biggest improvements, and from the 3rd analysis a full progress chart.\n\n"
+        f"Upload here: {site}/upload\n\n"
+        f"Tip: film the same type of footage as last time — it makes the comparison strongest.\n"
+        f"Reply to this email to opt out of reminders."
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
 # ── PURCHASE CONFIRMATION ─────────────────────────────────────────────────
 def render_purchase_confirmation(
     user_name: Optional[str],

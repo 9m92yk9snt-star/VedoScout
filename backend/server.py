@@ -39,6 +39,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, UploadFile, File
 from email_service import send_email, send_email_async, send_bulk_email, email_enabled
 from email_templates import (
     render_welcome_email,
+    render_curve_reminder_email,
     render_purchase_confirmation,
     render_bulk_email,
     render_admin_sale_notification,
@@ -4274,6 +4275,23 @@ async def admin_list_demo_videos(_=Depends(get_current_admin)):
     return {"items": items}
 
 
+@api_router.post("/admin/curve-reminders/run")
+async def admin_run_curve_reminders(
+    dry_run: bool = True,
+    test_to: Optional[str] = None,
+    admin=Depends(get_current_admin),
+):
+    """Admin: preview (dry_run) or trigger the curve-reminder sweep now.
+    `test_to` sends ONE sample reminder email to that address instead."""
+    if test_to:
+        html, text, subject = render_curve_reminder_email(admin.get("name"), "Alex Demo", 5)
+        ok = await send_email_async(test_to, subject, html, text)
+        return {"test_sent": ok, "to": test_to, "smtp_configured": email_enabled()}
+    results = await _curve_reminder_sweep(dry_run=dry_run)
+    return {"dry_run": dry_run, "count": len(results), "candidates": results,
+            "smtp_configured": email_enabled()}
+
+
 @api_router.post("/admin/demo-videos")
 async def admin_create_demo_video(payload: DemoVideoCreate, _=Depends(get_current_admin)):
     doc = {
@@ -5798,6 +5816,79 @@ async def compute_progression_for_report(doc: dict):
     except Exception:
         logger.exception("progression computation failed")
         return None
+
+
+# ── Curve reminder — nudge parents to upload again after 4-6 weeks ─────────
+CURVE_REMINDER_MIN_DAYS = 28
+CURVE_REMINDER_MAX_DAYS = 56
+CURVE_REMINDER_SWEEP_INTERVAL_SEC = 6 * 3600
+
+
+async def _curve_reminder_sweep(dry_run: bool = False) -> list:
+    """Find unlocked reports 4-8 weeks old with NO newer report for the same
+    player and email the parent a development-curve reminder (once, ever)."""
+    now = datetime.now(timezone.utc)
+    lo = (now - timedelta(days=CURVE_REMINDER_MAX_DAYS)).isoformat()
+    hi = (now - timedelta(days=CURVE_REMINDER_MIN_DAYS)).isoformat()
+    results = []
+    cursor = db.reports.find(
+        {
+            "full_report": {"$ne": None},
+            "$or": [{"is_paid": True}, {"manually_unlocked": True}],
+            "created_at": {"$gte": lo, "$lte": hi},
+            "curve_reminder_sent_at": {"$exists": False},
+        },
+        {"id": 1, "user_id": 1, "player_details.player_name": 1, "created_at": 1, "demo": 1},
+    ).sort("created_at", 1).limit(200)
+    async for doc in cursor:
+        if doc.get("demo") or str(doc.get("id", "")).startswith("kurvedemo"):
+            continue
+        pd = doc.get("player_details") or {}
+        name = _norm_player_name(pd.get("player_name"))
+        if not name:
+            continue
+        newer = await db.reports.find(
+            {"user_id": doc["user_id"], "created_at": {"$gt": doc["created_at"]}},
+            {"player_details.player_name": 1},
+        ).to_list(100)
+        if any(_norm_player_name((n.get("player_details") or {}).get("player_name")) == name for n in newer):
+            continue
+        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1, "name": 1})
+        email = (u or {}).get("email")
+        if not email:
+            continue
+        created_dt = None
+        try:
+            created_dt = datetime.fromisoformat(str(doc["created_at"]).replace("Z", "+00:00"))
+        except Exception:
+            pass
+        weeks = max(4, (now - created_dt).days // 7) if created_dt else 4
+        results.append({"report_id": doc["id"], "player": pd.get("player_name"), "email": email, "weeks": weeks})
+        if dry_run:
+            continue
+        html, text, subject = render_curve_reminder_email(u.get("name"), pd.get("player_name"), weeks)
+        ok = await send_email_async(email, subject, html, text)
+        if ok:
+            await db.reports.update_one(
+                {"id": doc["id"]},
+                {"$set": {"curve_reminder_sent_at": now.isoformat()}},
+            )
+    return results
+
+
+async def _curve_reminder_loop():
+    await asyncio.sleep(120)
+    while True:
+        try:
+            if email_enabled():
+                sent = await _curve_reminder_sweep()
+                if sent:
+                    logger.info("[curve-reminder] sent %d reminder(s)", len(sent))
+            else:
+                logger.info("[curve-reminder] SMTP not configured — skipping sweep")
+        except Exception:
+            logger.exception("[curve-reminder] sweep failed")
+        await asyncio.sleep(CURVE_REMINDER_SWEEP_INTERVAL_SEC)
 
 
 async def _serialize_report(doc: dict, include_full: bool) -> dict:
@@ -11872,6 +11963,13 @@ async def on_startup():
         logger.info("[watchdog] periodic sweep loop started")
     except Exception:
         logger.exception("Analysis watchdog failed to start (non-fatal)")
+
+    # ── Curve reminder loop — emails parents 4-6 weeks after their last report ──
+    try:
+        asyncio.create_task(_curve_reminder_loop())
+        logger.info("[curve-reminder] loop started")
+    except Exception:
+        logger.exception("Curve reminder loop failed to start (non-fatal)")
 
 
 # ============== ROUTES: SCOUT ACCESS SUBSCRIPTION (Fase 2) ==============

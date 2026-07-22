@@ -27,6 +27,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 23, 2026 — b) — KURVE-EMAIL (Curve Reminder) ✅
+- **Template**: `render_curve_reminder_email` in email_templates.py (English, branded, "development curve is waiting for its next point", CTA → /upload, opt-out line).
+- **Sweep**: `_curve_reminder_sweep` in server.py — finds unlocked reports 28-56 days old with NO newer report for same player (same user + norm name), skips demo/kurvedemo + missing emails, sends ONCE (marks `curve_reminder_sent_at` on success). `_curve_reminder_loop` runs every 6h, started at startup (skips when SMTP unconfigured). Uses existing Gmail SMTP (`email_service.py`).
+- **Admin endpoint**: `POST /api/admin/curve-reminders/run?dry_run=true|false&test_to=<email>` (get_current_admin) — preview candidates, trigger now, or send a sample.
+- **E2E tested live**: dry-run listed 2 candidates; real sweep sent 1 REAL email to scoutmeplay@gmail.com (check inbox!); report marked; 2nd dry-run = 0 (once-only). Old test-account report `23f625b8` pre-marked `skipped-test-account` to avoid a bounce. Test artifacts kept: user `curve-test-user` + report `kurve-solo-0001` (marked sent).
+- ⚠️ REQUIRES REDEPLOY (loop + endpoint). SMTP env vars must be present in prod deploy.
+
 ### Session (Jul 23, 2026) — UDVIKLINGSKURVE (Development Curve) ✅
 - **Backend**: new `progression.py` (`build_progression`) — pure math, no AI. `compute_progression_for_report` in server.py matches earlier reports (same user_id + normalized player_name + age ±1, full_report present, created before), diffs 4 categories + overall (flat band ±0.3), sub-skills (observed in both, med/high conf; improvements ≥ +0.5 top-3 with `trained` flag from prev dev-priorities; watch ≤ −0.5 top-2), builds `series` for the curve. Exposed as `out["progression"]` in `_serialize_report` and injected as `doc["progression"]` before all 3 `_ensure_report_pdf` call sites.
 - **Web**: new `report-v2/progress.jsx` — `ProgressCard` (5 delta chips w/ overall highlighted, Biggest Improvements w/ pills + one-time trained note, Keep An Eye On box w/ reassuring text, dynamic-axis SVG curve from 3+ reports, honesty footnote) + `ProgressTeaser` on reports without history ("upload in 4-6 weeks"). Rendered right under Row 1 in PremiumReportV2. Testids: `v2-progress-card`, `v2-prog-cat-*`, `v2-prog-improve-*`, `v2-prog-watch-*`, `v2-prog-curve`, `v2-progress-teaser`.
