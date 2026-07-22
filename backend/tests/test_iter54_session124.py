@@ -65,7 +65,7 @@ class TestJ1_TightenedTimeouts:
 
     def test_primary_extra_params_timeout_150(self, server_src):
         # primary call: chat.extra_params timeout set to 150.0
-        assert 'chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0}' in server_src, \
+        assert 'chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0, "temperature": 0.2}' in server_src, \
             "primary chat.extra_params timeout should be 150.0"
 
     def test_primary_wait_for_180(self, server_src):
@@ -74,7 +74,7 @@ class TestJ1_TightenedTimeouts:
         assert re.search(pattern, server_src), "primary wait_for should be timeout=180"
 
     def test_retry_extra_params_timeout_150(self, server_src):
-        assert 'retry_chat.extra_params = {"timeout": 150.0}' in server_src, \
+        assert 'retry_chat.extra_params = {"timeout": 150.0, "temperature": 0.2}' in server_src, \
             "retry chat.extra_params timeout should be 150.0"
 
     def test_retry_wait_for_180(self, server_src):

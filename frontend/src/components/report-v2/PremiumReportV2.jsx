@@ -3,7 +3,7 @@
 // all values come from the existing full_report analysis via derive.js.
 
 import React, { useRef, useState, useCallback } from "react";
-import { Star, Users } from "lucide-react";
+import { Star, Users, ShieldCheck } from "lucide-react";
 import { deriveV2, tsToSeconds } from "./derive";
 import {
   V2Card, V2Title, SnapshotCard, MatchStatsCard, AgeComparisonCard,
@@ -235,6 +235,13 @@ export default function PremiumReportV2({ report, assetBase }) {
         <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl} />
         <DevPrioritiesCard devPriorities={d.devPriorities} />
       </div>
+
+      {d.identityNote && (
+        <div data-testid="v2-identity-note" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#8A6D3B] bg-[#FFF8E9] border border-[#F0E3C4] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
+          <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>{d.identityNote}</span>
+        </div>
+      )}
 
       {/* Row 4 — roadmap / training plan / parent tips */}
       <div className="grid lg:grid-cols-3 gap-4 mb-4">

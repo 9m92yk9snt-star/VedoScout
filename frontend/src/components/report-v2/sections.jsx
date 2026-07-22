@@ -140,6 +140,11 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
                     <Play className="w-3 h-3 text-white fill-white ml-0.5" />
                   </span>
                 </span>
+                {s.thumb && s.thumbVerified && (
+                  <span data-testid={`v2-strength-verified-${i}`} className="absolute left-1.5 top-1.5 flex items-center gap-1 bg-[#0A190F]/80 text-[#CCFF00] text-[8.5px] font-extrabold tracking-[0.08em] px-1.5 py-0.5 rounded-[4px] pointer-events-none">
+                    <ShieldCheck className="w-2.5 h-2.5" /> AI-VERIFIED
+                  </span>
+                )}
               </button>
             ) : <div className="w-[140px] shrink-0 hidden md:block" />}
           </div>
@@ -303,6 +308,11 @@ export function VideoHighlightCard({ videoHighlight, videoUrl, posterUrl, videoR
         {videoHighlight?.timestamp && (
           <span className="absolute left-3 bottom-12 bg-[#0A190F]/85 text-white font-barlow font-extrabold text-[13px] px-2.5 py-0.5 rounded-[5px] pointer-events-none">
             {videoHighlight.timestamp}
+          </span>
+        )}
+        {videoHighlight?.thumbVerified && (
+          <span data-testid="v2-highlight-verified" className="absolute right-3 bottom-12 flex items-center gap-1 bg-[#0A190F]/85 text-[#CCFF00] font-extrabold text-[9px] tracking-[0.08em] px-2 py-0.5 rounded-[5px] pointer-events-none">
+            <ShieldCheck className="w-3 h-3" /> AI-VERIFIED FRAME
           </span>
         )}
       </div>

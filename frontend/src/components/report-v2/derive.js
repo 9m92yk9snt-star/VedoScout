@@ -73,7 +73,7 @@ function buildFrameLookup(full) {
   const comments = Array.isArray(full?.video_comments) ? full.video_comments : [];
   const entries = comments
     .filter((c) => c && c.frame_url && c.identity_verified !== false)
-    .map((c) => ({ ts: c.timestamp, sec: tsToSeconds(c.timestamp), url: c.frame_url }));
+    .map((c) => ({ ts: c.timestamp, sec: tsToSeconds(c.timestamp), url: c.frame_url, verified: c.identity_verified === true }));
   const used = new Set();
   const find = (ts) => {
     const sec = tsToSeconds(ts);
@@ -88,7 +88,7 @@ function buildFrameLookup(full) {
     }
     if (!best) best = entries.find((e) => !used.has(e.url)) || null;
     if (best) used.add(best.url);
-    return best ? best.url : null;
+    return best ? { url: best.url, verified: !!best.verified } : null;
   };
   return { entries, find };
 }
@@ -110,11 +110,13 @@ export function deriveV2(report) {
     .slice(0, 4)
     .map((s) => {
       const ev = s.evidence.find((e) => e && e.timestamp && e.timestamp !== "General");
+      const fr = frames.find(ev?.timestamp);
       return {
         name: s.label, score: s.score, category: s.category,
         note: firstSentences(s.notes, 130),
         timestamp: ev?.timestamp || null,
-        thumb: frames.find(ev?.timestamp),
+        thumb: fr?.url || null,
+        thumbVerified: !!fr?.verified,
       };
     });
 
@@ -216,14 +218,26 @@ export function deriveV2(report) {
 
   // ---- Video highlight (prefer an identity-verified frame) ----
   const vc = (full.video_comments || []).filter((c) => c && c.timestamp);
-  const vcBest = vc.find((c) => c.frame_url && c.identity_verified !== false) || vc[0];
+  const vcBest = vc.find((c) => c.frame_url && c.identity_verified === true)
+    || vc.find((c) => c.frame_url && c.identity_verified !== false)
+    || vc[0];
   const videoHighlight = vcBest
-    ? { timestamp: vcBest.timestamp, caption: vcBest.comment, thumb: vcBest.identity_verified === false ? null : vcBest.frame_url || null }
+    ? {
+        timestamp: vcBest.timestamp, caption: vcBest.comment,
+        thumb: vcBest.identity_verified === false ? null : vcBest.frame_url || null,
+        thumbVerified: vcBest.identity_verified === true,
+      }
     : null;
 
   // ---- Overall gauge ----
   const overall = typeof full.scores?.overall_development === "number" ? full.scores.overall_development : null;
   const ageBracket = ob.age_bracket_used || null;
+
+  // ---- Evidence-integrity note (strict image policy) ----
+  const ist = report?.identity_stats;
+  const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
+    ? "Some moments are shown as text only — an image is displayed only when an independent AI identity check confirms your player with certainty."
+    : null;
 
   return {
     playerType: full.player_type || "",
@@ -232,6 +246,6 @@ export function deriveV2(report) {
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
-    matchStats, videoHighlight,
+    matchStats, videoHighlight, identityNote,
   };
 }

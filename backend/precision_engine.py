@@ -844,12 +844,12 @@ def verify_and_pick_thumbnail(
             cv2.line(out_img, (x0, y0), (x0 + dx * c, y0), white, max(2, thickness - 1))
             cv2.line(out_img, (x0, y0), (x0, y0 + dy * c), white, max(2, thickness - 1))
 
-    # Downscale to keep file size reasonable (max 720 wide)
+    # Downscale to keep file size reasonable (max 1280 wide — sharp evidence)
     h, w = out_img.shape[:2]
-    if w > 720:
-        scale = 720 / w
-        out_img = cv2.resize(out_img, (720, int(h * scale)), interpolation=cv2.INTER_AREA)
-    cv2.imwrite(str(out_path), out_img, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+    if w > 1280:
+        scale = 1280 / w
+        out_img = cv2.resize(out_img, (1280, int(h * scale)), interpolation=cv2.INTER_AREA)
+    cv2.imwrite(str(out_path), out_img, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
 
     meta.update({
         "picked_ts": float(best_ts),

@@ -313,7 +313,10 @@ def derive_v2(report):
         match_stats = [r for r in rows if r["value"] is not None] or None
 
     vc = [c for c in (full.get("video_comments") or []) if isinstance(c, dict) and c.get("timestamp")]
-    vc_best = next((c for c in vc if c.get("frame_url") and c.get("identity_verified") is not False), vc[0] if vc else None)
+    vc_best = next(
+        (c for c in vc if c.get("frame_url") and c.get("identity_verified") is True),
+        next((c for c in vc if c.get("frame_url") and c.get("identity_verified") is not False), vc[0] if vc else None),
+    )
     video_highlight = None
     if vc_best:
         video_highlight = {
@@ -335,7 +338,18 @@ def derive_v2(report):
         "trainingWeek": training_week, "parentSummary": parent_summary,
         "parentTips": parent_tips, "coachNotes": coach_notes, "scoutOutlook": scout_outlook,
         "matchStats": match_stats, "videoHighlight": video_highlight,
+        "identityNote": _identity_note(report),
     }
+
+
+def _identity_note(report):
+    st = report.get("identity_stats") or {}
+    checked = st.get("checked") or 0
+    verified = st.get("verified") or 0
+    if checked > 0 and verified / checked < 0.5:
+        return ("Some moments are shown as text only — an image appears only when an "
+                "independent AI identity check confirms the player with certainty.")
+    return None
 
 
 # ═══════════════════════ low-level drawing helpers ═══════════════════════
@@ -697,16 +711,9 @@ def _top_strengths_card(c, strengths, x, y, w, h, resolve):
         iy_top = ty
         th_w, th_h = 56, min(40, item_h - 12)
         thumb = resolve(s.get("thumb")) if s.get("thumb") else None
-        if not (thumb and draw_cover_image(c, thumb, x + PAD, iy_top - 6 - th_h, th_w, th_h, radius=5)):
-            c.saveState()
-            c.setFillColor(SOFT)
-            c.setStrokeColor(SOFT_BORDER)
-            c.roundRect(x + PAD, iy_top - 6 - th_h, th_w, th_h, 5, stroke=1, fill=1)
-            c.setFillColor(GREEN)
-            c.setFont(F_BLACK, 13)
-            c.drawCentredString(x + PAD + th_w / 2, iy_top - 6 - th_h / 2 - 4.5, str(s["name"])[:1])
-            c.restoreState()
-        tx = x + PAD + th_w + 9
+        has_thumb = bool(thumb and draw_cover_image(c, thumb, x + PAD, iy_top - 6 - th_h, th_w, th_h, radius=5))
+        # No placeholder: unverified moments render as text-only, full width.
+        tx = x + PAD + (th_w + 9 if has_thumb else 0)
         tw = w - PAD - tx
         c.setFillColor(INK)
         c.setFont(F_BOLD, 8.4)
@@ -838,14 +845,9 @@ def _video_highlight_card(c, vh, x, y, w, h, resolve):
     tw = w - 2 * PAD
     th = tw * 9 / 16
     thumb = resolve(vh.get("thumb")) if vh.get("thumb") else None
-    if not (thumb and draw_cover_image(c, thumb, x + PAD, ty - th, tw, th, radius=7)):
-        c.saveState()
-        c.setFillColor(HexColor("#0F2A1A"))
-        c.roundRect(x + PAD, ty - th, tw, th, 7, stroke=0, fill=1)
-        c.setFillColor(LIME)
-        c.setFont(F_BLACK, 11)
-        c.drawCentredString(x + PAD + tw / 2, ty - th / 2 - 4, "VIDEO MOMENT")
-        c.restoreState()
+    drew = bool(thumb and draw_cover_image(c, thumb, x + PAD, ty - th, tw, th, radius=7))
+    if not drew:
+        th = 22  # no verified image — timestamp chip renders alone in a slim band
     if vh.get("timestamp"):
         chip = f"AT {vh['timestamp']}"
         cw2 = c.stringWidth(chip, F_BOLD, 7) + 12
@@ -1162,6 +1164,9 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         dy = fy - GAP - 66 - 14
     c.setFillColor(MUTED)
     c.setFont(F_BODY, 6.2)
+    if d.get("identityNote"):
+        c.drawCentredString(W / 2, dy, d["identityNote"])
+        dy -= 9
     c.drawCentredString(W / 2, dy,
                         "Independent player development analysis based on submitted video. Not a recruitment guarantee.")
     _page_footer(c, 3)

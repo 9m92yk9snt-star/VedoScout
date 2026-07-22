@@ -41,9 +41,13 @@ async def verify_frame_identity(
     frame_path: str,
     jersey_name: str = "unclear",
     shorts_name: str = "unclear",
-) -> bool | None:
-    """Return True (tapped player visible), False (not visible / another
-    same-kit player), or None (inconclusive / any error — do not overrule)."""
+) -> str:
+    """STRICT evidence verdict:
+    "confirmed" — tapped player IS visible (high/medium-confidence match)
+    "uncertain" — model answered but without enough certainty either way
+    "rejected"  — high-confidence: the tapped player is NOT in the frame
+    "error"     — verifier unavailable (API/parse failure) — no verdict given
+    """
     try:
         refs = [
             ImageContent(image_base64=_b64(p))
@@ -51,7 +55,7 @@ async def verify_frame_identity(
             if p and Path(p).exists()
         ]
         if not refs or not Path(frame_path).exists():
-            return None
+            return "error"
         chat = LlmChat(
             api_key=api_key,
             session_id=session_id,
@@ -80,19 +84,18 @@ async def verify_frame_identity(
         text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
         start, end = text.find("{"), text.rfind("}")
         if start < 0 or end <= start:
-            return None
+            return "error"
         data = json.loads(text[start:end + 1])
         match = bool(data.get("match"))
         conf = str(data.get("confidence", "")).lower()
         logger.info(f"[identity] {session_id}: match={match} conf={conf} why={str(data.get('why'))[:120]}")
-        # Conservative policy: only a HIGH-confidence rejection drops a frame;
-        # a LOW-confidence approval never counts as verified.
+        # STRICT policy: only a confident positive match may keep an image.
         if match:
-            return True if conf in ("high", "medium") else None
-        return False if conf == "high" else None
+            return "confirmed" if conf in ("high", "medium") else "uncertain"
+        return "rejected" if conf == "high" else "uncertain"
     except Exception as e:
         logger.warning(f"identity verify inconclusive ({session_id}): {e}")
-        return None
+        return "error"
 
 
 def _extract_json(text: str) -> dict | None:

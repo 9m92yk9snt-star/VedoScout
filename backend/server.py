@@ -95,7 +95,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 14  # v14 = Premium Report V2 card layout (mirrors web report)
+PDF_RENDER_VERSION = 15  # v15 = strict evidence policy (no placeholder boxes, integrity note)
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -1741,8 +1741,8 @@ def _extract_video_frame(video_path: Path, seconds: int, out_path: Path) -> bool
             [
                 FFMPEG_BIN, "-y", "-ss", str(max(0, int(seconds))),
                 "-i", str(video_path),
-                "-frames:v", "1", "-q:v", "3",
-                "-vf", "scale=640:-1",
+                "-frames:v", "1", "-q:v", "2",
+                "-vf", "scale='min(1280,iw)':-2",
                 str(out_path),
             ],
             capture_output=True, timeout=15,
@@ -2839,7 +2839,9 @@ async def call_gemini_with_video(
         # extra_params which _build_completion_params merges into the final call.
         # Session 124: tightened from 240 → 150 s (httpx socket timeout) and
         # 300 → 180 s (asyncio outer cancel) so worst-case retry is 6 min not 10.
-        chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0}
+        # temperature 0.2 → deterministic scoring: the same video should
+        # produce the same scores run-to-run (score-stability requirement).
+        chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0, "temperature": 0.2}
         response = await asyncio.wait_for(chat.send_message(user_message), timeout=180)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
@@ -2909,7 +2911,7 @@ async def call_gemini_with_video(
             "commentary."
         ),
     ).with_model("gemini", "gemini-2.5-pro")
-    retry_chat.extra_params = {"timeout": 150.0}
+    retry_chat.extra_params = {"timeout": 150.0, "temperature": 0.2}
     retry_message = UserMessage(text=strict_prompt, file_contents=file_contents)
 
     # Session 124: retry-transparency — surface to the frontend that we are
@@ -5654,6 +5656,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
     if include_full:
         out["full_report"] = doc.get("full_report")
         out["agent_review"] = doc.get("agent_review")
+        out["identity_stats"] = doc.get("identity_stats")
         out["trial_readiness"] = compute_trial_readiness(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
@@ -5837,61 +5840,76 @@ async def _verify_enriched_frames(
     report_id: str, doc: dict, video_path: Path, frames_dir: Path,
     enriched: list, ref_crops: list[str],
 ) -> dict:
-    """Layer A — cross-model (GPT vision) identity check of every evidence frame.
-    Failing frames are re-windowed (±3/±6 s); still-unverified frames are dropped."""
+    """Layer A — STRICT evidence policy. EVERY evidence frame is cross-checked
+    by GPT vision; only a CONFIRMED identity match keeps its image. Uncertain
+    or rejected frames get a nearby-seconds re-window search for a confirmed
+    frame — otherwise the image is dropped entirely (text-only evidence).
+    Verifier outages (API errors) keep the image but leave it unverified."""
     fp = doc.get("fingerprint") or {}
     jersey = fp.get("jersey_name", "unclear")
     shorts = fp.get("shorts_name", "unclear")
-    checked = 0
-    for i, c in enumerate(enriched):
-        if not isinstance(c, dict):
-            continue
-        fu = c.get("frame_url") or ""
-        if not fu.startswith("/api/uploads/frames/") or checked >= 8:
-            continue
-        checked += 1
-        frame_path = frames_dir / Path(fu).name
+    sem = asyncio.Semaphore(3)
+
+    async def _check_one(i: int, c: dict) -> None:
+        frame_path = frames_dir / Path(str(c.get("frame_url"))).name
         if not frame_path.exists():
-            continue
-        verdict = await verify_frame_identity(
-            EMERGENT_LLM_KEY, f"idv-{report_id}-{i}", ref_crops, str(frame_path), jersey, shorts,
-        )
-        if verdict is None:
             c["identity_verified"] = None
-            continue
-        if verdict:
-            c["identity_verified"] = True
-            continue
-        # Wrong player at the claimed second — try nearby frames for the same moment.
-        sec = _mmss_to_secs(c.get("timestamp"))
-        fixed = False
-        if sec is not None and video_path.exists():
-            for off in (3.0, -3.0, 6.0):
-                ts2 = max(0.0, sec + off)
-                cand = frames_dir / f".idv_{i}_{ts2:.1f}.jpg"
-                if not await asyncio.to_thread(extract_frame_at, video_path, ts2, cand):
-                    continue
-                v2 = await verify_frame_identity(
-                    EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-{off:+.0f}", ref_crops, str(cand), jersey, shorts,
+            return
+        async with sem:
+            verdict = await verify_frame_identity(
+                EMERGENT_LLM_KEY, f"idv-{report_id}-{i}", ref_crops, str(frame_path), jersey, shorts,
+            )
+            if verdict == "error":
+                await asyncio.sleep(2)
+                verdict = await verify_frame_identity(
+                    EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-r", ref_crops, str(frame_path), jersey, shorts,
                 )
-                if v2:
-                    shutil.move(str(cand), str(frame_path))
-                    c["identity_verified"] = True
-                    c["frame_ts_adjusted"] = off
-                    fixed = True
-                    break
-                cand.unlink(missing_ok=True)
-        if not fixed:
-            # Honest fallback: no thumbnail is better than the wrong player.
+            if verdict == "confirmed":
+                c["identity_verified"] = True
+                return
+            if verdict == "error":
+                # Verifier down — an infra failure is not evidence of a wrong player.
+                c["identity_verified"] = None
+                return
+            # Uncertain OR rejected — search nearby seconds for a CONFIRMED frame.
+            sec = _mmss_to_secs(c.get("timestamp"))
+            if sec is not None and video_path.exists():
+                for off in (2.0, -2.0, 4.0, -4.0, 6.0):
+                    ts2 = max(0.0, sec + off)
+                    cand = frames_dir / f".idv_{i}_{ts2:.1f}.jpg"
+                    if not await asyncio.to_thread(extract_frame_at, video_path, ts2, cand):
+                        continue
+                    v2 = await verify_frame_identity(
+                        EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-{off:+.0f}", ref_crops, str(cand), jersey, shorts,
+                    )
+                    if v2 == "confirmed":
+                        shutil.move(str(cand), str(frame_path))
+                        c["identity_verified"] = True
+                        c["frame_ts_adjusted"] = off
+                        return
+                    cand.unlink(missing_ok=True)
+            # STRICT POLICY: no confirmed match anywhere near — drop the image.
             c["identity_verified"] = False
+            c["identity_hard_reject"] = verdict == "rejected"
             c["frame_url"] = None
             frame_path.unlink(missing_ok=True)
-    verified = dropped = 0
+
+    tasks = [
+        _check_one(i, c) for i, c in enumerate(enriched)
+        if isinstance(c, dict) and str(c.get("frame_url") or "").startswith("/api/uploads/frames/")
+    ]
+    checked = len(tasks)
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    verified = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is True)
+    dropped = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is False)
+    hard_rejected = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_hard_reject"))
     if checked:
-        verified = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is True)
-        dropped = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is False)
-        logger.info(f"[identity] {report_id}: {checked} frames checked · {verified} verified · {dropped} dropped")
-    return {"checked": checked, "verified": verified, "dropped": dropped}
+        logger.info(
+            f"[identity] {report_id}: {checked} frames checked · {verified} verified · "
+            f"{dropped} dropped ({hard_rejected} hard-rejected)"
+        )
+    return {"checked": checked, "verified": verified, "dropped": dropped, "hard_rejected": hard_rejected}
 
 
 async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
@@ -6115,7 +6133,7 @@ async def generate_full_report_task(report_id: str) -> None:
         # most evidence frames (Gemini most likely switched player mid-video).
         try:
             checked = (identity_stats or {}).get("checked", 0)
-            dropped = (identity_stats or {}).get("dropped", 0)
+            dropped = (identity_stats or {}).get("hard_rejected", 0)
             if checked >= 2 and dropped / checked >= 0.5:
                 fresh = await db.reports.find_one({"id": report_id})
                 if fresh and not fresh.get("identity_retry_done"):
@@ -6123,7 +6141,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     bad_ts = [
                         str(c.get("timestamp"))
                         for c in (fresh.get("full_report") or {}).get("video_comments", [])
-                        if isinstance(c, dict) and c.get("identity_verified") is False and c.get("timestamp")
+                        if isinstance(c, dict) and c.get("identity_hard_reject") and c.get("timestamp")
                     ]
                     correction = (
                         "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact video FAILED an "
@@ -6151,7 +6169,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     )
                     stats2 = await _persist_video_frames(report_id, file_path)
                     checked2 = (stats2 or {}).get("checked", 0)
-                    dropped2 = (stats2 or {}).get("dropped", 0)
+                    dropped2 = (stats2 or {}).get("hard_rejected", 0)
                     if checked2 >= 2 and dropped2 / checked2 >= 0.5:
                         await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
                         logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
