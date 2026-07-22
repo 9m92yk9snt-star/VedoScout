@@ -1,5 +1,12 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jul 22, 2026 — nav fix) — TOP MENU OVERLAP BUG (user-reported) ✅
+- **User bug**: desktop top menu — "How it works"/"Home" links rendered ON TOP of the SCOUTMEPLAY logo (screenshot from user, confirmed at 1024/1280/1440px).
+- **Root cause**: 8 inline nav links + logo + CTAs exceed available width; logo Link had `min-w-0 shrink` while its wordmark is `whitespace-nowrap` → flex item shrank but text overflowed under the nav.
+- **Fix (Navigation.jsx)**: logo now `shrink-0` (never overlapped); desktop middle nav reduced to 4 core links (How it works / What's inside / Sample / Pricing) + new `MoreMenu` dropdown (`nav-more-btn`/`nav-more-menu`) holding For scouts / Blog / Methodology (same `nav-link-*` testids preserved); "Home" removed from desktop nav (logo = home; mobile menu keeps all 8 links unchanged); logged-in Dashboard/Admin labels icon-only below xl (title attr), Upload CTA short "Upload" below xl; nav gap 5/7→4/6.
+- **Verified via screenshots**: logged-out 1024/1280/1440 clean, More dropdown opens + navigates to /methodology, admin logged-in 1024 (icons) + 1440 (full labels) clean.
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Original Problem Statement
 Build a premium football player video analysis platform (ScoutMePlay) where players or parents upload a football video, mark their player, receive a complimentary preview analysis, and unlock a comprehensive premium report upon a single fixed fee payment.
 

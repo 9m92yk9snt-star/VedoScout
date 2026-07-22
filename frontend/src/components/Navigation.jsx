@@ -1,20 +1,31 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import api from "@/lib/api";
-import { LogOut, Shield, LayoutDashboard, Upload, ChevronRight, Menu, X, Home, ArrowUp } from "lucide-react";
+import { LogOut, Shield, LayoutDashboard, Upload, ChevronRight, ChevronDown, Menu, X, Home, ArrowUp } from "lucide-react";
 
 const LIME = "#ccff00";
 
-const NAV_LINKS = [
-  { label: "Home", testid: "hero-section", isHome: true },
+// Core anchor links rendered inline on desktop (kept short so the bar never
+// overlaps the logo). Secondary pages live in the "More" dropdown.
+const CORE_LINKS = [
   { label: "How it works", testid: "how-it-works-walkthrough" },
   { label: "What's inside", testid: "what-you-get" },
   { label: "Sample", testid: "example-report" },
   { label: "Pricing", testid: "pricing-section" },
+];
+
+const MORE_LINKS = [
   { label: "For scouts", to: "/scouts" },
   { label: "Blog", to: "/blog" },
   { label: "Methodology", to: "/methodology" },
+];
+
+// Full list for the mobile menu (Home first — on desktop the logo is Home)
+const NAV_LINKS = [
+  { label: "Home", testid: "hero-section", isHome: true },
+  ...CORE_LINKS,
+  ...MORE_LINKS,
 ];
 
 // Sections shown on the right-edge scroll-spy rail (desktop, landing page only)
@@ -164,7 +175,7 @@ export default function Navigation() {
           <Link
             to="/"
             data-testid="nav-logo"
-            className="flex flex-col leading-none min-w-0 shrink group"
+            className="flex flex-col leading-none shrink-0 group"
             onClick={(e) => {
               if (location.pathname === "/") {
                 e.preventDefault();
@@ -201,38 +212,25 @@ export default function Navigation() {
           </Link>
 
           {/* === MIDDLE NAV LINKS — desktop only === */}
-          <nav className="hidden lg:flex items-center gap-5 xl:gap-7" aria-label="Primary">
-            {NAV_LINKS.map((item, i) => {
+          <nav className="hidden lg:flex items-center gap-4 xl:gap-6 min-w-0" aria-label="Primary">
+            {CORE_LINKS.map((item, i) => {
               const testid = `nav-link-${slug(item.label)}`;
-              const activeHome = item.isHome && isLanding;
-              const cls = `relative text-[11px] uppercase tracking-[0.18em] font-bold transition-colors py-1 group/link flex items-center gap-1.5 whitespace-nowrap ${
-                activeHome ? "text-white" : "text-white/65 hover:text-white"
-              }`;
+              const cls = "relative text-[11px] uppercase tracking-[0.18em] font-bold transition-colors py-1 group/link flex items-center gap-1.5 whitespace-nowrap text-white/65 hover:text-white";
               const underline = (
                 <span
                   aria-hidden
-                  className={`absolute left-0 -bottom-0.5 h-[1.5px] transition-all duration-300 ${
-                    activeHome ? "w-full" : "w-0 group-hover/link:w-full"
-                  }`}
+                  className="absolute left-0 -bottom-0.5 h-[1.5px] w-0 group-hover/link:w-full transition-all duration-300"
                   style={{ background: LIME, boxShadow: `0 0 6px ${LIME}80` }}
                 />
               );
-              const icon = item.isHome ? <Home className="w-3 h-3" strokeWidth={2.4} /> : null;
-              if (item.to) {
-                return (
-                  <Link key={i} to={item.to} data-testid={testid} className={cls}>
-                    {icon}{item.label}
-                    {underline}
-                  </Link>
-                );
-              }
               return (
-                <button key={i} type="button" onClick={handleAnchor(item.testid, item.isHome)} data-testid={testid} className={cls}>
-                  {icon}{item.label}
+                <button key={i} type="button" onClick={handleAnchor(item.testid)} data-testid={testid} className={cls}>
+                  {item.label}
                   {underline}
                 </button>
               );
             })}
+            <MoreMenu slug={slug} />
           </nav>
 
           {/* === RIGHT — auth / user CTAs === */}
@@ -242,19 +240,21 @@ export default function Navigation() {
                 <Link
                   to="/dashboard"
                   data-testid="nav-dashboard-btn"
+                  title="Dashboard"
                   className="hidden md:flex items-center gap-2 text-xs text-white/75 hover:text-white uppercase tracking-widest font-semibold transition-colors"
                 >
                   <LayoutDashboard className="w-4 h-4" />
-                  Dashboard
+                  <span className="hidden xl:inline">Dashboard</span>
                 </Link>
                 {user.role === "admin" && (
                   <Link
                     to="/admin"
                     data-testid="nav-admin-btn"
+                    title="Admin"
                     className="hidden md:flex items-center gap-2 text-xs text-forest-pop hover:text-white uppercase tracking-widest font-semibold transition-colors"
                   >
                     <Shield className="w-4 h-4" />
-                    Admin
+                    <span className="hidden xl:inline">Admin</span>
                   </Link>
                 )}
                 <Link
@@ -265,7 +265,8 @@ export default function Navigation() {
                   onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
                 >
                   <Upload className="w-4 h-4" />
-                  <span className="hidden sm:inline">Upload video</span>
+                  <span className="hidden xl:inline">Upload video</span>
+                  <span className="hidden sm:inline xl:hidden">Upload</span>
                   <span className="sm:hidden">Upload</span>
                   <ChevronRight className="w-3.5 h-3.5 group-hover/cta:translate-x-0.5 transition-transform" />
                 </Link>
@@ -441,6 +442,61 @@ export default function Navigation() {
       {/* === BACK TO TOP — floating button (landing only) === */}
       {isLanding && <BackToTop scrolled={scrolled} />}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------
+ * MoreMenu — desktop dropdown holding secondary pages (For scouts,
+ * Blog, Methodology) so the top bar never overflows into the logo.
+ * ------------------------------------------------------------------ */
+function MoreMenu({ slug }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        data-testid="nav-more-btn"
+        aria-expanded={open}
+        aria-haspopup="true"
+        className={`relative text-[11px] uppercase tracking-[0.18em] font-bold transition-colors py-1 flex items-center gap-1 whitespace-nowrap ${
+          open ? "text-white" : "text-white/65 hover:text-white"
+        }`}
+      >
+        More
+        <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`} strokeWidth={2.5} />
+      </button>
+      {open && (
+        <div
+          data-testid="nav-more-menu"
+          className="absolute right-0 top-full mt-3 min-w-[180px] bg-ink border border-white/10 rounded-xl py-2 shadow-2xl z-50"
+          style={{ boxShadow: "0 18px 40px -12px rgba(0,0,0,0.7)" }}
+        >
+          {MORE_LINKS.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={() => setOpen(false)}
+              data-testid={`nav-link-${slug(item.label)}`}
+              className="block px-4 py-2.5 text-[11px] uppercase tracking-[0.18em] font-bold text-white/70 hover:text-white hover:bg-white/5 transition-colors whitespace-nowrap"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
