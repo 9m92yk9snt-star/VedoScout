@@ -27,6 +27,19 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026 — PM) — ANCHOR-LOCKED EVIDENCE: wrong-player fix (user bug report) DONE ✅
+- **User bug**: new production-style test (report 11533a13, AOrman) — ALL evidence screenshots showed the wrong player / rings on empty grass.
+- **ROOT CAUSES FOUND**:
+  1. `_extract_video_frame` did `int(seconds)` — truncated fractional anchor times (4.26→4), extracting frames 0.3-0.7 s BEFORE the tapped moment → different scene. FIXED: fractional `-ss %.3f`.
+  2. Gemini bbox + GPT-4o crop-verify CANNOT distinguish same-kit teammates at this resolution — the "double verification" approved wrong players. REMOVED AI from graphics placement entirely.
+- **NEW ARCHITECTURE — ground truth only**:
+  - `ensure_video_frames`: evidence timestamps SNAP to the nearest user tap anchor within `ANCHOR_SNAP_WINDOW` (1.5 s) — frame extracted at the exact tap time, `anchor_locked=True`, `identity_verified=True` (user's own tap = ground truth, no GPT call needed). In practice nearly all Gemini-cited moments are tap moments.
+  - `_verify_enriched_frames`: skips anchor-locked frames; stats now `{checked, verified, dropped, hard_rejected, anchor_locked}`.
+  - **Telestration**: ONLY on anchor-locked frames. New `locate_player_in_box` (precision_engine): kit-colour blob search RESTRICTED INSIDE the tap box, with (a) background-similar kit colours dropped (grass-contaminated shorts hex), (b) pitch-line rejection (aspect/fill filters), (c) blobs scored by area ÷ distance-to-box-centre (beats white banners matching white jerseys), (d) feet clamped by user box bottom, head ≈ blob top − 0.5·blob width. Fallback when no confident blob: spotlight + chip WITHOUT ring (`tele_ring=False`) — never a wrong ring. Chip always placed above min(refined top, tap-box top) so it never covers the player.
+  - Old Gemini `detect_player_bbox` flow abandoned (function remains in telestration.py, unused).
+- **VERIFIED**: report 11533a13 regenerated — all 4 frames visually inspected: ring/spotlight/chip on the correct player in every frame (00:04, 00:08, 00:09, 00:14 → taps 4.26/7.67/9.38/14.49 s). Web report screenshot: 4 AI-VERIFIED thumbs correct. 48 regression tests pass. PDF cache purged for the report.
+- ⚠️ REQUIRES REDEPLOY. NOTE: graphics accuracy now = tap accuracy; users should centre the box on the player.
+
 ### Session (Jul 22, 2026) — Telestrerede Øjeblikke: TV-style spotlight graphics (user-approved) DONE ✅
 - **NEW `/app/backend/telestration.py`**: `detect_player_bbox` (Gemini 2.5 Pro, temperature 0, box_2d 0-1000 normalized + sanity bounds), `crop_box_region` (18% padded crop for cross-check), `render_telestration` (PIL: spotlight dim 0.52 + blurred ellipse mask, 2x-supersampled volt double-ring under feet w/ glow — clamped fully inside frame, dark chip "«FIRSTNAME» · TRACKED" with volt dot above player). Overwrites the frame JPEG at full 1280px, q90.
 - **DOUBLE-VERIFICATION (strict policy)**: graphics drawn ONLY when (1) frame already identity-verified, (2) Gemini finds the player high/medium conf, AND (3) GPT-4o (different model family) returns "confirmed" on the cropped box via `verify_frame_identity`. ANY failure → plain image, never wrong graphics. Max 4 frames per report (`TELE_MAX_FRAMES`).

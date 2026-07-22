@@ -120,8 +120,11 @@ def crop_box_region(frame_path: str, box: dict, out_path: str, pad: float = 0.18
         return False
 
 
-def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER") -> bool:
-    """Draw spotlight dim + volt ring under the feet + name chip. Overwrites the frame."""
+def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER",
+                        ring: bool = True, chip_top: float | None = None) -> bool:
+    """Draw spotlight dim + volt ring under the feet + name chip. Overwrites the frame.
+    With ring=False (no refined player blob) only the spotlight + chip are drawn —
+    an honest fallback that can never point at the wrong spot."""
     try:
         img = Image.open(frame_path).convert("RGB")
         W, H = img.size
@@ -141,21 +144,23 @@ def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER") 
         out = Image.composite(img, dark, mask).convert("RGBA")
 
         # 2 — volt ring under the feet (2x supersampled for crisp anti-aliasing)
-        S = 2
-        ov = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
-        od = ImageDraw.Draw(ov)
-        rw = max(bw * 0.85, W * 0.045)
-        rh = rw * 0.32
-        feet_y = min(feet_y, H - rh - 4)  # keep the full ellipse inside the frame
-        lw = max(3, int(W / 230))
-        od.ellipse([(cx - rw) * S, (feet_y - rh) * S, (cx + rw) * S, (feet_y + rh) * S],
-                   outline=VOLT + (255,), width=lw * S)
-        od.ellipse([(cx - rw * 0.68) * S, (feet_y - rh * 0.68) * S,
-                    (cx + rw * 0.68) * S, (feet_y + rh * 0.68) * S],
-                   outline=VOLT + (110,), width=max(1, lw // 2) * S)
-        glow = ov.filter(ImageFilter.GaussianBlur(7 * S))
-        ov = Image.alpha_composite(glow, ov).resize((W, H), Image.LANCZOS)
-        out = Image.alpha_composite(out, ov)
+        out = out.convert("RGBA")
+        if ring:
+            S = 2
+            ov = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+            od = ImageDraw.Draw(ov)
+            rw = min(max(bw * 0.6, W * 0.045), W * 0.22)
+            rh = rw * 0.32
+            feet_y = min(feet_y, H - rh - 4)  # keep the full ellipse inside the frame
+            lw = max(3, int(W / 230))
+            od.ellipse([(cx - rw) * S, (feet_y - rh) * S, (cx + rw) * S, (feet_y + rh) * S],
+                       outline=VOLT + (255,), width=lw * S)
+            od.ellipse([(cx - rw * 0.68) * S, (feet_y - rh * 0.68) * S,
+                        (cx + rw * 0.68) * S, (feet_y + rh * 0.68) * S],
+                       outline=VOLT + (110,), width=max(1, lw // 2) * S)
+            glow = ov.filter(ImageFilter.GaussianBlur(7 * S))
+            ov = Image.alpha_composite(glow, ov).resize((W, H), Image.LANCZOS)
+            out = Image.alpha_composite(out, ov)
 
         # 3 — name chip above the player (clamped inside the frame)
         d = ImageDraw.Draw(out)
@@ -168,7 +173,8 @@ def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER") 
         dot_r = fs * 0.22
         chip_w = tw + 2 * pad_x + dot_r * 2 + fs * 0.5
         chx = min(max(6, cx - chip_w / 2), W - chip_w - 6)
-        chy = max(6, y0 - chip_h - max(12, bh * 0.09))
+        top_ref = min(y0, chip_top * H) if chip_top is not None else y0
+        chy = max(6, top_ref - chip_h - 10)
         d.rounded_rectangle([chx, chy, chx + chip_w, chy + chip_h],
                             radius=int(chip_h / 2.4), fill=INK + (235,))
         dcx = chx + pad_x + dot_r

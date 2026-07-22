@@ -687,6 +687,97 @@ def _color_match_mask_bgr(frame_bgr: np.ndarray, target_rgb: tuple[int, int, int
     return dist2 < (tol * tol)
 
 
+def locate_player_in_box(
+    frame_path: str | Path,
+    box: dict,
+    jersey_hex: str,
+    shorts_hex: str,
+) -> dict | None:
+    """Refine the user's ground-truth tap box to a tight player bbox using
+    kit-colour blob matching INSIDE the box only. Returns normalized
+    {x0,y0,x1,y1} (full-body estimate) or None when no confident blob."""
+    try:
+        img = cv2.imread(str(frame_path))
+        if img is None:
+            return None
+        H, W = img.shape[:2]
+        mx, my = float(box["w"]) * 0.15, float(box["h"]) * 0.15
+        rx0 = max(0, int((float(box["x"]) - mx) * W))
+        ry0 = max(0, int((float(box["y"]) - my) * H))
+        rx1 = min(W, int((float(box["x"]) + float(box["w"]) + mx) * W))
+        ry1 = min(H, int((float(box["y"]) + float(box["h"]) + my) * H))
+        if rx1 - rx0 < 12 or ry1 - ry0 < 12:
+            return None
+        region = img[ry0:ry1, rx0:rx1]
+        # Ignore kit colours that resemble the background (e.g. grass-contaminated
+        # shorts sample) — otherwise the mask floods the pitch itself.
+        border = np.concatenate([
+            region[0:3, :].reshape(-1, 3), region[-3:, :].reshape(-1, 3),
+            region[:, 0:3].reshape(-1, 3), region[:, -3:].reshape(-1, 3),
+        ])
+        bg_bgr = np.median(border, axis=0)
+        masks = []
+        for hx in (jersey_hex, shorts_hex):
+            rgb = _hex_to_rgb(hx)
+            dist_bg = float(np.linalg.norm(np.array(rgb[::-1], dtype=float) - bg_bgr))
+            if dist_bg < 70:
+                continue
+            masks.append(_color_match_mask_bgr(region, rgb, tol=55))
+        if not masks:
+            return None
+        mask = masks[0]
+        for m in masks[1:]:
+            mask = mask | m
+        mask = mask.astype(np.uint8)
+        if int(mask.sum()) < 30:
+            return None
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        n, _labels, stats_cc, cents = cv2.connectedComponentsWithStats(mask, 8)
+        # Box centre in region coords — the user centres their tap box on the
+        # player, so blobs near the centre outrank bigger blobs at the edges
+        # (e.g. white banners matching a white jersey).
+        bcx = (float(box["x"]) + float(box["w"]) / 2) * W - rx0
+        bcy = (float(box["y"]) + float(box["h"]) / 2) * H - ry0
+        diag = ((rx1 - rx0) ** 2 + (ry1 - ry0) ** 2) ** 0.5
+        best = None
+        best_score = 0.0
+        for i in range(1, n):
+            bx, by, bw_, bh_, area = stats_cc[i]
+            if area < 25 or bw_ < 4 or bh_ < 6:
+                continue
+            aspect = bh_ / max(1.0, float(bw_))
+            fill = area / max(1.0, float(bw_ * bh_))
+            # Reject pitch-line-like blobs: extreme aspect or hollow fill.
+            if aspect < 0.5 or aspect > 6.0 or fill < 0.22:
+                continue
+            d_norm = (((cents[i][0] - bcx) ** 2 + (cents[i][1] - bcy) ** 2) ** 0.5) / max(1.0, diag)
+            score = area / (1.0 + 6.0 * d_norm * d_norm)
+            if best is None or score > best_score:
+                best = (bx, by, bw_, bh_, area)
+                best_score = score
+        if best is None:
+            return None
+        bx, by, bw_, bh_, _ = best
+        # Blob covers the kit. Head ≈ half a blob-width above; feet: extend the
+        # blob but never past the user's own box bottom (they frame the body).
+        top = ry0 + by - bw_ * 0.5
+        raw_bottom = ry0 + by + bh_
+        ext_bottom = ry0 + by + bh_ * 1.85
+        box_bottom = (float(box["y"]) + float(box["h"]) * 1.08) * H
+        bottom = max(raw_bottom, min(ext_bottom, box_bottom))
+        left = rx0 + bx - bw_ * 0.15
+        right = rx0 + bx + bw_ * 1.15
+        bottom = min(bottom, H)
+        return {
+            "x0": max(0.0, left / W), "y0": max(0.0, top / H),
+            "x1": min(1.0, right / W), "y1": min(1.0, bottom / H),
+        }
+    except Exception:
+        return None
+
+
 def verify_and_pick_thumbnail(
     video_path: str | Path,
     seconds: float,

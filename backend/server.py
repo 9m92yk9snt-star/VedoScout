@@ -65,6 +65,7 @@ from precision_engine import (
     extract_frame_at,
     save_context_crop,
     save_display_crop,
+    locate_player_in_box,
     build_preview_prompt as precision_build_preview_prompt,
     build_full_prompt as precision_build_full_prompt,
     scrub_hedging,
@@ -1733,13 +1734,13 @@ def _make_placeholder_frame(timestamp: str, comment: str, out_path: Path) -> boo
         return False
 
 
-def _extract_video_frame(video_path: Path, seconds: int, out_path: Path) -> bool:
-    """Use ffmpeg to grab a single frame at the given second."""
+def _extract_video_frame(video_path: Path, seconds: float, out_path: Path) -> bool:
+    """Use ffmpeg to grab a single frame at the given (fractional) second."""
     try:
         import subprocess
         result = subprocess.run(
             [
-                FFMPEG_BIN, "-y", "-ss", str(max(0, int(seconds))),
+                FFMPEG_BIN, "-y", "-ss", f"{max(0.0, float(seconds)):.3f}",
                 "-i", str(video_path),
                 "-frames:v", "1", "-q:v", "2",
                 "-vf", "scale='min(1280,iw)':-2",
@@ -1804,6 +1805,22 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             fingerprint_obj = None
 
     enriched = []
+    # Ground-truth anchors: the user's own taps (exact time + box) — the ONLY
+    # 100% reliable identity source. Evidence frames snap to a tap moment when
+    # one is within ANCHOR_SNAP_WINDOW seconds of the cited timestamp.
+    anchors = [
+        a for a in (report_doc.get("anchors") or [])
+        if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
+    ]
+
+    def _nearest_anchor(sec: float):
+        best = None
+        for a in anchors:
+            d = abs(float(a["t"]) - sec)
+            if d <= ANCHOR_SNAP_WINDOW and (best is None or d < abs(float(best["t"]) - sec)):
+                best = a
+        return best
+
     for idx, c in enumerate(comments):
         if not isinstance(c, dict):
             enriched.append(c)
@@ -1821,8 +1838,19 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             if have_video:
                 seconds = _ts_to_seconds(ts)
                 if seconds is not None:
-                    # Prefer the verified-and-reticled thumbnail when we have a fingerprint
-                    if fingerprint_obj is not None:
+                    # 1) Ground truth first: snap to the user's own tap moment.
+                    anchor = _nearest_anchor(float(seconds))
+                    if anchor is not None:
+                        ok = _extract_video_frame(video_path, float(anchor["t"]), out_path)
+                        if ok:
+                            frame_meta = {
+                                "ok": True,
+                                "picked_ts": float(anchor["t"]),
+                                "anchor_locked": True,
+                                "anchor_box": anchor["box"],
+                            }
+                    # 2) Otherwise the fingerprint-verified window pick
+                    if not ok and fingerprint_obj is not None:
                         try:
                             from precision_engine import verify_and_pick_thumbnail
                             ok, frame_meta = verify_and_pick_thumbnail(
@@ -1843,6 +1871,10 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             out["frame_picked_ts"] = frame_meta.get("picked_ts")
             out["frame_match_score"] = frame_meta.get("match_score")
             out["frame_reticle"] = frame_meta.get("reticle")
+            if frame_meta.get("anchor_locked"):
+                out["anchor_locked"] = True
+                out["anchor_box"] = frame_meta.get("anchor_box")
+                out["identity_verified"] = True
         enriched.append(out)
     return enriched
 
@@ -5901,40 +5933,43 @@ async def _verify_enriched_frames(
 
     tasks = [
         _check_one(i, c) for i, c in enumerate(enriched)
-        if isinstance(c, dict) and str(c.get("frame_url") or "").startswith("/api/uploads/frames/")
+        if isinstance(c, dict) and not c.get("anchor_locked")
+        and str(c.get("frame_url") or "").startswith("/api/uploads/frames/")
     ]
     checked = len(tasks)
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
+    anchor_locked = sum(1 for c in enriched if isinstance(c, dict) and c.get("anchor_locked"))
+    checked += anchor_locked  # tap moments are ground truth — counted as verified
     verified = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is True)
     dropped = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_verified") is False)
     hard_rejected = sum(1 for c in enriched if isinstance(c, dict) and c.get("identity_hard_reject"))
     if checked:
         logger.info(
-            f"[identity] {report_id}: {checked} frames checked · {verified} verified · "
-            f"{dropped} dropped ({hard_rejected} hard-rejected)"
+            f"[identity] {report_id}: {checked} frames checked ({anchor_locked} anchor-locked) · "
+            f"{verified} verified · {dropped} dropped ({hard_rejected} hard-rejected)"
         )
-    return {"checked": checked, "verified": verified, "dropped": dropped, "hard_rejected": hard_rejected}
+    return {"checked": checked, "verified": verified, "dropped": dropped,
+            "hard_rejected": hard_rejected, "anchor_locked": anchor_locked}
 
 
 TELE_MAX_FRAMES = 4
+ANCHOR_SNAP_WINDOW = 1.5  # secs — evidence snaps to a user tap within this window
 
 
 async def _telestrate_verified_frames(
     report_id: str, doc: dict, frames_dir: Path, enriched: list, ref_crops: list[str],
 ) -> int:
-    """TV-style spotlight on VERIFIED frames only. Double-verified: Gemini
-    proposes the bbox, GPT-4o must CONFIRM the cropped box shows the tapped
-    player — otherwise the frame keeps its plain image. Best-effort."""
+    """TV-style spotlight drawn ONLY from GROUND-TRUTH tap anchors (the user's
+    own taps). AI-guessed boxes proved unsafe with same-kit teammates — so
+    no anchor = no graphics, never a wrong ring."""
     pd = doc.get("player_details") or {}
     fp = doc.get("fingerprint") or {}
     first = str(pd.get("player_name") or "").strip().split(" ")[0]
     label = f"{first.upper()} · TRACKED" if first else "YOUR PLAYER"
     done = 0
-    for i, c in enumerate(enriched):
-        if done >= TELE_MAX_FRAMES:
-            break
-        if not (isinstance(c, dict) and c.get("identity_verified") is True):
+    for c in enriched:
+        if not (isinstance(c, dict) and c.get("anchor_locked") and isinstance(c.get("anchor_box"), dict)):
             continue
         fu = str(c.get("frame_url") or "")
         if not fu.startswith("/api/uploads/frames/"):
@@ -5942,25 +5977,33 @@ async def _telestrate_verified_frames(
         frame_path = frames_dir / Path(fu).name
         if not frame_path.exists():
             continue
-        box = await detect_player_bbox(EMERGENT_LLM_KEY, f"tele-{report_id}-{i}", ref_crops, str(frame_path))
-        if not box:
-            continue
-        crop_path = frames_dir / f".tele_{i}.jpg"
-        verdict = None
-        if await asyncio.to_thread(crop_box_region, str(frame_path), box, str(crop_path)):
-            verdict = await verify_frame_identity(
-                EMERGENT_LLM_KEY, f"tele-v-{report_id}-{i}", ref_crops, str(crop_path),
-                fp.get("jersey_name", "unclear"), fp.get("shorts_name", "unclear"),
-            )
-        crop_path.unlink(missing_ok=True)
-        if verdict != "confirmed":
-            logger.info(f"[tele] {report_id} frame {i}: box NOT confirmed ({verdict}) — no graphics")
-            continue
-        if await asyncio.to_thread(render_telestration, str(frame_path), box, label):
+        b = c["anchor_box"]
+        # Refine the tap box to the player's kit-colour blob INSIDE the box.
+        refined = await asyncio.to_thread(
+            locate_player_in_box, str(frame_path), b,
+            fp.get("jersey_hex", "#888888"), fp.get("shorts_hex", "#888888"),
+        )
+        if refined:
+            box, ring = refined, True
+        else:
+            try:
+                box = {
+                    "x0": float(b["x"]), "y0": float(b["y"]),
+                    "x1": float(b["x"]) + float(b["w"]), "y1": float(b["y"]) + float(b["h"]),
+                }
+            except Exception:
+                continue
+            ring = False  # no confident blob — spotlight + chip only, never a wrong ring
+        try:
+            chip_top = float(b.get("y", box["y0"]))
+        except Exception:
+            chip_top = box["y0"]
+        if await asyncio.to_thread(render_telestration, str(frame_path), box, label, ring, chip_top):
             c["telestrated"] = True
+            c["tele_ring"] = ring
             done += 1
     if done:
-        logger.info(f"[tele] {report_id}: {done} frames telestrated")
+        logger.info(f"[tele] {report_id}: {done} anchor-locked frames telestrated")
     return done
 
 
@@ -5984,10 +6027,9 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
             stats = await _verify_enriched_frames(report_id, doc, Path(str(video_path)), frames_dir, enriched, ref_crops)
     except Exception:
         logger.exception(f"identity verification layer failed for {report_id}")
-    # Telestration — TV-style spotlight on double-verified frames only.
+    # Telestration — ring drawn ONLY from the user's own tap anchors (ground truth).
     try:
-        if ref_crops:
-            await _telestrate_verified_frames(report_id, doc, frames_dir, enriched, ref_crops)
+        await _telestrate_verified_frames(report_id, doc, frames_dir, enriched, ref_crops)
     except Exception:
         logger.exception(f"telestration layer failed for {report_id}")
     if r2_storage.is_configured():
@@ -11410,7 +11452,7 @@ from identity_verify import (
     identity_profile_block,
     verify_preview_summary,
 )
-from telestration import detect_player_bbox, crop_box_region, render_telestration
+from telestration import render_telestration
 from pdf_v2 import build_pdf_v2
 
 
