@@ -40,6 +40,7 @@ from email_service import send_email, send_email_async, send_bulk_email, email_e
 from email_templates import (
     render_welcome_email,
     render_curve_reminder_email,
+    render_report_ready_email,
     render_purchase_confirmation,
     render_bulk_email,
     render_admin_sale_notification,
@@ -100,7 +101,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 19  # v19 = development curve (progress strip, progress card, diploma trend)
+PDF_RENDER_VERSION = 20  # v20 = printables page (mission card + training week planner)
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -2740,7 +2741,12 @@ Produce a JSON object EXACTLY in this format:
       "body": "<4-6 short sentences written DIRECTLY TO THE CHILD in age-appropriate language. Mention 2-3 concrete moments from THEIR video (with timestamps). Warm, honest, zero hype. Never mention scores or tiers.>",
       "signoff": "<e.g. 'Keep playing YOUR way. — Your scout'>"
     }
-  }
+  },
+  "next_match_missions": [
+    {"mission": "<ONE short instruction written TO the child — something countable during a match>", "target": "<countable target, e.g. '5 times'>", "why": "<ONE short sentence why this matters>"},
+    {"mission": "...", "target": "...", "why": "..."},
+    {"mission": "...", "target": "...", "why": "..."}
+  ]
 }
 
 RULES FOR TOP-LEVEL "scores":
@@ -2767,6 +2773,11 @@ RULES FOR "parents_package" (family-facing — tone matters):
 - watch_together.moments: 2-3 moments. ONLY use timestamps that already appear in your action_timeline or video_comments — never introduce new moments. Each say_this praises a DECISION or EFFORT (not the outcome), in warm plain words a parent would naturally say out loud.
 - watch_together.avoid: EXACTLY 2 short honest anti-tips (e.g. comparing to teammates, coaching from the sofa, only talking about goals).
 - message_to_player: written DIRECTLY to the child and calibrated to their age: under 10 → very short playful sentences with ONE single focus; 10-13 → encouraging, concrete, simple; 14+ → respectful scout-to-player tone. Reference 2-3 real moments from THIS video with their timestamps. This is the section the child will read again and again — make it feel personal and true.
+
+RULES FOR "next_match_missions" (printed as a card for the sports bag):
+- EXACTLY 3 missions. Each is a PROCESS goal the child can COUNT during a match — never outcome goals (no "score 2 goals", no "win the game").
+- Each mission trains one of the development_priorities_detailed items. Age-appropriate wording, written TO the child ("Receive the ball side-on", not "the player should...").
+- target must be a small countable number the child can realistically hit (e.g. "5 times", "3 times each half").
 
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
@@ -5876,6 +5887,36 @@ async def _curve_reminder_sweep(dry_run: bool = False) -> list:
     return results
 
 
+async def _send_report_ready_email(report_id: str):
+    """Notify the parent by email when the full report finishes (once)."""
+    try:
+        if not email_enabled():
+            return
+        doc = await db.reports.find_one(
+            {"id": report_id},
+            {"user_id": 1, "player_details.player_name": 1, "report_ready_email_sent_at": 1, "demo": 1},
+        )
+        if not doc or doc.get("report_ready_email_sent_at") or doc.get("demo"):
+            return
+        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1, "name": 1})
+        email = (u or {}).get("email")
+        if not email:
+            return
+        site = (os.environ.get("SITE_PUBLIC_URL") or os.environ.get("FRONTEND_URL") or "https://scoutmeplay.com").rstrip("/")
+        html, text, subject = render_report_ready_email(
+            u.get("name"), (doc.get("player_details") or {}).get("player_name"),
+            f"{site}/report/{report_id}",
+        )
+        ok = await send_email_async(email, subject, html, text)
+        if ok:
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"report_ready_email_sent_at": now_iso()}},
+            )
+    except Exception:
+        logger.exception(f"report-ready email failed for {report_id}")
+
+
 async def _curve_reminder_loop():
     await asyncio.sleep(120)
     while True:
@@ -6645,6 +6686,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 )
         except Exception:
             logger.exception(f"Failed to queue agent_review for {report_id}")
+        await _send_report_ready_email(report_id)
     except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
         # Persist a friendly failure marker so the frontend can surface "Try again".

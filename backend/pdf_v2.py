@@ -341,6 +341,8 @@ def derive_v2(report):
         "identityNote": _identity_note(report),
         "actionTimeline": _action_timeline(full),
         "parentsPackage": _parents_package(full),
+        "missions": [m for m in (full.get("next_match_missions") or [])
+                     if isinstance(m, dict) and m.get("mission")][:3],
     }
 
 
@@ -1713,6 +1715,125 @@ def _letter_card(c, msg, x, y, w, h, player_name):
                  _style(F_SCRIPT, 12, GREEN, leading=15, align=TA_RIGHT), max_h=iy - y - PAD)
 
 
+def _cutout_frame(c, x, y, w, h, label):
+    """Dashed cut-out border + label — signals 'print & cut this out'."""
+    c.saveState()
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.roundRect(x, y, w, h, 10, stroke=0, fill=1)
+    c.setStrokeColor(HexColor("#9AA895"))
+    c.setLineWidth(1)
+    c.setDash(5, 4)
+    c.roundRect(x, y, w, h, 10, stroke=1, fill=0)
+    c.setDash()
+    lw2 = c.stringWidth(label, F_BLACK, 5.4) + 14
+    c.setFillColor(HexColor("#EDE8D6"))
+    c.roundRect(x + w - lw2 - 10, y + h - 7, lw2, 14, 7, stroke=0, fill=1)
+    c.setFillColor(MUTED)
+    c.setFont(F_BLACK, 5.4)
+    c.drawCentredString(x + w - lw2 / 2 - 10, y + h - 2.4, label)
+    c.restoreState()
+
+
+def _mission_card_print(c, missions, player_name, x, y, w, h):
+    """Cut-out mission card for the sports bag: 3 countable missions + boxes."""
+    _cutout_frame(c, x, y, w, h, "CUT OUT · SPORTS BAG")
+    ty = y + h - 20
+    c.setFillColor(FOREST)
+    c.setFont(F_BLACK, 13)
+    c.drawString(x + 16, ty, "NEXT MATCH MISSIONS")
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6.4)
+    c.drawString(x + 16, ty - 11, f"{str(player_name).upper()} · TICK THEM OFF AFTER THE MATCH")
+    _wordmark(c, x + w - 110, ty - 4, size=11)
+    iy = ty - 26
+    row_h = (iy - y - 26) / 3
+    for i, m in enumerate(missions[:3]):
+        ry = iy - i * row_h
+        c.saveState()
+        c.setStrokeColor(HexColor("#D8D2BE"))
+        c.setLineWidth(1.2)
+        c.roundRect(x + 16, ry - row_h / 2 + 0.5, 15, 15, 3, stroke=1, fill=0)
+        c.setFillColor(FOREST)
+        c.circle(x + 45, ry - row_h / 2 + 8, 7.5, stroke=0, fill=1)
+        c.setFillColor(HexColor("#CCFF00"))
+        c.setFont(F_BLACK, 8)
+        c.drawCentredString(x + 45, ry - row_h / 2 + 5.4, str(i + 1))
+        c.restoreState()
+        target = str(m.get("target") or "")
+        t_w = c.stringWidth(target.upper(), F_BLACK, 7) + 12 if target else 0
+        mh2 = draw_par(c, f"<b>{esc(str(m.get('mission', '')))}</b>", x + 60, ry - 6,
+                       w - 60 - 32 - t_w - 10, _style(F_BOLD, 8.6, INK, leading=11), max_h=row_h - 16)
+        if target:
+            c.saveState()
+            c.setFillColor(HexColor("#CCFF00"))
+            c.roundRect(x + w - 16 - t_w, ry - 18, t_w, 13, 4, stroke=0, fill=1)
+            c.setFillColor(INK)
+            c.setFont(F_BLACK, 7)
+            c.drawCentredString(x + w - 16 - t_w / 2, ry - 13.8, target.upper())
+            c.restoreState()
+        if m.get("why"):
+            draw_par(c, esc(str(m["why"])), x + 60, ry - 8 - mh2, w - 60 - 32,
+                     _style(F_BODY, 6.2, MUTED, leading=8.4), max_h=max(9, row_h - mh2 - 18))
+        if i < 2:
+            c.saveState()
+            c.setStrokeColor(HexColor("#EDE8D6"))
+            c.setLineWidth(0.7)
+            c.line(x + 16, ry - row_h + 2, x + w - 16, ry - row_h + 2)
+            c.restoreState()
+    c.setFillColor(GREEN)
+    c.setFont(F_SCRIPT, 11)
+    c.drawString(x + 16, y + 9, "Process over outcome — count them, own them!  — Your scout")
+
+
+def _week_planner_print(c, week, focus, x, y, w, h):
+    """Cut-out weekly training planner with 4 weeks of tick-circles."""
+    _cutout_frame(c, x, y, w, h, "CUT OUT · FRIDGE DOOR")
+    ty = y + h - 20
+    c.setFillColor(FOREST)
+    c.setFont(F_BLACK, 13)
+    c.drawString(x + 16, ty, "TRAINING WEEK PLANNER")
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6.4)
+    c.drawString(x + 16, ty - 11, "REPEAT EVERY WEEK UNTIL THE NEXT ANALYSIS · TICK EACH SESSION DONE")
+    # header row for tick columns
+    col_w = 26
+    tick_x0 = x + w - 16 - 4 * col_w
+    c.setFillColor(MUTED)
+    c.setFont(F_BLACK, 5.6)
+    for j in range(4):
+        c.drawCentredString(tick_x0 + j * col_w + col_w / 2, ty - 24, f"W{j + 1}")
+    iy = ty - 30
+    rows = [r for r in (week or []) if r.get("name")][:4]
+    row_h = (iy - y - 34) / max(1, len(rows))
+    for i, r in enumerate(rows):
+        ry = iy - i * row_h
+        if i % 2 == 0:
+            c.saveState()
+            c.setFillColor(HexColor("#F7F4E9"))
+            c.roundRect(x + 12, ry - row_h + 3, w - 24, row_h - 2, 5, stroke=0, fill=1)
+            c.restoreState()
+        c.setFillColor(FOREST)
+        c.setFont(F_BLACK, 8)
+        c.drawString(x + 18, ry - row_h / 2 - 1, str(r.get("day", "")).upper())
+        c.setFillColor(INK)
+        c.setFont(F_BOLD, 8.4)
+        name = str(r.get("name") or "")[:52]
+        c.drawString(x + 78, ry - row_h / 2 + 2, name)
+        if r.get("mins"):
+            c.setFillColor(MUTED)
+            c.setFont(F_BODY, 6.4)
+            c.drawString(x + 78, ry - row_h / 2 - 7.5, str(r["mins"]))
+        for j in range(4):
+            c.saveState()
+            c.setStrokeColor(HexColor("#C9C2A9"))
+            c.setLineWidth(1.1)
+            c.circle(tick_x0 + j * col_w + col_w / 2, ry - row_h / 2 + 1, 6, stroke=1, fill=0)
+            c.restoreState()
+    if focus:
+        draw_par(c, f"<b>WEEKLY FOCUS:</b> {esc(first_sentences(focus, 150))}", x + 16, y + 26,
+                 w - 32, _style(F_BODY, 6.6, BODY, leading=9), max_h=20)
+
+
 def _seal(c, cx, cy, r, label1, label2):
     c.saveState()
     c.setStrokeColor(FOREST)
@@ -1872,10 +1993,12 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     fifa_lens = _lenses.get("fifa") if isinstance(_lenses, dict) else None
     fifa_neighbors = _arch.get("fifa_neighbors") or []
     pp = d.get("parentsPackage")
+    missions = d.get("missions") or []
+    has_print = bool(missions or d.get("trainingWeek"))
     prog = report_doc.get("progression")
     prog = prog if isinstance(prog, dict) and prog.get("categories") else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 4 + (1 if has_p4 else 0) + (1 if pp else 0)
+    total_pages = 4 + (1 if has_p4 else 0) + (1 if pp else 0) + (1 if has_print else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -2039,6 +2162,28 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 else:
                     _letter_card(c, pp["message"], M, yy - cols_h, CW, cols_h, player_name)
         _page_footer(c, 4 + (1 if has_p4 else 0), total_pages)
+        c.showPage()
+
+    # ── PAGE — Printables (mission card + training week planner) ──
+    if has_print:
+        _page_bg(c)
+        mh = _mini_header(c, player_name)
+        yy = H - M - mh - 6
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 6.6)
+        c.drawString(M, yy - 4, "PRINT THIS PAGE — CUT ALONG THE DASHED LINES")
+        yy -= 14
+        if missions:
+            h_mc = 300
+            _mission_card_print(c, missions, player_name, M, yy - h_mc, CW, h_mc)
+            yy -= h_mc + 16
+        if d.get("trainingWeek"):
+            h_wp = min(300.0, yy - M - 34)
+            if h_wp > 160:
+                _week_planner_print(c, d["trainingWeek"],
+                                    ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
+                                    M, yy - h_wp, CW, h_wp)
+        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if pp else 0), total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──

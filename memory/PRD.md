@@ -27,6 +27,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 23, 2026 — c) — RAPPORT-KLAR EMAIL + MISSION-KORT + PRINTBART UGESKEMA ✅
+- **Report-ready email**: `render_report_ready_email` template; `_send_report_ready_email(report_id)` called at end of `generate_full_report_task` (after agent_review queue). Once-only via `report_ready_email_sent_at`, skips demo/missing email/SMTP-off. E2E tested: REAL email sent to scoutmeplay@gmail.com ("Kurve's scout report is ready"), marker set, second call = no duplicate.
+- **Næste Kamp Missions**: `next_match_missions` added to FULL_REPORT_PROMPT (EXACTLY 3 countable PROCESS goals, no outcome goals, tied to dev priorities, age-calibrated). Web: `report-v2/missions.jsx` (`MissionsCard`, testids `v2-missions-card`, `v2-mission-{i}`) after ParentsPackage; derive.js adds `missions`. Only NEW uploads get real AI missions; AOrman test report has MOCKED demo missions injected.
+- **PDF Printables page** (new page before diploma, `PDF_RENDER_VERSION` 19→20): `_cutout_frame` (dashed cut lines + "CUT OUT" chips), `_mission_card_print` (checkbox + number + target chip + why, scout signoff) and `_week_planner_print` (MON/WED/FRI/WEEKEND rows from trainingWeek, W1-W4 tick circles, weekly focus). Page shows planner always (trainingWeek always derived), mission card only when missions exist. Page count now 5-7.
+- Verified: AOrman PDF 7 pages (missions + planner), Lukas 6 pages (planner only, correct conditional), web missions card renders, checkbox alignment fixed. One broken pdf_v2 edit (duplicate tail) caught & fixed via import check.
+- ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 23, 2026 — b) — KURVE-EMAIL (Curve Reminder) ✅
 - **Template**: `render_curve_reminder_email` in email_templates.py (English, branded, "development curve is waiting for its next point", CTA → /upload, opt-out line).
 - **Sweep**: `_curve_reminder_sweep` in server.py — finds unlocked reports 28-56 days old with NO newer report for same player (same user + norm name), skips demo/kurvedemo + missing emails, sends ONCE (marks `curve_reminder_sent_at` on success). `_curve_reminder_loop` runs every 6h, started at startup (skips when SMTP unconfigured). Uses existing Gmail SMTP (`email_service.py`).

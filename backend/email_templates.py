@@ -190,6 +190,43 @@ def render_curve_reminder_email(
     return _wrap_html(inner, preheader), plaintext, subject
 
 
+# ── REPORT READY ───────────────────────────────────────────────────────────
+def render_report_ready_email(
+    parent_name: Optional[str],
+    player_name: Optional[str],
+    report_url: str,
+) -> tuple[str, str, str]:
+    player = (player_name or "your player").strip() or "your player"
+    first = player.split(" ")[0]
+    greet = (parent_name or "").strip()
+    greet_line = f"Hi {greet}," if greet else "Hi,"
+    subject = f"{first}'s scout report is ready"
+    preheader = f"The full analysis of {first} is done — open the report now."
+    inner = f"""
+    <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      {first}&apos;s report is ready.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      {greet_line}
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      Our AI scout has finished the full analysis of <strong>{player}</strong>. The report is live now &mdash; scores, strengths, development plan, home drills and the personal message to {first}.
+    </p>
+    {_btn("Open the report", report_url)}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      Tip: watch the video together with {first} first &mdash; the report includes exact moments to pause and praise.
+    </p>
+    """
+    plaintext = (
+        f"{greet_line}\n\n"
+        f"The full scout analysis of {player} is ready.\n\n"
+        f"Open the report: {report_url}\n\n"
+        f"Tip: watch the video together first — the report includes exact moments to pause and praise."
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
 # ── PURCHASE CONFIRMATION ─────────────────────────────────────────────────
 def render_purchase_confirmation(
     user_name: Optional[str],

@@ -261,6 +261,10 @@ export function deriveV2(report) {
     ? { homeDrills, watchTogether, playerMessage }
     : null;
 
+  // ---- Next match missions (printable card) ----
+  const missions = (Array.isArray(full.next_match_missions) ? full.next_match_missions : [])
+    .filter((m) => m && m.mission).slice(0, 3);
+
   // ---- Evidence-integrity note (strict image policy) ----
   const ist = report?.identity_stats;
   const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
@@ -274,6 +278,6 @@ export function deriveV2(report) {
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
-    matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage,
+    matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
   };
 }

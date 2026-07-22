@@ -14,6 +14,7 @@ import {
 import { MovementMapCard } from "./movement";
 import { ParentsPackageSection } from "./parents";
 import { ProgressCard, ProgressTeaser } from "./progress";
+import { MissionsCard } from "./missions";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -277,6 +278,12 @@ export default function PremiumReportV2({ report, assetBase }) {
       {d.parentsPackage && (
         <div className="mb-4">
           <ParentsPackageSection pack={d.parentsPackage} playerName={pd.player_name} onPlayAt={playAt} />
+        </div>
+      )}
+
+      {d.missions?.length > 0 && (
+        <div className="mb-4">
+          <MissionsCard missions={d.missions} />
         </div>
       )}
 
