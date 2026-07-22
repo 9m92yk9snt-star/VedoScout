@@ -11,7 +11,7 @@ const LIME = "#ccff00";
 const CORE_LINKS = [
   { label: "How it works", testid: "how-it-works-walkthrough" },
   { label: "What's inside", testid: "what-you-get" },
-  { label: "Sample", testid: "example-report" },
+  { label: "Sample", to: "/sample" },
   { label: "Pricing", testid: "pricing-section" },
 ];
 
@@ -223,6 +223,14 @@ export default function Navigation() {
                   style={{ background: LIME, boxShadow: `0 0 6px ${LIME}80` }}
                 />
               );
+              if (item.to) {
+                return (
+                  <Link key={i} to={item.to} data-testid={testid} className={cls}>
+                    {item.label}
+                    {underline}
+                  </Link>
+                );
+              }
               return (
                 <button key={i} type="button" onClick={handleAnchor(item.testid)} data-testid={testid} className={cls}>
                   {item.label}

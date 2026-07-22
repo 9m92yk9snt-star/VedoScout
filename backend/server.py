@@ -9138,6 +9138,52 @@ async def _resolve_sample_report() -> dict | None:
     return doc
 
 
+_SAMPLE_ALIAS = "Alex"
+
+
+def _anonymize_sample_payload(payload: dict, real_name: str) -> dict:
+    """Deep-anonymize a serialized report for the public sample page:
+    strip account fields and replace every player-name mention with an alias."""
+    payload.pop("user_id", None)
+    payload.pop("user_email", None)
+    payload["share_enabled"] = False
+    payload["share_token"] = None
+    pd = dict(payload.get("player_details") or {})
+    pd["player_name"] = _SAMPLE_ALIAS
+    pd["description"] = None
+    payload["player_details"] = pd
+    variants = [v for v in ({real_name.strip()} | set(real_name.split())) if len(v) >= 3]
+    if variants:
+        pats = [re.compile(re.escape(v), re.IGNORECASE) for v in variants]
+
+        def walk(x):
+            if isinstance(x, str):
+                for p in pats:
+                    x = p.sub(_SAMPLE_ALIAS, x)
+                return x
+            if isinstance(x, list):
+                return [walk(i) for i in x]
+            if isinstance(x, dict):
+                return {k: walk(v) for k, v in x.items()}
+            return x
+
+        payload = walk(payload)
+    payload["sample"] = True
+    return payload
+
+
+@api_router.get("/sample/report")
+async def get_public_sample_report():
+    """Public, no-auth JSON payload powering the /sample demo page — the full
+    premium report (same serializer as the owner view) with identity anonymized."""
+    doc = await _resolve_sample_report()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Sample report not available yet")
+    out = await _serialize_report(doc, include_full=True)
+    real_name = ((doc.get("player_details") or {}).get("player_name") or "")
+    return _anonymize_sample_payload(out, real_name)
+
+
 @api_router.get("/sample/scoutmeplay-report.pdf")
 async def download_public_sample_pdf():
     """Public, no-auth endpoint that streams a curated sample premium PDF.
