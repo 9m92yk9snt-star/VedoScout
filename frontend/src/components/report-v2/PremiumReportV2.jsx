@@ -15,6 +15,7 @@ import { MovementMapCard } from "./movement";
 import { ParentsPackageSection } from "./parents";
 import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
+import { ScoreGuideCard } from "./scoreguide";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -134,7 +135,7 @@ function ParentSummaryCard({ parentSummary }) {
   );
 }
 
-function OverallScoreCard({ overall, playerType, stars }) {
+function OverallScoreCard({ overall, playerType, stars, ctx, bracket }) {
   const pct = overall != null ? (overall / 10) * 100 : 0;
   return (
     <V2Card testid="v2-overall-score-card" className="flex flex-col items-center justify-center text-center">
@@ -149,6 +150,11 @@ function OverallScoreCard({ overall, playerType, stars }) {
         </span>
         <span className="relative text-[14px] text-[#8B957F] font-bold">/10</span>
       </div>
+      {ctx?.level && (
+        <div data-testid="v2-overall-level" className="bg-[#12402A] text-[#CCFF00] font-barlow font-extrabold text-[13px] tracking-[0.1em] uppercase px-4 py-1.5 rounded-full mb-2.5">
+          {ctx.level} level{bracket ? ` · ${bracket}` : ""}
+        </div>
+      )}
       <div className="text-[13px] font-extrabold tracking-[0.09em] uppercase text-[#101B12]">{playerType}</div>
       <div className="flex gap-1 my-2.5">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -156,7 +162,7 @@ function OverallScoreCard({ overall, playerType, stars }) {
         ))}
       </div>
       <p className="text-[12px] text-[#68766B] leading-[1.55] max-w-[290px]">
-        This score reflects the current level compared to other players of the same age in this position.
+        {ctx?.line || "This score reflects the current level compared to other players of the same age in this position."}
       </p>
     </V2Card>
   );
@@ -225,7 +231,7 @@ export default function PremiumReportV2({ report, assetBase }) {
       <div className="grid lg:grid-cols-[1fr_1.22fr_1fr] gap-4 mb-4">
         <PlayerHeroCard playerDetails={pd} photoCandidates={photoCandidates} positionAbbr={d.positionAbbr} />
         <ParentSummaryCard parentSummary={d.parentSummary} />
-        <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} />
+        <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} ctx={report.score_context?.overall} bracket={report.score_context?.bracket} />
       </div>
 
       {report.progression?.categories?.length > 0 ? (
@@ -265,6 +271,12 @@ export default function PremiumReportV2({ report, assetBase }) {
       {report.movement_map?.trail?.length > 0 && (
         <div className="mb-4">
           <MovementMapCard movement={report.movement_map} onPlayAt={playAt} />
+        </div>
+      )}
+
+      {report.score_context?.overall && (
+        <div className="mb-4">
+          <ScoreGuideCard sctx={report.score_context} />
         </div>
       )}
 

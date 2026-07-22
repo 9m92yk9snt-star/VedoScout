@@ -93,7 +93,7 @@ function _timestampFor(skillKey, videoComments) {
 }
 
 /* ── Compact skill row ─────────────────────────────────────────────────── */
-function SkillRow({ skillKey, score, pillar, videoComments, onSeek, expanded, onToggle, index }) {
+function SkillRow({ skillKey, score, pillar, videoComments, onSeek, expanded, onToggle, index, ctx }) {
   const meta = SKILL_MEANINGS[skillKey];
   if (!meta) return null;
   const pMeta = PILLAR_META[pillar];
@@ -150,6 +150,14 @@ function SkillRow({ skillKey, score, pillar, videoComments, onSeek, expanded, on
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {ctx?.level && (
+            <span
+              className="hidden sm:inline-block text-[8.5px] uppercase tracking-[0.14em] font-black text-forest bg-forest/8 border border-forest/25 px-1.5 py-0.5"
+              data-testid={`skill-level-${skillKey}`}
+            >
+              {ctx.level}
+            </span>
+          )}
           <span className={`font-barlow font-black text-xl tabular-nums leading-none ${tone}`}>
             {score}
             <span className="text-[9px] text-ink/40 font-bold ml-0.5">/10</span>
@@ -174,6 +182,12 @@ function SkillRow({ skillKey, score, pillar, videoComments, onSeek, expanded, on
             <Info className="w-3 h-3 mt-0.5 text-forest shrink-0" />
             <p><span className="font-bold text-ink/85">What we&apos;re looking at:</span> {meta.meaning}</p>
           </div>
+          {ctx?.line && (
+            <div className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed" data-testid={`skill-context-${skillKey}`}>
+              <span className="shrink-0 mt-0.5 text-[8.5px] uppercase tracking-[0.14em] font-black text-white bg-forest px-1.5 py-0.5">{ctx.level}</span>
+              <p className="text-forest font-medium italic">&ldquo;{ctx.line}&rdquo;</p>
+            </div>
+          )}
           {tsParsed && (
             <button
               type="button"
@@ -286,7 +300,7 @@ function BandChip({ tone, range, label }) {
 }
 
 /* ── Main export ───────────────────────────────────────────────────────── */
-export default function SkillsBreakdown({ fullReport, videoComments, onSeek, ageProfile }) {
+export default function SkillsBreakdown({ fullReport, videoComments, onSeek, ageProfile, scoreContext }) {
   const [expandedKey, setExpandedKey] = useState(null);
 
   // Collect every scored skill across all 4 pillars.
@@ -363,10 +377,11 @@ export default function SkillsBreakdown({ fullReport, videoComments, onSeek, age
         <div className="border border-gray-border bg-cream-card p-3 min-w-[210px]" data-testid="skills-legend">
           <div className="text-[9px] uppercase tracking-[0.28em] font-black text-ink/50 mb-2">Score bands</div>
           <div className="space-y-1.5">
-            <BandChip tone="bg-forest"      range="8–10" label="Elite / Pro" />
-            <BandChip tone="bg-forest-pop"  range="6.5–8" label="Strong club" />
-            <BandChip tone="bg-amber-600"   range="5–6.5" label="Standard club" />
-            <BandChip tone="bg-ink/40"      range="< 5"  label="Foundation" />
+            <BandChip tone="bg-forest"      range="9–10"    label="Elite" />
+            <BandChip tone="bg-forest-pop"  range="8–8.9"   label="Academy" />
+            <BandChip tone="bg-amber-600"   range="7–7.9"   label="Top Club" />
+            <BandChip tone="bg-amber-700"   range="5.5–6.9" label="Club" />
+            <BandChip tone="bg-ink/40"      range="< 5.5"   label="Grassroots" />
           </div>
         </div>
       </div>
@@ -426,8 +441,19 @@ export default function SkillsBreakdown({ fullReport, videoComments, onSeek, age
                 <div className="text-right shrink-0">
                   <div className={`font-barlow font-black text-2xl leading-none tabular-nums ${meta.accent}`}>{avg}</div>
                   <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-ink/45 mt-0.5">Pillar avg</div>
+                  {scoreContext?.categories?.[p]?.level && (
+                    <div className="mt-1 text-[8.5px] uppercase tracking-[0.14em] font-black text-white bg-forest px-1.5 py-0.5 inline-block" data-testid={`pillar-level-${p}`}>
+                      {scoreContext.categories[p].level}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {scoreContext?.categories?.[p]?.line && (
+                <p className="mb-3 -mt-1 text-[12px] text-forest italic leading-snug" data-testid={`pillar-context-${p}`}>
+                  &ldquo;{scoreContext.categories[p].line}&rdquo;
+                </p>
+              )}
 
               {/* Skill rows */}
               <div className="space-y-2">
@@ -442,6 +468,7 @@ export default function SkillsBreakdown({ fullReport, videoComments, onSeek, age
                     expanded={expandedKey === s.key}
                     onToggle={() => toggle(s.key)}
                     index={idx}
+                    ctx={scoreContext?.skills?.[s.key]}
                   />
                 ))}
               </div>

@@ -637,7 +637,7 @@ def _parent_summary_card(c, ps, x, y, w, h):
         gn_para.drawOn(c, x + PAD + 41, by + box_h - 22 - gh)
 
 
-def _overall_score_card(c, d, x, y, w, h):
+def _overall_score_card(c, d, x, y, w, h, ctx=None, bracket=None):
     card(c, x, y, w, h)
     cx = x + w / 2
     ty = y + h - PAD - 4
@@ -647,24 +647,36 @@ def _overall_score_card(c, d, x, y, w, h):
     c.drawCentredString(cx, ty - 19, "SCORE")
     overall = d["overall"]
     pct = (overall / 10 * 100) if overall is not None else 0
-    dy = ty - 78
-    draw_donut(c, cx, dy, 42, pct, thickness=11)
+    dy = ty - 74
+    draw_donut(c, cx, dy, 40, pct, thickness=10)
     c.setFillColor(INK)
-    c.setFont(F_BLACK, 27)
+    c.setFont(F_BLACK, 26)
     score_txt = f"{overall:.1f}" if overall is not None else "—"
     c.drawCentredString(cx - 4, dy - 8, score_txt)
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 8)
-    c.drawString(cx - 4 + c.stringWidth(score_txt, F_BLACK, 27) / 2 + 2, dy - 8, "/10")
-    ty = dy - 58
+    c.drawString(cx - 4 + c.stringWidth(score_txt, F_BLACK, 26) / 2 + 2, dy - 8, "/10")
+    ty = dy - 54
+    if ctx and ctx.get("level"):
+        lbl = f"{ctx['level'].upper()} LEVEL" + (f" · {bracket}" if bracket else "")
+        lw2 = c.stringWidth(lbl, F_BLACK, 6.6) + 16
+        c.saveState()
+        c.setFillColor(FOREST)
+        c.roundRect(cx - lw2 / 2, ty - 3, lw2, 13, 6.5, stroke=0, fill=1)
+        c.setFillColor(HexColor("#CCFF00"))
+        c.setFont(F_BLACK, 6.6)
+        c.drawCentredString(cx, ty + 1, lbl)
+        c.restoreState()
+        ty -= 15
     c.setFillColor(INK)
     c.setFont(F_BOLD, 8.6)
     c.drawCentredString(cx, ty, str(d["playerType"]).upper())
     draw_stars_row(c, cx, ty - 13, d["stars"])
-    draw_par(c, esc("This score reflects the current level compared to other players "
-                    "of the same age in this position."),
-             x + PAD + 4, ty - 24, w - 2 * PAD - 8,
-             _style(F_BODY, 6.8, HexColor("#68766B"), leading=9.4, align=TA_CENTER))
+    line = (ctx or {}).get("line") or ("This score reflects the current level compared to other players "
+                                       "of the same age in this position.")
+    draw_par(c, esc(line), x + PAD + 4, ty - 24, w - 2 * PAD - 8,
+             _style(F_BODY, 6.8, HexColor("#68766B"), leading=9.4, align=TA_CENTER),
+             max_h=ty - 24 - y - PAD + 6)
 
 
 def _snapshot_card(c, snap, x, y, w, h):
@@ -1715,6 +1727,120 @@ def _letter_card(c, msg, x, y, w, h, player_name):
                  _style(F_SCRIPT, 12, GREEN, leading=15, align=TA_RIGHT), max_h=iy - y - PAD)
 
 
+LEVELS_ORDER = ["Grassroots", "Club", "Top Club", "Academy", "Elite"]
+CAT_LABELS = {"technical": "Technical", "tactical": "Tactical", "physical": "Physical", "mentality": "Mindset"}
+
+
+def _level_chip(c, x, cy, level, small=False):
+    """Draw a forest/lime level chip; returns its width."""
+    fs = 5.4 if small else 6.4
+    lbl = str(level).upper()
+    lw2 = c.stringWidth(lbl, F_BLACK, fs) + (10 if small else 14)
+    hh = 10 if small else 13
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(x, cy - hh / 2, lw2, hh, hh / 2, stroke=0, fill=1)
+    c.setFillColor(HexColor("#CCFF00"))
+    c.setFont(F_BLACK, fs)
+    c.drawCentredString(x + lw2 / 2, cy - fs / 2 + 1.2, lbl)
+    c.restoreState()
+    return lw2
+
+
+def _level_scale(c, x, y, w, active_level):
+    """Horizontal 5-step level scale with the player's level highlighted."""
+    seg_w = (w - 4 * 4) / 5
+    for i, lv in enumerate(LEVELS_ORDER):
+        bx = x + i * (seg_w + 4)
+        active = lv == active_level
+        c.saveState()
+        c.setFillColor(FOREST if active else HexColor("#EDE8D6"))
+        c.roundRect(bx, y, seg_w, 16, 4, stroke=0, fill=1)
+        c.setFillColor(HexColor("#CCFF00") if active else MUTED)
+        c.setFont(F_BLACK, 6)
+        c.drawCentredString(bx + seg_w / 2, y + 5.4, lv.upper())
+        c.restoreState()
+
+
+def _score_guide_page(c, sctx, d, player_name, page_no, total_pages):
+    """Full page: what every score means — level words + plain sentences."""
+    _page_bg(c)
+    mh = _mini_header(c, player_name)
+    yy = H - M - mh - 4
+
+    # header card with level scale
+    h_hd = 86
+    card(c, M, yy - h_hd, CW, h_hd)
+    ty = yy - PAD
+    ty -= card_title(c, M + PAD, ty, f"What The Scores Mean · {sctx.get('bracket', '')}", CW - 2 * PAD)
+    ov = sctx.get("overall") or {}
+    _level_scale(c, M + PAD, ty - 20, CW - 2 * PAD, ov.get("level"))
+    c.setFillColor(MUTED)
+    c.setFont(F_BODY, 6.6)
+    c.drawString(M + PAD, ty - 32, "Every score below is translated into a level every parent knows — and one plain sentence about what it looks like on the pitch.")
+    yy -= h_hd + GAP
+
+    # 2×2 category blocks
+    cats = sctx.get("categories") or {}
+    cw2 = (CW - GAP) / 2
+    h_cat = 78
+    order = [k for k in ("technical", "tactical", "physical", "mentality") if k in cats]
+    for i, key in enumerate(order):
+        cx0 = M + (i % 2) * (cw2 + GAP)
+        cy0 = yy - h_cat - (i // 2) * (h_cat + GAP)
+        ctx = cats[key]
+        card(c, cx0, cy0, cw2, h_cat, fill=HexColor("#FBF9F3"))
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 6)
+        c.drawString(cx0 + PAD, cy0 + h_cat - 16, CAT_LABELS[key].upper() + " · PILLAR")
+        c.setFillColor(INK)
+        c.setFont(F_BLACK, 17)
+        st = f"{ctx['score']:.1f}"
+        c.drawString(cx0 + PAD, cy0 + h_cat - 34, st)
+        _level_chip(c, cx0 + PAD + c.stringWidth(st, F_BLACK, 17) + 8, cy0 + h_cat - 29, ctx["level"])
+        draw_par(c, esc(f"\u201c{ctx['line']}\u201d"), cx0 + PAD, cy0 + h_cat - 42, cw2 - 2 * PAD,
+                 _style(F_BODY, 6.8, GREEN, leading=9.2), max_h=h_cat - 48)
+    yy -= 2 * h_cat + GAP + GAP
+
+    # skills — two columns of compact rows
+    skills = sctx.get("skills") or {}
+    if skills:
+        rows = sorted(skills.items(), key=lambda kv: -kv[1]["score"])
+        n_col = 2
+        per_col = (len(rows) + 1) // n_col
+        row_h = 30
+        h_sk = min(per_col * row_h + 34.0, yy - M - 58)
+        card(c, M, yy - h_sk, CW, h_sk)
+        ty2 = yy - PAD
+        ty2 -= card_title(c, M + PAD, ty2, "Every Skill · Level By Level", CW - 2 * PAD)
+        col_w = (CW - 3 * PAD) / 2
+        from progression import SKILL_LABELS
+        max_rows = int((h_sk - 34) // row_h)
+        for i, (k, ctx) in enumerate(rows[:max_rows * 2]):
+            col = i // max_rows
+            rowi = i % max_rows
+            bx = M + PAD + col * (col_w + PAD)
+            by = ty2 - rowi * row_h
+            label = SKILL_LABELS.get(k, k.replace("_", " ").title())
+            c.setFillColor(INK)
+            c.setFont(F_BOLD, 7.2)
+            c.drawString(bx, by - 8, label.upper())
+            st = f"{ctx['score']:.1f}"
+            c.setFillColor(FOREST)
+            c.setFont(F_BLACK, 8)
+            c.drawRightString(bx + col_w - 52, by - 8, st)
+            _level_chip(c, bx + col_w - 46, by - 5.4, ctx["level"], small=True)
+            draw_par(c, esc(ctx["line"]), bx, by - 12, col_w,
+                     _style(F_BODY, 5.8, MUTED, leading=7.6), max_h=row_h - 14)
+        yy -= h_sk + 8
+
+    # method note
+    draw_par(c, esc(sctx.get("method_note") or ""), M + 2, yy - 4, CW - 4,
+             _style(F_BODY, 6, MUTED, leading=8.4), max_h=30)
+    _page_footer(c, page_no, total_pages)
+    c.showPage()
+
+
 def _cutout_frame(c, x, y, w, h, label):
     """Dashed cut-out border + label — signals 'print & cut this out'."""
     c.saveState()
@@ -1995,10 +2121,12 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     pp = d.get("parentsPackage")
     missions = d.get("missions") or []
     has_print = bool(missions or d.get("trainingWeek"))
+    sctx = report_doc.get("score_context")
+    sctx = sctx if isinstance(sctx, dict) and sctx.get("overall") else None
     prog = report_doc.get("progression")
     prog = prog if isinstance(prog, dict) and prog.get("categories") else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 4 + (1 if has_p4 else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    total_pages = 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if pp else 0) + (1 if has_print else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -2020,7 +2148,8 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     hero_photo = _pick_hero_photo(report_doc, resolve)
     _hero_card(c, d, pd, M, row1_top - h1, c1, h1, hero_photo)
     _parent_summary_card(c, d["parentSummary"], M + c1 + GAP, row1_top - h1, c2, h1)
-    _overall_score_card(c, d, M + c1 + c2 + 2 * GAP, row1_top - h1, c3, h1)
+    _overall_score_card(c, d, M + c1 + c2 + 2 * GAP, row1_top - h1, c3, h1,
+                        ctx=(sctx or {}).get("overall"), bracket=(sctx or {}).get("bracket"))
 
     row2_top = row1_top - h1 - GAP
     h2 = 240
@@ -2141,6 +2270,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         _page_footer(c, 4, total_pages)
         c.showPage()
 
+    # ── PAGE — Score guide (what every score means) ──
+    if sctx:
+        _score_guide_page(c, sctx, d, player_name, 4 + (1 if has_p4 else 0), total_pages)
+
     # ── PAGE — Parents Package (home drills / watch together / letter) ──
     if pp:
         _page_bg(c)
@@ -2161,7 +2294,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                     _watch_together_card(c, pp["watch"], M, yy - cols_h, CW, cols_h)
                 else:
                     _letter_card(c, pp["message"], M, yy - cols_h, CW, cols_h, player_name)
-        _page_footer(c, 4 + (1 if has_p4 else 0), total_pages)
+        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0), total_pages)
         c.showPage()
 
     # ── PAGE — Printables (mission card + training week planner) ──
@@ -2183,7 +2316,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 _week_planner_print(c, d["trainingWeek"],
                                     ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
                                     M, yy - h_wp, CW, h_wp)
-        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if pp else 0), total_pages)
+        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if pp else 0), total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──

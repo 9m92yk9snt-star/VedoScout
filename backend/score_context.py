@@ -6,13 +6,12 @@ from __future__ import annotations
 BRACKETS = [(0, 8, "U6-U8"), (9, 11, "U9-U11"), (12, 14, "U12-U14"), (15, 17, "U15-U17"), (18, 99, "U18-U21")]
 
 BANDS = [
-    # (min_score, pct_lo, pct_hi, level, maturity)
-    (9.0, 95, 98, "Elite Academy", "~2+ years ahead of the age curve"),
-    (8.0, 90, 95, "Academy", "~1-2 years ahead of the age curve"),
-    (7.0, 75, 90, "Strong Club", "clearly ahead of the age curve"),
-    (6.0, 55, 75, "Club", "on the age curve — with clear upside"),
-    (5.0, 35, 55, "Club (developing)", "typical for the age group"),
-    (0.0, 10, 35, "Developing", "earlier on the curve — the most trainable phase"),
+    # (min_score, level)
+    (9.0, "Elite"),
+    (8.0, "Academy"),
+    (7.0, "Top Club"),
+    (5.5, "Club"),
+    (0.0, "Grassroots"),
 ]
 
 CAT_LINES = {
@@ -68,9 +67,9 @@ SKILL_LINES = {
 
 CATS = ["technical", "tactical", "physical", "mentality"]
 
-METHOD_NOTE = ("How to read these benchmarks: calibrated estimates for players in organised youth football, "
-               "built from age-stage development standards and evidence-based AI observation — not a global ranking. "
-               "Percentiles are shown as honest ranges, never false precision.")
+METHOD_NOTE = ("Levels are calibrated for organised youth football at this age group: "
+               "Grassroots · Club · Top Club · Academy · Elite. A level describes this skill "
+               "TODAY — it is a snapshot, not a ceiling.")
 
 
 def _bracket(age) -> str:
@@ -84,11 +83,11 @@ def _bracket(age) -> str:
     return "U18-U21"
 
 
-def _band(score: float):
-    for mn, lo, hi, level, mat in BANDS:
+def _level(score: float) -> str:
+    for mn, level in BANDS:
         if score >= mn:
-            return lo, hi, level, mat
-    return 10, 35, "Developing", "earlier on the curve"
+            return level
+    return "Grassroots"
 
 
 def _tier(score: float) -> str:
@@ -96,12 +95,21 @@ def _tier(score: float) -> str:
 
 
 def _ctx(score: float, line: str, next_step: str | None = None) -> dict:
-    lo, hi, level, mat = _band(score)
     return {
-        "score": round(score, 1), "pct_lo": lo, "pct_hi": hi, "level": level,
-        "maturity": mat, "line": line,
+        "score": round(score, 1),
+        "level": _level(score),
+        "line": line,
         "next_step": next_step if (next_step and score >= 7.5) else None,
     }
+
+
+OVERALL_LINES = {
+    "Elite": "A profile that would stand out even in an elite academy session for this age group.",
+    "Academy": "Taken as a whole, this is the level academy players typically show at this age.",
+    "Top Club": "The overall picture of a player who stands out at good club level.",
+    "Club": "A solid club-level foundation for the age group — with clear room to climb.",
+    "Grassroots": "Early on the football journey — exactly where the biggest jumps happen.",
+}
 
 
 def build_score_context(full: dict, age) -> dict | None:
@@ -128,17 +136,10 @@ def build_score_context(full: dict, age) -> dict | None:
             if isinstance(s, (int, float)) and lines:
                 skills[k] = _ctx(float(s), lines[_tier(float(s))], lines.get("next"))
                 skills[k]["category"] = cat
-    verified = sum(1 for a in (full.get("action_timeline") or [])
-                   if isinstance(a, dict) and a.get("tracking_verified"))
-    cited = len(full.get("video_comments") or [])
-    ev = f"Based on {cited} cited moments in this video" if cited else "Based on this video's full analysis"
-    if verified:
-        ev += f" · {verified} tracking-verified"
     return {
         "bracket": bracket,
-        "overall": _ctx(float(ov), f"The overall picture of a {_band(float(ov))[2].lower()}-level profile for {bracket}."),
+        "overall": _ctx(float(ov), OVERALL_LINES[_level(float(ov))]),
         "categories": categories,
         "skills": skills,
-        "evidence": ev,
         "method_note": METHOD_NOTE,
     }

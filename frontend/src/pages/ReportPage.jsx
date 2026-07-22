@@ -2883,6 +2883,7 @@ export default function ReportPage() {
                     videoComments={full_report.video_comments || []}
                     onSeek={seekVideoTo}
                     ageProfile={age_profile_reference}
+                    scoreContext={report.score_context}
                   />
 
                   {/* Performance Radar — cinematic dark centrepiece (custom SVG + Nano Banana bg) */}

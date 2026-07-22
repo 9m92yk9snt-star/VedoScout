@@ -5963,6 +5963,12 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         out["identity_stats"] = doc.get("identity_stats")
         out["movement_map"] = doc.get("movement_map")
         out["progression"] = await compute_progression_for_report(doc)
+        try:
+            out["score_context"] = build_score_context(
+                doc.get("full_report") or {}, (doc.get("player_details") or {}).get("age"))
+        except Exception:
+            logger.exception("score context failed")
+            out["score_context"] = None
         out["trial_readiness"] = compute_trial_readiness(
             doc.get("full_report") or {},
             doc.get("player_details") or {},
@@ -9070,6 +9076,10 @@ def _ensure_report_pdf(doc: dict, shared: bool = False) -> Path:
         return pdf_path
     _purge_stale_pdfs(report_id)
     # Deterministic enrichment so PDF == web report.
+    doc["score_context"] = build_score_context(
+        doc.get("full_report") or {},
+        (doc.get("player_details") or {}).get("age"),
+    )
     doc["trial_readiness"] = compute_trial_readiness(
         doc.get("full_report") or {},
         doc.get("player_details") or {},
@@ -12565,14 +12575,6 @@ async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"scout_access.status": "active", "scout_access.revoked_at": None, "scout_access.revoked_reason": None}},
-    )
-    return {"ok": True, "user_id": user_id, "restored": True}
-
-
-# Register the API router LAST so it includes every @api_router route defined above
-# (including scout-access + players-database endpoints in Fase 2).
-app.include_router(api_router)
-t_access.revoked_reason": None}},
     )
     return {"ok": True, "user_id": user_id, "restored": True}
 
