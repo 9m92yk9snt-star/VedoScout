@@ -101,7 +101,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 20  # v20 = printables page (mission card + training week planner)
+PDF_RENDER_VERSION = 21  # v21 = score benchmark page (bell curves + scout lines)
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -11853,6 +11853,7 @@ from telestration import render_telestration
 from player_tracking import track_player, track_at
 from movement_metrics import compute_movement_map
 from progression import build_progression
+from score_context import build_score_context
 from pdf_v2 import build_pdf_v2
 
 
@@ -12564,6 +12565,14 @@ async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
     await db.users.update_one(
         {"id": user_id},
         {"$set": {"scout_access.status": "active", "scout_access.revoked_at": None, "scout_access.revoked_reason": None}},
+    )
+    return {"ok": True, "user_id": user_id, "restored": True}
+
+
+# Register the API router LAST so it includes every @api_router route defined above
+# (including scout-access + players-database endpoints in Fase 2).
+app.include_router(api_router)
+t_access.revoked_reason": None}},
     )
     return {"ok": True, "user_id": user_id, "restored": True}
 
