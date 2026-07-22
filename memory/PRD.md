@@ -1,5 +1,16 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jul 22, 2026 — Skat-hjælper) — DANISH TAX HELPER ADMIN TAB ✅
+- **User request**: admin section that helps him report Danish taxes (SKAT) — income + expenses easily, he has CVR, no accounting knowledge. Choices: has CVR (1b), auto Stripe income (2a), 2026 only (3a).
+- **Backend**: NEW `/app/backend/tax_helper.py` (`build_tax_router(db, get_current_admin, upload_dir)`, wired in server.py after chunked_upload router). Endpoints (all admin-only, prefix `/api/admin/tax`):
+  - `GET /summary?year=2026` — income auto from `payment_transactions` (payment_status=paid), each USD txn converted to DKK via ECB daily rate (`api.frankfurter.dev/v1/{date}`, cached in Mongo `fx_rates`, fallback chain nearest-cache → 6.50 w/ `fx_approximate` flag); monthly breakdown; expenses from `tax_expenses` coll w/ per-category totals + købsmoms (20% of vat_included expenses); result + rubrik 111/112; VAT half-year revenue + deadlines + all-DK salgsmoms estimate; 5-step Danish CVR guide (bogføring/moms via TastSelv/oplysningsskema/forskudsopgørelse/opstartsudgifter) + disclaimer.
+  - `POST /expenses` (multipart: amount_dkk, date YYYY-MM-DD, category [hosting/ai/domain/software/marketing/equipment/other], note, vat_included, optional receipt jpg/png/webp/pdf/heic ≤15MB → saved `uploads/receipts/{id}.{ext}` + R2 flush → `/api/media/receipts/...`), `DELETE /expenses/{id}`.
+  - `GET /export.csv` (semicolon+BOM Excel-friendly, income txns w/ FX rate + expenses + totals) and `GET /export.pdf` (reportlab summary — Danish number format via `_kr()`).
+- **Frontend**: NEW `admin/TaxAdmin.jsx` — "Skat" tab in AdminPage (between Payments and Diagnostics). Danish UI: 4 stat cards (Indtægter/Udgifter/Årets resultat m. rubrik/Moms vejledende), add-expense form (beløb/dato/kategori/note/moms-checkbox/kvittering), monthly income table (auto from Stripe), expense list w/ category chips + receipt links + delete, moms half-year cards w/ deadlines, accordion guide. Testids: `admin-tab-tax`, `tax-card-*`, `tax-expense-*`, `tax-export-csv/pdf`, `tax-guide-step-*`, `tax-vat-section`.
+- **GOTCHA fixed**: frankfurter.app 301-redirects to frankfurter.dev — httpx doesn't follow redirects by default → all FX fell to fallback. Fixed: direct `api.frankfurter.dev/v1/` + follow_redirects.
+- **VERIFIED e2e**: real ECB rate on txn date (6.4211 on 2026-06-04); expense create w/ receipt → R2 proxy 200; UI add via form (toast + live totals); delete; CSV content correct; PDF text-asserted (SKATTERAPPORT/rubrik/MOMS, Danish 1.650,50 format). Test expenses cleaned — user starts with a clean ledger.
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Session (Jul 22, 2026 — nav fix) — TOP MENU OVERLAP BUG (user-reported) ✅
 - **User bug**: desktop top menu — "How it works"/"Home" links rendered ON TOP of the SCOUTMEPLAY logo (screenshot from user, confirmed at 1024/1280/1440px).
 - **Root cause**: 8 inline nav links + logo + CTAs exceed available width; logo Link had `min-w-0 shrink` while its wordmark is `whitespace-nowrap` → flex item shrank but text overflowed under the nav.

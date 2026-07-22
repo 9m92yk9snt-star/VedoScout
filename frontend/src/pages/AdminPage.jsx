@@ -17,6 +17,7 @@ import ScoutVerificationAdmin from "@/components/admin/ScoutVerificationAdmin";
 import DemoVideosAdmin from "@/components/admin/DemoVideosAdmin";
 import GrantAccessAdmin from "@/components/admin/GrantAccessAdmin";
 import DiagnosticsAdmin from "@/components/admin/DiagnosticsAdmin";
+import TaxAdmin from "@/components/admin/TaxAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
@@ -31,6 +32,7 @@ const ALL_TABS = [
   { id: "faq", label: "FAQ", role: "admin" },
   { id: "blog", label: "Blog", role: "admin" },
   { id: "payments", label: "Payments", role: "admin" },
+  { id: "tax", label: "Skat", role: "admin" },
   { id: "diagnostics", label: "Diagnostics", role: "admin" },
   { id: "settings", label: "Settings", role: "admin" },
 ];
@@ -412,6 +414,7 @@ export default function AdminPage() {
 
               {activeTab === "grant-access" && <GrantAccessAdmin />}
               {activeTab === "diagnostics" && <DiagnosticsAdmin />}
+              {activeTab === "tax" && <TaxAdmin />}
               {activeTab === "demo-videos" && <DemoVideosAdmin />}
 
               {activeTab === "blog" && <BlogAdmin />}

@@ -11916,6 +11916,12 @@ api_router.include_router(build_chunked_upload_router(
     get_current_user=get_current_user,
     db=db,
 ))
+from tax_helper import build_tax_router
+api_router.include_router(build_tax_router(
+    db=db,
+    get_current_admin=get_current_admin,
+    upload_dir=UPLOAD_DIR,
+))
 api_router.include_router(build_progress_router(
     db=db,
     get_current_user=get_current_user,
