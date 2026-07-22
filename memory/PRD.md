@@ -27,6 +27,13 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026) — Action Timeline (user-approved pick "B") DONE ✅
+- **Prompt** (FULL_REPORT_PROMPT): new `action_timeline` field — EVERY observable involvement of the tapped player, chronological, 6-15 entries: `{timestamp, action_type, title, description, rating 1-10|null, outcome positive|neutral|negative, identity_confidence}`. Same hard identity rules (omit if not re-identifiable). `_filter_low_identity_evidence` extended to strip low-confidence timeline rows (retry path).
+- **Web**: `ActionTimelineCard` (sections.jsx) — vertical dotted timeline, forest ts-chips, title+description, rating right (orange when outcome=negative), whole row CLICKS to `playAt(timestamp)` (video seek). Rendered full-width after Row 3 in PremiumReportV2. testids: `v2-action-timeline-card`, `v2-action-row-{i}`. derive.js filters low-confidence + normalizes casing (Gemini returns "Positive"/"High" capitalized — handled via .toLowerCase()).
+- **PDF** (pdf_v2.py): `_action_timeline_card` inserted on page 3 between row 5 and the forest footer; height computed dynamically from available space (rows capped so promo/QR + disclaimer always fit; skipped when <3 rows fit). Same outcome-casing normalization in `_action_timeline`.
+- **VERIFIED**: REAL Gemini e2e on test report 78b5ea4a — model returned a valid action_timeline (1 honest entry for a short shot clip); strict identity policy fired live (frame REJECTED high-conf → re-window +2s → CONFIRMED replacement, 2/2 verified). PDF page 3 rasterised + visually inspected (owner: 6 rows, shared+QR: 5 rows, orange negative row); web screenshot: 6 rows, low-confidence row filtered, dots/chips/ratings correct. Click-to-seek uses the SAME proven playAt path as strength thumbnails (headless test browser lacks H.264 — canPlayType empty — so seek can't be asserted there; verified earlier in real Chrome, iteration_59). Fabricated seed data removed from report 9cf9c397 afterwards (trust policy).
+- Old reports without the field simply hide the card. ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jun/Jul 22, 2026) — STRICT Evidence Image Policy + score stability (P0, user-approved) DONE ✅
 - **User mandate**: evidence images/timestamps must NEVER show the wrong player; images should be sharper; same video should give the same score (preview gave 8, prod gave 6).
 - **1. Strict verdicts** (`identity_verify.py`): `verify_frame_identity` now returns `"confirmed" | "uncertain" | "rejected" | "error"`. match+low-conf → uncertain (previously slipped through as None and KEPT the image); ANY non-high-conf rejection → uncertain (previously kept).

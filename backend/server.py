@@ -2451,6 +2451,9 @@ Track ONLY that player across the video. If you lose sight of them in some momen
 🎯 EVIDENCE IDENTITY CHECK (mandatory before EVERY cited timestamp)
 Before writing ANY evidence timestamp (in video_comments or a sub-skill evidence list), silently re-identify the player at that exact moment: where are they in the frame, are they fully or partially visible, who stands in front of/behind them, and why is this the SAME player the user tapped. If you cannot re-identify the tapped player with reasonable certainty at a moment, DO NOT cite that moment. For every video_comments entry, fill in the player_check and identity_confidence fields honestly.
 
+🎯 ACTION TIMELINE (chronological match report)
+In action_timeline, list EVERY clearly observable involvement of the tapped player in strict chronological order — touches, passes, dribbles, shots, runs, duels, defensive actions. Aim for 6-15 entries depending on footage length. Rate each single action 1-10 (or null when the action is not ratable). THE SAME IDENTITY RULES APPLY: re-identify the tapped player at every timestamp; if you cannot, OMIT the entry entirely. Never list an action performed by a different player. Timestamps must be real moments you observed in the footage — never invented.
+
 🎯 CONTENT AWARENESS (from pre-analysis)
 CONTENT_TYPE: {content_type}
 QUALITY: {quality}
@@ -2585,6 +2588,7 @@ Produce a JSON object EXACTLY in this format:
     "ninety_day_plan": "<paragraph>"
   },
   "video_comments": [{"timestamp": "MM:SS", "comment": "<specific moment observation in plain words>", "player_check": "<where the tapped player is in the frame at this exact moment — pitch position, fully or partially visible, who is in front/behind>", "identity_confidence": "high" | "medium" | "low"}],
+  "action_timeline": [{"timestamp": "MM:SS", "action_type": "first_touch" | "dribble" | "pass" | "shot" | "run" | "duel" | "defensive" | "cross" | "finish" | "other", "title": "<3-5 word plain-words headline, e.g. 'Beats his man wide'>", "description": "<one specific sentence about exactly what the tapped player did at this moment>", "rating": <1-10 with one decimal for THIS single action, or null>, "outcome": "positive" | "neutral" | "negative", "identity_confidence": "high" | "medium" | "low"}],
   "match_stats": {
     "total_actions": <integer — DISTINCT observable involvements of THIS PLAYER (touches, passes, shots, duels, runs) you actually counted in the footage>,
     "successful_dribbles": <integer>,
@@ -5972,6 +5976,11 @@ def _filter_low_identity_evidence(full: dict, report_id: str) -> dict:
         if len(kept) != len(vcs):
             logger.info(f"[identity] {report_id}: removed {len(vcs) - len(kept)} low-confidence evidence rows")
             full["video_comments"] = kept
+        ats = full.get("action_timeline") or []
+        kept_a = [a for a in ats if not (isinstance(a, dict) and str(a.get("identity_confidence", "")).lower() == "low")]
+        if len(kept_a) != len(ats):
+            logger.info(f"[identity] {report_id}: removed {len(ats) - len(kept_a)} low-confidence timeline rows")
+            full["action_timeline"] = kept_a
     except Exception:
         pass
     return full

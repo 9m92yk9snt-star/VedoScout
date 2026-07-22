@@ -233,6 +233,22 @@ export function deriveV2(report) {
   const overall = typeof full.scores?.overall_development === "number" ? full.scores.overall_development : null;
   const ageBracket = ob.age_bracket_used || null;
 
+  // ---- Action timeline (chronological match report) ----
+  const actionTimeline = (Array.isArray(full.action_timeline) ? full.action_timeline : [])
+    .filter((a) => a && a.timestamp && (a.title || a.description)
+      && String(a.identity_confidence || "").toLowerCase() !== "low")
+    .slice(0, 15)
+    .map((a) => {
+      const oc = String(a.outcome || "").toLowerCase();
+      return {
+        timestamp: a.timestamp,
+        title: a.title || String(a.action_type || "").replace(/_/g, " "),
+        description: firstSentences(a.description, 110),
+        rating: typeof a.rating === "number" ? a.rating : null,
+        outcome: ["positive", "neutral", "negative"].includes(oc) ? oc : "neutral",
+      };
+    });
+
   // ---- Evidence-integrity note (strict image policy) ----
   const ist = report?.identity_stats;
   const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
@@ -246,6 +262,6 @@ export function deriveV2(report) {
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
-    matchStats, videoHighlight, identityNote,
+    matchStats, videoHighlight, identityNote, actionTimeline,
   };
 }

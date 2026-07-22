@@ -9,6 +9,7 @@ import {
   V2Card, V2Title, SnapshotCard, MatchStatsCard, AgeComparisonCard,
   TopStrengthsCard, DevPrioritiesCard, RoadmapCard, TrainingPlanCard,
   ParentTipsCard, VideoHighlightCard, CoachNotesCard, ScoutOutlookCard,
+  ActionTimelineCard,
 } from "./sections";
 
 const resolveUrl = (url, base) => {
@@ -240,6 +241,12 @@ export default function PremiumReportV2({ report, assetBase }) {
         <div data-testid="v2-identity-note" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#8A6D3B] bg-[#FFF8E9] border border-[#F0E3C4] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
           <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>{d.identityNote}</span>
+        </div>
+      )}
+
+      {d.actionTimeline?.length > 0 && (
+        <div className="mb-4">
+          <ActionTimelineCard actions={d.actionTimeline} onPlayAt={playAt} />
         </div>
       )}
 

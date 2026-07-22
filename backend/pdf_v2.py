@@ -339,7 +339,28 @@ def derive_v2(report):
         "parentTips": parent_tips, "coachNotes": coach_notes, "scoutOutlook": scout_outlook,
         "matchStats": match_stats, "videoHighlight": video_highlight,
         "identityNote": _identity_note(report),
+        "actionTimeline": _action_timeline(full),
     }
+
+
+def _action_timeline(full):
+    out = []
+    for a in (full.get("action_timeline") or []):
+        if not isinstance(a, dict) or not a.get("timestamp"):
+            continue
+        if not (a.get("title") or a.get("description")):
+            continue
+        if str(a.get("identity_confidence", "")).lower() == "low":
+            continue
+        oc = str(a.get("outcome") or "").lower()
+        out.append({
+            "timestamp": a["timestamp"],
+            "title": a.get("title") or str(a.get("action_type") or "").replace("_", " "),
+            "description": first_sentences(a.get("description"), 110),
+            "rating": a.get("rating") if isinstance(a.get("rating"), (int, float)) else None,
+            "outcome": oc if oc in ("positive", "neutral", "negative") else "neutral",
+        })
+    return out[:15]
 
 
 def _identity_note(report):
@@ -834,6 +855,52 @@ def _parent_tips_card(c, tips, x, y, w, h):
         ty -= item_h
 
 
+def _action_timeline_card(c, actions, x, y, w, h):
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "Action Timeline", w - 2 * PAD)
+    row_h = (ty - y - 4) / max(1, len(actions))
+    lx = x + PAD + 5
+    c.saveState()
+    c.setStrokeColor(SOFT_BORDER)
+    c.setLineWidth(1.2)
+    c.line(lx, y + 10, lx, ty - 8)
+    c.restoreState()
+    orange = HexColor("#DD6B20")
+    for a in actions:
+        cy = ty - row_h / 2
+        col = orange if a.get("outcome") == "negative" else FOREST
+        c.saveState()
+        c.setFillColor(col)
+        c.setStrokeColor(HexColor("#FFFFFF"))
+        c.setLineWidth(1.2)
+        c.circle(lx, cy, 3.1, stroke=1, fill=1)
+        ts = str(a.get("timestamp") or "")
+        chip_w = c.stringWidth(ts, F_BLACK, 7) + 10
+        c.setFillColor(FOREST)
+        c.roundRect(lx + 10, cy - 6.5, chip_w, 13, 5, stroke=0, fill=1)
+        c.setFillColor(LIME)
+        c.setFont(F_BLACK, 7)
+        c.drawCentredString(lx + 10 + chip_w / 2, cy - 2.4, ts)
+        tx0 = lx + 16 + chip_w
+        c.setFillColor(INK)
+        c.setFont(F_BOLD, 7.6)
+        c.drawString(tx0, cy + 1.5, str(a.get("title") or "").upper())
+        desc = str(a.get("description") or "")
+        max_w = w - PAD - tx0 - 40
+        c.setFont(F_BODY, 6.6)
+        while desc and c.stringWidth(desc, F_BODY, 6.6) > max_w:
+            desc = desc[:-4].rstrip() + "…"
+        c.setFillColor(MUTED)
+        c.drawString(tx0, cy - 7.5, desc)
+        if a.get("rating") is not None:
+            c.setFillColor(col)
+            c.setFont(F_BLACK, 9)
+            c.drawRightString(x + w - PAD, cy - 3, f"{float(a['rating']):.1f}")
+        c.restoreState()
+        ty -= row_h
+
+
 def _video_highlight_card(c, vh, x, y, w, h, resolve):
     card(c, x, y, w, h)
     ty = y + h - PAD
@@ -1157,6 +1224,15 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                         CW - cv1 - cv2 - 2 * GAP, h5)
 
     fy = row5_top - h5 - GAP - 78
+    at = d.get("actionTimeline") or []
+    if at:
+        reserve = (GAP + 66 if promo else 0) + 40 + M
+        avail = row5_top - h5 - 2 * GAP - 78 - reserve
+        rows = min(len(at), int((avail - 31) / 19)) if avail > 90 else 0
+        if rows >= 3:
+            th_at = 31 + rows * 19 + 6
+            _action_timeline_card(c, at[:rows], M, row5_top - h5 - GAP - th_at, CW, th_at)
+            fy = row5_top - h5 - GAP - th_at - GAP - 78
     _forest_footer(c, M, fy, CW, 78)
     dy = fy - 14
     if promo:

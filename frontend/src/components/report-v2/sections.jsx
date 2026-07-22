@@ -157,6 +157,47 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
 const DP_ICONS = [Bell, Footprints, Brain];
 const HTI_ICONS = [Dumbbell, Timer, MonitorPlay];
 
+const AT_OUTCOME = { positive: "#12402A", neutral: "#5B695E", negative: "#DD6B20" };
+
+export function ActionTimelineCard({ actions, onPlayAt }) {
+  if (!actions?.length) return null;
+  return (
+    <V2Card testid="v2-action-timeline-card">
+      <V2Title icon={ClipboardList} right={<span className="text-[11px] font-extrabold tracking-[0.14em] text-[#1E5B3C] hidden md:block">{actions.length} ACTIONS · TAP TO WATCH</span>}>
+        Action Timeline
+      </V2Title>
+      <div className="relative pl-7">
+        <div className="absolute left-[7px] top-2 bottom-2 w-[2px] bg-[#EFEADB]" />
+        {actions.map((a, i) => (
+          <button
+            key={i}
+            type="button"
+            data-testid={`v2-action-row-${i}`}
+            onClick={() => onPlayAt?.(a.timestamp)}
+            className={`relative w-full text-left flex items-center gap-3 py-2.5 group ${i < actions.length - 1 ? "border-b border-[#F2EDDE]" : ""}`}
+          >
+            <span
+              className="absolute -left-7 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-[3px] border-white shadow-[0_1px_4px_rgba(30,50,35,0.25)]"
+              style={{ background: AT_OUTCOME[a.outcome] || AT_OUTCOME.neutral }}
+            />
+            <span className="bg-[#12402A] text-[#CCFF00] font-barlow font-extrabold text-[12px] px-2 py-0.5 rounded-[6px] tabular-nums shrink-0">{a.timestamp}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[12.5px] font-extrabold tracking-[0.04em] uppercase text-[#1C2B21] group-hover:text-[#12402A] transition-colors">{a.title}</span>
+              {a.description && <span className="block text-[11.5px] text-[#68766B] leading-[1.45] line-clamp-1">{a.description}</span>}
+            </span>
+            {a.rating != null && (
+              <span className="font-barlow font-black text-[17px] shrink-0 tabular-nums" style={{ color: AT_OUTCOME[a.outcome] || "#12402A" }}>
+                {Number(a.rating).toFixed(1)}
+              </span>
+            )}
+            <Play className="w-3.5 h-3.5 text-[#12402A] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block" />
+          </button>
+        ))}
+      </div>
+    </V2Card>
+  );
+}
+
 export function DevPrioritiesCard({ devPriorities }) {
   if (!devPriorities?.length) return null;
   return (
