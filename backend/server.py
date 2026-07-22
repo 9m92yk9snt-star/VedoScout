@@ -1827,6 +1827,7 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                             from precision_engine import verify_and_pick_thumbnail
                             ok, frame_meta = verify_and_pick_thumbnail(
                                 video_path, float(seconds), fingerprint_obj, out_path,
+                                reticle=False,
                             )
                         except Exception as e:
                             logging.warning(f"thumbnail verify failed for ts={ts}: {e}")
@@ -5916,6 +5917,53 @@ async def _verify_enriched_frames(
     return {"checked": checked, "verified": verified, "dropped": dropped, "hard_rejected": hard_rejected}
 
 
+TELE_MAX_FRAMES = 4
+
+
+async def _telestrate_verified_frames(
+    report_id: str, doc: dict, frames_dir: Path, enriched: list, ref_crops: list[str],
+) -> int:
+    """TV-style spotlight on VERIFIED frames only. Double-verified: Gemini
+    proposes the bbox, GPT-4o must CONFIRM the cropped box shows the tapped
+    player — otherwise the frame keeps its plain image. Best-effort."""
+    pd = doc.get("player_details") or {}
+    fp = doc.get("fingerprint") or {}
+    first = str(pd.get("player_name") or "").strip().split(" ")[0]
+    label = f"{first.upper()} · TRACKED" if first else "YOUR PLAYER"
+    done = 0
+    for i, c in enumerate(enriched):
+        if done >= TELE_MAX_FRAMES:
+            break
+        if not (isinstance(c, dict) and c.get("identity_verified") is True):
+            continue
+        fu = str(c.get("frame_url") or "")
+        if not fu.startswith("/api/uploads/frames/"):
+            continue
+        frame_path = frames_dir / Path(fu).name
+        if not frame_path.exists():
+            continue
+        box = await detect_player_bbox(EMERGENT_LLM_KEY, f"tele-{report_id}-{i}", ref_crops, str(frame_path))
+        if not box:
+            continue
+        crop_path = frames_dir / f".tele_{i}.jpg"
+        verdict = None
+        if await asyncio.to_thread(crop_box_region, str(frame_path), box, str(crop_path)):
+            verdict = await verify_frame_identity(
+                EMERGENT_LLM_KEY, f"tele-v-{report_id}-{i}", ref_crops, str(crop_path),
+                fp.get("jersey_name", "unclear"), fp.get("shorts_name", "unclear"),
+            )
+        crop_path.unlink(missing_ok=True)
+        if verdict != "confirmed":
+            logger.info(f"[tele] {report_id} frame {i}: box NOT confirmed ({verdict}) — no graphics")
+            continue
+        if await asyncio.to_thread(render_telestration, str(frame_path), box, label):
+            c["telestrated"] = True
+            done += 1
+    if done:
+        logger.info(f"[tele] {report_id}: {done} frames telestrated")
+    return done
+
+
 async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
     """Extract REAL evidence frames right after full-report generation (while the
     video is guaranteed local), then flush them to R2 and persist the durable
@@ -5929,12 +5977,19 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
     enriched = await asyncio.to_thread(ensure_video_frames, doc, str(video_path))
     # Layer A — GPT-vision identity gate before the frames are published.
     stats = None
+    ref_crops: list[str] = []
     try:
         ref_crops = _identity_ref_crops(doc)
         if ref_crops:
             stats = await _verify_enriched_frames(report_id, doc, Path(str(video_path)), frames_dir, enriched, ref_crops)
     except Exception:
         logger.exception(f"identity verification layer failed for {report_id}")
+    # Telestration — TV-style spotlight on double-verified frames only.
+    try:
+        if ref_crops:
+            await _telestrate_verified_frames(report_id, doc, frames_dir, enriched, ref_crops)
+    except Exception:
+        logger.exception(f"telestration layer failed for {report_id}")
     if r2_storage.is_configured():
         for c in enriched:
             if not isinstance(c, dict):
@@ -11355,6 +11410,7 @@ from identity_verify import (
     identity_profile_block,
     verify_preview_summary,
 )
+from telestration import detect_player_bbox, crop_box_region, render_telestration
 from pdf_v2 import build_pdf_v2
 
 

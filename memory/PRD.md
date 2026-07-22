@@ -27,6 +27,15 @@ Build a premium football player video analysis platform (ScoutMePlay) where play
 
 ## Implemented (Feb–Mar 2026 — current session)
 
+### Session (Jul 22, 2026) — Telestrerede Øjeblikke: TV-style spotlight graphics (user-approved) DONE ✅
+- **NEW `/app/backend/telestration.py`**: `detect_player_bbox` (Gemini 2.5 Pro, temperature 0, box_2d 0-1000 normalized + sanity bounds), `crop_box_region` (18% padded crop for cross-check), `render_telestration` (PIL: spotlight dim 0.52 + blurred ellipse mask, 2x-supersampled volt double-ring under feet w/ glow — clamped fully inside frame, dark chip "«FIRSTNAME» · TRACKED" with volt dot above player). Overwrites the frame JPEG at full 1280px, q90.
+- **DOUBLE-VERIFICATION (strict policy)**: graphics drawn ONLY when (1) frame already identity-verified, (2) Gemini finds the player high/medium conf, AND (3) GPT-4o (different model family) returns "confirmed" on the cropped box via `verify_frame_identity`. ANY failure → plain image, never wrong graphics. Max 4 frames per report (`TELE_MAX_FRAMES`).
+- **Wiring**: `_telestrate_verified_frames` in server.py, called in `_persist_video_frames` after identity verification, before R2 flush; `c["telestrated"]=True` persisted. Best-effort try/except.
+- **Old UNVERIFIED color-blob reticle DISABLED**: `ensure_video_frames` now calls `verify_and_pick_thumbnail(..., reticle=False)` — the blob reticle was never verified and could box empty grass (seen in practice). Telestration is now the ONLY on-frame graphic. Frame-picking logic unchanged.
+- **VERIFIED LIVE (report 78b5ea4a)**: frame 0 — Gemini box high-conf but GPT-4o REJECTED crop → NO graphics (clean frame confirmed visually); frame 1 — both confirmed → telestrated (visually inspected: spotlight+ring+chip on the correct player, 1280px sharp). Web report screenshot: AI-VERIFIED badges + telestrated thumb + real Action Timeline entry all rendering.
+- **GOTCHA recurrence**: parallel search_replace batch on server.py DROPPED the `from telestration import ...` edit despite "success" — caused NameError on first live run. Re-applied + grep-verified. ALWAYS grep server.py after batch edits.
+- ⚠️ REQUIRES REDEPLOY.
+
 ### Session (Jul 22, 2026) — Action Timeline (user-approved pick "B") DONE ✅
 - **Prompt** (FULL_REPORT_PROMPT): new `action_timeline` field — EVERY observable involvement of the tapped player, chronological, 6-15 entries: `{timestamp, action_type, title, description, rating 1-10|null, outcome positive|neutral|negative, identity_confidence}`. Same hard identity rules (omit if not re-identifiable). `_filter_low_identity_evidence` extended to strip low-confidence timeline rows (retry path).
 - **Web**: `ActionTimelineCard` (sections.jsx) — vertical dotted timeline, forest ts-chips, title+description, rating right (orange when outcome=negative), whole row CLICKS to `playAt(timestamp)` (video seek). Rendered full-width after Row 3 in PremiumReportV2. testids: `v2-action-timeline-card`, `v2-action-row-{i}`. derive.js filters low-confidence + normalizes casing (Gemini returns "Positive"/"High" capitalized — handled via .toLowerCase()).
