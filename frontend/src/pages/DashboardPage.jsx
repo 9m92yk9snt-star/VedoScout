@@ -7,6 +7,7 @@ import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
 import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { trackPurchase } from "@/lib/pixels";
 import {
   Plus, Lock, CheckCircle2, Film, Loader2, Rocket, TrendingUp, AlertCircle,
   Activity, ArrowRight, Sparkles, Zap, Crown, Calendar, XCircle, RefreshCw,
@@ -81,6 +82,7 @@ export default function DashboardPage() {
         try {
           const { data } = await api.get(`/payments/subscribe/status/${subSession}`);
           if (data.payment_status === "paid") {
+            trackPurchase();
             setSubscription(data.subscription);
             toast.success(`Welcome to ${data.tier === "vip" ? "VIP Premium" : "Premium"}! Your subscription is now active.`, { duration: 9000 });
             return;

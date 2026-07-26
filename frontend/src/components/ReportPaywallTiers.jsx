@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Check, Star, Crown, ArrowRight, Loader2, FileCheck2, TrendingUp, ShieldCheck, Lock } from "lucide-react";
 import api from "@/lib/api";
+import { trackInitiateCheckout } from "@/lib/pixels";
 
 function fmtPrice(v) {
   if (v == null || Number.isNaN(Number(v))) return "—";
@@ -68,6 +69,7 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle,
     try {
       const { data } = await api.post("/payments/subscribe", { tier, origin_url: window.location.origin });
       if (!data?.url) throw new Error("No checkout URL received");
+      trackInitiateCheckout();
       window.location.href = data.url;
     } catch (err) {
       toast.error(err?.response?.data?.detail || err.message || "Could not start checkout.", { duration: 8000 });

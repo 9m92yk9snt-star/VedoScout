@@ -1,5 +1,16 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jul 26, 2026 — Ad tracking) — META PIXEL + TIKTOK PIXEL INTEGRATION ✅
+- **User request**: help with FB/IG/TikTok ads for sales; approved building pixel tracking ("Ja Byg det"). Ad creatives (billeder + copy) still PENDING as next step.
+- **Backend (server.py, before /settings/price)**: `GET /api/settings/pixels` (public — returns meta_pixel_id/tiktok_pixel_id from settings key `marketing_pixels`) + `PUT /api/admin/pixels` (admin, validates meta=5-20 digits, tiktok=alnum 5-40, empty=disable).
+- **Frontend**:
+  - NEW `lib/pixels.js` — GDPR-gated loader: pixels ONLY inject when cookie consent `marketing:true` (localStorage `smp_cookie_consent_v1`, listens on `smp:cookie-consent` event so accepting later loads them live). Exports `initPixels`, `trackPageView`, `trackSignUp` (Meta CompleteRegistration/TikTok CompleteRegistration), `trackInitiateCheckout`, `trackPurchase` (Meta Purchase/TikTok CompletePayment, w/ value+currency).
+  - Wired: App.js `AnimatedRoutes` (initPixels on mount + trackPageView per pathname — no double-count on first load), Signup.jsx (after signup success), EmbeddedCheckoutModal.jsx (session ready), ReportPaywallTiers.jsx (subscribe redirect), ReportPage.jsx (~line 1755 payment paid → trackPurchase(price,"USD")), DashboardPage.jsx (~line 84 subscription paid).
+  - AdminPage Settings tab: NEW "Marketing pixels" card on top (testids `admin-pixels-card`, `admin-pixel-meta-input`, `admin-pixel-tiktok-input`, `admin-pixel-save-btn`) — loads via GET, saves via PUT.
+- **VERIFIED e2e**: API save/read/validation/401; browser: fbq+ttq undefined BEFORE consent → loaded (4 scripts) AFTER Accept, route change OK; admin card loads saved IDs + save-toast. Test IDs cleared — fields EMPTY awaiting user's real Pixel IDs (business.facebook.com Events Manager / ads.tiktok.com Assets→Events).
+- ⚠️ REQUIRES REDEPLOY. User must paste real Pixel IDs in Admin → Settings before ads run.
+- **NEXT (user asked for)**: ready-made ad images (feed 1080x1080 + story 1080x1920) + Danish ad copy (4 angles: stolthed/udvikling/drøm/bevis) + strategy guide.
+
 ## Session (Jul 22, 2026 — Sample REMOVED) — /sample PAGE + NAV BUTTON DELETED (user request) ✅
 - User asked to delete the sample page + Sample button. REVERTED everything from the "Sample page" session below: `SampleReportPage.jsx` deleted, `/sample` route + import removed from App.js (now redirects to /), "Sample" removed from Navigation CORE_LINKS (desktop+mobile), public `GET /api/sample/report` endpoint + `_anonymize_sample_payload` removed from server.py, `sample_demo_report_id` settings pin deleted (sample PDF endpoint restored to prior fallback behaviour and still returns 200).
 - VERIFIED: nav has 0 sample links, /sample redirects to /, /api/sample/report = 404, sample PDF = 200.

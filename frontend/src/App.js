@@ -28,6 +28,7 @@ import ScoutsLandingPage from "@/pages/ScoutsLandingPage";
 import PlayersDatabasePage from "@/pages/PlayersDatabasePage";
 import CookieBanner from "@/components/CookieBanner";
 import MobileBottomTabs from "@/components/MobileBottomTabs";
+import { initPixels, trackPageView } from "@/lib/pixels";
 import BackgroundAnalysisTracker from "@/components/BackgroundAnalysisTracker";
 
 function RequireAuth({ children, adminOnly = false }) {
@@ -73,6 +74,8 @@ function LandingRoute() {
    AnimatePresence detects the change. */
 function AnimatedRoutes() {
   const location = useLocation();
+  useEffect(() => { initPixels(); }, []);
+  useEffect(() => { trackPageView(); }, [location.pathname]);
   return (
     <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>

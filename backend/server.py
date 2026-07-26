@@ -4495,6 +4495,36 @@ async def admin_upload_demo_poster(file: UploadFile = File(...), _=Depends(get_c
 
 # ============== ROUTES: VIDEO UPLOAD & FREE PREVIEW ==============
 
+@api_router.get("/settings/pixels")
+async def public_pixels():
+    """Public — the frontend loads marketing pixels (Meta/TikTok) from these IDs
+    for visitors who accepted marketing cookies."""
+    doc = await db.settings.find_one({"key": "marketing_pixels"}, {"_id": 0})
+    v = (doc or {}).get("value") or {}
+    return {"meta_pixel_id": v.get("meta_pixel_id") or "", "tiktok_pixel_id": v.get("tiktok_pixel_id") or ""}
+
+
+class PixelSettings(BaseModel):
+    meta_pixel_id: str = ""
+    tiktok_pixel_id: str = ""
+
+
+@api_router.put("/admin/pixels")
+async def save_pixels(payload: PixelSettings, _=Depends(get_current_admin)):
+    meta = (payload.meta_pixel_id or "").strip()
+    tiktok = (payload.tiktok_pixel_id or "").strip()
+    if meta and not re.fullmatch(r"\d{5,20}", meta):
+        raise HTTPException(400, "Meta Pixel ID must be a 5-20 digit number")
+    if tiktok and not re.fullmatch(r"[A-Za-z0-9]{5,40}", tiktok):
+        raise HTTPException(400, "TikTok Pixel ID looks invalid (letters/digits only)")
+    await db.settings.update_one(
+        {"key": "marketing_pixels"},
+        {"$set": {"value": {"meta_pixel_id": meta, "tiktok_pixel_id": tiktok}}},
+        upsert=True,
+    )
+    return {"saved": True, "meta_pixel_id": meta, "tiktok_pixel_id": tiktok}
+
+
 @api_router.get("/settings/price")
 async def public_price():
     doc = await db.settings.find_one({"key": "report_price"}, {"_id": 0})

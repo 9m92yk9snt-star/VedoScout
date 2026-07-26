@@ -4,6 +4,7 @@ import { Lock, Loader2, Check, ShieldCheck, AlertCircle, X } from "lucide-react"
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import api from "@/lib/api";
+import { trackInitiateCheckout } from "@/lib/pixels";
 
 /**
  * EmbeddedCheckoutModal
@@ -74,6 +75,7 @@ export default function EmbeddedCheckoutModal({
         setClientSecret(init.client_secret);
         setSessionId(init.session_id);
         setState("ready");
+        trackInitiateCheckout();
       } catch (err) {
         const msg =
           err?.response?.data?.detail || err?.message || "Couldn't open checkout. Try again.";

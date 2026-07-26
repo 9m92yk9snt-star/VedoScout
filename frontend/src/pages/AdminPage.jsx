@@ -86,6 +86,26 @@ export default function AdminPage() {
   const [social, setSocial] = useState(DEFAULT_SOCIAL);
   const [socialInput, setSocialInput] = useState(DEFAULT_SOCIAL);
   const [savingSocial, setSavingSocial] = useState(false);
+  const [pixels, setPixels] = useState({ meta_pixel_id: "", tiktok_pixel_id: "" });
+  const [savingPixels, setSavingPixels] = useState(false);
+
+  useEffect(() => {
+    api.get("/settings/pixels")
+      .then((r) => setPixels({ meta_pixel_id: r.data.meta_pixel_id || "", tiktok_pixel_id: r.data.tiktok_pixel_id || "" }))
+      .catch(() => {});
+  }, []);
+
+  const savePixels = async () => {
+    setSavingPixels(true);
+    try {
+      await api.put("/admin/pixels", pixels);
+      toast.success("Marketing pixels saved");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not save pixels");
+    } finally {
+      setSavingPixels(false);
+    }
+  };
 
   // Blog draft count — surfaced as a badge on the Blog tab
   const [blogDraftCount, setBlogDraftCount] = useState(0);
@@ -718,6 +738,56 @@ export default function AdminPage() {
 
               {activeTab === "settings" && (
                 <div className="space-y-6 max-w-3xl">
+                  {/* ── Marketing pixels (Meta + TikTok) ── */}
+                  <div data-testid="admin-pixels-card" className="bg-surface border border-gray-border p-6 md:p-8">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BadgeDollarSign className="w-4 h-4 text-volt" />
+                      <span className="text-volt text-[10px] uppercase tracking-[0.22em] font-bold">Ad tracking</span>
+                    </div>
+                    <h2 className="font-barlow font-black uppercase text-2xl text-ink">Marketing pixels</h2>
+                    <p className="mt-2 text-ink/65 text-sm">
+                      Paste your Pixel IDs and the site automatically reports <b>PageView → SignUp → InitiateCheckout → Purchase</b> to
+                      Facebook/Instagram and TikTok, so your ads can optimise for buyers and retarget visitors.
+                      Pixels only fire for visitors who accept marketing cookies. Leave a field empty to disable that pixel.
+                    </p>
+                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <label className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">Meta Pixel ID</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="e.g. 1234567890123"
+                          value={pixels.meta_pixel_id}
+                          onChange={(e) => setPixels((p) => ({ ...p, meta_pixel_id: e.target.value }))}
+                          data-testid="admin-pixel-meta-input"
+                          className="bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                        />
+                        <span className="mt-1.5 text-[11px] text-ink/45">business.facebook.com → Events Manager</span>
+                      </label>
+                      <label className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-[0.22em] font-bold text-ink/55 mb-2">TikTok Pixel ID</span>
+                        <input
+                          type="text"
+                          placeholder="e.g. C1A2B3C4D5E6F7"
+                          value={pixels.tiktok_pixel_id}
+                          onChange={(e) => setPixels((p) => ({ ...p, tiktok_pixel_id: e.target.value }))}
+                          data-testid="admin-pixel-tiktok-input"
+                          className="bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                        />
+                        <span className="mt-1.5 text-[11px] text-ink/45">ads.tiktok.com → Assets → Events</span>
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={savePixels}
+                      disabled={savingPixels}
+                      data-testid="admin-pixel-save-btn"
+                      className="mt-5 flex items-center gap-2 bg-forest hover:bg-forest-pop text-white text-[11px] uppercase tracking-[0.18em] font-black px-6 py-3 transition-colors disabled:opacity-50"
+                    >
+                      {savingPixels ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} Save pixels
+                    </button>
+                  </div>
+
                   {/* ── NEW: 3-tier display pricing card ── */}
                   <div
                     data-testid="admin-tier-pricing-card"

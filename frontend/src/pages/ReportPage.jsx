@@ -6,6 +6,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from "recharts";
 import Navigation from "@/components/Navigation";
+import { trackPurchase } from "@/lib/pixels";
 import ReportChapterNav from "@/components/ReportChapterNav";
 import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 import FullFrameWithBoxCanvas from "@/components/FullFrameWithBoxCanvas";
@@ -1752,6 +1753,7 @@ export default function ReportPage() {
       try {
         const { data } = await api.get(`/payments/status/${sessionId}`);
         if (data.payment_status === "paid") {
+          trackPurchase(price, "USD");
           setCheckoutModal({ open: true, state: "success", errorMessage: null });
           const np = new URLSearchParams(searchParams);
           np.delete("session_id");
