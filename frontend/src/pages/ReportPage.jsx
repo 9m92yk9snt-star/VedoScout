@@ -6,7 +6,7 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from "recharts";
 import Navigation from "@/components/Navigation";
-import { trackPurchase } from "@/lib/pixels";
+import { trackPurchase, trackViewContent } from "@/lib/pixels";
 import ReportChapterNav from "@/components/ReportChapterNav";
 import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 import FullFrameWithBoxCanvas from "@/components/FullFrameWithBoxCanvas";
@@ -1682,6 +1682,15 @@ export default function ReportPage() {
   }, [id, navigate]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  // Marketing pixels: ViewContent once per report view (the "product page")
+  const viewContentTrackedRef = useRef(false);
+  useEffect(() => {
+    if (report?.id && !viewContentTrackedRef.current) {
+      viewContentTrackedRef.current = true;
+      trackViewContent("scout_report");
+    }
+  }, [report?.id]);
 
   // Session 126 — Auto-generate the full scout dossier for premium tiers
   // (admin/premium/vip/scout) OR any report that's already paid/unlocked but

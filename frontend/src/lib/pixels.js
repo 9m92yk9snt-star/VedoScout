@@ -89,6 +89,13 @@ export function trackPageView() {
   } catch { /* noop */ }
 }
 
+export function trackViewContent(name) {
+  try {
+    if (loaded.meta && window.fbq) window.fbq("track", "ViewContent", name ? { content_name: name } : undefined);
+    if (loaded.tiktok && window.ttq) window.ttq.track("ViewContent", name ? { content_name: name } : {});
+  } catch { /* noop */ }
+}
+
 export function trackSignUp() {
   try {
     if (loaded.meta && window.fbq) window.fbq("track", "CompleteRegistration");

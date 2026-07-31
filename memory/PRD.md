@@ -1,5 +1,13 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jul 31, 2026 — Meta events) — ViewContent + FULL EVENT VERIFICATION ✅
+- **User request** (Meta Pixel 1035066355595835 live in prod, PageView confirmed by user): implement ViewContent/CompleteRegistration/InitiateCheckout/Purchase + verify each.
+- **Already wired** (from pixel session): CompleteRegistration, InitiateCheckout (EmbeddedCheckoutModal + ReportPaywallTiers), Purchase. **NEW this session**: `trackViewContent(name)` in lib/pixels.js (Meta ViewContent + TikTok ViewContent w/ content_name); fired once per report view in ReportPage (`viewContentTrackedRef`, content_name:"scout_report"); PricingTiers.jsx (landing) was MISSING InitiateCheckout on both `goSingleReport` (prepay) + `startSubscription` — added before Stripe redirect.
+- **VERIFIED in preview** (set real pixel IDs in preview DB temporarily, then RESET to empty): fbq stub-queue + localStorage-logger technique (blocked fbevents.js + stripe redirects): real UI flows produced `PageView | CompleteRegistration (signup) | ViewContent {content_name:scout_report} (report view) | InitiateCheckout (pricing single click)`. Purchase wired at payment-paid confirmations (same helper) — fires at first real sale; not testable without real payment.
+- **KEY LEARNING**: Meta fbevents.js does NOT dispatch /tr network calls from automated/headless browsers (bot protection) — fbq calls verified via queue/wrapper instead. TikTok DOES send from headless (10 API calls captured on prod earlier). Don't chase missing facebook.com/tr requests in playwright.
+- **Prod status**: pixel IDs saved correctly in prod (meta=1035066355595835, tiktok=D9KF9L3C77U13TU26ADG — fixed user's I-vs-1 typo earlier). TikTok standard event fired via prod test signup `pixeltest1785283867@scoutmeplay.com`.
+- ⚠️ ViewContent + PricingTiers InitiateCheckout REQUIRE REDEPLOY (rest already live in prod).
+
 ## Session (Jul 26, 2026 — Ad tracking) — META PIXEL + TIKTOK PIXEL INTEGRATION ✅
 - **User request**: help with FB/IG/TikTok ads for sales; approved building pixel tracking ("Ja Byg det"). Ad creatives (billeder + copy) still PENDING as next step.
 - **Backend (server.py, before /settings/price)**: `GET /api/settings/pixels` (public — returns meta_pixel_id/tiktok_pixel_id from settings key `marketing_pixels`) + `PUT /api/admin/pixels` (admin, validates meta=5-20 digits, tiktok=alnum 5-40, empty=disable).

@@ -33,6 +33,7 @@ import {
 
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { trackInitiateCheckout } from "@/lib/pixels";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL;
 const IMG = (name) => `${ASSET_BASE}/api/static/landing/${name}`;
@@ -133,6 +134,7 @@ export default function PricingTiers() {
         origin_url: window.location.origin,
       });
       if (!data?.url) throw new Error("No checkout URL received");
+      trackInitiateCheckout();
       window.location.href = data.url;
     } catch (err) {
       const detail = err?.response?.data?.detail || err.message || "Could not start checkout.";
@@ -154,6 +156,7 @@ export default function PricingTiers() {
         origin_url: window.location.origin,
       });
       if (!data?.url) throw new Error("No checkout URL received");
+      trackInitiateCheckout();
       window.location.href = data.url;
     } catch (err) {
       const detail = err?.response?.data?.detail || err.message || "Could not start checkout.";
