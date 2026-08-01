@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup — Analysis Waiting Experience</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --cream:#F4EFE6; --card:#FBF9F3; --ink:#182016; --muted:#75816F; --forest:#12402A; --forest2:#1F4F2F; --lime:#CCFF00; --line:#E5DFCE; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--cream); font-family:Inter,sans-serif; color:var(--ink); display:flex; justify-content:center; padding:0; }
+  .phone { width:100%; max-width:420px; min-height:100vh; padding:18px 18px 28px; }
+  .bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .logo { font-family:'Barlow Condensed'; font-weight:900; font-size:19px; letter-spacing:.06em; }
+  .logo b { background:var(--lime); padding:0 3px; }
+  .kicker { font-size:9.5px; font-weight:800; letter-spacing:.22em; text-transform:uppercase; color:var(--forest2); }
+  h1 { font-family:'Barlow Condensed'; font-weight:900; font-size:30px; line-height:1; text-transform:uppercase; margin-top:4px; }
+  .player-chip { display:inline-flex; gap:6px; margin-top:10px; }
+  .chip { font-size:9.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; background:#fff; border:1px solid var(--line); padding:4px 8px; border-radius:5px; }
+
+  .progress-card { background:var(--forest); border-radius:16px; padding:18px; margin-top:16px; box-shadow:0 18px 40px -18px rgba(18,64,42,.5); }
+  .pc-top { display:flex; justify-content:space-between; align-items:baseline; }
+  .pct { font-family:'Barlow Condensed'; font-weight:900; font-size:46px; color:var(--lime); line-height:1; }
+  .eta { text-align:right; }
+  .eta b { display:block; color:#fff; font-size:13px; }
+  .eta span { color:rgba(255,255,255,.55); font-size:10px; }
+  .track { height:8px; background:rgba(255,255,255,.14); border-radius:99px; margin-top:12px; overflow:hidden; }
+  .fill { height:100%; width:64%; border-radius:99px; background:linear-gradient(90deg,#8FD622,var(--lime)); position:relative; }
+  .fill::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent); animation:sheen 1.8s infinite; }
+  @keyframes sheen { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+  .live { margin-top:10px; font-size:11px; color:rgba(255,255,255,.75); display:flex; gap:7px; align-items:center; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--lime); animation:pulse 1.2s infinite; }
+  @keyframes pulse { 50%{opacity:.3} }
+
+  .stages { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-top:14px; }
+  .stages h3 { font-size:9.5px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+  .stage { display:flex; gap:11px; align-items:flex-start; padding:7px 0; }
+  .ic { width:22px; height:22px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .done .ic { background:var(--forest); color:var(--lime); }
+  .active .ic { background:var(--lime); color:var(--forest); animation:spinp 1.4s infinite; }
+  @keyframes spinp { 50%{transform:scale(1.15)} }
+  .todo .ic { border:2px dashed #C9C2AF; }
+  .stage p { font-size:13px; font-weight:700; padding-top:2px; }
+  .stage small { display:block; font-size:10.5px; color:var(--muted); font-weight:500; margin-top:1px; }
+  .done p { color:#5C6657; text-decoration:none; }
+  .todo p { color:#B7B2A2; }
+  .active p { color:var(--ink); }
+  .badge-live { font-size:8.5px; font-weight:800; letter-spacing:.1em; background:var(--lime); color:var(--forest); border-radius:4px; padding:2px 6px; margin-left:6px; text-transform:uppercase; }
+
+  .tip { background:var(--forest); border-radius:16px; padding:16px; margin-top:14px; position:relative; overflow:hidden; }
+  .tip .tag { font-size:8.5px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--lime); }
+  .tip h4 { font-family:'Barlow Condensed'; color:#fff; font-size:20px; font-weight:900; text-transform:uppercase; margin-top:6px; line-height:1.05; }
+  .tip p { color:rgba(255,255,255,.75); font-size:12px; line-height:1.5; margin-top:6px; }
+  .tipdots { display:flex; gap:4px; margin-top:12px; }
+  .tipdots span { width:5px; height:5px; border-radius:99px; background:rgba(255,255,255,.25); }
+  .tipdots span.on { width:16px; background:var(--lime); }
+  .tipball { position:absolute; right:-18px; top:-18px; width:80px; height:80px; border-radius:50%; border:14px solid rgba(204,255,0,.12); }
+
+  .leave { margin-top:14px; text-align:center; }
+  .leave p { font-size:11px; color:var(--muted); }
+  .leave button { margin-top:8px; background:#fff; border:1px solid var(--line); font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; padding:10px 16px; border-radius:10px; color:var(--forest); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="bar"><span class="logo">SCOUT<b>ME</b>PLAY</span><span style="font-size:10px;color:var(--muted);font-weight:700">STEP 3 / 3</span></div>
+
+  <span class="kicker">Live analysis</span>
+  <h1>Your Scout Is<br>Watching The Clip</h1>
+  <div class="player-chip"><span class="chip">⚽ Mikkel</span><span class="chip">U12 · Winger</span><span class="chip" style="background:var(--forest);color:var(--lime);border:none">Identity locked</span></div>
+
+  <div class="progress-card">
+    <div class="pc-top">
+      <span class="pct">64%</span>
+      <div class="eta"><b>≈ 40 sec left</b><span>typically ready in ~90 sec</span></div>
+    </div>
+    <div class="track"><div class="fill"></div></div>
+    <div class="live"><span class="dot"></span> Scout is reviewing every action — 14 actions found so far</div>
+  </div>
+
+  <div class="stages">
+    <h3>Real analysis stages — live from the engine</h3>
+    <div class="stage done"><span class="ic">✓</span><p>Video received &amp; prepared</p></div>
+    <div class="stage done"><span class="ic">✓</span><p>Your player locked<small>7/7 of your taps verified — no mix-ups possible</small></p></div>
+    <div class="stage done"><span class="ic">✓</span><p>Optical tracking complete<small>Top speed &amp; sprints measured — never guessed</small></p></div>
+    <div class="stage active"><span class="ic">●</span><p>Scout analysing every action<span class="badge-live">Now</span><small>Technique · decisions · off-ball work · bravery</small></p></div>
+    <div class="stage todo"><span class="ic"></span><p>Building your development plan</p></div>
+    <div class="stage todo"><span class="ic"></span><p>Quality check &amp; report ready</p></div>
+  </div>
+
+  <div class="tip">
+    <div class="tipball"></div>
+    <span class="tag">Scout tip · for the player</span>
+    <h4>Scan before you receive</h4>
+    <p>Scouts look for this first: a quick look over the shoulder before the ball arrives buys you a full extra second on the pitch.</p>
+    <div class="tipdots"><span class="on"></span><span></span><span></span><span></span><span></span></div>
+  </div>
+
+  <div class="leave">
+    <p>You can safely leave this page — the analysis keeps running.</p>
+    <button>✉ Email me when the report is ready</button>
+  </div>
+</div>
+</body>
+</html>
