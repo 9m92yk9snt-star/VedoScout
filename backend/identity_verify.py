@@ -120,6 +120,7 @@ async def build_identity_profile(
     session_id: str,
     crop_paths: list[str],
     wide_crop_paths: list[str],
+    jersey_number: str | None = None,
 ) -> dict | None:
     """Layer B (pre-analysis) — GPT-vision examines the user's tap crops BEFORE
     Gemini runs and returns a verified description of the tapped player plus,
