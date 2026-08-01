@@ -5,6 +5,9 @@ Every tap gives a ground-truth (time, box). From each seed we track the player
 forward AND backward (±SPAN seconds) with local NCC template matching:
 - search window = last box grown 45%
 - template updated every frame, drift-guarded against the ORIGINAL tap content
+- COLOUR VETO: every accepted match is compared against the seed's HSV
+  colour signature (jersey area). Consistent colour mismatch = likely an
+  identity switch onto another player → stop honestly.
 - track ends conservatively on low confidence (fail-safe: no data ≠ wrong data)
 
 No AI involved — pure, repeatable computer vision.
@@ -22,12 +25,16 @@ logger = logging.getLogger(__name__)
 SAMPLE_HZ = 12.5
 SPAN = 4.0
 TARGET_W = 480
+COLOR_W = 240  # half-res colour frames for HSV signature checks
 MATCH_MIN = 0.45
 DRIFT_MIN = 0.30
 MAX_MISSES = 3
+COLOR_MIN = 0.22      # HSV-correlation below this = colour mismatch
+COLOR_MAX_MISSES = 3  # consecutive colour mismatches → stop (identity risk)
 
 
 def _read_window(cap, w0: float, w1: float, step: float):
+    """Returns [(t, gray_480w, hsv_240w), ...]"""
     frames = []
     cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, w0) * 1000.0)
     last_t = -1e9
@@ -40,10 +47,12 @@ def _read_window(cap, w0: float, w1: float, step: float):
             continue
         last_t = pos
         h, w = fr.shape[:2]
-        g = cv2.cvtColor(
-            cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w)))), cv2.COLOR_BGR2GRAY,
+        small = cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w))))
+        g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(
+            cv2.resize(small, (COLOR_W, max(2, small.shape[0] // 2))), cv2.COLOR_BGR2HSV,
         )
-        frames.append((pos, g))
+        frames.append((pos, g, hsv))
     return frames
 
 
@@ -55,6 +64,29 @@ def _crop(g, box_px):
     if x1 - x0 < 6 or y1 - y0 < 6:
         return None
     return g[y0:y1, x0:x1]
+
+
+def _color_hist(hsv, box_px_gray, scale: float):
+    """H-S histogram of the jersey area (upper 60% of the box), on the
+    half-res HSV frame. Returns None when the crop is too small to judge."""
+    x0, y0, x1, y1 = [int(v * scale) for v in box_px_gray]
+    y1 = y0 + max(1, int((y1 - y0) * 0.6))  # jersey/torso region
+    H, W = hsv.shape[:2]
+    x0, y0 = max(0, x0), max(0, y0)
+    x1, y1 = min(W, x1), min(H, y1)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return None
+    roi = hsv[y0:y1, x0:x1]
+    hist = cv2.calcHist([roi], [0, 1], None, [30, 32], [0, 180, 0, 256])
+    cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
+    return hist
+
+
+def _color_sim(ref_hist, hsv, box_px_gray, scale: float) -> float | None:
+    cand = _color_hist(hsv, box_px_gray, scale)
+    if cand is None or ref_hist is None:
+        return None
+    return float(cv2.compareHist(ref_hist, cand, cv2.HISTCMP_CORREL))
 
 
 def _record(out: dict, t: float, cur, W: int, H: int, conf: float):
@@ -71,19 +103,22 @@ def _record(out: dict, t: float, cur, W: int, H: int, conf: float):
 
 
 def _run_direction(frames, i0: int, box_px, out: dict, direction: int):
-    _t0, g0 = frames[i0]
+    _t0, g0, hsv0 = frames[i0]
     tmpl0 = _crop(g0, box_px)
     if tmpl0 is None:
         return
     tmpl = tmpl0
     bw, bh = box_px[2] - box_px[0], box_px[3] - box_px[1]
     H, W = g0.shape[:2]
+    scale = hsv0.shape[1] / float(W)  # gray-px → colour-px
+    ref_hist = _color_hist(hsv0, box_px, scale)  # FIXED colour signature from the tap
     misses = 0
+    color_misses = 0
     steps = 0
     cur = list(box_px)
     end = len(frames) if direction > 0 else -1
     for i in range(i0 + direction, end, direction):
-        t, g = frames[i]
+        t, g, hsv = frames[i]
         gx, gy = bw * 0.45, bh * 0.45
         sx0, sy0 = max(0, int(cur[0] - gx)), max(0, int(cur[1] - gy))
         sx1, sy1 = min(W, int(cur[2] + gx)), min(H, int(cur[3] + gy))
@@ -98,7 +133,16 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int):
                 break
             continue
         misses = 0
-        cur = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + int(bw), sy0 + ml[1] + int(bh)]
+        cand_box = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + int(bw), sy0 + ml[1] + int(bh)]
+        # ── colour veto: does the matched box still wear the tapped colours? ──
+        csim = _color_sim(ref_hist, hsv, cand_box, scale)
+        if csim is not None and csim < COLOR_MIN:
+            color_misses += 1
+            if color_misses >= COLOR_MAX_MISSES:
+                break  # colours no longer match the tapped player — stop honestly
+            continue  # do NOT accept the suspicious box
+        color_misses = 0
+        cur = cand_box
         steps += 1
         cand = _crop(g, cur)
         if cand is None:
