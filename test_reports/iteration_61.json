@@ -1,0 +1,41 @@
+{
+  "summary": "Iter61 RETEST of the GO-TO-DASHBOARD handoff on /upload PrecisionScanOverlay (data-testid='wait-go-dashboard-btn'). Iteration 60's HIGH bug is FIXED. Repro'd the full flow (login as testfree-mar@elitescout.com, transcoded webm upload, ScoutMode 3-tap confirms + scout-finish-early, form fill, submit). Waited for wait-live-pct to exceed 15% (reached 23% within 1s), then clicked wait-go-dashboard-btn. Every expected behavior fires: success toast \"We'll let you know when your report is ready.\", immediate navigate to /dashboard, bg-analysis-tracker pill visible +1s later, localStorage.elite_token survives the click, localStorage.scoutmeplay.activeAnalysis is written with the report id, and /api/reports/{id}/status polling continues from the tracker with 200 responses (zero 401s). The 'Your scout report is ready!' toast + tracker-disappearance was NOT observed within the 6-min watch window because the surrogate webm analysis was still on Step 2/5 (Preparing your video) — environmental (headless-Chromium webm), NOT a code regression. The tracker was live and correctly polling the whole time. All handoff wiring is correct end-to-end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verifications": {
+    "upload_report_id": "d5152024-f753-4e81-ae3a-8cc2e32d7ebf",
+    "pct_at_click_pct": 23,
+    "success_toast_after_click": true,
+    "navigated_to_dashboard": true,
+    "url_after_click": "/dashboard",
+    "bg_analysis_tracker_visible": true,
+    "bg_analysis_tracker_visible_at_seconds": 1,
+    "localStorage_activeAnalysis_written": true,
+    "elite_token_before_click": true,
+    "elite_token_immediately_after_click": true,
+    "elite_token_at_15s_after_click": true,
+    "status_polls_after_click_total": 5,
+    "status_polls_401_after_click": 0,
+    "ready_toast_seen_within_6min": false,
+    "ready_toast_note": "Analysis still on Step 2/5 at end of 6-min watch window; not tested to completion — environmental webm-surrogate limitation from iter60, NOT a code bug.",
+    "final_dashboard_url": "https://scout-ai-pro-1.preview.emergentagent.com/dashboard"
+  },
+  "test_report_links": [
+    "/app/test_reports/iter61_after_click.png",
+    "/app/test_reports/iter61_final.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "UploadPage.jsx line 593-607 (onContinueInBackground) — clean, correct immediate-handoff. startBackgroundAnalysis(rid) is called before setSubmitting(false) + navigate('/dashboard'), guaranteeing the tracker owns the report id before the overlay unmounts. Iter60 bug fully resolved.",
+    "UploadPage.jsx line 466-473 (poll loop backgrounded branch) — now correctly a no-op-after-handoff: just re-arms startBackgroundAnalysis and returns. Correct defensive design in case the click lands mid-upload before reportIdRef is set (the button handler covers the no-id path with a friendlier toast).",
+    "BackgroundAnalysisTracker.jsx line 132-136 — correctly hides the pill on /upload and only renders when status==='analyzing'. Verified live: pill appears +1s after navigating to /dashboard once the first poll returns status='analyzing'."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% on the requested retest — all 5 expected behaviors observed; ready-toast completion left unverified due to same environmental webm slowness noted in iter60"},
+  "test_credentials": "testfree-mar@elitescout.com / Free@2026! (5 prepaid uploads re-seeded via `cd /app/backend && python make_demo_accounts.py`)",
+  "seed_data_creation": "Ran /app/backend/make_demo_accounts.py once to restore prepaid uploads.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter60 HIGH bug on wait-go-dashboard-btn is fixed. If iter62 needs to confirm the 'ready' toast + tracker-disappearance transition on real hardware, use a shorter/simpler test video or bump the wait window to ~10 min — the analysis pipeline was still on Step 2/5 (Preparing) after 6 min on the webm surrogate used here.",
+  "rca_of_the_issue": "iter60 root cause was that onContinueInBackground only set backgroundedRef.current=true and relied on the next poll-loop tick to call navigate('/dashboard'); on the loop's next tick, startBackgroundAnalysis(data.id) was invoked from a poll-loop tick that had already lost the httpOnly-cookie context (or was silently throwing), so navigate() never fired and subsequent status polls 401'd. FIX (verified in iter61): the button handler now performs the full handoff IMMEDIATELY — startBackgroundAnalysis(reportIdRef.current) + success toast + setSubmitting(false) + navigate('/dashboard') — and the poll-loop branch is reduced to a defensive re-arm + return. Verified live: navigation is instant, tracker owns the report and polls 200s from the dashboard, and localStorage.elite_token is preserved throughout."
+}

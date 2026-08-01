@@ -68,10 +68,13 @@ export default function UploadPage() {
   // Holds the completed upload response while the "done" celebration is on
   // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
   const pendingDoneRef = useRef(null);
-  // Flag set when the user clicks "Continue in background" — breaks the local
+  // Flag set when the user clicks "Go to Dashboard" — breaks the local
   // poll loop in handleSubmit so the global BackgroundAnalysisTracker can take
   // over and the user is free to navigate away.
   const backgroundedRef = useRef(false);
+  // The report id from the upload response — lets the Go-to-Dashboard handler
+  // hand off to the background tracker immediately (no poll-tick dependency).
+  const reportIdRef = useRef(null);
 
   const fileRef = useRef(null);
   const videoRef = useRef(null);
@@ -453,6 +456,7 @@ export default function UploadPage() {
       // background task on the server. We poll /reports/{id}/status every 3s until
       // status === "ready" (success) or "failed" (rejected/error).
       let finalData = data;
+      reportIdRef.current = data?.id || null;
       if (data?.analysis_status === "analyzing") {
         const start = Date.now();
         const MAX_WAIT_MS = 10 * 60 * 1000; // 10 minute hard ceiling
@@ -460,15 +464,11 @@ export default function UploadPage() {
         // poll loop
         // eslint-disable-next-line no-constant-condition
         while (true) {
-          // User clicked "Continue in background" → hand off to the global tracker.
+          // User clicked "Go to Dashboard" → the button handler already did the
+          // navigation + toast; just make sure the tracker owns this report and
+          // stop the local loop (covers a click that landed mid-upload too).
           if (backgroundedRef.current) {
             startBackgroundAnalysis(data.id);
-            setSubmitting(false);
-            setUploadPhase("idle");
-            toast.success("We'll let you know when your report is ready.", {
-              duration: 4500,
-            });
-            navigate("/dashboard");
             return;
           }
           if (Date.now() - start > MAX_WAIT_MS) {
@@ -591,10 +591,19 @@ export default function UploadPage() {
         tapsCount={markerAnchors?.length || 0}
         heroImage={markerPreviewUrl}
         onContinueInBackground={() => {
-          // Set the flag — the poll loop in handleSubmit will detect it on its next
-          // tick, hand off to startBackgroundAnalysis(), close the overlay, and
-          // navigate the user to /dashboard.
+          // Immediate handoff — never depend on the poll loop's next tick.
           backgroundedRef.current = true;
+          const rid = reportIdRef.current;
+          if (rid) {
+            startBackgroundAnalysis(rid);
+            toast.success("We'll let you know when your report is ready.", { duration: 4500 });
+          } else {
+            // Upload POST still in flight — the poll loop hands off once the id exists.
+            toast.success("Your upload keeps running — we'll let you know when the report is ready.", { duration: 4500 });
+          }
+          setSubmitting(false);
+          setUploadPhase("idle");
+          navigate("/dashboard");
         }}
         onViewReport={() => {
           const pending = pendingDoneRef.current;
