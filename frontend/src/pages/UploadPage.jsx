@@ -585,7 +585,11 @@ export default function UploadPage() {
         phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
         backendStep={backendStep}
-        hideTimers={isPaidTier}
+        playerName={form.player_name}
+        playerAge={form.age}
+        playerPosition={form.position}
+        tapsCount={markerAnchors?.length || 0}
+        heroImage={markerPreviewUrl}
         onContinueInBackground={() => {
           // Set the flag — the poll loop in handleSubmit will detect it on its next
           // tick, hand off to startBackgroundAnalysis(), close the overlay, and
