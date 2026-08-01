@@ -2717,3 +2717,25 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - P2: Drag-to-trim before marking
 - P3: AI-commentated highlight video
 - P3: Upload wait-time UX ("Din analyse er typisk klar om ~1 minut")
+
+---
+
+# Session (Juni 2026, del 2) — Fase 0 sikkerhed + Eksempelrapport på forsiden
+
+## Fase 0 — Kritiske sikkerheds- & småfejlsrettelser (DONE, testet)
+- **JWT_SECRET_KEY roteret** til stærk random hex (backend/.env). Alle gamle sessions invalideres ved deploy — brugere skal logge ind igen én gang.
+- **CORS låst** til scoutmeplay.com + www + preview-domænet (var "*").
+- **Signerede video-URLs**: `/api/media/reports/**/*.mp4` kræver nu HMAC-token (`?tk=&exp=`, 7 dages TTL, nøgle afledt af JWT_SECRET). Implementeret i `_sign_media_url()` + håndhævet i `stream_r2_media`. ALLE video-URLs går gennem `_resolve_video_url` (rapport, status, dashboard/mine, scout-kø, admin) → automatisk dækket. Postere/crops/demo-videoer forbliver offentlige (bruges af <img>). PDF upåvirket (læser R2 direkte). VIGTIGT: headless testbrowser kan ikke afspille H.264 (fejlkode 4 / "unavailable on this device") — det er codec-mangel i testmiljøet, IKKE en fejl; backend-log bekræfter 206 på browserens signerede request.
+- Demo-videotitler i DB omdøbt ("Banger Kick"/"Bager 2" → "From Phone Clip To Report"/"Marking Your Player" + undertekster).
+- Dashboard: "Current plan" viser nu "Pay-per-report" for købere uden abonnement (var misvisende "Free").
+- `/register` → redirect til `/signup` (App.js route).
+- BEVIDST IKKE RØRT: Stripe LIVE-nøgler i preview (.env deployes med koden — skift til testnøgler ville ramme produktion ved næste deploy; kræver brugerens beslutning). /api/uploads (lokal statisk mount) er stadig offentlig — filer er dog flygtige (R2-flush sletter dem); dokumenteret som restpunkt.
+
+## Eksempelrapport på forsiden (DONE, testet mobil + desktop)
+- Ny `components/SampleReportShowcase.jsx` — anonymiseret, statisk sample (ingen backend). 7 swipe-kort: Overview (8.2 + sløret efternavn + identity-locked), 4 pillarer, Styrker & fokus, Pace & sprints, What Parents Ask, 90-dages plan, PDF+CTA ("Upload your video" → samme handler som hero-CTA).
+- Placeret i `LandingMinimal.jsx` DIREKTE under HeroSection (før TrustStrip). Sektion-id: #sample-report.
+- Mobil: scroll-snap swipe + dots. Desktop: pile-knapper. Testids: sample-report-showcase/-scroller/-prev/-next/-cta, sample-card-*.
+- Rapportkortene bruger den ægte rapports farver (forest #12402A + lime #CCFF00) for autenticitet.
+
+## Research-leverance (samme session, tidligere)
+- `/app/memory/RESEARCH_RAPPORT_2026.md` — komplet 12-sektions audit + prioriteret roadmap (Fase 0–3). Bruger har godkendt Fase 0 + eksempelrapport (begge nu udført). Resterende Fase 1: DKK-priser/prisforenkling, cookie-banner-strip, code-splitting, social proof, server-side Meta CAPI. Ubesvarede afklaringer fra ask_human: prototype-format, DKK-beløb, enkeltkøbets skæbne, dansk/engelsk sprog.

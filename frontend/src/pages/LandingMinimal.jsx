@@ -21,6 +21,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck, Send, PlayCircle } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
+import SampleReportShowcase from "@/components/SampleReportShowcase";
 import PricingTiers from "@/components/PricingTiers";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 import {
@@ -108,6 +109,7 @@ export default function LandingMinimal() {
       <Navigation />
 
       <HeroSection onPrimaryCta={handlePrimaryCta} isLoggedIn={!!user} />
+      <SampleReportShowcase onPrimaryCta={handlePrimaryCta} />
       <TrustStrip />
       <HowItWorks />
       <WhatsInside />

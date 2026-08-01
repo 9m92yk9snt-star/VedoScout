@@ -82,6 +82,7 @@ function AnimatedRoutes() {
         <Route path="/" element={<PageTransition><LandingRoute /></PageTransition>} />
         <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
         <Route path="/signup" element={<PageTransition><Signup /></PageTransition>} />
+        <Route path="/register" element={<Navigate to="/signup" replace />} />
         <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/upload" element={<PageTransition><RequireAuth><UploadPage /></RequireAuth></PageTransition>} />

@@ -6,6 +6,7 @@ import uuid
 import json
 import math
 import hashlib
+import hmac
 import logging
 import shutil
 import re
@@ -4238,6 +4239,17 @@ async def stream_r2_media(key: str, request: Request):
     if key.startswith("/") or ".." in key or "\x00" in key:
         raise HTTPException(400, "Bad media key")
 
+    # Raw report videos (footage of minors) require a signed, expiring token.
+    if key.startswith("reports/") and key.endswith(".mp4"):
+        tk = request.query_params.get("tk") or ""
+        try:
+            exp_i = int(request.query_params.get("exp") or "0")
+        except ValueError:
+            exp_i = 0
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        if exp_i < now_ts or not hmac.compare_digest(tk, _media_token(key, exp_i)):
+            raise HTTPException(403, "Media link expired — reload the page.")
+
     range_header = request.headers.get("range") or request.headers.get("Range")
     try:
         obj = r2_storage.get_stream(key, range_header=range_header)
@@ -4873,6 +4885,28 @@ async def upload_video_and_create_preview(
     }
 
 
+# ─── Signed media URLs — raw match videos of minors must not be publicly
+#     streamable. Only /api/media/reports/**/*.mp4 requires a token; posters,
+#     crops, demo/marketing media stay public (needed by <img> tags broadly).
+MEDIA_TOKEN_TTL_S = 7 * 24 * 3600
+
+
+def _media_token(key: str, exp: int) -> str:
+    return hmac.new(
+        f"{JWT_SECRET}:media".encode(), f"{key}:{exp}".encode(), hashlib.sha256
+    ).hexdigest()[:32]
+
+
+def _sign_media_url(url: Optional[str]) -> Optional[str]:
+    if not url or not isinstance(url, str) or not url.startswith("/api/media/reports/"):
+        return url
+    key = url[len("/api/media/"):]
+    if not key.endswith(".mp4"):
+        return url
+    exp = int(datetime.now(timezone.utc).timestamp()) + MEDIA_TOKEN_TTL_S
+    return f"{url}?tk={_media_token(key, exp)}&exp={exp}"
+
+
 def _resolve_video_url(doc: dict) -> Optional[str]:
     """Resolve the playable video URL for a report doc.
 
@@ -4881,7 +4915,7 @@ def _resolve_video_url(doc: dict) -> Optional[str]:
     """
     override = doc.get("video_url_override")
     if override:
-        return override
+        return _sign_media_url(override)
     vf = doc.get("video_filename")
     return f"/api/uploads/{vf}" if vf else None
 

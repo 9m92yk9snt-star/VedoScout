@@ -130,6 +130,8 @@ export default function DashboardPage() {
       : "Premium"
     : passState?.active
     ? "Progress Pass"
+    : premiumReports > 0
+    ? "Pay-per-report"
     : "Free";
 
   return (
