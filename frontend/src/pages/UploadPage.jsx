@@ -54,6 +54,7 @@ export default function UploadPage() {
     position: "",
     preferred_foot: "right",
     current_club: "",
+    jersey_number: "",
     video_type: "highlight",
     description: "",
   });
@@ -63,6 +64,7 @@ export default function UploadPage() {
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
   const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser (free-tier)
   const [premiumReadyReport, setPremiumReadyReport] = useState(null); // Session 130 — premium-tier celebration screen
+  const [profiles, setProfiles] = useState([]); // Stage 5 — saved player identity profiles
   // Holds the completed upload response while the "done" celebration is on
   // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
   const pendingDoneRef = useRef(null);
@@ -76,6 +78,28 @@ export default function UploadPage() {
   const navigate = useNavigate();
 
   const setField = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
+
+  // Stage 5 — saved players on this account (identity memory) for one-tap pre-fill
+  useEffect(() => {
+    let alive = true;
+    api.get("/me/player-profiles")
+      .then(({ data }) => { if (alive) setProfiles(data?.profiles || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const applyProfile = (p) => {
+    setForm((prev) => ({
+      ...prev,
+      player_name: p.player_name || "",
+      age: p.age != null ? String(p.age) : "",
+      position: p.position || "",
+      preferred_foot: p.preferred_foot || "right",
+      current_club: p.current_club && p.current_club !== "Independent" ? p.current_club : "",
+      jersey_number: p.jersey_number || "",
+    }));
+    toast.success(`Details filled from ${p.player_name}'s profile — the scout also remembers how ${p.player_name} looks.`);
+  };
 
   // Fetch upload eligibility on mount + after returning from Stripe checkout
   const refreshEligibility = async () => {
@@ -920,6 +944,33 @@ export default function UploadPage() {
             <div className="bg-surface border border-gray-border p-6 md:p-8 space-y-5">
               <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 3 · Player details</span>
 
+              {profiles.length > 0 && (
+                <div data-testid="upload-profile-picker" className="bg-deepnavy border border-volt/25 p-3.5">
+                  <span className="text-[10px] uppercase tracking-[0.18em] font-black text-volt block mb-2">
+                    Same player again? Tap to pre-fill
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {profiles.map((p, i) => (
+                      <button
+                        key={p.id || i}
+                        type="button"
+                        data-testid={`upload-profile-chip-${i}`}
+                        onClick={() => applyProfile(p)}
+                        className="inline-flex items-center gap-1.5 border border-gray-border hover:border-volt text-ink text-xs font-bold px-3 py-1.5 transition-colors"
+                      >
+                        {p.player_name}
+                        <span className="text-ink/45 font-normal">
+                          · {p.age != null ? `U${Math.min(21, Math.max(5, Number(p.age) + 1))}` : ""} {p.position || ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-ink/40 mt-2">
+                    The scout remembers this player's verified look from earlier reports — recognition starts stronger.
+                  </p>
+                </div>
+              )}
+
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Player name *</label>
@@ -987,7 +1038,7 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Current club / team</label>
                   <input
@@ -997,6 +1048,19 @@ export default function UploadPage() {
                     data-testid="upload-player-club"
                     className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
                     placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Shirt number</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={3}
+                    value={form.jersey_number}
+                    onChange={(e) => setField("jersey_number", e.target.value.replace(/[^0-9]/g, ""))}
+                    data-testid="upload-player-jersey"
+                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
+                    placeholder="e.g. 10 — sharpens AI identity check"
                   />
                 </div>
                 <div>

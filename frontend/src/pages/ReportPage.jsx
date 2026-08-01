@@ -27,6 +27,7 @@ import PaymentBadges from "@/components/PaymentBadges";
 import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
+import DoubtConfirmModal from "@/components/DoubtConfirmModal";
 
 /* Tier visual treatment — 4 levels mapped to colour + label */
 const TIER_META = {
@@ -1623,6 +1624,8 @@ export default function ReportPage() {
   const [checkoutModal, setCheckoutModal] = useState({ open: false, state: "preparing", errorMessage: null });
   const [embeddedOpen, setEmbeddedOpen] = useState(false);
   const [generatingFull, setGeneratingFull] = useState(false);
+  const [doubtInfo, setDoubtInfo] = useState(null);
+  const [doubtBusy, setDoubtBusy] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareState, setShareState] = useState(null); // null → follow report doc; {token} local override
@@ -1683,6 +1686,29 @@ export default function ReportPage() {
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
+  // Stage 3 — surface the doubt-confirmation prompt when the report doc says
+  // the tracker is waiting for the owner's answer (also covers page reloads).
+  useEffect(() => {
+    if (report?.doubt_status === "awaiting" && report?.doubt_moments?.length) {
+      setDoubtInfo({ moments: report.doubt_moments });
+    }
+  }, [report?.doubt_status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const submitDoubt = async (taps, skip = false) => {
+    setDoubtBusy(true);
+    try {
+      await api.post(`/reports/${id}/doubt-confirm`, { taps, skip });
+      setDoubtInfo(null);
+      toast.success(skip
+        ? "Okay — the tracker decides on its own. Analysis continues."
+        : "Player confirmed — tracking updated. Analysis continues.");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not submit — try again.");
+    } finally {
+      setDoubtBusy(false);
+    }
+  };
+
   // Marketing pixels: ViewContent once per report view (the "product page")
   const viewContentTrackedRef = useRef(false);
   useEffect(() => {
@@ -1707,12 +1733,16 @@ export default function ReportPage() {
     const needsFullReport = alreadyUnlocked && !report.full_report;
     // Don't auto-fire if the backend is already generating (e.g. right after
     // a successful checkout). The Stripe success path sets generatingFull.
-    if (needsFullReport && report.full_report_status !== "generating") {
+    if (needsFullReport) {
       autoGenTriggeredRef.current = true;
       (async () => {
         setGeneratingFull(true);
         try {
-          await api.post(`/reports/${id}/generate-full`);
+          // Don't re-fire if the backend is already generating (e.g. right after
+          // a successful checkout or a doubt-confirmation wait) — just poll.
+          if (report.full_report_status !== "generating" && report.full_report_status !== "awaiting_confirmation") {
+            await api.post(`/reports/${id}/generate-full`);
+          }
           await pollFullReportReady();
           await fetchReport();
         } catch (err) {
@@ -1872,6 +1902,11 @@ export default function ReportPage() {
     while (Date.now() - start < HARD_TIMEOUT_MS) {
       try {
         const { data } = await api.get(`/reports/${id}/status`);
+        if (data?.doubt_status === "awaiting" && data?.doubt_moments?.length) {
+          setDoubtInfo({ moments: data.doubt_moments });
+        } else if (data?.doubt_status && data.doubt_status !== "awaiting") {
+          setDoubtInfo(null);
+        }
         if (data?.full_report_status === "ready" || data?.has_full_report) return data;
         if (data?.full_report_status === "failed") {
           throw new Error(data?.full_report_error || "Full report generation failed");
@@ -2105,6 +2140,14 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen bg-deepnavy text-ink pb-20">
       <Navigation />
+      {doubtInfo && (
+        <DoubtConfirmModal
+          moments={doubtInfo.moments}
+          busy={doubtBusy}
+          onConfirm={(taps) => submitDoubt(taps, false)}
+          onSkip={() => submitDoubt([], true)}
+        />
+      )}
       <CheckoutTransitionModal
         open={checkoutModal.open}
         state={checkoutModal.state}

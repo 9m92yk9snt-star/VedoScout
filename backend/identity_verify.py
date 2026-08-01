@@ -41,6 +41,7 @@ async def verify_frame_identity(
     frame_path: str,
     jersey_name: str = "unclear",
     shorts_name: str = "unclear",
+    jersey_number: str | None = None,
 ) -> str:
     """STRICT evidence verdict:
     "confirmed" — tapped player IS visible (high/medium-confidence match)
@@ -72,7 +73,13 @@ async def verify_frame_identity(
             "NOTE: the player may be PARTIALLY HIDDEN in a reference crop (behind another player, only part "
             "of the body visible) — the player at the CENTRE of each crop is the target, not necessarily the "
             "most visible person in it.\n"
-            "The LAST image is a frame from the match video.\n"
+            + (
+                f"The player's own family states the target wears SHIRT NUMBER {jersey_number}. A readable "
+                "shirt number is STRONG evidence: a matching number supports a match, a clearly different "
+                "number rules the player out.\n"
+                if jersey_number else ""
+            )
+            + "The LAST image is a frame from the match video.\n"
             "Question: is that SAME individual player visible anywhere in the frame, even if small or "
             "partially occluded behind other players? A partial but plausible presence counts as visible. "
             "Do not confuse them with teammates in an identical kit — check build, hair, socks, boots.\n"
@@ -155,11 +162,20 @@ async def build_identity_profile(
             "2. Write a precise physical description that distinguishes the target from teammates in an "
             "IDENTICAL kit (build, hair colour/style, sock height, boot colour, shirt number if visible).\n"
             "3. For each WIDE crop, state whether the TARGET (the centre player) is the one in possession of "
-            "the ball at that instant, or whether the ball is with a DIFFERENT player.\n\n"
-            'Respond ONLY with JSON: {"same_player": true|false, "confidence": "high"|"medium"|"low", '
+            "the ball at that instant, or whether the ball is with a DIFFERENT player.\n"
+            + (
+                f"4. The player's own family states the target wears SHIRT NUMBER {jersey_number}. If a shirt "
+                "number is readable in ANY crop, check it against that number.\n"
+                if jersey_number else ""
+            )
+            + '\nRespond ONLY with JSON: {"same_player": true|false, "confidence": "high"|"medium"|"low", '
             '"description": "<2-3 sentences>", '
             '"wide_ball_status": [{"idx": 1, "target_has_ball": "yes"|"no"|"unclear", "note": "<short>"}], '
-            '"confusion_risk": "<one short sentence about nearby players who could be confused with the target, or \'none\'>"}'
+            + (
+                '"jersey_number_check": "confirmed"|"mismatch"|"not_visible", '
+                if jersey_number else ""
+            )
+            + '"confusion_risk": "<one short sentence about nearby players who could be confused with the target, or \'none\'>"}'
         )
         msg = UserMessage(text=prompt, file_contents=[*tights, *wides])
         resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
@@ -167,6 +183,8 @@ async def build_identity_profile(
         data = _extract_json(text)
         if not data or "description" not in data:
             return None
+        if jersey_number:
+            data["stated_jersey_number"] = str(jersey_number)
         logger.info(
             f"[identity-profile] {session_id}: same_player={data.get('same_player')} "
             f"conf={data.get('confidence')} desc={str(data.get('description'))[:120]}"
@@ -195,19 +213,52 @@ def identity_profile_block(profile: dict | None) -> str:
         note = str(w.get("note") or "").strip()
         rows.append(f"  • Tap moment {w.get('idx', '?')} — target {label}{f' — {note}' if note else ''}")
     confusion = str(profile.get("confusion_risk") or "").strip()
+    jn = str(profile.get("stated_jersey_number") or "").strip()
+    jc = str(profile.get("jersey_number_check") or "").strip().lower()
+    jersey_lines = ""
+    if jn:
+        status = {
+            "confirmed": "an independent vision check CONFIRMED this number is readable on the target",
+            "mismatch": "WARNING — the vision check read a DIFFERENT number in a crop; rely on the physical description",
+        }.get(jc, "not readable in the tap crops — use it whenever a number becomes visible in the video")
+        jersey_lines = f"STATED SHIRT NUMBER: {jn} (provided by the player's own family — {status})\n"
     return (
         "\n\n🔒 CROSS-MODEL IDENTITY VERIFICATION (an INDEPENDENT vision system examined the user's tap "
         "crops BEFORE this analysis)\n"
         f"VERIFIED TARGET DESCRIPTION: {profile.get('description')}\n"
+        + jersey_lines
         + (f"CONFUSION RISK: {confusion}\n" if confusion and confusion.lower() != "none" else "")
         + (("BALL STATUS AT THE USER'S TAP MOMENTS:\n" + "\n".join(rows) + "\n") if rows else "")
         + "HARD RULES:\n"
-        "- If the target does NOT have the ball at a tap moment, ANY on-ball action happening then "
+        + (
+            f"- A readable shirt number that is NOT {jn} means that player is NOT the target — never "
+            "credit their actions to the target.\n"
+            if jn and jc != "mismatch" else ""
+        )
+        + "- If the target does NOT have the ball at a tap moment, ANY on-ball action happening then "
         "(dribbling, carrying, beating players, passing) belongs to a DIFFERENT player — NEVER credit "
         "it to the target.\n"
         "- The eye-catching ball-carrier is often NOT the target. The target may be making off-ball runs, "
         "arriving to receive a pass, or finishing a move a teammate started.\n"
         "- Re-identify the target against the VERIFIED TARGET DESCRIPTION before writing every sentence."
+    )
+
+
+def identity_memory_block(profile: dict | None) -> str:
+    """Stage 5 — identity memory from the player's PREVIOUS verified reports
+    (per-account player profile). Injected into both Gemini prompts."""
+    if not profile:
+        return ""
+    desc = str(profile.get("identity_description") or "").strip()
+    jn = str(profile.get("jersey_number") or "").strip()
+    if not desc and not jn:
+        return ""
+    return (
+        "\n\n📇 IDENTITY MEMORY (verified in this player's previous reports on this account)\n"
+        + (f"PREVIOUS VERIFIED DESCRIPTION: {desc}\n" if desc else "")
+        + (f"USUAL SHIRT NUMBER: {jn}\n" if jn else "")
+        + "NOTE: kit colours can differ between matches — build, hair, movement style and shirt "
+        "number are the stable signals. The user's taps in THIS video remain the primary ground truth."
     )
 
 

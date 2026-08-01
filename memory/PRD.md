@@ -2669,3 +2669,51 @@ product: ScoutMePlay – Football Video Analysis
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`.
+
+---
+
+# Session (June 2026) — Tracking & Analysis Upgrade: Stages 1-5 COMPLETE
+
+User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
+
+## Stage 1 — Colour tracking + deterministic Pace/Sprints
+- `player_tracking.py`: HSV colour-veto stops tracker honestly on kit-colour change (crossover safety).
+- `speed_metrics.py`: deterministic top speed / sprints / distance from optical track (age-scaled body height, never AI-guessed). Wired into full-report pipeline (`server.py` stores `pace_metrics` on report).
+- Web: `report-v2/pace.jsx` (PaceCard, click→seek). PDF: `_pace_strip` page 4. PDF_RENDER_VERSION=23.
+
+## Stage 2 — Jersey number verification + visible trust strip
+- Optional "Shirt number" field on upload (`jersey_number` in player_details, Form param).
+- GPT-4o identity profile + frame verification prompts check the stated number (`jersey_number_check`: confirmed/mismatch/not_visible); hard rule injected into Gemini prompts.
+- Web: `report-v2/verification.jsx` — "IDENTITY LOCKED" strip (owner taps, optical tracking, dual-AI X/Y, shirt # confirmed). Serialized as `report.verification`.
+
+## Stage 3 — Doubt-moment control (BEFORE full analysis)
+- Tracker flags low-confidence stops (`doubt_moments` from colour-veto/drift breaks, deduped, max 3, excludes ±1.2s of user taps).
+- Full-report task publishes doubt frames (R2), sets `doubt_status=awaiting`/`full_report_status=awaiting_confirmation`, waits up to 120s (DOUBT_WAIT_S) with heartbeats, then re-tracks with confirmed taps (t minus t_off) or proceeds (timeout/skip → old behaviour, never blocks).
+- `POST /api/reports/{id}/doubt-confirm` {taps:[{idx,x,y}], skip}. Status+report payloads expose doubt fields while awaiting.
+- Web: `components/DoubtConfirmModal.jsx` (tap player in frame → confirm/skip) shown on ReportPage during generation and on reload.
+- Guard: generate-full treats `awaiting_confirmation` as already-generating (no double-fire).
+
+## Stage 4 — Parent Value Metrics
+- FULL_REPORT_PROMPT: new `parent_value_metrics` (involvement touches/min, bravery 1-10, reaction_after_mistake strong/neutral/concerning with never-invent rule, off_ball_work, top_minutes 1-3 windows).
+- Web: `report-v2/parentmetrics.jsx` "What Parents Ask" card (click→seek top minutes). PDF: `_parent_metrics_strip` on parents-package page.
+- NOTE: AOrman demo report has MOCKED `parent_value_metrics` injected (like earlier mocked missions). Real uploads get real data.
+
+## Stage 5 — Player profile identity memory
+- Extends EXISTING `player_profiles` (progress_tracking schema, keyed user_id+normalized_name) with `fingerprint`, `identity_description`, `jersey_number`, `current_club`, `preferred_foot`, `last_report_id` via `_upsert_player_profile()` (called at preview-ready).
+- `GET /api/me/player-profiles` → upload page "Same player again?" chips pre-fill all details.
+- `identity_memory_block()` (identity_verify.py) injects previous verified description + usual shirt number into BOTH Gemini prompts (kit-may-differ caveat).
+
+## Bugfix
+- `progress_tracking.compute_trajectory` early-returns missing `report_count` → KeyError 500 on `/progress/players/{id}/trajectory` for profiles without reports. Fixed.
+
+## Testing (this session)
+- Stage-by-stage self-tests: curl API checks, python integration test of doubt wait/confirm/re-track machinery, PDF rasterised page checks, screenshots (PaceCard, verification strip, DoubtConfirmModal e2e tap→confirm, ParentMetrics card, upload profile chips + prefill).
+- Backend pytest: 442 passed; 43 failures are STALE (old 22-page v1 PDF expectations, missing system ffmpeg in env, old price defaults) — verified unrelated.
+- Known gotcha recurred TWICE: parallel search_replace on server.py/pdf_v2.py corrupted file tail + silently dropped an edit → always grep-verify after batches on those files.
+
+## Backlog (unchanged priorities)
+- P2: Audio Pep-Talk (OpenAI TTS, user postponed until after tracking upgrades — NOW UNBLOCKED)
+- P2: Chat with the Scout (report-context chatbot)
+- P2: Drag-to-trim before marking
+- P3: AI-commentated highlight video
+- P3: Upload wait-time UX ("Din analyse er typisk klar om ~1 minut")

@@ -341,9 +341,25 @@ def derive_v2(report):
         "identityNote": _identity_note(report),
         "actionTimeline": _action_timeline(full),
         "parentsPackage": _parents_package(full),
+        "parentMetrics": _parent_metrics(full),
         "missions": [m for m in (full.get("next_match_missions") or [])
                      if isinstance(m, dict) and m.get("mission")][:3],
     }
+
+
+def _parent_metrics(full):
+    pvm = full.get("parent_value_metrics")
+    if not isinstance(pvm, dict):
+        return None
+    top = [t for t in (pvm.get("top_minutes") or []) if isinstance(t, dict) and t.get("from")][:3]
+    out = {
+        "involvement": pvm.get("involvement") if isinstance(pvm.get("involvement"), dict) else None,
+        "bravery": pvm.get("bravery") if isinstance(pvm.get("bravery"), dict) else None,
+        "reaction": pvm.get("reaction_after_mistake") if isinstance(pvm.get("reaction_after_mistake"), dict) else None,
+        "offBall": pvm.get("off_ball_work") if isinstance(pvm.get("off_ball_work"), dict) else None,
+        "topMinutes": top,
+    }
+    return out if any([out["involvement"], out["bravery"], out["reaction"], out["offBall"], top]) else None
 
 
 def _parents_package(full):
@@ -1288,6 +1304,49 @@ def _movement_map_card(c, mm, x, y, w, h):
     )
 
 
+def _pace_strip(c, pace, x, y, w, h):
+    """Deterministic pace estimates from the optical track — forest strip."""
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(x, y, w, h, 10, stroke=0, fill=1)
+    c.setFillColor(HexColor("#A9BC9C"))
+    c.setFont(F_BOLD, 5.8)
+    c.drawString(x + PAD, y + h - 15, "PACE & SPRINTS · ESTIMATED FROM OPTICAL TRACKING")
+    c.setFillColor(HexColor("#CCFF00"))
+    c.setFont(F_BLACK, 21)
+    top_txt = f"{pace.get('top_speed_kmh', 0)} KM/H"
+    c.drawString(x + PAD, y + h - 41, top_txt)
+    tw2 = c.stringWidth(top_txt, F_BLACK, 21)
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.setFont(F_BOLD, 6.2)
+    c.drawString(x + PAD + tw2 + 8, y + h - 41, f"TOP SPEED (EST.) · AT {pace.get('top_speed_t', 0)}S")
+    chips = [
+        (str(pace.get("sprint_count", 0)), f"SPRINTS >{pace.get('sprint_threshold_kmh', 0):g} KM/H"),
+        (f"{pace.get('distance_tracked_m', 0)} m", "DISTANCE TRACKED"),
+        (f"{pace.get('avg_moving_kmh') or '—'}", "MOVING PACE KM/H"),
+    ]
+    cw2 = 92
+    bx = x + w - PAD - len(chips) * (cw2 + 8) + 8
+    for val, lbl in chips:
+        c.setFillColor(HexColor("#12402A"))
+        c.roundRect(bx, y + h - 51, cw2, 38, 7, stroke=0, fill=1)
+        c.setFillColor(HexColor("#CCFF00"))
+        c.setFont(F_BLACK, 12)
+        c.drawCentredString(bx + cw2 / 2, y + h - 32, val)
+        c.setFillColor(HexColor("#A9BC9C"))
+        c.setFont(F_BOLD, 4.8)
+        c.drawCentredString(bx + cw2 / 2, y + h - 46, lbl)
+        bx += cw2 + 8
+    c.setFillColor(HexColor("#8FA98F"))
+    c.setFont(F_BODY, 5.8)
+    c.drawString(
+        x + PAD, y + 7,
+        f"Scaled by age-typical body height (est. ±10-15%) · measured only in the "
+        f"{pace.get('tracked_seconds', 0)}s of secure tracking — never guessed.",
+    )
+    c.restoreState()
+
+
 def _player_twin_card(c, lens, neighbors, x, y, w, h):
     """FIFA Pro similarity — the player's 'style twin' + top-5 nearest pros."""
     card(c, x, y, w, h)
@@ -1860,6 +1919,56 @@ def _cutout_frame(c, x, y, w, h, label):
     c.restoreState()
 
 
+def _parent_metrics_strip(c, pm, x, y, w, h):
+    """'What Parents Ask' — evidence-only involvement/character chips + top minutes."""
+    card(c, x, y, w, h)
+    ty = y + h - PAD
+    ty -= card_title(c, x + PAD, ty, "What Parents Ask · Evidence Only", w - 2 * PAD)
+    ty -= 4
+    chips = []
+    inv = pm.get("involvement") or {}
+    if inv:
+        per = inv.get("touches_per_minute")
+        chips.append((str(inv.get("touches_observed", "—")), "TOUCHES",
+                      f"≈{per}/MIN" if per is not None else "INVOLVEMENT"))
+    br = pm.get("bravery") or {}
+    if br:
+        chips.append((f"{br.get('score')}/10" if br.get("score") is not None else "—", "BRAVERY", "UNDER PRESSURE"))
+    re_ = pm.get("reaction") or {}
+    if re_:
+        rating = str(re_.get("rating") or "").lower()
+        val = {"strong": "STRONG", "neutral": "NEUTRAL", "concerning": "SUPPORT"}.get(rating, "—")
+        if not re_.get("observed"):
+            val = "NO MISTAKE"
+        chips.append((val, "REACTION", "AFTER MISTAKE"))
+    ob = pm.get("offBall") or {}
+    if ob:
+        chips.append((f"{ob.get('score')}/10" if ob.get("score") is not None else "—", "OFF-BALL", "WORK RATE"))
+    n = max(1, len(chips))
+    cw2 = (w - 2 * PAD - (n - 1) * 8) / n
+    ch = 46
+    for i, (val, l1, l2) in enumerate(chips):
+        bx = x + PAD + i * (cw2 + 8)
+        card(c, bx, ty - ch, cw2, ch, fill=HexColor("#FBF9F3"), r=7)
+        c.setFillColor(INK)
+        c.setFont(F_BLACK, 13)
+        c.drawCentredString(bx + cw2 / 2, ty - ch + 25, str(val))
+        c.setFillColor(MUTED)
+        c.setFont(F_BOLD, 4.8)
+        c.drawCentredString(bx + cw2 / 2, ty - ch + 15, l1)
+        c.drawCentredString(bx + cw2 / 2, ty - ch + 8, l2)
+    ly = ty - ch - 13
+    for t in (pm.get("topMinutes") or [])[:3]:
+        rng = f"{t.get('from')}–{t.get('to')}" if t.get("to") else str(t.get("from"))
+        c.setFillColor(FOREST)
+        c.setFont(F_BOLD, 6)
+        c.drawString(x + PAD, ly, f"WATCH FIRST  {rng}")
+        c.setFillColor(MUTED)
+        c.setFont(F_BODY, 6)
+        c.drawString(x + PAD + 92, ly, esc(str(t.get("why") or ""))[:130])
+        ly -= 11
+
+
 def _mission_card_print(c, missions, player_name, x, y, w, h):
     """Cut-out mission card for the sports bag: 3 countable missions + boxes."""
     _cutout_frame(c, x, y, w, h, "CUT OUT · SPORTS BAG")
@@ -2114,6 +2223,8 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     player_name = pd.get("player_name") or "Player"
 
     mm = report_doc.get("movement_map") or {}
+    pace = report_doc.get("pace_metrics") or {}
+    has_pace = bool(pace.get("top_speed_kmh"))
     _arch = report_doc.get("archetype") or {}
     _lenses = _arch.get("lenses") if isinstance(_arch.get("lenses"), dict) else {}
     fifa_lens = _lenses.get("fifa") if isinstance(_lenses, dict) else None
@@ -2240,7 +2351,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         _page_bg(c)
         mh = _mini_header(c, player_name)
         yy = H - M - mh - 4
-        blocks = int(bool(prog)) + int(bool(mm.get("trail"))) + int(bool(fifa_lens))
+        blocks = int(bool(prog)) + int(bool(mm.get("trail"))) + int(bool(fifa_lens)) + int(has_pace)
         if prog:
             series_ok = len([s for s in (prog.get("series") or [])
                              if isinstance(s.get("overall"), (int, float))]) >= 3
@@ -2255,10 +2366,17 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 h_mm = 235
                 _movement_map_card(c, mm, M, (H - h_mm) / 2, CW, h_mm)
             else:
-                h_mm = min(235.0, yy - M - 30 - (160 + GAP if fifa_lens else 0))
+                h_mm = min(235.0, yy - M - 30 - (160 + GAP if fifa_lens else 0) - (68 + GAP if has_pace else 0))
                 if h_mm > 120:
                     _movement_map_card(c, mm, M, yy - h_mm, CW, h_mm)
                     yy -= h_mm + GAP
+        if has_pace:
+            h_pc = 68
+            if blocks == 1:
+                _pace_strip(c, pace, M, (H - h_pc) / 2, CW, h_pc)
+            elif yy - M - 30 - (160 + GAP if fifa_lens else 0) >= h_pc:
+                _pace_strip(c, pace, M, yy - h_pc, CW, h_pc)
+                yy -= h_pc + GAP
         if fifa_lens:
             if blocks == 1:
                 h_tw = 255
@@ -2279,12 +2397,14 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         _page_bg(c)
         mh = _mini_header(c, player_name)
         yy = H - M - mh - 4
+        pm = d.get("parentMetrics")
+        h_pm = (96 + 11 * len(pm.get("topMinutes") or [])) if pm else 0
         if pp.get("drills"):
             h_hd = 258
             _home_drills_card(c, pp["drills"], M, yy - h_hd, CW, h_hd)
             yy -= h_hd + GAP
         if pp.get("watch") or pp.get("message"):
-            cols_h = min(300.0, yy - M - 30)
+            cols_h = min(300.0, yy - M - 30 - ((h_pm + GAP) if pm else 0))
             if cols_h > 140:
                 if pp.get("watch") and pp.get("message"):
                     lw3 = (CW - GAP) * 0.53
@@ -2294,6 +2414,9 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                     _watch_together_card(c, pp["watch"], M, yy - cols_h, CW, cols_h)
                 else:
                     _letter_card(c, pp["message"], M, yy - cols_h, CW, cols_h, player_name)
+                yy -= cols_h + GAP
+        if pm and yy - M - 20 >= h_pm:
+            _parent_metrics_strip(c, pm, M, yy - h_pm, CW, h_pm)
         _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0), total_pages)
         c.showPage()
 
@@ -2324,4 +2447,3 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _page_footer(c, total_pages, total_pages)
     c.showPage()
     c.save()
-

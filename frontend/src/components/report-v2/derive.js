@@ -265,6 +265,22 @@ export function deriveV2(report) {
   const missions = (Array.isArray(full.next_match_missions) ? full.next_match_missions : [])
     .filter((m) => m && m.mission).slice(0, 3);
 
+  // ---- Parent value metrics (Stage 4 — involvement / bravery / reaction / off-ball / top minutes) ----
+  const pvmRaw = full.parent_value_metrics;
+  let parentMetrics = null;
+  if (pvmRaw && typeof pvmRaw === "object") {
+    const topMinutes = (Array.isArray(pvmRaw.top_minutes) ? pvmRaw.top_minutes : [])
+      .filter((m) => m && m.from).slice(0, 3);
+    const pm = {
+      involvement: pvmRaw.involvement || null,
+      bravery: pvmRaw.bravery || null,
+      reaction: pvmRaw.reaction_after_mistake || null,
+      offBall: pvmRaw.off_ball_work || null,
+      topMinutes,
+    };
+    if (pm.involvement || pm.bravery || pm.reaction || pm.offBall || topMinutes.length) parentMetrics = pm;
+  }
+
   // ---- Evidence-integrity note (strict image policy) ----
   const ist = report?.identity_stats;
   const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
@@ -279,5 +295,6 @@ export function deriveV2(report) {
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
     matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
+    parentMetrics,
   };
 }

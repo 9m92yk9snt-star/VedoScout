@@ -217,12 +217,12 @@ async def compute_trajectory(db, profile_doc: dict) -> dict:
     """Pull every linked report and compute a trajectory snapshot."""
     report_ids = profile_doc.get("report_ids") or []
     if not report_ids:
-        return {"timeline": [], "verdict": "first_report", "badges": [], "deltas": {}, "narrative": None}
+        return {"timeline": [], "verdict": "first_report", "badges": [], "deltas": {}, "narrative": None, "report_count": 0}
 
     cursor = db[REPORTS].find({"id": {"$in": report_ids}}).sort("created_at", 1)
     reports = [r async for r in cursor]
     if not reports:
-        return {"timeline": [], "verdict": "first_report", "badges": [], "deltas": {}, "narrative": None}
+        return {"timeline": [], "verdict": "first_report", "badges": [], "deltas": {}, "narrative": None, "report_count": 0}
 
     timeline = []
     for r in reports:

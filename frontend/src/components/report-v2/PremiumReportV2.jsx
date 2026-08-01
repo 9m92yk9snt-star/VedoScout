@@ -12,6 +12,9 @@ import {
   ActionTimelineCard,
 } from "./sections";
 import { MovementMapCard } from "./movement";
+import { PaceCard } from "./pace";
+import { VerifiedIdentityStrip } from "./verification";
+import { ParentValueMetricsCard } from "./parentmetrics";
 import { ParentsPackageSection } from "./parents";
 import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
@@ -255,6 +258,12 @@ export default function PremiumReportV2({ report, assetBase }) {
         <DevPrioritiesCard devPriorities={d.devPriorities} />
       </div>
 
+      {report.verification?.anchors > 0 && (
+        <div className="mb-4">
+          <VerifiedIdentityStrip verification={report.verification} />
+        </div>
+      )}
+
       {d.identityNote && (
         <div data-testid="v2-identity-note" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#8A6D3B] bg-[#FFF8E9] border border-[#F0E3C4] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
           <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -274,6 +283,12 @@ export default function PremiumReportV2({ report, assetBase }) {
         </div>
       )}
 
+      {report.pace_metrics?.top_speed_kmh && (
+        <div className="mb-4">
+          <PaceCard pace={report.pace_metrics} onPlayAt={playAt} />
+        </div>
+      )}
+
       {report.score_context?.overall && (
         <div className="mb-4">
           <ScoreGuideCard sctx={report.score_context} />
@@ -286,6 +301,12 @@ export default function PremiumReportV2({ report, assetBase }) {
         <TrainingPlanCard trainingWeek={d.trainingWeek} />
         <ParentTipsCard parentTips={d.parentTips} />
       </div>
+
+      {d.parentMetrics && (
+        <div className="mb-4">
+          <ParentValueMetricsCard metrics={d.parentMetrics} onPlayAt={playAt} />
+        </div>
+      )}
 
       {d.parentsPackage && (
         <div className="mb-4">

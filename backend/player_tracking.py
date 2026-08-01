@@ -102,7 +102,18 @@ def _record(out: dict, t: float, cur, W: int, H: int, conf: float):
         out[key] = rec
 
 
-def _run_direction(frames, i0: int, box_px, out: dict, direction: int):
+def _doubt(doubts, t: float, cur, W: int, H: int, reason: str):
+    if doubts is None:
+        return
+    doubts.append({
+        "t": round(t, 2),
+        "x": round(cur[0] / W, 4), "y": round(cur[1] / H, 4),
+        "w": round((cur[2] - cur[0]) / W, 4), "h": round((cur[3] - cur[1]) / H, 4),
+        "reason": reason,
+    })
+
+
+def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None):
     _t0, g0, hsv0 = frames[i0]
     tmpl0 = _crop(g0, box_px)
     if tmpl0 is None:
@@ -139,6 +150,7 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int):
         if csim is not None and csim < COLOR_MIN:
             color_misses += 1
             if color_misses >= COLOR_MAX_MISSES:
+                _doubt(doubts, t, cur, W, H, "kit-colour change — possible player crossover")
                 break  # colours no longer match the tapped player — stop honestly
             continue  # do NOT accept the suspicious box
         color_misses = 0
@@ -151,6 +163,7 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int):
             c0 = cv2.resize(cand, (tmpl0.shape[1], tmpl0.shape[0]))
             drift = float(cv2.matchTemplate(c0, tmpl0, cv2.TM_CCOEFF_NORMED)[0][0])
             if drift < DRIFT_MIN:
+                _doubt(doubts, t, cur, W, H, "visual drift — tracker no longer certain")
                 break  # drifted away from the original tap content — stop honestly
         tmpl = cand
         _record(out, t, cur, W, H, mx)
@@ -165,11 +178,12 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
         if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
     ]
     if not seeds:
-        return {"points": [], "segments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ}
+        return {"points": [], "segments": [], "doubt_moments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ}
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        return {"points": [], "segments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ}
+        return {"points": [], "segments": [], "doubt_moments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ}
     points: dict = {}
+    doubts: list = []
     step = 1.0 / SAMPLE_HZ
     try:
         for t_seed, b in seeds:
@@ -185,8 +199,8 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
                 (float(b["x"]) + float(b["w"])) * W, (float(b["y"]) + float(b["h"])) * H,
             ]
             _record(points, frames[i0][0], box_px, W, H, 1.0)  # the tap itself
-            _run_direction(frames, i0, box_px, points, +1)
-            _run_direction(frames, i0, box_px, points, -1)
+            _run_direction(frames, i0, box_px, points, +1, doubts)
+            _run_direction(frames, i0, box_px, points, -1, doubts)
             del frames
     finally:
         cap.release()
@@ -198,7 +212,19 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
         else:
             segs.append([p["t"], p["t"]])
     segs = [[round(a, 2), round(b, 2)] for a, b in segs if b - a >= 0.3]
-    return {"points": pts, "segments": segs, "t_off": round(float(t_off or 0.0), 3), "hz": SAMPLE_HZ}
+    # ── doubt moments: identity-risk stops NOT already covered by a user tap ──
+    seed_times = [t for t, _b in seeds]
+    doubt_out: list = []
+    for dmom in sorted(doubts, key=lambda d: d["t"]):
+        if any(abs(dmom["t"] - st) <= 1.2 for st in seed_times):
+            continue  # user already confirmed identity right there
+        if doubt_out and dmom["t"] - doubt_out[-1]["t"] < 1.0:
+            continue
+        doubt_out.append(dmom)
+    return {
+        "points": pts, "segments": segs, "doubt_moments": doubt_out[:3],
+        "t_off": round(float(t_off or 0.0), 3), "hz": SAMPLE_HZ,
+    }
 
 
 def track_at(points: list, sec: float, max_gap: float = 0.45) -> dict | None:

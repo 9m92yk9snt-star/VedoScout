@@ -101,7 +101,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 21  # v21 = score benchmark page (bell curves + scout lines)
+PDF_RENDER_VERSION = 23  # v23 = pace strip + parent value metrics ("What Parents Ask")
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -2746,7 +2746,14 @@ Produce a JSON object EXACTLY in this format:
     {"mission": "<ONE short instruction written TO the child — something countable during a match>", "target": "<countable target, e.g. '5 times'>", "why": "<ONE short sentence why this matters>"},
     {"mission": "...", "target": "...", "why": "..."},
     {"mission": "...", "target": "...", "why": "..."}
-  ]
+  ],
+  "parent_value_metrics": {
+    "involvement": {"touches_observed": <integer — clearly observed touches by the circled player>, "touches_per_minute": <number with one decimal>, "note": "<ONE parent-friendly sentence about how involved the player was>"},
+    "bravery": {"score": <1-10 with one decimal, or null>, "note": "<ONE sentence with concrete evidence — demanding the ball, receiving under pressure, taking players on>"},
+    "reaction_after_mistake": {"observed": true | false, "rating": "strong" | "neutral" | "concerning" | null, "timestamp": "MM:SS" | null, "note": "<what went wrong + how the player responded in the following seconds, or why nothing could be tested>"},
+    "off_ball_work": {"score": <1-10 with one decimal, or null>, "note": "<ONE sentence — runs, scanning, defensive recovery observed without the ball>"},
+    "top_minutes": [{"from": "MM:SS", "to": "MM:SS", "why": "<ONE sentence — why this window shows the player at their best>"}]
+  }
 }
 
 RULES FOR TOP-LEVEL "scores":
@@ -2778,6 +2785,13 @@ RULES FOR "next_match_missions" (printed as a card for the sports bag):
 - EXACTLY 3 missions. Each is a PROCESS goal the child can COUNT during a match — never outcome goals (no "score 2 goals", no "win the game").
 - Each mission trains one of the development_priorities_detailed items. Age-appropriate wording, written TO the child ("Receive the ball side-on", not "the player should...").
 - target must be a small countable number the child can realistically hit (e.g. "5 times", "3 times each half").
+
+RULES FOR "parent_value_metrics" (the questions families actually ask — honesty is everything):
+- involvement: COUNT only touches you clearly observed for THE CIRCLED PLAYER (identity rules apply). touches_per_minute = touches ÷ minutes of footage. Small honest numbers are correct.
+- bravery: reward the WILLINGNESS (showing for the ball, receiving with an opponent close, taking on a duel) — never the outcome. Set score to null when the footage gives no evidence either way.
+- reaction_after_mistake: only when a clear mistake by the circled player is visible (lost ball, missed chance, failed tackle). Rate the response in the following ~10 seconds: "strong" (keeps playing, wins the ball back, demands it again), "neutral", or "concerning" (head drops, stops running). If no clear mistake happens, set observed=false and rating/timestamp to null — NEVER invent a mistake.
+- off_ball_work: what the player does WITHOUT the ball. Set score to null when the camera never shows the player off the ball.
+- top_minutes: 1-3 windows (30-90 seconds each) inside the real footage where the circled player is at their best — the minutes a busy parent or coach should watch first. Timestamps must lie within the video and the player must be re-identifiable across the whole window.
 
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
@@ -4610,6 +4624,7 @@ async def upload_video_and_create_preview(
     position: str = Form(...),
     preferred_foot: str = Form(...),
     current_club: Optional[str] = Form(None),
+    jersey_number: Optional[str] = Form(None),
     video_type: str = Form(...),
     description: str = Form(...),
     user=Depends(get_current_user),
@@ -4750,6 +4765,7 @@ async def upload_video_and_create_preview(
         "position": position,
         "preferred_foot": preferred_foot,
         "current_club": current_club or "Independent",
+        "jersey_number": (str(jersey_number).strip()[:4] or None) if jersey_number else None,
         "video_type": video_type,
         "description": description,
     }
@@ -4948,6 +4964,10 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         "full_report_status": doc.get("full_report_status") or ("ready" if doc.get("full_report") else None),
         "full_report_error": doc.get("full_report_error"),
         "has_full_report": bool(doc.get("full_report")),
+        # Stage 3 — doubt-moment control: the owner can confirm identity at
+        # flagged crossovers while the full report task waits (bounded).
+        "doubt_status": doc.get("doubt_status"),
+        "doubt_moments": doc.get("doubt_moments") if doc.get("doubt_status") == "awaiting" else None,
     }
     if analysis_status == "ready":
         out.update({
@@ -5313,6 +5333,7 @@ async def analyze_preview_task(report_id: str):
         if anchor_crop_paths:
             identity_profile_task = asyncio.ensure_future(build_identity_profile(
                 EMERGENT_LLM_KEY, f"idp-{report_id}", anchor_crop_paths, wide_crop_paths,
+                jersey_number=(details or {}).get("jersey_number"),
             ))
 
         # ============== PREVIEW CLIP + AUDIO PEAKS (cut from the raw file) ==============
@@ -5461,6 +5482,16 @@ async def analyze_preview_task(report_id: str):
             )
             preview_prompt += identity_profile_block(identity_profile)
             await _trace(report_id, "identity_profile_done")
+        # Stage 5 — inject identity memory from this player's previous reports.
+        try:
+            _mem = await db.player_profiles.find_one(
+                {"user_id": doc.get("user_id"), "normalized_name": _norm_player_name(details.get("player_name"))})
+            _mem_block = identity_memory_block(_mem)
+            if _mem_block:
+                preview_prompt += _mem_block
+                await _trace(report_id, "identity_memory_injected")
+        except Exception:
+            pass
         await _trace(report_id, "gemini_preview_start")
         preview = await _await_with_heartbeat(report_id, call_gemini_with_video(
             session_id=f"preview-{report_id}",
@@ -5597,6 +5628,8 @@ async def analyze_preview_task(report_id: str):
 
         # If the upload was prepaid / pass-credit, kick off the full premium report too.
         doc = await db.reports.find_one({"id": report_id})
+        # Stage 5 — refresh the per-player identity memory profile.
+        await _upsert_player_profile(report_id)
         if doc and doc.get("is_paid"):
             asyncio.create_task(generate_full_report_task(report_id))
     except Exception as e:
@@ -5622,6 +5655,50 @@ async def analyze_preview_task(report_id: str):
             await _refund_upload_eligibility(report_id)
         except Exception as re:
             logger.warning(f"Eligibility refund failed for {report_id}: {re}")
+
+
+async def _upsert_player_profile(report_id: str):
+    """Stage 5 — per-player identity memory. Extends the existing
+    `player_profiles` docs (progress_tracking schema: name/normalized_name/
+    last_age/last_position/report_ids) with the visual fingerprint + verified
+    description so future uploads pre-fill details and recognition gets a
+    verified head start. Best-effort."""
+    try:
+        doc = await db.reports.find_one({"id": report_id})
+        if not doc or doc.get("demo"):
+            return
+        pd = doc.get("player_details") or {}
+        key = _norm_player_name(pd.get("player_name"))
+        if not key or not doc.get("user_id"):
+            return
+        idp = doc.get("identity_profile") or {}
+        update = {
+            "name": (pd.get("player_name") or "").strip(),
+            "last_age": pd.get("age"),
+            "last_position": pd.get("position"),
+            "preferred_foot": pd.get("preferred_foot"),
+            "current_club": pd.get("current_club"),
+            "last_report_id": report_id,
+            "updated_at": now_iso(),
+        }
+        if pd.get("jersey_number"):
+            update["jersey_number"] = pd.get("jersey_number")
+        if doc.get("fingerprint"):
+            update["fingerprint"] = doc["fingerprint"]
+        if isinstance(idp, dict) and idp.get("description"):
+            update["identity_description"] = idp["description"]
+        await db.player_profiles.update_one(
+            {"user_id": doc["user_id"], "normalized_name": key},
+            {
+                "$set": update,
+                "$addToSet": {"report_ids": report_id},
+                "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": now_iso()},
+            },
+            upsert=True,
+        )
+        logger.info(f"[player-profile] upserted '{key}' for user {doc['user_id']}")
+    except Exception:
+        logger.exception(f"player profile upsert failed for {report_id}")
 
 
 async def _refund_upload_eligibility(report_id: str):
@@ -5984,6 +6061,8 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "is_paid": doc.get("is_paid", False),
         "manually_unlocked": doc.get("manually_unlocked", False),
         "demo": doc.get("demo", False),
+        "doubt_status": doc.get("doubt_status"),
+        "doubt_moments": doc.get("doubt_moments") if doc.get("doubt_status") == "awaiting" else None,
         "created_at": doc.get("created_at"),
         "paid_at": doc.get("paid_at"),
     }
@@ -5992,6 +6071,16 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         out["agent_review"] = doc.get("agent_review")
         out["identity_stats"] = doc.get("identity_stats")
         out["movement_map"] = doc.get("movement_map")
+        out["pace_metrics"] = doc.get("pace_metrics")
+        _vstats = doc.get("identity_stats")
+        out["verification"] = {
+            "anchors": len(doc.get("anchors") or []),
+            "tracked": bool((doc.get("player_track") or {}).get("points")),
+            "identity_stats": _vstats if isinstance(_vstats, dict) else None,
+            "jersey_number": (doc.get("player_details") or {}).get("jersey_number"),
+            "jersey_check": (doc.get("identity_profile") or {}).get("jersey_number_check")
+            if isinstance(doc.get("identity_profile"), dict) else None,
+        }
         out["progression"] = await compute_progression_for_report(doc)
         try:
             out["score_context"] = build_score_context(
@@ -6112,7 +6201,7 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
 
     # Idempotency — if a task is already running for this report, no-op.
     current = doc.get("full_report_status")
-    if current == "generating":
+    if current in ("generating", "awaiting_confirmation"):
         return {"status": "already_generating", "report_id": report_id, "full_report_status": "generating"}
 
     # Verify the source video is REACHABLE (local disk OR Cloudflare R2).
@@ -6131,6 +6220,136 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     )
     background.add_task(generate_full_report_task, report_id)
     return {"status": "generating", "report_id": report_id, "full_report_status": "generating"}
+
+
+# ─── Doubt-moment control (Stage 3): owner confirms identity at low-confidence
+#     crossovers BEFORE the AI analysis runs ───────────────────────────────────
+DOUBT_WAIT_S = 120
+
+
+class DoubtTap(BaseModel):
+    idx: int
+    x: float
+    y: float
+
+
+class DoubtConfirmPayload(BaseModel):
+    taps: List[DoubtTap] = []
+    skip: bool = False
+
+
+@api_router.post("/reports/{report_id}/doubt-confirm")
+async def confirm_doubt_moments(report_id: str, payload: DoubtConfirmPayload, user=Depends(get_current_user)):
+    """Owner answers the 'is this your player?' prompt for flagged crossover
+    moments. Confirmed taps become extra tracking seeds; skip lets the
+    fail-safe tracker decide on its own (old behaviour)."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if doc.get("user_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not your report.")
+    moments = doc.get("doubt_moments") or []
+    if not moments:
+        raise HTTPException(status_code=400, detail="No doubt moments to confirm.")
+    if payload.skip or not payload.taps:
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"doubt_status": "skipped", "doubt_resolved": True}},
+        )
+        return {"ok": True, "status": "skipped"}
+    confirmations = []
+    for tap in payload.taps[: len(moments)]:
+        if not (0 <= tap.idx < len(moments)) or not (0.0 <= tap.x <= 1.0 and 0.0 <= tap.y <= 1.0):
+            continue
+        m = moments[tap.idx]
+        bw = min(max(float(m.get("w") or 0.06), 0.02), 0.5)
+        bh = min(max(float(m.get("h") or 0.16), 0.05), 0.7)
+        box = {
+            "x": round(min(max(tap.x - bw / 2, 0.0), 1.0 - bw), 4),
+            "y": round(min(max(tap.y - bh / 2, 0.0), 1.0 - bh), 4),
+            "w": round(bw, 4), "h": round(bh, 4),
+        }
+        confirmations.append({"t": float(m["t"]), "box": box, "idx": tap.idx})
+    if not confirmations:
+        raise HTTPException(status_code=400, detail="No valid taps.")
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {
+            "doubt_confirmations": confirmations,
+            "doubt_status": "confirmed",
+            "doubt_resolved": True,
+        }},
+    )
+    return {"ok": True, "status": "confirmed", "count": len(confirmations)}
+
+
+async def _run_doubt_confirmation(
+    report_id: str, file_path: Path, valid_anchors: list, gt_t_off: float,
+    gt_track: dict, doubt_moments: list,
+) -> dict:
+    """Publish flagged crossover frames, wait (bounded) for the owner's answer,
+    and re-run the deterministic tracker with the confirmed taps as extra
+    ground-truth seeds. Timeout/skip → original track (old behaviour)."""
+    enriched = []
+    for i, dmom in enumerate(doubt_moments[:3]):
+        fname = f"{report_id}-doubt-{i + 1}.jpg"
+        out_path = UPLOAD_DIR / fname
+        if not await asyncio.to_thread(_extract_video_frame, Path(file_path), float(dmom["t"]), out_path):
+            continue
+        url = f"/api/uploads/{fname}"
+        try:
+            if r2_storage.is_configured():
+                url = await asyncio.to_thread(
+                    r2_storage.upload_file, f"reports/{report_id}/{fname}", out_path, "image/jpeg")
+        except Exception:
+            pass
+        enriched.append({**dmom, "frame_url": url})
+    if not enriched:
+        return gt_track
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {
+            "doubt_moments": enriched,
+            "doubt_status": "awaiting",
+            "full_report_status": "awaiting_confirmation",
+            **_wd_heartbeat(),
+        }},
+    )
+    logger.info(f"[doubt] {report_id}: {len(enriched)} low-confidence crossovers — waiting up to {DOUBT_WAIT_S}s for owner")
+    waited = 0.0
+    fresh = None
+    while waited < DOUBT_WAIT_S:
+        await asyncio.sleep(3)
+        waited += 3
+        fresh = await db.reports.find_one(
+            {"id": report_id}, {"_id": 0, "doubt_status": 1, "doubt_confirmations": 1})
+        if fresh and fresh.get("doubt_status") in ("confirmed", "skipped"):
+            break
+        if int(waited) % 30 == 0:
+            await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat()})
+    status = (fresh or {}).get("doubt_status")
+    confirmations = (fresh or {}).get("doubt_confirmations") or []
+    final = status if status in ("confirmed", "skipped") else "timeout"
+    if final == "confirmed" and confirmations:
+        # Confirmed taps FIRST so they always survive the 10-seed cap. Their t
+        # is already in video time — subtract t_off since track_player re-adds it.
+        seeds = [
+            {"t": float(c["t"]) - float(gt_t_off or 0.0), "box": c["box"]}
+            for c in confirmations
+            if isinstance(c, dict) and isinstance(c.get("box"), dict)
+        ] + valid_anchors
+        try:
+            gt_track = await asyncio.to_thread(track_player, str(file_path), seeds, gt_t_off)
+            gt_track.pop("doubt_moments", None)
+            final = "applied"
+        except Exception:
+            logger.exception(f"doubt re-track failed for {report_id}")
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"doubt_status": final, "full_report_status": "generating", **_wd_heartbeat()}},
+    )
+    logger.info(f"[doubt] {report_id}: resolution={final}")
+    return gt_track
 
 
 def _try_restore_from_r2(url: Optional[str], dest: Path) -> bool:
@@ -6190,6 +6409,7 @@ async def _verify_enriched_frames(
     fp = doc.get("fingerprint") or {}
     jersey = fp.get("jersey_name", "unclear")
     shorts = fp.get("shorts_name", "unclear")
+    jnum = (doc.get("player_details") or {}).get("jersey_number")
     sem = asyncio.Semaphore(3)
 
     async def _check_one(i: int, c: dict) -> None:
@@ -6199,12 +6419,12 @@ async def _verify_enriched_frames(
             return
         async with sem:
             verdict = await verify_frame_identity(
-                EMERGENT_LLM_KEY, f"idv-{report_id}-{i}", ref_crops, str(frame_path), jersey, shorts,
+                EMERGENT_LLM_KEY, f"idv-{report_id}-{i}", ref_crops, str(frame_path), jersey, shorts, jnum,
             )
             if verdict == "error":
                 await asyncio.sleep(2)
                 verdict = await verify_frame_identity(
-                    EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-r", ref_crops, str(frame_path), jersey, shorts,
+                    EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-r", ref_crops, str(frame_path), jersey, shorts, jnum,
                 )
             if verdict == "confirmed":
                 c["identity_verified"] = True
@@ -6222,7 +6442,7 @@ async def _verify_enriched_frames(
                     if not await asyncio.to_thread(extract_frame_at, video_path, ts2, cand):
                         continue
                     v2 = await verify_frame_identity(
-                        EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-{off:+.0f}", ref_crops, str(cand), jersey, shorts,
+                        EMERGENT_LLM_KEY, f"idv-{report_id}-{i}-{off:+.0f}", ref_crops, str(cand), jersey, shorts, jnum,
                     )
                     if v2 == "confirmed":
                         shutil.move(str(cand), str(frame_path))
@@ -6561,12 +6781,21 @@ async def generate_full_report_task(report_id: str) -> None:
                         estimate_time_offset, str(file_path), marker_path, float(doc["marker_timestamp"]),
                     )
                 gt_track = await asyncio.to_thread(track_player, str(file_path), valid_anchors, gt_t_off)
+                doubt_moments = gt_track.pop("doubt_moments", []) or []
+                if doubt_moments and not doc.get("doubt_resolved"):
+                    try:
+                        gt_track = await _run_doubt_confirmation(
+                            report_id, file_path, valid_anchors, gt_t_off, gt_track, doubt_moments)
+                    except Exception:
+                        logger.exception(f"doubt confirmation flow failed for {report_id}")
                 await db.reports.update_one(
                     {"id": report_id},
                     {"$set": {
                         "player_track": gt_track,
                         "anchor_time_offset": gt_t_off,
                         "movement_map": compute_movement_map(gt_track),
+                        "pace_metrics": compute_speed_metrics(
+                            gt_track, (doc.get("player_details") or {}).get("age")),
                     }},
                 )
                 logger.info(
@@ -6626,6 +6855,16 @@ async def generate_full_report_task(report_id: str) -> None:
             _idp = doc.get("identity_profile")
             if _idp:
                 full_prompt += identity_profile_block(_idp)
+        except Exception:
+            pass
+        # Stage 5 — identity memory from this player's previous reports.
+        try:
+            _mem = await db.player_profiles.find_one(
+                {"user_id": doc.get("user_id"),
+                 "normalized_name": _norm_player_name((doc.get("player_details") or {}).get("player_name"))})
+            _mem_block = identity_memory_block(_mem)
+            if _mem_block:
+                full_prompt += _mem_block
         except Exception:
             pass
         # Inject the ground-truth tap positions + tracking coverage.
@@ -9510,6 +9749,30 @@ def _has_active_subscription(user: dict) -> Optional[str]:
     return None
 
 
+@api_router.get("/me/player-profiles")
+async def list_my_player_profiles(user=Depends(get_current_user)):
+    """Stage 5 — saved players on this account (identity memory). Used by the
+    upload page to pre-fill details with one tap."""
+    rows = await db.player_profiles.find(
+        {"user_id": user["id"]},
+        {"_id": 0, "fingerprint": 0, "identity_description": 0, "cached_trajectory": 0},
+    ).sort("updated_at", -1).to_list(20)
+    return {"profiles": [
+        {
+            "id": r.get("id"),
+            "player_name": r.get("name"),
+            "age": r.get("last_age"),
+            "position": r.get("last_position"),
+            "preferred_foot": r.get("preferred_foot"),
+            "current_club": r.get("current_club"),
+            "jersey_number": r.get("jersey_number"),
+            "reports_count": len(r.get("report_ids") or []) or 1,
+            "updated_at": r.get("updated_at"),
+        }
+        for r in rows if r.get("name")
+    ]}
+
+
 @api_router.get("/me/upload-eligibility")
 async def get_upload_eligibility(user=Depends(get_current_user)):
     """Tells the frontend whether the user can upload for free, must pre-pay, or is admin.
@@ -11887,11 +12150,13 @@ from identity_verify import (
     verify_frame_identity,
     build_identity_profile,
     identity_profile_block,
+    identity_memory_block,
     verify_preview_summary,
 )
 from telestration import render_telestration
 from player_tracking import track_player, track_at
 from movement_metrics import compute_movement_map
+from speed_metrics import compute_speed_metrics
 from progression import build_progression
 from score_context import build_score_context
 from pdf_v2 import build_pdf_v2
@@ -12618,3 +12883,4 @@ async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
 # Register the API router LAST so it includes every @api_router route defined above
 # (including scout-access + players-database endpoints in Fase 2).
 app.include_router(api_router)
+
