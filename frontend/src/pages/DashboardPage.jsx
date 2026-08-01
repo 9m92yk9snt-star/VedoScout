@@ -11,6 +11,7 @@ import { trackPurchase } from "@/lib/pixels";
 import {
   Plus, Lock, CheckCircle2, Film, Loader2, Rocket, TrendingUp, AlertCircle,
   Activity, ArrowRight, Sparkles, Zap, Crown, Calendar, XCircle, RefreshCw,
+  Globe2, Copy,
 } from "lucide-react";
 
 const VERDICT_META = {
@@ -280,12 +281,12 @@ export default function DashboardPage() {
                     {reports.map((r) => {
                       const unlocked = r.is_paid || r.manually_unlocked;
                       return (
+                        <div key={r.id} className="group bg-cream-card hover:bg-white transition-colors flex flex-col overflow-hidden">
                         <Link
                           to={`/report/${r.id}`}
-                          key={r.id}
                           data-testid={`dashboard-report-${r.id}`}
                           data-report-id={r.id}
-                          className="group bg-cream-card hover:bg-white transition-colors flex flex-col overflow-hidden open-report-link"
+                          className="flex-1 flex flex-col overflow-hidden open-report-link"
                         >
                           <div className="relative aspect-video bg-ink overflow-hidden">
                             {r.poster_url ? (
@@ -331,6 +332,15 @@ export default function DashboardPage() {
                             </div>
                           </div>
                         </Link>
+                        {r.video_url && (
+                          <VideoShareRow
+                            report={r}
+                            onChanged={(id, val) =>
+                              setReports((prev) => prev.map((x) => (x.id === id ? { ...x, video_share_enabled: val } : x)))
+                            }
+                          />
+                        )}
+                        </div>
                       );
                     })}
                   </div>
@@ -372,6 +382,120 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── VideoShareRow — parent-consent toggle for permanent video links.
+ *    Default OFF: video links are private and expire. When the parent
+ *    explicitly says yes, the raw video link works permanently until
+ *    they switch it off again. */
+function VideoShareRow({ report, onChanged }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const enabled = !!report.video_share_enabled;
+  const shareUrl = report.video_url
+    ? `${process.env.REACT_APP_BACKEND_URL}${report.video_url.split("?")[0]}`
+    : null;
+
+  const setShare = async (val) => {
+    setBusy(true);
+    try {
+      await api.post(`/reports/${report.id}/video-share`, { enabled: val });
+      onChanged(report.id, val);
+      setConfirming(false);
+      toast.success(
+        val
+          ? "Sharing is ON — anyone with the link can watch this video."
+          : "Sharing turned off — the shared link no longer works."
+      );
+    } catch {
+      toast.error("Could not update sharing — try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Video link copied — it works permanently until you turn sharing off.");
+    } catch {
+      toast.error("Could not copy the link.");
+    }
+  };
+
+  return (
+    <div className="border-t border-ink/10 px-4 py-2.5 bg-cream-soft/40" data-testid={`share-row-${report.id}`}>
+      {confirming ? (
+        <div>
+          <p className="text-[11px] text-ink/70 leading-snug">
+            <span className="font-black text-ink">Share this video permanently?</span>{" "}
+            Anyone with the link can watch it — until you turn sharing off again.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              data-testid={`share-confirm-${report.id}`}
+              disabled={busy}
+              onClick={() => setShare(true)}
+              className="bg-forest hover:bg-forest-pop text-white text-[10px] uppercase tracking-widest font-black px-3 py-1.5 transition-colors disabled:opacity-50"
+            >
+              {busy ? "…" : "Yes, share"}
+            </button>
+            <button
+              type="button"
+              data-testid={`share-cancel-${report.id}`}
+              disabled={busy}
+              onClick={() => setConfirming(false)}
+              className="text-[10px] uppercase tracking-widest font-bold text-ink/50 hover:text-ink px-2 py-1.5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] font-black text-ink/60 min-w-0">
+            {enabled ? (
+              <>
+                <Globe2 className="w-3.5 h-3.5 text-forest flex-shrink-0" />
+                <span className="text-forest">Video link: shared</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 flex-shrink-0" />
+                Video link: private
+              </>
+            )}
+          </span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {enabled && shareUrl && (
+              <button
+                type="button"
+                data-testid={`share-copy-${report.id}`}
+                onClick={copyLink}
+                className="flex items-center gap-1 border border-forest/30 text-forest hover:bg-forest hover:text-white text-[10px] uppercase tracking-widest font-black px-2 py-1 transition-colors"
+              >
+                <Copy className="w-3 h-3" /> Copy link
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid={`share-toggle-${report.id}`}
+              disabled={busy}
+              onClick={() => (enabled ? setShare(false) : setConfirming(true))}
+              className={`text-[10px] uppercase tracking-widest font-black px-2 py-1 transition-colors disabled:opacity-50 ${
+                enabled
+                  ? "text-ink/50 hover:text-ink border border-ink/15"
+                  : "bg-forest hover:bg-forest-pop text-white"
+              }`}
+            >
+              {busy ? "…" : enabled ? "Turn off" : "Share"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

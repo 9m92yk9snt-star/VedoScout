@@ -2739,3 +2739,9 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 
 ## Research-leverance (samme session, tidligere)
 - `/app/memory/RESEARCH_RAPPORT_2026.md` — komplet 12-sektions audit + prioriteret roadmap (Fase 0–3). Bruger har godkendt Fase 0 + eksempelrapport (begge nu udført). Resterende Fase 1: DKK-priser/prisforenkling, cookie-banner-strip, code-splitting, social proof, server-side Meta CAPI. Ubesvarede afklaringer fra ask_human: prototype-format, DKK-beløb, enkeltkøbets skæbne, dansk/engelsk sprog.
+
+## Video-deling med forældre-samtykke (Juni 2026, del 3 — DONE, testet e2e)
+- Dashboard: hver rapport har nu en "Video link: private/shared"-række (VideoShareRow i DashboardPage.jsx) med 2-trins samtykke ("Share this video permanently?" → Yes, share), Copy link-knap og Turn off.
+- Backend: `POST /api/reports/{id}/video-share` {enabled} (kun ejer/admin). Felt: `video_share_enabled` på report-doc. `stream_r2_media` tillader usignerede mp4-requests hvis flag er ON (15s in-memory cache `_share_cache`, invalideres ved toggle). Default OFF = signerede udløbende links som før.
+- Delt link = ren URL uden token → virker PERMANENT indtil forælderen slår deling fra.
+- Testet: OFF→403, enable→206 usigneret, disable→403 igen (efter cache), fremmed bruger kan ikke toggle (403), UI-flow verificeret med screenshots.

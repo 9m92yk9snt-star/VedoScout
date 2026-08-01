@@ -4239,7 +4239,9 @@ async def stream_r2_media(key: str, request: Request):
     if key.startswith("/") or ".." in key or "\x00" in key:
         raise HTTPException(400, "Bad media key")
 
-    # Raw report videos (footage of minors) require a signed, expiring token.
+    # Raw report videos (footage of minors) require a signed, expiring token —
+    # unless the parent has explicitly enabled permanent link sharing for that
+    # report from their dashboard.
     if key.startswith("reports/") and key.endswith(".mp4"):
         tk = request.query_params.get("tk") or ""
         try:
@@ -4247,8 +4249,12 @@ async def stream_r2_media(key: str, request: Request):
         except ValueError:
             exp_i = 0
         now_ts = int(datetime.now(timezone.utc).timestamp())
-        if exp_i < now_ts or not hmac.compare_digest(tk, _media_token(key, exp_i)):
-            raise HTTPException(403, "Media link expired — reload the page.")
+        valid_token = bool(tk) and exp_i >= now_ts and hmac.compare_digest(tk, _media_token(key, exp_i))
+        if not valid_token:
+            parts = key.split("/")
+            rid = parts[1] if len(parts) >= 3 else ""
+            if not (rid and await _video_share_enabled(rid)):
+                raise HTTPException(403, "Media link expired — reload the page.")
 
     range_header = request.headers.get("range") or request.headers.get("Range")
     try:
@@ -4889,6 +4895,19 @@ async def upload_video_and_create_preview(
 #     streamable. Only /api/media/reports/**/*.mp4 requires a token; posters,
 #     crops, demo/marketing media stay public (needed by <img> tags broadly).
 MEDIA_TOKEN_TTL_S = 7 * 24 * 3600
+_share_cache: dict = {}  # report_id -> (enabled, checked_at)
+
+
+async def _video_share_enabled(report_id: str) -> bool:
+    """Owner-consented permanent video sharing (dashboard toggle). 15s cache."""
+    now_ts = datetime.now(timezone.utc).timestamp()
+    hit = _share_cache.get(report_id)
+    if hit and now_ts - hit[1] < 15:
+        return hit[0]
+    doc = await db.reports.find_one({"id": report_id}, {"_id": 0, "video_share_enabled": 1})
+    enabled = bool(doc and doc.get("video_share_enabled"))
+    _share_cache[report_id] = (enabled, now_ts)
+    return enabled
 
 
 def _media_token(key: str, exp: int) -> str:
@@ -6095,6 +6114,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "is_paid": doc.get("is_paid", False),
         "manually_unlocked": doc.get("manually_unlocked", False),
         "demo": doc.get("demo", False),
+        "video_share_enabled": bool(doc.get("video_share_enabled")),
         "doubt_status": doc.get("doubt_status"),
         "doubt_moments": doc.get("doubt_moments") if doc.get("doubt_status") == "awaiting" else None,
         "created_at": doc.get("created_at"),
@@ -6254,6 +6274,35 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     )
     background.add_task(generate_full_report_task, report_id)
     return {"status": "generating", "report_id": report_id, "full_report_status": "generating"}
+
+
+class VideoSharePayload(BaseModel):
+    enabled: bool
+
+
+@api_router.post("/reports/{report_id}/video-share")
+async def set_video_share(report_id: str, payload: VideoSharePayload, user=Depends(get_current_user)):
+    """Parent consent toggle: when enabled, this report's raw video link works
+    permanently without a token. Default OFF (protected, expiring links)."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    if doc.get("user_id") != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not your report.")
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {
+            "video_share_enabled": bool(payload.enabled),
+            "video_share_updated_at": now_iso(),
+        }},
+    )
+    _share_cache.pop(report_id, None)
+    share_url = None
+    if payload.enabled:
+        raw = doc.get("video_url_override")
+        if isinstance(raw, str) and raw.startswith("/api/media/"):
+            share_url = raw
+    return {"ok": True, "enabled": bool(payload.enabled), "share_url": share_url}
 
 
 # ─── Doubt-moment control (Stage 3): owner confirms identity at low-confidence
