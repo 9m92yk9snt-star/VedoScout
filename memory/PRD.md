@@ -1,5 +1,24 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 1, 2026) — PIXEL-PERFECT "WAITING EXPERIENCE" (Ventetid-oplevelse) ✅
+- **User request**: 100% pixel-perfect mobile-first recreation of their reference image for the analysis waiting screen, hooked to REAL backend `progress_step` polling (no fake timers). User answered "Ja" → same design also for the uploading phase; done-screen kept unchanged.
+- **`PrecisionScanOverlay.jsx` fully rewritten** (cream bg #F0EDE5, LIME #CCFF00, INK #0C100B):
+  - Top bar SCOUT[ME]PLAY + "STEP 3/3"; kicker "🟢 SCOUTME PRO BENCHMARK ANALYSIS"; H1 "YOUR VIDEO IS BEING ANALYZED" (clamp single-line); "Every touch. Every run. Every decision. / Building your **Scout Report**."
+  - Chips w/ REAL data: ⚽ player name · U{age} • POSITION · IDENTITY LOCKED (dark+lime).
+  - Dark hero card: bg = user's OWN marker frame (blob URL via new `heroImage` prop, fallback dark radial), LIVE SCAN red-dot, huge lime live % + "~ X sec left" + "Typically ready in ~90 sec", lime progress bar w/ sheen, 4 mini stages (Detecting/Tracking/Analysing/Building Report).
+  - 6-row checklist mapped to real steps (`visualStageFor`): step1→row1, 2→row2, 3→row3, 4→row4 ("Scout analyzing every action" + NOW chip + radar pulse), >55 s inside step4→row5, ready→done. Row 2 shows real tap count "{n}/{n} taps verified – player identified". Done rows: black circle + lime check + "Done"; lime connector lines.
+  - % = monotonic eased value from STAGE_PCT boundaries (upload maps 0–15%, maxPctRef never decreases). ETA derived from remaining %.
+  - Dark SCOUT TIP card ("SCAN **BEFORE** YOU RECEIVE") w/ generated image `/assets/scout-tip.jpg` (Nano Banana).
+  - 🔒 "Your Scout Report will appear here automatically. / You can safely leave—find it in your Dashboard when it's ready." + lime pill **GO TO DASHBOARD** (`wait-go-dashboard-btn`).
+  - KnowledgeCarousel + elapsed timer + `hideTimers` prop REMOVED from the waiting UI. Done phase (scan-done-state) unchanged.
+  - Testids: `wait-headline`, `wait-live-pct`, `wait-eta`, `wait-hero-card`, `wait-checklist`, `wait-stage-row-1..6`, `wait-chip-player/meta/identity`, `wait-scout-tip`, `wait-go-dashboard-btn`, `wait-step-indicator` (root keeps `precision-scan-overlay`). NOTE: old `overlay-continue-in-background` testid replaced by `wait-go-dashboard-btn`.
+- **UploadPage.jsx**: passes `playerName/playerAge/playerPosition/tapsCount(markerAnchors.length)/heroImage(markerPreviewUrl)`.
+- **HIGH bug found by iter60 + FIXED + verified iter61**: GO TO DASHBOARD previously only set `backgroundedRef` and relied on the poll loop's next tick → no navigation. Fix: button handler now does IMMEDIATE handoff (`reportIdRef` set after upload POST; startBackgroundAnalysis(rid) + toast + setSubmitting(false) + navigate('/dashboard')); poll-loop branch reduced to defensive re-arm + return (covers click-mid-upload).
+- **VERIFIED**: iter60 17/17 testids + real data bindings + monotonic % + stage transitions (step1→row1, step2→row2) + marker-frame hero (blob, 480×848) + 0 console errors; iter61 handoff 100% (toast, /dashboard, bg-analysis-tracker +1 s, 0× 401, elite_token intact). Visual QA vs reference at 390px: kicker 1 line, "Building Report" fits, scout-tip title 1 line, done/uploading phases OK. Failed webm test report deleted from test account.
+- **GOTCHA recurrence**: parallel search_replace batch on PrecisionScanOverlay.jsx silently DROPPED 2 of 4 edits despite "success" — re-applied sequentially + grep-verified. ALWAYS grep after parallel batches on the same file.
+- Backlog note (iter60 MINOR): MarkerStudio could show a user-facing warning when `video.error` is set and videoReady stays false >5 s (unsupported codec browsers).
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Session (Jul 31, 2026 — Meta events) — ViewContent + FULL EVENT VERIFICATION ✅
 - **User request** (Meta Pixel 1035066355595835 live in prod, PageView confirmed by user): implement ViewContent/CompleteRegistration/InitiateCheckout/Purchase + verify each.
 - **Already wired** (from pixel session): CompleteRegistration, InitiateCheckout (EmbeddedCheckoutModal + ReportPaywallTiers), Purchase. **NEW this session**: `trackViewContent(name)` in lib/pixels.js (Meta ViewContent + TikTok ViewContent w/ content_name); fired once per report view in ReportPage (`viewContentTrackedRef`, content_name:"scout_report"); PricingTiers.jsx (landing) was MISSING InitiateCheckout on both `goSingleReport` (prepay) + `startSubscription` — added before Stripe redirect.
