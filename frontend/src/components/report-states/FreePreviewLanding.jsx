@@ -16,6 +16,7 @@ const INKG = "#0B1F14";
 
 const MISSING = [
   { icon: Zap, label: "25 Skill Ratings" },
+  { icon: Star, label: "Grow Your Game — video-proven lessons" },
   { icon: BarChart3, label: "Benchmarks & Percentiles" },
   { icon: Map, label: "Position Analysis" },
   { icon: ClipboardList, label: "Development Plan" },

@@ -16,6 +16,7 @@ import { PaceCard } from "./pace";
 import { VerifiedIdentityStrip } from "./verification";
 import { ParentValueMetricsCard } from "./parentmetrics";
 import { ParentsPackageSection } from "./parents";
+import { GrowYourGameSection } from "./growyourgame";
 import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
 import { ScoreGuideCard } from "./scoreguide";
@@ -305,6 +306,12 @@ export default function PremiumReportV2({ report, assetBase }) {
       {d.parentMetrics && (
         <div className="mb-4">
           <ParentValueMetricsCard metrics={d.parentMetrics} onPlayAt={playAt} />
+        </div>
+      )}
+
+      {d.growYourGame && (
+        <div className="mb-4">
+          <GrowYourGameSection gyg={d.growYourGame} playerName={pd.player_name} onPlayAt={playAt} />
         </div>
       )}
 

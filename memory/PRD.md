@@ -2861,3 +2861,37 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - P1: Danske priser (DKK), 3 tiers (Gratis 0 kr / Premium / VIP) + tilfredshedsgaranti ved checkout
 - P2: Code-splitting/lazy loading på landing page; server-side Meta Conversions API
 - P3: Delbar highlight-video med score-overlay; Audio Pep-Talk (OpenAI TTS); Chat with the Scout
+
+---
+
+# Session (Juni 2026, del 6) — GROW YOUR GAME: bevis-gated fodboldundervisning
+
+## Konceptet (brugerens 18 emner → Fase 1 med 9 beviselige)
+- Hver premium-rapport kan nu indeholde "GROW YOUR GAME"-lektioner: What scouts look for / Why it matters / What happened in YOUR match / AI evidence m. tidsstempler / Age benchmark / Personal advice / "Explain it simply" (forældre).
+- 100%-REGLEN: Ingen generiske artikler. Emner vises KUN med verificeret bevis fra spillerens egen kamp. Tom sektion er et gyldigt (og ærligt) resultat.
+
+## Fase 1-emner (GYG_TOPICS i server.py m. min. momenter)
+- ON BALL: first_touch(3), body_shape(2), playing_under_pressure(2), decision_making(3)
+- OFF BALL: scanning(2), playing_without_ball(2), creating_space(2) — krydstjekkes mod optisk tracking (moment skal ligge ±6s fra track-punkter)
+- MENTALITY: five_seconds_after_mistake(1), defensive_mentality(2)
+- IKKE med (kan ikke bevises 100%): Football IQ, Match Awareness, Communication, Mentality-aggregat, Handling Setbacks, Sideline Behaviour, Consistency. Forældre-hjørne = Fase 2.
+
+## Implementering
+- server.py: FULL_REPORT_PROMPT udvidet med grow_your_game JSON-schema + regler; `_validate_grow_your_game()` (~linje 2889) = hård gate: topic-whitelist, case-normalisering (Gemini skriver fx "Decision_making"/"Strong"), strength=strong only, tidsstempler valideret mod videolængde (cv2), min-momenter, personlig grounding (fornavn/timestamp i what_happened), tracking-krydstjek for off-ball, max 5, homework kun for beholdte emner. Drop-årsager logges: `[gyg] raw_lessons=N kept=M drops=[...]`.
+- `gyg_lesson_count` gemmes top-level på rapporten (til free-teaser) + i _serialize_report.
+- Frontend: /components/report-v2/growyourgame.jsx (GrowYourGameSection) — premium mørkegrøn banner, LESSON-kort m. verified-chips, klikbare tidsstempler (Evidence Reel via onPlayAt + "Play all moments" sekventiel), guld benchmark-linje, Personal advice-panel, "Explain it simply"-foldeud, THIS WEEK'S HOMEWORK. Integreret i PremiumReportV2 efter parentMetrics. derive.js: growYourGame.
+- PDF (pdf_v2.py): ny GROW YOUR GAME-side (op til 3 lektioner + homework-strip), PDF_RENDER cache respekterer versionsnummer — RYD /app/backend/pdfs/{id}*.pdf ved test.
+- FreePreviewLanding: "Grow Your Game — video-proven lessons" i MISSING-listen.
+
+## Testing (del 6)
+- Gate unit-tests: 7/7 (strong/partial, min-momenter, out-of-duration, tracking-krydstjek begge veje, generisk tekst droppet).
+- E2E: 4 ægte Gemini-genereringer på rapport aca4906c — gaten afviste korrekt ubeviselige lektioner (kort klip); drops-log bekræftet transparent.
+- UI verificeret via screenshots med kuraterede testdata (INJICERET i Loop Test2-rapporten — ligger stadig der som demo); PDF-side visuelt verificeret (side 6/9).
+- VIGTIGT: Korte klip giver ofte 0-1 lektioner — BY DESIGN. Rigtige kampklip med god tracking giver flere.
+
+## Kendt agent-faldgrube (recurring!)
+- search_replace på server.py/pdf_v2.py rapporterer nogle gange succes uden at editen faktisk lander (3 tilfælde i dag: guest-pill, topic-normalisering, PDF-funktioner). VERIFICÉR ALTID kritiske edits med grep umiddelbart efter.
+
+## Næste opgaver
+- P1: Danske priser (DKK, 3 tiers) + tilfredshedsgaranti
+- P2: GYG Fase 2: Forældre-hjørne (personaliseret), Udvikling-siden-sidst, Scoutens Pep-Talk (TTS); lazy loading; Meta CAPI

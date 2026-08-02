@@ -2286,6 +2286,122 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
 
 # ═══════════════════════ main builder ═══════════════════════
 
+# ── GROW YOUR GAME — evidence-gated football education page ──
+_GYG_CAT = {"on_ball": "ON THE BALL", "off_ball": "OFF THE BALL", "mentality": "MENTALITY"}
+
+
+def _gyg_block(c, x, y_top, w, label, text, max_h):
+    c.setFillColor(MUTED)
+    c.setFont(F_BLACK, 5.8)
+    c.drawString(x, y_top - 6, str(label).upper())
+    used = draw_par(c, esc(text), x, y_top - 10, w,
+                    _style(F_BODY, 6.9, BODY, leading=9.2), max_h=max(10, max_h - 14))
+    return 14 + used
+
+
+def _gyg_lesson_card(c, les, n, x, y, w, h, first_name):
+    card(c, x, y, w, h)
+    ty = y + h - PAD + 2
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(x + PAD, ty - 13, 54, 13, 4, stroke=0, fill=1)
+    c.setFillColor(LIME)
+    c.setFont(F_BLACK, 6.4)
+    c.drawCentredString(x + PAD + 27, ty - 8.8, f"LESSON {n:02d}")
+    c.setFillColor(INK)
+    c.setFont(F_BLACK, 10)
+    c.drawString(x + PAD + 62, ty - 10.5, str(les.get("title", "")).upper())
+    c.setFillColor(GREEN)
+    c.setFont(F_BLACK, 5.8)
+    c.drawRightString(x + w - PAD, ty - 9,
+                      f"{_GYG_CAT.get(les.get('category'), '')}   ·   {len(les.get('moments') or [])} MOMENTS VERIFIED")
+    c.restoreState()
+    ty -= 20
+
+    foot_h = 32
+    col_h = ty - (y + foot_h + 8)
+    col_w = (w - 2 * PAD - 14) / 2
+    lx, rx = x + PAD, x + PAD + col_w + 14
+    half = col_h / 2
+    _gyg_block(c, lx, ty, col_w, "What scouts look for", les.get("what_scouts_look_for", ""), half)
+    _gyg_block(c, lx, ty - half, col_w, "Why it matters", les.get("why_it_matters", ""), half)
+    _gyg_block(c, rx, ty, col_w, f"What happened in {first_name}'s match", les.get("what_happened", ""), half)
+    _gyg_block(c, rx, ty - half, col_w, "Personal advice", les.get("personal_advice", ""), half)
+
+    fy = y + 6
+    c.saveState()
+    c.setFillColor(HexColor("#F0F5EC"))
+    c.roundRect(x + PAD, fy, w - 2 * PAD, foot_h - 2, 6, stroke=0, fill=1)
+    cx0 = x + PAD + 7
+    for m in (les.get("moments") or [])[:5]:
+        tsv = str(m.get("timestamp", ""))
+        chip_w = c.stringWidth(tsv, F_BLACK, 6.2) + 10
+        c.setFillColor(FOREST)
+        c.roundRect(cx0, fy + foot_h - 17, chip_w, 11, 4, stroke=0, fill=1)
+        c.setFillColor(LIME)
+        c.setFont(F_BLACK, 6.2)
+        c.drawCentredString(cx0 + chip_w / 2, fy + foot_h - 13.5, tsv)
+        cx0 += chip_w + 5
+    bench = les.get("age_benchmark")
+    if bench:
+        c.setFillColor(HexColor("#8A6D3B"))
+        c.setFont(F_BOLD, 6.2)
+        c.drawString(x + PAD + 7, fy + 5, ("* " + str(bench))[:160])
+    c.restoreState()
+
+
+def _gyg_homework_strip(c, hw, x, y, w, h):
+    card(c, x, y, w, h, fill=FOREST, stroke=FOREST)
+    ty = y + h - PAD
+    c.setFillColor(LIME)
+    c.setFont(F_BLACK, 8.6)
+    c.drawString(x + PAD, ty - 8, "THIS WEEK'S HOMEWORK — 15 MIN A DAY")
+    ty -= 18
+    row_h = (ty - y - 4) / max(1, len(hw))
+    pale = HexColor("#E9EFE2")
+    for e in hw:
+        c.setFillColor(LIME)
+        c.setFont(F_BLACK, 6.4)
+        c.drawString(x + PAD, ty - 8, str(e.get("days", "")).upper())
+        txt = str(e.get("drill", ""))
+        if e.get("why"):
+            txt += f" — {e['why']}"
+        draw_par(c, esc(txt), x + PAD + 54, ty - 2, w - 2 * PAD - 54,
+                 _style(F_BODY, 6.6, pale, leading=8.6), max_h=row_h - 2)
+        ty -= row_h
+
+
+def _gyg_page(c, gyg, player_name, page_no, total_pages):
+    first = (player_name or "Player").split()[0]
+    _page_bg(c)
+    mh = _mini_header(c, player_name)
+    yy = H - M - mh - 4
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(M, yy - 44, CW, 44, 9, stroke=0, fill=1)
+    c.setFillColor(LIME)
+    c.setFont(F_BLACK, 13)
+    c.drawString(M + PAD, yy - 19, "GROW YOUR GAME")
+    c.setFillColor(HexColor("#C9D8C0"))
+    c.setFont(F_BODY, 6.8)
+    c.drawString(M + PAD, yy - 33,
+                 f"Real lessons from {first}'s own match — every lesson below is backed by verified moments from this video.")
+    c.restoreState()
+    yy -= 44 + GAP
+    lessons = (gyg.get("lessons") or [])[:3]
+    hw = (gyg.get("homework_plan") or [])[:4]
+    h_hw = (30 + 22 * len(hw)) if hw else 0
+    avail = yy - M - 24 - ((h_hw + GAP) if hw else 0)
+    lh = avail / max(1, len(lessons)) - GAP
+    for i, les in enumerate(lessons):
+        _gyg_lesson_card(c, les, i + 1, M, yy - lh, CW, lh, first)
+        yy -= lh + GAP
+    if hw:
+        _gyg_homework_strip(c, hw, M, yy - h_hw, CW, h_hw)
+    _page_footer(c, page_no, total_pages)
+    c.showPage()
+
+
 def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo: bool = False):
     """Render the Premium Report V2 card layout to a 3-page A4 PDF.
     promo=True adds the shared-link marketing strip (QR + CTA) on page 3."""
@@ -2308,8 +2424,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     sctx = sctx if isinstance(sctx, dict) and sctx.get("overall") else None
     prog = report_doc.get("progression")
     prog = prog if isinstance(prog, dict) and prog.get("categories") else None
+    gyg = (report_doc.get("full_report") or {}).get("grow_your_game")
+    gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    total_pages = 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -2464,6 +2582,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     if sctx:
         _score_guide_page(c, sctx, d, player_name, 4 + (1 if has_p4 else 0), total_pages)
 
+    # ── PAGE — GROW YOUR GAME (evidence-gated football education) ──
+    if gyg:
+        _gyg_page(c, gyg, player_name, 4 + (1 if has_p4 else 0) + (1 if sctx else 0), total_pages)
+
     # ── PAGE — Parents Package (home drills / watch together / letter) ──
     if pp:
         _page_bg(c)
@@ -2489,7 +2611,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 yy -= cols_h + GAP
         if pm and yy - M - 20 >= h_pm:
             _parent_metrics_strip(c, pm, M, yy - h_pm, CW, h_pm)
-        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0), total_pages)
+        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0), total_pages)
         c.showPage()
 
     # ── PAGE — Printables (mission card + training week planner) ──
@@ -2511,7 +2633,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 _week_planner_print(c, d["trainingWeek"],
                                     ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
                                     M, yy - h_wp, CW, h_wp)
-        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if pp else 0), total_pages)
+        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──

@@ -2768,6 +2768,24 @@ Produce a JSON object EXACTLY in this format:
     "reaction_after_mistake": {"observed": true | false, "rating": "strong" | "neutral" | "concerning" | null, "timestamp": "MM:SS" | null, "note": "<what went wrong + how the player responded in the following seconds, or why nothing could be tested>"},
     "off_ball_work": {"score": <1-10 with one decimal, or null>, "note": "<ONE sentence — runs, scanning, defensive recovery observed without the ball>"},
     "top_minutes": [{"from": "MM:SS", "to": "MM:SS", "why": "<ONE sentence — why this window shows the player at their best>"}]
+  },
+  "grow_your_game": {
+    "lessons": [
+      {
+        "topic_id": "first_touch" | "body_shape" | "playing_under_pressure" | "decision_making" | "scanning" | "playing_without_ball" | "creating_space" | "five_seconds_after_mistake" | "defensive_mentality",
+        "evidence_strength": "strong" | "partial",
+        "moments": [{"timestamp": "MM:SS", "what": "<ONE concrete moment you actually observed — identity rules apply>"}],
+        "what_scouts_look_for": "<2-3 plain sentences — what a real scout watches for in this topic>",
+        "why_it_matters": "<2-3 plain sentences calibrated to THIS player's age — why this topic shapes development>",
+        "what_happened": "<3-4 sentences about THIS match. MUST use the player's first name and reference at least one timestamp from moments.>",
+        "personal_advice": "<2-3 concrete practice sentences tied DIRECTLY to what was observed>",
+        "age_benchmark": "<ONE sentence comparing what you saw to typical players in the same age bracket, e.g. 'Checking his shoulder twice before receiving is above average for U12.'>",
+        "simple_explanation": "<2 sentences explaining this topic to a parent with NO football background, using an everyday-life comparison>"
+      }
+    ],
+    "homework_plan": [
+      {"days": "Day 1-2", "topic_id": "<topic_id of an INCLUDED lesson>", "drill": "<10-15 min drill doable at home or in a park with just a ball>", "why": "<ONE sentence linking the drill to a specific observed moment with its timestamp>"}
+    ]
   }
 }
 
@@ -2808,12 +2826,173 @@ RULES FOR "parent_value_metrics" (the questions families actually ask — honest
 - off_ball_work: what the player does WITHOUT the ball. Set score to null when the camera never shows the player off the ball.
 - top_minutes: 1-3 windows (30-90 seconds each) inside the real footage where the circled player is at their best — the minutes a busy parent or coach should watch first. Timestamps must lie within the video and the player must be re-identifiable across the whole window.
 
+RULES FOR "grow_your_game" (evidence-gated football education — the 100% rule):
+- topic_id must be EXACTLY one of (lowercase, as written): first_touch, body_shape, playing_under_pressure, decision_making, scanning, playing_without_ball, creating_space, five_seconds_after_mistake, defensive_mentality.
+- A lesson may ONLY be included when you have REAL observed evidence from THIS video. Minimum distinct moments per topic: first_touch 3, decision_making 3, body_shape 2, playing_under_pressure 2, scanning 2, playing_without_ball 2, creating_space 2, defensive_mentality 2, five_seconds_after_mistake 1.
+- Every moment timestamp must be a moment you actually observed with the tapped player re-identified (same identity rules as everywhere else). Reusing timestamps from action_timeline / video_comments is encouraged.
+- evidence_strength = "strong" ONLY when every listed moment passed your identity check with high confidence. Anything less → "partial" (partial lessons are dropped server-side, so never pad).
+- Return 0-5 lessons. Returning only 1-3 (or an empty list) is NORMAL and correct for short clips. NEVER force a topic without evidence — an empty list is a good answer.
+- five_seconds_after_mistake: only when a clear possession loss or mistake by the tapped player is visible; describe what they actually did in the following ~5 seconds. No mistake in the clip → do NOT include the topic.
+- scanning: only when head/shoulder checks BEFORE receiving are clearly visible at the camera distance. If heads are too small to judge, skip the topic.
+- homework_plan: 3-4 entries covering roughly a week (Day 1-2, Day 3-4, Day 5-7). Each entry MUST train one of the INCLUDED lessons and reference one of its timestamps in "why". If lessons is empty, homework_plan must be empty.
+- Tone: warm, humble, development-first — written for a young player and the family supporting them, never clinical.
+
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
 - Evidence-only — never invent, never guess
 - Honest cannot_evaluate is better than fake confidence
 - Return ONLY valid JSON, no markdown, no commentary
 """
+
+
+# ── GROW YOUR GAME — evidence-gated football education (Session 145) ──
+GYG_TOPICS = {
+    "first_touch":                {"min": 3, "cat": "on_ball",   "title": "First Touch"},
+    "body_shape":                 {"min": 2, "cat": "on_ball",   "title": "Body Shape"},
+    "playing_under_pressure":     {"min": 2, "cat": "on_ball",   "title": "Playing Under Pressure"},
+    "decision_making":            {"min": 3, "cat": "on_ball",   "title": "Decision Making"},
+    "scanning":                   {"min": 2, "cat": "off_ball",  "title": "Scanning"},
+    "playing_without_ball":       {"min": 2, "cat": "off_ball",  "title": "Playing Without the Ball"},
+    "creating_space":             {"min": 2, "cat": "off_ball",  "title": "Creating Space"},
+    "five_seconds_after_mistake": {"min": 1, "cat": "mentality", "title": "The 5 Seconds After a Mistake"},
+    "defensive_mentality":        {"min": 2, "cat": "mentality", "title": "Defensive Mentality"},
+}
+
+
+def _gyg_ts_seconds(ts) -> Optional[float]:
+    try:
+        s = str(ts or "").strip()
+        if not s or ":" not in s:
+            return None
+        parts = s.split(":")
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    except Exception:
+        return None
+    return None
+
+
+def _video_duration_seconds(path) -> float:
+    try:
+        import cv2
+        cap = cv2.VideoCapture(str(path))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0
+        n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+        cap.release()
+        return float(n / fps) if fps > 0 else 0.0
+    except Exception:
+        return 0.0
+
+
+def _validate_grow_your_game(full: dict, duration_s: float, gt_track: Optional[dict], player_name: str) -> int:
+    """Hard 100%-evidence gate for the GROW YOUR GAME lessons. Drops every
+    lesson that cannot be fully proven: unknown topic, weak evidence strength,
+    too few moments, timestamps outside the real video, missing personal
+    grounding, or (for off-ball topics) moments the optical tracker never saw.
+    Returns the number of lessons that survived."""
+    gyg = full.get("grow_your_game")
+    if not isinstance(gyg, dict):
+        full.pop("grow_your_game", None)
+        return 0
+    lessons = gyg.get("lessons") if isinstance(gyg.get("lessons"), list) else []
+    first = (player_name or "").strip().split(" ")[0].lower()
+
+    track_ts: list = []
+    if isinstance(gt_track, dict):
+        for p in (gt_track.get("points") or []):
+            t = p.get("t") if isinstance(p, dict) else None
+            if isinstance(t, (int, float)):
+                track_ts.append(float(t))
+    track_ok = len(track_ts) >= 10
+
+    kept = []
+    drops = []
+    for les in lessons:
+        if not isinstance(les, dict):
+            continue
+        tid = str(les.get("topic_id") or "").strip().lower().replace(" ", "_").replace("-", "_")
+        meta = GYG_TOPICS.get(tid)
+        if not meta:
+            drops.append(f"{tid}:unknown_topic")
+            continue
+        strength = str(les.get("evidence_strength") or "").strip().lower()
+        if strength != "strong":
+            drops.append(f"{tid}:strength={strength}")
+            continue
+        moments = []
+        for m in (les.get("moments") or []):
+            if not isinstance(m, dict) or not str(m.get("what") or "").strip():
+                continue
+            sec = _gyg_ts_seconds(m.get("timestamp"))
+            if sec is None:
+                continue
+            if duration_s > 0 and sec > duration_s + 2:
+                continue
+            if meta["cat"] == "off_ball" and track_ok:
+                # Cross-check: the optical tracker must have seen the player
+                # near this moment — otherwise the claim is unverifiable.
+                if not any(abs(sec - t) <= 6 for t in track_ts):
+                    continue
+            moments.append({
+                "timestamp": str(m.get("timestamp")).strip(),
+                "what": str(m.get("what")).strip(),
+                "t_s": round(sec, 1),
+            })
+        if len(moments) < meta["min"]:
+            drops.append(f"{tid}:moments={len(moments)}<{meta['min']}")
+            continue
+        what = str(les.get("what_happened") or "").strip()
+        if len(what) < 40:
+            drops.append(f"{tid}:what_too_short")
+            continue
+        if first and first not in what.lower() and not any(mm["timestamp"] in what for mm in moments):
+            drops.append(f"{tid}:not_personal")
+            continue
+        if any(len(str(les.get(k) or "").strip()) < 20
+               for k in ("what_scouts_look_for", "why_it_matters", "personal_advice")):
+            drops.append(f"{tid}:sections_missing")
+            continue
+        kept.append({
+            "topic_id": tid,
+            "title": meta["title"],
+            "category": meta["cat"],
+            "moments": moments[:6],
+            "what_scouts_look_for": str(les["what_scouts_look_for"]).strip(),
+            "why_it_matters": str(les["why_it_matters"]).strip(),
+            "what_happened": what,
+            "personal_advice": str(les["personal_advice"]).strip(),
+            "age_benchmark": str(les.get("age_benchmark") or "").strip() or None,
+            "simple_explanation": str(les.get("simple_explanation") or "").strip() or None,
+        })
+
+    kept.sort(key=lambda l: len(l["moments"]), reverse=True)
+    kept = kept[:5]
+    kept_ids = {l["topic_id"] for l in kept}
+    logger.info(f"[gyg] raw_lessons={len(lessons)} kept={len(kept)} drops={drops}")
+
+    homework = []
+    for hw in (gyg.get("homework_plan") or []):
+        if not isinstance(hw, dict):
+            continue
+        hw_tid = str(hw.get("topic_id") or "").strip().lower().replace(" ", "_").replace("-", "_")
+        if hw_tid not in kept_ids:
+            continue
+        if not str(hw.get("drill") or "").strip():
+            continue
+        homework.append({
+            "days": str(hw.get("days") or "").strip() or "This week",
+            "topic_id": hw_tid,
+            "drill": str(hw["drill"]).strip(),
+            "why": str(hw.get("why") or "").strip() or None,
+        })
+
+    if not kept:
+        full.pop("grow_your_game", None)
+        return 0
+    full["grow_your_game"] = {"lessons": kept, "homework_plan": homework[:4]}
+    return len(kept)
 
 
 def extract_json(text: str) -> dict:
@@ -6216,6 +6395,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "doubt_moments": doc.get("doubt_moments") if doc.get("doubt_status") == "awaiting" else None,
         "created_at": doc.get("created_at"),
         "paid_at": doc.get("paid_at"),
+        "gyg_lesson_count": doc.get("gyg_lesson_count", 0),
     }
     if not include_full:
         # Honest teaser for the free landing — a real overall number ONLY when a
@@ -7183,6 +7363,17 @@ async def generate_full_report_task(report_id: str) -> None:
         )
         full = scrub_hedging(full)
         _apply_tracking_verification(full, anchor_payload_list, gt_track, gt_t_off)
+        # GROW YOUR GAME — hard 100%-evidence gate (drops unproven lessons).
+        try:
+            _dur = await asyncio.to_thread(_video_duration_seconds, file_path)
+            gyg_count = _validate_grow_your_game(
+                full, _dur, gt_track,
+                (doc.get("player_details") or {}).get("player_name") or "")
+            logger.info(f"[gyg] {report_id}: {gyg_count} lessons kept after evidence gate")
+        except Exception:
+            logger.exception(f"grow-your-game validation failed for {report_id}")
+            full.pop("grow_your_game", None)
+            gyg_count = 0
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -7190,6 +7381,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 "full_generated_at": now_iso(),
                 "full_report_status": "ready",
                 "full_report_error": None,
+                "gyg_lesson_count": gyg_count,
                 "audio_events_full": [
                     {"t": e.t, "peak_db": e.peak_db, "kind": e.kind} for e in audio_events_full
                 ],
