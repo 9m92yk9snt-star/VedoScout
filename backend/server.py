@@ -2092,6 +2092,9 @@ class UserPublic(BaseModel):
     # recognise subscription-based premium users whose role is still "user"
     # (e.g. admin-granted Premium/VIP accounts).
     subscription_tier: Optional[str] = None
+    # Next billing date (ISO) for active Stripe subscriptions — shown in the
+    # premium subscription-management card on the report/building dashboard.
+    subscription_renews_at: Optional[str] = None
 
 
 class TokenResponse(BaseModel):
@@ -3893,6 +3896,11 @@ async def reset_password(payload: ResetPasswordRequest, request: Request):
 @api_router.get("/auth/me", response_model=UserPublic)
 async def me(user=Depends(get_current_user)):
     is_paid_scout = (user.get("scout_access") or {}).get("status") == "active"
+    _renews = None
+    if _has_active_subscription(user):
+        _pe = (user.get("subscription") or {}).get("current_period_end")
+        if _pe:
+            _renews = str(_pe)
     return UserPublic(
         id=user["id"],
         email=user["email"],
@@ -3901,6 +3909,7 @@ async def me(user=Depends(get_current_user)):
         created_at=user["created_at"],
         is_paid_scout=is_paid_scout,
         subscription_tier=_has_active_subscription(user),
+        subscription_renews_at=_renews,
     )
 
 
@@ -6120,6 +6129,13 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "created_at": doc.get("created_at"),
         "paid_at": doc.get("paid_at"),
     }
+    if not include_full:
+        # Honest teaser for the free landing — a real overall number ONLY when a
+        # full report already exists server-side; otherwise the UI shows a locked
+        # "calculated on unlock" state. Never invented.
+        _fr_scores = (doc.get("full_report") or {}).get("scores") or {}
+        _vals = [v for v in _fr_scores.values() if isinstance(v, (int, float))]
+        out["teaser"] = {"overall_potential": round(sum(_vals) / len(_vals) * 10) if _vals else None}
     if include_full:
         out["full_report"] = doc.get("full_report")
         out["agent_review"] = doc.get("agent_review")

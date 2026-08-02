@@ -28,6 +28,8 @@ import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 import DoubtConfirmModal from "@/components/DoubtConfirmModal";
+import PremiumBuildingDashboard from "@/components/report-states/PremiumBuildingDashboard";
+import FreePreviewLanding from "@/components/report-states/FreePreviewLanding";
 
 /* Tier visual treatment — 4 levels mapped to colour + label */
 const TIER_META = {
@@ -2133,6 +2135,60 @@ export default function ReportPage() {
             <ScoutReview reportId={id} />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  /* ═══ NEW premium building dashboard — unlocked but dossier not ready yet.
+     Existing polling/auto-gen effects keep running and swap in the full
+     dossier automatically the moment generation completes. ═══ */
+  if (unlocked && !report.demo) {
+    return (
+      <div className="min-h-screen bg-[#F2EDE2] pb-16">
+        <Navigation />
+        {doubtInfo && (
+          <DoubtConfirmModal
+            moments={doubtInfo.moments}
+            busy={doubtBusy}
+            onConfirm={(taps) => submitDoubt(taps, false)}
+            onSkip={() => submitDoubt([], true)}
+          />
+        )}
+        <PremiumBuildingDashboard report={report} user={user} />
+      </div>
+    );
+  }
+
+  /* ═══ NEW free preview landing — permanent until payment. Checkout modals
+     stay mounted so the unlock flow works exactly as before. ═══ */
+  if (!unlocked && !report.demo) {
+    return (
+      <div className="min-h-screen bg-[#F2EDE2] pb-16">
+        <Navigation />
+        <CheckoutTransitionModal
+          open={checkoutModal.open}
+          state={checkoutModal.state}
+          errorMessage={checkoutModal.errorMessage}
+          amount={price}
+          currency="USD"
+          product="ScoutMePlay – Football Video Analysis"
+          onClose={() => setCheckoutModal({ open: false, state: "preparing", errorMessage: null })}
+        />
+        <EmbeddedCheckoutModal
+          open={embeddedOpen}
+          sessionInit={embeddedUnlockInit}
+          amount={price}
+          currency="USD"
+          product="ScoutMePlay – Premium Report Unlock"
+          onSuccess={handleEmbeddedSuccess}
+          onClose={() => setEmbeddedOpen(false)}
+        />
+        <FreePreviewLanding
+          report={report}
+          user={user}
+          unlocking={unlocking}
+          onUnlockSingle={handleUnlock}
+        />
       </div>
     );
   }
