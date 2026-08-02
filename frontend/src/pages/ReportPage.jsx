@@ -1728,6 +1728,7 @@ export default function ReportPage() {
   // renders. Guard against re-triggering with a ref so React StrictMode's
   // double-effect doesn't fire two Gemini jobs.
   const autoGenTriggeredRef = useRef(false);
+  const [fullReportError, setFullReportError] = useState(null);
   useEffect(() => {
     if (!report || generatingFull || autoGenTriggeredRef.current) return;
     const premiumRoleNow = isPremiumUser(user);
@@ -1748,8 +1749,8 @@ export default function ReportPage() {
           await pollFullReportReady();
           await fetchReport();
         } catch (err) {
-          // Silent fail — the "OPEN FULL SCOUT DOSSIER" button below stays
-          // available for a manual retry. No toast to avoid noise on mount.
+          // Surface a retry card on the building dashboard instead of a toast.
+          setFullReportError(err?.message || "Generation was interrupted — tap retry, nothing is lost.");
           // eslint-disable-next-line no-console
           console.warn("Auto full-report generation failed:", err?.message);
         } finally {
@@ -1896,11 +1897,11 @@ export default function ReportPage() {
   };
 
   // Polls the report-status endpoint until the full report finishes generating
-  // (or fails). Backend caps generation at ~5 min, we wait up to 7 min just in
-  // case of slow Gemini responses, then surface a friendly toast either way.
+  // (or fails). The backend now auto-resumes orphaned generations (restart-safe
+  // watchdog), so we patiently poll up to 20 min before giving up.
   const pollFullReportReady = async () => {
     const start = Date.now();
-    const HARD_TIMEOUT_MS = 7 * 60 * 1000;
+    const HARD_TIMEOUT_MS = 20 * 60 * 1000;
     while (Date.now() - start < HARD_TIMEOUT_MS) {
       try {
         const { data } = await api.get(`/reports/${id}/status`);
@@ -2154,7 +2155,12 @@ export default function ReportPage() {
             onSkip={() => submitDoubt([], true)}
           />
         )}
-        <PremiumBuildingDashboard report={report} user={user} />
+        <PremiumBuildingDashboard
+          report={report}
+          user={user}
+          error={fullReportError}
+          onRetry={() => window.location.reload()}
+        />
       </div>
     );
   }

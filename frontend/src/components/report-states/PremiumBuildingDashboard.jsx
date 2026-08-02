@@ -40,8 +40,10 @@ function useBuildProgress(reportId) {
     return () => clearInterval(t);
   }, []);
   const elapsed = (Date.now() - startRef.current) / 1000;
-  const pct = Math.min(98, Math.round(72 + 26 * (1 - Math.exp(-elapsed / 110))));
-  const etaMin = Math.max(1, Math.ceil((99 - pct) / 10));
+  // Honest pacing: full generation typically takes 5-10 min. Ease 72→96 over
+  // ~8 min and never claim "final check" until the very end.
+  const pct = Math.min(96, Math.round(72 + 24 * (1 - Math.exp(-elapsed / 240))));
+  const etaMin = Math.max(1, Math.ceil((97 - pct) / 6));
   return { pct, etaMin, elapsed };
 }
 
@@ -88,7 +90,7 @@ function Gauge({ label, value }) {
   );
 }
 
-export default function PremiumBuildingDashboard({ report, user }) {
+export default function PremiumBuildingDashboard({ report, user, error, onRetry }) {
   const navigate = useNavigate();
   const { pct, etaMin, elapsed } = useBuildProgress(report.id);
   const [showVideo, setShowVideo] = useState(false);
@@ -114,9 +116,9 @@ export default function PremiumBuildingDashboard({ report, user }) {
     if (i === 0) return "done";
     if (i === 1) return (report.fingerprint || (report.anchors || []).length) ? "done" : "active";
     if (i === 2) return report.preview ? "done" : "active";
-    if (i === 3) return pct < 90 ? "active" : "done";
-    if (i === 4) return pct < 90 ? "todo" : pct < 96 ? "active" : "done";
-    return pct >= 96 ? "active" : "todo";
+    if (i === 3) return pct < 88 ? "active" : "done";
+    if (i === 4) return pct < 88 ? "todo" : pct < 94 ? "active" : "done";
+    return pct >= 94 ? "active" : "todo";
   };
 
   const gaugeValue = (target) => Math.min(target, Math.round(target * Math.min(1, 0.45 + elapsed / 180)));
@@ -170,7 +172,29 @@ export default function PremiumBuildingDashboard({ report, user }) {
         </h1>
         <p className="text-[14px] text-[#5C6657] mt-0.5">Here&rsquo;s your latest report</p>
 
-        {/* ── Building hero ── */}
+        {/* ── Interrupted state — honest retry instead of an endless spinner ── */}
+        {(error || report.full_report_status === "failed") ? (
+          <div className="rounded-[24px] mt-4 p-7 text-center shadow-xl" style={{ background: `linear-gradient(120deg, #0E2A1B 0%, ${INKG} 100%)` }} data-testid="pbd-failed-card">
+            <span className="w-14 h-14 rounded-full mx-auto flex items-center justify-center" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)" }}>
+              <Clock className="w-6 h-6" style={{ color: LIME }} />
+            </span>
+            <h2 className="font-barlow font-black uppercase text-white text-[24px] leading-tight mt-3">
+              Generation was <span style={{ color: LIME }}>interrupted</span>
+            </h2>
+            <p className="text-white/70 text-[13.5px] mt-2 max-w-[340px] mx-auto">
+              {report.full_report_error || error || "Nothing is lost — your video and analysis are safe. Tap retry and we'll pick up right where we left off."}
+            </p>
+            <button
+              type="button"
+              onClick={onRetry}
+              data-testid="pbd-retry-btn"
+              className="mt-5 inline-flex items-center gap-2 rounded-full px-9 py-3.5 font-barlow font-black uppercase tracking-[0.06em] text-[15px] transition-transform active:scale-[0.98] hover:brightness-95"
+              style={{ background: LIME, color: "#12211A" }}
+            >
+              Retry now
+            </button>
+          </div>
+        ) : (
         <div className="relative rounded-[24px] overflow-hidden mt-4 shadow-xl" style={{ background: `linear-gradient(120deg, #0E2A1B 0%, ${INKG} 60%, #10241A 100%)` }} data-testid="pbd-hero">
           {heroImg && (
             <div className="absolute inset-y-0 right-0 w-[46%] hidden sm:block" aria-hidden>
@@ -227,14 +251,24 @@ export default function PremiumBuildingDashboard({ report, user }) {
               })}
             </div>
 
-            <div className="mt-5 flex justify-center">
+            <div className="mt-5 flex flex-col items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-bold text-white" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)" }} data-testid="pbd-eta">
                 <Clock className="w-4 h-4" style={{ color: LIME }} />
-                Estimated ready in <span style={{ color: LIME }}>~{etaMin} min</span>
+                {pct >= 94 ? (
+                  <>Finishing up — <span style={{ color: LIME }}>almost there</span></>
+                ) : (
+                  <>Estimated ready in <span style={{ color: LIME }}>~{etaMin} min</span></>
+                )}
               </span>
+              {elapsed > 720 && (
+                <span className="text-white/60 text-[11.5px] text-center max-w-[300px]" data-testid="pbd-long-wait-note">
+                  Taking a little longer than usual — the scout is being thorough. This page updates automatically, and you can safely leave and come back.
+                </span>
+              )}
             </div>
           </div>
         </div>
+        )}
 
         {/* ── Match card ── */}
         <div className="bg-white rounded-[20px] border border-[#E9E4D5] p-4 mt-4 shadow-sm" data-testid="pbd-match-card">

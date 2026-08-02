@@ -1,5 +1,15 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 2, 2026 - later) — CRITICAL FIX: Full-report generation stuck forever after backend restart ✅
+- **User bug**: fresh premium upload stuck at 98% "Final Check". ROOT CAUSE (from logs): preview finished 06:05, full-report task started, backend worker RESTARTED 06:06:46 → in-process asyncio task died silently, doc stayed `full_report_status="generating"` forever; frontend poll had a 7-min hard timeout and gave up; auto-gen effect refused to re-fire because status was "generating". Same class of bug as the Session-131 preview watchdog — full report was never covered.
+- **Backend (server.py)**:
+  - `_sweep_stuck_full_reports(include_fresh)` + `_full_report_watchdog_loop` (120 s cadence): at STARTUP any doc still "generating" is orphaned by definition → requeued immediately; periodic sweep requeues docs whose `full_report_started_at` > 20 min (FULL_REPORT_STALL_SECONDS). Max 2 retries (`full_report_retries`) then flips to "failed" with friendly `full_report_error`.
+  - `full_report_started_at` set at task start AND refreshed on doubt-confirm resume (prevents false stall-requeue after long parent waits).
+  - Wired in on_startup after the preview watchdog. On deploy this instantly rescued 2 orphaned reports (aca4906c user's + 1e5ba91f stale-since-July) → BOTH completed "ready" (identity check even confirmed jersey 15: match=True high).
+- **Frontend**: ReportPage poll timeout 7→20 min; auto-gen catch now sets `fullReportError` → PremiumBuildingDashboard shows an honest "Generation was interrupted / RETRY NOW" card (pbd-failed-card / pbd-retry-btn, also on full_report_status==="failed"; retry = reload → auto-gen effect). Progress ring made honest: 72→96 cap over ~8 min (tau 240), stages: Writing<88 / Creating PDF 88-94 / Final Check ≥94; ETA becomes "Finishing up — almost there" at ≥94; after 12 min a reassurance note (pbd-long-wait-note) appears.
+- **Timing facts** (for speed questions): full dossier ≈ 4-6 min legit (Gemini 2.5 Pro full-video watch + optical tracking + GPT-4o identity verification + telestration); doubt-confirm can add up to 2 min wait. The "stuck" case was NOT slowness but the killed task.
+- **VERIFIED**: py_compile, startup logs show sweep+loop, both orphans regenerated to ready, stuck report now renders full dossier (screenshot), frontend compiles. ⚠️ REQUIRES REDEPLOY. NOTE: in preview env, ANY backend .py edit hot-reloads and kills in-flight generations (watchdog now auto-requeues, costing an extra LLM run) — avoid editing backend while a generation runs.
+
 ## Session (Aug 2, 2026 - later) — NEW POST-ANALYSIS PAGES: Premium Building Dashboard + Free Preview Landing ✅
 - **User request**: Replace the old cluttered post-analysis report page with two new mobile-first designs (their mockups followed exactly): premium = clean "building" dashboard (no sales), free = conversion-first locked landing (permanent until payment).
 - **PremiumBuildingDashboard** (`/components/report-states/PremiumBuildingDashboard.jsx`), shown when `unlocked && !full_report && !demo`:

@@ -6445,7 +6445,14 @@ async def _run_doubt_confirmation(
             logger.exception(f"doubt re-track failed for {report_id}")
     await db.reports.update_one(
         {"id": report_id},
-        {"$set": {"doubt_status": final, "full_report_status": "generating", **_wd_heartbeat()}},
+        {"$set": {
+            "doubt_status": final,
+            "full_report_status": "generating",
+            # refresh the stall anchor so the watchdog doesn't requeue a
+            # generation that legitimately waited long for the parent's answer
+            "full_report_started_at": datetime.now(timezone.utc).isoformat(),
+            **_wd_heartbeat(),
+        }},
     )
     logger.info(f"[doubt] {report_id}: resolution={final}")
     return gt_track
@@ -6858,7 +6865,11 @@ async def generate_full_report_task(report_id: str) -> None:
             return
         await db.reports.update_one(
             {"id": report_id},
-            {"$set": {"full_report_status": "generating", "full_report_error": None}},
+            {"$set": {
+                "full_report_status": "generating",
+                "full_report_error": None,
+                "full_report_started_at": datetime.now(timezone.utc).isoformat(),
+            }},
         )
         file_path = await _ensure_report_video_local(report_id)
         if not file_path or not file_path.exists():
@@ -12417,6 +12428,70 @@ app.add_middleware(
 )
 
 
+# ── Full-report generation watchdog ────────────────────────────────────────
+# Same root cause as the preview watchdog (Session 131): generation runs as an
+# in-process asyncio task, so a worker restart (hot reload, deploy, pod cycle)
+# kills it mid-flight and the doc stays `full_report_status="generating"`
+# forever — the premium building dashboard then spins at 98% with no recovery.
+FULL_REPORT_STALL_SECONDS = 20 * 60   # a legit generation can take ~10 min
+FULL_REPORT_MAX_RETRIES = 2
+
+
+async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
+    """Requeue orphaned/stalled full-report generations. At startup ANY doc
+    still 'generating' is orphaned by definition (include_fresh=True); the
+    periodic sweep only touches docs whose `full_report_started_at` is older
+    than FULL_REPORT_STALL_SECONDS. Bounded by FULL_REPORT_MAX_RETRIES, after
+    which the doc flips to 'failed' so the UI can offer a retry."""
+    now = datetime.now(timezone.utc)
+    query: dict = {"full_report_status": "generating"}
+    if not include_fresh:
+        cutoff = (now - timedelta(seconds=FULL_REPORT_STALL_SECONDS)).isoformat()
+        query["$or"] = [
+            {"full_report_started_at": {"$lt": cutoff}},
+            {"full_report_started_at": {"$in": [None, ""]}},
+            {"full_report_started_at": {"$exists": False}},
+        ]
+    requeued = 0
+    async for d in db.reports.find(query, {"id": 1, "full_report_retries": 1}):
+        rid = d.get("id")
+        if not rid:
+            continue
+        retries = int(d.get("full_report_retries") or 0)
+        if retries >= FULL_REPORT_MAX_RETRIES:
+            await db.reports.update_one(
+                {"id": rid, "full_report_status": "generating"},
+                {"$set": {
+                    "full_report_status": "failed",
+                    "full_report_error": "Generation was interrupted repeatedly — tap retry, nothing is lost.",
+                }},
+            )
+            logger.error(f"[full-report-watchdog] {rid} exceeded {FULL_REPORT_MAX_RETRIES} retries → failed")
+            continue
+        await db.reports.update_one(
+            {"id": rid},
+            {"$set": {
+                "full_report_retries": retries + 1,
+                "full_report_started_at": now.isoformat(),
+            }},
+        )
+        asyncio.create_task(generate_full_report_task(rid))
+        requeued += 1
+        logger.warning(f"[full-report-watchdog] requeued generation for {rid} (attempt {retries + 1})")
+    return requeued
+
+
+async def _full_report_watchdog_loop() -> None:
+    while True:
+        try:
+            await asyncio.sleep(120)
+            await _sweep_stuck_full_reports(include_fresh=False)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("[full-report-watchdog] sweep raised (loop continues)")
+
+
 @app.on_event("startup")
 async def on_startup():
     # ── Security indexes (idempotent, safe to call every boot) ──
@@ -12492,6 +12567,18 @@ async def on_startup():
         logger.info("[watchdog] periodic sweep loop started")
     except Exception:
         logger.exception("Analysis watchdog failed to start (non-fatal)")
+
+    # ── Full-report generation resume + watchdog ──
+    # In-process generation tasks die with the worker; any doc still
+    # 'generating' at boot is orphaned by definition → requeue immediately.
+    try:
+        resumed = await _sweep_stuck_full_reports(include_fresh=True)
+        if resumed:
+            logger.warning(f"[startup-sweep] resumed {resumed} orphaned full-report generation(s)")
+        asyncio.create_task(_full_report_watchdog_loop())
+        logger.info("[full-report-watchdog] loop started")
+    except Exception:
+        logger.exception("Full-report watchdog failed to start (non-fatal)")
 
     # ── Curve reminder loop — emails parents 4-6 weeks after their last report ──
     try:
