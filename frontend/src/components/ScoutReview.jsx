@@ -97,7 +97,7 @@ export default function ScoutReview({ reportId }) {
             <Sparkles className="w-4 h-4 text-volt" />
             <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Bonus included</span>
           </div>
-          <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
+          <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95] text-ink">
             Your scout review is in progress
           </h3>
           <p className="mt-3 text-ink/70 text-sm md:text-base max-w-2xl leading-relaxed">
@@ -178,7 +178,7 @@ export default function ScoutReview({ reportId }) {
           <ShieldCheck className="w-4 h-4 text-volt" />
           <span className="text-volt text-[11px] uppercase tracking-[0.25em] font-bold">Human scout review</span>
         </div>
-        <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95]">
+        <h3 className="font-barlow font-black uppercase text-3xl md:text-4xl tracking-tighter leading-[0.95] text-ink">
           What the scout said
         </h3>
         <div className="mt-5 bg-cream-card/90 border-l-2 border-volt p-5">
@@ -214,7 +214,7 @@ export default function ScoutReview({ reportId }) {
                       className={`px-4 py-3 text-sm leading-relaxed ${
                         isUser
                           ? "bg-volt text-white"
-                          : "bg-deepnavy border border-gray-border text-white"
+                          : "bg-deepnavy border border-gray-border text-ink"
                       }`}
                     >
                       {!isUser && (

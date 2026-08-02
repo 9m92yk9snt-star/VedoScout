@@ -2802,3 +2802,28 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - Backend: `POST /api/reports/{id}/video-share` {enabled} (kun ejer/admin). Felt: `video_share_enabled` på report-doc. `stream_r2_media` tillader usignerede mp4-requests hvis flag er ON (15s in-memory cache `_share_cache`, invalideres ved toggle). Default OFF = signerede udløbende links som før.
 - Delt link = ren URL uden token → virker PERMANENT indtil forælderen slår deling fra.
 - Testet: OFF→403, enable→206 usigneret, disable→403 igen (efter cache), fremmed bruger kan ikke toggle (403), UI-flow verificeret med screenshots.
+
+---
+
+# Session (Juni 2026, del 4) — Parallel dossier-pipeline + Scout-titel læsbarhed
+
+## 1. Hvid tekst på Scout-sektionens titler (P0 — DONE, screenshot-verificeret)
+- Rodårsag: `ScoutReview.jsx` h3-titler ("Your scout review is in progress" / "What the scout said") havde INGEN farveklasse → arvede near-white `--foreground` fra det gamle mørke tema → usynlig på den lyse premium-baggrund (#F2EDE2/bg-surface).
+- Fix: tilføjet `text-ink` til begge h3'er + scout-chatboble ændret fra `bg-deepnavy text-white` (deepnavy er nu cream-alias!) til `text-ink`.
+- Verificeret med screenshot af færdig premium-rapport (admin-login).
+
+## 2. Parallelisering af generate_full_report_task (P0 — DONE, e2e-testet med ægte regenerering)
+- server.py (~linje 6926): Refaktoreret til 2 parallelle faser med asyncio.gather:
+  - Fase A: `_tracking_core()` (time offset + track_player + doubt confirmation) ∥ `_audio_core()` (extract_audio_events)
+  - Fase B: `call_gemini_with_video` (hovedanalyse) ∥ `_movement_pace_core()` (movement map + trusted fastest moment GPT-vision + pace metrics + DB-write)
+  - Gemini-prompten afhænger KUN af gt_track (gt_block) og audio — IKKE af movement/pace → sikkert at parallelisere.
+  - compute_movement_map/compute_speed_metrics kører nu i asyncio.to_thread (blokerer ikke event loop under Gemini-kald).
+  - Fejl i movement/pace-grenen fanges internt (non-fatal) — kun Gemini-fejl propagerer til failed-status.
+- E2E-test: rapport aca4906c regenereret → 2m36s total (07:13:13→07:15:49). Bevis for parallelitet: movement_map+pace_metrics skrevet 07:13:33 mens Gemini stadig kørte. Identity gate 4/4 verified, telestration OK, alle rapportsektioner + scores intakte, ingen exceptions i logvinduet.
+- Watchdog upåvirket (FULL_REPORT_STALL_SECONDS=20min >> ny køretid).
+
+## Næste opgaver (uændret prioritet fra bruger)
+- P1: Ny upload-flow — upload video FØRST, opret konto EFTER upload (konverteringsoptimering)
+- P1: Danske priser (DKK), 3 tiers (Gratis 0 kr / Premium / VIP) + tilfredshedsgaranti ved checkout
+- P2: Code-splitting/lazy loading på landing page; server-side Meta Conversions API
+- P3: Delbar highlight-video med score-overlay; Audio Pep-Talk (OpenAI TTS); Chat with the Scout

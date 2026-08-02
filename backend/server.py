@@ -6924,28 +6924,57 @@ async def generate_full_report_task(report_id: str) -> None:
         gate = doc.get("content_gate") or {}
 
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
-        gt_track = None
-        gt_t_off = 0.0
-        try:
-            valid_anchors = [
-                a for a in anchor_payload_list
-                if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
-            ]
-            if valid_anchors:
-                if marker_path and isinstance(doc.get("marker_timestamp"), (int, float)):
-                    gt_t_off, _ms = await asyncio.to_thread(
-                        estimate_time_offset, str(file_path), marker_path, float(doc["marker_timestamp"]),
-                    )
-                gt_track = await asyncio.to_thread(track_player, str(file_path), valid_anchors, gt_t_off)
-                doubt_moments = gt_track.pop("doubt_moments", []) or []
-                if doubt_moments and not doc.get("doubt_resolved"):
-                    try:
-                        gt_track = await _run_doubt_confirmation(
-                            report_id, file_path, valid_anchors, gt_t_off, gt_track, doubt_moments)
-                    except Exception:
-                        logger.exception(f"doubt confirmation flow failed for {report_id}")
-                tap_times = [float(a["t"]) + gt_t_off for a in valid_anchors]
-                mm_map = compute_movement_map(gt_track, tap_times=tap_times)
+        # Session 143 — PARALLEL PIPELINE:
+        #   Phase A: optical tracking (+doubt confirmation) ∥ audio extraction
+        #   Phase B: movement/pace metrics (GPT-vision) ∥ Gemini full analysis
+        # Saves 1-2 min of wall-clock vs the old strictly-sequential flow.
+        valid_anchors = [
+            a for a in anchor_payload_list
+            if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
+        ]
+
+        async def _tracking_core():
+            t_off, track = 0.0, None
+            try:
+                if valid_anchors:
+                    if marker_path and isinstance(doc.get("marker_timestamp"), (int, float)):
+                        t_off, _ms = await asyncio.to_thread(
+                            estimate_time_offset, str(file_path), marker_path, float(doc["marker_timestamp"]),
+                        )
+                    track = await asyncio.to_thread(track_player, str(file_path), valid_anchors, t_off)
+                    doubt_moments = track.pop("doubt_moments", []) or []
+                    if doubt_moments and not doc.get("doubt_resolved"):
+                        try:
+                            track = await _run_doubt_confirmation(
+                                report_id, file_path, valid_anchors, t_off, track, doubt_moments)
+                        except Exception:
+                            logger.exception(f"doubt confirmation flow failed for {report_id}")
+            except Exception:
+                logger.exception(f"player tracking failed for {report_id}")
+                track = None
+            return track, t_off
+
+        async def _audio_core():
+            try:
+                return await asyncio.to_thread(extract_audio_events, file_path, top_n=10)
+            except Exception:
+                return []
+
+        (gt_track, gt_t_off), audio_events_full = await asyncio.gather(_tracking_core(), _audio_core())
+        tap_times = [float(a["t"]) + gt_t_off for a in valid_anchors] if gt_track else []
+        if gt_track:
+            logger.info(
+                f"[track] {report_id}: {len(gt_track.get('points') or [])} points, "
+                f"{len(gt_track.get('segments') or [])} segments (Δ={gt_t_off:+.2f}s)"
+            )
+
+        async def _movement_pace_core():
+            """Movement map + trusted fastest moment + pace metrics. Runs in
+            parallel with the Gemini call — nothing here feeds the prompt."""
+            if not gt_track:
+                return
+            try:
+                mm_map = await asyncio.to_thread(compute_movement_map, gt_track, tap_times=tap_times)
                 chosen_fast = None
                 if mm_map:
                     try:
@@ -6972,7 +7001,8 @@ async def generate_full_report_task(report_id: str) -> None:
                     mm_map["taps_confidence"] = ip.get("confidence") if ip else None
                     mm_map.pop("fast_candidates", None)
                     mm_map.pop("fast_near_tap", None)
-                pace_m = compute_speed_metrics(
+                pace_m = await asyncio.to_thread(
+                    compute_speed_metrics,
                     gt_track, (doc.get("player_details") or {}).get("age"),
                     trusted_windows=tap_times)
                 await db.reports.update_one(
@@ -6984,12 +7014,8 @@ async def generate_full_report_task(report_id: str) -> None:
                         "pace_metrics": pace_m,
                     }},
                 )
-                logger.info(
-                    f"[track] {report_id}: {len(gt_track.get('points') or [])} points, "
-                    f"{len(gt_track.get('segments') or [])} segments (Δ={gt_t_off:+.2f}s)"
-                )
-        except Exception:
-            logger.exception(f"player tracking failed for {report_id}")
+            except Exception:
+                logger.exception(f"movement/pace metrics failed for {report_id}")
 
         # ── Precision priors ──
         fp_obj = None
@@ -7008,11 +7034,6 @@ async def generate_full_report_task(report_id: str) -> None:
                 )
             except Exception:
                 fp_obj = None
-        try:
-            audio_events_full = await asyncio.to_thread(extract_audio_events, file_path, top_n=10)
-        except Exception:
-            audio_events_full = []
-
         if fp_obj is not None:
             full_prompt = precision_build_full_prompt(
                 base_prompt=FULL_REPORT_PROMPT,
@@ -7060,13 +7081,17 @@ async def generate_full_report_task(report_id: str) -> None:
                 full_prompt += gt_block
         except Exception:
             pass
-        full = await call_gemini_with_video(
-            session_id=f"full-{report_id}",
-            prompt=full_prompt,
-            video_path=str(file_path),
-            marker_path=marker_path,
-            crop_path=crop_path_str,
-            anchor_crops=anchor_crops_full if anchor_crops_full else None,
+        # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
+        full, _mm_done = await asyncio.gather(
+            call_gemini_with_video(
+                session_id=f"full-{report_id}",
+                prompt=full_prompt,
+                video_path=str(file_path),
+                marker_path=marker_path,
+                crop_path=crop_path_str,
+                anchor_crops=anchor_crops_full if anchor_crops_full else None,
+            ),
+            _movement_pace_core(),
         )
         full = scrub_hedging(full)
         _apply_tracking_verification(full, anchor_payload_list, gt_track, gt_t_off)
