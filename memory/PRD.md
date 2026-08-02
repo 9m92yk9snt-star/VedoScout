@@ -2915,3 +2915,15 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 ## Næste opgaver
 - P1: Danske priser (DKK, 3 tiers) + tilfredshedsgaranti
 - P2: GYG Fase 2 (Udvikling siden sidst, Pep-Talk TTS); lazy loading; Meta CAPI
+
+## Session (Aug 2, 2026 - evening) — PROD PAYMENT/ACCESS BUGS FIXED + PREVIEW DB PURGED ✅
+- **User-reported prod bugs** (scoutmeplay.com): (1) free user got FULL report without paying, (2) same email got 3 free previews, (3) "Adam Hamid" showed PREMIUM without any payment.
+- **RCA**: (1) ReportPage `unlocked`/auto-gen included viewer role (admin/premium) → admin opening a user's unpaid report AUTO-fired POST generate-full (backend admin bypass allowed) → free Gemini full report. (2) refund paths (`_refund_upload_eligibility`) not idempotent + watchdog-refund-vs-late-success race → free preview credit could come back after a successful analysis. (3) admin "Unlock" button had NO confirm dialog (one misclick = manually_unlocked=True → scout queue + PREMIUM segment); segment logic counted manually_unlocked reports as "premium".
+- **Fixes (user-approved scope, nothing else changed)**:
+  - ReportPage.jsx: `unlocked = is_paid || manually_unlocked` (display ~L2049) and auto-gen guard (~L1733) — viewer role removed. Backend generate-full admin bypass KEPT intentionally (explicit admin action still allowed per user choice A).
+  - server.py `_refund_upload_eligibility`: atomic `eligibility_refunded` guard — refund max ONCE per report; re-burn block in analyze_preview_task after "ready" (late success re-consumes refunded credit: free preview = max 1 successful analysis).
+  - AdminPage: window.confirm on Unlock (explicit "no payment will ever be collected" warning); Reports tab hides failed/empty by default + toggle `admin-toggle-failed-reports` (red FAILED badge); Payments tab per-row delete (`admin-delete-payment-{id}`, confirm) → new `DELETE /api/admin/payments/{txn_id}`.
+  - `GET /admin/users` segments: **premium = real paid payment_transaction only**; new **granted** segment (amber, Unlock icon) for prepaid/unlock/subscription without money; new filter pill.
+- **VERIFIED**: iteration_64 100% pass (backend 13/13 pytest + frontend: admin on unpaid report sees FreePreviewLanding, 0 generate-full calls in 10s, Mongo unchanged; confirm dialogs; granted pill; delete payment; paid-report regression green). Refund idempotency unit-tested (double-refund = no-op both free_preview & prepaid buckets).
+- **PREVIEW DB PURGED (user request)**: 47 test users, 55 reports, 183 payments, 44 player_profiles, all uploads (731MB) + PDFs deleted. ONLY admin@elitescout.com remains. Re-seed if needed: `python make_demo_accounts.py`, `python seed_fictional_players.py`, `python seed_test_accounts.py`.
+- ⚠️ REQUIRES REDEPLOY to fix scoutmeplay.com. NOTE for prod cleanup: Broderick's force-generated full report + Hamid's manually_unlocked report can now be deleted via admin UI (Reports tab / Payments tab delete buttons).
