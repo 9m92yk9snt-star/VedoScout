@@ -117,8 +117,8 @@ export default function PricingTiers() {
 
   // ── CTA handlers ──────────────────────────────────────────────────
   const goFree = () => {
-    if (user) navigate("/upload");
-    else navigate("/signup?plan=free");
+    // Guest-first flow: straight to /upload — account is created at "Start analysis".
+    navigate("/upload");
   };
 
   // Single Report: one-time prepay flow. Logged-out users go to signup.

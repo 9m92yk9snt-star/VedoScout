@@ -296,7 +296,7 @@ export default function Navigation() {
                   Log in
                 </Link>
                 <Link
-                  to="/signup"
+                  to="/upload"
                   data-testid="nav-signup-btn"
                   className="group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-[11px] sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all"
                   onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 28px 2px ${LIME}55`; }}
@@ -429,7 +429,7 @@ export default function Navigation() {
                     Log in
                   </Link>
                   <Link
-                    to="/signup"
+                    to="/upload"
                     onClick={() => setMobileOpen(false)}
                     className="font-barlow font-black uppercase tracking-widest text-sm px-5 py-3.5 text-center rounded-full flex items-center justify-center gap-2"
                     style={{ background: LIME, color: "#0A1F0F" }}

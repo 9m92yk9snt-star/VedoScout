@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 const TABS = [
   { to: "/",          label: "Home",    icon: Home,       testid: "mobile-tab-home" },
   { to: "/dashboard", label: "Reports", icon: FolderOpen, testid: "mobile-tab-reports", auth: true },
-  { to: "/upload",    label: "Upload",  icon: Upload,     testid: "mobile-tab-upload",  auth: true, primary: true },
+  { to: "/upload",    label: "Upload",  icon: Upload,     testid: "mobile-tab-upload",  primary: true },
   { to: "/profile",   label: "Profile", icon: User,       testid: "mobile-tab-profile", auth: true },
 ];
 

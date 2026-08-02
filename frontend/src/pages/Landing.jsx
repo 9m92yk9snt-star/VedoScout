@@ -518,7 +518,8 @@ export default function Landing() {
     }).catch(() => {});
   }, []);
 
-  const startHref = user ? "/upload" : "/signup";
+  // Guest-first flow: everyone starts at /upload — account is created at "Start analysis".
+  const startHref = "/upload";
   const startLabel = "Upload your video";
 
   return (

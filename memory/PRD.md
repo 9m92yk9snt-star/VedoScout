@@ -2927,3 +2927,8 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - **VERIFIED**: iteration_64 100% pass (backend 13/13 pytest + frontend: admin on unpaid report sees FreePreviewLanding, 0 generate-full calls in 10s, Mongo unchanged; confirm dialogs; granted pill; delete payment; paid-report regression green). Refund idempotency unit-tested (double-refund = no-op both free_preview & prepaid buckets).
 - **PREVIEW DB PURGED (user request)**: 47 test users, 55 reports, 183 payments, 44 player_profiles, all uploads (731MB) + PDFs deleted. ONLY admin@elitescout.com remains. Re-seed if needed: `python make_demo_accounts.py`, `python seed_fictional_players.py`, `python seed_test_accounts.py`.
 - ⚠️ REQUIRES REDEPLOY to fix scoutmeplay.com. NOTE for prod cleanup: Broderick's force-generated full report + Hamid's manually_unlocked report can now be deleted via admin UI (Reports tab / Payments tab delete buttons).
+
+## Session (Aug 2, 2026 - late) — GUEST-FIRST ENTRY POINTS FIXED (user bug) ✅
+- **User bug**: "Upload" button + "Get started" sent guests to /signup//login — broke the approved "Upload Før Konto" structure (account only at "Start analysis").
+- **Fixes**: Navigation.jsx desktop+mobile "Get started" → /upload; MobileBottomTabs Upload tab `auth:true` removed → /upload for guests; Landing.jsx `startHref` always /upload; LandingMinimal `handlePrimaryCta` → /upload; PricingTiers `goFree` → /upload. Paid-tier CTAs (single/premium/vip) KEEP signup-first (Stripe needs an account).
+- **VERIFIED (screenshots)**: guest desktop Get started → /upload with guest-upload-pill; mobile bottom tab → /upload. ⚠️ REQUIRES REDEPLOY.

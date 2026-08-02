@@ -93,8 +93,8 @@ export default function LandingMinimal() {
   }, []);
 
   const handlePrimaryCta = () => {
-    if (user) navigate("/upload");
-    else navigate("/signup?next=/upload");
+    // Guest-first flow: straight to /upload — account is created at "Start analysis".
+    navigate("/upload");
   };
 
   return (
