@@ -2786,6 +2786,11 @@ Produce a JSON object EXACTLY in this format:
     "homework_plan": [
       {"days": "Day 1-2", "topic_id": "<topic_id of an INCLUDED lesson>", "drill": "<10-15 min drill doable at home or in a park with just a ball>", "why": "<ONE sentence linking the drill to a specific observed moment with its timestamp>"}
     ]
+  },
+  "parent_corner": {
+    "size_and_potential": "<4-5 sentences TO THE PARENTS about seeing past physical size, grounded in what THIS analysis actually found (use the player's first name and reference at least one observed moment)>",
+    "development_takes_time": "<4-5 sentences TO THE PARENTS about patience and long-term development, connecting this report's real strengths and its main development point>",
+    "your_role_on_the_sideline": "<3-4 sentences of practical sideline advice for the parents, tied to a real observed moment from this match>"
   }
 }
 
@@ -2836,6 +2841,14 @@ RULES FOR "grow_your_game" (evidence-gated football education — the 100% rule)
 - scanning: only when head/shoulder checks BEFORE receiving are clearly visible at the camera distance. If heads are too small to judge, skip the topic.
 - homework_plan: 3-4 entries covering roughly a week (Day 1-2, Day 3-4, Day 5-7). Each entry MUST train one of the INCLUDED lessons and reference one of its timestamps in "why". If lessons is empty, homework_plan must be empty.
 - Tone: warm, humble, development-first — written for a young player and the family supporting them, never clinical.
+
+RULES FOR "parent_corner" (written TO the parents — warm, humble, personal):
+- Address the parents directly ("Dear parent", "you") — never the player.
+- Every field MUST be grounded in THIS report: use the player's first name and reference at least one concrete observation or timestamp you actually made.
+- size_and_potential: reassure honestly about physical size vs football intelligence USING what this analysis found. NEVER invent physical attributes you could not verify on video.
+- development_takes_time: connect the report's actual strengths and its main development point to the long-term, non-linear nature of youth development. No empty cliches.
+- your_role_on_the_sideline: practical sideline advice tied to a real moment from this match (e.g. how to react when the player loses the ball, referencing the reaction you observed).
+- 3-5 sentences per field. If the video gave you too little to personalize honestly, set "parent_corner" to null.
 
 CRITICAL:
 - Independent developmental analysis — do NOT imply trials, contracts, selection
@@ -2993,6 +3006,32 @@ def _validate_grow_your_game(full: dict, duration_s: float, gt_track: Optional[d
         return 0
     full["grow_your_game"] = {"lessons": kept, "homework_plan": homework[:4]}
     return len(kept)
+
+
+_PC_FIELDS = ("size_and_potential", "development_takes_time", "your_role_on_the_sideline")
+
+
+def _validate_parent_corner(full: dict, player_name: str) -> bool:
+    """Personalization gate for the parent corner: each kept field must be
+    substantial (≥80 chars) and the section as a whole must actually mention
+    the player's first name. Drops the section entirely otherwise."""
+    pc = full.get("parent_corner")
+    if not isinstance(pc, dict):
+        full.pop("parent_corner", None)
+        return False
+    first = (player_name or "").strip().split(" ")[0].lower()
+    kept = {}
+    for k in _PC_FIELDS:
+        v = str(pc.get(k) or "").strip()
+        if len(v) >= 80:
+            kept[k] = v
+    named = any(first and first in v.lower() for v in kept.values())
+    if len(kept) < 2 or not named:
+        logger.info(f"[parent-corner] dropped (fields={len(kept)}, named={named})")
+        full.pop("parent_corner", None)
+        return False
+    full["parent_corner"] = kept
+    return True
 
 
 def extract_json(text: str) -> dict:
@@ -7374,6 +7413,11 @@ async def generate_full_report_task(report_id: str) -> None:
             logger.exception(f"grow-your-game validation failed for {report_id}")
             full.pop("grow_your_game", None)
             gyg_count = 0
+        try:
+            _validate_parent_corner(full, (doc.get("player_details") or {}).get("player_name") or "")
+        except Exception:
+            logger.exception(f"parent-corner validation failed for {report_id}")
+            full.pop("parent_corner", None)
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
