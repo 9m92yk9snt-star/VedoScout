@@ -102,7 +102,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 23  # v23 = pace strip + parent value metrics ("What Parents Ask")
+PDF_RENDER_VERSION = 24  # v24 = parent-friendly movement/pace transparency + trusted fastest moment
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -6777,6 +6777,52 @@ def _apply_tracking_verification(full: dict, anchors: list, track: dict | None, 
         pass
 
 
+async def _trusted_fastest_moment(
+    report_id: str,
+    mm_map: dict,
+    tap_times: list[float],
+    video_path,
+    ref_crops: list[str],
+):
+    """Pick the fastest moment that can be PROVEN to belong to the tapped player.
+    Order of proof: (1) moment ≤2 s from one of the user's own taps (tap = ground
+    truth), (2) independent GPT-vision identity check of the exact frame (max 2
+    calls), (3) fall back to the fastest sample near a tap. Returns
+    (t, v, trust) with trust in {"tap", "ai"} — or None when nothing can be proven."""
+    cands = mm_map.get("fast_candidates") or []
+    near = lambda t: any(abs(t - tt) <= 2.0 for tt in tap_times)  # noqa: E731
+    ai_checks = 0
+    for cand in cands:
+        try:
+            t, v = float(cand["t"]), float(cand["v"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if near(t):
+            return t, v, "tap"
+        if ai_checks < 2 and ref_crops and video_path and Path(video_path).exists():
+            ai_checks += 1
+            frame = UPLOAD_DIR / f".fast-{report_id}-{t:.1f}.jpg"
+            try:
+                ok = await asyncio.to_thread(extract_frame_at, Path(video_path), t, frame)
+                if ok:
+                    verdict = await verify_frame_identity(
+                        EMERGENT_LLM_KEY, f"fast-{report_id}-{t:.1f}", ref_crops, str(frame),
+                    )
+                    if verdict == "confirmed":
+                        return t, v, "ai"
+            except Exception:
+                logger.warning(f"[fastest] identity check failed for {report_id} @ {t:.1f}s")
+            finally:
+                frame.unlink(missing_ok=True)
+    fnt = mm_map.get("fast_near_tap")
+    if fnt:
+        try:
+            return float(fnt["t"]), float(fnt["v"]), "tap"
+        except (KeyError, TypeError, ValueError):
+            pass
+    return None
+
+
 async def generate_full_report_task(report_id: str) -> None:
     """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads).
 
@@ -6871,14 +6917,44 @@ async def generate_full_report_task(report_id: str) -> None:
                             report_id, file_path, valid_anchors, gt_t_off, gt_track, doubt_moments)
                     except Exception:
                         logger.exception(f"doubt confirmation flow failed for {report_id}")
+                tap_times = [float(a["t"]) + gt_t_off for a in valid_anchors]
+                mm_map = compute_movement_map(gt_track, tap_times=tap_times)
+                chosen_fast = None
+                if mm_map:
+                    try:
+                        chosen_fast = await _trusted_fastest_moment(
+                            report_id, mm_map, tap_times, file_path, anchor_crops_full)
+                    except Exception:
+                        logger.exception(f"trusted fastest-moment selection failed for {report_id}")
+                    if chosen_fast:
+                        ct, cv, trust = chosen_fast
+                        start_s = mm_map.get("track_start_s")
+                        mm_map.update({
+                            "top_speed_t": fmt_mmss(ct),
+                            "top_video_s": round(ct, 1),
+                            "top_speed_idx": min(100, round(cv * 65)),
+                            "top_trust": trust,
+                            "top_after_start": round(ct - start_s, 1) if start_s is not None else None,
+                        })
+                    else:
+                        mm_map["top_trust"] = None
+                    mm_map["tap_times_s"] = [round(t, 1) for t in tap_times]
+                    mm_map["tap_times_mmss"] = [fmt_mmss(t) for t in tap_times]
+                    ip = doc.get("identity_profile") or {}
+                    mm_map["taps_same_player"] = bool(ip.get("same_player")) if ip else None
+                    mm_map["taps_confidence"] = ip.get("confidence") if ip else None
+                    mm_map.pop("fast_candidates", None)
+                    mm_map.pop("fast_near_tap", None)
+                pace_m = compute_speed_metrics(
+                    gt_track, (doc.get("player_details") or {}).get("age"),
+                    trusted_windows=tap_times)
                 await db.reports.update_one(
                     {"id": report_id},
                     {"$set": {
                         "player_track": gt_track,
                         "anchor_time_offset": gt_t_off,
-                        "movement_map": compute_movement_map(gt_track),
-                        "pace_metrics": compute_speed_metrics(
-                            gt_track, (doc.get("player_details") or {}).get("age")),
+                        "movement_map": mm_map,
+                        "pace_metrics": pace_m,
                     }},
                 )
                 logger.info(
@@ -12238,7 +12314,7 @@ from identity_verify import (
 )
 from telestration import render_telestration
 from player_tracking import track_player, track_at
-from movement_metrics import compute_movement_map
+from movement_metrics import compute_movement_map, fmt_mmss
 from speed_metrics import compute_speed_metrics
 from progression import build_progression
 from score_context import build_score_context

@@ -279,7 +279,7 @@ export default function PremiumReportV2({ report, assetBase }) {
 
       {report.movement_map?.trail?.length > 0 && (
         <div className="mb-4">
-          <MovementMapCard movement={report.movement_map} onPlayAt={playAt} />
+          <MovementMapCard movement={report.movement_map} pace={report.pace_metrics} onPlayAt={playAt} />
         </div>
       )}
 

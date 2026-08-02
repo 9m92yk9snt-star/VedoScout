@@ -1262,16 +1262,43 @@ def _movement_map_card(c, mm, x, y, w, h):
     c.saveState()
     c.setFillColor(HexColor("#5F7A66"))
     c.setFont(F_BOLD, 5.2)
-    c.drawString(pl_x + 6, pl_y + 5, "PLAYER PATH IN FRAME · WHITE RINGS = YOUR TAPS")
+    c.drawString(pl_x + 6, pl_y + 5, "THIS CLIP ONLY · NOTHING IS GUESSED")
     c.restoreState()
+    # legend + honesty note under the map (when the layout leaves room)
+    if pl_y - (y + PAD) > 30:
+        ly = pl_y - 13
+        c.saveState()
+        c.setStrokeColor(HexColor("#9FC400"))
+        c.setLineWidth(2)
+        c.setLineCap(1)
+        c.line(pl_x, ly + 2, pl_x + 11, ly + 2)
+        c.setFillColor(HexColor("#4B5563"))
+        c.setFont(F_BOLD, 5.4)
+        c.drawString(pl_x + 15, ly, "YOUR PLAYER'S ROUTE")
+        lx2 = pl_x + 15 + c.stringWidth("YOUR PLAYER'S ROUTE", F_BOLD, 5.4) + 12
+        c.setStrokeColor(HexColor("#7A8471"))
+        c.setLineWidth(0.9)
+        c.circle(lx2 + 3, ly + 2, 2.8, stroke=1, fill=0)
+        c.drawString(lx2 + 9, ly, "YOUR TAPS")
+        lx3 = lx2 + 9 + c.stringWidth("YOUR TAPS", F_BOLD, 5.4) + 12
+        c.setFillColor(HexColor("#C9DE7E"))
+        c.circle(lx3 + 3, ly + 2, 2.8, stroke=0, fill=1)
+        c.setFillColor(HexColor("#4B5563"))
+        c.drawString(lx3 + 9, ly, "GLOW = TIME SPENT THERE")
+        c.restoreState()
+        draw_par(
+            c,
+            esc("Only moments with a secure lock on your player are drawn — when the tracker is unsure, it stops honestly instead of guessing."),
+            pl_x, ly - 7, pl_w, _style(F_BODY, 6.0, MUTED, leading=8.6),
+        )
 
     rx = pl_x + pl_w + PAD
     rw = x + w - PAD - rx
     chip_w = (rw - 12) / 3
     stats = [
-        (str(mm.get("bursts", 0)), "EXPLOSIVE", "ACTIONS"),
-        (f"{mm.get('tracked_seconds', 0)}s", "TRACKED", "PLAY"),
-        (str(mm.get("intensity", 0)), "INTENSITY", "INDEX /100"),
+        (str(mm.get("bursts", 0)), "SPEED BURSTS", "SUDDEN ACCELERATIONS"),
+        (f"{mm.get('tracked_seconds', 0)}s", "SECURE TRACKING", "TIME LOCKED ON PLAYER"),
+        (str(mm.get("intensity", 0)), "WORK RATE", "ACTIVITY · 0-100"),
     ]
     ch = 52
     for i, (val, l1, l2) in enumerate(stats):
@@ -1283,25 +1310,60 @@ def _movement_map_card(c, mm, x, y, w, h):
         c.setFillColor(MUTED)
         c.setFont(F_BOLD, 5)
         c.drawCentredString(bx + chip_w / 2, pl_top - ch + 15, l1)
+        c.setFont(F_BOLD, 4.3)
         c.drawCentredString(bx + chip_w / 2, pl_top - ch + 8, l2)
-    fy2 = pl_top - ch - 10
-    fh = 38
+    fy2 = pl_top - ch - 8
+    fh = 58
     c.saveState()
     c.setFillColor(FOREST)
     c.roundRect(rx, fy2 - fh, rw, fh, 8, stroke=0, fill=1)
     c.setFillColor(HexColor("#A9BC9C"))
-    c.setFont(F_BOLD, 5.6)
-    c.drawString(rx + 10, fy2 - 13, "FASTEST MEASURED MOMENT")
+    c.setFont(F_BOLD, 5.4)
+    c.drawString(rx + 10, fy2 - 11, "FASTEST MOMENT · IN YOUR UPLOADED CLIP")
     c.setFillColor(HexColor("#CCFF00"))
     c.setFont(F_BLACK, 13)
-    c.drawString(rx + 10, fy2 - 29, f"{mm.get('top_speed_t', '—')}  ·  {mm.get('top_speed_idx', 0)}/100 PACE")
+    c.drawString(rx + 10, fy2 - 26, f"{mm.get('top_speed_t', '—')}  ·  BURST {mm.get('top_speed_idx', 0)}/100")
+    c.setFillColor(HexColor("#DCE5D6"))
+    c.setFont(F_BOLD, 5.2)
+    info_y = fy2 - 36
+    if mm.get("track_start_t"):
+        c.drawString(
+            rx + 10, info_y,
+            f"TRACKING BEGAN AT {mm['track_start_t']} · COVERED {mm.get('tracked_seconds', 0)}S "
+            f"IN {mm.get('segments', 0)} PASSAGE{'S' if mm.get('segments', 0) != 1 else ''}",
+        )
+        info_y -= 8
+    if mm.get("top_after_start") is not None:
+        c.drawString(rx + 10, info_y, f"FASTEST MOVEMENT +{mm['top_after_start']}S AFTER TRACKING BEGAN")
+        info_y -= 8
+    trust = mm.get("top_trust")
+    if trust:
+        ty2 = max(info_y, fy2 - fh + 5)
+        c.setFillColor(HexColor("#CCFF00"))
+        c.circle(rx + 12.5, ty2 + 2, 2.4, stroke=0, fill=1)
+        c.setFillColor(FOREST)
+        c.setFont(F_BLACK, 3.6)
+        c.drawCentredString(rx + 12.5, ty2 + 0.8, "V")
+        c.setFillColor(HexColor("#CCFF00"))
+        c.setFont(F_BLACK, 5.4)
+        label = "VERIFIED — AT YOUR OWN TAP" if trust == "tap" else "AI IDENTITY-CHECKED AT THIS EXACT SECOND"
+        c.drawString(rx + 18, ty2, label)
     c.restoreState()
-    draw_par(
-        c,
-        esc("Measured frame-by-frame with optical tracking seeded by the parent's own player taps — "
-            "mathematical data, not AI estimates."),
-        rx, fy2 - fh - 8, rw, _style(F_BODY, 6.6, MUTED, leading=9.4),
-    )
+    py = fy2 - fh - 8
+    taps = mm.get("tap_times_mmss") or []
+    if taps and py - (y + 6) > 16:
+        tap_line = "<b>YOUR TAPS:</b> " + " · ".join(taps[:8])
+        if mm.get("taps_same_player"):
+            tap_line += "  —  INDEPENDENT AI CHECK: ALL TAPS SHOW THE SAME PLAYER"
+        py -= draw_par(c, tap_line, rx, py, rw, _style(F_BODY, 6.0, FOREST, leading=8.4)) + 4
+    if py - (y + 6) > 26:
+        draw_par(
+            c,
+            esc("What was measured: your player's position, frame by frame, in your own clip. "
+                "How: optical tracking seeded by your taps — pure mathematics, no AI guessing. "
+                "Why trust it: the fastest moment is only reported from an identity-verified second."),
+            rx, py, rw, _style(F_BODY, 6.0, MUTED, leading=8.6),
+        )
 
 
 def _pace_strip(c, pace, x, y, w, h):
@@ -1319,11 +1381,20 @@ def _pace_strip(c, pace, x, y, w, h):
     tw2 = c.stringWidth(top_txt, F_BLACK, 21)
     c.setFillColor(HexColor("#FFFFFF"))
     c.setFont(F_BOLD, 6.2)
-    c.drawString(x + PAD + tw2 + 8, y + h - 41, f"TOP SPEED (EST.) · AT {pace.get('top_speed_t', 0)}S")
+    c.drawString(x + PAD + tw2 + 8, y + h - 41, "TOP SPEED (EST.)")
+    try:
+        _ts = float(pace.get("top_speed_t") or 0)
+    except (TypeError, ValueError):
+        _ts = 0
+    _at = f"{int(_ts) // 60:02d}:{int(_ts) % 60:02d}"
+    _trust_txt = " · VERIFIED MOMENT" if pace.get("top_trust") else ""
+    c.setFillColor(HexColor("#DCE5D6"))
+    c.setFont(F_BOLD, 5.6)
+    c.drawString(x + PAD, y + h - 52, f"AT {_at} IN YOUR CLIP{_trust_txt}")
     chips = [
         (str(pace.get("sprint_count", 0)), f"SPRINTS >{pace.get('sprint_threshold_kmh', 0):g} KM/H"),
         (f"{pace.get('distance_tracked_m', 0)} m", "DISTANCE TRACKED"),
-        (f"{pace.get('avg_moving_kmh') or '—'}", "MOVING PACE KM/H"),
+        (f"{pace.get('avg_moving_kmh') or '—'}", "AVG SPEED (MOVING)"),
     ]
     cw2 = 92
     bx = x + w - PAD - len(chips) * (cw2 + 8) + 8
@@ -1339,10 +1410,11 @@ def _pace_strip(c, pace, x, y, w, h):
         bx += cw2 + 8
     c.setFillColor(HexColor("#8FA98F"))
     c.setFont(F_BODY, 5.8)
+    _extra = " · top speed only from an identity-verified moment." if pace.get("top_trust") else "."
     c.drawString(
         x + PAD, y + 7,
-        f"Scaled by age-typical body height (est. ±10-15%) · measured only in the "
-        f"{pace.get('tracked_seconds', 0)}s of secure tracking — never guessed.",
+        f"Estimated from optical tracking, scaled by age-typical body height (±10-15%) · measured only in the "
+        f"{pace.get('tracked_seconds', 0)}s of secure tracking — never guessed{_extra}",
     )
     c.restoreState()
 

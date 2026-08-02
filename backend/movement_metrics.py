@@ -5,16 +5,22 @@ from __future__ import annotations
 
 BURST_MIN_PTS = 3     # ≥3 consecutive fast samples (~0.24 s) = one burst
 MAX_TRAIL = 90
+NEAR_TAP_S = 2.0      # a moment ≤2 s from a user tap counts as identity-anchored
 
 
-def _fmt_mmss(t: float) -> str:
+def fmt_mmss(t: float) -> str:
     m, s = divmod(int(round(t)), 60)
     return f"{m:02d}:{s:02d}"
 
 
-def compute_movement_map(track: dict | None) -> dict | None:
-    """Return {tracked_seconds, segments, points, bursts, top_speed_t,
-    top_speed_idx, intensity, trail:[{t,x,y,tap}]} or None when too little data."""
+_fmt_mmss = fmt_mmss  # back-compat alias
+
+
+def compute_movement_map(track: dict | None, tap_times: list[float] | None = None) -> dict | None:
+    """Return {tracked_seconds, segments, passages, track_start_*, points, bursts,
+    top_speed_*, intensity, fast_candidates, fast_near_tap, trail} or None when
+    too little data. tap_times = absolute video seconds of the user's taps
+    (incl. time offset) — used for identity-safe fastest-moment candidates."""
     pts = (track or {}).get("points") or []
     segs = (track or {}).get("segments") or []
     if len(pts) < 6:
@@ -54,6 +60,15 @@ def compute_movement_map(track: dict | None) -> dict | None:
             run = 0
     if run >= BURST_MIN_PTS:
         bursts += 1
+    # Fastest-moment candidates (top-5 by speed) + best sample near a user tap.
+    ranked = sorted(sm, key=lambda s: s[1], reverse=True)
+    fast_candidates = [{"t": round(t, 2), "v": round(v, 4)} for t, v in ranked[:5]]
+    fast_near_tap = None
+    if tap_times:
+        near = [(t, v) for t, v in sm if any(abs(t - tt) <= NEAR_TAP_S for tt in tap_times)]
+        if near:
+            bt, bv = max(near, key=lambda s: s[1])
+            fast_near_tap = {"t": round(bt, 2), "v": round(bv, 4)}
     trail = centers
     if len(trail) > MAX_TRAIL:
         keep = {i for i, p in enumerate(trail) if p["tap"]}
@@ -62,13 +77,21 @@ def compute_movement_map(track: dict | None) -> dict | None:
         keep |= {min(len(trail) - 1, int(i * step)) for i in range(n_fill)}
         trail = [trail[i] for i in sorted(keep)]
     tracked = sum(b - a for a, b in segs)
+    track_start_s = segs[0][0] if segs else None
     return {
         "tracked_seconds": round(tracked, 1),
         "segments": len(segs),
+        "passages": [[fmt_mmss(a), fmt_mmss(b)] for a, b in segs[:6]],
+        "track_start_s": round(track_start_s, 1) if track_start_s is not None else None,
+        "track_start_t": fmt_mmss(track_start_s) if track_start_s is not None else None,
         "points": len(pts),
         "bursts": bursts,
-        "top_speed_t": _fmt_mmss(vmax_t),
+        "top_speed_t": fmt_mmss(vmax_t),
+        "top_video_s": round(vmax_t, 1),
         "top_speed_idx": min(100, round(vmax * 65)),
+        "top_after_start": round(vmax_t - track_start_s, 1) if track_start_s is not None else None,
         "intensity": min(100, round(median_v * 180)),
+        "fast_candidates": fast_candidates,
+        "fast_near_tap": fast_near_tap,
         "trail": trail,
     }

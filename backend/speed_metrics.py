@@ -50,8 +50,11 @@ def _rolling_median(vals: list[float], i: int, half: int = 4) -> float:
     return statistics.median(vals[lo:hi])
 
 
-def compute_speed_metrics(track: dict, age) -> dict | None:
-    """Returns pace estimates or None when the track is too thin to be honest."""
+def compute_speed_metrics(track: dict, age, trusted_windows: list[float] | None = None) -> dict | None:
+    """Returns pace estimates or None when the track is too thin to be honest.
+    trusted_windows — absolute video seconds of the user's taps. When given, the
+    headline top speed is the fastest smoothed moment within ±2 s of a tap
+    (identity-anchored) instead of the global percentile moment."""
     pts = (track or {}).get("points") or []
     segs = (track or {}).get("segments") or []
     tracked_s = round(sum(b - a for a, b in segs), 1)
@@ -87,6 +90,18 @@ def compute_speed_metrics(track: dict, age) -> dict | None:
     ordered = sorted(smooth)
     top_kmh = ordered[min(len(ordered) - 1, int(len(ordered) * 0.97))]
     top_t = samples[smooth.index(max(smooth))][0]
+    top_trust = None
+
+    # Identity-anchored headline: fastest smoothed moment within ±2 s of a tap.
+    if trusted_windows:
+        anchored = [
+            (sp, samples[i][0])
+            for i, sp in enumerate(smooth)
+            if any(abs(samples[i][0] - tt) <= 2.0 for tt in trusted_windows)
+        ]
+        if anchored:
+            top_kmh, top_t = max(anchored)
+            top_trust = "tap"
 
     thr = _sprint_threshold(age)
     sprints = 0
@@ -108,6 +123,7 @@ def compute_speed_metrics(track: dict, age) -> dict | None:
     return {
         "top_speed_kmh": round(top_kmh, 1),
         "top_speed_t": round(top_t, 1),
+        "top_trust": top_trust,
         "sprint_count": sprints,
         "sprint_threshold_kmh": thr,
         "distance_tracked_m": round(distance_m),
