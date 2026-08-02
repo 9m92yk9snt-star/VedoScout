@@ -2,13 +2,17 @@ import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import Navigation from "@/components/Navigation";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, ArrowRight } from "lucide-react";
+import {
+  AuthShell, AuthHeroImage, SmpLogo, AuthInput, GoogleButton, OrDivider,
+  BenefitsStrip, TrustedBadge, googleRedirect,
+} from "@/components/auth/AuthShell";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +21,6 @@ export default function Login() {
   const params = new URLSearchParams(location.search);
   const nextParam = params.get("next");
   const openPass = params.get("open_pass");
-  // Build the destination after login
   const resolvedNext = nextParam
     ? (openPass ? `${nextParam}${nextParam.includes("?") ? "&" : "?"}open_pass=${openPass}` : nextParam)
     : null;
@@ -45,83 +48,134 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-deepnavy text-ink">
-      <Navigation />
-      <div className="pt-32 pb-20 px-6">
-        <div className="max-w-md mx-auto">
-          <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Welcome back</span>
-          <h1 className="mt-3 font-barlow font-black uppercase text-5xl tracking-tighter leading-[0.95]">Log in</h1>
-          <p className="mt-3 text-ink/65 text-sm">Access your dashboard and player reports.</p>
+    <AuthShell>
+      <AuthHeroImage />
 
-          <form onSubmit={handleSubmit} className="mt-10 space-y-5" data-testid="login-form">
+      <div className="relative">
+        <SmpLogo />
+
+        {/* Headline */}
+        <div className="mt-8 md:mt-10 max-w-[62%] md:max-w-[58%]">
+          <h1 className="font-barlow font-black uppercase tracking-tight leading-[0.95] text-4xl sm:text-5xl text-[#161C12]" data-testid="login-headline">
+            WELCOME BACK
+            <span className="block text-[#63A61F] mt-1">CONTINUE YOUR FOOTBALL JOURNEY</span>
+          </h1>
+          <p className="mt-4 text-[15px] md:text-base leading-relaxed text-[#3D4435]">
+            Log in to access your <span className="text-[#63A61F] font-semibold">dashboard</span>,
+            track your <span className="text-[#63A61F] font-semibold">progress</span> and
+            view your <span className="text-[#63A61F] font-semibold">reports</span>.
+          </p>
+        </div>
+
+        {/* Card */}
+        <div className="relative mt-8 bg-white rounded-3xl shadow-[0_24px_70px_rgba(30,50,10,0.12)] p-6 md:p-8" data-testid="login-card">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-[#EDF4E2] flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-7 h-7 text-[#63A61F]" strokeWidth={2} />
+            </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Email</label>
-              <input
+              <div className="font-barlow font-black uppercase text-xl md:text-2xl tracking-tight text-[#161C12] leading-tight">
+                <span className="text-[#63A61F]">LOG IN</span> TO YOUR ACCOUNT
+              </div>
+              <div className="text-sm text-[#3D4435]">
+                Access your <span className="text-[#63A61F] font-semibold">reports</span>, <span className="text-[#63A61F] font-semibold">progress</span> and more.
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4" data-testid="login-form">
+            <div>
+              <label className="block text-[15px] font-semibold text-[#161C12] mb-2">Email</label>
+              <AuthInput
+                icon={Mail}
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                data-testid="login-email"
-                className="w-full bg-surface border border-gray-border px-4 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
-                placeholder="you@email.com"
+                placeholder="Enter your email"
+                autoComplete="email"
+                testId="login-email"
               />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Password</label>
-                <Link
-                  to="/forgot-password"
-                  data-testid="login-forgot-password"
-                  className="text-[10px] uppercase tracking-widest font-bold text-volt hover:text-ink transition-colors"
-                >
-                  Forgot?
-                </Link>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  data-testid="login-password"
-                  className="w-full bg-surface border border-gray-border pl-4 pr-11 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt transition-colors"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/50 hover:text-ink"
-                  tabIndex={-1}
-                  aria-label="Toggle password visibility"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+              <label className="block text-[15px] font-semibold text-[#161C12] mb-2">Password</label>
+              <AuthInput
+                icon={Lock}
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                testId="login-password"
+                rightSlot={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#9AA08F] hover:text-[#161C12]"
+                    tabIndex={-1}
+                    aria-label="Toggle password visibility"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                }
+              />
             </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  data-testid="login-remember-me"
+                  className="w-4.5 h-4.5 w-[18px] h-[18px] rounded border-[#C9C4B4] text-[#63A61F] accent-[#63A61F]"
+                />
+                <span className="text-[15px] text-[#161C12]">Remember me</span>
+              </label>
+              <Link
+                to="/forgot-password"
+                data-testid="login-forgot-password"
+                className="text-[15px] font-semibold text-[#63A61F] hover:text-[#446E12] transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             <button
               type="submit"
               disabled={submitting}
               data-testid="login-submit"
-              className="w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full flex items-center justify-center gap-3 rounded-xl bg-[#63A61F] hover:bg-[#558F17] text-white font-barlow font-black uppercase tracking-[0.08em] text-lg py-4 transition-colors disabled:opacity-60"
             >
-              {submitting ? "Signing in..." : "Log in"}
-              {!submitting && <ArrowRight className="w-4 h-4" />}
+              <LogIn className="w-5 h-5" strokeWidth={2.4} />
+              {submitting ? "Signing in..." : "LOG IN"}
             </button>
           </form>
 
-          <p className="mt-8 text-sm text-ink/55 text-center">
-            New here?{" "}
+          <OrDivider />
+          <GoogleButton onClick={() => googleRedirect("/dashboard")} testId="login-google-btn" />
+
+          <p className="mt-5 text-center text-[15px] text-[#3D4435]">
+            Don&apos;t have an account?{" "}
             <Link
               to={`/signup${location.search || ""}`}
               data-testid="login-to-signup"
-              className="text-volt hover:text-ink transition-colors uppercase tracking-widest font-semibold"
+              className="inline-flex items-center gap-1.5 font-semibold text-[#63A61F] hover:text-[#446E12] transition-colors"
             >
-              Create account
+              Create free account <ArrowRight className="w-4 h-4" />
             </Link>
           </p>
         </div>
+
+        {/* Benefits + trust */}
+        <div className="mt-8">
+          <BenefitsStrip />
+        </div>
+        <div className="mt-8">
+          <TrustedBadge />
+        </div>
       </div>
-    </div>
+    </AuthShell>
   );
 }

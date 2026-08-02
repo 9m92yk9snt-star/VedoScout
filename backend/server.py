@@ -2060,7 +2060,7 @@ def ensure_share_card(report_doc: dict) -> Optional[str]:
 
 class UserSignup(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=10, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=1, max_length=80)
     # Honeypot — bots fill hidden form fields, humans leave it empty. Blocks signup
     # if any value is submitted. Frontend renders this as a visually-hidden input.
@@ -2078,7 +2078,7 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str = Field(min_length=16, max_length=128)
-    new_password: str = Field(min_length=10, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class UserPublic(BaseModel):
@@ -2213,7 +2213,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ── SECURITY HELPERS (added Feb 2026) ──────────────────────────────────
 
-_PASSWORD_MIN_LENGTH = 10
+_PASSWORD_MIN_LENGTH = 8
 _LOGIN_MAX_ATTEMPTS = 5           # per (ip, email) combo
 _LOGIN_LOCKOUT_MINUTES = 15
 _SIGNUP_MAX_PER_IP_PER_HOUR = 5
@@ -2232,10 +2232,8 @@ def validate_password_strength(pw: str) -> None:
     if len(pw) > 128:
         raise HTTPException(status_code=400, detail="Password is too long (max 128 characters).")
     checks = [
-        (any(c.islower() for c in pw), "a lowercase letter"),
         (any(c.isupper() for c in pw), "an uppercase letter"),
         (any(c.isdigit() for c in pw), "a digit"),
-        (any(not c.isalnum() for c in pw), "a symbol (e.g. ! ? # $ %)"),
     ]
     missing = [label for ok, label in checks if not ok]
     if missing:
@@ -2342,6 +2340,19 @@ async def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depen
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+async def get_current_user_optional(creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)):
+    """Guest-friendly variant — returns None instead of raising 401. Used by the
+    pre-signup upload endpoints (chunked upload / URL fetch) so visitors can
+    start uploading BEFORE creating an account."""
+    if creds is None:
+        return None
+    try:
+        payload = pyjwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALG])
+    except pyjwt.PyJWTError:
+        return None
+    return await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
 
 
 async def get_current_admin(user=Depends(get_current_user)):
@@ -3758,6 +3769,9 @@ async def login(payload: UserLogin, request: Request):
     email = payload.email.lower()
     await _login_lockout_check(ip, email)
     user = await db.users.find_one({"email": email})
+    if user and not user.get("password_hash"):
+        # Google-created account — no password exists to verify.
+        raise HTTPException(status_code=401, detail="This account uses Google sign-in. Tap 'Continue with Google' instead.")
     if not user or not verify_password(payload.password, user["password_hash"]):
         await _login_attempt_record_failure(ip, email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -3772,6 +3786,80 @@ async def login(payload: UserLogin, request: Request):
             full_name=user["full_name"],
             role=user["role"],
             created_at=user["created_at"],
+            is_paid_scout=is_paid_scout,
+            subscription_tier=_has_active_subscription(user),
+        ),
+    )
+
+
+class GoogleSessionPayload(BaseModel):
+    session_id: str
+
+
+@api_router.post("/auth/google/session", response_model=TokenResponse)
+async def google_session_exchange(payload: GoogleSessionPayload, background_tasks: BackgroundTasks):
+    """Emergent-managed Google OAuth bridge. The frontend lands back with
+    #session_id=... in the URL fragment; we exchange it SERVER-SIDE for the
+    user's Google profile, find-or-create the matching account by email, and
+    issue the SAME JWT the email/password flow uses — every downstream endpoint
+    works unchanged.
+    REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    """
+    sid = (payload.session_id or "").strip()
+    if not sid:
+        raise HTTPException(status_code=400, detail="Missing session_id")
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
+                headers={"X-Session-ID": sid},
+            )
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not reach the Google sign-in service. Please try again.")
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Google sign-in session is invalid or expired. Please try again.")
+    data = resp.json()
+    email = (data.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(status_code=401, detail="Google did not return an email address.")
+    name = (data.get("name") or "").strip() or email.split("@")[0].replace(".", " ").title()
+    picture = data.get("picture")
+
+    user = await db.users.find_one({"email": email})
+    if not user:
+        user_id = str(uuid.uuid4())
+        user = {
+            "id": user_id,
+            "email": email,
+            "password_hash": None,
+            "full_name": name,
+            "role": "user",
+            "auth_provider": "google",
+            "picture": picture,
+            "created_at": now_iso(),
+        }
+        await db.users.insert_one(dict(user))
+        try:
+            html, text, subject = render_welcome_email(name)
+            background_tasks.add_task(send_email, email, subject, html, text)
+        except Exception as exc:
+            logger.warning("Could not queue welcome email for %s: %s", email, exc)
+    else:
+        upd = {"google_linked": True}
+        if picture and not user.get("picture"):
+            upd["picture"] = picture
+        await db.users.update_one({"id": user["id"]}, {"$set": upd})
+
+    token = create_token(user["id"], user["email"], user.get("role", "user"))
+    is_paid_scout = (user.get("scout_access") or {}).get("status") == "active"
+    return TokenResponse(
+        access_token=token,
+        user=UserPublic(
+            id=user["id"],
+            email=user["email"],
+            full_name=user.get("full_name") or name,
+            role=user.get("role", "user"),
+            created_at=user.get("created_at") or now_iso(),
             is_paid_scout=is_paid_scout,
             subscription_tier=_has_active_subscription(user),
         ),
@@ -12415,11 +12503,11 @@ api_router.include_router(build_blog_router(
 api_router.include_router(build_seo_router(db=db))
 api_router.include_router(build_url_fetch_router(
     upload_dir=UPLOAD_DIR,
-    get_current_user=get_current_user,
+    get_current_user=get_current_user_optional,
 ))
 api_router.include_router(build_chunked_upload_router(
     upload_dir=UPLOAD_DIR,
-    get_current_user=get_current_user,
+    get_current_user=get_current_user_optional,
     db=db,
 ))
 from tax_helper import build_tax_router
@@ -13170,4 +13258,3 @@ async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
 # Register the API router LAST so it includes every @api_router route defined above
 # (including scout-access + players-database endpoints in Fase 2).
 app.include_router(api_router)
-

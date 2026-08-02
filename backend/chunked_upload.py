@@ -140,6 +140,7 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
         total_size: int = Form(...),
         user=Depends(get_current_user),
     ):
+        uid = (user or {}).get("id") or "guest"
         if total_size <= 0:
             raise HTTPException(400, "Invalid total_size.")
         if total_size > MAX_TOTAL_BYTES:
@@ -156,7 +157,7 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
             await _sweep_stale_mongo()
             await db[SESSION_COLL].insert_one({
                 "_id": upload_id,
-                "user_id": user["id"],
+                "user_id": uid,
                 "ext": ext,
                 "total_size": int(total_size),
                 "created_at": time.time(),
@@ -167,7 +168,7 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
             d = chunks_root / upload_id
             d.mkdir(parents=True, exist_ok=True)
             (d / "meta.json").write_text(json.dumps({
-                "user_id": user["id"],
+                "user_id": uid,
                 "ext": ext,
                 "total_size": int(total_size),
                 "created_at": time.time(),
@@ -181,11 +182,12 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
         chunk: UploadFile = File(...),
         user=Depends(get_current_user),
     ):
+        uid = (user or {}).get("id") or "guest"
         if index < 0 or index >= MAX_CHUNKS:
             raise HTTPException(400, "Invalid chunk index.")
         if _r2_mode():
             upload_id = _clean_id(upload_id)
-            await _get_session(upload_id, user["id"])
+            await _get_session(upload_id, uid)
             buf = bytearray()
             while True:
                 data = await chunk.read(1024 * 1024)
@@ -209,7 +211,7 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
             )
             return {"ok": True, "index": index, "bytes": size}
         # local fallback
-        d, _ = _session_dir(upload_id, user["id"])
+        d, _ = _session_dir(upload_id, uid)
         part = d / f"part_{index:05d}"
         size = 0
         try:
@@ -234,11 +236,12 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
         total_chunks: int = Form(...),
         user=Depends(get_current_user),
     ):
+        uid = (user or {}).get("id") or "guest"
         if total_chunks <= 0 or total_chunks > MAX_CHUNKS:
             raise HTTPException(400, "Invalid chunk count.")
         if _r2_mode():
             upload_id = _clean_id(upload_id)
-            doc = await _get_session(upload_id, user["id"])
+            doc = await _get_session(upload_id, uid)
             parts = doc.get("parts") or {}
             missing = [i for i in range(int(total_chunks)) if str(i) not in parts]
             if missing:
@@ -266,7 +269,7 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
             await _delete_session(doc)
             return {"token": token, "size_mb": round(total / (1024 * 1024), 2), "stored_filename": final.name}
         # local fallback
-        d, meta = _session_dir(upload_id, user["id"])
+        d, meta = _session_dir(upload_id, uid)
         parts = [d / f"part_{i:05d}" for i in range(int(total_chunks))]
         missing = [i for i, p in enumerate(parts) if not p.exists()]
         if missing:
@@ -289,12 +292,13 @@ def build_chunked_upload_router(*, upload_dir: Path, get_current_user, db=None) 
         upload_id: str = Form(...),
         user=Depends(get_current_user),
     ):
+        uid = (user or {}).get("id") or "guest"
         if _r2_mode():
             upload_id = _clean_id(upload_id)
-            doc = await _get_session(upload_id, user["id"])
+            doc = await _get_session(upload_id, uid)
             await _delete_session(doc)
             return {"ok": True}
-        d, _ = _session_dir(upload_id, user["id"])
+        d, _ = _session_dir(upload_id, uid)
         shutil.rmtree(d, ignore_errors=True)
         return {"ok": True}
 

@@ -57,6 +57,9 @@ export function AuthProvider({ children }) {
   }, [persist]);
 
   useEffect(() => {
+    // Returning from Google OAuth — AuthCallback exchanges the session_id and
+    // establishes auth itself; skip the /me check to avoid a premature 401.
+    if (window.location.hash && window.location.hash.includes("session_id=")) return;
     // verify token on mount
     if (user && localStorage.getItem("elite_token")) {
       api.get("/auth/me")

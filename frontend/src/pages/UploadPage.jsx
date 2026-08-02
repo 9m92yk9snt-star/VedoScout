@@ -8,6 +8,7 @@ import PaymentBadges from "@/components/PaymentBadges";
 import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import { startBackgroundAnalysis } from "@/components/BackgroundAnalysisTracker";
 import MarkerStudio from "@/components/MarkerStudio";
+import AccountGateModal from "@/components/auth/AccountGateModal";
 import HeroTeaser from "@/components/HeroTeaser";
 import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
@@ -75,6 +76,11 @@ export default function UploadPage() {
   // The report id from the upload response — lets the Go-to-Dashboard handler
   // hand off to the background tracker immediately (no poll-tick dependency).
   const reportIdRef = useRef(null);
+
+  // ── Guest-first flow (Session 144) — upload first, account right before analysis ──
+  const [gateOpen, setGateOpen] = useState(false);
+  const [bgUpload, setBgUpload] = useState({ status: "idle", pct: 0, token: null });
+  const bgUploadRef = useRef(null);
 
   const fileRef = useRef(null);
   const videoRef = useRef(null);
@@ -244,6 +250,7 @@ export default function UploadPage() {
     setMarkerBox(null);
     setStudioOpen(false);
     setTempVideoToken(null); // clear any prior URL-fetch
+    startBgUpload(f); // Session 144 — upload starts NOW, hidden behind marking + details
   };
 
   // Fetch a video from a public URL (YouTube / Vimeo / Veo / direct MP4)
@@ -335,7 +342,7 @@ export default function UploadPage() {
   const CHUNK_SIZE = 24 * 1024 * 1024;
   const DIRECT_LIMIT = 80 * 1024 * 1024; // ≤80 MB still goes as one request
 
-  const chunkedUpload = async (f) => {
+  const chunkedUpload = async (f, onPct = (p) => setUploadPct(p)) => {
     const initFd = new FormData();
     initFd.append("filename", f.name || "video.mp4");
     initFd.append("total_size", String(f.size));
@@ -352,7 +359,7 @@ export default function UploadPage() {
         timeout: 300000,
         onUploadProgress: (ev) => {
           const done = sent + (ev.loaded || 0);
-          setUploadPct(Math.min(99, Math.round((done * 100) / f.size)));
+          onPct(Math.min(99, Math.round((done * 100) / f.size)));
         },
       });
       sent += blob.size;
@@ -363,6 +370,33 @@ export default function UploadPage() {
     const { data: fin } = await api.post("/me/chunked-upload/complete", doneFd, { timeout: 300000 });
     return fin.token;
   };
+
+  // ── Background upload — starts the moment a file is picked so the transfer
+  // is hidden behind marking + details (guests AND logged-in users) ──
+  const startBgUpload = (f) => {
+    const gen = {};
+    bgUploadRef.current = gen;
+    setBgUpload({ status: "uploading", pct: 0, token: null });
+    gen.promise = (async () => {
+      try {
+        const token = await chunkedUpload(f, (pct) => {
+          if (bgUploadRef.current === gen) setBgUpload((s) => ({ ...s, pct }));
+        });
+        if (bgUploadRef.current === gen) setBgUpload({ status: "done", pct: 100, token });
+        return token;
+      } catch (err) {
+        if (bgUploadRef.current === gen) setBgUpload({ status: "failed", pct: 0, token: null });
+        return null;
+      }
+    })();
+  };
+
+  // While the analysis overlay waits on the background upload, mirror its progress.
+  useEffect(() => {
+    if (submitting && uploadPhase === "uploading" && bgUpload.status === "uploading") {
+      setUploadPct(bgUpload.pct);
+    }
+  }, [bgUpload, submitting, uploadPhase]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -378,18 +412,60 @@ export default function UploadPage() {
       toast.error("Please fill out all required fields");
       return;
     }
+    if (!user) {
+      // Guest — the video is already uploading/uploaded in the background.
+      // Creating the account is the LAST step; analysis starts right after.
+      setGateOpen(true);
+      return;
+    }
+    await doSubmit();
+  };
+
+  const doSubmit = async (o = {}) => {
+    const _file = o.file || file;
+    const _markerBlob = o.markerBlob || markerBlob;
+    const _tempToken = o.tempVideoToken || tempVideoToken;
+    const _markerTimestamp = o.markerTimestamp !== undefined ? o.markerTimestamp : markerTimestamp;
+    const _markerBox = o.markerBox !== undefined ? o.markerBox : markerBox;
+    const _markerAnchors = o.markerAnchors !== undefined ? o.markerAnchors : markerAnchors;
+    const _form = o.form || form;
 
     setSubmitting(true);
     const fd = new FormData();
-    if (file?._fromUrl && tempVideoToken) {
-      fd.append("temp_video_token", tempVideoToken);
-    } else if (file.size > DIRECT_LIMIT) {
+    if (_file?._fromUrl && _tempToken) {
+      fd.append("temp_video_token", _tempToken);
+    } else if (bgUpload.status === "done" && bgUpload.token) {
+      // Background upload already finished — submit only the token.
+      fd.append("temp_video_token", bgUpload.token);
+    } else if (bgUpload.status === "uploading" && bgUploadRef.current?.promise) {
+      // Background upload still in flight — wait for it (progress mirrors into the overlay).
+      setUploadPhase("uploading");
+      const token = await bgUploadRef.current.promise;
+      if (token) {
+        fd.append("temp_video_token", token);
+      } else if (_file.size > DIRECT_LIMIT) {
+        setUploadPct(0);
+        let chunkToken = null;
+        try {
+          chunkToken = await chunkedUpload(_file);
+        } catch (err) {
+          const msg = err?.response?.data?.detail || "Upload failed while sending the video. Please check your connection and try again.";
+          toast.error(typeof msg === "string" ? msg : "Upload failed. Please try again.");
+          setSubmitting(false);
+          setUploadPhase("idle");
+          return;
+        }
+        fd.append("temp_video_token", chunkToken);
+      } else {
+        fd.append("file", _file);
+      }
+    } else if (_file.size > DIRECT_LIMIT) {
       // Large file → chunked upload first, then submit only the token.
       setUploadPhase("uploading");
       setUploadPct(0);
       let chunkToken = null;
       try {
-        chunkToken = await chunkedUpload(file);
+        chunkToken = await chunkedUpload(_file);
       } catch (err) {
         const msg = err?.response?.data?.detail || "Upload failed while sending the video. Please check your connection and try again.";
         toast.error(typeof msg === "string" ? msg : "Upload failed. Please try again.");
@@ -399,26 +475,26 @@ export default function UploadPage() {
       }
       fd.append("temp_video_token", chunkToken);
     } else {
-      fd.append("file", file);
+      fd.append("file", _file);
     }
-    fd.append("marker_image", markerBlob, "marker.jpg");
-    fd.append("marker_timestamp", String(markerTimestamp || 0));
-    if (markerBox) {
+    fd.append("marker_image", _markerBlob, "marker.jpg");
+    fd.append("marker_timestamp", String(_markerTimestamp || 0));
+    if (_markerBox) {
       fd.append(
         "marker_box",
         JSON.stringify({
-          x: Number(markerBox.x.toFixed(4)),
-          y: Number(markerBox.y.toFixed(4)),
-          w: Number(markerBox.w.toFixed(4)),
-          h: Number(markerBox.h.toFixed(4)),
+          x: Number(_markerBox.x.toFixed(4)),
+          y: Number(_markerBox.y.toFixed(4)),
+          w: Number(_markerBox.w.toFixed(4)),
+          h: Number(_markerBox.h.toFixed(4)),
         }),
       );
     }
-    if (markerAnchors && markerAnchors.length) {
+    if (_markerAnchors && _markerAnchors.length) {
       fd.append(
         "marker_anchors",
         JSON.stringify(
-          markerAnchors.map((a) => ({
+          _markerAnchors.map((a) => ({
             t: Number((a.t || 0).toFixed(2)),
             box: {
               x: Number(a.box.x.toFixed(4)),
@@ -431,7 +507,7 @@ export default function UploadPage() {
         ),
       );
     }
-    Object.entries(form).forEach(([k, v]) => {
+    Object.entries(_form).forEach(([k, v]) => {
       if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v));
     });
 
@@ -559,6 +635,95 @@ export default function UploadPage() {
     }
   };
 
+  /* ── Google sign-in from the account gate — persists the finished upload +
+     markers + form to sessionStorage, then round-trips through Emergent auth.
+     The resume effect below picks everything up and auto-submits. ── */
+  const blobToDataUrl = (blob) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+
+  const handleGateGoogle = async () => {
+    const token = file?._fromUrl ? tempVideoToken : bgUpload.token;
+    if (!token) return; // button is disabled until the upload finishes
+    let markerDataUrl = null;
+    try {
+      if (markerBlob) markerDataUrl = await blobToDataUrl(markerBlob);
+    } catch (_) { /* ignore */ }
+    const state = {
+      token,
+      fileName: file?.name,
+      fileSize: file?.size || 0,
+      markerTimestamp,
+      markerBox,
+      markerAnchors,
+      markerDataUrl,
+      form,
+    };
+    try {
+      sessionStorage.setItem("smp_resume_upload", JSON.stringify(state));
+    } catch (_) {
+      // Quota — retry without the anchor thumbnails (backend re-derives crops).
+      try {
+        sessionStorage.setItem("smp_resume_upload", JSON.stringify({
+          ...state,
+          markerAnchors: (markerAnchors || []).map((a) => ({ ...a, thumb: undefined })),
+        }));
+      } catch (_e) {
+        toast.error("Could not save your progress for Google sign-in — use email signup instead.");
+        return;
+      }
+    }
+    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    const redirectUrl = window.location.origin + "/upload";
+    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  /* ── Resume after the Google OAuth round-trip — restore the persisted upload
+     state and start the analysis immediately. ── */
+  useEffect(() => {
+    if (!user) return;
+    const raw = sessionStorage.getItem("smp_resume_upload");
+    if (!raw) return;
+    sessionStorage.removeItem("smp_resume_upload");
+    (async () => {
+      try {
+        const st = JSON.parse(raw);
+        if (!st?.token) return;
+        const stub = { name: st.fileName || "video.mp4", size: st.fileSize || 0, _fromUrl: true };
+        setFile(stub);
+        setTempVideoToken(st.token);
+        setMarkerTimestamp(st.markerTimestamp || 0);
+        setMarkerBox(st.markerBox || null);
+        setMarkerAnchors(st.markerAnchors || null);
+        if (st.form) setForm((prev) => ({ ...prev, ...st.form }));
+        let blob = null;
+        if (st.markerDataUrl) {
+          blob = await (await fetch(st.markerDataUrl)).blob();
+          setMarkerBlob(blob);
+          setMarkerPreviewUrl(URL.createObjectURL(blob));
+        }
+        if (!blob) {
+          toast.info("Welcome back! Please re-mark your player, then start the analysis.");
+          return;
+        }
+        toast.success("Welcome! Your video is ready — starting the analysis now.");
+        doSubmit({
+          file: stub,
+          markerBlob: blob,
+          tempVideoToken: st.token,
+          markerTimestamp: st.markerTimestamp || 0,
+          markerBox: st.markerBox || null,
+          markerAnchors: st.markerAnchors || null,
+          form: st.form || form,
+        });
+      } catch (_) { /* corrupted resume state — user can submit manually */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-deepnavy text-ink">
       <Navigation />
@@ -659,6 +824,19 @@ export default function UploadPage() {
         }
         onConfirm={handleStudioConfirm}
         onCancel={() => setStudioOpen(false)}
+      />
+      {/* Session 144 — guest account gate: shown at "Start analysis" when not logged in */}
+      <AccountGateModal
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        uploadReady={(file?._fromUrl && !!tempVideoToken) || bgUpload.status === "done"}
+        uploadPct={bgUpload.pct}
+        onAuthed={async () => {
+          setGateOpen(false);
+          try { await refreshEligibility(); } catch (_) { /* ignore */ }
+          doSubmit();
+        }}
+        onGoogleRedirect={handleGateGoogle}
       />
 
       <div className="pt-28 pb-16 px-6">

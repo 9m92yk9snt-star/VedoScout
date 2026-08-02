@@ -26,6 +26,7 @@ import BlogArticlePage from "@/pages/BlogArticlePage";
 import TrajectoryPage from "@/pages/TrajectoryPage";
 import ScoutsLandingPage from "@/pages/ScoutsLandingPage";
 import PlayersDatabasePage from "@/pages/PlayersDatabasePage";
+import AuthCallback from "@/components/auth/AuthCallback";
 import CookieBanner from "@/components/CookieBanner";
 import MobileBottomTabs from "@/components/MobileBottomTabs";
 import { initPixels, trackPageView } from "@/lib/pixels";
@@ -76,6 +77,11 @@ function AnimatedRoutes() {
   const location = useLocation();
   useEffect(() => { initPixels(); }, []);
   useEffect(() => { trackPageView(); }, [location.pathname]);
+  // Emergent Google OAuth callback — must run BEFORE any protected route.
+  // Synchronous render-time check on useLocation().hash (per playbook).
+  if (location.hash && location.hash.includes("session_id=")) {
+    return <AuthCallback />;
+  }
   return (
     <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>
@@ -85,7 +91,8 @@ function AnimatedRoutes() {
         <Route path="/register" element={<Navigate to="/signup" replace />} />
         <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
-        <Route path="/upload" element={<PageTransition><RequireAuth><UploadPage /></RequireAuth></PageTransition>} />
+        {/* /upload is PUBLIC — guests upload first, create an account right before analysis */}
+        <Route path="/upload" element={<PageTransition><UploadPage /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><RequireAuth><DashboardPage /></RequireAuth></PageTransition>} />
         <Route path="/trajectory/:id" element={<PageTransition><RequireAuth><TrajectoryPage /></RequireAuth></PageTransition>} />
         <Route path="/report/:id" element={<PageTransition><RequireAuth><ReportPage /></RequireAuth></PageTransition>} />
