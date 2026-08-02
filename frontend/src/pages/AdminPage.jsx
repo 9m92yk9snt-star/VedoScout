@@ -41,6 +41,7 @@ const SEGMENT_META = {
   all:     { label: "All users",  color: "text-ink" },
   free:    { label: "Free",       color: "text-ink/70" },
   premium: { label: "Premium",    color: "text-volt" },
+  granted: { label: "Granted",    color: "text-amber-400" },
   scout:   { label: "Scouts",     color: "text-blue-400" },
   admin:   { label: "Admins",     color: "text-pink-400" },
 };
@@ -115,9 +116,11 @@ export default function AdminPage() {
   const [savingLanding, setSavingLanding] = useState(false);
 
   // Users tab — segment filter + scout creation modal
-  const [userSegment, setUserSegment] = useState("all");   // all | free | premium | scout | admin
+  const [userSegment, setUserSegment] = useState("all");   // all | free | premium | granted | scout | admin
   const [showCreateScout, setShowCreateScout] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState(null);
+  // Reports tab — failed/empty uploads are hidden by default (list hygiene)
+  const [showFailedReports, setShowFailedReports] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -293,6 +296,7 @@ export default function AdminPage() {
   };
 
   const handleUnlock = async (id) => {
+    if (!window.confirm("This grants FREE premium access to this report — no payment will ever be collected, and the user will appear as GRANTED. Are you sure?")) return;
     try {
       await api.post(`/admin/reports/${id}/unlock`);
       toast.success("Report manually unlocked");
@@ -308,6 +312,17 @@ export default function AdminPage() {
       await api.delete(`/admin/reports/${id}`);
       toast.success("Report deleted");
       load();
+    } catch (err) {
+      toast.error("Delete failed");
+    }
+  };
+
+  const handleDeletePayment = async (id) => {
+    if (!window.confirm("Delete this payment row from the list? (Does not affect unlocks or credits.)")) return;
+    try {
+      await api.delete(`/admin/payments/${id}`);
+      toast.success("Payment row deleted");
+      setPayments((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
       toast.error("Delete failed");
     }
@@ -443,7 +458,28 @@ export default function AdminPage() {
 
               {activeTab === "email" && <EmailAdmin />}
 
-              {activeTab === "reports" && (
+              {activeTab === "reports" && (() => {
+                const isFailedOrEmpty = (r) =>
+                  r.analysis_status === "failed" || (!r.preview && r.analysis_status !== "analyzing");
+                const okReports = reports.filter((r) => !isFailedOrEmpty(r));
+                const failedReports = reports.filter(isFailedOrEmpty);
+                const visible = showFailedReports ? failedReports : okReports;
+                return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs uppercase tracking-widest font-bold text-white/60">
+                      {showFailedReports ? `Failed / empty uploads (${failedReports.length})` : `Analyses (${okReports.length})`}
+                    </span>
+                    {failedReports.length > 0 && (
+                      <button
+                        onClick={() => setShowFailedReports((v) => !v)}
+                        data-testid="admin-toggle-failed-reports"
+                        className="px-4 py-2 uppercase tracking-widest text-[10px] font-bold border border-gray-border text-white/65 hover:text-white hover:border-ink/12 transition-colors"
+                      >
+                        {showFailedReports ? "← Back to analyses" : `Show failed / empty (${failedReports.length})`}
+                      </button>
+                    )}
+                  </div>
                 <div className="border border-gray-border overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-volt text-white uppercase text-xs tracking-widest font-bold">
@@ -456,7 +492,7 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {reports.map((r) => (
+                      {visible.map((r) => (
                         <tr key={r.id} data-testid={`admin-report-row-${r.id}`} className="bg-surface border-t border-gray-border">
                           <td className="p-3">
                             <div className="font-bold text-ink">{r.player_details?.player_name}</div>
@@ -465,7 +501,9 @@ export default function AdminPage() {
                           <td className="p-3 text-ink/70 text-xs">{r.user_email}</td>
                           <td className="p-3 text-ink/65 text-xs">{new Date(r.created_at).toLocaleString()}</td>
                           <td className="p-3">
-                            {r.is_paid || r.manually_unlocked ? (
+                            {isFailedOrEmpty(r) ? (
+                              <span className="text-red-400 uppercase text-xs font-bold tracking-widest">Failed</span>
+                            ) : r.is_paid || r.manually_unlocked ? (
                               <span className="text-volt uppercase text-xs font-bold tracking-widest">Premium</span>
                             ) : (
                               <span className="text-ink/55 uppercase text-xs font-bold tracking-widest">Preview</span>
@@ -503,20 +541,22 @@ export default function AdminPage() {
                           </td>
                         </tr>
                       ))}
-                      {reports.length === 0 && (
-                        <tr><td colSpan="5" className="p-8 text-center text-ink/50 bg-surface">No reports yet</td></tr>
+                      {visible.length === 0 && (
+                        <tr><td colSpan="5" className="p-8 text-center text-ink/50 bg-surface">{showFailedReports ? "No failed uploads" : "No reports yet"}</td></tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-              )}
+                </div>
+                );
+              })()}
 
               {activeTab === "users" && (
                 <div className="space-y-4">
                   {/* Filter pills + Add Scout button */}
                   <div className="flex flex-wrap items-center gap-3 justify-between">
                     <div className="flex flex-wrap gap-2" data-testid="admin-users-filter">
-                      {["all", "free", "premium", "scout", "admin"].map((seg) => {
+                      {["all", "free", "premium", "granted", "scout", "admin"].map((seg) => {
                         const count = seg === "all" ? users.length : users.filter((u) => u.segment === seg).length;
                         const active = userSegment === seg;
                         const m = SEGMENT_META[seg];
@@ -565,6 +605,7 @@ export default function AdminPage() {
                             const isSelf = u.id === currentUser?.id;
                             const canDelete = u.role !== "admin" && !isSelf;
                             const segIcon = u.segment === "premium" ? <Crown className="w-3 h-3" /> :
+                                            u.segment === "granted" ? <Unlock className="w-3 h-3" /> :
                                             u.segment === "scout"   ? <UserCheck className="w-3 h-3" /> :
                                             u.segment === "admin"   ? <ShieldCheck className="w-3 h-3" /> :
                                                                        null;
@@ -712,6 +753,7 @@ export default function AdminPage() {
                         <th className="p-3 text-left">Amount</th>
                         <th className="p-3 text-left">Status</th>
                         <th className="p-3 text-left">Session</th>
+                        <th className="p-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -726,10 +768,20 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="p-3 text-ink/50 text-[10px] font-mono break-all">{p.session_id}</td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => handleDeletePayment(p.id)}
+                              data-testid={`admin-delete-payment-${p.id}`}
+                              title="Delete payment row"
+                              className="text-red-400 hover:bg-red-400 hover:text-ink p-2 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                       {payments.length === 0 && (
-                        <tr><td colSpan="5" className="p-8 text-center text-ink/50 bg-surface">No payments yet</td></tr>
+                        <tr><td colSpan="6" className="p-8 text-center text-ink/50 bg-surface">No payments yet</td></tr>
                       )}
                     </tbody>
                   </table>

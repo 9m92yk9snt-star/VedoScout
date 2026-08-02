@@ -5996,6 +5996,35 @@ async def analyze_preview_task(report_id: str):
             }},
         )
 
+        # A watchdog/timeout may have REFUNDED the credit while this task was
+        # still running (slow prod CPU / restart race). The analysis DID succeed,
+        # so re-consume it here — one free preview = max ONE successful analysis.
+        try:
+            _fresh = await db.reports.find_one(
+                {"id": report_id},
+                {"_id": 0, "eligibility_refunded": 1, "eligibility_consumed": 1, "user_id": 1},
+            )
+            if _fresh and _fresh.get("eligibility_refunded"):
+                _uid = _fresh.get("user_id")
+                _consumed = _fresh.get("eligibility_consumed")
+                if _uid and _consumed == "free_preview":
+                    await db.users.update_one({"id": _uid}, {"$set": {"free_preview_used": True}})
+                elif _uid and _consumed == "prepaid":
+                    await db.users.update_one(
+                        {"id": _uid, "prepaid_uploads": {"$gt": 0}},
+                        {"$inc": {"prepaid_uploads": -1}},
+                    )
+                elif _uid and _consumed == "pass_credit":
+                    await consume_pass_credit(db, _uid)
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$unset": {"eligibility_refunded": ""},
+                     "$set": {"analysis_error": None}},
+                )
+                logger.warning(f"[eligibility] {report_id}: re-consumed refunded credit after late success (bucket={_consumed})")
+        except Exception as e:
+            logger.warning(f"[eligibility] re-burn check failed for {report_id}: {e}")
+
         # If the upload was prepaid / pass-credit, kick off the full premium report too.
         doc = await db.reports.find_one({"id": report_id})
         # Stage 5 — refresh the per-player identity memory profile.
@@ -6074,7 +6103,15 @@ async def _upsert_player_profile(report_id: str):
 async def _refund_upload_eligibility(report_id: str):
     """Give back the credit consumed at upload time when the background analysis fails.
     Looks at the report doc's `eligibility_consumed` field (set by the upload endpoint)
-    to decide which bucket to credit back."""
+    to decide which bucket to credit back.
+    IDEMPOTENT: a report can only ever be refunded ONCE (atomic guard flag) —
+    timeout + watchdog + task-failure paths may all call this for the same report."""
+    guard = await db.reports.update_one(
+        {"id": report_id, "eligibility_refunded": {"$ne": True}},
+        {"$set": {"eligibility_refunded": True, "eligibility_refunded_at": now_iso()}},
+    )
+    if guard.modified_count == 0:
+        return
     doc = await db.reports.find_one({"id": report_id})
     if not doc:
         return
@@ -11582,17 +11619,23 @@ async def admin_users(_=Depends(get_current_admin)):
     - free      : role == user AND none of the above
     """
     docs = await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", -1).to_list(500)
-    # Bounded scans (1,000 most recent reports) so /admin/users stays responsive
-    # as the production reports collection grows past ~50k docs. The data shown
-    # in admin UI is dominated by recent activity anyway; older bulk-paid users
-    # are still surfaced via their `prepaid_uploads` counter on the user doc.
+    # Bounded scans so /admin/users stays responsive as production grows.
+    # PREMIUM = a REAL Stripe payment exists (payment_transactions paid).
+    # GRANTED = access without money: manual unlock / grant-access credits / admin-set subscription.
     paid_emails = set()
+    async for t in db.payment_transactions.find(
+        {"payment_status": "paid"},
+        {"_id": 0, "user_email": 1},
+    ).sort("created_at", -1).limit(2000):
+        if t.get("user_email"):
+            paid_emails.add(t["user_email"].lower())
+    granted_emails = set()
     async for r in db.reports.find(
         {"$or": [{"is_paid": True}, {"manually_unlocked": True}]},
         {"_id": 0, "user_email": 1},
     ).sort("created_at", -1).limit(1000):
         if r.get("user_email"):
-            paid_emails.add(r["user_email"].lower())
+            granted_emails.add(r["user_email"].lower())
     # paid-report counts per user_id for richer display
     report_counts: Dict[str, int] = {}
     async for r in db.reports.find({}, {"_id": 0, "user_id": 1}).sort("created_at", -1).limit(1000):
@@ -11605,8 +11648,14 @@ async def admin_users(_=Depends(get_current_admin)):
             seg = "admin"
         elif role == "scout":
             seg = "scout"
-        elif int(u.get("prepaid_uploads", 0) or 0) > 0 or (u.get("email", "").lower() in paid_emails):
+        elif u.get("email", "").lower() in paid_emails:
             seg = "premium"
+        elif (
+            int(u.get("prepaid_uploads", 0) or 0) > 0
+            or (u.get("email", "").lower() in granted_emails)
+            or bool(_has_active_subscription(u))
+        ):
+            seg = "granted"
         else:
             seg = "free"
         u["segment"] = seg
@@ -11991,6 +12040,17 @@ async def _grant_access_impl(email: str, password: str, full_name: str, access_t
 async def admin_payments(_=Depends(get_current_admin)):
     docs = await db.payment_transactions.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return docs
+
+
+@api_router.delete("/admin/payments/{txn_id}")
+async def admin_delete_payment(txn_id: str, _=Depends(get_current_admin)):
+    """Remove a payment-transaction row (test/stale entries). List hygiene only —
+    never touches report unlock state or user credits."""
+    res = await db.payment_transactions.delete_one({"id": txn_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return {"status": "deleted"}
+
 
 
 @api_router.put("/admin/price")
