@@ -57,7 +57,7 @@ export default function Login() {
         {/* Headline */}
         <div className="mt-8 md:mt-10 max-w-[62%] md:max-w-[58%]">
           <h1 className="font-barlow font-black uppercase tracking-tight leading-[0.95] text-4xl sm:text-5xl text-[#161C12]" data-testid="login-headline">
-            WELCOME BACK
+            WELCOME BACK{" "}
             <span className="block text-[#63A61F] mt-1">CONTINUE YOUR FOOTBALL JOURNEY</span>
           </h1>
           <p className="mt-4 text-[15px] md:text-base leading-relaxed text-[#3D4435]">

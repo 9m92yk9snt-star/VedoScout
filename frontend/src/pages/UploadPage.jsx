@@ -850,6 +850,15 @@ export default function UploadPage() {
               Upload the clip, scrub to the clearest moment, then drag a box around your player — head to feet. Our Pro Scout Intelligence locks onto their jersey, shorts, and body, and follows only that player through the video.
             </p>
 
+            {/* Guest pill — no login wall; account is created right before analysis */}
+            {!user && (
+              <div className="mt-5">
+                <span data-testid="guest-upload-pill" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/5 px-3 py-1.5">
+                  <Zap className="w-3.5 h-3.5" /> No account needed to start — create one right before the analysis
+                </span>
+              </div>
+            )}
+
             {/* Eligibility status pill */}
             {!eligibilityLoading && eligibility && (
               <div className="mt-5">

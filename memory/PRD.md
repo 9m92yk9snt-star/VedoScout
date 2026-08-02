@@ -2827,3 +2827,37 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - P1: Danske priser (DKK), 3 tiers (Gratis 0 kr / Premium / VIP) + tilfredshedsgaranti ved checkout
 - P2: Code-splitting/lazy loading på landing page; server-side Meta Conversions API
 - P3: Delbar highlight-video med score-overlay; Audio Pep-Talk (OpenAI TTS); Chat with the Scout
+
+---
+
+# Session (Juni 2026, del 5) — Gæste-upload-flow + nyt Login/Signup design + Google Auth
+
+## 1. Upload Før Konto (P1 — DONE, E2E-testet)
+- /upload er nu OFFENTLIG (RequireAuth fjernet i App.js). Gæste-pill: "No account needed to start".
+- Baggrunds-chunked-upload starter ved filvalg (startBgUpload i UploadPage) — skjult bag markering+detaljer.
+- Ved "Start analyse" som gæst: AccountGateModal (signup/login tabs, email+password, Google, trust-linje).
+- Efter konto: doSubmit() kører automatisk med temp_video_token → analyse starter øjeblikkeligt.
+- Google i modal: resume-state (token, markør-dataURL, anchors, form) i sessionStorage → redirect → AuthCallback → /upload auto-submit.
+- Backend: get_current_user_optional (server.py ~2345); chunked_upload.py + url_video_fetch accepterer gæster (uid="guest").
+
+## 2. Nyt Login/Signup design (DONE — 100% match med bruger-mockups)
+- Login.jsx + Signup.jsx totalt omskrevet; delte komponenter i /components/auth/AuthShell.jsx.
+- Cream bg #F4F0E5 (matcher hero-billedets bg præcist), grøn #63A61F, Barlow-headlines.
+- Genererede assets i /backend/static/landing/: auth-hero-player.jpg + auth-avatar-1..4.jpg.
+- Password-regler ændret til mockup: ≥8 tegn, 1 stort bogstav, 1 tal (backend _PASSWORD_MIN_LENGTH=8, UserSignup+ResetPassword min_length=8; lowercase/symbol-krav fjernet).
+
+## 3. Emergent Google Auth (DONE — bridged til eksisterende JWT)
+- POST /api/auth/google/session (server.py ~3799): udveksler session_id server-side → find-or-create bruger på email → udsteder appens egen JWT (TokenResponse). password_hash=None for Google-konti.
+- Login-guard: Google-konto med email/password → 401 "This account uses Google sign-in".
+- Frontend: AuthCallback.jsx renderes synkront når URL-hash har session_id (AppRouter-check); auth-context skipper /me ved hash.
+- Playbook + testinstruktioner: /app/auth_testing.md.
+
+## Testing (session 5)
+- Testing agent iteration_63: backend 8/8 pass, frontend ~90% (login/signup design, signup/login E2E, Google-redirect, gæste-chunked-upload uden auth-header, regression prepaid-bruger).
+- Main agent Playwright E2E: FULDT gæsteflow verificeret — fil → 10-tap markering → gate modal → konto i modal → analyse startede (PrecisionScanOverlay).
+- Fixet efter test: guest-pill genindsat, headline-whitespace (a11y), password-regel-farver bekræftet OK.
+
+## Næste opgaver
+- P1: Danske priser (DKK), 3 tiers (Gratis 0 kr / Premium / VIP) + tilfredshedsgaranti ved checkout
+- P2: Code-splitting/lazy loading på landing page; server-side Meta Conversions API
+- P3: Delbar highlight-video med score-overlay; Audio Pep-Talk (OpenAI TTS); Chat with the Scout

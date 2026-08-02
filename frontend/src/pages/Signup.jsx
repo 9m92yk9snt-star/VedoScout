@@ -67,7 +67,7 @@ export default function Signup() {
         {/* Headline */}
         <div className="mt-8 md:mt-10 max-w-[62%] md:max-w-[58%]">
           <h1 className="font-barlow font-black uppercase tracking-tight leading-[0.95] text-4xl sm:text-5xl text-[#161C12]" data-testid="signup-headline">
-            DISCOVER YOUR
+            DISCOVER YOUR{" "}
             <span className="block text-[#63A61F] mt-1">TRUE FOOTBALL LEVEL</span>
           </h1>
           <p className="mt-4 text-[15px] md:text-base leading-relaxed text-[#3D4435]">
