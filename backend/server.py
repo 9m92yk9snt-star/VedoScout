@@ -2790,7 +2790,8 @@ Produce a JSON object EXACTLY in this format:
   "parent_corner": {
     "size_and_potential": "<4-5 sentences TO THE PARENTS about seeing past physical size, grounded in what THIS analysis actually found (use the player's first name and reference at least one observed moment)>",
     "development_takes_time": "<4-5 sentences TO THE PARENTS about patience and long-term development, connecting this report's real strengths and its main development point>",
-    "your_role_on_the_sideline": "<3-4 sentences of practical sideline advice for the parents, tied to a real observed moment from this match>"
+    "your_role_on_the_sideline": "<3-4 sentences of practical sideline advice for the parents, tied to a real observed moment from this match>",
+    "how_to_support_mentally": "<4-5 sentences TO THE PARENTS about supporting the player mentally: how the player likely EXPERIENCED this match based on reactions you observed (reference a real moment), how to talk about the match afterwards (praise effort over results, what to ask), and what to do after a poor performance>"
   }
 }
 
@@ -2848,6 +2849,7 @@ RULES FOR "parent_corner" (written TO the parents — warm, humble, personal):
 - size_and_potential: reassure honestly about physical size vs football intelligence USING what this analysis found. NEVER invent physical attributes you could not verify on video.
 - development_takes_time: connect the report's actual strengths and its main development point to the long-term, non-linear nature of youth development. No empty cliches.
 - your_role_on_the_sideline: practical sideline advice tied to a real moment from this match (e.g. how to react when the player loses the ball, referencing the reaction you observed).
+- how_to_support_mentally: ground it in observed reactions and body language from THIS match (confidence after mistakes, response to pressure). Include "car ride home" style advice: what to ask, what to praise, when to stay silent. Never diagnose — only supportive, practical guidance.
 - 3-5 sentences per field. If the video gave you too little to personalize honestly, set "parent_corner" to null.
 
 CRITICAL:
@@ -3008,7 +3010,7 @@ def _validate_grow_your_game(full: dict, duration_s: float, gt_track: Optional[d
     return len(kept)
 
 
-_PC_FIELDS = ("size_and_potential", "development_takes_time", "your_role_on_the_sideline")
+_PC_FIELDS = ("size_and_potential", "development_takes_time", "your_role_on_the_sideline", "how_to_support_mentally")
 
 
 def _validate_parent_corner(full: dict, player_name: str) -> bool:

@@ -17,6 +17,7 @@ import { VerifiedIdentityStrip } from "./verification";
 import { ParentValueMetricsCard } from "./parentmetrics";
 import { ParentsPackageSection } from "./parents";
 import { GrowYourGameSection } from "./growyourgame";
+import { ParentCornerSection } from "./parentcorner";
 import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
 import { ScoreGuideCard } from "./scoreguide";
@@ -312,6 +313,12 @@ export default function PremiumReportV2({ report, assetBase }) {
       {d.growYourGame && (
         <div className="mb-4">
           <GrowYourGameSection gyg={d.growYourGame} playerName={pd.player_name} onPlayAt={playAt} />
+        </div>
+      )}
+
+      {(d.parentCorner || pd.age) && (
+        <div className="mb-4">
+          <ParentCornerSection parentCorner={d.parentCorner} playerName={pd.player_name} playerAge={pd.age} />
         </div>
       )}
 

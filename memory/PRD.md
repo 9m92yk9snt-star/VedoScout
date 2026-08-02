@@ -2895,3 +2895,23 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 ## Næste opgaver
 - P1: Danske priser (DKK, 3 tiers) + tilfredshedsgaranti
 - P2: GYG Fase 2: Forældre-hjørne (personaliseret), Udvikling-siden-sidst, Scoutens Pep-Talk (TTS); lazy loading; Meta CAPI
+
+---
+
+# Session (Juni 2026, del 7) — Forældre-Hjørnet ("FOR YOU ON THE SIDELINE")
+
+## To-lags arkitektur (web-rapport ONLY — bruger fravalgte PDF)
+- LAG 1 (AI, personaliseret fra rapporten): 4 felter i full_report.parent_corner:
+  size_and_potential, development_takes_time, your_role_on_the_sideline, how_to_support_mentally ("car ride home"-rådgivning baseret på observerede reaktioner).
+  - Prompt-schema + regler i FULL_REPORT_PROMPT (adresser forældrene, SKAL bruge fornavn + reference til konkret observation, null hvis for lidt data).
+  - Gate: `_validate_parent_corner()` i server.py — felter ≥80 tegn, min. 2 felter, fornavn skal optræde; ellers droppes hele sektionen. Unit-testet 3/3.
+- LAG 2 (kurateret, ALDRIG AI-genereret): /frontend/src/components/report-v2/parentGuideLibrary.js
+  - 3 aldersgrupper (U8-U10 / U11-U13 / U14-U16) × 5 emner: Sleep, Food & Hydration, Growing pains/Growth spurt & Injury prevention, Early & Late Developers, Mental Wellbeing.
+  - Auto-fremhævning: growth-emnet får "Likely relevant right now"-badge + auto-åben ved alder 12-15 (GROWTH_HIGHLIGHT_AGES).
+  - Disclaimer: "not medical advice".
+- UI: parentcorner.jsx (ParentCornerSection) — varm brun/amber design (bevidst forskellig fra grønne performance-sektioner), header "FOR YOU ON THE SIDELINE", "Written for parents — not part of the analysis", "BASED ON THIS MATCH"-badges. Integreret i PremiumReportV2 efter GrowYourGame. derive.js: parentCorner.
+- Testet: validator unit-tests 3/3, UI screenshot-verificeret med injicerede demo-data på Loop Test2 (ligger stadig som demo). Ny ægte upload genererer parent_corner automatisk via Gemini.
+
+## Næste opgaver
+- P1: Danske priser (DKK, 3 tiers) + tilfredshedsgaranti
+- P2: GYG Fase 2 (Udvikling siden sidst, Pep-Talk TTS); lazy loading; Meta CAPI

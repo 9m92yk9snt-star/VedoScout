@@ -287,6 +287,9 @@ export function deriveV2(report) {
     ? { lessons: gygRaw.lessons, homework: Array.isArray(gygRaw.homework_plan) ? gygRaw.homework_plan : [] }
     : null;
 
+  // ---- Parent corner (Layer 1: AI-personalized; Layer 2 lives client-side) ----
+  const parentCorner = full.parent_corner && typeof full.parent_corner === "object" ? full.parent_corner : null;
+
   // ---- Evidence-integrity note (strict image policy) ----
   const ist = report?.identity_stats;
   const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
@@ -301,6 +304,6 @@ export function deriveV2(report) {
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
     matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
-    parentMetrics, growYourGame,
+    parentMetrics, growYourGame, parentCorner,
   };
 }
