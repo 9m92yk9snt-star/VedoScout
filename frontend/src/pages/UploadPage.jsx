@@ -15,7 +15,9 @@ import { isPremiumUser } from "@/lib/premium";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
-import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp } from "lucide-react";
+import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp, ShieldCheck, Clock, FileText, Lightbulb, Play, Maximize2, User, Calendar, Shirt, Hash, Video, Heart, Footprints, TrendingUp } from "lucide-react";
+
+const LIME = "#ccff00";
 
 export default function UploadPage() {
   const { user } = useAuth();
@@ -63,6 +65,7 @@ export default function UploadPage() {
   const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
   const [premiumReadyReport, setPremiumReadyReport] = useState(null); // Session 130 — premium-tier celebration screen
+  const [howOpen, setHowOpen] = useState(false); // Step 2 "How it works" inline explainer
   const [profiles, setProfiles] = useState([]); // Stage 5 — saved player identity profiles
   // Holds the completed upload response while the "done" celebration is on
   // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
@@ -830,54 +833,102 @@ export default function UploadPage() {
         onGoogleRedirect={handleGateGoogle}
       />
 
-      <div className="pt-28 pb-16 px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-10">
-            <span className="text-volt text-xs uppercase tracking-[0.25em] font-bold">Step 01</span>
-            <h1 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.95]" data-testid="upload-title">
-              Upload your video & lock onto your player
-            </h1>
-            <p className="mt-3 text-ink/65 max-w-2xl text-sm md:text-base">
-              Upload the clip, scrub to the clearest moment, then drag a box around your player — head to feet. Our Pro Scout Intelligence locks onto their jersey, shorts, and body, and follows only that player through the video.
-            </p>
+      <div className="pt-24 md:pt-28 pb-16 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto">
 
-            {/* Guest pill — no login wall; account is created right before analysis */}
-            {!user && (
-              <div className="mt-5">
-                <span data-testid="guest-upload-pill" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/5 px-3 py-1.5">
-                  <Zap className="w-3.5 h-3.5" /> No account needed to start — create one right before the analysis
-                </span>
-              </div>
-            )}
+          {/* ===== HERO ===== */}
+          <section className="grid md:grid-cols-2 gap-8 md:gap-10 items-center mb-8 md:mb-10">
+            <div>
+              <h1
+                data-testid="upload-title"
+                className="font-barlow font-black uppercase text-4xl sm:text-5xl lg:text-6xl tracking-tighter leading-[0.95] text-ink"
+              >
+                Every match tells a story.{" "}
+                <span style={{ color: "#A6C800" }}>Let&rsquo;s discover theirs.</span>
+              </h1>
+              <p className="mt-4 text-ink/70 text-sm md:text-base max-w-md">
+                Upload one video and we&rsquo;ll reveal strengths, hidden moments and details you&rsquo;ve never noticed before.
+              </p>
 
-            {/* Eligibility status pill */}
-            {!eligibilityLoading && eligibility && (
-              <div className="mt-5">
-                {eligibility.reason === "free_preview" && (
-                  <span data-testid="eligibility-free" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/5 px-3 py-1.5">
-                    <Zap className="w-3.5 h-3.5" /> 1 free preview available
+              {/* Guest pill — no login wall; account is created right before analysis */}
+              {!user && (
+                <div className="mt-5">
+                  <span data-testid="guest-upload-pill" className="inline-flex items-center gap-2 rounded-full text-[10px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.22em] font-bold text-forest border border-forest/30 bg-forest/5 px-3.5 py-1.5">
+                    <Zap className="w-3.5 h-3.5 shrink-0" /> No account needed to start — create one right before the analysis
                   </span>
-                )}
-                {eligibility.reason === "prepaid" && (
-                  <span data-testid="eligibility-prepaid" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-volt border border-volt/40 bg-volt/5 px-3 py-1.5">
-                    <Check className="w-3.5 h-3.5" /> 1 prepaid upload · full premium report
-                  </span>
-                )}
-                {eligibility.reason === "admin" && (
-                  <span data-testid="eligibility-admin" className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-ink/70 border border-gray-border px-3 py-1.5">
-                    Admin · unlimited uploads
-                  </span>
-                )}
+                </div>
+              )}
+
+              {/* Eligibility status pill */}
+              {!eligibilityLoading && eligibility && (
+                <div className="mt-4">
+                  {eligibility.reason === "free_preview" && (
+                    <span data-testid="eligibility-free" className="inline-flex items-center gap-2 rounded-full text-[11px] uppercase tracking-[0.22em] font-bold text-forest border border-forest/30 bg-forest/5 px-3.5 py-1.5">
+                      <Zap className="w-3.5 h-3.5" /> 1 free preview available
+                    </span>
+                  )}
+                  {eligibility.reason === "prepaid" && (
+                    <span data-testid="eligibility-prepaid" className="inline-flex items-center gap-2 rounded-full text-[11px] uppercase tracking-[0.22em] font-bold text-forest border border-forest/30 bg-forest/5 px-3.5 py-1.5">
+                      <Check className="w-3.5 h-3.5" /> 1 prepaid upload · full premium report
+                    </span>
+                  )}
+                  {eligibility.reason === "admin" && (
+                    <span data-testid="eligibility-admin" className="inline-flex items-center gap-2 rounded-full text-[11px] uppercase tracking-[0.22em] font-bold text-ink/70 border border-gray-border px-3.5 py-1.5">
+                      Admin · unlimited uploads
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Trust chips */}
+              <div className="mt-7 flex items-stretch flex-wrap gap-y-3">
+                <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-5">
+                  <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7 text-forest shrink-0" strokeWidth={1.6} />
+                  <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.14em] font-bold text-ink/75 leading-tight">ScoutMe Pro<br />benchmarked<br />analysis</span>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-5 border-l border-ink/10">
+                  <Clock className="w-6 h-6 sm:w-7 sm:h-7 text-forest shrink-0" strokeWidth={1.6} />
+                  <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.14em] font-bold text-ink/75 leading-tight">Max<br />5 minutes</span>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-5 border-l border-ink/10">
+                  <FileText className="w-6 h-6 sm:w-7 sm:h-7 text-forest shrink-0" strokeWidth={1.6} />
+                  <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.14em] font-bold text-ink/75 leading-tight">Personal<br />PDF report</span>
+                </div>
               </div>
-            )}
-          </div>
+            </div>
+
+            {/* Hero image with scout-frame brackets */}
+            <div className="relative w-full max-w-sm mx-auto md:ml-auto">
+              <div className="relative p-3">
+                <img
+                  src="/assets/upload-hero.jpg"
+                  alt="Young player, number 10, ready to be discovered"
+                  className="w-full aspect-[4/5] object-cover"
+                  loading="eager"
+                />
+                {/* Lime corner brackets */}
+                <span className="absolute top-0 left-0 w-10 h-10 border-t-[3px] border-l-[3px]" style={{ borderColor: LIME }} />
+                <span className="absolute top-0 right-0 w-10 h-10 border-t-[3px] border-r-[3px]" style={{ borderColor: LIME }} />
+                <span className="absolute bottom-0 left-0 w-10 h-10 border-b-[3px] border-l-[3px]" style={{ borderColor: LIME }} />
+                <span className="absolute bottom-0 right-0 w-10 h-10 border-b-[3px] border-r-[3px]" style={{ borderColor: LIME }} />
+                <Crosshair className="absolute -bottom-2 -right-2 w-9 h-9" style={{ color: LIME }} strokeWidth={1.5} />
+                {/* Handwritten note on the darker stadium area */}
+                <p
+                  className="absolute top-5 right-4 w-[130px] text-right leading-snug text-[21px] rotate-[-3deg] font-bold"
+                  style={{ fontFamily: "'Caveat', cursive", color: "#1a2318", textShadow: "0 1px 8px rgba(244,239,230,0.55)" }}
+                >
+                  The next opportunity starts with what we discover.
+                </p>
+              </div>
+            </div>
+          </section>
 
           {/* ===== PAYWALL — ineligible state ===== */}
           {!eligibilityLoading && eligibility && !eligibility.eligible && eligibility.reason === "prepay_required" && (
-            <div data-testid="upload-paywall" className="mb-10 relative overflow-hidden border-2 border-volt bg-gradient-to-br from-volt/10 via-deepnavy/40 to-deepnavy/40 p-8 md:p-12" style={{ boxShadow: "0 0 80px rgba(204,255,0,0.12)" }}>
+            <div data-testid="upload-paywall" className="mb-10 relative overflow-hidden rounded-3xl border-2 border-volt bg-gradient-to-br from-volt/10 via-deepnavy/40 to-deepnavy/40 p-8 md:p-12" style={{ boxShadow: "0 0 80px rgba(45,107,61,0.12)" }}>
               <div className="grid md:grid-cols-3 gap-8 items-center">
                 <div className="md:col-span-2">
-                  <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] font-bold text-volt border border-volt/40 bg-volt/10 px-3 py-1.5 mb-5">
+                  <div className="inline-flex items-center gap-2 rounded-full text-[10px] uppercase tracking-[0.25em] font-bold text-volt border border-volt/40 bg-volt/10 px-3 py-1.5 mb-5">
                     <Lock className="w-3.5 h-3.5" />
                     Free preview used
                   </div>
@@ -905,7 +956,7 @@ export default function UploadPage() {
                     onClick={handlePrepayUpload}
                     disabled={prepaying}
                     data-testid="upload-prepay-btn"
-                    className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-7 py-4 transition-colors disabled:opacity-60"
+                    className="mt-8 inline-flex items-center justify-center gap-3 rounded-xl bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-7 py-4 transition-colors disabled:opacity-60"
                   >
                     {prepaying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
                     Pre-pay ${price} USD & upload
@@ -919,7 +970,7 @@ export default function UploadPage() {
                   </div>
                 </div>
                 <div className="md:col-span-1 text-center md:text-right">
-                  <div className="inline-block bg-cream-card/90 border border-volt/30 p-6">
+                  <div className="inline-block rounded-2xl bg-cream-card/90 border border-volt/30 p-6">
                     <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-volt mb-2">Per upload</div>
                     <div className="font-barlow font-black text-6xl text-ink leading-none">${price}</div>
                     <div className="mt-1 text-xs uppercase tracking-widest font-bold text-ink/60">USD · one-time</div>
@@ -929,77 +980,18 @@ export default function UploadPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className={`space-y-px ${eligibility && !eligibility.eligible ? "opacity-40 pointer-events-none" : ""}`} data-testid="upload-form">
-            {/* ===== STEP 1: FILE DROP ===== */}
-            <div className="grid lg:grid-cols-5 gap-px bg-cream-soft/40 border border-gray-border">
-              <div className="bg-surface p-6 md:p-8 lg:col-span-2">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 1 · Video file</span>
-                  {file && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Selected</span>}
-                </div>
+          <form onSubmit={handleSubmit} className={`space-y-5 ${eligibility && !eligibility.eligible ? "opacity-40 pointer-events-none" : ""}`} data-testid="upload-form">
 
-                {/* === Source mode tabs: file upload OR paste URL === */}
-                <div className="flex items-center gap-px mb-4 border border-gray-border bg-cream-soft/60">
-                  <button
-                    type="button"
-                    onClick={() => setSourceMode("file")}
-                    data-testid="upload-mode-file"
-                    className={`flex-1 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center justify-center gap-2 transition-colors ${
-                      sourceMode === "file"
-                        ? "bg-volt text-white"
-                        : "text-ink/60 hover:text-ink"
-                    }`}
-                  >
-                    <FileUp className="w-3.5 h-3.5" /> Upload file
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSourceMode("url")}
-                    data-testid="upload-mode-url"
-                    className={`flex-1 px-3 py-2.5 text-[10px] uppercase tracking-[0.18em] font-bold flex items-center justify-center gap-2 transition-colors ${
-                      sourceMode === "url"
-                        ? "bg-volt text-white"
-                        : "text-ink/60 hover:text-ink"
-                    }`}
-                  >
-                    <LinkIcon className="w-3.5 h-3.5" /> Paste URL
-                  </button>
-                </div>
+            {/* ===== STEP 1: UPLOAD YOUR VIDEO ===== */}
+            <section className="bg-surface rounded-3xl border border-gray-border p-5 sm:p-8">
+              <div className="flex items-center gap-3 mb-6 flex-wrap">
+                <span className="inline-flex items-center rounded-full px-3.5 py-1.5 font-barlow font-black text-[11px] tracking-[0.18em] text-ink" style={{ background: LIME }}>STEP 1</span>
+                <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink">Upload your video</h2>
+                {file && <span className="text-[10px] uppercase tracking-widest font-bold text-forest flex items-center gap-1"><Check className="w-3 h-3" /> Selected</span>}
+              </div>
 
-                {/* === URL paste box (when sourceMode === "url") === */}
-                {sourceMode === "url" && (
-                  <div className="mb-4 space-y-2">
-                    <div className="flex items-stretch gap-2">
-                      <input
-                        type="url"
-                        data-testid="upload-url-input"
-                        value={pasteUrl}
-                        onChange={(e) => setPasteUrl(e.target.value)}
-                        placeholder="Vimeo · Google Drive · .mp4 link"
-                        className="flex-1 px-3 py-2.5 bg-cream-soft border border-gray-border focus:border-volt outline-none text-sm font-mono"
-                        disabled={urlFetching}
-                      />
-                      <button
-                        type="button"
-                        onClick={handleUrlFetch}
-                        disabled={urlFetching || !pasteUrl.trim()}
-                        data-testid="upload-url-fetch"
-                        className="bg-volt hover:bg-volt-hover text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 flex items-center gap-2 disabled:opacity-50 transition-colors"
-                      >
-                        {urlFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LinkIcon className="w-3.5 h-3.5" />}
-                        {urlFetching ? "Fetching" : "Fetch"}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-ink/55 leading-relaxed">
-                      Best with Vimeo, Google Drive shared links or any direct .mp4 / .mov URL.
-                      <span className="block mt-1 text-forest font-bold">
-                        Veo &amp; YouTube links can&apos;t be fetched directly — download the clip to your device, then use &ldquo;Upload File&rdquo; above.
-                      </span>
-                      Max 500 MB · max 5 min.
-                    </p>
-                  </div>
-                )}
-
+              <div className="grid lg:grid-cols-3 gap-4 items-start">
+                {/* Dropzone */}
                 <label
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
@@ -1007,9 +999,7 @@ export default function UploadPage() {
                     if (sourceMode === "file") handleFile(e.dataTransfer.files?.[0]);
                   }}
                   data-testid="upload-dropzone"
-                  className={`block cursor-pointer border-2 border-dashed border-gray-border hover:border-volt bg-cream-soft p-6 md:p-8 text-center transition-colors ${
-                    sourceMode === "url" && !file ? "opacity-60" : ""
-                  }`}
+                  className="lg:col-span-2 block cursor-pointer rounded-2xl border-2 border-dashed border-ink/20 hover:border-forest bg-cream-base/50 p-6 md:p-8 text-center transition-colors"
                 >
                   <input
                     ref={fileRef}
@@ -1021,7 +1011,7 @@ export default function UploadPage() {
                   />
                   {file ? (
                     <div className="flex flex-col items-center gap-3">
-                      <Film className="w-9 h-9 text-volt" strokeWidth={1.5} />
+                      <Film className="w-10 h-10 text-forest" strokeWidth={1.5} />
                       <p className="font-barlow font-bold uppercase text-ink text-base break-all">{file.name}</p>
                       <p className="text-xs text-ink/55">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
                       <button
@@ -1033,111 +1023,255 @@ export default function UploadPage() {
                           setMarkerBlob(null);
                           setMarkerPreviewUrl(null);
                         }}
-                        className="text-xs text-ink/65 hover:text-volt uppercase tracking-widest font-semibold mt-2"
+                        className="text-xs text-ink/65 hover:text-forest uppercase tracking-widest font-semibold mt-2"
                       >
                         Replace file
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center gap-3">
-                      <UploadCloud className="w-11 h-11 text-volt" strokeWidth={1.25} />
-                      <p className="font-barlow font-black uppercase text-ink text-lg">Drop video here</p>
-                      <p className="text-xs text-ink/55">MP4, MOV or WebM · max 5 minutes</p>
-                      <span className="mt-1 text-xs text-volt uppercase tracking-widest font-bold">or click to browse</span>
-                      <p className="mt-3 text-[11px] text-ink/50 leading-relaxed max-w-[260px] text-center">
-                        Tip: pick your child&apos;s best moments — scouts decide in the first 3 minutes. Quality beats quantity.
-                      </p>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <UploadCloud className="w-12 h-12 text-forest-pop mb-1" strokeWidth={1.25} />
+                      <p className="font-barlow font-black uppercase text-ink text-lg tracking-tight">Drag &amp; drop your video here</p>
+                      <p className="text-sm text-ink/55 font-semibold">or tap to browse</p>
+                      <div className="mt-3 flex items-center gap-3 text-[11px] font-bold text-ink/60 uppercase tracking-widest">
+                        <span className="flex items-center gap-1"><Film className="w-3.5 h-3.5" /> MP4</span>
+                        <span className="text-ink/30">·</span>
+                        <span className="flex items-center gap-1"><Film className="w-3.5 h-3.5" /> MOV</span>
+                        <span className="text-ink/30">·</span>
+                        <span className="flex items-center gap-1"><Film className="w-3.5 h-3.5" /> WebM</span>
+                      </div>
+                      <p className="text-xs text-ink/50 mt-1">Up to 5 minutes</p>
+                      <div className="mt-4 w-full max-w-sm mx-auto rounded-xl bg-cream-soft/80 px-4 py-3 flex items-start gap-2.5 text-left">
+                        <Lightbulb className="w-4 h-4 text-forest mt-0.5 shrink-0" />
+                        <span className="text-[11.5px] text-ink/65 leading-snug">
+                          Tip: Scouts often know enough within the first few minutes when the footage is clear.
+                        </span>
+                      </div>
                     </div>
                   )}
                 </label>
-              </div>
 
-              {/* ===== STEP 2: VIDEO + MARK PLAYER ===== */}
-              <div className="bg-surface p-6 md:p-8 lg:col-span-3">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 2 · Lock onto your player</span>
-                  {markerBlob && <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1"><Check className="w-3 h-3" /> Locked</span>}
-                </div>
+                {/* Side actions: choose file / paste URL */}
+                <div className="flex flex-col gap-4">
+                  <button
+                    type="button"
+                    onClick={() => { setSourceMode("file"); fileRef.current?.click(); }}
+                    data-testid="upload-mode-file"
+                    className="w-full text-left rounded-2xl bg-forest hover:bg-forest-pop text-white p-5 flex items-center gap-4 transition-colors"
+                  >
+                    <span className="w-11 h-11 rounded-xl border border-white/25 flex items-center justify-center shrink-0">
+                      <FileUp className="w-5 h-5" />
+                    </span>
+                    <span>
+                      <span className="block font-barlow font-black uppercase tracking-wide text-base">Choose file</span>
+                      <span className="block text-white/70 text-xs mt-0.5">Upload from your device</span>
+                    </span>
+                  </button>
 
-                {!file ? (
-                  <div className="aspect-video bg-cream-soft border border-gray-border flex flex-col items-center justify-center text-center p-6">
-                    <Crosshair className="w-10 h-10 text-ink/30 mb-3" strokeWidth={1.25} />
-                    <p className="text-sm text-ink/50 uppercase tracking-widest font-bold">Upload a video first</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Compact preview — review your clip, then open the full studio */}
-                    <div className="relative bg-black border border-gray-border overflow-hidden">
-                      <video
-                        ref={videoRef}
-                        src={videoUrl}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        onLoadedMetadata={handleVideoLoadedMetadata}
-                        data-testid="upload-video-preview"
-                        className="w-full aspect-video bg-black"
-                      />
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => setSourceMode(sourceMode === "url" ? "file" : "url")}
+                    data-testid="upload-mode-url"
+                    className={`w-full text-left rounded-2xl p-5 flex items-center gap-4 transition-colors border ${
+                      sourceMode === "url" ? "bg-cream-soft border-forest/40" : "bg-cream-base/70 border-transparent hover:border-forest/30"
+                    }`}
+                  >
+                    <span className="w-11 h-11 rounded-xl border border-ink/15 flex items-center justify-center shrink-0 text-forest">
+                      <LinkIcon className="w-5 h-5" />
+                    </span>
+                    <span>
+                      <span className="block font-barlow font-black uppercase tracking-wide text-base text-ink">Paste URL</span>
+                      <span className="block text-ink/55 text-xs mt-0.5">Vimeo, Drive or any direct link</span>
+                    </span>
+                  </button>
 
-                    {!markerBlob && (
-                      <div className="bg-cream-card/90 border border-volt/30 p-3 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                        <div className="flex items-start gap-2.5 text-sm text-ink/80">
-                          <AlertCircle className="w-4 h-4 text-volt mt-0.5 flex-shrink-0" />
-                          <span>
-                            Open the <span className="text-volt font-bold">Marker Studio</span> for a fullscreen view: pinch-zoom on your player, drag a box around them, or tap <span className="text-volt font-bold">Auto-find</span> to detect every player on the field.
-                          </span>
-                        </div>
+                  {/* URL paste box (when sourceMode === "url") */}
+                  {sourceMode === "url" && (
+                    <div className="space-y-2">
+                      <div className="flex items-stretch gap-2">
+                        <input
+                          type="url"
+                          data-testid="upload-url-input"
+                          value={pasteUrl}
+                          onChange={(e) => setPasteUrl(e.target.value)}
+                          placeholder="Vimeo · Google Drive · .mp4 link"
+                          className="flex-1 min-w-0 rounded-xl px-3 py-2.5 bg-white border border-gray-border focus:border-forest outline-none text-sm font-mono"
+                          disabled={urlFetching}
+                        />
                         <button
                           type="button"
-                          onClick={() => setStudioOpen(true)}
-                          data-testid="upload-mark-start"
-                          className="flex-shrink-0 bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 transition-colors flex items-center gap-2"
+                          onClick={handleUrlFetch}
+                          disabled={urlFetching || !pasteUrl.trim()}
+                          data-testid="upload-url-fetch"
+                          className="rounded-xl bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 flex items-center gap-2 disabled:opacity-50 transition-colors"
                         >
-                          <Crosshair className="w-3.5 h-3.5" />
-                          Lock onto your player
+                          {urlFetching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LinkIcon className="w-3.5 h-3.5" />}
+                          {urlFetching ? "Fetching" : "Fetch"}
                         </button>
                       </div>
-                    )}
-
-                    {markerBlob && markerPreviewUrl && (
-                      <div className="bg-cream-card/90 border border-volt/30 p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] uppercase tracking-widest font-bold text-volt flex items-center gap-1.5">
-                            <Check className="w-3 h-3" /> Player locked
-                          </span>
-                          <button
-                            type="button"
-                            onClick={reMark}
-                            data-testid="upload-mark-redo"
-                            className="text-ink/65 hover:text-volt text-[10px] uppercase tracking-widest font-bold flex items-center gap-1 transition-colors"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Re-mark
-                          </button>
-                        </div>
-                        <img
-                          src={markerPreviewUrl}
-                          alt="Locked player"
-                          data-testid="upload-mark-preview"
-                          className="w-full aspect-video object-contain bg-black border border-gray-border"
-                        />
-                        <p className="mt-2 text-[11px] text-ink/55 text-center">
-                          We&apos;ll analyse <span className="text-volt font-bold">only the player inside the box</span>.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      <p className="text-[10px] text-ink/55 leading-relaxed">
+                        Best with Vimeo, Google Drive shared links or any direct .mp4 / .mov URL.
+                        <span className="block mt-1 text-forest font-bold">
+                          Veo &amp; YouTube links can&apos;t be fetched directly — download the clip to your device, then use &ldquo;Choose File&rdquo; above.
+                        </span>
+                        Max 500 MB · max 5 min.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* ===== STEP 3: PLAYER DETAILS ===== */}
-            <div className="bg-surface border border-gray-border p-6 md:p-8 space-y-5">
-              <span className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55">Step 3 · Player details</span>
+              <div className="mt-5 flex items-center justify-center gap-2 text-sm text-ink/60">
+                <Lock className="w-4 h-4 text-ink/45" />
+                Your video is private, secure and used only for your analysis.
+              </div>
+            </section>
+
+            {/* ===== STEP 2: LOCK ONTO YOUR PLAYER ===== */}
+            <section className="bg-surface rounded-3xl border border-gray-border p-5 sm:p-8">
+              <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="inline-flex items-center rounded-full px-3.5 py-1.5 font-barlow font-black text-[11px] tracking-[0.18em] text-ink" style={{ background: LIME }}>STEP 2</span>
+                  <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink">Lock onto your player</h2>
+                  {markerBlob && <span className="text-[10px] uppercase tracking-widest font-bold text-forest flex items-center gap-1"><Check className="w-3 h-3" /> Locked</span>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHowOpen((v) => !v)}
+                  data-testid="upload-how-it-works"
+                  className="inline-flex items-center gap-2 rounded-full border border-ink/20 hover:border-forest px-4 py-2 text-[10px] uppercase tracking-[0.18em] font-black text-ink/75 transition-colors"
+                >
+                  <Play className="w-3 h-3 fill-current" /> How it works
+                </button>
+              </div>
+              <p className="text-sm text-ink/60 mb-4">We lock onto them and ignore all other players.</p>
+
+              {howOpen && (
+                <div className="mb-4 rounded-xl bg-cream-soft/80 px-4 py-3 grid sm:grid-cols-3 gap-3 text-[12px] text-ink/75">
+                  <span className="flex items-center gap-2"><Video className="w-4 h-4 text-forest shrink-0" /> 1. We analyze your video</span>
+                  <span className="flex items-center gap-2"><Crosshair className="w-4 h-4 text-forest shrink-0" /> 2. You select the player</span>
+                  <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-forest shrink-0" /> 3. We reveal their story</span>
+                </div>
+              )}
+
+              {!file ? (
+                <div className="rounded-2xl overflow-hidden border border-gray-border">
+                  <div className="relative">
+                    <img
+                      src="/assets/upload-step2-demo.jpg"
+                      alt="Select your player in the video"
+                      className="w-full aspect-video object-cover"
+                      loading="lazy"
+                    />
+                    {/* Lime marker box on the center player */}
+                    <div className="absolute" style={{ left: "41.5%", top: "24%", width: "17%", height: "66%" }}>
+                      <span className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2" style={{ borderColor: LIME }} />
+                      <span className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2" style={{ borderColor: LIME }} />
+                      <span className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2" style={{ borderColor: LIME }} />
+                      <span className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2" style={{ borderColor: LIME }} />
+                    </div>
+                    <Crosshair className="absolute w-7 h-7" style={{ left: "60%", top: "78%", color: LIME }} strokeWidth={1.5} />
+                    {/* Hint pill */}
+                    <span className="absolute top-3 left-3 rounded-full bg-ink/70 text-white text-[10px] uppercase tracking-[0.18em] font-bold px-3 py-1.5">
+                      Upload a video first — then tap your player here
+                    </span>
+                    {/* 3-step strip */}
+                    <div className="absolute bottom-0 inset-x-0 bg-ink/75 backdrop-blur-sm px-4 py-3 hidden sm:flex items-center justify-between gap-2 text-white text-[11px]">
+                      <span className="flex items-center gap-2"><Video className="w-4 h-4" style={{ color: LIME }} /> 1. We analyze<br className="lg:hidden" /> your video</span>
+                      <span className="tracking-[0.3em]" style={{ color: LIME }}>--→</span>
+                      <span className="flex items-center gap-2"><Crosshair className="w-4 h-4" style={{ color: LIME }} /> 2. You select<br className="lg:hidden" /> the player</span>
+                      <span className="tracking-[0.3em]" style={{ color: LIME }}>--→</span>
+                      <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" style={{ color: LIME }} /> 3. We reveal<br className="lg:hidden" /> their story</span>
+                    </div>
+                  </div>
+                  {/* Decorative player bar */}
+                  <div className="bg-ink text-white px-4 py-2.5 flex items-center gap-3">
+                    <Play className="w-4 h-4 fill-current" />
+                    <span className="text-[11px] font-mono">00:12</span>
+                    <div className="relative flex-1 h-1 rounded-full bg-white/25">
+                      <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: "34%", background: LIME }} />
+                      <span className="absolute -top-1 w-3 h-3 rounded-full" style={{ left: "33%", background: LIME }} />
+                    </div>
+                    <span className="text-[11px] font-mono">03:45</span>
+                    <Maximize2 className="w-4 h-4" />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Compact preview — review your clip, then open the full studio */}
+                  <div className="relative bg-black rounded-2xl border border-gray-border overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      src={videoUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      onLoadedMetadata={handleVideoLoadedMetadata}
+                      data-testid="upload-video-preview"
+                      className="w-full aspect-video bg-black"
+                    />
+                  </div>
+
+                  {!markerBlob && (
+                    <div className="rounded-2xl bg-cream-base/70 border border-forest/25 p-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                      <div className="flex items-start gap-2.5 text-sm text-ink/80">
+                        <AlertCircle className="w-4 h-4 text-forest mt-0.5 flex-shrink-0" />
+                        <span>
+                          Open the <span className="text-forest font-bold">Marker Studio</span> for a fullscreen view: pinch-zoom on your player, drag a box around them, or tap <span className="text-forest font-bold">Auto-find</span> to detect every player on the field.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setStudioOpen(true)}
+                        data-testid="upload-mark-start"
+                        className="flex-shrink-0 rounded-xl bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-4 py-2.5 transition-colors flex items-center gap-2"
+                      >
+                        <Crosshair className="w-3.5 h-3.5" />
+                        Lock onto your player
+                      </button>
+                    </div>
+                  )}
+
+                  {markerBlob && markerPreviewUrl && (
+                    <div className="rounded-2xl bg-cream-base/70 border border-forest/25 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-forest flex items-center gap-1.5">
+                          <Check className="w-3 h-3" /> Player locked
+                        </span>
+                        <button
+                          type="button"
+                          onClick={reMark}
+                          data-testid="upload-mark-redo"
+                          className="text-ink/65 hover:text-forest text-[10px] uppercase tracking-widest font-bold flex items-center gap-1 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Re-mark
+                        </button>
+                      </div>
+                      <img
+                        src={markerPreviewUrl}
+                        alt="Locked player"
+                        data-testid="upload-mark-preview"
+                        className="w-full aspect-video object-contain bg-black rounded-xl border border-gray-border"
+                      />
+                      <p className="mt-2 text-[11px] text-ink/55 text-center">
+                        We&apos;ll analyse <span className="text-forest font-bold">only the player inside the box</span>.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* ===== STEP 3: TELL US ABOUT YOU ===== */}
+            <section className="bg-surface rounded-3xl border border-gray-border p-5 sm:p-8 space-y-5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="inline-flex items-center rounded-full px-3.5 py-1.5 font-barlow font-black text-[11px] tracking-[0.18em] text-ink" style={{ background: LIME }}>STEP 3</span>
+                <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink">Tell us about you</h2>
+              </div>
 
               {profiles.length > 0 && (
-                <div data-testid="upload-profile-picker" className="bg-deepnavy border border-volt/25 p-3.5">
-                  <span className="text-[10px] uppercase tracking-[0.18em] font-black text-volt block mb-2">
+                <div data-testid="upload-profile-picker" className="rounded-2xl bg-cream-base/70 border border-forest/25 p-4">
+                  <span className="text-[10px] uppercase tracking-[0.18em] font-black text-forest block mb-2">
                     Same player again? Tap to pre-fill
                   </span>
                   <div className="flex flex-wrap gap-2">
@@ -1147,7 +1281,7 @@ export default function UploadPage() {
                         type="button"
                         data-testid={`upload-profile-chip-${i}`}
                         onClick={() => applyProfile(p)}
-                        className="inline-flex items-center gap-1.5 border border-gray-border hover:border-volt text-ink text-xs font-bold px-3 py-1.5 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-gray-border hover:border-forest bg-white text-ink text-xs font-bold px-3.5 py-1.5 transition-colors"
                       >
                         {p.player_name}
                         <span className="text-ink/45 font-normal">
@@ -1162,112 +1296,130 @@ export default function UploadPage() {
                 </div>
               )}
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Player name *</label>
-                  <input
-                    required
-                    type="text"
-                    value={form.player_name}
-                    onChange={(e) => setField("player_name", e.target.value)}
-                    data-testid="upload-player-name"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                    placeholder="e.g. Lukas Andersen"
-                  />
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Player name <span className="text-forest">*</span></label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <input
+                      required
+                      type="text"
+                      value={form.player_name}
+                      onChange={(e) => setField("player_name", e.target.value)}
+                      data-testid="upload-player-name"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      placeholder="e.g. Lukas Andersen"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Age *</label>
-                  <input
-                    required
-                    type="number"
-                    min="5"
-                    max="50"
-                    value={form.age}
-                    onChange={(e) => setField("age", e.target.value)}
-                    data-testid="upload-player-age"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                    placeholder="14"
-                  />
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Position *</label>
-                  <select
-                    required
-                    value={form.position}
-                    onChange={(e) => setField("position", e.target.value)}
-                    data-testid="upload-player-position"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                  >
-                    <option value="">Select position</option>
-                    <option value="Goalkeeper">Goalkeeper</option>
-                    <option value="Centre-back">Centre-back</option>
-                    <option value="Full-back">Full-back</option>
-                    <option value="Wing-back">Wing-back</option>
-                    <option value="Defensive Midfielder">Defensive Midfielder</option>
-                    <option value="Central Midfielder">Central Midfielder</option>
-                    <option value="Attacking Midfielder">Attacking Midfielder</option>
-                    <option value="Winger">Winger</option>
-                    <option value="Striker">Striker</option>
-                  </select>
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Age <span className="text-forest">*</span></label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <input
+                      required
+                      type="number"
+                      min="5"
+                      max="50"
+                      value={form.age}
+                      onChange={(e) => setField("age", e.target.value)}
+                      data-testid="upload-player-age"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      placeholder="e.g. 14"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Preferred foot *</label>
-                  <select
-                    required
-                    value={form.preferred_foot}
-                    onChange={(e) => setField("preferred_foot", e.target.value)}
-                    data-testid="upload-player-foot"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                  >
-                    <option value="right">Right</option>
-                    <option value="left">Left</option>
-                    <option value="both">Both</option>
-                  </select>
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Position <span className="text-forest">*</span></label>
+                  <div className="relative">
+                    <Shirt className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <select
+                      required
+                      value={form.position}
+                      onChange={(e) => setField("position", e.target.value)}
+                      data-testid="upload-player-position"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                    >
+                      <option value="">Select position</option>
+                      <option value="Goalkeeper">Goalkeeper</option>
+                      <option value="Centre-back">Centre-back</option>
+                      <option value="Full-back">Full-back</option>
+                      <option value="Wing-back">Wing-back</option>
+                      <option value="Defensive Midfielder">Defensive Midfielder</option>
+                      <option value="Central Midfielder">Central Midfielder</option>
+                      <option value="Attacking Midfielder">Attacking Midfielder</option>
+                      <option value="Winger">Winger</option>
+                      <option value="Striker">Striker</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Preferred foot <span className="text-forest">*</span></label>
+                  <div className="relative">
+                    <Footprints className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <select
+                      required
+                      value={form.preferred_foot}
+                      onChange={(e) => setField("preferred_foot", e.target.value)}
+                      data-testid="upload-player-foot"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                    >
+                      <option value="right">Right</option>
+                      <option value="left">Left</option>
+                      <option value="both">Both</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Current club / team</label>
-                  <input
-                    type="text"
-                    value={form.current_club}
-                    onChange={(e) => setField("current_club", e.target.value)}
-                    data-testid="upload-player-club"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                    placeholder="Optional"
-                  />
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Current club / team</label>
+                  <div className="relative">
+                    <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={form.current_club}
+                      onChange={(e) => setField("current_club", e.target.value)}
+                      data-testid="upload-player-club"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      placeholder="Optional"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Shirt number</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={3}
-                    value={form.jersey_number}
-                    onChange={(e) => setField("jersey_number", e.target.value.replace(/[^0-9]/g, ""))}
-                    data-testid="upload-player-jersey"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                    placeholder="e.g. 10 — sharpens AI identity check"
-                  />
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Shirt number</label>
+                  <div className="relative">
+                    <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={3}
+                      value={form.jersey_number}
+                      onChange={(e) => setField("jersey_number", e.target.value.replace(/[^0-9]/g, ""))}
+                      data-testid="upload-player-jersey"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      placeholder="e.g. 10 — sharpens AI identity check"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Video type *</label>
-                  <select
-                    value={form.video_type}
-                    onChange={(e) => setField("video_type", e.target.value)}
-                    data-testid="upload-video-type"
-                    className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt"
-                  >
-                    <option value="highlight">Highlight reel — best moments from real games</option>
-                    <option value="match">Match clip — live game footage (1v1 / 5v5 / full game)</option>
-                    <option value="training">Training clip — passing rondos, possession drills</option>
-                    <option value="drill">Drills — cones, agility, ball-mastery, technical work</option>
-                    <option value="freestyle">Freestyle — solo ball-juggling / tricks</option>
-                  </select>
+                  <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Video type <span className="text-forest">*</span></label>
+                  <div className="relative">
+                    <Video className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                    <select
+                      value={form.video_type}
+                      onChange={(e) => setField("video_type", e.target.value)}
+                      data-testid="upload-video-type"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                    >
+                      <option value="highlight">Highlight reel — best moments from real games</option>
+                      <option value="match">Match clip — live game footage (1v1 / 5v5 / full game)</option>
+                      <option value="training">Training clip — passing rondos, possession drills</option>
+                      <option value="drill">Drills — cones, agility, ball-mastery, technical work</option>
+                      <option value="freestyle">Freestyle — solo ball-juggling / tricks</option>
+                    </select>
+                  </div>
                   {/* Tiny helper so the user understands how this affects the scout report. */}
                   <p className="mt-1.5 text-[10.5px] text-ink/55 leading-snug">
                     {form.video_type === "highlight" && "We'll judge game IQ + finishing — best moments only, expect short evidence."}
@@ -1280,45 +1432,79 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] font-bold text-ink/55 block mb-2">Which player are you in the video? *</label>
-                <textarea
-                  required
-                  value={form.description}
-                  onChange={(e) => setField("description", e.target.value)}
-                  data-testid="upload-player-description"
-                  rows={3}
-                  className="w-full bg-deepnavy border border-gray-border px-3 py-3 text-ink focus:outline-none focus:border-volt focus:ring-1 focus:ring-volt resize-none"
-                  placeholder="e.g. I am number 10 in the white shirt — the one you just marked above."
-                />
+                <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Which player are you in the video? <span className="text-forest">*</span></label>
+                <div className="relative">
+                  <Crosshair className="absolute left-3.5 top-4 w-4 h-4 text-ink/40 pointer-events-none" />
+                  <textarea
+                    required
+                    value={form.description}
+                    onChange={(e) => setField("description", e.target.value)}
+                    data-testid="upload-player-description"
+                    rows={2}
+                    className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest resize-none"
+                    placeholder="e.g. I am number 10 in the white shirt — the one you just marked above."
+                  />
+                </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting || !file || !markerBlob}
-                data-testid="upload-submit-btn"
-                className="w-full bg-volt hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-base px-8 py-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 mt-2"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Locking on · tracking · analysing
-                  </>
-                ) : !file ? (
-                  "Upload a video first"
-                ) : !markerBlob ? (
-                  "Lock onto your player first"
-                ) : (
-                  <>
-                    Start precision scan
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-              <p className="text-xs text-ink/50 text-center">
-                Pro Scout Intelligence locks onto the player in your box and tracks <span className="text-volt font-bold">only them</span>. Other players are ignored.
-              </p>
-            </div>
+              <div className="pt-1">
+                <div className="flex justify-center">
+                  <button
+                    type="submit"
+                    disabled={submitting || !file || !markerBlob}
+                    data-testid="upload-submit-btn"
+                    className="w-full md:w-auto md:min-w-[440px] rounded-xl bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-base px-10 py-4 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Locking on · tracking · analysing
+                      </>
+                    ) : !file ? (
+                      "Upload a video first"
+                    ) : !markerBlob ? (
+                      "Lock onto your player first"
+                    ) : (
+                      <>
+                        Start my analysis
+                        <ArrowRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="mt-3 text-xs text-ink/55 text-center flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-forest" />
+                  Takes about 5 minutes. You&rsquo;ll get your personal report.
+                </p>
+              </div>
+            </section>
           </form>
+
+          {/* ===== TRUST FOOTER STRIP ===== */}
+          <section className="mt-6 bg-surface rounded-3xl border border-gray-border px-5 sm:px-8 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Heart className="w-6 h-6 shrink-0 mt-0.5" style={{ color: "#A6C800", fill: "#A6C800" }} />
+              <div>
+                <p className="font-bold text-ink text-sm">Because every player deserves to know their true potential.</p>
+                <p className="text-ink/55 text-xs mt-0.5">We&rsquo;re here to help them take the next step.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2.5">
+                {[
+                  { i: "MK", c: "#1F4F2F" },
+                  { i: "LA", c: "#2D6B3D" },
+                  { i: "SJ", c: "#0A0F0D" },
+                  { i: "NP", c: "#8A6D3B" },
+                ].map((a) => (
+                  <span key={a.i} className="w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-black text-white" style={{ background: a.c }}>
+                    {a.i}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[11px] text-ink/60 leading-snug max-w-[130px]">Trusted by players and parents all over the world.</p>
+            </div>
+          </section>
         </div>
       </div>
     </div>
