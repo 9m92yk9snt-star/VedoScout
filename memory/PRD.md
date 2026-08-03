@@ -2959,3 +2959,8 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - **VERIFIED E2E (self-test, playwright)**: empty state page only ~1,322px tall on 390px (orig 5,300). Full happy path with VP9 webm fixture: file select → summary card shows "0.2 MB · 0:08 · 720p" → MarkerStudio scout-mode 10-tap flow completed → step 2 collapsed + step 3 expanded → guest submit → AccountGateModal opened. Desktop 1440px verified. Test artifacts cleaned (uploads dir + chunk sessions).
 - NOTE for future testing agents: MarkerStudio e2e works headless with VP9 WEBM fixtures (H.264 mp4 decodes to 0-duration in headless Chromium). Flow: wait for "Generating player screenshots" to detach → loop { click "CONFIRM PLAYER N" if visible else tap video center } ~26 rounds.
 - ⚠️ REQUIRES REDEPLOY.
+
+## Session (Aug 3, 2026 - later) — UPLOAD v3 HONESTY FIXES (user-reported) ✅
+- Bug 1: summary card claimed "Football video loaded" before any AI check (misleading on non-football uploads). Fix: now "Video verified — ready for player selection" + muted line "The AI scout confirms it's real football during the analysis." (content gate actually runs at analysis time and refunds non-football).
+- Bug 2: the 4 tool chips (Zoom/Auto detect/Ignore others/Scout precision) were buttons that all just opened MarkerStudio like the main CTA. Fix: converted to non-clickable informational badges (DIVs, muted) + caption "All tools are built into the studio — open it with the button below." Single action = LOCK ONTO PLAYER.
+- Verified via screenshot + DOM check (chips are DIVs; new copy renders).

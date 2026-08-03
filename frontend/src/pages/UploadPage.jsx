@@ -1123,7 +1123,10 @@ export default function UploadPage() {
                         {videoMeta?.height ? <> &nbsp;·&nbsp; {Math.min(videoMeta.width || videoMeta.height, videoMeta.height)}p</> : null}
                       </p>
                       <p className="flex items-center gap-1.5 text-[12px] font-bold text-forest mt-1.5">
-                        <CheckCircle2 className="w-4 h-4" /> Football video loaded — ready for player selection
+                        <CheckCircle2 className="w-4 h-4 shrink-0" /> Video verified — ready for player selection
+                      </p>
+                      <p className="text-[10.5px] text-ink/45 mt-0.5">
+                        The AI scout confirms it&rsquo;s real football during the analysis.
                       </p>
                     </div>
                   </div>
@@ -1202,7 +1205,7 @@ export default function UploadPage() {
                     />
                   </div>
 
-                  {/* Scout tool chips — all open the fullscreen Marker Studio */}
+                  {/* Studio capabilities — informational, the single action is the CTA below */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { icon: ZoomIn, label: "Zoom" },
@@ -1210,17 +1213,18 @@ export default function UploadPage() {
                       { icon: EyeOff, label: "Ignore others" },
                       { icon: LocateFixed, label: "Scout precision" },
                     ].map((t) => (
-                      <button
+                      <div
                         key={t.label}
-                        type="button"
-                        onClick={() => setStudioOpen(true)}
                         data-testid={`upload-tool-${t.label.toLowerCase().replace(/ /g, "-")}`}
-                        className="rounded-xl bg-cream-base/80 border border-ink/10 hover:border-forest px-3 py-2.5 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.12em] font-black text-ink/75 transition-colors"
+                        className="rounded-xl bg-cream-base/50 border border-ink/8 px-3 py-2.5 flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.12em] font-black text-ink/50 select-none"
                       >
-                        <t.icon className="w-3.5 h-3.5 text-ink/60" /> {t.label}
-                      </button>
+                        <t.icon className="w-3.5 h-3.5 text-forest/60" /> {t.label}
+                      </div>
                     ))}
                   </div>
+                  <p className="text-[10.5px] text-ink/45 text-center -mt-1">
+                    All tools are built into the studio — open it with the button below.
+                  </p>
 
                   {/* Info + primary CTA */}
                   <div className="rounded-2xl bg-cream-base/70 border border-ink/8 p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
