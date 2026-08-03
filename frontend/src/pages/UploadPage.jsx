@@ -833,11 +833,11 @@ export default function UploadPage() {
         onGoogleRedirect={handleGateGoogle}
       />
 
-      <div className="pt-24 md:pt-28 pb-16 px-4 sm:px-6">
+      <div className="pt-[76px] md:pt-24 pb-10 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
 
           {/* ===== HERO ===== */}
-          <section className="grid md:grid-cols-2 gap-8 md:gap-10 items-center mb-8 md:mb-10">
+          <section className="grid md:grid-cols-2 gap-5 md:gap-10 items-center mb-5 md:mb-8">
             <div>
               <h1
                 data-testid="upload-title"
@@ -846,13 +846,13 @@ export default function UploadPage() {
                 Every match tells a story.{" "}
                 <span style={{ color: "#A6C800" }}>Let&rsquo;s discover theirs.</span>
               </h1>
-              <p className="mt-4 text-ink/70 text-sm md:text-base max-w-md">
+              <p className="mt-3 text-ink/70 text-sm md:text-base max-w-md">
                 Upload one video and we&rsquo;ll reveal strengths, hidden moments and details you&rsquo;ve never noticed before.
               </p>
 
               {/* Guest pill — no login wall; account is created right before analysis */}
               {!user && (
-                <div className="mt-5">
+                <div className="mt-3">
                   <span data-testid="guest-upload-pill" className="inline-flex items-center gap-2 rounded-full text-[10px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.22em] font-bold text-forest border border-forest/30 bg-forest/5 px-3.5 py-1.5">
                     <Zap className="w-3.5 h-3.5 shrink-0" /> No account needed to start — create one right before the analysis
                   </span>
@@ -861,7 +861,7 @@ export default function UploadPage() {
 
               {/* Eligibility status pill */}
               {!eligibilityLoading && eligibility && (
-                <div className="mt-4">
+                <div className="mt-3">
                   {eligibility.reason === "free_preview" && (
                     <span data-testid="eligibility-free" className="inline-flex items-center gap-2 rounded-full text-[11px] uppercase tracking-[0.22em] font-bold text-forest border border-forest/30 bg-forest/5 px-3.5 py-1.5">
                       <Zap className="w-3.5 h-3.5" /> 1 free preview available
@@ -881,7 +881,7 @@ export default function UploadPage() {
               )}
 
               {/* Trust chips */}
-              <div className="mt-7 flex items-stretch flex-wrap gap-y-3">
+              <div className="mt-5 flex items-stretch flex-wrap gap-y-3">
                 <div className="flex items-center gap-2 sm:gap-2.5 pr-3 sm:pr-5">
                   <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7 text-forest shrink-0" strokeWidth={1.6} />
                   <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.14em] font-bold text-ink/75 leading-tight">ScoutMe Pro<br />benchmarked<br />analysis</span>
@@ -898,7 +898,7 @@ export default function UploadPage() {
             </div>
 
             {/* Hero image with scout-frame brackets */}
-            <div className="relative w-full max-w-sm mx-auto md:ml-auto">
+            <div className="relative w-full max-w-[280px] sm:max-w-sm mx-auto md:ml-auto">
               <div className="relative p-3">
                 <img
                   src="/assets/upload-hero.jpg"
@@ -914,7 +914,7 @@ export default function UploadPage() {
                 <Crosshair className="absolute -bottom-2 -right-2 w-9 h-9" style={{ color: LIME }} strokeWidth={1.5} />
                 {/* Handwritten note on the darker stadium area */}
                 <p
-                  className="absolute top-5 right-4 w-[130px] text-right leading-snug text-[21px] rotate-[-3deg] font-bold"
+                  className="absolute top-4 right-4 w-[105px] sm:w-[130px] text-right leading-snug text-[16px] sm:text-[21px] rotate-[-3deg] font-bold"
                   style={{ fontFamily: "'Caveat', cursive", color: "#1a2318", textShadow: "0 1px 8px rgba(244,239,230,0.55)" }}
                 >
                   The next opportunity starts with what we discover.
@@ -980,11 +980,11 @@ export default function UploadPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className={`space-y-5 ${eligibility && !eligibility.eligible ? "opacity-40 pointer-events-none" : ""}`} data-testid="upload-form">
+          <form onSubmit={handleSubmit} className={`space-y-3 sm:space-y-5 ${eligibility && !eligibility.eligible ? "opacity-40 pointer-events-none" : ""}`} data-testid="upload-form">
 
             {/* ===== STEP 1: UPLOAD YOUR VIDEO ===== */}
-            <section className="bg-surface rounded-3xl border border-gray-border p-5 sm:p-8">
-              <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <section className="bg-surface rounded-3xl border border-gray-border p-4 sm:p-8">
+              <div className="flex items-center gap-3 mb-4 sm:mb-6 flex-wrap">
                 <span className="inline-flex items-center rounded-full px-3.5 py-1.5 font-barlow font-black text-[11px] tracking-[0.18em] text-ink" style={{ background: LIME }}>STEP 1</span>
                 <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink">Upload your video</h2>
                 {file && <span className="text-[10px] uppercase tracking-widest font-bold text-forest flex items-center gap-1"><Check className="w-3 h-3" /> Selected</span>}
@@ -999,7 +999,7 @@ export default function UploadPage() {
                     if (sourceMode === "file") handleFile(e.dataTransfer.files?.[0]);
                   }}
                   data-testid="upload-dropzone"
-                  className="lg:col-span-2 block cursor-pointer rounded-2xl border-2 border-dashed border-ink/20 hover:border-forest bg-cream-base/50 p-6 md:p-8 text-center transition-colors"
+                  className="lg:col-span-2 block cursor-pointer rounded-2xl border-2 border-dashed border-ink/20 hover:border-forest bg-cream-base/50 p-5 md:p-8 text-center transition-colors"
                 >
                   <input
                     ref={fileRef}
@@ -1041,7 +1041,7 @@ export default function UploadPage() {
                         <span className="flex items-center gap-1"><Film className="w-3.5 h-3.5" /> WebM</span>
                       </div>
                       <p className="text-xs text-ink/50 mt-1">Up to 5 minutes</p>
-                      <div className="mt-4 w-full max-w-sm mx-auto rounded-xl bg-cream-soft/80 px-4 py-3 flex items-start gap-2.5 text-left">
+                      <div className="mt-3 w-full max-w-sm mx-auto rounded-xl bg-cream-soft/80 px-4 py-2.5 flex items-start gap-2.5 text-left">
                         <Lightbulb className="w-4 h-4 text-forest mt-0.5 shrink-0" />
                         <span className="text-[11.5px] text-ink/65 leading-snug">
                           Tip: Scouts often know enough within the first few minutes when the footage is clear.
@@ -1128,8 +1128,8 @@ export default function UploadPage() {
             </section>
 
             {/* ===== STEP 2: LOCK ONTO YOUR PLAYER ===== */}
-            <section className="bg-surface rounded-3xl border border-gray-border p-5 sm:p-8">
-              <div className="flex items-start justify-between gap-3 mb-2 flex-wrap">
+            <section className="bg-surface rounded-3xl border border-gray-border p-4 sm:p-8">
+              <div className="flex items-start justify-between gap-3 mb-1.5 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="inline-flex items-center rounded-full px-3.5 py-1.5 font-barlow font-black text-[11px] tracking-[0.18em] text-ink" style={{ background: LIME }}>STEP 2</span>
                   <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink">Lock onto your player</h2>
@@ -1144,7 +1144,7 @@ export default function UploadPage() {
                   <Play className="w-3 h-3 fill-current" /> How it works
                 </button>
               </div>
-              <p className="text-sm text-ink/60 mb-4">We lock onto them and ignore all other players.</p>
+              <p className="text-sm text-ink/60 mb-3">We lock onto them and ignore all other players.</p>
 
               {howOpen && (
                 <div className="mb-4 rounded-xl bg-cream-soft/80 px-4 py-3 grid sm:grid-cols-3 gap-3 text-[12px] text-ink/75">
@@ -1263,7 +1263,7 @@ export default function UploadPage() {
             </section>
 
             {/* ===== STEP 3: TELL US ABOUT YOU ===== */}
-            <section className="bg-surface rounded-3xl border border-gray-border p-5 sm:p-8 space-y-5">
+            <section className="bg-surface rounded-3xl border border-gray-border p-4 sm:p-8 space-y-4 sm:space-y-5">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="inline-flex items-center rounded-full px-3.5 py-1.5 font-barlow font-black text-[11px] tracking-[0.18em] text-ink" style={{ background: LIME }}>STEP 3</span>
                 <h2 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink">Tell us about you</h2>
@@ -1296,7 +1296,7 @@ export default function UploadPage() {
                 </div>
               )}
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div>
                   <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Player name <span className="text-forest">*</span></label>
                   <div className="relative">
@@ -1307,7 +1307,7 @@ export default function UploadPage() {
                       value={form.player_name}
                       onChange={(e) => setField("player_name", e.target.value)}
                       data-testid="upload-player-name"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                       placeholder="e.g. Lukas Andersen"
                     />
                   </div>
@@ -1324,7 +1324,7 @@ export default function UploadPage() {
                       value={form.age}
                       onChange={(e) => setField("age", e.target.value)}
                       data-testid="upload-player-age"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                       placeholder="e.g. 14"
                     />
                   </div>
@@ -1338,7 +1338,7 @@ export default function UploadPage() {
                       value={form.position}
                       onChange={(e) => setField("position", e.target.value)}
                       data-testid="upload-player-position"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                     >
                       <option value="">Select position</option>
                       <option value="Goalkeeper">Goalkeeper</option>
@@ -1362,7 +1362,7 @@ export default function UploadPage() {
                       value={form.preferred_foot}
                       onChange={(e) => setField("preferred_foot", e.target.value)}
                       data-testid="upload-player-foot"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                     >
                       <option value="right">Right</option>
                       <option value="left">Left</option>
@@ -1372,7 +1372,7 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Current club / team</label>
                   <div className="relative">
@@ -1382,7 +1382,7 @@ export default function UploadPage() {
                       value={form.current_club}
                       onChange={(e) => setField("current_club", e.target.value)}
                       data-testid="upload-player-club"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                       placeholder="Optional"
                     />
                   </div>
@@ -1398,7 +1398,7 @@ export default function UploadPage() {
                       value={form.jersey_number}
                       onChange={(e) => setField("jersey_number", e.target.value.replace(/[^0-9]/g, ""))}
                       data-testid="upload-player-jersey"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                       placeholder="e.g. 10 — sharpens AI identity check"
                     />
                   </div>
@@ -1411,7 +1411,7 @@ export default function UploadPage() {
                       value={form.video_type}
                       onChange={(e) => setField("video_type", e.target.value)}
                       data-testid="upload-video-type"
-                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
+                      className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                     >
                       <option value="highlight">Highlight reel — best moments from real games</option>
                       <option value="match">Match clip — live game footage (1v1 / 5v5 / full game)</option>
@@ -1441,7 +1441,7 @@ export default function UploadPage() {
                     onChange={(e) => setField("description", e.target.value)}
                     data-testid="upload-player-description"
                     rows={2}
-                    className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest resize-none"
+                    className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest resize-none"
                     placeholder="e.g. I am number 10 in the white shirt — the one you just marked above."
                   />
                 </div>
@@ -1481,7 +1481,7 @@ export default function UploadPage() {
           </form>
 
           {/* ===== TRUST FOOTER STRIP ===== */}
-          <section className="mt-6 bg-surface rounded-3xl border border-gray-border px-5 sm:px-8 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <section className="mt-4 sm:mt-6 bg-surface rounded-3xl border border-gray-border px-5 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
               <Heart className="w-6 h-6 shrink-0 mt-0.5" style={{ color: "#A6C800", fill: "#A6C800" }} />
               <div>

@@ -2944,3 +2944,8 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - **Preserved 100%**: all handlers (handleFile/handleUrlFetch/handleSubmit/setStudioOpen/reMark/applyProfile), all testids, eligibility pills, paywall block, profile picker, submit disabled-state texts. New state: howOpen. Icons added to lucide import.
 - **VERIFIED**: iteration_65 — 100% of testable items (guest 12/12, admin 5/5), no console errors, no overflow at 390/1920px, MarkerStudio mounts. Guest→AccountGateModal e2e not exercised (test-fixture mp4 had 0 duration in studio — code path untouched by redesign). ⚠️ REQUIRES REDEPLOY.
 - Testing-agent suggestions (optional backlog): silence guest 401 eligibility console noise; split UploadPage into subcomponents.
+
+## Session (Aug 3, 2026 - later) — UPLOAD PAGE MOBILE COMPACTION ✅
+- **User feedback**: too much empty space around title; STEP 1/2/3 should be tighter so phone scroll is shorter.
+- **Changes (UploadPage.jsx, visual only)**: top pad pt-[76px] mobile; hero gap/margins tightened (mb-5, mt-3 pills, mt-5 chips); hero image max-w-[280px] on mobile + smaller Caveat note; form space-y-3; step cards p-4 on mobile, headers mb-4; STEP 3 fields now 2-col grid on mobile with py-2.5 inputs; dropzone/tip/footer paddings reduced.
+- **RESULT**: mobile scrollHeight ~5,300px → ~2,900px (≈45% shorter). Verified via screenshots at 390px — no overflow, all sections render. No logic touched.
