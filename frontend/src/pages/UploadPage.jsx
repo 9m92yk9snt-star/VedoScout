@@ -9,7 +9,6 @@ import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import { startBackgroundAnalysis } from "@/components/BackgroundAnalysisTracker";
 import MarkerStudio from "@/components/MarkerStudio";
 import AccountGateModal from "@/components/auth/AccountGateModal";
-import HeroTeaser from "@/components/HeroTeaser";
 import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
 import { isPremiumUser } from "@/lib/premium";
@@ -63,7 +62,6 @@ export default function UploadPage() {
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
   const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
-  const [heroReport, setHeroReport] = useState(null);       // populated to trigger HeroTeaser (free-tier)
   const [premiumReadyReport, setPremiumReadyReport] = useState(null); // Session 130 — premium-tier celebration screen
   const [profiles, setProfiles] = useState([]); // Stage 5 — saved player identity profiles
   // Holds the completed upload response while the "done" celebration is on
@@ -603,8 +601,11 @@ export default function UploadPage() {
       if (!pendingDoneRef.current) return;
       pendingDoneRef.current = null;
       if (!skipHeroTeaser) {
-        // Free-tier flow: HeroTeaser (blur + PricingCards) — modal navigates on dismiss.
-        setHeroReport(finalData);
+        // Free-tier flow: straight to the report route — the NEW high-CTR
+        // FreePreviewLanding conversion page renders there. (Old HeroTeaser
+        // modal removed per owner request.)
+        setUploadPhase("idle");
+        if (finalData?.id) navigate(`/report/${finalData.id}`);
         return;
       }
       // Session 130 — Premium-tier flow: dedicated PremiumReadyOverlay
@@ -746,7 +747,7 @@ export default function UploadPage() {
         onClose={() => setEmbeddedOpen(false)}
       />
       <PrecisionScanOverlay
-        open={submitting && !heroReport && !premiumReadyReport}
+        open={submitting && !premiumReadyReport}
         phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
         uploadPct={uploadPct}
         backendStep={backendStep}
@@ -775,28 +776,18 @@ export default function UploadPage() {
           if (!pending) return;
           pendingDoneRef.current = null;
           if (!pending.skipHeroTeaser) {
-            // Free preview: show the HeroTeaser (mirrors the timer-driven path).
-            setHeroReport(pending.data);
+            // Free preview → the NEW conversion page (FreePreviewLanding) on the report route.
+            setSubmitting(false);
+            setUploadPhase("idle");
+            if (pending.data?.id) navigate(`/report/${pending.data.id}`);
           } else {
             // Session 130 — Premium celebration screen instead of instant nav.
             setPremiumReadyReport(pending.data);
           }
         }}
       />
-      <HeroTeaser
-        open={!!heroReport}
-        report={heroReport}
-        assetBase={ASSET_BASE}
-        onUnlock={() => {
-          if (heroReport?.id) {
-            navigate(`/report/${heroReport.id}?unlock=1`);
-          }
-        }}
-        onDismiss={() => {
-          setHeroReport(null);
-          if (heroReport?.id) navigate(`/report/${heroReport.id}`);
-        }}
-      />
+      {/* Old free-tier HeroTeaser modal REMOVED — free users now land on the
+          FreePreviewLanding conversion page at /report/{id}. */}
       {/* Session 130 — Premium-tier celebration overlay. Deliberately separate
           from HeroTeaser (which is the free-tier paywall). Zero blur, zero
           pricing, single "Open Full Premium Report" CTA that navigates to the

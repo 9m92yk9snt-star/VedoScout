@@ -2932,3 +2932,8 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - **User bug**: "Upload" button + "Get started" sent guests to /signup//login — broke the approved "Upload Før Konto" structure (account only at "Start analysis").
 - **Fixes**: Navigation.jsx desktop+mobile "Get started" → /upload; MobileBottomTabs Upload tab `auth:true` removed → /upload for guests; Landing.jsx `startHref` always /upload; LandingMinimal `handlePrimaryCta` → /upload; PricingTiers `goFree` → /upload. Paid-tier CTAs (single/premium/vip) KEEP signup-first (Stripe needs an account).
 - **VERIFIED (screenshots)**: guest desktop Get started → /upload with guest-upload-pill; mobile bottom tab → /upload. ⚠️ REQUIRES REDEPLOY.
+
+## Session (Aug 3, 2026) — OLD HeroTeaser REMOVED (user bug: old conversion popup after free analysis) ✅
+- **User bug**: after guest signup + free analysis, the OLD HeroTeaser modal ("PRO SCOUT LOCKED / 76/100") popped up; the NEW FreePreviewLanding only showed via Dashboard. User: old one must be deleted entirely, new high-CTR teaser page must be the free conversion surface.
+- **Fix (UploadPage.jsx)**: free-tier post-analysis paths (timer-driven ~L603 + onViewReport ~L778) now `navigate(/report/{id})` → FreePreviewLanding renders there. HeroTeaser render block + import + heroReport state removed; PrecisionScanOverlay open condition updated. `/app/frontend/src/components/HeroTeaser.jsx` DELETED. Premium flow (PremiumReadyOverlay) untouched. `skipHeroTeaser` gating variable kept (same semantics: paid tiers → celebration overlay).
+- **VERIFIED**: webpack compiles, /upload renders with 0 console errors, guest pill intact. FreePreviewLanding on unpaid reports already e2e-verified in iteration_64. ⚠️ REQUIRES REDEPLOY.
