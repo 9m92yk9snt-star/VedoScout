@@ -10332,6 +10332,54 @@ async def admin_toggle_growth_emails(payload: GrowthEmailsToggle, _=Depends(get_
     return {"enabled": bool(payload.enabled)}
 
 
+# ── Live stats ticker (landing + free preview) ─────────────────────────────
+_TICKER_KEYS = ("users", "videos", "reports", "scout_reviews", "players")
+
+
+async def _ticker_real_counts() -> dict:
+    return {
+        "users": await db.users.count_documents({"role": {"$ne": "admin"}}),
+        "videos": await db.reports.count_documents({}),
+        "reports": await db.reports.count_documents({"full_report": {"$type": "object"}}),
+        "scout_reviews": await db.reports.count_documents({"agent_review.status": "delivered"}),
+        "players": await db.player_profiles.count_documents({}),
+    }
+
+
+@api_router.get("/stats/ticker")
+async def public_stats_ticker():
+    cfg = ((await db.settings.find_one({"key": "ticker_config"})) or {}).get("value") or {}
+    if cfg.get("enabled") is False:
+        return {"enabled": False, "stats": None}
+    boosts = cfg.get("boosts") or {}
+    real = await _ticker_real_counts()
+    return {"enabled": True,
+            "stats": {k: int(real.get(k, 0)) + int(boosts.get(k) or 0) for k in _TICKER_KEYS}}
+
+
+class TickerConfig(BaseModel):
+    enabled: bool = True
+    boosts: dict = Field(default_factory=dict)
+
+
+@api_router.get("/admin/ticker")
+async def admin_get_ticker(_=Depends(get_current_admin)):
+    cfg = ((await db.settings.find_one({"key": "ticker_config"})) or {}).get("value") or {}
+    real = await _ticker_real_counts()
+    boosts = {k: int((cfg.get("boosts") or {}).get(k) or 0) for k in _TICKER_KEYS}
+    return {"enabled": cfg.get("enabled", True), "real": real, "boosts": boosts,
+            "totals": {k: real[k] + boosts[k] for k in _TICKER_KEYS}}
+
+
+@api_router.put("/admin/ticker")
+async def admin_set_ticker(payload: TickerConfig, _=Depends(get_current_admin)):
+    boosts = {k: max(0, int(payload.boosts.get(k) or 0)) for k in _TICKER_KEYS}
+    await db.settings.update_one(
+        {"key": "ticker_config"},
+        {"$set": {"value": {"enabled": bool(payload.enabled), "boosts": boosts}}}, upsert=True)
+    return {"ok": True, "boosts": boosts, "enabled": bool(payload.enabled)}
+
+
 @api_router.put("/admin/discounts/auto")
 async def admin_set_auto_discount(payload: AutoDiscountUpdate, _=Depends(get_current_admin)):
     await db.settings.update_one(
