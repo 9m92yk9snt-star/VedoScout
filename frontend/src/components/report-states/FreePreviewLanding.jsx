@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ASSET_BASE } from "@/lib/api";
 import ReportPaywallTiers from "@/components/ReportPaywallTiers";
+import { DreamPathTeaser } from "@/components/report-v2/dreampath";
 
 const LIME = "#CCFF00";
 const INKG = "#0B1F14";
@@ -286,6 +287,9 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             </div>
           </div>
         </div>
+
+        {/* ── The Path — dream roadmap teaser ── */}
+        <DreamPathTeaser playerName={pd.player_name} onUnlock={scrollToPackages} />
 
         {/* ── You've only seen 10% ── */}
         <div className="bg-white rounded-2xl border border-[#E9E4D5] p-5 mt-4 flex flex-col sm:flex-row items-center gap-5 shadow-sm" data-testid="fpl-seen-ring">

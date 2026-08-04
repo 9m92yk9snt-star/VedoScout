@@ -18,6 +18,7 @@ import { ParentValueMetricsCard } from "./parentmetrics";
 import { ParentsPackageSection } from "./parents";
 import { GrowYourGameSection } from "./growyourgame";
 import { ParentCornerSection } from "./parentcorner";
+import { DreamPathSection } from "./dreampath";
 import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
 import { ScoreGuideCard } from "./scoreguide";
@@ -321,6 +322,11 @@ export default function PremiumReportV2({ report, assetBase }) {
           <ParentCornerSection parentCorner={d.parentCorner} playerName={pd.player_name} playerAge={pd.age} />
         </div>
       )}
+
+      {/* The Path — honest dream roadmap, moves with every analysis */}
+      <div className="mb-4">
+        <DreamPathSection report={report} d={d} playerName={pd.player_name} />
+      </div>
 
       {d.parentsPackage && (
         <div className="mb-4">
