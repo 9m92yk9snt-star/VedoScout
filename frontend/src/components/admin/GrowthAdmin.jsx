@@ -10,14 +10,24 @@ export default function GrowthAdmin() {
   const [form, setForm] = useState({ name: "", percent: 20, hours_valid: 72, send_email: true });
   const [busy, setBusy] = useState(false);
   const [sweepResult, setSweepResult] = useState(null);
+  const [emailsOn, setEmailsOn] = useState(false);
 
   const load = () => {
     api.get("/admin/discounts").then(({ data }) => {
       setAutoPercent(data.auto_percent);
       setCampaigns(data.campaigns || []);
+      setEmailsOn(!!data.emails_enabled);
     }).catch(() => {});
   };
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
+
+  const toggleEmails = async () => {
+    try {
+      const { data } = await api.put("/admin/discounts/emails-enabled", { enabled: !emailsOn });
+      setEmailsOn(!!data.enabled);
+      toast.success(data.enabled ? "Nurture emails are ON" : "Nurture emails are OFF");
+    } catch { toast.error("Failed"); }
+  };
 
   const saveAuto = async () => {
     try {
@@ -75,7 +85,7 @@ export default function GrowthAdmin() {
         <div className="grid sm:grid-cols-4 gap-3 mt-3">
           <input placeholder="Name (e.g. Summer offer)" value={form.name} data-testid="campaign-name-input"
             onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${inp} sm:col-span-2`} />
-          <input type="number" min="1" max="90" value={form.percent} data-testid="campaign-percent-input"
+          <input type="number" min="1" max="90" value={form.percent} data-testid="campaign-percent"
             onChange={(e) => setForm({ ...form, percent: Number(e.target.value) })} className={inp} title="% off" />
           <input type="number" min="1" max="720" value={form.hours_valid} data-testid="campaign-hours-input"
             onChange={(e) => setForm({ ...form, hours_valid: Number(e.target.value) })} className={inp} title="Hours valid" />
@@ -109,7 +119,11 @@ export default function GrowthAdmin() {
 
       <section className="bg-white border border-gray-border rounded-2xl p-5">
         <h3 className="font-barlow font-black uppercase text-ink flex items-center gap-2"><Play className="w-4 h-4 text-forest" /> Nurture sweep</h3>
-        <p className="text-xs text-ink/55 mt-1">Runs automatically every 15 min: 24h numbers-mail, 48h discount, 72h discovery, 1h abandoned checkout.</p>
+        <p className="text-xs text-ink/55 mt-1">Runs automatically every 15 min when enabled: 24h numbers-mail, 48h discount, 72h discovery, 1h abandoned checkout.</p>
+        <label className="flex items-center gap-2 mt-3 text-sm text-ink/70">
+          <input type="checkbox" checked={emailsOn} onChange={toggleEmails} data-testid="growth-emails-toggle" />
+          Automatic nurture emails {emailsOn ? "ON" : "OFF"}
+        </label>
         <div className="flex gap-3 mt-3">
           <button type="button" onClick={() => runSweep(true)} disabled={busy} data-testid="sweep-dry-btn"
             className="border border-forest text-forest font-barlow font-black uppercase text-[11px] tracking-widest px-5 py-2.5 rounded-full disabled:opacity-50">Dry run</button>

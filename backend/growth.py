@@ -36,6 +36,11 @@ def _now():
 
 
 # ── Discounts ───────────────────────────────────────────────────────────────
+async def growth_emails_enabled(db) -> bool:
+    doc = await db.settings.find_one({"key": "growth_emails_enabled"})
+    return bool(doc and doc.get("value") is True)
+
+
 async def get_auto_discount_percent(db) -> float:
     doc = await db.settings.find_one({"key": "auto_discount_percent"})
     try:
@@ -186,7 +191,7 @@ async def conversion_loop(db, get_single_price):
     await asyncio.sleep(120)
     while True:
         try:
-            if email_enabled():
+            if email_enabled() and await growth_emails_enabled(db):
                 sent = await conversion_sweep(db, get_single_price)
                 if sent:
                     logger.info("[conversion] processed %d item(s)", len(sent))

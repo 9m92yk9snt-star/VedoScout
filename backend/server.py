@@ -10316,7 +10316,20 @@ async def admin_discounts(_=Depends(get_current_admin)):
         campaigns.append({"id": c["id"], "name": c.get("name"), "percent": c.get("percent"),
                           "expires_at": c.get("expires_at"), "active": bool(c.get("active")),
                           "created_at": c.get("created_at")})
-    return {"auto_percent": await get_auto_discount_percent(db), "campaigns": campaigns}
+    return {"auto_percent": await get_auto_discount_percent(db),
+            "emails_enabled": await growth_emails_enabled(db),
+            "campaigns": campaigns}
+
+
+class GrowthEmailsToggle(BaseModel):
+    enabled: bool
+
+
+@api_router.put("/admin/discounts/emails-enabled")
+async def admin_toggle_growth_emails(payload: GrowthEmailsToggle, _=Depends(get_current_admin)):
+    await db.settings.update_one(
+        {"key": "growth_emails_enabled"}, {"$set": {"value": bool(payload.enabled)}}, upsert=True)
+    return {"enabled": bool(payload.enabled)}
 
 
 @api_router.put("/admin/discounts/auto")
@@ -13030,6 +13043,7 @@ from growth import (
     get_active_discount,
     discounted_price,
     get_auto_discount_percent,
+    growth_emails_enabled,
     conversion_sweep,
     conversion_loop,
 )

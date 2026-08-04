@@ -13,7 +13,7 @@ export default function ReviewsAdmin() {
   const [busy, setBusy] = useState(false);
 
   const load = () => api.get("/admin/reviews").then(({ data }) => setItems(data.items || [])).catch(() => {});
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const onFile = (e) => {
     const f = e.target.files?.[0];
