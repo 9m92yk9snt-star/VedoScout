@@ -159,7 +159,7 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
   const NIcon = t.notchIcon;
   const p = priceParts(price);
   return (
-    <article data-testid={testid} className="relative flex flex-col rounded-[22px] overflow-hidden snap-center shrink-0 w-[82vw] max-w-[320px] sm:w-[46%] sm:max-w-none lg:w-auto lg:shrink" style={t.cardStyle}>
+    <article data-testid={testid} className="relative flex flex-col rounded-[22px] overflow-hidden snap-center shrink-0 w-[82vw] max-w-[320px] sm:w-[46%] sm:max-w-none lg:w-auto lg:shrink" style={{ ...t.cardStyle, transform: "translateZ(0)", WebkitBackfaceVisibility: "hidden" }}>
       {/* ── Header: icon + emotive title + tagline + atmosphere image ── */}
       <div className="relative">
         <div className="pt-7 px-5 text-center relative z-10">
@@ -275,13 +275,28 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   const navigate = useNavigate();
   const trackRef = useRef(null);
   const [busyTier, setBusyTier] = useState(null);
+  const [edge, setEdge] = useState({ start: true, end: false });
   const [prices, setPrices] = useState({ single: 129, premium: 29.99, vip: 49.99 });
+
+  const updateEdge = () => {
+    const el = trackRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setEdge({ start: el.scrollLeft <= 8, end: el.scrollLeft >= max - 8 });
+  };
+
+  useEffect(() => {
+    const t = setTimeout(updateEdge, 300);
+    return () => clearTimeout(t);
+  }, []);
 
   const nudge = (dir) => {
     const el = trackRef.current;
     if (!el) return;
     const card = el.querySelector("article");
-    el.scrollBy({ left: dir * ((card?.offsetWidth || 300) + 16), behavior: "smooth" });
+    const step = (card?.offsetWidth || 300) + 16;
+    const max = el.scrollWidth - el.clientWidth;
+    el.scrollTo({ left: Math.max(0, Math.min(max, el.scrollLeft + dir * step)), behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -335,7 +350,7 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   return (
     <div data-testid="dream-pricing-tiers" className="rounded-[26px] px-4 sm:px-6 py-6 md:py-8" style={{ background: "#070A07" }}>
       <div className="relative">
-        <div ref={trackRef} className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-smooth pb-2 lg:pb-0 items-stretch smp-dream-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+        <div ref={trackRef} onScroll={updateEdge} className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-smooth pb-2 lg:pb-0 items-stretch smp-dream-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none", overscrollBehaviorX: "contain", WebkitOverflowScrolling: "touch", transform: "translateZ(0)" }}>
         <TierCard
           tier="free" price={0} period="/ Month" cta="Start Here"
           onCta={goFree} testid="dream-card-free" ctaTestid="pricing-cta-free"
@@ -360,24 +375,31 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
         {/* Centered swipe arrows — visible until the 4-column grid kicks in */}
         <button
           type="button" aria-label="Previous plan" data-testid="dream-arrow-prev" onClick={() => nudge(-1)}
-          className="lg:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
-          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 0 20px rgba(204,255,0,0.22), 0 6px 20px rgba(0,0,0,0.5)" }}
+          disabled={edge.start}
+          className={`lg:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-all duration-300 ${edge.start ? "opacity-25 pointer-events-none" : "opacity-100"}`}
+          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", animation: edge.start ? "none" : "smp-arrow-pulse 2.2s ease-in-out infinite" }}
         >
-          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00" }} />
+          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00", animation: edge.start ? "none" : "smp-arrow-nudge-l 1.1s ease-in-out infinite" }} />
         </button>
         <button
           type="button" aria-label="Next plan" data-testid="dream-arrow-next" onClick={() => nudge(1)}
-          className="lg:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
-          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 0 20px rgba(204,255,0,0.22), 0 6px 20px rgba(0,0,0,0.5)" }}
+          disabled={edge.end}
+          className={`lg:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-all duration-300 ${edge.end ? "opacity-25 pointer-events-none" : "opacity-100"}`}
+          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", animation: edge.end ? "none" : "smp-arrow-pulse 2.2s ease-in-out infinite" }}
         >
-          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00" }} />
+          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00", animation: edge.end ? "none" : "smp-arrow-nudge-r 1.1s ease-in-out infinite" }} />
         </button>
       </div>
       <p className="lg:hidden mt-3 text-center text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
         Swipe to compare all plans →
       </p>
       <TrustStrip />
-      <style>{`.smp-dream-scroll::-webkit-scrollbar{display:none;}`}</style>
+      <style>{`
+        .smp-dream-scroll::-webkit-scrollbar{display:none;}
+        @keyframes smp-arrow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(204,255,0,0.25), 0 6px 20px rgba(0,0,0,0.5); } 50% { box-shadow: 0 0 30px rgba(204,255,0,0.65), 0 6px 20px rgba(0,0,0,0.5); } }
+        @keyframes smp-arrow-nudge-l { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-3px); } }
+        @keyframes smp-arrow-nudge-r { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+      `}</style>
     </div>
   );
 }

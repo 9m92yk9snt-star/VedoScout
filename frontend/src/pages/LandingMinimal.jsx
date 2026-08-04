@@ -18,7 +18,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin } from "lucide-react";
+import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin, Volleyball } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
@@ -236,18 +236,28 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             transition={{ duration: 0.5, delay: 0.25 }}
             className="mt-7 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 justify-center lg:justify-start"
           >
+            <style>{`
+              @keyframes smp-hero-glow { 0%,100% { box-shadow: 0 26px 48px -16px rgba(31,79,47,0.5), 0 0 16px rgba(204,255,0,0.15); } 50% { box-shadow: 0 26px 48px -16px rgba(31,79,47,0.5), 0 0 34px rgba(204,255,0,0.45); } }
+              @keyframes smp-hero-shine { 0% { transform: translateX(-160%) skewX(-18deg); } 60%, 100% { transform: translateX(280%) skewX(-18deg); } }
+              @keyframes smp-ball-x { 0% { left: -14%; } 100% { left: 106%; } }
+              @keyframes smp-ball-y { 0%,100% { bottom: 5px; } 50% { bottom: 18px; } }
+              @keyframes smp-ball-spin { 0% { rotate: 0deg; } 100% { rotate: 360deg; } }
+            `}</style>
             <button
               type="button"
               onClick={onPrimaryCta}
               data-testid="hero-upload-cta"
-              className="group inline-flex items-center justify-center gap-3 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base px-8 md:px-10 py-4 md:py-5 transition-all w-full sm:w-auto"
-              style={{
-                boxShadow:
-                  "0 26px 48px -16px rgba(31, 79, 47, 0.5), 0 10px 20px -8px rgba(31, 79, 47, 0.35), inset 0 1px 0 rgba(255,255,255,0.08)",
-              }}
+              className="group relative overflow-hidden inline-flex items-center justify-center gap-3 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base px-8 md:px-10 py-4 md:py-5 transition-all hover:scale-[1.02] w-full sm:w-auto"
+              style={{ animation: "smp-hero-glow 2.8s ease-in-out infinite" }}
             >
-              Upload your video
-              <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              <span aria-hidden className="absolute inset-y-0 w-1/3 bg-white/20 pointer-events-none" style={{ animation: "smp-hero-shine 3.2s ease-in-out infinite" }} />
+              <span aria-hidden className="absolute pointer-events-none" style={{ animation: "smp-ball-x 4.6s linear infinite, smp-ball-y 0.72s ease-in-out infinite" }}>
+                <Volleyball className="w-4 h-4" style={{ color: "rgba(204,255,0,0.75)", animation: "smp-ball-spin 1.3s linear infinite" }} />
+              </span>
+              <span className="relative z-10 inline-flex items-center gap-3">
+                Upload your video
+                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+              </span>
             </button>
             <a
               href="#how-it-works-walkthrough"

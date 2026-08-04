@@ -303,6 +303,7 @@ function CtaCard({ onPrimaryCta }) {
 export const SampleReportShowcase = ({ onPrimaryCta }) => {
   const scrollerRef = useRef(null);
   const [active, setActive] = useState(0);
+  const [edge, setEdge] = useState({ start: true, end: false });
   const cards = [OverviewCard, PillarsCard, StrengthsCard, PaceCardSample, ParentsCard, PlanCard];
 
   const handleScroll = () => {
@@ -312,13 +313,17 @@ export const SampleReportShowcase = ({ onPrimaryCta }) => {
     if (!card) return;
     const w = card.offsetWidth + 16;
     setActive(Math.min(cards.length, Math.round(el.scrollLeft / w)));
+    const max = el.scrollWidth - el.clientWidth;
+    setEdge({ start: el.scrollLeft <= 8, end: el.scrollLeft >= max - 8 });
   };
 
   const nudge = (dir) => {
     const el = scrollerRef.current;
     if (!el) return;
     const card = el.querySelector("[data-sample-card]");
-    el.scrollBy({ left: dir * ((card?.offsetWidth || 380) + 16), behavior: "smooth" });
+    const step = (card?.offsetWidth || 380) + 16;
+    const max = el.scrollWidth - el.clientWidth;
+    el.scrollTo({ left: Math.max(0, Math.min(max, el.scrollLeft + dir * step)), behavior: "smooth" });
   };
 
   return (
@@ -353,7 +358,7 @@ export const SampleReportShowcase = ({ onPrimaryCta }) => {
           onScroll={handleScroll}
           data-testid="sample-report-scroller"
           className="mt-7 flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide px-5 sm:px-6 pb-3"
-          style={{ scrollPaddingLeft: 20, WebkitOverflowScrolling: "touch" }}
+          style={{ scrollPaddingLeft: 20, WebkitOverflowScrolling: "touch", overscrollBehaviorX: "contain", transform: "translateZ(0)" }}
         >
           <div className="hidden lg:block shrink-0" style={{ width: "calc((100vw - 1280px) / 2)" }} />
           {cards.map((C, i) => <C key={i} onPrimaryCta={onPrimaryCta} />)}
@@ -361,19 +366,26 @@ export const SampleReportShowcase = ({ onPrimaryCta }) => {
           <div className="shrink-0 w-2" />
         </div>
         {/* Centered swipe arrows — mobile only */}
+        <style>{`
+          @keyframes smp-sarrow-pulse { 0%,100% { box-shadow: 0 0 10px rgba(204,255,0,0.25), 0 4px 18px rgba(0,0,0,0.35); } 50% { box-shadow: 0 0 24px rgba(204,255,0,0.6), 0 4px 18px rgba(0,0,0,0.35); } }
+          @keyframes smp-sarrow-nudge-l { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-3px); } }
+          @keyframes smp-sarrow-nudge-r { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
+        `}</style>
         <button
           type="button" aria-label="Previous card" data-testid="sample-arrow-prev" onClick={() => nudge(-1)}
-          className="sm:hidden absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
-          style={{ background: "rgba(10,20,14,0.62)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 4px 18px rgba(0,0,0,0.35)" }}
+          disabled={edge.start}
+          className={`sm:hidden absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-all duration-300 ${edge.start ? "opacity-25 pointer-events-none" : "opacity-100"}`}
+          style={{ background: "rgba(10,20,14,0.62)", border: "1px solid rgba(204,255,0,0.55)", animation: edge.start ? "none" : "smp-sarrow-pulse 2.2s ease-in-out infinite" }}
         >
-          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00" }} />
+          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00", animation: edge.start ? "none" : "smp-sarrow-nudge-l 1.1s ease-in-out infinite" }} />
         </button>
         <button
           type="button" aria-label="Next card" data-testid="sample-arrow-next" onClick={() => nudge(1)}
-          className="sm:hidden absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
-          style={{ background: "rgba(10,20,14,0.62)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 4px 18px rgba(0,0,0,0.35)" }}
+          disabled={edge.end}
+          className={`sm:hidden absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-all duration-300 ${edge.end ? "opacity-25 pointer-events-none" : "opacity-100"}`}
+          style={{ background: "rgba(10,20,14,0.62)", border: "1px solid rgba(204,255,0,0.55)", animation: edge.end ? "none" : "smp-sarrow-pulse 2.2s ease-in-out infinite" }}
         >
-          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00" }} />
+          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00", animation: edge.end ? "none" : "smp-sarrow-nudge-r 1.1s ease-in-out infinite" }} />
         </button>
       </div>
 

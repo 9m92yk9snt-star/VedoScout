@@ -3044,3 +3044,10 @@ Brugerens 4 punkter:
 - Nyt asset: /app/backend/static/landing/finalcta-stadium.jpg (genereret, bruges i FinalCta + sample CTA-kort).
 - Testing agent fix: footer social keys er instagram_url/facebook_url/twitter_url/linkedin_url i settings-svar (koden læser nu begge varianter).
 - Test: iteration_71.json — 100%, ingen console errors, alle regressioner OK.
+
+## Session (Aug 4, 2026 - nat 3) — SWIPE-KANT FIX + LEVENDE PILE + HERO-BOLD ✅ (self-tested m. screenshots)
+1. **"Jumps to black"-bug fixet**: Pricing-karrusellen (DreamPricingTiers) og sample-scrolleren kan ikke længere skubbes forbi kanten: nudge bruger nu clamped scrollTo (0..max), edge-state (start/end) trackes via onScroll, pile deaktiveres+fader (opacity-25) ved kanterne. iOS-render-bug forebygget: overscrollBehaviorX contain + transform translateZ(0) på track og kort (WebkitBackfaceVisibility hidden).
+2. **Levende pile**: pulserende volt-glow (smp-arrow-pulse) + chevron-nudge-animation (smp-arrow-nudge-l/r) + active:scale-90 på både dream- og sample-pile. Animation stopper når pilen er deaktiveret.
+3. **Hero-knappen "Upload your video"** (LandingMinimal ~239): nu levende — hoppende roterende fodbold (lucide Volleyball, volt) der hopper hen over knappen bag teksten (smp-ball-x/y/spin keyframes), hvid shine-sweep + pulserende volt-glød (smp-hero-glow/shine), hover scale. Tekst i z-10 span.
+- OBS: parallel-edit batch fejlede delvist (2 edits landede ikke + 1 dublet-tail i DreamPricingTiers) → gav midlertidige runtime errors "edge/updateEdge is not defined" — alle rettet og verificeret.
+- Verificeret: prev disabled ved start, 8x next-klik klemmer på max (969/969) m. VIP-kort synligt (ingen sort), next disabled ved slut, bold-ikonet renderer i hero-knappen, ingen console errors.
