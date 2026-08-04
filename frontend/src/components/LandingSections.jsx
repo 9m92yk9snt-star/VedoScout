@@ -96,40 +96,56 @@ export function TrustStrip() {
     <section
       id="trust-strip"
       data-testid="trust-strip"
-      className="relative bg-ink text-cream-base px-6 md:px-10 py-6 md:py-8 overflow-hidden border-b border-volt/15"
+      className="relative bg-ink text-cream-base px-6 md:px-10 py-7 md:py-9 overflow-hidden border-b border-volt/15"
     >
-      <style>{`@keyframes smp-strip-sweep { 0% { left: -20%; } 100% { left: 120%; } }`}</style>
+      <style>{`
+        @keyframes smp-strip-sweep { 0% { left: -25%; } 100% { left: 125%; } }
+        @keyframes smp-strip-shine { 0% { transform: translateX(-140%) skewX(-16deg); } 55%, 100% { transform: translateX(240%) skewX(-16deg); } }
+        @keyframes smp-icon-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+      `}</style>
       <span
         aria-hidden
-        className="absolute top-0 h-[2px] w-[18%] bg-gradient-to-r from-transparent via-volt to-transparent"
-        style={{ animation: "smp-strip-sweep 5s linear infinite" }}
+        className="absolute top-0 h-[3px] w-[26%] bg-gradient-to-r from-transparent via-volt to-transparent"
+        style={{ animation: "smp-strip-sweep 4s linear infinite" }}
+      />
+      <span
+        aria-hidden
+        className="absolute inset-y-0 w-1/4 pointer-events-none"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(204,255,0,0.06), transparent)", animation: "smp-strip-shine 6s ease-in-out infinite" }}
       />
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.05] pointer-events-none"
+        className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #CCFF00 1px, transparent 0)", backgroundSize: "28px 28px" }}
       />
-      <div className="relative max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 md:gap-x-0">
+      <div className="relative max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-6 md:gap-x-0">
         {items.map((it, idx) => {
           const Icon = it.icon;
           return (
             <motion.div
               key={it.label}
-              initial={{ opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 10, scale: 0.96 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              whileHover={{ y: -3 }}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.45, delay: idx * 0.08 }}
-              className={`flex items-center gap-3 md:gap-4 md:px-6 ${idx > 0 ? "md:border-l md:border-volt/10" : ""}`}
+              transition={{ duration: 0.5, delay: idx * 0.1 }}
+              className={`flex items-center gap-3 md:gap-4 md:px-6 ${idx > 0 ? "md:border-l md:border-volt/15" : ""}`}
             >
-              <span className="shrink-0 w-10 h-10 bg-volt/10 border border-volt/25 flex items-center justify-center">
-                <Icon className="w-5 h-5 text-volt" strokeWidth={1.9} aria-hidden="true" />
+              <span
+                className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
+                style={{ background: "rgba(204,255,0,0.12)", border: "1px solid rgba(204,255,0,0.45)", boxShadow: "0 0 16px rgba(204,255,0,0.18)", animation: `smp-icon-float 3.2s ease-in-out ${idx * 0.4}s infinite` }}
+              >
+                <Icon className="w-5 h-5" style={{ color: "#CCFF00" }} strokeWidth={1.9} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <div className="font-barlow font-black text-2xl md:text-3xl uppercase tracking-tight leading-none text-volt">
+                <div
+                  className="font-barlow font-black text-[28px] md:text-4xl uppercase tracking-tight leading-none"
+                  style={{ color: "#CCFF00", textShadow: "0 0 20px rgba(204,255,0,0.45)" }}
+                >
                   {it.value}
-                  <span className="text-cream-base/80 text-lg md:text-xl">{it.suffix}</span>
+                  <span className="text-cream-base text-lg md:text-2xl" style={{ textShadow: "none" }}>{it.suffix}</span>
                 </div>
-                <div className="mt-1 text-[10px] md:text-[11px] uppercase tracking-[0.14em] font-bold text-cream-base/60 leading-tight">
+                <div className="mt-1.5 text-[10px] md:text-[11px] uppercase tracking-[0.14em] font-bold text-cream-base/75 leading-tight">
                   {it.label}
                 </div>
               </div>
@@ -443,15 +459,24 @@ export function FinalCta({ isLoggedIn }) {
     <section
       id="final-cta"
       data-testid="final-cta"
-      className="relative bg-ink text-cream-base px-6 md:px-10 py-14 md:py-20 overflow-hidden"
+      className="relative bg-ink text-cream-base px-6 md:px-10 py-20 md:py-28 overflow-hidden"
     >
+      <style>{`
+        @keyframes smp-final-glow { 0%, 100% { box-shadow: 0 0 26px rgba(204,255,0,0.35); } 50% { box-shadow: 0 0 52px rgba(204,255,0,0.65); } }
+        @keyframes smp-final-shine { 0% { transform: translateX(-140%) skewX(-18deg); } 55%, 100% { transform: translateX(260%) skewX(-18deg); } }
+      `}</style>
+      <img
+        src={IMG("finalcta-stadium.jpg")}
+        alt=""
+        loading="lazy"
+        aria-hidden
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
       <div
         aria-hidden
-        className="absolute inset-0 opacity-[0.05] pointer-events-none"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, #CCFF00 1px, transparent 0)",
-          backgroundSize: "32px 32px",
-        }}
+        className="absolute inset-0"
+        style={{ background: "linear-gradient(180deg, rgba(6,10,7,0.82) 0%, rgba(6,10,7,0.45) 45%, rgba(6,10,7,0.9) 100%)" }}
       />
       <div className="relative max-w-3xl mx-auto text-center">
         <div className="inline-flex items-center gap-2.5 mb-4">
@@ -463,26 +488,28 @@ export function FinalCta({ isLoggedIn }) {
             Free preview · No card to start
           </span>
         </div>
-        <h2 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl lg:text-7xl leading-[0.9]">
+        <h2 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl lg:text-7xl leading-[0.9]" style={{ textShadow: "0 2px 30px rgba(0,0,0,0.6)" }}>
           Your next level is one<br />
-          <span className="text-volt">upload away.</span>
+          <span className="text-volt" style={{ textShadow: "0 0 34px rgba(204,255,0,0.4)" }}>upload away.</span>
         </h2>
-        <p className="mt-4 text-cream-base/70 max-w-xl mx-auto text-base md:text-lg leading-relaxed">
-          Get an honest professional read in 48 hours. Built for ambitious U7–U21 players.
+        <p className="mt-5 text-cream-base/85 max-w-xl mx-auto text-base md:text-lg leading-relaxed" style={{ textShadow: "0 1px 12px rgba(0,0,0,0.6)" }}>
+          The lights are already on. One clip — and your game finally gets the eyes it deserves.
         </p>
         <Link
           to={target}
           data-testid="final-cta-button"
-          className="mt-8 inline-flex items-center justify-center gap-3 bg-volt hover:bg-[#D8FF33] text-ink font-barlow font-black uppercase tracking-[0.18em] text-base md:text-lg px-10 md:px-14 py-5 md:py-6 transition-colors"
+          className="relative overflow-hidden mt-9 inline-flex items-center justify-center gap-3 bg-volt hover:bg-[#D8FF33] text-ink font-barlow font-black uppercase tracking-[0.18em] text-base md:text-lg px-10 md:px-14 py-5 md:py-6 rounded-sm transition-all hover:scale-[1.03]"
+          style={{ animation: "smp-final-glow 2.8s ease-in-out infinite" }}
         >
+          <span aria-hidden className="absolute inset-y-0 w-1/3 bg-white/40 pointer-events-none" style={{ animation: "smp-final-shine 3s ease-in-out infinite" }} />
           Upload your video
           <ArrowRight className="w-5 h-5" />
         </Link>
-        <div className="mt-5 flex items-center justify-center gap-5 text-[10px] uppercase tracking-[0.18em] font-bold text-cream-base/55">
+        <div className="mt-6 flex items-center justify-center gap-5 text-[10px] uppercase tracking-[0.18em] font-bold text-cream-base/70">
           <span className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3 text-volt" /> Secure Stripe</span>
-          <span className="w-1 h-1 bg-cream-base/30 rounded-full" />
+          <span className="w-1 h-1 bg-cream-base/40 rounded-full" />
           <span>Cancel anytime</span>
-          <span className="w-1 h-1 bg-cream-base/30 rounded-full hidden sm:inline-block" />
+          <span className="w-1 h-1 bg-cream-base/40 rounded-full hidden sm:inline-block" />
           <span className="hidden sm:inline">Refund if we miss 48h</span>
         </div>
       </div>

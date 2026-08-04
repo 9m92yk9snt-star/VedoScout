@@ -13,7 +13,7 @@
  *   Premium → POST /payments/subscribe { tier:"premium" }
  *   VIP     → POST /payments/subscribe { tier:"vip" }
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -273,8 +273,16 @@ function TrustStrip() {
 /* ════════════════════════════════════════════════════════════════════ */
 export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle = null, discount = null }) {
   const navigate = useNavigate();
+  const trackRef = useRef(null);
   const [busyTier, setBusyTier] = useState(null);
   const [prices, setPrices] = useState({ single: 129, premium: 29.99, vip: 49.99 });
+
+  const nudge = (dir) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const card = el.querySelector("article");
+    el.scrollBy({ left: dir * ((card?.offsetWidth || 300) + 16), behavior: "smooth" });
+  };
 
   useEffect(() => {
     let alive = true;
@@ -326,7 +334,8 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
 
   return (
     <div data-testid="dream-pricing-tiers" className="rounded-[26px] px-4 sm:px-6 py-6 md:py-8" style={{ background: "#070A07" }}>
-      <div className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-smooth pb-2 lg:pb-0 items-stretch smp-dream-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+      <div className="relative">
+        <div ref={trackRef} className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-smooth pb-2 lg:pb-0 items-stretch smp-dream-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
         <TierCard
           tier="free" price={0} period="/ Month" cta="Start Here"
           onCta={goFree} testid="dream-card-free" ctaTestid="pricing-cta-free"
@@ -347,6 +356,22 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
           onCta={() => startSubscription("vip")} loading={busyTier === "vip"} disabled={!!busyTier && busyTier !== "vip"}
           testid="dream-card-vip" ctaTestid="paywall-vip-cta"
         />
+        </div>
+        {/* Centered swipe arrows — visible until the 4-column grid kicks in */}
+        <button
+          type="button" aria-label="Previous plan" data-testid="dream-arrow-prev" onClick={() => nudge(-1)}
+          className="lg:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
+          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 0 20px rgba(204,255,0,0.22), 0 6px 20px rgba(0,0,0,0.5)" }}
+        >
+          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00" }} />
+        </button>
+        <button
+          type="button" aria-label="Next plan" data-testid="dream-arrow-next" onClick={() => nudge(1)}
+          className="lg:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
+          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 0 20px rgba(204,255,0,0.22), 0 6px 20px rgba(0,0,0,0.5)" }}
+        >
+          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00" }} />
+        </button>
       </div>
       <p className="lg:hidden mt-3 text-center text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
         Swipe to compare all plans →

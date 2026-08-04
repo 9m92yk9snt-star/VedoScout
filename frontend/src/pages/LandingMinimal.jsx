@@ -18,7 +18,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, Send, PlayCircle } from "lucide-react";
+import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
@@ -535,115 +535,140 @@ function FAQSection({ faqItems }) {
 /* ============================================================ */
 function SiteFooter() {
   const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+  const [social, setSocial] = useState(null);
+  useEffect(() => {
+    api.get("/settings/price").then(({ data }) => setSocial(data?.social || null)).catch(() => {});
+  }, []);
+
+  const socialLinks = [
+    ["instagram", Instagram, social?.instagram_url || social?.instagram],
+    ["facebook", Facebook, social?.facebook_url || social?.facebook],
+    ["twitter", Twitter, social?.twitter_url || social?.twitter],
+    ["linkedin", Linkedin, social?.linkedin_url || social?.linkedin],
+  ].filter(([, , url]) => !!url);
+
   return (
     <footer
       data-testid="footer-minimal"
-      className="relative isolate overflow-hidden bg-ink text-white/75 px-6 md:px-10 py-14 md:py-20"
+      className="relative isolate overflow-hidden bg-ink text-white/75 px-6 md:px-10 pt-16 md:pt-20 pb-8"
     >
-      {/* Layer 1 — Nano Banana hero turf (aerial pitch at midnight) */}
+      {/* Aerial turf at midnight */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-30 opacity-55"
+        className="absolute inset-0 -z-30 opacity-70"
         style={{
           backgroundImage: `url(${BACKEND_URL}/api/static/landing/footer-hero-turf.png)`,
           backgroundSize: "cover",
           backgroundPosition: "center 30%",
         }}
       />
-      {/* Layer 2 — dark ink gradient wash so text stays readable */}
       <div
         aria-hidden
         className="absolute inset-0 -z-20"
         style={{
           background:
-            "linear-gradient(180deg, rgba(10,26,18,0.72) 0%, rgba(10,26,18,0.88) 45%, rgba(10,26,18,0.96) 100%)",
+            "linear-gradient(180deg, rgba(8,18,12,0.86) 0%, rgba(8,18,12,0.68) 40%, rgba(8,18,12,0.94) 100%)",
         }}
       />
-      {/* Layer 3 — Nano Banana grain texture, blended in */}
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-10 opacity-25 mix-blend-overlay"
-        style={{
-          backgroundImage: `url(${BACKEND_URL}/api/static/landing/footer-noise-grain.png)`,
-          backgroundSize: "512px 512px",
-          backgroundRepeat: "repeat",
-        }}
-      />
-      {/* Layer 4 — top chalk line divider (subtle floodlight glow) */}
+      {/* Floodlight glow along the top edge */}
       <div
         aria-hidden
         className="absolute top-0 left-0 right-0 h-px -z-10"
         style={{
           background:
-            "linear-gradient(90deg, transparent 0%, rgba(204,255,0,0.35) 20%, rgba(245,196,67,0.4) 50%, rgba(204,255,0,0.35) 80%, transparent 100%)",
+            "linear-gradient(90deg, transparent 0%, rgba(204,255,0,0.4) 20%, rgba(245,196,67,0.45) 50%, rgba(204,255,0,0.4) 80%, transparent 100%)",
         }}
       />
       <span
         aria-hidden
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-8 -z-10 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(ellipse at top, rgba(245,196,67,0.35) 0%, transparent 70%)",
-        }}
+        className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-12 -z-10 pointer-events-none"
+        style={{ background: "radial-gradient(ellipse at top, rgba(245,196,67,0.32) 0%, transparent 70%)" }}
       />
+      {/* Giant watermark */}
+      <span
+        aria-hidden
+        className="absolute -bottom-6 left-1/2 -translate-x-1/2 -z-10 font-barlow font-black uppercase whitespace-nowrap select-none pointer-events-none tracking-tight"
+        style={{ fontSize: "clamp(80px, 14vw, 200px)", color: "rgba(204,255,0,0.045)", lineHeight: 1 }}
+      >
+        ScoutMePlay
+      </span>
 
-      <div className="relative max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
-        {/* Brand block */}
-        <div className="text-center md:text-left">
-          {/* Volt kicker line */}
-          <span
-            aria-hidden
-            className="hidden md:inline-block w-8 h-px bg-volt align-middle mr-3"
-          />
+      <div className="relative max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[1.5fr_1fr_1fr] gap-10 md:gap-8 text-center md:text-left">
+        {/* Brand + story */}
+        <div>
           <span className="font-barlow font-black uppercase text-white text-2xl md:text-3xl tracking-[0.14em]">
             SCOUT<span className="text-ink bg-volt px-[3px] mx-[1px]">ME</span>PLAY
           </span>
-          <p className="mt-3 text-[10px] md:text-[11px] uppercase tracking-[0.22em] text-white/60 font-bold">
-            See your game like never before
+          <p className="mt-4 text-[15px] text-white/80 leading-relaxed max-w-sm mx-auto md:mx-0">
+            Every player has a story worth seeing.
+            <span className="text-white font-semibold"> Upload one clip — and let yours begin.</span>
           </p>
-          {/* Tiny football pitch icon divider */}
-          <div className="mt-4 flex items-center gap-2 justify-center md:justify-start">
-            <span aria-hidden className="w-3 h-px bg-volt/50" />
-            <span aria-hidden className="w-1 h-1 rounded-full bg-volt" />
-            <span aria-hidden className="w-3 h-px bg-volt/50" />
-            <span className="text-[9px] uppercase tracking-[0.28em] font-black text-white/40">Elite</span>
-            <span aria-hidden className="w-3 h-px bg-volt/50" />
-            <span aria-hidden className="w-1 h-1 rounded-full bg-volt" />
-            <span aria-hidden className="w-3 h-px bg-volt/50" />
-          </div>
+          <Link
+            to="/upload"
+            data-testid="footer-upload-link"
+            className="group inline-flex items-center gap-2 mt-5 text-volt font-barlow font-black uppercase tracking-[0.16em] text-[12px] hover:text-[#D8FF33] transition-colors"
+          >
+            Start your story
+            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+          </Link>
         </div>
 
-        {/* Nav */}
-        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[11px] md:text-[12px] uppercase tracking-[0.22em] font-bold">
-          {[
-            ["/about", "About", "footer-link-about"],
-            ["/methodology", "Methodology", "footer-link-methodology"],
-            ["/blog", "Blog", "footer-link-blog"],
-            ["/privacy", "Privacy", "footer-link-privacy"],
-            ["/terms", "Terms", "footer-link-terms"],
-          ].map(([to, label, testid]) => (
-            <Link
-              key={to}
-              to={to}
-              data-testid={testid}
-              className="group relative text-white/70 hover:text-white transition-colors duration-200"
-            >
-              <span>{label}</span>
-              <span
-                aria-hidden
-                className="absolute -bottom-1 left-0 right-0 h-px bg-volt scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300"
-              />
-            </Link>
-          ))}
-        </nav>
+        {/* Explore */}
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.28em] text-volt/80 mb-4">Explore</div>
+          <ul className="space-y-2.5">
+            {[
+              ["/about", "About us", "footer-link-about"],
+              ["/methodology", "How it works", "footer-link-methodology"],
+              ["/blog", "Stories & blog", "footer-link-blog"],
+              ["/upload", "Upload a video", "footer-link-upload"],
+            ].map(([to, label, testid]) => (
+              <li key={to}>
+                <Link to={to} data-testid={testid} className="text-[13.5px] text-white/70 hover:text-volt transition-colors">
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Connect + legal */}
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.28em] text-volt/80 mb-4">Connect</div>
+          <div className="flex items-center gap-3 justify-center md:justify-start">
+            {socialLinks.length > 0 ? socialLinks.map(([key, Icon, url]) => (
+              <a
+                key={key}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={key}
+                data-testid={`footer-social-${key}`}
+                className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-white/70 hover:text-volt hover:border-volt hover:-translate-y-0.5 transition-all"
+              >
+                <Icon className="w-4 h-4" />
+              </a>
+            )) : (
+              <span className="text-[12px] text-white/40">Follow the journey — coming soon</span>
+            )}
+          </div>
+          <ul className="mt-5 space-y-2.5">
+            <li>
+              <Link to="/privacy" data-testid="footer-link-privacy" className="text-[13.5px] text-white/70 hover:text-volt transition-colors">Privacy</Link>
+            </li>
+            <li>
+              <Link to="/terms" data-testid="footer-link-terms" className="text-[13.5px] text-white/70 hover:text-volt transition-colors">Terms</Link>
+            </li>
+          </ul>
+        </div>
       </div>
 
       {/* Bottom bar */}
-      <div className="relative max-w-6xl mx-auto mt-10 pt-6 border-t border-white/10 text-[10px] uppercase tracking-[0.24em] text-white/45 font-bold flex flex-col sm:flex-row items-center justify-between gap-3">
-        <span>© {new Date().getFullYear()} ScoutMePlay · MentalKids · Denmark</span>
-        <span className="flex items-center gap-2">
+      <div className="relative max-w-6xl mx-auto mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <span className="text-[11px] text-white/50">© {new Date().getFullYear()} ScoutMePlay. All rights reserved.</span>
+        <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] font-bold text-white/50">
           <ShieldCheck className="w-3.5 h-3.5 text-volt" strokeWidth={2.4} />
-          <span>Secure Stripe · No subscription</span>
+          <span>Secure Stripe · Cancel anytime</span>
         </span>
       </div>
     </footer>

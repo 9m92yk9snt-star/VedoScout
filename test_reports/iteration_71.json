@@ -1,0 +1,21 @@
+{
+  "summary": "Frontend-only iteration 71 testing for ScoutMePlay landing polish (4 requests). All primary features verified: mobile centered dream-arrow-prev/next scroll (0→317 next, →0 prev) and are hidden on desktop; sample-arrow-prev/next visible on mobile and hidden on desktop while sample-prev/next remain on desktop; sample showcase content updated ('What They Really Mean' pillar title, humanized parent Q&A rows, 'One clip. One report...' CTA card headline, sample-report-cta still routes to /upload); trust-strip shows 48h / U7 / U21 / 19+ with glowing volt; final-cta headline 'next level' present, final-cta-button links to /upload, /api/static/landing/finalcta-stadium.jpg returns 200; footer redesigned — footer-upload-link present with 'Start your story', copyright '© 2026 ScoutMePlay. All rights reserved.' with NO MentalKids/Denmark; all 4 dream pricing cards render; no React console errors. One bug found and fixed: footer social icons were missing because SiteFooter read social.instagram/facebook/twitter/linkedin but backend returns instagram_url/facebook_url/twitter_url/linkedin_url — fixed to accept both keys; all 4 footer-social-* now render with correct hrefs.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_71.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "LandingMinimal.jsx SiteFooter accessed social.instagram/facebook/... but backend /api/settings/price returns instagram_url/facebook_url/... keys. Fixed in this iteration by reading `_url` variant first. Consider standardizing key names between admin settings save and public settings response to avoid future drift."
+  ],
+  "updated_files": ["/app/frontend/src/pages/LandingMinimal.jsx"],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (not needed — dashboard pricing arrows are the same shared DreamPricingTiers component already verified on landing)",
+  "seed_data_creation": "None. No users created; owner reports/reviews left intact.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Landing at /, mobile 390x844 works fully. If pricing carousel arrows need testing on Dashboard / free preview / report paywall in future, note it's the same DreamPricingTiers component. Fixed social link key mismatch (_url suffix)."
+}

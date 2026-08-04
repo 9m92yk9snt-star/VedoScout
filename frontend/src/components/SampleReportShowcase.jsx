@@ -33,7 +33,7 @@ function CardHead({ kicker, title }) {
   );
 }
 
-function Bar({ label, score }) {
+function Bar({ label, score, meaning }) {
   return (
     <div>
       <div className="flex items-baseline justify-between">
@@ -43,6 +43,7 @@ function Bar({ label, score }) {
       <div className="h-2 rounded-full bg-[#E5DFCE] mt-1.5 overflow-hidden">
         <div className="h-full rounded-full" style={{ width: `${score * 10}%`, background: `linear-gradient(90deg, ${FOREST}, #2D6B3D)` }} />
       </div>
+      {meaning && <p className="text-[11px] text-[#75816F] italic mt-1 leading-snug">{meaning}</p>}
     </div>
   );
 }
@@ -100,12 +101,12 @@ function OverviewCard() {
 function PillarsCard() {
   return (
     <Card testid="sample-card-pillars">
-      <CardHead kicker="The four pillars" title="Scout Scores" />
-      <div className="px-5 pt-4 space-y-4">
-        <Bar label="Technical" score={8.4} />
-        <Bar label="Game intelligence" score={7.6} />
-        <Bar label="Physical" score={7.9} />
-        <Bar label="Mentality" score={8.1} />
+      <CardHead kicker="The numbers — translated" title="What They Really Mean" />
+      <div className="px-5 pt-4 space-y-3">
+        <Bar label="Technical" score={8.4} meaning="His first touch buys him time others don't have." />
+        <Bar label="Game intelligence" score={7.6} meaning="Sees the pass early — plays it a beat later." />
+        <Bar label="Physical" score={7.9} meaning="Wins the metres that decide a 1v1." />
+        <Bar label="Mentality" score={8.1} meaning="A mistake doesn't slow him down — it switches him on." />
       </div>
       <div className="px-5 pb-5 mt-auto">
         <div className="rounded-xl bg-white border border-[#E5DFCE] p-3.5 flex items-center gap-3">
@@ -177,10 +178,15 @@ function PaceCardSample() {
         </div>
       </div>
       <div className="px-5 pb-5 pt-3 mt-auto">
-        <div className="flex items-start gap-2.5">
+        <div className="rounded-xl bg-white border border-[#E5DFCE] p-3.5">
+          <p className="text-[12px] text-[#3D4A38] leading-snug italic">
+            "Faster than most wingers his age — and the report shows the <span className="font-bold not-italic text-[#12402A]">exact sprint</span> where he proved it."
+          </p>
+        </div>
+        <div className="flex items-start gap-2.5 mt-3">
           <Gauge className="w-4 h-4 mt-0.5 shrink-0 text-[#2D6B3D]" />
           <p className="text-[11px] text-[#8A937F] leading-relaxed">
-            Speed comes from pixel-level optical tracking of <span className="font-bold text-[#3D4A38]">your marked player</span> — the numbers are never invented.
+            Pixel-level optical tracking of <span className="font-bold text-[#3D4A38]">your marked player</span> — never invented.
           </p>
         </div>
       </div>
@@ -190,14 +196,14 @@ function PaceCardSample() {
 
 function ParentsCard() {
   const rows = [
-    ["Involvement", "11 touches · 2.4/min"],
-    ["Bravery", "8.5 / 10"],
-    ["Reaction after mistake", "Strong — wins ball back"],
-    ["Off-ball work", "7.0 / 10"],
+    ["Does he demand the ball?", "11 touches · always available"],
+    ["Is he brave?", "8.5 / 10 — takes his man on"],
+    ["After a mistake?", "Wins the ball straight back"],
+    ["Work without the ball?", "7.0 — and growing"],
   ];
   return (
     <Card testid="sample-card-parents">
-      <CardHead kicker="Evidence only" title="What Parents Ask" />
+      <CardHead kicker="The questions you whisper" title="What Parents Ask" />
       <div className="px-5 pt-4 space-y-2">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-center justify-between bg-white border border-[#E5DFCE] rounded-xl px-3.5 py-2.5">
@@ -248,36 +254,45 @@ function PlanCard() {
 }
 
 function CtaCard({ onPrimaryCta }) {
+  const ASSET = process.env.REACT_APP_BACKEND_URL;
   return (
     <Card testid="sample-card-cta">
-      <div className="flex-1 flex flex-col px-5 py-6" style={{ background: FOREST }}>
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4" style={{ color: LIME }} />
-          <span className="text-[9.5px] font-black uppercase tracking-[0.18em] text-white">+ Downloadable PDF dossier</span>
+      <div className="relative flex-1 flex flex-col px-5 py-6 overflow-hidden">
+        <img
+          src={`${ASSET}/api/static/landing/finalcta-stadium.jpg`}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+        <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(5,8,5,0.62) 0%, rgba(5,8,5,0.3) 45%, rgba(5,8,5,0.9) 100%)" }} />
+        <style>{`
+          @keyframes smp-cta-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(220%) skewX(-18deg); } }
+          @keyframes smp-cta-glow { 0%, 100% { box-shadow: 0 0 22px rgba(204,255,0,0.35); } 50% { box-shadow: 0 0 40px rgba(204,255,0,0.65); } }
+        `}</style>
+        <div className="relative flex items-center gap-2">
+          <Sparkles className="w-4 h-4" style={{ color: "#F5C443" }} />
+          <span className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: "#F5C443" }}>Your story is next</span>
         </div>
-        <div className="mt-4 flex gap-2">
-          {["Scores", "Benchmarks", "Plan"].map((p, i) => (
-            <div key={p} className="flex-1 rounded-lg bg-white/10 border border-white/15 p-2.5 text-center" style={{ transform: `rotate(${(i - 1) * 2}deg)` }}>
-              <FileText className="w-4 h-4 mx-auto text-white/60" />
-              <div className="text-[8.5px] font-black uppercase tracking-[0.1em] text-white/70 mt-1.5">{p}</div>
-            </div>
-          ))}
-        </div>
-        <p className="text-[12.5px] text-white/80 leading-relaxed mt-5">
-          8-page printable dossier — share it with the coach, or frame the diploma page.
-          <span className="block mt-2 text-white/60 text-[11px]">VIP adds a written review from a real professional scout within 48h.</span>
-        </p>
-        <div className="mt-auto pt-5">
+        <h3 className="relative font-barlow font-black uppercase text-white text-[26px] leading-[1.02] mt-3">
+          One clip.<br />One report.<br />
+          <span style={{ color: LIME }}>A whole new way<br />to see your game.</span>
+        </h3>
+        <div className="relative mt-auto pt-6">
+          <p className="text-[12.5px] text-white/80 leading-relaxed mb-4">
+            The lights are already on. The next report we write could be about <span className="font-bold text-white">you</span>.
+          </p>
           <button
             type="button"
             data-testid="sample-report-cta"
             onClick={onPrimaryCta}
-            className="w-full inline-flex items-center justify-center gap-2 font-barlow font-black uppercase tracking-[0.12em] text-[14px] px-6 py-4 rounded-xl transition-transform active:scale-[0.98]"
-            style={{ background: LIME, color: "#0D2818" }}
+            className="relative overflow-hidden w-full inline-flex items-center justify-center gap-2 font-barlow font-black uppercase tracking-[0.12em] text-[14px] px-6 py-4 rounded-xl transition-transform active:scale-[0.98] hover:scale-[1.02]"
+            style={{ background: LIME, color: "#0D2818", animation: "smp-cta-glow 2.6s ease-in-out infinite" }}
           >
+            <span aria-hidden className="absolute inset-y-0 w-1/3 bg-white/40 pointer-events-none" style={{ animation: "smp-cta-shine 2.8s ease-in-out infinite" }} />
             Upload your video <ArrowRight className="w-4 h-4" />
           </button>
-          <p className="text-center text-[10px] text-white/55 mt-2.5">Free preview · no card needed to start</p>
+          <p className="text-center text-[10px] text-white/60 mt-2.5">Free preview · no card needed to start</p>
         </div>
       </div>
     </Card>
@@ -332,17 +347,34 @@ export const SampleReportShowcase = ({ onPrimaryCta }) => {
         </div>
       </div>
 
-      <div
-        ref={scrollerRef}
-        onScroll={handleScroll}
-        data-testid="sample-report-scroller"
-        className="mt-7 flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide px-5 sm:px-6 pb-3"
-        style={{ scrollPaddingLeft: 20, WebkitOverflowScrolling: "touch" }}
-      >
-        <div className="hidden lg:block shrink-0" style={{ width: "calc((100vw - 1280px) / 2)" }} />
-        {cards.map((C, i) => <C key={i} onPrimaryCta={onPrimaryCta} />)}
-        <CtaCard onPrimaryCta={onPrimaryCta} />
-        <div className="shrink-0 w-2" />
+      <div className="relative">
+        <div
+          ref={scrollerRef}
+          onScroll={handleScroll}
+          data-testid="sample-report-scroller"
+          className="mt-7 flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide px-5 sm:px-6 pb-3"
+          style={{ scrollPaddingLeft: 20, WebkitOverflowScrolling: "touch" }}
+        >
+          <div className="hidden lg:block shrink-0" style={{ width: "calc((100vw - 1280px) / 2)" }} />
+          {cards.map((C, i) => <C key={i} onPrimaryCta={onPrimaryCta} />)}
+          <CtaCard onPrimaryCta={onPrimaryCta} />
+          <div className="shrink-0 w-2" />
+        </div>
+        {/* Centered swipe arrows — mobile only */}
+        <button
+          type="button" aria-label="Previous card" data-testid="sample-arrow-prev" onClick={() => nudge(-1)}
+          className="sm:hidden absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
+          style={{ background: "rgba(10,20,14,0.62)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 4px 18px rgba(0,0,0,0.35)" }}
+        >
+          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00" }} />
+        </button>
+        <button
+          type="button" aria-label="Next card" data-testid="sample-arrow-next" onClick={() => nudge(1)}
+          className="sm:hidden absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-95 transition-transform"
+          style={{ background: "rgba(10,20,14,0.62)", border: "1px solid rgba(204,255,0,0.55)", boxShadow: "0 4px 18px rgba(0,0,0,0.35)" }}
+        >
+          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00" }} />
+        </button>
       </div>
 
       <div className="flex justify-center gap-1.5 mt-4" data-testid="sample-dots">
