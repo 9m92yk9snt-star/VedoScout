@@ -203,9 +203,14 @@ def build_score_meaning_teaser(doc: dict) -> dict:
                 "locked_count": len(labels), "has_discovery": False}
     sk = sm["skills"]
     unlocked = next((s for s in sk if (s.get("evidence") or {}).get("verified")), sk[0])
-    locked = [s["label"] for s in sk if s["key"] != unlocked["key"]]
+    bonus = None
+    if doc.get("bonus_story_unlocked"):
+        bonus = next((s for s in sk if s["key"] != unlocked["key"]), None)
+    taken = {unlocked["key"]} | ({bonus["key"]} if bonus else set())
+    locked = [s["label"] for s in sk if s["key"] not in taken]
     return {
         "unlocked": unlocked,
+        "bonus": bonus,
         "locked_labels": locked[:10],
         "locked_count": len(locked),
         "has_discovery": bool(sm.get("discovery")),

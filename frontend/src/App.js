@@ -25,6 +25,7 @@ import BlogIndexPage from "@/pages/BlogIndexPage";
 import BlogArticlePage from "@/pages/BlogArticlePage";
 import TrajectoryPage from "@/pages/TrajectoryPage";
 import ScoutsLandingPage from "@/pages/ScoutsLandingPage";
+import SharedTeaserPage from "@/pages/SharedTeaserPage";
 import PlayersDatabasePage from "@/pages/PlayersDatabasePage";
 import AuthCallback from "@/components/auth/AuthCallback";
 import CookieBanner from "@/components/CookieBanner";
@@ -104,6 +105,7 @@ function AnimatedRoutes() {
         <Route path="/blog" element={<PageTransition><BlogIndexPage /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogArticlePage /></PageTransition>} />
         <Route path="/scouts" element={<PageTransition><ScoutsLandingPage /></PageTransition>} />
+        <Route path="/s/:token" element={<PageTransition><SharedTeaserPage /></PageTransition>} />
         <Route path="/players-database" element={<PageTransition><RequireAuth><PlayersDatabasePage /></RequireAuth></PageTransition>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

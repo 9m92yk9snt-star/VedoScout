@@ -1,0 +1,51 @@
+{
+  "summary": "Iter67 growth/conversion package tested end-to-end (backend + frontend + share/reviews/discounts). Backend pytest: 10/13 PASS (3 failures are symptoms of a HIGH-priority environmental issue — the background conversion_loop in growth.py is running autonomously in the preview env and already fired REAL sweeps that (a) sent real Gmail emails to smtest.parent@example.com, (b) stamped conv_mail1/2/3_sent_at flags on all 3 seed reports, (c) stamped auto_48h discount on BOTH smtest-30h AND smtest-50h (drift), (d) marked txn smtest-txn-1 abandon_mail_sent_at, so future dry-run sweeps return 0 items and smtest-50h's discount is not null anymore. The sweep endpoint / discount / campaign / share / reviews code paths themselves are correct — only the background loop is unsafe for a preview DB). Frontend: all owner flows PASS (discount-banner + paywall-discount-chip + smt-bonus-card on /report/smtest-30h; full share flow on /report/smtest-80h — pill→modal→img→copy-btn→POST /share-unlock 200→success state→bonus card appears→pill disappears; /s/{token} logged-out public teaser renders with story+CTA; landing reviews-strip visible; dashboard review-prompt renders and lets user edit). One HIGH-priority frontend bug found: Admin Reviews tab crashes with runtime error 'destroy is not a function' and renders 0 review items — root cause is `useEffect(load, [])` where `load` returns a Promise (same anti-pattern in GrowthAdmin.jsx:20). Admin Growth tab: auto-percent input + dry-run button + campaign name input all render; dry-run returns JSON (currently empty due to background loop drift); campaign-percent input has no data-testid so it wasn't detected by that selector.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "growth.py conversion_loop()", "issue": "Background asyncio loop calls conversion_sweep(dry_run=False) every 15 minutes on server startup — actively sends real Gmail emails and mutates the DB (sets conv_mail*_sent_at flags, stamps discounts). In a preview environment with seeded test data this defeats the review-request's explicit 'do NOT send real emails' constraint and makes repeatable dry-run testing impossible (all seed reports now have the sent flags). Recommend guarding the loop behind an ENV flag (e.g. ENABLE_GROWTH_LOOP=1) that is OFF in preview.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/admin/conversion-sweep?dry_run=true", "issue": "Cannot reproduce '4 planned items' expectation because sent-flags were already mutated by the background loop before testing began. Returns []. Code path itself looks correct in growth.py."},
+      {"endpoint": "GET /api/reports/smtest-50h", "issue": "Expected pricing.discount = null. Actual: auto_48h 25% discount is present, because background sweep stamped it 50h into the seed's lifetime. Not a code bug — direct consequence of the above HIGH issue."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ReviewsAdmin (and same anti-pattern in GrowthAdmin)", "issue": "Uncaught TypeError: 'destroy is not a function'. Line `useEffect(load, [])` where `load = () => api.get(...).then(...).catch(...)` returns a Promise, which React tries to call as cleanup. Reviews tab shows 0 items despite backend returning them, and any tab-switch surfaces the runtime error overlay. Fix: `useEffect(() => { load(); }, []);` in both files.", "selector": "/app/frontend/src/components/admin/ReviewsAdmin.jsx:16 and /app/frontend/src/components/admin/GrowthAdmin.jsx:20", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Growth tab", "issues": ["Campaign 'percent' input is missing data-testid='campaign-percent' (the name input has one). Add for testability."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter67_growth.py",
+    "/app/test_reports/pytest/iter67_results.xml"
+  ],
+  "action_items": [
+    "HIGH: Guard growth.py conversion_loop() behind an ENV flag (e.g. ENABLE_GROWTH_LOOP) OFF by default in preview so it does not auto-send real emails / mutate seeded test data.",
+    "HIGH: Fix `useEffect(load, [])` in /app/frontend/src/components/admin/ReviewsAdmin.jsx:16 and /app/frontend/src/components/admin/GrowthAdmin.jsx:20 — change to `useEffect(() => { load(); }, []);` to stop React from treating the returned Promise as a cleanup fn. This unblocks the Admin Reviews tab (currently crashing/empty).",
+    "OPTIONAL: Reset seeded state (unset conv_mail1_sent_at / conv_mail2_sent_at / conv_mail3_sent_at on smtest-30h/50h/80h, remove auto_48h discount from smtest-50h, unset abandon_mail_sent_at on smtest-txn-1) so dry-run sweep reproducibly returns the 4 planned items during retesting.",
+    "LOW: Add data-testid='campaign-percent' to the campaign percent input in GrowthAdmin.jsx."
+  ],
+  "critical_code_review_comments": [
+    "growth.py — conversion_loop is unconditionally spawned on startup; there is no kill switch. In a preview env this is dangerous (real SMTP sends). Recommend `if os.environ.get('ENABLE_GROWTH_LOOP') == '1':` gate before scheduling.",
+    "server.py — pricing.discount serializer correctly implements report-level > global-campaign fallback; verified via API when I created a campaign (smtest-30h stayed at 25 while smtest-50h dropped to 10; after DELETE the fallback disappeared).",
+    "ReviewsAdmin.jsx / GrowthAdmin.jsx — same useEffect anti-pattern in both; consider a shared `useAsyncEffect` helper or lint rule to prevent regressions.",
+    "share_teaser.py — good defensive drawing (falls back to '?' placeholder when no photo). PNGs served via /api/uploads/teaser_cards/*.png verified downloadable with valid PNG magic bytes.",
+    "server.py file continues to grow (~13.8k lines) — the growth block was cleanly appended but the modularization tech-debt from prior iterations still stands."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter67_growth.py (NEW — 13 pytest cases covering sweep, discount pricing, campaign flow, auto-percent, teaser share + PNG download, public teaser, share-unlock bonus, review upsert/validation/admin-add-delete)"
+  ],
+  "success_rate": {
+    "backend": "77% (10/13 pytest — 3 failures caused by env drift from the runaway background loop, not by code bugs)",
+    "frontend": "92% — all owner-side flows work end-to-end; Admin Reviews tab crashes on load (destroy-not-a-function useEffect bug)"
+  },
+  "test_credentials": "Owner: smtest.parent@example.com / SmTest@2026!x (JWT via /api/auth/login → localStorage keys 'elite_token' + 'elite_user'). Admin: admin@elitescout.com / Admin@2026!Elite.",
+  "seed_data_creation": "None. Used the existing smtest-30h / smtest-50h / smtest-80h reports and smtest-txn-1 txn. Did leave a persistent user-review from the owner ('Really helpful iter67 test B', 5 stars) and did permanently set bonus_story_unlocked=true on smtest-50h and smtest-80h (share-unlock test). Discount campaign 'QA test' was created and immediately deactivated in the same test.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent (a) gates growth conversion_loop behind an ENV flag, (b) fixes the useEffect bug in ReviewsAdmin/GrowthAdmin, (c) resets the conv_mail*_sent_at flags + auto_48h discount on smtest-50h + abandon flag on smtest-txn-1, re-run /app/backend/tests/test_iter67_growth.py — the 3 currently-failing tests should then all pass (they check the correct expectations). Frontend admin Reviews tab needs a re-verification after the useEffect fix.",
+  "rca of the issue": "Two independent root causes: (1) growth.py:185 spawns `conversion_loop` on startup with no env gate; it calls conversion_sweep with dry_run=False every 15 min → real SMTP + DB mutation. (2) ReviewsAdmin.jsx:16 and GrowthAdmin.jsx:20 use `useEffect(load, [])` where `load` is an arrow that returns `api.get(...).then(...)` (a Promise). React sees the effect callback return non-undefined and expects it to be a cleanup fn → 'destroy is not a function' TypeError on unmount, corrupting the tab render and leaving items=[]. Fix is a one-line wrap in both files."
+}

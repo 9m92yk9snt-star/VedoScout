@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
+import GrowthAdmin from "@/components/admin/GrowthAdmin";
+import ReviewsAdmin from "@/components/admin/ReviewsAdmin";
 import FAQAdmin from "@/components/admin/FAQAdmin";
 import EmailAdmin from "@/components/admin/EmailAdmin";
 import ScoutVerificationAdmin from "@/components/admin/ScoutVerificationAdmin";
@@ -21,6 +23,8 @@ import TaxAdmin from "@/components/admin/TaxAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
+  { id: "growth", label: "Growth", role: "admin" },
+  { id: "reviews", label: "Reviews", role: "admin" },
   { id: "scouts", label: "Scout Queue", role: "both" },
   { id: "scout-db", label: "Scout DB Verify", role: "admin" },
   { id: "grant-access", label: "Grant Access", role: "admin" },
@@ -442,6 +446,10 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+
+              {activeTab === "growth" && <GrowthAdmin />}
+
+              {activeTab === "reviews" && <ReviewsAdmin />}
 
               {activeTab === "scouts" && <ScoutQueue />}
 

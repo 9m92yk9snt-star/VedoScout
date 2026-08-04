@@ -6487,6 +6487,17 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         except Exception:
             logger.exception("score meaning teaser failed")
             out["score_meaning_teaser"] = None
+        try:
+            base_price = await get_current_single_price()
+            disc = await get_active_discount(db, doc)
+            out["pricing"] = {
+                "single": base_price,
+                "discount": ({**disc, "discounted": discounted_price(base_price, disc)} if disc else None),
+            }
+        except Exception:
+            logger.exception("pricing enrichment failed")
+            out["pricing"] = None
+        out["bonus_story_unlocked"] = bool(doc.get("bonus_story_unlocked"))
     if include_full:
         out["full_report"] = doc.get("full_report")
         out["agent_review"] = doc.get("agent_review")
@@ -10117,6 +10128,240 @@ async def download_shared_pdf(token: str):
     )
 
 
+# ============== GROWTH: SHARE-TO-UNLOCK, REVIEWS & DISCOUNTS ==============
+
+class ShareUnlockBody(BaseModel):
+    shared: bool = True
+
+
+@api_router.post("/reports/{report_id}/teaser-share")
+async def create_teaser_share(report_id: str, user=Depends(get_current_user)):
+    """Owner creates a public teaser share link + personal share cards."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    token = doc.get("teaser_token") or uuid.uuid4().hex
+    if not doc.get("teaser_token"):
+        await db.reports.update_one({"id": report_id}, {"$set": {"teaser_token": token, "teaser_created_at": now_iso()}})
+        doc["teaser_token"] = token
+    photo_url = _resolve_subject_crop_url(doc) or _resolve_marker_url(doc) or _resolve_poster_url(doc)
+    try:
+        cards = await asyncio.to_thread(ensure_teaser_cards, doc, photo_url, UPLOAD_DIR)
+    except Exception:
+        logger.exception("teaser card generation failed for %s", report_id)
+        cards = {"card_feed_url": None, "card_story_url": None}
+    first = str((doc.get("player_details") or {}).get("player_name") or "My player").split(" ")[0]
+    return {
+        "token": token,
+        **cards,
+        "text": f"{first}'s football story — discovered from one video ⚽ See his first open chapter:",
+    }
+
+
+@api_router.get("/teaser/{token}")
+async def public_teaser(token: str):
+    """Public teaser page data for a shared free-preview link."""
+    if not token or len(token) < 12:
+        raise HTTPException(status_code=404, detail="Invalid link")
+    doc = await db.reports.find_one({"teaser_token": token})
+    if not doc:
+        raise HTTPException(status_code=404, detail="This link is no longer active")
+    pd = doc.get("player_details") or {}
+    t = build_score_meaning_teaser(doc)
+    photo_url = _resolve_subject_crop_url(doc) or _resolve_marker_url(doc) or _resolve_poster_url(doc)
+    try:
+        cards = await asyncio.to_thread(ensure_teaser_cards, doc, photo_url, UPLOAD_DIR)
+    except Exception:
+        cards = {"card_feed_url": None, "card_story_url": None}
+    return {
+        "player_first": str(pd.get("player_name") or "This player").split(" ")[0],
+        "story": t.get("unlocked"),
+        **cards,
+    }
+
+
+@api_router.post("/reports/{report_id}/share-unlock")
+async def share_unlock_bonus(report_id: str, _body: ShareUnlockBody = None, user=Depends(get_current_user)):
+    """Permanent bonus: sharing opens ONE extra real score story (choice 2b)."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not doc.get("bonus_story_unlocked"):
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"bonus_story_unlocked": True, "bonus_unlocked_at": now_iso()}})
+        doc["bonus_story_unlocked"] = True
+    t = build_score_meaning_teaser(doc)
+    return {"ok": True, "bonus": t.get("bonus")}
+
+
+# ── Reviews ────────────────────────────────────────────────────────────────
+class ReviewCreate(BaseModel):
+    stars: int = Field(ge=1, le=5)
+    text: str = Field(min_length=3, max_length=200)
+
+
+class AdminReviewCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    stars: int = Field(ge=1, le=5)
+    text: str = Field(min_length=3, max_length=200)
+    image_base64: Optional[str] = None
+
+
+def _review_public(d: dict) -> dict:
+    return {"id": d["id"], "name": d.get("name"), "text": d.get("text"),
+            "stars": d.get("stars"), "image_url": d.get("image_url"),
+            "source": d.get("source"), "created_at": d.get("created_at")}
+
+
+@api_router.get("/reviews")
+async def public_reviews():
+    items = [_review_public(d) async for d in db.reviews.find({}).sort("created_at", -1).limit(12)]
+    return {"items": items}
+
+
+@api_router.get("/reviews/mine")
+async def my_review(user=Depends(get_current_user)):
+    d = await db.reviews.find_one({"user_id": user["id"]})
+    return {"review": _review_public(d) if d else None}
+
+
+@api_router.post("/reviews")
+async def create_review(payload: ReviewCreate, user=Depends(get_current_user)):
+    rdoc = await db.reports.find_one(
+        {"user_id": user["id"], "status": "complete"}, sort=[("created_at", -1)])
+    image_url = None
+    name = (user.get("full_name") or "").split(" ")[0] or "A parent"
+    if rdoc:
+        image_url = _resolve_subject_crop_url(rdoc) or _resolve_marker_url(rdoc) or _resolve_poster_url(rdoc)
+        pfirst = str((rdoc.get("player_details") or {}).get("player_name") or "").split(" ")[0]
+        if pfirst:
+            name = f"{pfirst}'s family"
+    existing = await db.reviews.find_one({"user_id": user["id"]})
+    doc = {
+        "id": existing["id"] if existing else str(uuid.uuid4()),
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "name": name,
+        "stars": payload.stars,
+        "text": payload.text.strip(),
+        "image_url": image_url,
+        "source": "user",
+        "created_at": existing["created_at"] if existing else now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.reviews.update_one({"user_id": user["id"]}, {"$set": doc}, upsert=True)
+    return {"review": _review_public(doc)}
+
+
+@api_router.get("/admin/reviews")
+async def admin_reviews(_=Depends(get_current_admin)):
+    items = [_review_public(d) async for d in db.reviews.find({}).sort("created_at", -1).limit(200)]
+    return {"items": items}
+
+
+@api_router.post("/admin/reviews")
+async def admin_add_review(payload: AdminReviewCreate, _=Depends(get_current_admin)):
+    rid = str(uuid.uuid4())
+    image_url = None
+    if payload.image_base64:
+        try:
+            b64 = payload.image_base64.split(",", 1)[-1]
+            data = base64.b64decode(b64)
+            if len(data) > 4 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Image too large (max 4MB)")
+            rev_dir = UPLOAD_DIR / "reviews"
+            rev_dir.mkdir(parents=True, exist_ok=True)
+            (rev_dir / f"{rid}.jpg").write_bytes(data)
+            image_url = f"/api/uploads/reviews/{rid}.jpg"
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=400, detail="Could not decode the image")
+    doc = {"id": rid, "user_id": None, "name": payload.name.strip(), "stars": payload.stars,
+           "text": payload.text.strip(), "image_url": image_url, "source": "admin",
+           "created_at": now_iso()}
+    await db.reviews.insert_one(dict(doc))
+    return {"review": _review_public(doc)}
+
+
+@api_router.delete("/admin/reviews/{review_id}")
+async def admin_delete_review(review_id: str, _=Depends(get_current_admin)):
+    res = await db.reviews.delete_one({"id": review_id})
+    if not res.deleted_count:
+        raise HTTPException(status_code=404, detail="Review not found")
+    return {"ok": True}
+
+
+# ── Discounts (admin) ──────────────────────────────────────────────────────
+class AutoDiscountUpdate(BaseModel):
+    percent: float = Field(gt=0, le=90)
+
+
+class CampaignCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    percent: float = Field(gt=0, le=90)
+    hours_valid: int = Field(ge=1, le=720)
+    send_email: bool = False
+
+
+@api_router.get("/admin/discounts")
+async def admin_discounts(_=Depends(get_current_admin)):
+    campaigns = []
+    async for c in db.discount_campaigns.find({}).sort("created_at", -1).limit(50):
+        campaigns.append({"id": c["id"], "name": c.get("name"), "percent": c.get("percent"),
+                          "expires_at": c.get("expires_at"), "active": bool(c.get("active")),
+                          "created_at": c.get("created_at")})
+    return {"auto_percent": await get_auto_discount_percent(db), "campaigns": campaigns}
+
+
+@api_router.put("/admin/discounts/auto")
+async def admin_set_auto_discount(payload: AutoDiscountUpdate, _=Depends(get_current_admin)):
+    await db.settings.update_one(
+        {"key": "auto_discount_percent"}, {"$set": {"value": float(payload.percent)}}, upsert=True)
+    return {"auto_percent": float(payload.percent)}
+
+
+@api_router.post("/admin/discounts")
+async def admin_create_campaign(payload: CampaignCreate, _=Depends(get_current_admin)):
+    from datetime import timedelta as _td
+    cid = str(uuid.uuid4())
+    expires = (datetime.now(timezone.utc) + _td(hours=payload.hours_valid)).isoformat()
+    await db.discount_campaigns.insert_one({
+        "id": cid, "name": payload.name.strip(), "percent": float(payload.percent),
+        "applies_to": "single", "hours_valid": payload.hours_valid,
+        "expires_at": expires, "active": True, "created_at": now_iso(),
+    })
+    emailed = None
+    if payload.send_email:
+        recipients = [u["email"] async for u in db.users.find(
+            {"role": {"$ne": "admin"}, "email": {"$exists": True}}, {"email": 1})]
+        emailed = len(recipients)
+        if recipients and email_enabled():
+            html, text, subject = render_discount_campaign_email(
+                payload.name.strip(), payload.percent, payload.hours_valid)
+            asyncio.create_task(send_bulk_email(recipients, subject, html, text))
+    return {"id": cid, "expires_at": expires, "emailed": emailed}
+
+
+@api_router.delete("/admin/discounts/{campaign_id}")
+async def admin_deactivate_campaign(campaign_id: str, _=Depends(get_current_admin)):
+    res = await db.discount_campaigns.update_one({"id": campaign_id}, {"$set": {"active": False}})
+    if not res.matched_count:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    return {"ok": True}
+
+
+@api_router.post("/admin/conversion-sweep")
+async def admin_run_conversion_sweep(dry_run: bool = True, _=Depends(get_current_admin)):
+    results = await conversion_sweep(db, get_current_single_price, dry_run=dry_run)
+    return {"dry_run": dry_run, "results": results}
+
+
 # ============== PAYMENTS (STRIPE) ==============
 
 # ---- Subscription helpers (recurring billing) ---------------------------
@@ -10773,6 +11018,9 @@ async def create_checkout(payload: CheckoutInit, request: Request, user=Depends(
         raise HTTPException(status_code=400, detail="Report already paid")
 
     price = await get_current_single_price()
+    _disc = await get_active_discount(db, report)
+    if _disc:
+        price = discounted_price(price, _disc)
 
     host_url = str(request.base_url)
     webhook_url = f"{host_url}api/webhook/stripe"
@@ -10986,6 +11234,9 @@ async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_cur
     if not _embedded_ready():
         raise HTTPException(status_code=503, detail="Embedded checkout not configured. Add Stripe pk_/sk_ keys.")
     price = await get_current_single_price()
+    _disc = await get_active_discount(db, None)
+    if _disc:
+        price = discounted_price(price, _disc)
     amount_cents = int(round(float(price) * 100))
 
     origin = payload.origin_url.rstrip("/")
@@ -11057,6 +11308,9 @@ async def embedded_unlock(payload: CheckoutInit, user=Depends(get_current_user))
         raise HTTPException(status_code=400, detail="Report already paid")
 
     price = await get_current_single_price()
+    _disc = await get_active_discount(db, report)
+    if _disc:
+        price = discounted_price(price, _disc)
     amount_cents = int(round(float(price) * 100))
 
     origin = payload.origin_url.rstrip("/")
@@ -12772,6 +13026,15 @@ from speed_metrics import compute_speed_metrics
 from progression import build_progression
 from score_context import build_score_context
 from score_meaning import build_score_meaning, build_score_meaning_teaser
+from growth import (
+    get_active_discount,
+    discounted_price,
+    get_auto_discount_percent,
+    conversion_sweep,
+    conversion_loop,
+)
+from share_teaser import ensure_teaser_cards
+from email_templates import render_discount_campaign_email
 from pdf_v2 import build_pdf_v2
 
 
@@ -13010,6 +13273,7 @@ async def on_startup():
     # ── Curve reminder loop — emails parents 4-6 weeks after their last report ──
     try:
         asyncio.create_task(_curve_reminder_loop())
+        asyncio.create_task(conversion_loop(db, get_current_single_price))
         logger.info("[curve-reminder] loop started")
     except Exception:
         logger.exception("Curve reminder loop failed to start (non-fatal)")

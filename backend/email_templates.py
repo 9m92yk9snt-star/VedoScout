@@ -49,7 +49,7 @@ def _wrap_html(inner_html: str, preheader: str = "") -> str:
                 Scout<span style="color:#CCFF00;">Me</span>Play
               </td>
               <td align="right" style="color:#FFFFFFAA; font-size:9px; letter-spacing:2.5px; text-transform:uppercase; font-weight:700;">
-                Pro Scout Intelligence
+                ScoutMe Pro Intelligence
               </td>
             </tr>
           </table>
@@ -98,15 +98,15 @@ def _btn(label: str, href: str) -> str:
 def render_welcome_email(user_name: Optional[str] = None) -> tuple[str, str, str]:
     site = _site_url()
     display_name = (user_name or "player").strip() or "player"
-    subject = f"Welcome to ScoutMePlay, {display_name} — your scout journey starts here"
-    preheader = "Upload your first video and get an instant AI scout report."
+    subject = f"Welcome to ScoutMePlay, {display_name} — the discovery starts here"
+    preheader = "Upload your first video — and discover what nobody has put into words yet."
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:28px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.05;">
       Welcome, {display_name}.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      Your account is live &mdash; you now have access to <strong>Pro Scout Intelligence</strong>, the football scout analysis platform built for ambitious U7&ndash;U21 players.
+      Your account is live &mdash; you now have access to <strong>ScoutMe Pro Intelligence</strong>, built for ambitious U7&ndash;U21 players and the families behind them. One video is all it takes to start a player&apos;s story.
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
       Here&apos;s how to get your first report:
@@ -119,7 +119,7 @@ def render_welcome_email(user_name: Optional[str] = None) -> tuple[str, str, str
         <strong style="color:#1F4F2F;">02</strong> &nbsp;&nbsp; Mark your player in 10 taps so we know who to analyse.
       </td></tr>
       <tr><td style="padding:0 0 10px 0; font-size:14px; color:#1F2724;">
-        <strong style="color:#1F4F2F;">03</strong> &nbsp;&nbsp; Get an <strong>instant AI scout report</strong> across 4 pillars: Technical, Tactical, Physical, Mindset.
+        <strong style="color:#1F4F2F;">03</strong> &nbsp;&nbsp; Watch every number become a <strong>story about your player</strong> &mdash; across 4 pillars: Technical, Tactical, Physical, Mindset.
       </td></tr>
     </table>
     {_btn("Upload your first video", f"{site}/upload")}
@@ -129,8 +129,8 @@ def render_welcome_email(user_name: Optional[str] = None) -> tuple[str, str, str
     """
     plaintext = (
         f"Welcome to ScoutMePlay, {display_name}!\n\n"
-        f"Your account is live. Upload your first video and get an instant AI scout report across "
-        f"Technical, Tactical, Physical and Mindset.\n\n"
+        f"Your account is live. Upload your first video and watch every number become a story about "
+        f"your player — across Technical, Tactical, Physical and Mindset.\n\n"
         f"Upload here: {site}/upload\n\n"
         f"ScoutMePlay — Professional · Independent · Evidence-based"
     )
@@ -200,7 +200,7 @@ def render_report_ready_email(
     first = player.split(" ")[0]
     greet = (parent_name or "").strip()
     greet_line = f"Hi {greet}," if greet else "Hi,"
-    subject = f"{first}'s scout report is ready"
+    subject = f"{first}'s report is ready"
     preheader = f"The full analysis of {first} is done — open the report now."
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
@@ -211,7 +211,7 @@ def render_report_ready_email(
       {greet_line}
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      Our AI scout has finished the full analysis of <strong>{player}</strong>. The report is live now &mdash; scores, strengths, development plan, home drills and the personal message to {first}.
+      ScoutMe Pro Intelligence has finished the full analysis of <strong>{player}</strong>. The report is live now &mdash; scores, strengths, development plan, home drills and the personal message to {first}.
     </p>
     {_btn("Open the report", report_url)}
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
@@ -220,7 +220,7 @@ def render_report_ready_email(
     """
     plaintext = (
         f"{greet_line}\n\n"
-        f"The full scout analysis of {player} is ready.\n\n"
+        f"The full analysis of {player} is ready.\n\n"
         f"Open the report: {report_url}\n\n"
         f"Tip: watch the video together first — the report includes exact moments to pause and praise."
     )
@@ -345,5 +345,173 @@ def render_admin_sale_notification(
         f"Buyer: {display_buyer} <{buyer_email}>\n"
         f"{('Stripe session: ' + session_id + chr(10)) if session_id else ''}"
         f"\nAdmin: {site}/admin"
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
+# ── CONVERSION: 24h — the numbers are waiting ─────────────────────────────
+def render_conv_waiting_email(first, total_numbers, open_label, open_score, report_url):
+    score_str = f"{open_score:.1f}" if isinstance(open_score, (int, float)) else None
+    open_line = (
+        f"One story is already open &mdash; <strong>{open_label}: {score_str}</strong>. "
+        if (open_label and score_str) else ""
+    )
+    subject = f"{first}'s {total_numbers} numbers are still waiting"
+    preheader = f"Every one of them is a discovery about {first} — with the proof on video."
+    inner = f"""
+    <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      {first}&apos;s story didn&apos;t stop at the whistle.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      {open_line}There are <strong>{total_numbers} numbers</strong> in {first}&apos;s report &mdash; and every one of them
+      is a small discovery: what he does that most players his age don&apos;t, the exact moment it happened on video,
+      and what it means for where he can go next.
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      Most parents never get to see their player this clearly. You&apos;re one click away.
+    </p>
+    {_btn(f"See all {total_numbers} of {first}'s numbers", report_url)}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      Every number is real, measured from your own video &mdash; nothing is invented.
+    </p>
+    """
+    plaintext = (
+        f"{first}'s story didn't stop at the whistle.\n\n"
+        f"There are {total_numbers} numbers in {first}'s report — each one a discovery with its proof on video.\n\n"
+        f"See them here: {report_url}\n"
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
+# ── CONVERSION: 48h — honest limited discount ─────────────────────────────
+def render_conv_discount_email(first, report_url, percent, base_price, new_price, hours=48):
+    pct = int(percent) if float(percent).is_integer() else percent
+    subject = f"{pct}% off {first}'s full report — for the next {hours} hours"
+    preheader = f"${new_price:.2f} instead of ${base_price:.2f}. Real deadline, no games."
+    inner = f"""
+    <span style="display:inline-block; padding:4px 10px; background:#CCFF00; color:#0A0F0D; font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:800;">
+      {pct}% off &mdash; {hours} hours only
+    </span>
+    <h1 style="margin:14px 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      {first}&apos;s full story &mdash; with {pct}% off.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      For the next <strong>{hours} hours</strong>, {first}&apos;s complete report is
+      <strong style="color:#1F4F2F;">${new_price:.2f}</strong>
+      <span style="color:#6B6B6B; text-decoration:line-through;">${base_price:.2f}</span>.
+      The discount is applied automatically at checkout &mdash; no code needed.
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      Inside: every number translated into meaning, the video proof behind it, his development plan
+      &mdash; and the road from where he is now to where he could be.
+    </p>
+    {_btn(f"Open {first}'s full report", report_url)}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      This is a real deadline &mdash; when it passes, the price simply goes back. No fake countdowns here.
+    </p>
+    """
+    plaintext = (
+        f"{pct}% off {first}'s full report — for the next {hours} hours.\n\n"
+        f"${new_price:.2f} instead of ${base_price:.2f} — applied automatically at checkout.\n\n"
+        f"Open the report: {report_url}\n"
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
+# ── CONVERSION: 72h — the position secret ─────────────────────────────────
+def render_conv_discovery_email(first, report_url):
+    subject = f"The match whispered something about {first}…"
+    preheader = f"There's a possibility in {first}'s game most people would never guess."
+    inner = f"""
+    <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      There&apos;s something in {first}&apos;s game<br>most people would never guess.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      While analysing {first}&apos;s video, the numbers lined up in a way that pointed somewhere unexpected &mdash;
+      a hint about <strong>where on the pitch he could also belong</strong>.
+    </p>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      It&apos;s not a verdict. It&apos;s a possibility &mdash; backed by what he actually did in the match.
+      The kind of thing that changes how you watch his next game.
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      It&apos;s waiting inside his full report.
+    </p>
+    {_btn(f"See what was discovered about {first}", report_url)}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      Based only on real moments from your own video &mdash; nothing is invented.
+    </p>
+    """
+    plaintext = (
+        f"There's something in {first}'s game most people would never guess.\n\n"
+        f"The numbers pointed somewhere unexpected — a hint about where on the pitch he could also belong. "
+        f"It's waiting inside his full report.\n\n"
+        f"See it here: {report_url}\n"
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
+# ── CONVERSION: abandoned checkout ─────────────────────────────────────────
+def render_abandoned_checkout_email(first, resume_url):
+    subject = f"You were 30 seconds from {first}'s full story"
+    preheader = "Everything is still exactly where you left it."
+    inner = f"""
+    <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      You were 30 seconds away.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      Your checkout for <strong>{first}&apos;s full report</strong> didn&apos;t finish &mdash; it happens.
+      Everything is still exactly where you left it: his numbers, his proof moments, his road forward.
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      If something felt unclear, just reply to this email &mdash; a real person answers.
+    </p>
+    {_btn("Pick up where you left off", resume_url)}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      Payments are handled securely by Stripe. You were charged nothing.
+    </p>
+    """
+    plaintext = (
+        f"You were 30 seconds from {first}'s full story.\n\n"
+        f"Your checkout didn't finish — everything is still where you left it.\n\n"
+        f"Continue here: {resume_url}\n\nYou were charged nothing."
+    )
+    return _wrap_html(inner, preheader), plaintext, subject
+
+
+# ── ADMIN: manual discount campaign blast ──────────────────────────────────
+def render_discount_campaign_email(name, percent, hours_valid):
+    site = _site_url()
+    pct = int(percent) if float(percent).is_integer() else percent
+    subject = f"{pct}% off every full player report — {name}"
+    preheader = f"For the next {hours_valid} hours the full report is {pct}% off — applied automatically."
+    inner = f"""
+    <span style="display:inline-block; padding:4px 10px; background:#CCFF00; color:#0A0F0D; font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:800;">
+      {name} &mdash; {pct}% off
+    </span>
+    <h1 style="margin:14px 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      Your player&apos;s full story &mdash; {pct}% off.
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      For the next <strong>{hours_valid} hours</strong>, every full player report is <strong>{pct}% off</strong>.
+      The discount is applied automatically at checkout &mdash; no code needed.
+    </p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
+      Every number translated into meaning. Every score with its proof on video. Every player with a road forward.
+    </p>
+    {_btn("Open your dashboard", f"{site}/dashboard")}
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      Real deadline &mdash; when it passes, the price goes back. Reply to this email to opt out of offers.
+    </p>
+    """
+    plaintext = (
+        f"{name}: {pct}% off every full player report for the next {hours_valid} hours.\n"
+        f"Applied automatically at checkout.\n\nDashboard: {site}/dashboard\n\n"
+        f"Reply to this email to opt out of offers."
     )
     return _wrap_html(inner, preheader), plaintext, subject

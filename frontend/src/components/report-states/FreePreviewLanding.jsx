@@ -2,7 +2,7 @@
 // AI preview finishes (permanent until they unlock). Replaces the old long
 // report-style preview. Every visible fact is REAL (video, strengths count,
 // tap timestamps); locked values are never invented — they unlock with payment.
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Lock, Play, ShieldCheck, Star, TrendingUp, Zap, Target, FileText,
   BarChart3, Map, ClipboardList, Brain, Shuffle, Gift, ChevronRight,
@@ -12,6 +12,7 @@ import { ASSET_BASE } from "@/lib/api";
 import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import { DreamPathTeaser } from "@/components/report-v2/dreampath";
 import { ScoreMeaningTeaser } from "@/components/report-v2/scoremeaning";
+import ShareUnlockModal from "@/components/ShareUnlockModal";
 
 const LIME = "#CCFF00";
 const INKG = "#0B1F14";
@@ -70,6 +71,24 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
   const totalNumbers = lockedNumbers != null ? lockedNumbers + 1 : null;
   const strengths = preview.top_strengths || [];
   const potential = teaser.overall_potential;
+  const discount = report.pricing?.discount || null;
+  const [shareOpen, setShareOpen] = useState(false);
+  const [bonusStory, setBonusStory] = useState(null);
+  const hasBonus = !!(report.score_meaning_teaser?.bonus || bonusStory);
+
+  useEffect(() => {
+    if (hasBonus) return undefined;
+    const key = `smp_exit_${report.id}`;
+    if (localStorage.getItem(key)) return undefined;
+    const t0 = Date.now();
+    const onLeave = (e) => {
+      if (e.clientY > 0 || Date.now() - t0 < 8000) return;
+      localStorage.setItem(key, "1");
+      setShareOpen(true);
+    };
+    document.addEventListener("mouseleave", onLeave);
+    return () => document.removeEventListener("mouseleave", onLeave);
+  }, [report.id, hasBonus]);
 
   const keyMomentT = useMemo(() => {
     const anchors = report.anchors || [];
@@ -292,8 +311,11 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           </div>
         </div>
 
+        {/* ── Limited discount banner (real, server-enforced deadline) ── */}
+        {discount && <DiscountBanner discount={discount} pFirst={pFirst} onCta={scrollToPackages} />}
+
         {/* ── What the numbers really mean — one open score story (1 of 25) ── */}
-        <ScoreMeaningTeaser teaser={report.score_meaning_teaser} playerName={pd.player_name} onUnlock={scrollToPackages} />
+        <ScoreMeaningTeaser teaser={report.score_meaning_teaser} playerName={pd.player_name} onUnlock={scrollToPackages} bonusOverride={bonusStory} />
 
         {/* ── The Path — dream roadmap teaser ── */}
         <DreamPathTeaser playerName={pd.player_name} onUnlock={scrollToPackages} />
@@ -368,7 +390,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
 
         {/* ── Packages (existing tier chooser) ── */}
         <div id="scout-packages" className="mt-6" data-testid="fpl-packages">
-          <ReportPaywallTiers isLoggedIn={!!user} onUnlockSingle={onUnlockSingle} playerName={pd.player_name} />
+          <ReportPaywallTiers isLoggedIn={!!user} onUnlockSingle={onUnlockSingle} playerName={pd.player_name} discount={discount} />
         </div>
 
         {/* ── Trust bar ── */}
@@ -390,6 +412,64 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           </span>
         </div>
       </div>
+      {!hasBonus && (
+        <button
+          type="button"
+          onClick={() => setShareOpen(true)}
+          data-testid="share-gift-pill"
+          className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-2 rounded-full pl-3 pr-4 py-2.5 shadow-xl active:scale-[0.97] transition-transform"
+          style={{ background: "#0B1F14", border: "1px solid rgba(204,255,0,0.4)" }}
+        >
+          <Gift className="w-4 h-4" style={{ color: LIME }} />
+          <span className="text-[11px] font-extrabold uppercase tracking-[0.06em]" style={{ color: LIME }}>
+            Unlock 1 more story
+          </span>
+        </button>
+      )}
+
+      <ShareUnlockModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        report={report}
+        onUnlocked={(b) => setBonusStory(b)}
+      />
     </div>
+  );
+}
+
+function DiscountBanner({ discount, pFirst, onCta }) {
+  const [left, setLeft] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const ms = new Date(discount.expires_at).getTime() - Date.now();
+      if (ms <= 0) { setLeft(""); return; }
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      setLeft(`${h}h ${m}m`);
+    };
+    tick();
+    const iv = setInterval(tick, 30000);
+    return () => clearInterval(iv);
+  }, [discount.expires_at]);
+  if (!left) return null;
+  return (
+    <button
+      type="button"
+      onClick={onCta}
+      data-testid="discount-banner"
+      className="mt-5 w-full flex items-center justify-between gap-3 rounded-2xl px-5 py-4 text-left active:scale-[0.99] transition-transform"
+      style={{ background: "#0B1F14", border: "1px solid rgba(204,255,0,0.35)" }}
+    >
+      <div>
+        <div className="text-[10px] font-extrabold tracking-[0.2em] uppercase" style={{ color: LIME }}>
+          {Math.round(discount.percent)}% off — ends in {left}
+        </div>
+        <div className="text-white font-barlow font-black uppercase text-[15px] leading-tight mt-0.5">
+          {pFirst ? `${pFirst}'s full report` : "The full report"} — ${"" + discount.discounted}
+        </div>
+        <div className="text-white/50 text-[10.5px] mt-0.5">Applied automatically at checkout. Real deadline — no games.</div>
+      </div>
+      <ChevronRight className="w-5 h-5 shrink-0" style={{ color: LIME }} />
+    </button>
   );
 }

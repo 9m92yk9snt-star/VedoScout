@@ -259,10 +259,11 @@ export function ScoreMeaningSection({ sm, playerName, position, onPlayAt }) {
 }
 
 // ─── Free preview teaser — exactly ONE real, fully-open score story ───
-export function ScoreMeaningTeaser({ teaser, playerName, onUnlock }) {
+export function ScoreMeaningTeaser({ teaser, playerName, onUnlock, bonusOverride = null }) {
   if (!teaser) return null;
   const first = (playerName || "your player").split(" ")[0];
-  const lockedLabels = teaser.locked_labels || [];
+  const bonus = teaser.bonus || bonusOverride;
+  const lockedLabels = (teaser.locked_labels || []).filter((l) => l !== bonus?.label);
   return (
     <div className="mt-5" data-testid="smt-section">
       <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.16em] uppercase text-[#12402A]">
@@ -287,6 +288,20 @@ export function ScoreMeaningTeaser({ teaser, playerName, onUnlock }) {
       ) : (
         <div className="mt-3 bg-white rounded-2xl border border-[#E9E4D5] p-4 shadow-sm text-[12.5px] text-[#5C6657]" data-testid="smt-pending-card">
           {first}&rsquo;s score stories are written during the complete evaluation — every number arrives with meaning, proof and a next step.
+        </div>
+      )}
+
+      {bonus && (
+        <div className="mt-4" data-testid="smt-bonus-card">
+          <div className="relative">
+            <span
+              className="absolute -top-2.5 left-4 z-10 text-[9px] font-extrabold tracking-[0.12em] uppercase px-2.5 py-1 rounded-full"
+              style={{ background: "#12402A", color: "#CCFF00" }}
+            >
+              Unlocked by your share — thank you
+            </span>
+            <SkillMeaningCard s={bonus} position={null} seekable={false} defaultOpen={false} />
+          </div>
         </div>
       )}
 

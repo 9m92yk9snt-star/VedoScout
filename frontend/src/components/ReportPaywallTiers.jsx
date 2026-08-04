@@ -35,7 +35,7 @@ const Feat = ({ children, highlight = false, dark = false }) => (
   </li>
 );
 
-export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle, singleTitle = "Unlock this report", playerName = "" }) {
+export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle, singleTitle = "Unlock this report", playerName = "", discount = null }) {
   const pFirst = String(playerName || "").trim().split(" ")[0];
   const navigate = useNavigate();
   const [busyTier, setBusyTier] = useState(null);
@@ -108,7 +108,15 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle,
           </div>
           <h4 className="font-barlow font-black uppercase text-2xl tracking-tight text-ink leading-none">{singleTitle}</h4>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="font-barlow font-black text-4xl md:text-5xl text-forest leading-none">{fmtPrice(prices.single)}</span>
+            {discount?.discounted != null ? (
+              <span className="inline-flex items-end gap-2 flex-wrap justify-center">
+                <span className="text-xl md:text-2xl text-ink/35 line-through font-bold">{fmtPrice(prices.single)}</span>
+                <span className="font-barlow font-black text-4xl md:text-5xl text-forest leading-none" data-testid="paywall-discounted-price">{fmtPrice(discount.discounted)}</span>
+                <span className="text-[10px] font-extrabold tracking-widest uppercase px-2 py-1 rounded-full mb-1" style={{ background: "#CCFF00", color: "#12211A" }} data-testid="paywall-discount-chip">{Math.round(discount.percent)}% off — limited</span>
+              </span>
+            ) : (
+              <span className="font-barlow font-black text-4xl md:text-5xl text-forest leading-none">{fmtPrice(prices.single)}</span>
+            )}
             <span className="text-ink/50 uppercase tracking-widest font-bold text-xs">one-time</span>
           </div>
           <ul className="mt-5 space-y-2 flex-1">

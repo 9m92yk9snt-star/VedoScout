@@ -21,6 +21,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck, Send, PlayCircle } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
+import ReviewsStrip from "@/components/ReviewsStrip";
 import SampleReportShowcase from "@/components/SampleReportShowcase";
 import PricingTiers from "@/components/PricingTiers";
 import SEO, { organizationJsonLd } from "@/components/SEO";
@@ -118,6 +119,7 @@ export default function LandingMinimal() {
         <PricingTiers />
       </div>
       <SocialProof />
+      <ReviewsStrip />
       <FAQSection faqItems={faqItems} />
       <DemoVideoCarousel />
       <FinalCta isLoggedIn={!!user} />
