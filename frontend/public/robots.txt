@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /report/
+
+Sitemap: https://scout-ai-pro-1.preview.emergentagent.com/api/sitemap.xml

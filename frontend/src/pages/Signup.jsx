@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { trackSignUp } from "@/lib/pixels";
+import SEO from "@/components/SEO";
 import { Mail, Lock, User, Eye, EyeOff, UserPlus, ArrowRight, CheckCircle2 } from "lucide-react";
 import {
   AuthShell, AuthHeroImage, SmpLogo, AuthInput, GoogleButton, OrDivider,
@@ -59,6 +60,7 @@ export default function Signup() {
 
   return (
     <AuthShell>
+      <SEO pageKey="signup" title="Create Your Free Account" url="/signup" />
       <AuthHeroImage />
 
       <div className="relative">

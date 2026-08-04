@@ -1,5 +1,18 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
+
+/* Admin-managed per-page SEO config (module-level cache, fetched once). */
+let _seoCache = null;
+let _seoPromise = null;
+function loadSeoPages() {
+  if (_seoPromise) return _seoPromise;
+  const base = process.env.REACT_APP_BACKEND_URL || "";
+  _seoPromise = fetch(`${base}/api/seo/pages`)
+    .then((r) => r.json())
+    .then((d) => { _seoCache = d?.pages || {}; return _seoCache; })
+    .catch(() => { _seoCache = {}; return _seoCache; });
+  return _seoPromise;
+}
 
 /**
  * <SEO />  — reusable head tag manager.
@@ -19,6 +32,7 @@ import { Helmet } from "react-helmet-async";
  * author         string  article author
  */
 export default function SEO({
+  pageKey,
   title,
   description,
   keywords,
@@ -31,6 +45,18 @@ export default function SEO({
   updatedAt,
   author,
 }) {
+  const [cfg, setCfg] = useState(pageKey && _seoCache ? _seoCache[pageKey] || null : null);
+  useEffect(() => {
+    if (!pageKey) return undefined;
+    let alive = true;
+    loadSeoPages().then((pages) => { if (alive) setCfg(pages[pageKey] || null); });
+    return () => { alive = false; };
+  }, [pageKey]);
+
+  const effTitle = cfg?.title || title;
+  const effDesc = cfg?.description || description;
+  const effKeywords = cfg?.keywords || keywords;
+
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const fullUrl = url
     ? (url.startsWith("http") ? url : `${origin}${url.startsWith("/") ? "" : "/"}${url}`)
@@ -38,14 +64,16 @@ export default function SEO({
   const ogImage = image
     ? (image.startsWith("http") ? image : `${origin}${image.startsWith("/") ? "" : "/"}${image}`)
     : `${origin}/og-default.jpg`;
-  const fullTitle = title ? `${title} · ScoutMePlay` : "ScoutMePlay — Where Talent Gets Noticed";
-  const desc = description || "Upload your football video and receive a detailed scouting report powered by football intelligence, professional player benchmarks and real scouts. Built for ambitious U7–U21 players.";
+  const fullTitle = effTitle
+    ? (effTitle.toLowerCase().includes("scoutmeplay") ? effTitle : `${effTitle} · ScoutMePlay`)
+    : "ScoutMePlay — Where Talent Gets Noticed";
+  const desc = effDesc || "Upload your football video and receive a detailed scouting report powered by football intelligence, professional player benchmarks and real scouts. Built for ambitious U7–U21 players.";
 
   return (
     <Helmet>
       <title>{fullTitle}</title>
       <meta name="description" content={desc} />
-      {keywords && <meta name="keywords" content={keywords} />}
+      {effKeywords && <meta name="keywords" content={effKeywords} />}
       {noindex && <meta name="robots" content="noindex,nofollow" />}
       <link rel="canonical" href={fullUrl} />
 
@@ -129,5 +157,15 @@ export const breadcrumbJsonLd = (origin, items) => ({
     position: i + 1,
     name: it.name,
     item: `${origin}${it.path}`,
+  })),
+});
+
+export const faqJsonLd = (items) => ({
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: (items || []).map((it) => ({
+    "@type": "Question",
+    name: it.q || it.question || "",
+    acceptedAnswer: { "@type": "Answer", text: it.a || it.answer || "" },
   })),
 });

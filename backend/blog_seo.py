@@ -15,9 +15,12 @@ from fastapi.responses import PlainTextResponse, Response
 
 STATIC_ROUTES = [
     {"loc": "/", "priority": "1.0", "changefreq": "weekly"},
+    {"loc": "/upload", "priority": "0.9", "changefreq": "monthly"},
     {"loc": "/about", "priority": "0.7", "changefreq": "monthly"},
     {"loc": "/methodology", "priority": "0.8", "changefreq": "monthly"},
+    {"loc": "/scouts", "priority": "0.7", "changefreq": "monthly"},
     {"loc": "/privacy", "priority": "0.3", "changefreq": "yearly"},
+    {"loc": "/terms", "priority": "0.3", "changefreq": "yearly"},
     {"loc": "/blog", "priority": "0.9", "changefreq": "daily"},
     {"loc": "/signup", "priority": "0.6", "changefreq": "monthly"},
     {"loc": "/login", "priority": "0.4", "changefreq": "yearly"},
@@ -32,6 +35,13 @@ def _site_base_url(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
     return f"{proto}://{host}".rstrip("/")
+
+
+def _xml_escape(s: str) -> str:
+    return (
+        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace('"', "&quot;").replace("'", "&apos;")
+    )
 
 
 def build_seo_router(*, db: Any):
@@ -89,11 +99,56 @@ def build_seo_router(*, db: Any):
             "Allow: /\n"
             "Disallow: /admin\n"
             "Disallow: /api/\n"
-            "Disallow: /upload\n"
             "Disallow: /dashboard\n"
             "Disallow: /report/\n"
             f"\nSitemap: {base}/api/sitemap.xml\n"
         )
         return PlainTextResponse(body)
+
+    @router.get("/rss.xml", include_in_schema=False)
+    async def rss_xml(request: Request):
+        base = _site_base_url(request)
+        now = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+        items = []
+        try:
+            cursor = (
+                db["blog_posts"]
+                .find({"status": "published"}, {"slug": 1, "title": 1, "excerpt": 1, "published_at": 1})
+                .sort("published_at", -1)
+                .limit(50)
+            )
+            async for doc in cursor:
+                slug = doc.get("slug")
+                if not slug:
+                    continue
+                title = _xml_escape(doc.get("title") or slug)
+                desc = _xml_escape(doc.get("excerpt") or "")
+                pub = ""
+                raw = doc.get("published_at")
+                if isinstance(raw, str):
+                    try:
+                        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                        pub = f"<pubDate>{dt.strftime('%a, %d %b %Y %H:%M:%S +0000')}</pubDate>"
+                    except Exception:
+                        pub = ""
+                items.append(
+                    f"<item><title>{title}</title>"
+                    f"<link>{base}/blog/{slug}</link>"
+                    f"<guid>{base}/blog/{slug}</guid>"
+                    f"<description>{desc}</description>{pub}</item>"
+                )
+        except Exception:
+            pass
+        body = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<rss version="2.0"><channel>'
+            "<title>ScoutMePlay Blog</title>"
+            f"<link>{base}/blog</link>"
+            "<description>Football scouting, training and pro-path insights for ambitious young players.</description>"
+            f"<lastBuildDate>{now}</lastBuildDate>"
+            + "".join(items)
+            + "</channel></rss>"
+        )
+        return Response(body, media_type="application/rss+xml")
 
     return router

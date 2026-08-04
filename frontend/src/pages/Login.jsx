@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import SEO from "@/components/SEO";
 import { Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, ArrowRight } from "lucide-react";
 import {
   AuthShell, AuthHeroImage, SmpLogo, AuthInput, GoogleButton, OrDivider,
@@ -49,6 +50,7 @@ export default function Login() {
 
   return (
     <AuthShell>
+      <SEO pageKey="login" title="Log In" url="/login" />
       <AuthHeroImage />
 
       <div className="relative">

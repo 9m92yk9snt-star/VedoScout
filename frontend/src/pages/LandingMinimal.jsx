@@ -24,7 +24,7 @@ import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
 import SampleReportShowcase from "@/components/SampleReportShowcase";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
-import SEO, { organizationJsonLd } from "@/components/SEO";
+import SEO, { organizationJsonLd, faqJsonLd } from "@/components/SEO";
 import {
   TrustStrip,
   HowItWorks,
@@ -34,6 +34,7 @@ import {
 } from "@/components/LandingSections";
 import DemoVideoCarousel from "@/components/DemoVideoCarousel";
 import StatsTicker from "@/components/StatsTicker";
+import SocialFollowSection from "@/components/SocialFollowSection";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -101,10 +102,11 @@ export default function LandingMinimal() {
   return (
     <div data-testid="landing-minimal" className="min-h-screen bg-cream-base text-ink overflow-x-clip">
       <SEO
+        pageKey="home"
         title="ScoutMePlay — Discover your true football level"
         description="Upload your football video and get an instant ScoutMe Pro report — plus a real professional scout review within 48h (VIP). Built for ambitious U7–U21 players."
         canonical="/"
-        jsonLd={organizationJsonLd()}
+        jsonLd={[organizationJsonLd(), faqJsonLd(faqItems)]}
       />
 
       <Navigation />
@@ -120,6 +122,7 @@ export default function LandingMinimal() {
         <DreamPricingTiers isLoggedIn={!!user} />
       </div>
       <ReviewsStrip />
+      <SocialFollowSection />
       <FAQSection faqItems={faqItems} />
       <DemoVideoCarousel />
       <FinalCta isLoggedIn={!!user} />

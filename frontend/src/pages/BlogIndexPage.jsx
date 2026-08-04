@@ -136,6 +136,7 @@ export default function BlogIndexPage() {
   return (
     <div className="min-h-screen bg-cream-base text-ink">
       <SEO
+        pageKey="blog"
         title="Blog — Football Scouting, Training & Pro Path Insights"
         description="Expert articles on football scouting, training drills, parent guides, and the academy-to-pro player path. Built for ambitious U7-U21 players, parents and coaches."
         url="/blog"

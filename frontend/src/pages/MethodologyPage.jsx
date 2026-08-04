@@ -62,6 +62,7 @@ export default function MethodologyPage() {
   return (
     <div className="min-h-screen bg-cream-base text-ink">
       <SEO
+        pageKey="methodology"
         title="Methodology — How ScoutMePlay grades players"
         description="A transparent look at the methodology behind ScoutMePlay reports: UEFA youth-development pillars, age-bracketed benchmarks, FIFA k-NN twin matching, and StatsBomb percentile calibration."
         url="/methodology"

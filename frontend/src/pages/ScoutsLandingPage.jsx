@@ -8,6 +8,7 @@ import {
   Trophy, FileText, Play, ChevronDown, Star, X, MessageSquare,
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import SEO from "@/components/SEO";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -116,6 +117,7 @@ export default function ScoutsLandingPage() {
 
   return (
     <div data-testid="scouts-landing" className="min-h-screen bg-[#0A1F14] text-white antialiased overflow-x-hidden">
+      <SEO pageKey="scouts" title="For Scouts & Clubs — Discover Verified Youth Talent" url="/scouts" />
       <Navigation />
 
       <HeroSection access={access} />

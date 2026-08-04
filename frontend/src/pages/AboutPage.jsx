@@ -22,6 +22,7 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-deepnavy text-ink">
       <SEO
+        pageKey="about"
         title="About ScoutMePlay — Built by people who love football"
         description="ScoutMePlay was built by scouts, parents and engineers who care about young footballers. Learn our story, methodology and what makes our reports different."
         url="/about"

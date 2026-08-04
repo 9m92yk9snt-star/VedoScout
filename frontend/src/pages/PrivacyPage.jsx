@@ -2,12 +2,14 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Mail } from "lucide-react";
 import Navigation from "@/components/Navigation";
+import SEO from "@/components/SEO";
 
 export default function PrivacyPage() {
   const lastUpdated = "June 2026";
 
   return (
     <div className="min-h-screen bg-deepnavy text-ink">
+      <SEO pageKey="privacy" title="Privacy Policy" url="/privacy" />
       <Navigation />
 
       <div className="max-w-3xl mx-auto px-6 md:px-10 py-14 md:py-20">

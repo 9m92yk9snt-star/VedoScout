@@ -526,6 +526,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-deepnavy text-ink relative overflow-hidden">
       <SEO
+        pageKey="home"
         title="Where talent gets noticed — Football scouting reports"
         description="Upload your football video and receive a premium scouting report powered by advanced football intelligence, professional player benchmarks, and real scouts. Built for ambitious U7–U21 players."
         keywords="football scouting, youth football, player report, U14 scouting, U16 scouting, football academy, talent scout, player analysis, football trial"
