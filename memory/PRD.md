@@ -3051,3 +3051,19 @@ Brugerens 4 punkter:
 3. **Hero-knappen "Upload your video"** (LandingMinimal ~239): nu levende — hoppende roterende fodbold (lucide Volleyball, volt) der hopper hen over knappen bag teksten (smp-ball-x/y/spin keyframes), hvid shine-sweep + pulserende volt-glød (smp-hero-glow/shine), hover scale. Tekst i z-10 span.
 - OBS: parallel-edit batch fejlede delvist (2 edits landede ikke + 1 dublet-tail i DreamPricingTiers) → gav midlertidige runtime errors "edge/updateEdge is not defined" — alle rettet og verificeret.
 - Verificeret: prev disabled ved start, 8x next-klik klemmer på max (969/969) m. VIP-kort synligt (ingen sort), next disabled ved slut, bold-ikonet renderer i hero-knappen, ingen console errors.
+
+## Session (Aug 5, 2026) — SOCIAL-FOLLOW BOKSE + FULD SEO-PAKKE SHIPPED ✅ (iter72: 9/9 backend + frontend 100%)
+Brugervalg: a) admin-styrede follower-tal (ingen Meta API) + lovlig SEO-pakke (ingen "automatiske backlinks" — forklaret og accepteret).
+**A. Social-follow sektion** (landing, efter ReviewsStrip):
+- SocialFollowSection.jsx: 2 flotte bokse — Instagram (brand-gradient) + Facebook (blå) m. count-up follower-tal ved scroll, glow, follow-knapper (åbner i ny fane). followers=0 → viser "Join us from day one" i stedet for 0.
+- Backend (seo_social.py): GET /api/social-follow (public; URL-fallback til settings social_links.value), GET/PUT /api/admin/social-follow. Settings key: social_follow.
+- Admin: SocialFollowAdmin.jsx (enable-switch, URL + followers pr. netværk) i ny fane **"SEO & Social"**.
+**B. SEO-pakke**:
+- Backend seo_social.py: PAGE_DEFS for 10 sider (home/upload/about/methodology/blog/scouts/privacy/terms/signup/login) m. anbefalede titler/descriptions/keywords. GET /api/seo/pages (public, merged), GET+PUT /api/admin/seo, POST /api/admin/seo/autofill. Settings key: seo_pages.
+- blog_seo.py: sitemap udvidet (+/upload,/scouts,/terms), robots.txt tillader nu /upload, NYT /api/rss.xml (blog RSS 2.0, XML-escaped).
+- SEO.jsx: pageKey-prop henter admin-config (modul-cache), titel-suffix undgår dublet-"ScoutMePlay", faqJsonLd-builder eksporteret. jsonLd kan være array.
+- Alle 10 sider har nu SEO m. pageKey (Privacy/Terms/Scouts/Login/Signup fik SEO-komponent tilføjet). LandingMinimal: jsonLd=[Organization, FAQPage].
+- index.html renset for duplikerede meta/OG-tags (Helmet styrer runtime); statisk robots.txt + og-default.jpg (genereret brandet OG-banner) i frontend/public.
+- Admin SeoAdmin.jsx: pr.-side editor (tællere 70/175), Google-preview snippet, "Auto-fill recommended SEO", links til sitemap/robots/rss + Search Console-guide.
+- Test: iteration_72.json — 100% begge dele; cleanup udført (ingen overrides, followers=0). Pytest: /app/backend/tests/test_iter72_seo_social.py.
+- NOTE: preview-domænets rod-/robots.txt interceptes af platform-edge; /api/robots.txt + statisk fil virker. Efter produktion-deploy: indsend {domæne}/api/sitemap.xml i Google Search Console (guide står i admin-fanen).
