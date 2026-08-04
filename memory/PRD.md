@@ -1,5 +1,16 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 4, 2026) — SOCIAL BOXES + BLOG SHARE + NEWSLETTER + BLOG STUDIO ✅ (iter73, 100% pass)
+- **User task (approved "Kør")**: 1) compact side-by-side follow boxes, 2) viral share buttons on blog articles, 3) newsletter signup, 4) weekly warm-tone article flow.
+- **SocialFollowSection.jsx REWRITTEN**: light cream section (bg-cream-soft/50, border-y) replacing the big dark #081109 block; two compact white cards side-by-side even on mobile (grid-cols-2), small icon chips + count-up follower numbers (24 IG / 9 FB) + Follow pills. Same testids preserved; admin settings untouched.
+- **NEW BlogShareBar.jsx**: Facebook sharer / X intent / WhatsApp / LinkedIn popups + copy-link (toast) + native Web Share when available. Rendered twice on BlogArticlePage (under meta ~line 167, bottom "Enjoyed it? Share it" ~line 233). NOTE: auto-posting TO the brand's own IG/FB profiles requires Meta Graph API + user's business credentials — NOT built, explained to user; FB share button lets owner 1-click share each post to their page.
+- **NEW NewsletterSignup.jsx** ("The ScoutMePlay Letter", dark forest card, consent line): on /blog (below grid) + bottom of every article. Backend was already in seo_social.py: POST /api/newsletter/subscribe (dedupe, email regex 400), GET/DELETE /api/admin/newsletter. No emails are SENT yet — storage only.
+- **NEW admin/BlogStudioPanel.jsx + admin/NewsletterAdmin.jsx**, wired as "Blog Studio" + "Subscribers" buttons in BlogAdmin list header. Studio: topic/keyword optional → POST /api/blog-studio/generate (job) → polls /api/blog-studio/jobs 3s → draft lands in list; weekly auto-draft toggle (PUT /api/blog-studio/config, currently OFF).
+- **Backend**: blog_studio.py (created previous session — gpt-5.4 via emergentintegrations, warm-voice SYSTEM_PROMPT banning "AI"/"percentile", always status=draft) already mounted; THIS session wired `blog_studio_weekly_loop(db)` into on_startup (next to curve-reminder). py_compile OK.
+- **VERIFIED (iteration_73.json, 0 issues)**: backend 8/8 pytest (subscribe/dup/invalid/list/delete, config persistence, ONE real LLM generation → valid warm draft, no "AI"/"percentile"), frontend 100% (compact cards, share popup URLs asserted, copy toast, newsletter success state, admin panels, weekly toggle both ways, regression on 5 published posts). Test subscribers cleaned; generated draft kept: slug `how-to-help-your-child-bounce-back-after-a-tough-match-0b85` (Parent's Guide, draft — publish or delete in admin).
+- Backlog notes from review (optional): word-count floor in blog_studio is chars-based; weekly loop is in-process (fine single-worker). ⚠️ REQUIRES REDEPLOY.
+
+
 ## Session (Aug 2, 2026 - later) — CRITICAL FIX: Full-report generation stuck forever after backend restart ✅
 - **User bug**: fresh premium upload stuck at 98% "Final Check". ROOT CAUSE (from logs): preview finished 06:05, full-report task started, backend worker RESTARTED 06:06:46 → in-process asyncio task died silently, doc stayed `full_report_status="generating"` forever; frontend poll had a 7-min hard timeout and gave up; auto-gen effect refused to re-fire because status was "generating". Same class of bug as the Session-131 preview watchdog — full report was never covered.
 - **Backend (server.py)**:
