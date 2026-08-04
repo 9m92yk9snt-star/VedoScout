@@ -76,7 +76,7 @@ function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen }) {
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
-            <LessonBlock label="What scouts look for">{lesson.what_scouts_look_for}</LessonBlock>
+            <LessonBlock label="What the next level looks for">{lesson.what_scouts_look_for}</LessonBlock>
             <LessonBlock label="Why it matters">{lesson.why_it_matters}</LessonBlock>
           </div>
 
@@ -87,7 +87,7 @@ function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen }) {
           {/* AI evidence — the verified moments (Evidence Reel) */}
           <div>
             <div className="flex items-center justify-between gap-2">
-              <div className="text-[9.5px] font-extrabold tracking-[0.16em] uppercase text-[#8B957F]">AI evidence — verified moments</div>
+              <div className="text-[9.5px] font-extrabold tracking-[0.16em] uppercase text-[#8B957F]">Verified moments from the match</div>
               {onPlayAt && moments.length > 1 && (
                 <button
                   type="button"

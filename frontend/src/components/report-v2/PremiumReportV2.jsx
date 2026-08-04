@@ -22,6 +22,7 @@ import { DreamPathSection } from "./dreampath";
 import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
 import { ScoreGuideCard } from "./scoreguide";
+import { ScoreMeaningSection } from "./scoremeaning";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -43,7 +44,7 @@ function V2PageHeader({ reportDate }) {
         <div className="font-barlow font-black text-[26px] tracking-[0.03em] text-[#12402A] leading-none">
           SCOUT<span className="text-[#7BA05B]">ME</span>PLAY
         </div>
-        <div className="text-[10px] tracking-[0.24em] font-bold text-[#8B957F] uppercase mt-1">AI Powered Player Analysis</div>
+        <div className="text-[10px] tracking-[0.24em] font-bold text-[#8B957F] uppercase mt-1">ScoutMe Pro Intelligence</div>
       </div>
       <div className="text-center">
         <h1 className="font-barlow font-black text-[26px] md:text-[30px] tracking-[0.04em] text-[#101B12] leading-none">PREMIUM PLAYER REPORT</h1>
@@ -292,11 +293,15 @@ export default function PremiumReportV2({ report, assetBase }) {
         </div>
       )}
 
-      {report.score_context?.overall && (
+      {report.score_meaning?.skills?.length ? (
+        <div className="mb-4">
+          <ScoreMeaningSection sm={report.score_meaning} playerName={pd.player_name} position={pd.position} onPlayAt={playAt} />
+        </div>
+      ) : report.score_context?.overall ? (
         <div className="mb-4">
           <ScoreGuideCard sctx={report.score_context} />
         </div>
-      )}
+      ) : null}
 
       {/* Row 4 — roadmap / training plan / parent tips */}
       <div className="grid lg:grid-cols-3 gap-4 mb-4">

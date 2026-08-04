@@ -142,7 +142,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
                 </span>
                 {s.thumb && s.thumbVerified && (
                   <span data-testid={`v2-strength-verified-${i}`} className="absolute left-1.5 top-1.5 flex items-center gap-1 bg-[#0A190F]/80 text-[#CCFF00] text-[8.5px] font-extrabold tracking-[0.08em] px-1.5 py-0.5 rounded-[4px] pointer-events-none">
-                    <ShieldCheck className="w-2.5 h-2.5" /> AI-VERIFIED
+                    <ShieldCheck className="w-2.5 h-2.5" /> IDENTITY-VERIFIED
                   </span>
                 )}
               </button>
@@ -360,7 +360,7 @@ export function VideoHighlightCard({ videoHighlight, videoUrl, posterUrl, videoR
         )}
         {videoHighlight?.thumbVerified && (
           <span data-testid="v2-highlight-verified" className="absolute right-3 bottom-12 flex items-center gap-1 bg-[#0A190F]/85 text-[#CCFF00] font-extrabold text-[9px] tracking-[0.08em] px-2 py-0.5 rounded-[5px] pointer-events-none">
-            <ShieldCheck className="w-3 h-3" /> AI-VERIFIED FRAME
+            <ShieldCheck className="w-3 h-3" /> IDENTITY-VERIFIED FRAME
           </span>
         )}
       </div>
@@ -398,7 +398,7 @@ const Dots = ({ n }) => (
 export function ScoutOutlookCard({ scoutOutlook }) {
   return (
     <V2Card testid="v2-scout-outlook-card">
-      <V2Title icon={Binoculars}>Scout Outlook</V2Title>
+      <V2Title icon={Binoculars}>Next Level Outlook</V2Title>
       <div className="grid grid-cols-[1.05fr_1fr] gap-4">
         <div>
           <div className="mb-3.5">

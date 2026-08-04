@@ -11,6 +11,7 @@ import {
 import { ASSET_BASE } from "@/lib/api";
 import ReportPaywallTiers from "@/components/ReportPaywallTiers";
 import { DreamPathTeaser } from "@/components/report-v2/dreampath";
+import { ScoreMeaningTeaser } from "@/components/report-v2/scoremeaning";
 
 const LIME = "#CCFF00";
 const INKG = "#0B1F14";
@@ -18,7 +19,7 @@ const INKG = "#0B1F14";
 const MISSING = [
   { icon: Zap, label: "25 Skill Ratings" },
   { icon: Star, label: "Grow Your Game — video-proven lessons" },
-  { icon: BarChart3, label: "Benchmarks & Percentiles" },
+  { icon: BarChart3, label: "Benchmarks & Age Comparisons" },
   { icon: Map, label: "Position Analysis" },
   { icon: ClipboardList, label: "Development Plan" },
   { icon: Brain, label: "Mental & Personality Profile" },
@@ -26,7 +27,7 @@ const MISSING = [
 ];
 
 const CTA_FEATURES = [
-  { icon: FileText, label: "Complete AI Scout Report" },
+  { icon: FileText, label: "Complete Player Report" },
   { icon: Star, label: "25 Professional Skill Ratings" },
   { icon: BarChart3, label: "Benchmarks & Comparisons" },
   { icon: ClipboardList, label: "Development Plan" },
@@ -160,7 +161,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 </div>
                 <div className="font-barlow font-black text-[20px] mt-2" style={{ color: LIME }}>{potentialLabel(potential)}</div>
                 <p className="text-white/75 text-[13px] leading-relaxed mt-2">
-                  Your player shows real potential. The complete scout evaluation is ready to unlock.
+                  Your player shows real potential. The complete evaluation is ready to unlock.
                 </p>
               </>
             ) : (
@@ -173,7 +174,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 </div>
                 <div className="font-barlow font-black text-[17px] mt-2 text-white/90">SCORE CALCULATED</div>
                 <p className="text-white/70 text-[13px] leading-relaxed mt-1.5">
-                  Your player&rsquo;s full 0-100 potential score is computed with the complete scout evaluation — unlock to reveal it.
+                  Your player&rsquo;s full 0-100 potential score is computed with the complete evaluation — unlock to reveal it.
                 </p>
               </>
             )}
@@ -189,7 +190,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
               There&rsquo;s something special in your player&rsquo;s game that most parents miss.
             </div>
             <p className="text-white/70 text-[13px] mt-1.5">
-              Our scout found {strengths.length || "several"} strengths in this clip — one could be a game-changer. Unlock the full report to see what it is.
+              ScoutMe Pro Intelligence found {strengths.length || "several"} strengths in this clip — one could be a game-changer. Unlock the full report to see what it is.
             </p>
           </div>
           <div className="flex flex-col items-center gap-1.5 mx-auto sm:mx-0">
@@ -258,9 +259,9 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 </span>
               </div>
               <div className="min-w-0">
-                <div className="font-barlow font-black text-[16px] text-[#12211A]">Scout Insight Hidden</div>
+                <div className="font-barlow font-black text-[16px] text-[#12211A]">Match Insight Hidden</div>
                 <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
-                  Unlock the full report to see what our scouts noticed in this moment.
+                  Unlock the full report to see what ScoutMe Pro Intelligence noticed in this moment.
                 </p>
                 {keyMomentT && (
                   <span className="inline-block bg-[#F0EDE5] text-[#12211A] text-[11px] font-extrabold px-2.5 py-1 rounded-md mt-2.5" data-testid="fpl-key-moment-t">
@@ -288,6 +289,9 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           </div>
         </div>
 
+        {/* ── What the numbers really mean — one open score story (1 of 25) ── */}
+        <ScoreMeaningTeaser teaser={report.score_meaning_teaser} playerName={pd.player_name} onUnlock={scrollToPackages} />
+
         {/* ── The Path — dream roadmap teaser ── */}
         <DreamPathTeaser playerName={pd.player_name} onUnlock={scrollToPackages} />
 
@@ -304,7 +308,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             <div className="font-barlow font-black text-[18px] text-[#12211A] uppercase">
               You&rsquo;ve only seen <span className="text-[#5C7A00]">10%</span>
             </div>
-            <p className="text-[12.5px] text-[#5C6657] mt-0.5">90% of your professional scout analysis is still locked and waiting for you.</p>
+            <p className="text-[12.5px] text-[#5C6657] mt-0.5">90% of your ScoutMe Pro analysis is still locked and waiting for you.</p>
           </div>
           <div className="flex gap-2">
             {["SKILLS", "BENCHMARKS", "REPORT", "PLAN"].map((t) => (
@@ -327,7 +331,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             <Gift className="w-6 h-6" style={{ color: LIME }} />
           </span>
           <h2 className="font-barlow font-black uppercase text-white text-[24px] md:text-[28px] leading-tight mt-3">
-            Unlock your <span style={{ color: LIME }}>complete scout report</span> now
+            Unlock your <span style={{ color: LIME }}>complete player report</span> now
           </h2>
           <div className="flex flex-wrap justify-center gap-x-5 gap-y-3 mt-4 max-w-[560px] mx-auto">
             {CTA_FEATURES.map(({ icon: Icon, label }) => (

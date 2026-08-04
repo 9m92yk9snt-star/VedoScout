@@ -404,7 +404,7 @@ def _identity_note(report):
     verified = st.get("verified") or 0
     if checked > 0 and verified / checked < 0.5:
         return ("Some moments are shown as text only — an image appears only when an "
-                "independent AI identity check confirms the player with certainty.")
+                "independent identity check confirms the player with certainty.")
     return None
 
 
@@ -1011,7 +1011,7 @@ def _coach_notes_card(c, notes, x, y, w, h):
 def _scout_outlook_card(c, so, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Scout Outlook", w - 2 * PAD)
+    ty -= card_title(c, x + PAD, ty, "Next Level Outlook", w - 2 * PAD)
     for label, val_key, dots_key in (("CURRENT LEVEL", "currentLabel", "currentDots"),
                                      ("POTENTIAL LEVEL", "potentialLabel", "potentialDots")):
         c.setFillColor(MUTED)
@@ -1071,7 +1071,7 @@ def _header(c, report_date):
     _wordmark(c, M, top - 16)
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 6)
-    c.drawString(M, top - 26, "AI POWERED PLAYER ANALYSIS")
+    c.drawString(M, top - 26, "SCOUTME PRO INTELLIGENCE")
     c.setFillColor(INK)
     c.setFont(F_BLACK, 16)
     c.drawCentredString(W / 2, top - 15, "PREMIUM PLAYER REPORT")
@@ -1346,7 +1346,7 @@ def _movement_map_card(c, mm, x, y, w, h):
         c.drawCentredString(rx + 12.5, ty2 + 0.8, "V")
         c.setFillColor(HexColor("#CCFF00"))
         c.setFont(F_BLACK, 5.4)
-        label = "VERIFIED — AT YOUR OWN TAP" if trust == "tap" else "AI IDENTITY-CHECKED AT THIS EXACT SECOND"
+        label = "VERIFIED — AT YOUR OWN TAP" if trust == "tap" else "IDENTITY-CHECKED AT THIS EXACT SECOND"
         c.drawString(rx + 18, ty2, label)
     c.restoreState()
     py = fy2 - fh - 8
@@ -1354,13 +1354,13 @@ def _movement_map_card(c, mm, x, y, w, h):
     if taps and py - (y + 6) > 16:
         tap_line = "<b>YOUR TAPS:</b> " + " · ".join(taps[:8])
         if mm.get("taps_same_player"):
-            tap_line += "  —  INDEPENDENT AI CHECK: ALL TAPS SHOW THE SAME PLAYER"
+            tap_line += "  —  INDEPENDENT IDENTITY CHECK: ALL TAPS SHOW THE SAME PLAYER"
         py -= draw_par(c, tap_line, rx, py, rw, _style(F_BODY, 6.0, FOREST, leading=8.4)) + 4
     if py - (y + 6) > 26:
         draw_par(
             c,
             esc("What was measured: your player's position, frame by frame, in your own clip. "
-                "How: optical tracking seeded by your taps — pure mathematics, no AI guessing. "
+                "How: optical tracking seeded by your taps — pure mathematics, no guessing. "
                 "Why trust it: the fastest moment is only reported from an identity-verified second."),
             rx, py, rw, _style(F_BODY, 6.0, MUTED, leading=8.6),
         )
@@ -1893,6 +1893,171 @@ def _level_scale(c, x, y, w, active_level):
         c.restoreState()
 
 
+def _sm_text_chip(c, x, cy, text, fill, fg, fs=5.6):
+    w2 = c.stringWidth(text, F_BLACK, fs) + 10
+    c.saveState()
+    c.setFillColor(fill)
+    c.roundRect(x, cy - 5.5, w2, 11, 5.5, stroke=0, fill=1)
+    c.setFillColor(fg)
+    c.setFont(F_BLACK, fs)
+    c.drawCentredString(x + w2 / 2, cy - 2, text)
+    c.restoreState()
+    return w2
+
+
+def _sm_chips_row(c, s, x, cy, max_w):
+    chips = []
+    ev = s.get("evidence") or {}
+    ang = s.get("angles") or {}
+    if ev.get("verified"):
+        chips.append((f"SEEN AT {ev.get('timestamp')}", FOREST, LIME))
+    if ang.get("better_than") is not None:
+        chips.append((f"STRONGER THAN {ang['better_than']} OF 10 HIS AGE", HexColor("#E4EEDD"), GREEN))
+    dlt = ang.get("delta")
+    if isinstance(dlt, (int, float)) and dlt:
+        chips.append((f"{'+' if dlt > 0 else ''}{dlt:.1f} SINCE LAST",
+                      HexColor("#EAF6EC") if dlt > 0 else HexColor("#FFF6EA"),
+                      GREEN if dlt > 0 else HexColor("#8A6D3B")))
+    if ang.get("gap_to_next") is not None and ang.get("next_band"):
+        chips.append((f"{ang['gap_to_next']:.1f} FROM {str(ang['next_band']).upper()}", HexColor("#EDE8D6"), MUTED))
+    cx0 = x
+    for text, fill, fg in chips:
+        w2 = c.stringWidth(text, F_BLACK, 5.6) + 10
+        if cx0 + w2 > x + max_w:
+            break
+        _sm_text_chip(c, cx0, cy, text, fill, fg)
+        cx0 += w2 + 4
+
+
+def _sm_rich_card(c, s, x, y, w, h):
+    card(c, x, y, w, h)
+    ty = y + h - PAD + 2
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 5.6)
+    c.drawString(x + PAD, ty - 7, str(s.get("category", "")).upper())
+    c.setFillColor(INK)
+    c.setFont(F_BLACK, 10.5)
+    c.drawString(x + PAD, ty - 19, str(s.get("label", ""))[:26].upper())
+    sc = f"{s['score']:.1f}"
+    c.setFillColor(FOREST)
+    c.setFont(F_BLACK, 19)
+    c.drawRightString(x + w - PAD - 13, ty - 18, sc)
+    c.setFillColor(MUTED)
+    c.setFont(F_BOLD, 6.6)
+    c.drawString(x + w - PAD - 11, ty - 18, "/10")
+    ty -= 27
+    lines = s.get("lines") or []
+    if lines:
+        used = draw_par(c, esc(lines[0]), x + PAD, ty, w - 2 * PAD,
+                        _style(F_BOLD, 6.9, GREEN, leading=9.2), max_h=30)
+        ty -= used + 4
+        if len(lines) > 1:
+            used = draw_par(c, esc(lines[1]), x + PAD, ty, w - 2 * PAD,
+                            _style(F_BODY, 6.6, BODY, leading=8.8), max_h=28)
+            ty -= used + 4
+    why = s.get("position_why")
+    if why and ty - (y + 18) > 12:
+        draw_par(c, esc("For his position: " + str(why)), x + PAD, ty, w - 2 * PAD,
+                 _style(F_BODY, 6.0, FOREST, leading=8.0), max_h=max(10, ty - (y + 18)))
+    _sm_chips_row(c, s, x + PAD, y + 11, w - 2 * PAD)
+
+
+def _score_meaning_page(c, sm, player_name, page_no, total_pages):
+    """Full page: the numbers, translated — one primary truth per score,
+    every other mention a NEW angle (proof, comparison, trend, gap)."""
+    first = (player_name or "Player").split()[0]
+    _page_bg(c)
+    mh = _mini_header(c, player_name)
+    yy = H - M - mh - 4
+
+    h_hd = 58
+    c.saveState()
+    c.setFillColor(FOREST)
+    c.roundRect(M, yy - h_hd, CW, h_hd, 9, stroke=0, fill=1)
+    c.setFillColor(LIME)
+    c.setFont(F_BLACK, 13)
+    c.drawString(M + PAD, yy - 20, "THE NUMBERS, TRANSLATED")
+    c.setFillColor(HexColor("#C9D8C0"))
+    c.setFont(F_BODY, 6.8)
+    c.drawString(M + PAD, yy - 32,
+                 f"A number on its own says nothing. Here every score becomes a discovery about {first} — "
+                 "what it looks like on the pitch, the proof behind it, and the road upward.")
+    if sm.get("position_line"):
+        c.setFillColor(HexColor("#9FBF93"))
+        c.setFont(F_BODY, 6.4)
+        c.drawString(M + PAD, yy - 44, str(sm["position_line"])[:150])
+    c.restoreState()
+    yy -= h_hd + GAP
+
+    skills = sm.get("skills") or []
+    rich, rest = skills[:4], skills[4:]
+    disc = sm.get("discovery")
+
+    cw2 = (CW - GAP) / 2
+    h_rich = 128
+    for i, s in enumerate(rich):
+        _sm_rich_card(c, s, M + (i % 2) * (cw2 + GAP),
+                      yy - h_rich - (i // 2) * (h_rich + GAP), cw2, h_rich)
+    yy -= (2 if len(rich) > 2 else 1) * (h_rich + GAP)
+
+    h_disc = 56 if disc else 0
+    if rest:
+        row_h = 21
+        avail = yy - M - 24 - ((h_disc + GAP) if disc else 0)
+        max_rows = max(1, int((avail - 30) / row_h))
+        n_show = min(len(rest), max_rows * 2)
+        rows_used = (n_show + 1) // 2
+        h_sk = rows_used * row_h + 32
+        card(c, M, yy - h_sk, CW, h_sk)
+        ty2 = yy - PAD
+        ty2 -= card_title(c, M + PAD, ty2, "Every Other Number — A New Angle, Never A Repeat", CW - 2 * PAD)
+        col_w = (CW - 3 * PAD) / 2
+        for i, s in enumerate(rest[:n_show]):
+            col = i // rows_used
+            rowi = i % rows_used
+            bx = M + PAD + col * (col_w + PAD)
+            by = ty2 - rowi * row_h
+            c.setFillColor(INK)
+            c.setFont(F_BOLD, 7)
+            c.drawString(bx, by - 8, str(s.get("label", "")).upper())
+            c.setFillColor(FOREST)
+            c.setFont(F_BLACK, 8)
+            c.drawRightString(bx + col_w, by - 8, f"{s['score']:.1f}")
+            ang = s.get("angles") or {}
+            bits = []
+            if ang.get("better_than") is not None:
+                bits.append(f"Stronger than {ang['better_than']} of 10 his age")
+            if isinstance(ang.get("delta"), (int, float)) and ang["delta"]:
+                bits.append(f"{'+' if ang['delta'] > 0 else ''}{ang['delta']:.1f} since last")
+            if ang.get("gap_to_next") is not None and ang.get("next_band"):
+                bits.append(f"{ang['gap_to_next']:.1f} from {ang['next_band']}")
+            ev = s.get("evidence") or {}
+            if ev.get("verified"):
+                bits.append(f"seen at {ev.get('timestamp')}")
+            c.setFillColor(MUTED)
+            c.setFont(F_BODY, 5.9)
+            c.drawString(bx, by - 16.5, ("  ·  ".join(bits))[:96])
+        yy -= h_sk + GAP
+
+    if disc and yy - M >= h_disc:
+        c.saveState()
+        c.setFillColor(HexColor("#0B1F14"))
+        c.roundRect(M, yy - h_disc, CW, h_disc, 9, stroke=0, fill=1)
+        c.setFillColor(LIME)
+        c.setFont(F_BLACK, 8.6)
+        c.drawString(M + PAD, yy - 16,
+                     f"A DISCOVERY ABOUT {first.upper()} — ANOTHER HOME ON THE PITCH: {str(disc.get('suggest', '')).upper()}")
+        draw_par(c, esc(disc.get("why", "")), M + PAD, yy - 22, CW - 2 * PAD,
+                 _style(F_BODY, 6.6, HexColor("#D8E4D0"), leading=8.8), max_h=20)
+        c.setFillColor(HexColor("#8FA894"))
+        c.setFont(F_BODY, 5.8)
+        c.drawString(M + PAD, yy - h_disc + 7, str(disc.get("note", ""))[:170])
+        c.restoreState()
+
+    _page_footer(c, page_no, total_pages)
+    c.showPage()
+
+
 def _score_guide_page(c, sctx, d, player_name, page_no, total_pages):
     """Full page: what every score means — level words + plain sentences."""
     _page_bg(c)
@@ -2089,7 +2254,7 @@ def _mission_card_print(c, missions, player_name, x, y, w, h):
             c.restoreState()
     c.setFillColor(GREEN)
     c.setFont(F_SCRIPT, 11)
-    c.drawString(x + 16, y + 9, "Process over outcome — count them, own them!  — Your scout")
+    c.drawString(x + 16, y + 9, "Process over outcome — count them, own them!  — Team ScoutMePlay")
 
 
 def _week_planner_print(c, week, focus, x, y, w, h):
@@ -2174,7 +2339,7 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     _wordmark(c, (W - wm_w) / 2, H - 96, size=wm_size)
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 6.4)
-    c.drawCentredString(W / 2, H - 108, "AI POWERED PLAYER ANALYSIS")
+    c.drawCentredString(W / 2, H - 108, "SCOUTME PRO INTELLIGENCE")
 
     c.saveState()
     c.setStrokeColor(GOLD)
@@ -2218,7 +2383,7 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     c.setFillColor(BODY)
     c.setFont(F_BODY, 10.5)
     c.drawCentredString(W / 2, H - 332,
-                        "has completed a full AI scouting analysis as " + ", ".join(b for b in bits if b))
+                        "has completed a full ScoutMe Pro Benchmarked Analysis as " + ", ".join(b for b in bits if b))
     if prog:
         ov = next((cat for cat in (prog.get("categories") or []) if cat.get("key") == "overall_development"), None)
         line = f"{_ordinal(prog.get('analysis_number', 2))} ANALYSIS"
@@ -2249,7 +2414,7 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
         c.drawCentredString(W / 2, dcy - 108, str(d["playerType"]).upper())
 
     # seals
-    seals = [("AI SCOUT", "ANALYSED")]
+    seals = [("SCOUTME PRO", "ANALYSED")]
     if tracked:
         seals.append(("OPTICAL", "TRACKING VERIFIED"))
     seals.append(("EVIDENCE", "BASED REPORT"))
@@ -2270,7 +2435,7 @@ def _diploma_page(c, d, pd, report_date, tracked=False, prog=None):
     c.setFillColor(MUTED)
     c.setFont(F_BOLD, 6.2)
     c.drawCentredString(M + 140, base_y - 11, "DATE OF ANALYSIS")
-    c.drawCentredString(W - M - 140, base_y - 11, "SCOUTMEPLAY SCOUTING INTELLIGENCE")
+    c.drawCentredString(W - M - 140, base_y - 11, "SCOUTME PRO INTELLIGENCE")
     c.setFillColor(INK)
     c.setFont(F_BOLD, 9)
     c.drawCentredString(M + 140, base_y + 6, report_date)
@@ -2323,7 +2488,7 @@ def _gyg_lesson_card(c, les, n, x, y, w, h, first_name):
     col_w = (w - 2 * PAD - 14) / 2
     lx, rx = x + PAD, x + PAD + col_w + 14
     half = col_h / 2
-    _gyg_block(c, lx, ty, col_w, "What scouts look for", les.get("what_scouts_look_for", ""), half)
+    _gyg_block(c, lx, ty, col_w, "What the next level looks for", les.get("what_scouts_look_for", ""), half)
     _gyg_block(c, lx, ty - half, col_w, "Why it matters", les.get("why_it_matters", ""), half)
     _gyg_block(c, rx, ty, col_w, f"What happened in {first_name}'s match", les.get("what_happened", ""), half)
     _gyg_block(c, rx, ty - half, col_w, "Personal advice", les.get("personal_advice", ""), half)
@@ -2422,12 +2587,14 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     has_print = bool(missions or d.get("trainingWeek"))
     sctx = report_doc.get("score_context")
     sctx = sctx if isinstance(sctx, dict) and sctx.get("overall") else None
+    sm = report_doc.get("score_meaning")
+    sm = sm if isinstance(sm, dict) and (sm.get("skills") or []) else None
     prog = report_doc.get("progression")
     prog = prog if isinstance(prog, dict) and prog.get("categories") else None
     gyg = (report_doc.get("full_report") or {}).get("grow_your_game")
     gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    total_pages = 4 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -2578,13 +2745,15 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         _page_footer(c, 4, total_pages)
         c.showPage()
 
-    # ── PAGE — Score guide (what every score means) ──
-    if sctx:
+    # ── PAGE — The numbers, translated (meaning + proof) / score guide fallback ──
+    if sm:
+        _score_meaning_page(c, sm, player_name, 4 + (1 if has_p4 else 0), total_pages)
+    elif sctx:
         _score_guide_page(c, sctx, d, player_name, 4 + (1 if has_p4 else 0), total_pages)
 
     # ── PAGE — GROW YOUR GAME (evidence-gated football education) ──
     if gyg:
-        _gyg_page(c, gyg, player_name, 4 + (1 if has_p4 else 0) + (1 if sctx else 0), total_pages)
+        _gyg_page(c, gyg, player_name, 4 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0), total_pages)
 
     # ── PAGE — Parents Package (home drills / watch together / letter) ──
     if pp:
@@ -2633,7 +2802,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 _week_planner_print(c, d["trainingWeek"],
                                     ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
                                     M, yy - h_wp, CW, h_wp)
-        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
+        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──

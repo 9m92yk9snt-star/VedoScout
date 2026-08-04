@@ -6482,6 +6482,11 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         _fr_scores = (doc.get("full_report") or {}).get("scores") or {}
         _vals = [v for v in _fr_scores.values() if isinstance(v, (int, float))]
         out["teaser"] = {"overall_potential": round(sum(_vals) / len(_vals) * 10) if _vals else None}
+        try:
+            out["score_meaning_teaser"] = build_score_meaning_teaser(doc)
+        except Exception:
+            logger.exception("score meaning teaser failed")
+            out["score_meaning_teaser"] = None
     if include_full:
         out["full_report"] = doc.get("full_report")
         out["agent_review"] = doc.get("agent_review")
@@ -6498,6 +6503,11 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
             if isinstance(doc.get("identity_profile"), dict) else None,
         }
         out["progression"] = await compute_progression_for_report(doc)
+        try:
+            out["score_meaning"] = build_score_meaning(doc, out["progression"])
+        except Exception:
+            logger.exception("score meaning failed")
+            out["score_meaning"] = None
         try:
             out["score_context"] = build_score_context(
                 doc.get("full_report") or {}, (doc.get("player_details") or {}).get("age"))
@@ -9923,6 +9933,11 @@ def _ensure_report_pdf(doc: dict, shared: bool = False) -> Path:
         doc.get("full_report") or {},
         (doc.get("player_details") or {}).get("age"),
     )
+    try:
+        doc["score_meaning"] = build_score_meaning(doc, doc.get("progression"))
+    except Exception:
+        logger.exception("score meaning for PDF failed")
+        doc["score_meaning"] = None
     doc["trial_readiness"] = compute_trial_readiness(
         doc.get("full_report") or {},
         doc.get("player_details") or {},
@@ -12756,6 +12771,7 @@ from movement_metrics import compute_movement_map, fmt_mmss
 from speed_metrics import compute_speed_metrics
 from progression import build_progression
 from score_context import build_score_context
+from score_meaning import build_score_meaning, build_score_meaning_teaser
 from pdf_v2 import build_pdf_v2
 
 

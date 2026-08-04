@@ -293,7 +293,7 @@ export function deriveV2(report) {
   // ---- Evidence-integrity note (strict image policy) ----
   const ist = report?.identity_stats;
   const identityNote = ist && (ist.checked || 0) > 0 && (ist.verified || 0) / ist.checked < 0.5
-    ? "Some moments are shown as text only — an image is displayed only when an independent AI identity check confirms your player with certainty."
+    ? "Some moments are shown as text only — an image is displayed only when an independent identity check confirms your player with certainty."
     : null;
 
   return {
