@@ -110,6 +110,8 @@ export default function LandingMinimal() {
 
       <Navigation />
       <StatsTicker />
+
+      <HeroSection onPrimaryCta={handlePrimaryCta} isLoggedIn={!!user} />
       <SampleReportShowcase onPrimaryCta={handlePrimaryCta} />
       <TrustStrip />
       <HowItWorks />
