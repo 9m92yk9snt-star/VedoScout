@@ -3067,3 +3067,15 @@ Brugervalg: a) admin-styrede follower-tal (ingen Meta API) + lovlig SEO-pakke (i
 - Admin SeoAdmin.jsx: pr.-side editor (tællere 70/175), Google-preview snippet, "Auto-fill recommended SEO", links til sitemap/robots/rss + Search Console-guide.
 - Test: iteration_72.json — 100% begge dele; cleanup udført (ingen overrides, followers=0). Pytest: /app/backend/tests/test_iter72_seo_social.py.
 - NOTE: preview-domænets rod-/robots.txt interceptes af platform-edge; /api/robots.txt + statisk fil virker. Efter produktion-deploy: indsend {domæne}/api/sitemap.xml i Google Search Console (guide står i admin-fanen).
+
+## Session (Aug 5, 2026 - 2) — FOLLOWER-TAL SAT + 5 SEO-BLOGINDLÆG PUBLICERET ✅ (self-tested: curl + screenshots)
+1. **Follower-tal** (brugerens rigtige tal): Instagram 24, Facebook 9 — sat i settings.social_follow; verificeret via GET /api/social-follow.
+2. **5 SEO-blogindlæg publiceret** via POST /api/blog/admin/posts (author "ScoutMePlay Editorial", alle m. meta_title/description/keywords, tags, kategori, genererede cover-billeder i /app/backend/uploads/blog/cover-*.jpg serveret via /api/blog/uploads/):
+   - youth-football-report-parents-guide (Parent's Guide) — hovedkeyword "youth football report"
+   - how-football-scouts-evaluate-young-players (Scouting Tips)
+   - how-to-film-football-match-tips (Parent's Guide)
+   - four-pillars-player-development (Training)
+   - grassroots-to-academy-roadmap (Pro Player Path)
+   Artiklerne krydslinker hinanden + /upload + /methodology (intern linkstruktur). Ingen forbudte ord ("AI"/"percentile" undgået; "scout" ok i editorial kontekst godkendt af bruger via emnerne).
+3. Verificeret: 5 public posts, sitemap.xml indeholder 5 /blog/-URLs, rss.xml har 5 items, covers 200, blogindex + artikelside renderer flot m. korrekt SEO-titel.
+- Seed-script: /tmp/seed_blog.py (engangs).
