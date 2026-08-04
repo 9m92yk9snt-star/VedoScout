@@ -4535,9 +4535,14 @@ def _serialize_demo_video(doc: dict) -> dict:
 
 @api_router.get("/demo-videos")
 async def public_list_demo_videos():
-    """Public — landing page fetches this. Only active videos, ordered."""
+    """Public — landing page fetches this. Only active videos whose files exist."""
     cursor = db.demo_videos.find({"status": "active"}, {"_id": 0}).sort("order", 1)
-    items = [_serialize_demo_video(d) async for d in cursor]
+    items = []
+    async for d in cursor:
+        vu = d.get("video_url") or ""
+        if vu.startswith("/api/uploads/") and not (UPLOAD_DIR / vu.replace("/api/uploads/", "", 1)).exists():
+            continue
+        items.append(_serialize_demo_video(d))
     return {"items": items}
 
 
@@ -10201,14 +10206,14 @@ async def share_unlock_bonus(report_id: str, _body: ShareUnlockBody = None, user
 
 # ── Reviews ────────────────────────────────────────────────────────────────
 class ReviewCreate(BaseModel):
-    stars: int = Field(ge=1, le=5)
-    text: str = Field(min_length=3, max_length=200)
+    stars: int = Field(ge=0, le=5)
+    text: str = Field(min_length=3, max_length=50)
 
 
 class AdminReviewCreate(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    stars: int = Field(ge=1, le=5)
-    text: str = Field(min_length=3, max_length=200)
+    stars: int = Field(ge=0, le=5)
+    text: str = Field(min_length=3, max_length=50)
     image_base64: Optional[str] = None
 
 

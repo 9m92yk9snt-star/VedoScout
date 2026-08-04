@@ -52,15 +52,15 @@ export default function ReviewPrompt() {
       </div>
       <textarea
         value={text}
-        onChange={(e) => setText(e.target.value.slice(0, 180))}
+        onChange={(e) => setText(e.target.value.slice(0, 50))}
         rows={2}
-        maxLength={180}
+        maxLength={50}
         data-testid="review-text-input"
-        placeholder="Two lines about what the analysis meant for your player…"
+        placeholder="One short line about what it meant for your player…"
         className="mt-3 w-full bg-[#FBF9F3] border border-[#E5DFCE] rounded-xl px-4 py-3 text-sm text-ink focus:outline-none focus:border-forest resize-none"
       />
       <div className="flex items-center justify-between mt-2">
-        <span className="text-[11px] text-ink/40">{text.length}/180</span>
+        <span className="text-[11px] text-ink/40">{text.length}/50</span>
         <button
           type="button"
           onClick={submit}

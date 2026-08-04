@@ -30,7 +30,6 @@ import {
   HowItWorks,
   WhatsInside,
   ImageStrip,
-  SocialProof,
   FinalCta,
 } from "@/components/LandingSections";
 import DemoVideoCarousel from "@/components/DemoVideoCarousel";
@@ -120,7 +119,6 @@ export default function LandingMinimal() {
       <div id="pricing-section" data-testid="pricing-section">
         <PricingTiers />
       </div>
-      <SocialProof />
       <ReviewsStrip />
       <FAQSection faqItems={faqItems} />
       <DemoVideoCarousel />

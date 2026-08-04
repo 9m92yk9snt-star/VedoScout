@@ -34,6 +34,7 @@ export default function DemoVideoCarousel() {
   };
 
   if (loading) return null;
+  if (videos.length === 0) return null;
 
   return (
     <section
@@ -86,9 +87,7 @@ export default function DemoVideoCarousel() {
               See how <span className="text-forest">it actually works.</span>
             </h2>
             <p className="mt-1.5 text-ink/55 text-sm leading-snug max-w-md">
-              {videos.length === 0
-                ? "First iPhone workflow demos landing here soon."
-                : "Short walkthroughs. Real screen, real report."}
+              Short walkthroughs. Real screen, real report.
             </p>
           </div>
 
@@ -122,19 +121,15 @@ export default function DemoVideoCarousel() {
           className="relative flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-6 px-6 md:mx-0 md:px-0 no-scrollbar"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          {videos.length === 0 ? (
-            <EmptyStateCard />
-          ) : (
-            videos.map((v) => (
-              <VideoCard
-                key={v.id}
-                video={v}
-                isPlaying={playingId === v.id}
-                onPlay={() => setPlayingId(v.id)}
-                onPause={() => setPlayingId(null)}
-              />
-            ))
-          )}
+          {videos.map((v) => (
+            <VideoCard
+              key={v.id}
+              video={v}
+              isPlaying={playingId === v.id}
+              onPlay={() => setPlayingId(v.id)}
+              onPause={() => setPlayingId(null)}
+            />
+          ))}
         </div>
 
         {/* Dots */}
@@ -184,25 +179,6 @@ function ChalkArrow() {
         markerEnd="url(#chalkHead)"
       />
     </svg>
-  );
-}
-
-/* ─── EMPTY STATE ─── */
-function EmptyStateCard() {
-  return (
-    <PremiumFrame testid="demo-empty-state">
-      <div className="aspect-[16/10] w-full flex flex-col items-center justify-center px-6 text-center">
-        <div className="w-10 h-10 border border-forest/40 bg-forest/5 flex items-center justify-center mb-3">
-          <Video className="w-4 h-4 text-forest" strokeWidth={1.5} />
-        </div>
-        <div className="text-[10px] uppercase tracking-[0.22em] font-black text-forest mb-1.5">
-          Coming soon
-        </div>
-        <h3 className="font-barlow font-black uppercase text-base md:text-lg leading-tight text-ink max-w-xs">
-          First workflow clips landing here shortly.
-        </h3>
-      </div>
-    </PremiumFrame>
   );
 }
 

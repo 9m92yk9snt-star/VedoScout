@@ -87,37 +87,49 @@ function Section({ id, eyebrow, headline, headlineAccent, sub, children, dark = 
 /* ────────────────────────────────────────────────────────────────────── */
 export function TrustStrip() {
   const items = [
-    { value: "48h", label: "Report delivery", icon: Clock },
-    { value: "U7–U21", label: "Age coverage", icon: Users },
-    { value: "10-tap", label: "Marking workflow", icon: Target },
-    { value: "Pro", label: "Scout Intelligence", icon: ShieldCheck },
+    { value: "48", suffix: "h", label: "From upload to full report", icon: Clock },
+    { value: "U7", suffix: "–U21", label: "Every age · every dream", icon: Users },
+    { value: "19", suffix: "+", label: "Skills scored & explained", icon: Target },
+    { value: "1", suffix: "", label: "Player in focus — you", icon: ShieldCheck },
   ];
   return (
     <section
       id="trust-strip"
       data-testid="trust-strip"
-      className="relative bg-cream-card border-b border-gray-border px-6 md:px-10 py-5 md:py-7"
+      className="relative bg-ink text-cream-base px-6 md:px-10 py-6 md:py-8 overflow-hidden border-b border-volt/15"
     >
-      <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 md:gap-x-0">
+      <style>{`@keyframes smp-strip-sweep { 0% { left: -20%; } 100% { left: 120%; } }`}</style>
+      <span
+        aria-hidden
+        className="absolute top-0 h-[2px] w-[18%] bg-gradient-to-r from-transparent via-volt to-transparent"
+        style={{ animation: "smp-strip-sweep 5s linear infinite" }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.05] pointer-events-none"
+        style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #CCFF00 1px, transparent 0)", backgroundSize: "28px 28px" }}
+      />
+      <div className="relative max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 md:gap-x-0">
         {items.map((it, idx) => {
           const Icon = it.icon;
           return (
             <motion.div
               key={it.label}
-              initial={{ opacity: 0, y: 6 }}
+              initial={{ opacity: 0, y: 8 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.4, delay: idx * 0.06 }}
-              className={`flex items-center gap-3 md:gap-4 md:px-6 ${idx > 0 ? "md:border-l md:border-forest/15" : ""}`}
+              transition={{ duration: 0.45, delay: idx * 0.08 }}
+              className={`flex items-center gap-3 md:gap-4 md:px-6 ${idx > 0 ? "md:border-l md:border-volt/10" : ""}`}
             >
-              <span className="shrink-0 w-9 h-9 md:w-10 md:h-10 bg-forest/8 border border-forest/15 flex items-center justify-center">
-                <Icon className="w-4 h-4 md:w-5 md:h-5 text-forest" strokeWidth={1.9} aria-hidden="true" />
+              <span className="shrink-0 w-10 h-10 bg-volt/10 border border-volt/25 flex items-center justify-center">
+                <Icon className="w-5 h-5 text-volt" strokeWidth={1.9} aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <div className="font-barlow font-black text-2xl md:text-3xl uppercase tracking-tight leading-none text-ink">
+                <div className="font-barlow font-black text-2xl md:text-3xl uppercase tracking-tight leading-none text-volt">
                   {it.value}
+                  <span className="text-cream-base/80 text-lg md:text-xl">{it.suffix}</span>
                 </div>
-                <div className="mt-1 text-[10px] md:text-[11px] uppercase tracking-[0.18em] font-bold text-ink/55 truncate">
+                <div className="mt-1 text-[10px] md:text-[11px] uppercase tracking-[0.14em] font-bold text-cream-base/60 leading-tight">
                   {it.label}
                 </div>
               </div>
@@ -238,36 +250,40 @@ export function HowItWorks() {
 export function WhatsInside() {
   const features = [
     {
+      img: "inside-seen.jpg",
       icon: Activity,
-      title: "4-pillar scoring",
-      body: "Technical · Tactical · Physical · Mentality — each scored against age-appropriate benchmarks.",
+      title: "Your game, finally seen",
+      body: "Every match hides moments nobody notices. We find yours — and show you what makes your game special.",
     },
     {
+      img: "inside-spotlight.jpg",
       icon: Target,
-      title: "Pixel-perfect tracking",
-      body: "Your player is locked frame-by-frame. The report describes them — not random players in the background.",
+      title: "Only you in the spotlight",
+      body: "The whole report follows one player: you. Your runs, your touches, your decisions — nobody else's.",
     },
     {
+      img: "inside-moments.jpg",
       icon: PlayCircle,
-      title: "Timestamped moments",
-      body: "Every key action gets a clickable timestamp so you can rewatch the exact moment the scout describes.",
+      title: "Relive your best moments",
+      body: "Jump straight to the seconds where you shine. Watch them again, feel them again — and learn what made them work.",
     },
     {
+      img: "inside-path.jpg",
       icon: Trophy,
-      title: "Personal training plan",
-      body: "5 prescriptive drills plus a 7, 30 and 90-day plan written specifically for your player's gaps.",
+      title: "Your road to the next level",
+      body: "A personal plan that turns every training week into progress you can feel — 7, 30 and 90 days ahead.",
     },
   ];
   return (
     <Section
       id="what-you-get"
       eyebrow="What's inside"
-      headline="A real scouting"
-      headlineAccent="dossier."
-      sub="Not a generic auto-summary. A structured premium report parents and academies actually use."
+      headline="Where the dream"
+      headlineAccent="starts growing."
+      sub="Not cold numbers — a personal story about your game: what shines today, and what takes you further tomorrow."
       tight
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
         {features.map((f, idx) => {
           const Icon = f.icon;
           return (
@@ -278,34 +294,28 @@ export function WhatsInside() {
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.45, delay: idx * 0.06 }}
               data-testid={`feature-${idx}`}
-              className="group relative bg-cream-card border border-gray-border p-5 md:p-6 hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 flex gap-4 md:gap-5 overflow-hidden"
+              className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 transition-colors duration-300"
             >
-              {/* Subtle dotted background pattern (mobile + desktop) */}
-              <div
-                aria-hidden
-                className="absolute inset-0 opacity-[0.04] pointer-events-none"
-                style={{
-                  backgroundImage: "radial-gradient(circle at 1px 1px, #1F4F2F 1px, transparent 0)",
-                  backgroundSize: "16px 16px",
-                }}
-              />
-              {/* Vertical accent strip — visible on every breakpoint */}
-              <span aria-hidden className="absolute left-0 top-0 bottom-0 w-[3px] bg-forest/10 group-hover:bg-forest transition-colors" />
-              {/* Top-right corner bracket */}
-              <span aria-hidden className="absolute top-2 right-2 w-3 h-3 border-r border-t border-forest/30 group-hover:border-forest transition-colors" />
-
-              <span className="relative shrink-0 w-12 h-12 bg-forest text-white border border-forest flex items-center justify-center">
-                <Icon className="w-5 h-5" strokeWidth={2.1} />
-              </span>
-              <div className="relative min-w-0 flex-1">
-                <div className="flex items-baseline gap-3">
-                  <h3 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-ink leading-tight">
+              <div className="relative aspect-[16/9] overflow-hidden bg-ink">
+                <img
+                  src={IMG(f.img)}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" />
+                <span aria-hidden className="absolute top-3 right-3 w-4 h-4 border-r-2 border-t-2 border-volt/70" />
+                <div className="absolute bottom-3 left-4 right-4 flex items-center gap-3">
+                  <span className="shrink-0 w-9 h-9 bg-volt text-ink flex items-center justify-center">
+                    <Icon className="w-4 h-4" strokeWidth={2.2} />
+                  </span>
+                  <h3 className="font-barlow font-black uppercase tracking-tight text-lg md:text-xl text-white leading-tight drop-shadow-sm">
                     {f.title}
                   </h3>
-                  <span aria-hidden className="flex-1 h-px bg-forest/15" />
                 </div>
-                <p className="mt-1.5 text-sm md:text-[15px] text-ink/65 leading-relaxed">{f.body}</p>
               </div>
+              <p className="p-4 md:p-5 text-sm md:text-[15px] text-ink/70 leading-relaxed">{f.body}</p>
             </motion.div>
           );
         })}
@@ -428,7 +438,7 @@ export function SocialProof() {
 /*  FinalCta — Final conversion strip (dark ink panel).                   */
 /* ────────────────────────────────────────────────────────────────────── */
 export function FinalCta({ isLoggedIn }) {
-  const target = isLoggedIn ? "/upload" : "/signup?next=/upload";
+  const target = "/upload";
   return (
     <section
       id="final-cta"

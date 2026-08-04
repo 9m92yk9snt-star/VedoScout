@@ -51,6 +51,10 @@ export default function ReviewsAdmin() {
           <input placeholder="Name (e.g. Noah's dad)" value={form.name} data-testid="admin-review-name"
             onChange={(e) => setForm({ ...form, name: e.target.value })} className={inp} />
           <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setForm({ ...form, stars: 0 })} data-testid="admin-review-star-0"
+              className={`text-[10px] font-black px-2 py-1 border rounded mr-1 ${form.stars === 0 ? "border-forest text-forest bg-forest/5" : "border-gray-border text-ink/40"}`}>
+              0
+            </button>
             {[1, 2, 3, 4, 5].map((i) => (
               <button key={i} type="button" onClick={() => setForm({ ...form, stars: i })} data-testid={`admin-review-star-${i}`}>
                 <Star className="w-6 h-6" style={{ color: i <= form.stars ? "#B9CE00" : "#D8D3C4", fill: i <= form.stars ? "#B9CE00" : "none" }} />
@@ -59,8 +63,9 @@ export default function ReviewsAdmin() {
           </div>
           <input type="file" accept="image/*" onChange={onFile} data-testid="admin-review-image" className="text-xs" />
         </div>
-        <textarea rows={2} maxLength={180} placeholder="Two lines of review text…" value={form.text} data-testid="admin-review-text"
-          onChange={(e) => setForm({ ...form, text: e.target.value })} className={`${inp} w-full mt-3 resize-none`} />
+        <textarea rows={2} maxLength={50} placeholder="Max 50 characters of review text…" value={form.text} data-testid="admin-review-text"
+          onChange={(e) => setForm({ ...form, text: e.target.value.slice(0, 50) })} className={`${inp} w-full mt-3 resize-none`} />
+        <div className="text-[11px] text-ink/40 mt-1">{form.text.length}/50</div>
         <button type="button" onClick={add} disabled={busy} data-testid="admin-review-add-btn"
           className="mt-3 bg-forest text-white font-barlow font-black uppercase text-[11px] tracking-widest px-6 py-2.5 rounded-full disabled:opacity-50">
           Publish review
