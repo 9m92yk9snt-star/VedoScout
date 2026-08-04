@@ -35,6 +35,7 @@ import {
 import DemoVideoCarousel from "@/components/DemoVideoCarousel";
 import StatsTicker from "@/components/StatsTicker";
 import SocialFollowSection from "@/components/SocialFollowSection";
+import BlogHighlights from "@/components/BlogHighlights";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
@@ -123,6 +124,7 @@ export default function LandingMinimal() {
       </div>
       <ReviewsStrip />
       <SocialFollowSection />
+      <BlogHighlights />
       <FAQSection faqItems={faqItems} />
       <DemoVideoCarousel />
       <FinalCta isLoggedIn={!!user} />

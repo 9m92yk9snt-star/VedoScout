@@ -3079,3 +3079,8 @@ Brugervalg: a) admin-styrede follower-tal (ingen Meta API) + lovlig SEO-pakke (i
    Artiklerne krydslinker hinanden + /upload + /methodology (intern linkstruktur). Ingen forbudte ord ("AI"/"percentile" undgået; "scout" ok i editorial kontekst godkendt af bruger via emnerne).
 3. Verificeret: 5 public posts, sitemap.xml indeholder 5 /blog/-URLs, rss.xml har 5 items, covers 200, blogindex + artikelside renderer flot m. korrekt SEO-titel.
 - Seed-script: /tmp/seed_blog.py (engangs).
+
+## Session (Aug 5, 2026 - 3) — BLOG-HIGHLIGHTS PÅ FORSIDEN ✅ (self-tested m. screenshots desktop+mobil)
+- Ny komponent BlogHighlights.jsx: lille flot sektion "From the journal / Stories that build players." med de 3 nyeste artikler fra GET /api/blog/posts?limit=3. Kort: coverbillede m. hover-zoom, kategori-chip (forest/volt), læsetid, titel+subtitle line-clamp, "Read the story"-link. Mobil: snap-swipe m. centrerede glødende pile (blog-arrow-prev/next, edge-clamping som pricing); desktop: 3-kolonne grid. "All articles"-link til /blog.
+- Placeret i LandingMinimal mellem SocialFollowSection og FAQSection. Skjules automatisk hvis ingen posts.
+- Search Console: kan kun udføres af brugeren selv på live-domæne (guide ligger i admin → SEO & Social).
