@@ -3034,3 +3034,13 @@ Brugerkrav: nyt 4-kolonne "dream"-pricing-design (100% identisk med uploadet bil
 - **Bevaret funktionalitet**: priser live fra GET /api/settings/price (admin PUT /api/admin/pricing verificeret dynamisk), onUnlockSingle (embedded checkout på rapport), discount-visning (slashed pris + paywall-discounted-price/paywall-discount-chip testids beholdt), subscribe premium/vip → Stripe URL, guest-CTA'er → signup m. plan-param, Free → /upload.
 - **Robusthedsfix**: _serialize_report bruger nu doc.get("player_details") or {} (var KeyError/500 på minimale docs).
 - Test: iteration_70.json — alt bestået inkl. discountflow, dashboard, free preview, regression (ticker/reviews/hero). Pytest: /app/backend/tests/test_iter70_dream_pricing.py.
+
+## Session (Aug 4, 2026 - nat 2) — LANDING POLISH x4 SHIPPED ✅ (iter71: frontend 100%)
+Brugerens 4 punkter:
+0. **Sample report showcase sælger drøm/nysgerrighed**: Bar-komponenten fik "meaning"-linjer (menneskelig oversættelse under hver pillar-score, kort omdøbt "What They Really Mean"); ParentsCard-rækker humaniseret ("Does he demand the ball?" osv.); PaceCard fik emotionelt citat; sidste CTA-swipe-kort totalt redesignet m. gyldent stadionbillede (finalcta-stadium.jpg), "One clip. One report. A whole new way to see your game." + glødende/shimrende upload-knap (keyframes smp-cta-shine/glow).
+1. **Centrerede swipe-pile på pricing**: DreamPricingTiers fik trackRef + nudge + runde glas-pile m. volt-glow midt på banneret (dream-arrow-prev/next, lg:hidden) — virker automatisk ALLE steder komponenten bruges (landing/dashboard/free preview/report). Sample-scroller fik også mobile centrerede pile (sample-arrow-prev/next, sm:hidden).
+2. **TrustStrip levende**: glødende volt-tal (textShadow), flydende ikon-chips (smp-icon-float), animeret sweep (3px/4s) + diagonal shine (smp-strip-shine), lysere labels, hover-lift.
+3. **FinalCta + footer**: FinalCta har nu cinematisk gyldent stadionbillede som baggrund + glødende pulserende knap m. shine. SiteFooter (LandingMinimal ~536) totalt redesignet: turf-baggrund mere synlig, 3 kolonner (brand-story m. "Start your story"-link, Explore, Connect m. sociale ikoner fra /api/settings/price), kæmpe watermark "ScoutMePlay", bundlinje "© year ScoutMePlay. All rights reserved." — "MentalKids · Denmark" FJERNET.
+- Nyt asset: /app/backend/static/landing/finalcta-stadium.jpg (genereret, bruges i FinalCta + sample CTA-kort).
+- Testing agent fix: footer social keys er instagram_url/facebook_url/twitter_url/linkedin_url i settings-svar (koden læser nu begge varianter).
+- Test: iteration_71.json — 100%, ingen console errors, alle regressioner OK.
