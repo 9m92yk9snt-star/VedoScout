@@ -1,5 +1,8 @@
 # ScoutMePlay — PRD & Status
 
+## FUTURE (ON HOLD, Aug 4 2026) — Instagram Growth Funnel
+User approved the full plan but said WAIT ("gem alt som future, lav ikke noget"). Full spec saved in `/app/memory/FUTURE_instagram_funnel.md`: Carousel Studio (AI slide images + later auto-post to IG via Meta Graph API), free PDF lead magnet, /guide email-capture page, sequenced offer emails (report discount, membership discount, paid PDF — all admin-controlled), admin discount-code system for subscriptions/single reports, ManyChat comment→DM guide. Nothing built yet.
+
 ## Session (Aug 4, 2026) — SOCIAL BOXES + BLOG SHARE + NEWSLETTER + BLOG STUDIO ✅ (iter73, 100% pass)
 - **User task (approved "Kør")**: 1) compact side-by-side follow boxes, 2) viral share buttons on blog articles, 3) newsletter signup, 4) weekly warm-tone article flow.
 - **SocialFollowSection.jsx REWRITTEN**: light cream section (bg-cream-soft/50, border-y) replacing the big dark #081109 block; two compact white cards side-by-side even on mobile (grid-cols-2), small icon chips + count-up follower numbers (24 IG / 9 FB) + Follow pills. Same testids preserved; admin settings untouched.
