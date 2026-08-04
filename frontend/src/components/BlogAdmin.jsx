@@ -4,9 +4,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Plus, Edit3, Trash2, Eye, FileText, Sparkles, Save, Send, Upload, Loader2, X,
-  ImageIcon, Tag as TagIcon, ArrowLeft, Layers, ChevronRight,
+  ImageIcon, Tag as TagIcon, ArrowLeft, Layers, ChevronRight, PenLine, Mail,
 } from "lucide-react";
 import api from "@/lib/api";
+import BlogStudioPanel from "@/components/admin/BlogStudioPanel";
+import NewsletterAdmin from "@/components/admin/NewsletterAdmin";
 
 const STATUS_LABEL = { draft: "Draft", published: "Live" };
 const DEFAULT_AUDIENCE = "parents and ambitious young footballers U7–U21";
@@ -35,6 +37,8 @@ function BlogList({ onNew, onEdit }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [seriesOpen, setSeriesOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [subsOpen, setSubsOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all"); // all | draft | published
 
   const load = async () => {
@@ -79,7 +83,21 @@ function BlogList({ onNew, onEdit }) {
           <h2 className="font-barlow font-black uppercase text-2xl md:text-3xl tracking-tight">Blog</h2>
           <p className="text-sm text-ink/60 mt-1">SEO-optimised articles. AI drafting + Gemini SEO suggestions available.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setSubsOpen((v) => !v)}
+            data-testid="admin-blog-newsletter-btn"
+            className="text-ink/65 hover:text-ink border border-gray-border hover:border-forest font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 flex items-center gap-2 transition-colors"
+          >
+            <Mail className="w-4 h-4" /> Subscribers
+          </button>
+          <button
+            onClick={() => setStudioOpen((v) => !v)}
+            data-testid="admin-blog-studio-btn"
+            className="text-forest hover:text-cream-card hover:bg-forest border border-forest/40 font-barlow font-black uppercase tracking-widest text-xs px-4 py-3 flex items-center gap-2 transition-colors"
+          >
+            <PenLine className="w-4 h-4" /> Blog Studio
+          </button>
           <button
             onClick={() => setSeriesOpen((v) => !v)}
             data-testid="admin-blog-series-btn"
@@ -96,6 +114,17 @@ function BlogList({ onNew, onEdit }) {
           </button>
         </div>
       </div>
+
+      {/* Blog Studio — warm-tone generator + weekly auto-draft */}
+      {studioOpen && (
+        <BlogStudioPanel
+          onClose={() => setStudioOpen(false)}
+          onSaved={() => load()}
+        />
+      )}
+
+      {/* Newsletter subscribers */}
+      {subsOpen && <NewsletterAdmin onClose={() => setSubsOpen(false)} />}
 
       {/* Generate Series panel (inline, expandable) */}
       {seriesOpen && (

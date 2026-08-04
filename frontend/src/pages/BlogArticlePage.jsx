@@ -6,6 +6,8 @@ import remarkGfm from "remark-gfm";
 import { Clock, ArrowLeft, ArrowRight, Tag as TagIcon, Calendar } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SEO, { articleJsonLd, breadcrumbJsonLd } from "@/components/SEO";
+import BlogShareBar from "@/components/BlogShareBar";
+import NewsletterSignup from "@/components/NewsletterSignup";
 import api from "@/lib/api";
 
 const LIME = "#ccff00";
@@ -160,6 +162,10 @@ export default function BlogArticlePage() {
                 <span className="text-ink/70">By {post.author_name}</span>
               )}
             </div>
+
+            <div className="mt-6">
+              <BlogShareBar title={post.title} />
+            </div>
           </div>
         </header>
 
@@ -215,8 +221,8 @@ export default function BlogArticlePage() {
             </div>
           )}
 
-          {/* Back to blog */}
-          <div className="mt-12 flex items-center justify-between border-t border-gray-border pt-8">
+          {/* Share + back to blog */}
+          <div className="mt-12 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 border-t border-gray-border pt-8">
             <Link
               to="/blog"
               data-testid="blog-back-link"
@@ -224,6 +230,12 @@ export default function BlogArticlePage() {
             >
               <ArrowLeft className="w-3.5 h-3.5" /> All articles
             </Link>
+            <BlogShareBar title={post.title} label="Enjoyed it? Share it" />
+          </div>
+
+          {/* Newsletter */}
+          <div className="mt-10">
+            <NewsletterSignup source="article" />
           </div>
         </div>
       </article>

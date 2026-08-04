@@ -13349,6 +13349,7 @@ async def on_startup():
     try:
         asyncio.create_task(_curve_reminder_loop())
         asyncio.create_task(conversion_loop(db, get_current_single_price))
+        asyncio.create_task(blog_studio_weekly_loop(db))
         logger.info("[curve-reminder] loop started")
     except Exception:
         logger.exception("Curve reminder loop failed to start (non-fatal)")

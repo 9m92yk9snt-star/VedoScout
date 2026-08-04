@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Search, Clock, ArrowRight, Tag as TagIcon } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SEO, { organizationJsonLd } from "@/components/SEO";
+import NewsletterSignup from "@/components/NewsletterSignup";
 import api from "@/lib/api";
 
 const LIME = "#ccff00";
@@ -264,6 +265,11 @@ export default function BlogIndexPage() {
             </motion.div>
           </>
         )}
+      </section>
+
+      {/* ===== NEWSLETTER ===== */}
+      <section className="max-w-6xl mx-auto px-6 md:px-10 pb-14 md:pb-20">
+        <NewsletterSignup source="blog-index" />
       </section>
 
       {/* ===== CTA ===== */}
