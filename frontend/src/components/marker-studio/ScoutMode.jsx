@@ -960,7 +960,7 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
               <span className="relative rounded-full w-2 h-2 bg-[#CCFF00]" />
             </span>
             <span className="text-[10.5px] uppercase tracking-[0.22em] font-black text-[#CCFF00]">
-              Verified by Pro Scout Intelligence ✓
+              Verified by ScoutMe Pro Intelligence ✓
             </span>
           </div>
         </div>

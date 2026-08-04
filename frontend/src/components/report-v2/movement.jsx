@@ -49,15 +49,15 @@ function TrailSvg({ trail }) {
 
 const TRUST_LABEL = {
   tap: "Verified — this moment sits at one of your own taps",
-  ai: "Identity-checked by a second AI at this exact second",
+  ai: "Independently identity-checked at this exact second",
 };
 
 const HOW_WE_MEASURED = [
   ["What was measured?", "Your player's position, frame by frame, in the video you uploaded."],
   ["When?", "Only in the passages where the tracker had a secure lock on your player — shown above as timestamps from your clip."],
-  ["How?", "You tapped your player; an optical tracker followed exactly that figure. Pure mathematics — no AI guessing."],
+  ["How?", "You tapped your player; an optical tracker followed exactly that figure. Pure mathematics — no guessing."],
   ["Why does it matter?", "Bursts, work rate and top speed show how actively your player moves — things that are hard to see live."],
-  ["Why trust it?", "Every tap was cross-checked by an independent AI, and the fastest moment is only reported from an identity-verified second. When the tracker is unsure, it stops instead of guessing."],
+  ["Why trust it?", "Every tap was cross-checked by an independent identity engine, and the fastest moment is only reported from an identity-verified second. When the tracker is unsure, it stops instead of guessing."],
 ];
 
 export function MovementMapCard({ movement, pace, onPlayAt }) {
@@ -128,7 +128,7 @@ export function MovementMapCard({ movement, pace, onPlayAt }) {
                 <div className="flex items-start gap-1.5 mt-2 text-[10.5px] font-semibold text-[#1E5B3C]" data-testid="v2-mm-taps-verified">
                   <ShieldCheck className="w-3.5 h-3.5 flex-shrink-0 mt-[1px]" />
                   <span>
-                    Independent AI check: all {taps.length} of your taps show the same player
+                    Independent identity check: all {taps.length} of your taps show the same player
                     {movement.taps_confidence ? ` (${movement.taps_confidence} confidence)` : ""}.
                   </span>
                 </div>

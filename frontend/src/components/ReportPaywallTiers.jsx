@@ -136,7 +136,7 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle,
           </div>
           <ul className="mt-5 space-y-2 flex-1">
             <Feat>2 video reports every month</Feat>
-            <Feat>Instant AI analysis — no waiting</Feat>
+            <Feat>Instant analysis — no waiting</Feat>
             <Feat>Progress tracking over time</Feat>
             <Feat>Personal development plan</Feat>
             <Feat>Visible in the scout database</Feat>

@@ -14,7 +14,7 @@ import api, { ASSET_BASE } from "@/lib/api";
 const LIME = "#CCFF00";
 const INKG = "#0B1F14";
 
-const STAGES = ["Video Uploaded", "Player Tracked", "AI Analyzing", "Writing Report", "Creating PDF", "Final Check"];
+const STAGES = ["Video Uploaded", "Player Tracked", "Deep Analysis", "Writing Report", "Creating PDF", "Final Check"];
 const GAUGES = [
   { label: "Technical", target: 92 },
   { label: "Tactical", target: 85 },
@@ -214,7 +214,7 @@ export default function PremiumBuildingDashboard({ report, user, error, onRetry 
                   <span style={{ color: LIME }}>Scout Dossier</span>
                 </h2>
                 <p className="text-white/75 text-[14px] mt-2 max-w-[300px]">
-                  Our AI is analyzing every detail of your player&rsquo;s performance.
+                  ScoutMe Pro Intelligence is analyzing every detail of your player&rsquo;s performance.
                 </p>
               </div>
             </div>

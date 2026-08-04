@@ -88,7 +88,7 @@ function OverviewCard() {
             <span className="text-[9.5px] font-black uppercase tracking-[0.14em] text-white">Identity locked</span>
           </div>
           <p className="text-[11px] text-white/70 leading-relaxed mt-1">
-            Parent marked the player with 10 taps · optical tracking · dual-AI verification. The report is about <span className="text-white font-bold">your child</span> — never a lookalike.
+            Parent marked the player with 10 taps · optical tracking · dual identity verification. The report is about <span className="text-white font-bold">your child</span> — never a lookalike.
           </p>
         </div>
         <p className="mt-auto pt-3 text-[10px] text-[#8A937F]">Scored against U12 expectations — never against adults.</p>
@@ -180,7 +180,7 @@ function PaceCardSample() {
         <div className="flex items-start gap-2.5">
           <Gauge className="w-4 h-4 mt-0.5 shrink-0 text-[#2D6B3D]" />
           <p className="text-[11px] text-[#8A937F] leading-relaxed">
-            Speed comes from pixel-level optical tracking of <span className="font-bold text-[#3D4A38]">your marked player</span> — the AI never invents physical numbers.
+            Speed comes from pixel-level optical tracking of <span className="font-bold text-[#3D4A38]">your marked player</span> — the numbers are never invented.
           </p>
         </div>
       </div>

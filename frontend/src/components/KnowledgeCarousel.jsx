@@ -19,7 +19,7 @@ const FACTS = [
   {
     icon: "🏃",
     headline: "U12 players change position 4× per match",
-    body: "Young players rarely play one role. Our Pro Scout Intelligence tells you the role your child actually plays — based on heatmap evidence, not declarations.",
+    body: "Young players rarely play one role. Our ScoutMe Pro Intelligence tells you the role your child actually plays — based on heatmap evidence, not declarations.",
   },
   {
     icon: "📏",

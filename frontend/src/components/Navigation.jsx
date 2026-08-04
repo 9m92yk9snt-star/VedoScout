@@ -206,7 +206,7 @@ export default function Navigation() {
                 className="inline-block w-1 h-1 rounded-full"
                 style={{ background: LIME, boxShadow: `0 0 6px ${LIME}99` }}
               />
-              See your game through scout eyes
+              See your game like never before
             </span>
           </Link>
 

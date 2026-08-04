@@ -61,7 +61,7 @@ const FAQ = [
   },
   {
     q: "How do players end up in the database?",
-    a: "Players upload their match video, get a full AI scout report, then choose whether to make themselves discoverable. Minors under 16 require verified parental consent. Players can opt out any time.",
+    a: "Players upload their match video, get a full ScoutMe Pro report, then choose whether to make themselves discoverable. Minors under 16 require verified parental consent. Players can opt out any time.",
   },
   {
     q: "What's the difference between Scout and Club?",

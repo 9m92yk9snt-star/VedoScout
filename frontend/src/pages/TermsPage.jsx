@@ -83,7 +83,7 @@ export default function TermsPage() {
             <ul className="list-disc list-outside ml-5 space-y-1.5">
               <li>Prices are displayed in USD and shown on the pricing section before checkout.</li>
               <li>All payments are processed securely via Stripe. ScoutMePlay never stores your card details.</li>
-              <li>Pro Scout Intelligence (AI) reports are delivered instantly — as soon as the AI pipeline finishes processing your video (typically within minutes). If your plan includes a real scout review (VIP Premium), a professional scout responds with their personal written feedback within 48 hours on top of the instant AI report. If we fail to deliver a scout review within that 48-hour window, you are entitled to a full refund — contact us through the message form.</li>
+              <li>ScoutMe Pro Intelligence reports are delivered instantly — as soon as the analysis pipeline finishes processing your video (typically within minutes). If your plan includes a real scout review (VIP Premium), a professional scout responds with their personal written feedback within 48 hours on top of the instant report. If we fail to deliver a scout review within that 48-hour window, you are entitled to a full refund — contact us through the message form.</li>
               <li>The 12-month plan includes 3 reports across 365 days; unused reports expire after 12 months and are not refundable.</li>
               <li>All sales are final once the report has been delivered.</li>
             </ul>

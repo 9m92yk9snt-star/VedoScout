@@ -267,7 +267,7 @@ export default function BlogArticlePage() {
         <div className="max-w-3xl mx-auto px-6 md:px-10 text-center">
           <h2 className="font-barlow font-black uppercase text-3xl md:text-5xl tracking-tight leading-[0.95]">
             Ready to see your game
-            <span className="block mt-2" style={{ color: LIME }}>through scout eyes?</span>
+            <span className="block mt-2" style={{ color: LIME }}>like never before?</span>
           </h2>
           <Link
             to="/signup"

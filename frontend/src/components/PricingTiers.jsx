@@ -42,7 +42,7 @@ const IMG = (name) => `${ASSET_BASE}/api/static/landing/${name}`;
 const FREE_FEATURES = [
   { label: "Professional Player Profile", included: true },
   { label: "1 Video Upload",                included: true },
-  { label: "Basic AI Football Analysis",    included: true },
+  { label: "Basic Football Analysis",    included: true },
   { label: "Entry-Level Performance Insights", included: true },
   { label: "Progress Tracking",            included: false },
   { label: "Personal Development Plan",     included: false },
@@ -52,7 +52,7 @@ const FREE_FEATURES = [
 
 const SINGLE_FEATURES = [
   { label: "Full 4-Pillar Premium Report", included: true },
-  { label: "Pro Scout Intelligence Analysis (instant)", included: true },
+  { label: "ScoutMe Pro Intelligence Analysis (instant)", included: true },
   { label: "Real Scout Review (within 48h)",  included: true },
   { label: "Downloadable PDF Report",         included: true },
   { label: "Personalised Feedback",           included: true },
@@ -65,7 +65,7 @@ const PREMIUM_FEATURES = [
   { label: "Professional Player Profile",      included: true },
   { label: "2 Video Reports Monthly",          included: true },
   { label: "Extra Reports at Subscriber Rate", included: true, hint: "cheaper than a single report" },
-  { label: "Instant AI Analysis",              included: true, hint: "delivered as soon as the pipeline finishes" },
+  { label: "Instant Analysis",              included: true, hint: "delivered as soon as the pipeline finishes" },
   { label: "Progress Tracking Over Time",      included: true },
   { label: "Personal Development Plan",        included: true },
   { label: "Download PDF Reports",             included: true },
@@ -77,7 +77,7 @@ const VIP_FEATURES = [
   { label: "Everything in Premium",                  included: true },
   { label: "4 Video Reports Monthly",                 included: true },
   { label: "Extra Reports at Deepest Discount",       included: true, hint: "cheapest per-report rate" },
-  { label: "Instant AI + Real Scout Review (48h)",    included: true, hint: "AI report is instant, scout responds within 48h" },
+  { label: "Instant Analysis + Real Scout Review (48h)",    included: true, hint: "report is instant, scout responds within 48h" },
   { label: "Direct Contact with Professional Scouts", included: true },
   { label: "Personalised Scout Feedback Report",      included: true },
   { label: "Maximum Exposure for Opportunities",      included: true },
@@ -250,7 +250,7 @@ function Header() {
         <span className="text-forest">level.</span>
       </h2>
       <p className="mt-5 text-base md:text-lg text-ink/65 leading-relaxed max-w-2xl mx-auto">
-        Get a one-off scout report or commit to ongoing monthly progress. Same Pro Scout Intelligence, four ways in.
+        Get a one-off scout report or commit to ongoing monthly progress. Same ScoutMe Pro Intelligence, four ways in.
       </p>
       <span className="inline-flex items-center gap-2 mt-5 px-3.5 py-1.5 bg-cream-card border border-forest/25 text-[10px] uppercase tracking-[0.22em] font-bold text-forest">
         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor" aria-hidden>
@@ -742,7 +742,7 @@ function TrustRow() {
   const items = [
     { icon: Shield,    title: "Trusted by ambitious players",  body: "Join a growing community of footballers worldwide." },
     { icon: Users,     title: "Connected with pro scouts",     body: "Your profile and videos seen by professional scouts." },
-    { icon: BarChart3, title: "Data-driven insights",          body: "Advanced AI analysis to help you improve and stand out." },
+    { icon: BarChart3, title: "Data-driven insights",          body: "Advanced analysis to help you improve and stand out." },
     { icon: Lock,      title: "Secure & private by default",   body: "Your data is encrypted and never shared. Always protected." },
   ];
   return (

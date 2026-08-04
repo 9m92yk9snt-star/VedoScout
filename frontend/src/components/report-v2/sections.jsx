@@ -95,7 +95,7 @@ export function AgeComparisonCard({ ageComparison, ageBracket }) {
           <div className="text-[13px] font-extrabold text-[#12402A] w-[64px] text-right">{c.label}</div>
         </div>
       ))}
-      <div className="text-[10.5px] text-[#93A08F] mt-2.5">Percentiles show how your child compares to other players his age.</div>
+      <div className="text-[10.5px] text-[#93A08F] mt-2.5">These bars show how your child compares to other players his age.</div>
     </V2Card>
   );
 }

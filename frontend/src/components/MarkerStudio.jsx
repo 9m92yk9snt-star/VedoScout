@@ -1623,7 +1623,7 @@ export default function MarkerStudio({
             onClick={runAutoSuggest}
             disabled={autoSuggesting || (!anchors.length && !box) || anchors.length >= MAX_ANCHORS}
             className="px-3 py-2 flex items-center gap-1.5 bg-[#CCFF00]/15 border border-[#CCFF00]/45 text-[#CCFF00] text-[11px] uppercase tracking-widest font-bold hover:bg-[#CCFF00]/25 disabled:opacity-50"
-            title="Pro Scout Intelligence scans the video and suggests up to 5 anchors matching your locked player"
+            title="ScoutMe Pro Intelligence scans the video and suggests up to 5 anchors matching your locked player"
           >
             {autoSuggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             ✨ Suggest 5

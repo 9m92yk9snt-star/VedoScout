@@ -75,7 +75,7 @@ export const AuthInput = ({ icon: Icon, rightSlot = null, testId, ...rest }) => 
 );
 
 const BENEFITS = [
-  { icon: BarChart3, label: "AI benchmark performance analysis" },
+  { icon: BarChart3, label: "Benchmarked performance analysis" },
   { icon: UserCheck, label: "Real scout review & feedback" },
   { icon: FileText, label: "Professional PDF report & development plan" },
   { icon: MessageCircle, label: "Direkt chat with scout" },

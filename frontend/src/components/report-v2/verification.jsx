@@ -13,7 +13,7 @@ export function VerifiedIdentityStrip({ verification }) {
   if (stats.checked > 0) {
     chips.push({
       icon: ScanEye,
-      text: `Dual-AI identity check · ${stats.verified || 0}/${stats.checked} images confirmed`,
+      text: `Dual identity check · ${stats.verified || 0}/${stats.checked} images confirmed`,
       testid: "v2-verified-dualai",
     });
   }

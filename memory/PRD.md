@@ -2971,3 +2971,19 @@ User-approved 11-point upgrade plan, built in 5 stages. ALL DONE + self-tested.
 - **Placement**: PremiumReportV2 after ParentCorner (testid dream-path-section, dp-you-are-here, dp-next-step, dp-momentum, dp-step-{key}). FreePreviewLanding teaser before "seen 10%" ring (testid dream-path-teaser, dp-unlock → scrollToPackages) — step 1 visible, YOU ARE HERE + future steps blurred/locked.
 - **VERIFIED (screenshots as admin)**: premium on synthetic full report (all states: done/current/next/locked + honest note + momentum fallback); teaser on real free report d2738bb7 (mobile 390px) + unlock CTA scrolls to pricing tiers. Synthetic test docs deleted after.
 - NOT in PDF yet (offer as follow-up). ⚠️ REQUIRES REDEPLOY.
+
+## Session (Aug 4, 2026 - later) — FEATURES 1–4 "TAL BLIVER TIL OPDAGELSE" SHIPPED ✅ (agent-testet iter66, afventer brugerbekræftelse)
+User choices: 1a (free = ÉN fuld score-historie, resten låst), 2b (discovery som sløret teaser i free, kun når evidens findes), 3a (aldersvinkel afledt af analysens egen tier — ordet "percentile" er FORBUDT). GLOBAL REGEL: ordene "AI" og "scout" må ALDRIG bruges som attribution af analysen (brand: "ScoutMe Pro Intelligence" / "ScoutMe Pro Benchmarked Analysis"; human-features "Real Scout Review"/"Talk With Scout" er tilladt).
+- Backend: NEW `/app/backend/score_meaning.py` (build_score_meaning + build_score_meaning_teaser) + kurateret `/app/backend/content/skill_knowledge.json` (renset for scout/AI-ord). Payload: pr. skill 2 menneskelige sætninger (name/age-substitueret), looks_for, 6/8/9-skala, next_level, position_why, angles {better_than X of 10, delta siden sidst, gap til næste niveau} og evidence {timestamp, verified}. verified=true KUN ved tap-anchor ±4s eller identity_verified frame ±5s.
+- Discovery (alternativ position): regelbaseret pr. position i skill_knowledge.json, kræver observerede skills ≥7.5 (high/med confidence) og evt. svag skill ≤6.4; altid med disclaimer-note.
+- Wiring: server.py `_serialize_report` (score_meaning ved full, score_meaning_teaser ved free — lækker ALDRIG låste scores, kun labels), `_ensure_report_pdf`.
+- Frontend: NEW `/app/frontend/src/components/report-v2/scoremeaning.jsx` (ScoreMeaningSection m. expand-panel/stige/see-why-seek chips, PositionDiscoveryCard, ScoreMeaningTeaser). Premium: erstatter ScoreGuideCard når score_meaning findes (fallback bevaret). Free: teaser i FreePreviewLanding efter key-moment grid.
+- PDF: NEW `_score_meaning_page` i pdf_v2.py ("THE NUMBERS, TRANSLATED": 4 rige kort + kompakt liste med nye vinkler + discovery-strip) — erstatter score-guide-siden når data findes.
+- Copy-purge på tværs af app (web+PDF+DB-FAQ): "AI Powered Player Analysis"→"ScoutMe Pro Intelligence", "Scout Outlook"→"Next Level Outlook", "AI-VERIFIED"→"IDENTITY-VERIFIED", "Percentiles show…"→"These bars show…", "See your game through scout eyes"→"like never before", "Pro Scout Intelligence"→"ScoutMe Pro Intelligence" (8 filer), pricing "Instant AI…"→"Instant Analysis…", FAQ i DB opdateret + default-seed i server.py.
+- Test: 14/14 pytest (`/app/backend/tests/test_iter66_score_meaning.py`) + frontend flows via testing agent (iteration_66.json). Seed-testdata SLETTET efter test. Preview-DB indeholder nu kun admin + ejerens egne 4 trial-uploads (Aug 2–4, alle unpaid).
+- LÆRING (P0-recurrence): parallel batch af search_replace på SAMME fil racede igen (pdf_v2.py tail-korruption + tabte edits). Brug ét sekventielt python-replace-script til multi-string edits i samme fil.
+
+## Næste (efter 1–4)
+- Brugerbekræftelse af 1–4 i free/premium/PDF (kræver en rigtig analyse eller re-seed).
+- Evt. lint-guard der scanner src for /\bAI\b|percentile|scout-attribution (testagent-forslag).
+- server.py modul-refactor (stående tech-debt).

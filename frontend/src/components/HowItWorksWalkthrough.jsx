@@ -48,16 +48,16 @@ const SCENES = [
       { kind: "chip", label: "Veo / YouTube", accent: true },
       { kind: "text", label: "link." },
     ] },
-  { id: "mark",     duration: 7600, label: "Mark",    title: "Tap your player ten times",                  caption: "No AI guessing — you stay in control.",                          Icon: MousePointer2,
+  { id: "mark",     duration: 7600, label: "Mark",    title: "Tap your player ten times",                  caption: "No guessing — you stay in control.",                          Icon: MousePointer2,
     titleLead: "Tap",        titleTail: "your player ten times",
     captionParts: [
       { kind: "chip", label: "10 taps", accent: true },
       { kind: "text", label: "·" },
-      { kind: "text", label: "No AI guessing —" },
+      { kind: "text", label: "No guessing —" },
       { kind: "text", label: "you stay in control." },
     ] },
-  { id: "analyze",  duration: 7600, label: "Analyze", title: "Pro Scout Intelligence builds your report",  caption: "6 pillars · 47 metrics · one honest score.",                     Icon: Sparkles,
-    titleLead: "Analyze.",   titleTail: "Pro Scout Intelligence builds your report",
+  { id: "analyze",  duration: 7600, label: "Analyze", title: "ScoutMe Pro Intelligence builds your report",  caption: "6 pillars · 47 metrics · one honest score.",                     Icon: Sparkles,
+    titleLead: "Analyze.",   titleTail: "ScoutMe Pro Intelligence builds your report",
     captionParts: [
       { kind: "chip", label: "6 pillars" },
       { kind: "chip", label: "47 metrics" },
@@ -2049,7 +2049,7 @@ export default function HowItWorksWalkthrough({ startHref = "/signup", price = 1
               </span>
             </h2>
             <p className="mt-5 text-ink/70 text-base leading-relaxed">
-              Upload from any device or paste a Veo / YouTube link. Pro Scout Intelligence + real human scouts. A full PDF and a living progress chart any coach respects.
+              Upload from any device or paste a Veo / YouTube link. ScoutMe Pro Intelligence + real human scouts. A full PDF and a living progress chart any coach respects.
             </p>
 
             <div className="mt-6 grid grid-cols-3 gap-2">

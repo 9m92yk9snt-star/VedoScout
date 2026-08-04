@@ -147,7 +147,7 @@ export function HowItWorks() {
       n: "02",
       img: IMG("step-mark.png"),
       title: "Mark your player",
-      body: "Tap your player on 10 frames so Pro Scout Intelligence locks onto them. No AI guessing, no wrong player.",
+      body: "Tap your player on 10 frames so ScoutMe Pro Intelligence locks onto them. No guessing, no wrong player.",
       eyebrow: "Step 02 · mark",
     },
     {
@@ -264,7 +264,7 @@ export function WhatsInside() {
       eyebrow="What's inside"
       headline="A real scouting"
       headlineAccent="dossier."
-      sub="Not a generic AI summary. A structured premium report parents and academies actually use."
+      sub="Not a generic auto-summary. A structured premium report parents and academies actually use."
       tight
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
@@ -362,7 +362,7 @@ export function ImageStrip() {
               <span className="text-volt">next level.</span>
             </h3>
             <p className="mt-4 text-cream-base/75 text-sm md:text-base max-w-md mx-auto md:mx-0 leading-relaxed">
-              Pro Scout Intelligence reviews every frame &mdash; then a real scout signs off on every premium report.
+              ScoutMe Pro Intelligence reviews every frame &mdash; then a real scout signs off on every premium report.
             </p>
           </div>
         </div>

@@ -2205,7 +2205,7 @@ export default function Landing() {
                   <span aria-hidden className="absolute left-[16%] right-[16%] top-[18px] h-[2px] bg-forest/25 pointer-events-none" />
                   {[
                     { n: "01", t: "You pay", d: "Stripe-secure checkout" },
-                    { n: "02", t: "Instant AI report", d: "Delivered right after upload" },
+                    { n: "02", t: "Instant report", d: "Delivered right after upload" },
                     { n: "03", t: "Scout follow-up", d: "Real scout within 48h" },
                   ].map((s, i) => (
                     <li key={i} data-testid={`refund-step-${i}`} className="relative flex flex-col items-center text-center px-1.5">
@@ -2369,7 +2369,7 @@ export default function Landing() {
                     className="inline-block w-1 h-1 rounded-full"
                     style={{ background: "#ccff00", boxShadow: "0 0 6px #ccff0099" }}
                   />
-                  See your game through scout eyes
+                  See your game like never before
                 </span>
               </Link>
 
@@ -2534,7 +2534,7 @@ function FooterLink({ to, children, testid, icon: IconCmp }) {
 const FAQ_ITEMS = [
   {
     q: "How long does it take to get my report?",
-    a: "Your Pro Scout Intelligence analysis is delivered instantly — as soon as the AI pipeline finishes processing your video (typically 5–15 minutes, depending on clip length). If your plan includes a real scout review (VIP Premium), a professional scout responds with their personal feedback within 48 hours on top of the instant AI report. If we ever miss that 48-hour window on a scout review, your purchase is refunded in full — automatically, no support tickets needed.",
+    a: "Your ScoutMe Pro Intelligence analysis is delivered instantly — as soon as the analysis pipeline finishes processing your video (typically 5–15 minutes, depending on clip length). If your plan includes a real scout review (VIP Premium), a professional scout responds with their personal feedback within 48 hours on top of the instant report. If we ever miss that 48-hour window on a scout review, your purchase is refunded in full — automatically, no support tickets needed.",
   },
   {
     q: "Is my child too young for this?",

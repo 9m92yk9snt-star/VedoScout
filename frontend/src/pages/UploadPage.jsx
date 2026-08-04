@@ -333,7 +333,7 @@ export default function UploadPage() {
     const count = anchors?.length || 1;
     toast.success(
       count > 1
-        ? `${count} anchors locked. Pro Scout Intelligence will track this exact player across the whole clip.`
+        ? `${count} anchors locked. ScoutMe Pro Intelligence will track this exact player across the whole clip.`
         : "Player locked. We'll analyse only the player in the box.",
     );
   };
@@ -1126,7 +1126,7 @@ export default function UploadPage() {
                         <CheckCircle2 className="w-4 h-4 shrink-0" /> Video verified — ready for player selection
                       </p>
                       <p className="text-[10.5px] text-ink/45 mt-0.5">
-                        The AI scout confirms it&rsquo;s real football during the analysis.
+                        ScoutMe Pro Intelligence confirms it&rsquo;s real football during the analysis.
                       </p>
                     </div>
                   </div>

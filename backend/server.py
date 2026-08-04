@@ -12178,10 +12178,10 @@ async def admin_update_pricing(payload: PricingUpdate, _=Depends(get_current_adm
 _DEFAULT_FAQ_ITEMS = [
     {
         "q": "How long does it take to get my report?",
-        "a": ("Your Pro Scout Intelligence analysis is delivered instantly — as soon as the AI pipeline "
+        "a": ("Your ScoutMe Pro Intelligence analysis is delivered instantly — as soon as the analysis pipeline "
               "finishes processing your video (typically 5–15 minutes, depending on clip length). "
               "If your plan includes a real scout review (VIP Premium), a professional scout responds "
-              "with their personal feedback within 48 hours on top of the instant AI report. "
+              "with their personal feedback within 48 hours on top of the instant report. "
               "If we ever miss that 48-hour window on a scout review, your purchase is refunded in full — "
               "automatically, no support tickets needed."),
     },

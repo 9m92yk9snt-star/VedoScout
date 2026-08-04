@@ -80,8 +80,8 @@ export default function AboutPage() {
               },
               {
                 icon: Brain,
-                title: "Evidence-based Pro Scout Intelligence",
-                body: "Our Pro Scout Intelligence watches the full clip, scores 11 dimensions of your game, and gives you timestamped evidence — not generic praise.",
+                title: "Evidence-based ScoutMe Pro Intelligence",
+                body: "Our ScoutMe Pro Intelligence watches the full clip, scores 11 dimensions of your game, and gives you timestamped evidence — not generic praise.",
               },
               {
                 icon: Trophy,

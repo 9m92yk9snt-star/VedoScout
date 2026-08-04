@@ -808,7 +808,7 @@ function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportI
           ? `All ${monthlyLimit} VIP reports used — that's elite-level commitment. Add one extra at your private VIP rate and keep the scouts watching. Quota resets next billing cycle.`
           : isPremiumAtLimit
           ? `All ${monthlyLimit} Premium reports used — proof you're putting in the work. Add one extra at your private member rate, or step up to VIP for 4 reports a month and a real scout's eyes on your game.`
-          : "You're on the Free plan. Upgrade for more uploads, advanced AI analysis, and (with VIP) a real scout reviewing your video."}
+          : "You're on the Free plan. Upgrade for more uploads, advanced analysis, and (with VIP) a real scout reviewing your video."}
       </p>
 
       {isAtLimit ? (
@@ -977,7 +977,7 @@ function SubscriptionCard({ subscription, tiers, onChange }) {
           <div className="mt-3.5 flex flex-wrap gap-2">
             {(isVip
               ? ["4 reports / month", "Real scout review", "Direct contact", "Deepest discount"]
-              : [`${conf.monthly_upload_limit ?? "—"} reports / month`, "Advanced AI analysis", "Full premium dossier"]
+              : [`${conf.monthly_upload_limit ?? "—"} reports / month`, "Advanced analysis", "Full premium dossier"]
             ).map((perk) => (
               <span key={perk} className="inline-flex items-center gap-1.5 border border-white/15 bg-white/[0.06] px-3 py-1 text-[10px] uppercase tracking-[0.18em] font-bold text-white/80">
                 <CheckCircle2 className={`w-3 h-3 ${isVip ? "text-[#F5C443]" : "text-[#CCFF00]"}`} /> {perk}

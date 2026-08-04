@@ -48,7 +48,7 @@ export default function PrivacyPage() {
           <Section title="3. Why we process your data (legal bases under GDPR)">
             <ul className="list-disc list-outside ml-5 space-y-1.5">
               <li><span className="text-ink">Contract performance (GDPR art. 6(1)(b))</span> — to deliver the analysis report you purchased.</li>
-              <li><span className="text-ink">Legitimate interest (GDPR art. 6(1)(f))</span> — to improve the AI scoring engine, prevent fraud, and run our scout review queue.</li>
+              <li><span className="text-ink">Legitimate interest (GDPR art. 6(1)(f))</span> — to improve the scoring engine, prevent fraud, and run our scout review queue.</li>
               <li><span className="text-ink">Legal obligation (GDPR art. 6(1)(c))</span> — to retain accounting records for payment transactions (Danish bookkeeping law requires 5 years).</li>
               <li><span className="text-ink">Consent (GDPR art. 6(1)(a))</span> — only for optional marketing emails (if you opt in).</li>
             </ul>
