@@ -6456,7 +6456,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "id": doc["id"],
         "user_id": doc["user_id"],
         "user_email": doc.get("user_email"),
-        "player_details": doc["player_details"],
+        "player_details": doc.get("player_details") or {},
         "video_url": _resolve_video_url(doc),
         "poster_url": _resolve_poster_url(doc),
         "marker_url": _resolve_marker_url(doc),
