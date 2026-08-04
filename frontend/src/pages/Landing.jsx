@@ -14,7 +14,7 @@ import {
   Lightbulb, Crown, Calendar, Dumbbell, Mail, Send, Twitter, Facebook, Linkedin, Instagram, MessageCircle,
 } from "lucide-react";
 import PaymentBadges from "@/components/PaymentBadges";
-import PricingCards from "@/components/PricingCards";
+import DreamPricingTiers from "@/components/DreamPricingTiers";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 import HowItWorksWalkthrough from "@/components/HowItWorksWalkthrough";
 import StatsTicker from "@/components/StatsTicker";
@@ -1935,7 +1935,7 @@ export default function Landing() {
           </div>
 
           <div className="mt-12">
-            <PricingCards isLoggedIn={!!user} singleHref={startHref} />
+            <DreamPricingTiers isLoggedIn={!!user} />
           </div>
         </div>
       </section>

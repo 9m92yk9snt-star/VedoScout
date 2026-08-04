@@ -23,7 +23,7 @@ import { ArrowRight, ShieldCheck, Send, PlayCircle } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
 import SampleReportShowcase from "@/components/SampleReportShowcase";
-import PricingTiers from "@/components/PricingTiers";
+import DreamPricingTiers from "@/components/DreamPricingTiers";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 import {
   TrustStrip,
@@ -117,7 +117,7 @@ export default function LandingMinimal() {
       <WhatsInside />
       <ImageStrip />
       <div id="pricing-section" data-testid="pricing-section">
-        <PricingTiers />
+        <DreamPricingTiers isLoggedIn={!!user} />
       </div>
       <ReviewsStrip />
       <FAQSection faqItems={faqItems} />

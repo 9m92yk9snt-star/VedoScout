@@ -9,7 +9,7 @@ import {
   CheckCircle2, Users, MessageSquare, Download,
 } from "lucide-react";
 import { ASSET_BASE } from "@/lib/api";
-import ReportPaywallTiers from "@/components/ReportPaywallTiers";
+import DreamPricingTiers from "@/components/DreamPricingTiers";
 import { DreamPathTeaser } from "@/components/report-v2/dreampath";
 import { ScoreMeaningTeaser } from "@/components/report-v2/scoremeaning";
 import ShareUnlockModal from "@/components/ShareUnlockModal";
@@ -390,7 +390,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
 
         {/* ── Packages (existing tier chooser) ── */}
         <div id="scout-packages" className="mt-6" data-testid="fpl-packages">
-          <ReportPaywallTiers isLoggedIn={!!user} onUnlockSingle={onUnlockSingle} playerName={pd.player_name} discount={discount} />
+          <DreamPricingTiers isLoggedIn={!!user} onUnlockSingle={onUnlockSingle} discount={discount} />
         </div>
 
         {/* ── Trust bar ── */}

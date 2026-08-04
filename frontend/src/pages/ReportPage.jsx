@@ -23,7 +23,7 @@ import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
 import EmbeddedCheckoutModal from "@/components/EmbeddedCheckoutModal";
 import PaymentBadges from "@/components/PaymentBadges";
-import ReportPaywallTiers from "@/components/ReportPaywallTiers";
+import DreamPricingTiers from "@/components/DreamPricingTiers";
 import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 import DoubtConfirmModal from "@/components/DoubtConfirmModal";
@@ -1608,7 +1608,7 @@ function LockedOverlay({ isLoggedIn, onUnlockSingle }) {
             Get the complete technical, tactical, physical &amp; mental breakdown — plus a real scout&apos;s written review.
           </p>
         </div>
-        <ReportPaywallTiers isLoggedIn={isLoggedIn} onUnlockSingle={onUnlockSingle} />
+        <DreamPricingTiers isLoggedIn={isLoggedIn} onUnlockSingle={onUnlockSingle} />
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ import Navigation from "@/components/Navigation";
 import { MiniPitch } from "@/components/FootballAccents";
 import ReviewPrompt from "@/components/ReviewPrompt";
 import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
-import ReportPaywallTiers from "@/components/ReportPaywallTiers";
+import DreamPricingTiers from "@/components/DreamPricingTiers";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { trackPurchase } from "@/lib/pixels";
@@ -883,9 +883,8 @@ function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportI
           {/* Unified 3-tier pricing (Single / Premium / VIP) — same component
               as the report paywall and the post-analysis HeroTeaser so free
               users see ONE consistent offer everywhere. */}
-          <ReportPaywallTiers
+          <DreamPricingTiers
             isLoggedIn
-            singleTitle="Unlock a full report"
             onUnlockSingle={() => {
               if (latestLockedReportId) navigate(`/report/${latestLockedReportId}?unlock=1`);
               else navigate("/upload");
