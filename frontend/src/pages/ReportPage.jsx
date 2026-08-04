@@ -2129,7 +2129,7 @@ export default function ReportPage() {
                 className="bg-[#12402A] hover:bg-[#1E5B3C] text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 transition-colors disabled:opacity-50 flex items-center gap-2 rounded"
               >
                 {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Download PDF
+                {(report.player_details?.player_name || "").trim() ? `Download ${report.player_details.player_name.trim().split(" ")[0]}'s report` : "Download PDF"}
               </button>
             </div>
           </div>

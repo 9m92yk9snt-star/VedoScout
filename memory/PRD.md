@@ -2987,3 +2987,14 @@ User choices: 1a (free = ÉN fuld score-historie, resten låst), 2b (discovery s
 - Brugerbekræftelse af 1–4 i free/premium/PDF (kræver en rigtig analyse eller re-seed).
 - Evt. lint-guard der scanner src for /\bAI\b|percentile|scout-attribution (testagent-forslag).
 - server.py modul-refactor (stående tech-debt).
+
+## Session (Aug 4, 2026 - senere) — PERSONLIGE UNLOCK-CTA'ER (navn + konkret indhold) ✅ (agent-testet, afventer brugerbekræftelse)
+User-krav: intet generisk — alle unlock-/CTA-tekster bruger spillerens fornavn (fra upload) + ægte tal fra rapporten. Sprog: engelsk (valg 1a). Kun tekster ændret, ingen logik/layout.
+- FreePreviewLanding: hoved-CTA = "See all {N} of {Name}'s numbers + his path to the next level" (N = locked_count+1, REELT tal; fallback uden tal/navn bevaret), heading "See everything the match revealed about {Name}", + 7 andre personaliserede tekster (potentiale, discovered-strip, låste kort, key moment, 10%-ring).
+- scoremeaning.jsx teaser: "{n} more of {Name}'s numbers are waiting…", knap "Give every one of {Name}'s numbers its story".
+- dreampath.jsx teaser-knap: "Walk {Name}'s road to the dream".
+- ReportPaywallTiers: ny optional playerName-prop; single-CTA "Unlock {Name}'s full report" (generisk fallback når prop mangler — bruges også på pricing uden spillerkontekst).
+- UploadPage: submit-knap "Start {Name}'s analysis" (fjernede også "Start scout analysis" = scout-attribution), undertekst "{Name}'s personal report will be waiting."
+- ReportPage premium header: "Download {Name}'s report".
+- pdf_v2.py _promo_strip (delte PDF'er): "{NAME}'S STORY WAS HIDING IN ONE VIDEO — YOUR PLAYER'S IS TOO" + family-linje; signatur fik player_name-param.
+- Verifikation: seeded Noah-testdata → alle 13 tekster verificeret via browser (case-insensitive pga. CSS uppercase) + PDF-promo unit-checket. Seed-data slettet igen (DB: kun admin + ejerens 4 trial-uploads).

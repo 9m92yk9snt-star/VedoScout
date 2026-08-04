@@ -1133,8 +1133,9 @@ def _forest_footer(c, x, y, w, h):
     c.restoreState()
 
 
-def _promo_strip(c, x, y, w, h):
-    """Marketing strip for SHARED PDFs only — QR + pro-scout CTA."""
+def _promo_strip(c, x, y, w, h, player_name=None):
+    """Marketing strip for SHARED PDFs only — QR + personal CTA."""
+    first = str(player_name or "").strip().split(" ")[0] if player_name else ""
     c.saveState()
     c.setFillColor(CARD)
     c.setStrokeColor(BORDER)
@@ -1154,13 +1155,19 @@ def _promo_strip(c, x, y, w, h):
     tx = x + 16
     c.setFillColor(FOREST)
     c.setFont(F_BLACK, 11)
-    c.drawString(tx, y + h - 26, "PRO SCOUT ANALYSIS FOR EVERY PLAYER")
+    if first:
+        c.drawString(tx, y + h - 26, f"{first.upper()}'S STORY WAS HIDING IN ONE VIDEO — YOUR PLAYER'S IS TOO")
+    else:
+        c.drawString(tx, y + h - 26, "EVERY PLAYER HAS A STORY WAITING TO BE DISCOVERED")
     c.setFillColor(BODY)
     c.setFont(F_BODY, 7.6)
-    c.drawString(tx, y + h - 40, "This report was produced by ScoutMePlay's professional-grade scouting engine.")
+    if first:
+        c.drawString(tx, y + h - 40, f"This report gave {first}'s family the full picture: every number, its proof, and his next step.")
+    else:
+        c.drawString(tx, y + h - 40, "This report was produced by ScoutMe Pro Intelligence — every number with its proof and next step.")
     c.setFont(F_BODY, 7.6)
-    c.drawString(tx, y + h - 51, "Get your own player report at ")
-    lw = c.stringWidth("Get your own player report at ", F_BODY, 7.6)
+    c.drawString(tx, y + h - 51, "Discover your own player's story at ")
+    lw = c.stringWidth("Discover your own player's story at ", F_BODY, 7.6)
     c.setFillColor(GREEN)
     c.setFont(F_BOLD, 7.8)
     c.drawString(tx + lw, y + h - 51, "scoutmeplay.com")
@@ -2691,7 +2698,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _forest_footer(c, M, fy, CW, 78)
     dy = fy - 14
     if promo:
-        _promo_strip(c, M, fy - GAP - 66, CW, 66)
+        _promo_strip(c, M, fy - GAP - 66, CW, 66, player_name=player_name)
         dy = fy - GAP - 66 - 14
     c.setFillColor(MUTED)
     c.setFont(F_BODY, 6.2)

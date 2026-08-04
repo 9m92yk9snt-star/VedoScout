@@ -1476,13 +1476,13 @@ export default function UploadPage() {
                       ) : (
                         <>
                           <Rocket className="w-5 h-5" />
-                          Start scout analysis
+                          {form.player_name?.trim() ? `Start ${form.player_name.trim().split(" ")[0]}'s analysis` : "Start the analysis"}
                         </>
                       )}
                     </button>
                     <p className="mt-2.5 text-xs text-ink/55 text-center flex items-center justify-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5 text-forest" />
-                      Takes about 5 minutes. You&rsquo;ll get your personal report.
+                      {form.player_name?.trim() ? `Takes about 5 minutes. ${form.player_name.trim().split(" ")[0]}'s personal report will be waiting.` : "Takes about 5 minutes. You'll get your personal report."}
                     </p>
                   </div>
                 </div>

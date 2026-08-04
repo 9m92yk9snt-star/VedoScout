@@ -294,7 +294,7 @@ export function ScoreMeaningTeaser({ teaser, playerName, onUnlock }) {
         <div className="mt-3 bg-white rounded-2xl border border-[#E9E4D5] p-4 shadow-sm" data-testid="smt-locked-list">
           <div className="flex items-center justify-between">
             <div className="font-barlow font-black text-[14px] text-[#12211A] uppercase">
-              {teaser.locked_count || lockedLabels.length} more numbers are waiting to tell their story
+              {teaser.locked_count || lockedLabels.length} more of {first}&rsquo;s numbers are waiting to tell their story
             </div>
             <Lock className="w-4 h-4 text-[#8B957F]" />
           </div>
@@ -340,7 +340,7 @@ export function ScoreMeaningTeaser({ teaser, playerName, onUnlock }) {
         className="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-full py-3.5 font-barlow font-black uppercase tracking-[0.05em] text-[14px] transition-transform active:scale-[0.98] hover:brightness-95"
         style={{ background: "#12211A", color: LIME }}
       >
-        Give every number its story <ChevronRight className="w-4 h-4" />
+        Give every one of {first}&rsquo;s numbers its story <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );

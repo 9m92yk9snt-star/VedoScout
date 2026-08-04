@@ -272,7 +272,7 @@ export function DreamPathTeaser({ playerName, onUnlock }) {
         className="mt-5 w-full rounded-xl py-3.5 font-barlow font-black uppercase tracking-[0.14em] text-[13px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
         style={{ background: LIME, color: INKG }}
       >
-        Unlock the full journey <ArrowRight className="w-4 h-4" />
+        Walk {first}&rsquo;s road to the dream <ArrowRight className="w-4 h-4" />
       </button>
       <p className="mt-2 text-center text-[10.5px] text-white/40">
         Updated with every new analysis — see {first} move step by step.

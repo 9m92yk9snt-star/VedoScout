@@ -35,7 +35,8 @@ const Feat = ({ children, highlight = false, dark = false }) => (
   </li>
 );
 
-export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle, singleTitle = "Unlock this report" }) {
+export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle, singleTitle = "Unlock this report", playerName = "" }) {
+  const pFirst = String(playerName || "").trim().split(" ")[0];
   const navigate = useNavigate();
   const [busyTier, setBusyTier] = useState(null);
   const [prices, setPrices] = useState({ single: null, premium: null, vip: null, premiumExtra: null, vipExtra: null });
@@ -117,7 +118,7 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle,
             <Feat>7 / 30 / 90-day training plan</Feat>
             <Feat>Downloadable PDF report</Feat>
           </ul>
-          <CtaBtn testid="paywall-single-cta" onClick={handleSingle}>Unlock now</CtaBtn>
+          <CtaBtn testid="paywall-single-cta" onClick={handleSingle}>{pFirst ? `Unlock ${pFirst}'s full report` : "Unlock now"}</CtaBtn>
         </div>
 
         {/* ── Premium (most popular) ────────────────────── */}

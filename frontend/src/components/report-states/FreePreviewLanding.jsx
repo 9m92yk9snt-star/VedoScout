@@ -65,6 +65,9 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
   const teaser = report.teaser || {};
   const poster = report.poster_url || report.marker_url;
   const firstName = (user?.full_name || "").split(" ")[0] || "there";
+  const pFirst = String(pd.player_name || "").trim().split(" ")[0];
+  const lockedNumbers = report.score_meaning_teaser?.locked_count;
+  const totalNumbers = lockedNumbers != null ? lockedNumbers + 1 : null;
   const strengths = preview.top_strengths || [];
   const potential = teaser.overall_potential;
 
@@ -161,7 +164,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 </div>
                 <div className="font-barlow font-black text-[20px] mt-2" style={{ color: LIME }}>{potentialLabel(potential)}</div>
                 <p className="text-white/75 text-[13px] leading-relaxed mt-2">
-                  Your player shows real potential. The complete evaluation is ready to unlock.
+                  {pFirst ? `${pFirst} shows real potential — everything he could become is ready to open.` : "Your player shows real potential. The complete evaluation is ready to unlock."}
                 </p>
               </>
             ) : (
@@ -174,7 +177,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 </div>
                 <div className="font-barlow font-black text-[17px] mt-2 text-white/90">SCORE CALCULATED</div>
                 <p className="text-white/70 text-[13px] leading-relaxed mt-1.5">
-                  Your player&rsquo;s full 0-100 potential score is computed with the complete evaluation — unlock to reveal it.
+                  {pFirst ? `${pFirst}'s full 0-100 potential score is written into his complete evaluation — see what the match says he can become.` : "Your player's full 0-100 potential score is computed with the complete evaluation — unlock to reveal it."}
                 </p>
               </>
             )}
@@ -187,10 +190,10 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           <div className="text-center sm:text-left">
             <div className="text-[10.5px] font-extrabold tracking-[0.2em] uppercase" style={{ color: LIME }}>What we discovered…</div>
             <div className="font-barlow font-black text-white text-[20px] md:text-[22px] leading-tight mt-1">
-              There&rsquo;s something special in your player&rsquo;s game that most parents miss.
+              {pFirst ? `There's something special in ${pFirst}'s game that most parents never get to see.` : "There's something special in your player's game that most parents miss."}
             </div>
             <p className="text-white/70 text-[13px] mt-1.5">
-              ScoutMe Pro Intelligence found {strengths.length || "several"} strengths in this clip — one could be a game-changer. Unlock the full report to see what it is.
+              ScoutMe Pro Intelligence found {strengths.length || "several"} strengths in {pFirst ? `${pFirst}'s game` : "this clip"} — one could change everything{pFirst ? " for him" : ""}. Unlock the full report to see what it is.
             </p>
           </div>
           <div className="flex flex-col items-center gap-1.5 mx-auto sm:mx-0">
@@ -228,7 +231,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                   <div className="mx-auto w-32 h-3 rounded bg-[#C9C4B4] mt-2" />
                 </div>
               </LockedBlur>
-              <div className="text-[11.5px] font-semibold text-[#12211A] mt-2 leading-snug">Unlock to reveal your biggest strength</div>
+              <div className="text-[11.5px] font-semibold text-[#12211A] mt-2 leading-snug">{pFirst ? `Reveal ${pFirst}'s biggest strength — the thing he does best` : "Unlock to reveal your biggest strength"}</div>
             </div>
             <div className="bg-white rounded-2xl border border-[#E9E4D5] p-4 text-center shadow-sm">
               <div className="text-[9.5px] font-extrabold tracking-[0.12em] uppercase text-[#5C6657]">Needs to improve</div>
@@ -238,7 +241,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                   <div className="mx-auto w-32 h-3 rounded bg-[#C9C4B4] mt-2" />
                 </div>
               </LockedBlur>
-              <div className="text-[11.5px] font-semibold text-[#12211A] mt-2 leading-snug">Unlock to see where you can improve most</div>
+              <div className="text-[11.5px] font-semibold text-[#12211A] mt-2 leading-snug">{pFirst ? `See where ${pFirst} can grow fastest` : "Unlock to see where you can improve most"}</div>
             </div>
           </div>
         </div>
@@ -261,7 +264,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
               <div className="min-w-0">
                 <div className="font-barlow font-black text-[16px] text-[#12211A]">Match Insight Hidden</div>
                 <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
-                  Unlock the full report to see what ScoutMe Pro Intelligence noticed in this moment.
+                  {pFirst ? `See what ScoutMe Pro Intelligence noticed about ${pFirst} in this exact moment.` : "Unlock the full report to see what ScoutMe Pro Intelligence noticed in this moment."}
                 </p>
                 {keyMomentT && (
                   <span className="inline-block bg-[#F0EDE5] text-[#12211A] text-[11px] font-extrabold px-2.5 py-1 rounded-md mt-2.5" data-testid="fpl-key-moment-t">
@@ -308,7 +311,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             <div className="font-barlow font-black text-[18px] text-[#12211A] uppercase">
               You&rsquo;ve only seen <span className="text-[#5C7A00]">10%</span>
             </div>
-            <p className="text-[12.5px] text-[#5C6657] mt-0.5">90% of your ScoutMe Pro analysis is still locked and waiting for you.</p>
+            <p className="text-[12.5px] text-[#5C6657] mt-0.5">{pFirst ? `90% of ${pFirst}'s story is still locked and waiting for you.` : "90% of your ScoutMe Pro analysis is still locked and waiting for you."}</p>
           </div>
           <div className="flex gap-2">
             {["SKILLS", "BENCHMARKS", "REPORT", "PLAN"].map((t) => (
@@ -331,7 +334,11 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             <Gift className="w-6 h-6" style={{ color: LIME }} />
           </span>
           <h2 className="font-barlow font-black uppercase text-white text-[24px] md:text-[28px] leading-tight mt-3">
-            Unlock your <span style={{ color: LIME }}>complete player report</span> now
+            {pFirst ? (
+              <>See everything the match revealed about <span style={{ color: LIME }}>{pFirst}</span></>
+            ) : (
+              <>Unlock your <span style={{ color: LIME }}>complete player report</span> now</>
+            )}
           </h2>
           <div className="flex flex-wrap justify-center gap-x-5 gap-y-3 mt-4 max-w-[560px] mx-auto">
             {CTA_FEATURES.map(({ icon: Icon, label }) => (
@@ -348,7 +355,11 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             className="mt-5 inline-flex items-center justify-center gap-2 rounded-full px-10 py-4 font-barlow font-black uppercase tracking-[0.05em] text-[16px] w-full sm:w-auto transition-transform active:scale-[0.98] hover:brightness-95"
             style={{ background: LIME, color: "#12211A", boxShadow: `0 14px 34px -12px ${LIME}66` }}
           >
-            <Lock className="w-4 h-4" /> Unlock full report now <ChevronRight className="w-4 h-4" />
+            <Lock className="w-4 h-4" />
+            {pFirst
+              ? (totalNumbers ? `See all ${totalNumbers} of ${pFirst}'s numbers + his path to the next level` : `Open ${pFirst}'s full story + his path to the next level`)
+              : "Unlock full report now"}
+            <ChevronRight className="w-4 h-4" />
           </button>
           <div className="text-[11px] font-bold mt-2.5" style={{ color: LIME }}>
             One-time access · Instant unlock · Secure payment
@@ -357,7 +368,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
 
         {/* ── Packages (existing tier chooser) ── */}
         <div id="scout-packages" className="mt-6" data-testid="fpl-packages">
-          <ReportPaywallTiers isLoggedIn={!!user} onUnlockSingle={onUnlockSingle} />
+          <ReportPaywallTiers isLoggedIn={!!user} onUnlockSingle={onUnlockSingle} playerName={pd.player_name} />
         </div>
 
         {/* ── Trust bar ── */}
