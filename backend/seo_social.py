@@ -5,10 +5,12 @@ Call `build_seo_social_router(db=..., admin_dep=...)` and include in the api rou
 
 from __future__ import annotations
 
+import re
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 PAGE_DEFS = [
@@ -96,6 +98,11 @@ class SocialFollowUpdate(BaseModel):
     facebook: SocialNetwork = SocialNetwork()
 
 
+class NewsletterSubscribe(BaseModel):
+    email: str = Field(min_length=5, max_length=200)
+    source: str = ""
+
+
 def build_seo_social_router(*, db: Any, admin_dep: Any):
     router = APIRouter(tags=["seo-social"])
 
@@ -178,5 +185,33 @@ def build_seo_social_router(*, db: Any, admin_dep: Any):
             upsert=True,
         )
         return {"ok": True}
+
+    # ── Newsletter ─────────────────────────────────────────────────────
+    @router.post("/newsletter/subscribe")
+    async def newsletter_subscribe(payload: NewsletterSubscribe):
+        email = payload.email.strip().lower()
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$", email):
+            raise HTTPException(400, "Please enter a valid email address")
+        if await db.newsletter_subscribers.find_one({"email": email}):
+            return {"ok": True, "already": True}
+        await db.newsletter_subscribers.insert_one({
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "source": (payload.source or "blog")[:40],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+        return {"ok": True}
+
+    @router.get("/admin/newsletter")
+    async def admin_newsletter(_=Depends(admin_dep)):
+        items = []
+        async for d in db.newsletter_subscribers.find({}, {"_id": 0}).sort("created_at", -1).limit(500):
+            items.append(d)
+        return {"total": await db.newsletter_subscribers.count_documents({}), "items": items}
+
+    @router.delete("/admin/newsletter/{sub_id}")
+    async def admin_newsletter_delete(sub_id: str, _=Depends(admin_dep)):
+        res = await db.newsletter_subscribers.delete_one({"id": sub_id})
+        return {"ok": True, "deleted": res.deleted_count}
 
     return router

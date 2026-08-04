@@ -13150,6 +13150,9 @@ api_router.include_router(build_seo_router(db=db))
 
 from seo_social import build_seo_social_router
 api_router.include_router(build_seo_social_router(db=db, admin_dep=get_current_admin))
+
+from blog_studio import build_blog_studio_router, blog_studio_weekly_loop
+api_router.include_router(build_blog_studio_router(db=db, admin_dep=get_current_admin))
 api_router.include_router(build_url_fetch_router(
     upload_dir=UPLOAD_DIR,
     get_current_user=get_current_user_optional,
