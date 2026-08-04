@@ -10333,16 +10333,18 @@ async def admin_toggle_growth_emails(payload: GrowthEmailsToggle, _=Depends(get_
 
 
 # ── Live stats ticker (landing + free preview) ─────────────────────────────
-_TICKER_KEYS = ("users", "videos", "reports", "scout_reviews", "players")
+_TICKER_KEYS = ("players_analyzed", "pro_reports", "scout_reviews",
+                "players_available", "trial_invites", "club_opportunities")
 
 
 async def _ticker_real_counts() -> dict:
     return {
-        "users": await db.users.count_documents({"role": {"$ne": "admin"}}),
-        "videos": await db.reports.count_documents({}),
-        "reports": await db.reports.count_documents({"full_report": {"$type": "object"}}),
+        "players_analyzed": await db.reports.count_documents({}),
+        "pro_reports": await db.reports.count_documents({"full_report": {"$type": "object"}}),
         "scout_reviews": await db.reports.count_documents({"agent_review.status": "delivered"}),
-        "players": await db.player_profiles.count_documents({}),
+        "players_available": await db.player_profiles.count_documents({}),
+        "trial_invites": 0,
+        "club_opportunities": 0,
     }
 
 

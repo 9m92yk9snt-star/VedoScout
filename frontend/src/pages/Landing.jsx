@@ -17,6 +17,7 @@ import PaymentBadges from "@/components/PaymentBadges";
 import PricingCards from "@/components/PricingCards";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 import HowItWorksWalkthrough from "@/components/HowItWorksWalkthrough";
+import StatsTicker from "@/components/StatsTicker";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -535,6 +536,7 @@ export default function Landing() {
       {/* Scroll progress bar */}
       <motion.div className="scroll-progress-bar" style={{ scaleX: scrollYProgress }} />
       <Navigation transparent />
+      <StatsTicker />
 
       {/* ============ HERO ============ */}
       <section data-testid="hero-section" className="relative min-h-screen flex items-center pt-24 pb-12">

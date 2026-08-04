@@ -34,6 +34,7 @@ import {
   FinalCta,
 } from "@/components/LandingSections";
 import DemoVideoCarousel from "@/components/DemoVideoCarousel";
+import StatsTicker from "@/components/StatsTicker";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 

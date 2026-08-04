@@ -2,17 +2,18 @@
 // Real numbers from /api/stats/ticker (admin can boost + toggle). Auto-refreshes.
 
 import React, { useEffect, useState } from "react";
-import { Users, Clapperboard, FileText, PenLine, Search } from "lucide-react";
+import { Volleyball, FileText, UserCheck, Globe, Target, Trophy } from "lucide-react";
 import api from "@/lib/api";
 
 const LIME = "#CCFF00";
 
 const ITEMS = [
-  { key: "users", icon: Users, label: "users on ScoutMePlay" },
-  { key: "videos", icon: Clapperboard, label: "match videos uploaded" },
-  { key: "reports", icon: FileText, label: "player reports created" },
-  { key: "scout_reviews", icon: PenLine, label: "real scout reviews delivered" },
-  { key: "players", icon: Search, label: "players in the scout library" },
+  { key: "players_analyzed", icon: Volleyball, label: "Players Analyzed" },
+  { key: "pro_reports", icon: FileText, label: "ScoutMe Pro Reports Delivered" },
+  { key: "scout_reviews", icon: UserCheck, label: "Professional Scout Reviews Delivered" },
+  { key: "players_available", icon: Globe, label: "Players Available to Scouts" },
+  { key: "trial_invites", icon: Target, label: "Trial Invitations Earned" },
+  { key: "club_opportunities", icon: Trophy, label: "Club Opportunities Created" },
 ];
 
 const fmt = (n) => Number(n || 0).toLocaleString("en-US");
@@ -26,7 +27,7 @@ function TickerRun({ stats }) {
           <span className="font-barlow font-black text-[13px] tracking-[0.02em]" style={{ color: LIME }}>
             {fmt(stats[key])}
           </span>
-          <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-white/60">{label}</span>
+          <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-white/60">{label}</span>
           <span className="ml-7 w-1 h-1 rounded-full bg-white/20" />
         </span>
       ))}

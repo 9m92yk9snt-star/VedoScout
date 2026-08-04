@@ -20,10 +20,12 @@ import DemoVideosAdmin from "@/components/admin/DemoVideosAdmin";
 import GrantAccessAdmin from "@/components/admin/GrantAccessAdmin";
 import DiagnosticsAdmin from "@/components/admin/DiagnosticsAdmin";
 import TaxAdmin from "@/components/admin/TaxAdmin";
+import TickerAdmin from "@/components/admin/TickerAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
   { id: "growth", label: "Growth", role: "admin" },
+  { id: "ticker", label: "Ticker", role: "admin" },
   { id: "reviews", label: "Reviews", role: "admin" },
   { id: "scouts", label: "Scout Queue", role: "both" },
   { id: "scout-db", label: "Scout DB Verify", role: "admin" },
@@ -448,6 +450,8 @@ export default function AdminPage() {
               )}
 
               {activeTab === "growth" && <GrowthAdmin />}
+
+              {activeTab === "ticker" && <TickerAdmin />}
 
               {activeTab === "reviews" && <ReviewsAdmin />}
 

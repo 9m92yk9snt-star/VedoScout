@@ -29,6 +29,7 @@ import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 import DoubtConfirmModal from "@/components/DoubtConfirmModal";
 import PremiumBuildingDashboard from "@/components/report-states/PremiumBuildingDashboard";
 import FreePreviewLanding from "@/components/report-states/FreePreviewLanding";
+import StatsTicker from "@/components/StatsTicker";
 
 /* Tier visual treatment — 4 levels mapped to colour + label */
 const TIER_META = {
@@ -2173,6 +2174,7 @@ export default function ReportPage() {
     return (
       <div className="min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
+        <StatsTicker />
         <CheckoutTransitionModal
           open={checkoutModal.open}
           state={checkoutModal.state}
