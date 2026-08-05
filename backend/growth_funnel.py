@@ -85,7 +85,17 @@ async def _create_stripe_promo(code: str, percent: int, expires_at: Optional[str
 
     def _do():
         coupon = s.Coupon.create(percent_off=percent, duration="once", name=f"ScoutMePlay {code}")
-        kwargs = {"coupon": coupon.id, "code": code}
+        kwargs = {"code": code}
+        try:
+            promo = s.PromotionCode.create(promotion={"type": "coupon", "coupon": coupon.id}, **kwargs_extra(kwargs))
+        except Exception as e:
+            if "unknown parameter" in str(e).lower():
+                promo = s.PromotionCode.create(coupon=coupon.id, **kwargs_extra(kwargs))
+            else:
+                raise
+        return promo
+
+    def kwargs_extra(kwargs):
         if expires_at:
             try:
                 kwargs["expires_at"] = int(datetime.fromisoformat(expires_at).replace(tzinfo=timezone.utc).timestamp())
@@ -93,7 +103,7 @@ async def _create_stripe_promo(code: str, percent: int, expires_at: Optional[str
                 pass
         if max_uses:
             kwargs["max_redemptions"] = int(max_uses)
-        return s.PromotionCode.create(**kwargs)
+        return kwargs
 
     try:
         promo = await asyncio.to_thread(_do)

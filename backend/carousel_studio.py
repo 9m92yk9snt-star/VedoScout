@@ -39,9 +39,10 @@ NEVER use the standalone word "AI". Never use the word "percentile". Short punch
 
 
 def _user_prompt(topic: str, slides: int, comment_word: str) -> str:
+    content = max(3, slides - 1)
     return f"""Write an Instagram carousel about: "{topic}"
 
-Structure (return EXACTLY {slides} content slides + 1 CTA slide as JSON):
+Structure (return EXACTLY {content} content slides + 1 CTA slide = {content + 1} slides total, as JSON):
 - Slide 1 = HOOK: a bold scroll-stopping headline (max 9 words) + one short sub-line.
 - Middle slides = one clear point each: short heading (max 8 words) + 2-4 short lines (each max 12 words). Practical, warm, honest.
 - Optionally one slide can be "the fix" with concrete steps.

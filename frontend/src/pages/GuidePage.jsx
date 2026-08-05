@@ -27,6 +27,10 @@ export default function GuidePage() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email.trim())) {
+      setError("Please enter a valid email address");
+      return;
+    }
     setBusy(true);
     setError("");
     try {

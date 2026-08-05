@@ -1,7 +1,19 @@
 # ScoutMePlay — PRD & Status
 
-## FUTURE (ON HOLD, Aug 4 2026) — Instagram Growth Funnel
-User approved the full plan but said WAIT ("gem alt som future, lav ikke noget"). Full spec saved in `/app/memory/FUTURE_instagram_funnel.md`: Carousel Studio (AI slide images + later auto-post to IG via Meta Graph API), free PDF lead magnet, /guide email-capture page, sequenced offer emails (report discount, membership discount, paid PDF — all admin-controlled), admin discount-code system for subscriptions/single reports, ManyChat comment→DM guide. Nothing built yet.
+## Session (Aug 5, 2026) — INSTAGRAM FUNNEL FASE 1 + BLOG PUBLISH + WEEKLY ON + WELCOME EMAIL ✅ (iter74 15/15 + HIGH fix verified)
+- **User tapped all 4 next-action items**: publish draft, weekly auto-draft ON, build Funnel Phase 1, newsletter welcome email.
+- **Blog**: draft "How to Help Your Child Bounce Back After a Tough Match" published w/ new realistic cover (`/api/blog/uploads/cover-bounce-back.jpg`) → 6 live articles. `blog_studio` auto_weekly = **TRUE** (a fresh draft lands weekly for review).
+- **NEW backend modules**: `carousel_studio.py` (gpt-5.4 slide texts → PIL-rendered 1080×1080 dark cinematic slides using `static/landing/carousel-bg-1..7.jpg`, jobs at `/api/carousel/*`, ZIP download, slides served from `/api/uploads/carousels/`), `guide_pdf.py` (free 8-page branded PDF "The 5 Things Every Football Parent Gets Wrong", cached, public `GET /api/guide/pdf`), `guide_emails.py` (funnel + welcome templates), `growth_funnel.py` (POST /api/guide/subscribe → instant PDF email; funnel config settings key `guide_funnel` w/ 3 admin-controlled steps: report_offer (default on, day 2, needs code), membership_offer (on, day 5, needs code), paid_guide (OFF, needs link); hourly `guide_funnel_loop`; leads admin; **discount codes CRUD** → creates REAL Stripe Coupon+PromotionCode (LIVE key!) — NOTE new Stripe API needs `promotion={'type':'coupon','coupon':id}` param (fixed after iter74 HIGH; fallback to legacy `coupon=` kept)).
+- **server.py**: 2 router mounts (~line 13158), `guide_funnel_loop` at startup, `allow_promotion_codes=True` added to embedded unlock + prepay session creates (subscription checkout already had it) → codes redeem natively in Stripe checkout, zero payment-frontend changes.
+- **seo_social.py**: newsletter subscribe now sends branded welcome email (verified in log to owner inbox) + `GET /api/newsletter/unsubscribe/{id}`.
+- **Frontend**: NEW `/guide` page (GuidePage.jsx, book-mockup asset `guide-book-mockup.jpg`, email capture w/ client-side validation → success + direct download). NEW admin tab **Marketing** (MarketingAdmin) = CarouselStudioAdmin + GuideFunnelAdmin (master toggle, per-step toggles/delays/codes, leads list) + DiscountCodesAdmin (create/%/applies-to/expiry/max-uses/toggle/delete, shows times_redeemed).
+- **VERIFIED (iteration_74.json)**: 15/15 backend pytest, /guide UI e2e, Marketing tab all panels, ONE real carousel run (7 slides, demo job KEPT: 37f73665…), checkout regression (subscribe + prepay sessions create OK), welcome email sent, blog regression. Post-test fixes verified by curl: Stripe promo now created (stripe_promo_id set, warning null); carousel count label now matches output; guide-error shows on invalid email.
+- **Demo data KEPT for owner**: carousel job, scoutmeplay@gmail.com in guide_leads + newsletter (received guide + welcome emails).
+- Backlog (minor, from review): in-process loops need a lock if ever multi-worker; pre-existing `<span> in <option>` console warning in AdminPage (not from this session).
+- ⚠️ REQUIRES REDEPLOY. NOTE: Stripe key in env is **sk_live** — codes created in admin are live promotion codes.
+
+## FUTURE (ON HOLD, Aug 4 2026) — Instagram Growth Funnel — FASE 2+3 remaining
+Fase 1 BUILT (see above). Remaining per `/app/memory/FUTURE_instagram_funnel.md`: Fase 2 = "Post to Instagram" auto-publish button (needs user's Meta Business setup + integration_expert playbook for Instagram Graph API), Fase 3 = ManyChat comment→DM setup guide + DM texts (user-side setup, we provide content).
 
 ## Session (Aug 4, 2026) — SOCIAL BOXES + BLOG SHARE + NEWSLETTER + BLOG STUDIO ✅ (iter73, 100% pass)
 - **User task (approved "Kør")**: 1) compact side-by-side follow boxes, 2) viral share buttons on blog articles, 3) newsletter signup, 4) weekly warm-tone article flow.
