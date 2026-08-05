@@ -304,11 +304,16 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, delay: 0.1 }}
-          className="lg:col-span-6 relative"
+          className="lg:col-span-6 relative w-full max-w-[430px] mx-auto lg:max-w-none"
           data-testid="hero-composition"
         >
+          <style>{`
+            @keyframes lm-kenburns { from { transform: scale(1); } to { transform: scale(1.09) translateX(-8px); } }
+            @keyframes lm-float { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(-2.5deg); } }
+            @keyframes lm-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
+          `}</style>
           {/* MAIN — action shot frame */}
-          <div className="relative aspect-[4/5] w-full bg-ink overflow-hidden border border-gray-border">
+          <div className="relative aspect-square sm:aspect-[4/5] w-full bg-ink overflow-hidden border border-gray-border">
             <img
               src={heroAction}
               alt="Young footballer in action"
@@ -316,22 +321,25 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
                 e.currentTarget.style.display = "none";
               }}
               className="absolute inset-0 w-full h-full object-cover"
+              style={{ animation: "lm-kenburns 16s ease-in-out infinite alternate" }}
             />
             {/* Forest gradient overlay for cohesion */}
             <div
               aria-hidden
               className="absolute inset-0 bg-gradient-to-tr from-ink/45 via-transparent to-forest/25 mix-blend-multiply"
             />
+            {/* Bottom scrim for caption readability */}
+            <div aria-hidden className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent" />
             {/* Corner brackets */}
-            <span aria-hidden className="absolute top-3 left-3 w-5 h-5 border-l-2 border-t-2 border-volt" />
-            <span aria-hidden className="absolute top-3 right-3 w-5 h-5 border-r-2 border-t-2 border-volt" />
-            <span aria-hidden className="absolute bottom-3 left-3 w-5 h-5 border-l-2 border-b-2 border-volt" />
-            <span aria-hidden className="absolute bottom-3 right-3 w-5 h-5 border-r-2 border-b-2 border-volt" />
+            <span aria-hidden className="absolute top-3 left-3 w-5 h-5 border-l-2 border-t-2" style={{ borderColor: "#F5C443" }} />
+            <span aria-hidden className="absolute top-3 right-3 w-5 h-5 border-r-2 border-t-2" style={{ borderColor: "#F5C443" }} />
+            <span aria-hidden className="absolute bottom-3 left-3 w-5 h-5 border-l-2 border-b-2" style={{ borderColor: "#F5C443" }} />
+            <span aria-hidden className="absolute bottom-3 right-3 w-5 h-5 border-r-2 border-b-2" style={{ borderColor: "#F5C443" }} />
 
             {/* Floating "TRACKING" badge */}
             <div className="absolute top-5 left-5">
-              <span className="inline-flex items-center gap-1.5 bg-volt text-ink text-[10px] uppercase tracking-[0.22em] font-black px-2.5 py-1.5">
-                <span className="w-1.5 h-1.5 bg-ink rounded-full animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] font-black px-2.5 py-1.5 backdrop-blur-sm rounded" style={{ background: "rgba(9,15,12,0.82)", color: "#F5C443", border: "1px solid rgba(245,196,67,0.35)" }}>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#F5C443" }} />
                 Pro scout · live
               </span>
             </div>
@@ -339,8 +347,8 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             {/* Bottom caption */}
             <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-volt/95 font-bold">Match footage</div>
-                <div className="font-barlow font-black uppercase text-white text-xl md:text-2xl leading-tight">
+                <div className="text-[10px] uppercase tracking-[0.22em] font-bold" style={{ color: "#F5C443" }}>Match footage</div>
+                <div className="font-barlow font-black uppercase text-white text-xl md:text-2xl leading-tight" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
                   Instant analysis + 48h scout
                 </div>
               </div>
@@ -350,19 +358,19 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             <motion.div
               aria-hidden
               initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.5, 0] }}
-              transition={{ duration: 3, repeat: Infinity, delay: 1 }}
-              className="absolute inset-x-0 h-px bg-volt"
-              style={{ top: "30%" }}
+              animate={{ opacity: [0, 0.6, 0], top: ["22%", "72%", "22%"] }}
+              transition={{ duration: 6, repeat: Infinity, delay: 1, ease: "easeInOut" }}
+              className="absolute inset-x-0 h-px"
+              style={{ background: "#F5C443", boxShadow: "0 0 12px rgba(245,196,67,0.8)" }}
             />
           </div>
 
           {/* FLOATING SCOUT REPORT CARD — overlapper bottom-left of image */}
           <motion.div
             initial={{ opacity: 0, y: 20, rotate: -8 }}
-            animate={{ opacity: 1, y: 0, rotate: -4 }}
+            animate={{ opacity: 1, y: 0, rotate: 0 }}
             transition={{ duration: 0.75, delay: 0.4, ease: "easeOut" }}
-            className="absolute -bottom-6 md:-bottom-8 -left-4 md:-left-10 w-[55%] md:w-[44%] z-10"
+            className="absolute -bottom-6 md:-bottom-8 -left-3 md:-left-10 w-[50%] md:w-[44%] z-10"
             data-testid="hero-floating-report"
           >
             <div
@@ -370,6 +378,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               style={{
                 boxShadow:
                   "0 32px 60px -16px rgba(10,26,18,0.4), 0 12px 22px -10px rgba(10,26,18,0.3)",
+                animation: "lm-float 5.5s ease-in-out 1.4s infinite",
               }}
             >
               <img
@@ -383,7 +392,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               {/* Bottom strip with score */}
               <div className="bg-forest text-white px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-between border-t border-ink">
                 <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold">Scout report</span>
-                <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold text-volt">
+                <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold" style={{ color: "#F5C443" }}>
                   4-pillar · Instant analysis
                 </span>
               </div>
@@ -395,17 +404,20 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.55 }}
-            className="absolute -top-3 md:-top-4 -right-2 md:-right-3 z-10 bg-ink text-cream-base px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 border border-ink"
+            className="absolute -top-3 md:-top-4 -right-2 md:-right-3 z-10 text-cream-base px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3"
             style={{
+              background: "linear-gradient(150deg, #1F4F2F 0%, #12402A 100%)",
+              border: "1px solid rgba(245,196,67,0.4)",
               boxShadow:
                 "0 18px 36px -10px rgba(10,26,18,0.4)",
+              animation: "lm-bob 4.5s ease-in-out 1.8s infinite",
             }}
           >
-            <span className="w-7 md:w-9 h-7 md:h-9 bg-volt text-ink flex items-center justify-center font-barlow font-black text-sm md:text-base leading-none">
+            <span className="w-7 md:w-9 h-7 md:h-9 flex items-center justify-center font-barlow font-black text-sm md:text-base leading-none" style={{ background: "#F5C443", color: "#12200F" }}>
               7.8
             </span>
             <div className="text-left">
-              <div className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold text-volt">Overall</div>
+              <div className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold" style={{ color: "#F5C443" }}>Overall</div>
               <div className="text-[9px] md:text-[11px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-bold text-cream-base/80">U14 · AMF</div>
             </div>
           </motion.div>

@@ -249,19 +249,19 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
 /* ── Bottom trust strip ─────────────────────────────────────────────── */
 function TrustStrip() {
   const items = [
-    { icon: ShieldCheck, color: "#9BE15D", text: ["No credit card", "required"] },
-    { icon: Lock, color: "#CDF05A", text: ["Secure one-time", "payment"] },
-    { icon: BarChart3, color: "#CDF05A", text: ["Track. Improve.", "Grow."] },
-    { icon: Gem, color: "#E8C258", text: ["Maximum exposure.", "Maximum opportunity."] },
+    { icon: ShieldCheck, color: "#2D6B3D", text: ["No credit card", "required"] },
+    { icon: Lock, color: "#1F4F2F", text: ["Secure one-time", "payment"] },
+    { icon: BarChart3, color: "#1F4F2F", text: ["Track. Improve.", "Grow."] },
+    { icon: Gem, color: "#B98A2E", text: ["Maximum exposure.", "Maximum opportunity."] },
   ];
   return (
-    <div className="mt-7 pt-6 border-t border-white/10 grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4" data-testid="dream-pricing-trust">
+    <div className="mt-7 pt-6 border-t border-[#12402A26] grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4" data-testid="dream-pricing-trust">
       {items.map(({ icon: Icon, color, text }, i) => (
         <div key={i} className="flex items-center gap-3 justify-center lg:justify-start">
-          <span className="shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center" style={{ borderColor: `${color}55` }}>
+          <span className="shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center bg-white/60" style={{ borderColor: `${color}55` }}>
             <Icon className="w-4 h-4" style={{ color }} strokeWidth={2} />
           </span>
-          <span className="text-[12px] leading-snug text-white/80 font-semibold">
+          <span className="text-[12px] leading-snug text-[#3D4A38] font-semibold">
             {text[0]}<br />{text[1]}
           </span>
         </div>
@@ -348,7 +348,7 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   };
 
   return (
-    <div data-testid="dream-pricing-tiers" className="rounded-[26px] px-4 sm:px-6 py-6 md:py-8" style={{ background: "#070A07" }}>
+    <div data-testid="dream-pricing-tiers" className="rounded-[26px] px-4 sm:px-6 py-6 md:py-8" style={{ background: "linear-gradient(170deg, #F3EFE1 0%, #E9E4D0 100%)", border: "1px solid rgba(18,64,42,0.16)", boxShadow: "0 18px 44px -22px rgba(18,64,42,0.35)" }}>
       <div className="relative">
         <div ref={trackRef} onScroll={updateEdge} className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-smooth pb-2 lg:pb-0 items-stretch smp-dream-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none", overscrollBehaviorX: "contain", WebkitOverflowScrolling: "touch", transform: "translateZ(0)" }}>
         <TierCard
@@ -377,26 +377,26 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
           type="button" aria-label="Previous plan" data-testid="dream-arrow-prev" onClick={() => nudge(-1)}
           disabled={edge.start}
           className={`lg:hidden absolute left-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-all duration-300 ${edge.start ? "opacity-25 pointer-events-none" : "opacity-100"}`}
-          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", animation: edge.start ? "none" : "smp-arrow-pulse 2.2s ease-in-out infinite" }}
+          style={{ background: "rgba(18,64,42,0.88)", border: "1px solid rgba(245,196,67,0.6)", animation: edge.start ? "none" : "smp-arrow-pulse 2.2s ease-in-out infinite" }}
         >
-          <ChevronLeft className="w-5 h-5" style={{ color: "#CCFF00", animation: edge.start ? "none" : "smp-arrow-nudge-l 1.1s ease-in-out infinite" }} />
+          <ChevronLeft className="w-5 h-5" style={{ color: "#F5C443", animation: edge.start ? "none" : "smp-arrow-nudge-l 1.1s ease-in-out infinite" }} />
         </button>
         <button
           type="button" aria-label="Next plan" data-testid="dream-arrow-next" onClick={() => nudge(1)}
           disabled={edge.end}
           className={`lg:hidden absolute right-1 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-all duration-300 ${edge.end ? "opacity-25 pointer-events-none" : "opacity-100"}`}
-          style={{ background: "rgba(7,10,7,0.66)", border: "1px solid rgba(204,255,0,0.55)", animation: edge.end ? "none" : "smp-arrow-pulse 2.2s ease-in-out infinite" }}
+          style={{ background: "rgba(18,64,42,0.88)", border: "1px solid rgba(245,196,67,0.6)", animation: edge.end ? "none" : "smp-arrow-pulse 2.2s ease-in-out infinite" }}
         >
-          <ChevronRight className="w-5 h-5" style={{ color: "#CCFF00", animation: edge.end ? "none" : "smp-arrow-nudge-r 1.1s ease-in-out infinite" }} />
+          <ChevronRight className="w-5 h-5" style={{ color: "#F5C443", animation: edge.end ? "none" : "smp-arrow-nudge-r 1.1s ease-in-out infinite" }} />
         </button>
       </div>
-      <p className="lg:hidden mt-3 text-center text-[10px] uppercase tracking-[0.22em] font-bold text-white/40">
+      <p className="lg:hidden mt-3 text-center text-[10px] uppercase tracking-[0.22em] font-bold text-[#12402A66]">
         Swipe to compare all plans →
       </p>
       <TrustStrip />
       <style>{`
         .smp-dream-scroll::-webkit-scrollbar{display:none;}
-        @keyframes smp-arrow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(204,255,0,0.25), 0 6px 20px rgba(0,0,0,0.5); } 50% { box-shadow: 0 0 30px rgba(204,255,0,0.65), 0 6px 20px rgba(0,0,0,0.5); } }
+        @keyframes smp-arrow-pulse { 0%,100% { box-shadow: 0 0 12px rgba(245,196,67,0.25), 0 6px 20px rgba(18,64,42,0.35); } 50% { box-shadow: 0 0 28px rgba(245,196,67,0.6), 0 6px 20px rgba(18,64,42,0.35); } }
         @keyframes smp-arrow-nudge-l { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-3px); } }
         @keyframes smp-arrow-nudge-r { 0%,100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
       `}</style>

@@ -352,9 +352,10 @@ export function ImageStrip() {
       data-testid="image-strip"
       className="relative bg-ink overflow-hidden border-b border-gray-border"
     >
-      {/* Mobile: 5:6 portrait aspect so the headline gets real estate.
+      <style>{`@keyframes lm-strip-ken { from { transform: scale(1); } to { transform: scale(1.08) translateX(10px); } }`}</style>
+      {/* Mobile: square aspect keeps it compact.
           Desktop: 21:8 cinematic strip. */}
-      <div className="relative aspect-[5/6] md:aspect-[21/8] w-full">
+      <div className="relative aspect-square md:aspect-[21/8] w-full overflow-hidden">
         <picture>
           {/* Square crop optimised for mobile */}
           <source media="(max-width: 767px)" srcSet={IMG("imagestrip-mobile.png")} />
@@ -366,30 +367,51 @@ export function ImageStrip() {
               e.currentTarget.style.display = "none";
             }}
             className="absolute inset-0 w-full h-full object-cover"
+            style={{ animation: "lm-strip-ken 18s ease-in-out infinite alternate" }}
           />
         </picture>
         {/* Mobile uses a bottom-to-top dark scrim so text is at the bottom; desktop keeps the left-to-right scrim */}
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-ink/90 md:from-ink/85 via-ink/35 md:via-ink/40 to-transparent" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-ink/95 md:from-ink/85 via-ink/45 md:via-ink/40 to-transparent" />
         {/* Mobile decorative corner brackets */}
-        <span aria-hidden className="md:hidden absolute top-4 left-4 w-5 h-5 border-l-2 border-t-2 border-volt" />
-        <span aria-hidden className="md:hidden absolute top-4 right-4 w-5 h-5 border-r-2 border-t-2 border-volt" />
+        <span aria-hidden className="md:hidden absolute top-4 left-4 w-5 h-5 border-l-2 border-t-2" style={{ borderColor: "#F5C443" }} />
+        <span aria-hidden className="md:hidden absolute top-4 right-4 w-5 h-5 border-r-2 border-t-2" style={{ borderColor: "#F5C443" }} />
 
         <div className="absolute inset-0 flex items-end md:items-center px-6 pb-8 md:pb-0 md:px-12">
           <div className="max-w-2xl text-center md:text-left mx-auto md:mx-0">
-            <div className="inline-flex items-center gap-2 mb-3 justify-center md:justify-start">
-              <span className="w-6 md:w-8 h-px bg-volt" />
-              <span className="text-volt text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.4 }}
+              transition={{ duration: 0.55 }}
+              className="inline-flex items-center gap-2 mb-3 justify-center md:justify-start"
+            >
+              <span className="w-6 md:w-8 h-px" style={{ background: "#F5C443" }} />
+              <span className="text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold" style={{ color: "#F5C443" }}>
                 Real scouts · Real evidence
               </span>
-              <span className="md:hidden w-6 h-px bg-volt" />
-            </div>
-            <h3 className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl text-cream-base leading-[0.9]">
+              <span className="md:hidden w-6 h-px" style={{ background: "#F5C443" }} />
+            </motion.div>
+            <motion.h3
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.12 }}
+              className="font-barlow font-black uppercase tracking-tighter text-4xl md:text-6xl text-cream-base leading-[0.9]"
+              style={{ textShadow: "0 3px 18px rgba(0,0,0,0.5)" }}
+            >
               Built for the<br />
-              <span className="text-volt">next level.</span>
-            </h3>
-            <p className="mt-4 text-cream-base/75 text-sm md:text-base max-w-md mx-auto md:mx-0 leading-relaxed">
+              <span style={{ color: "#F5C443", textShadow: "0 3px 18px rgba(0,0,0,0.55)" }}>next level.</span>
+            </motion.h3>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.24 }}
+              className="mt-4 text-cream-base/85 text-sm md:text-base max-w-md mx-auto md:mx-0 leading-relaxed"
+              style={{ textShadow: "0 1px 8px rgba(0,0,0,0.5)" }}
+            >
               ScoutMe Pro Intelligence reviews every frame &mdash; then a real scout signs off on every premium report.
-            </p>
+            </motion.p>
           </div>
         </div>
       </div>
