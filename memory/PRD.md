@@ -3144,3 +3144,27 @@ Brugervalg: a) admin-styrede follower-tal (ingen Meta API) + lovlig SEO-pakke (i
 - Ny komponent BlogHighlights.jsx: lille flot sektion "From the journal / Stories that build players." med de 3 nyeste artikler fra GET /api/blog/posts?limit=3. Kort: coverbillede m. hover-zoom, kategori-chip (forest/volt), læsetid, titel+subtitle line-clamp, "Read the story"-link. Mobil: snap-swipe m. centrerede glødende pile (blog-arrow-prev/next, edge-clamping som pricing); desktop: 3-kolonne grid. "All articles"-link til /blog.
 - Placeret i LandingMinimal mellem SocialFollowSection og FAQSection. Skjules automatisk hvis ingen posts.
 - Search Console: kan kun udføres af brugeren selv på live-domæne (guide ligger i admin → SEO & Social).
+
+## 2026-08-05 — P0 Pipeline Overhaul: Tapping, Consistency & Dual-Pass (iteration 75)
+User-approved critical audit + fixes of the upload → tap → analysis → report chain.
+### Audit findings (full detail: /app/memory/AUDIT_pipeline_2026-08-05.md)
+- Player-selection lineage verified SOLID end-to-end (taps → crops → identity profile → tap-seeded optical tracking → ground-truth prompt block → GPT-4o frame verification → identity gate). Nothing overwrites the selection.
+- ROOT CAUSE of "multiple editors": MarkerStudio auto-open effect re-opened Scout Mode 250ms after user pressed X (infinite loop) — reproduced in browser, FIXED via scoutDismissed state.
+- Consistency measured: same 41s video + identical 6 taps uploaded twice → BEFORE: all 5 scores differed (technical 3 vs 8), tier Strong Club vs Pro Academy. Root cause: single-pass Gemini video nondeterminism (seed param NOT supported by LLM proxy — verified).
+### Shipped (all tested; testing agent iteration_75 100% pass)
+1. Scout Mode X-fix + honest boot labels ("Preparing your video", "Finding key moments")
+2. Guided tapping UX: intro coach card, tap → confirm → "Player locked" flash → auto zoom-out
+3. MANUAL-mode anchors 2..5 coordinate conversion fix (letterbox offset bug)
+4. Step 3: player photo REQUIRED (upload compressed 512px OR "use video image" → display crop) + country REQUIRED (searchable combobox, /app/frontend/src/lib/countries.js); enforced frontend + backend 400s
+5. Categories reduced to 3: Match (30s–5min), Skills & Technical Training (15s–5min), Highlights (15s–5min); min-duration enforced client-side AND in analyze_preview_task (with eligibility refund)
+6. Gemini temperature 0.2 → 0.0 (both call sites)
+7. INTELLIGENT DUAL-PASS cross-verification on full reports: second independent Gemini pass re-watches video, must confirm every timeline claim (identity + event) against tap crops + ground-truth positions, scores independently; deterministic merge in code (drop WRONG_PLAYER/NOT_SEEN claims, track-window check, timestamp snap ≤2s, scores = rounded mean, scores_confidence=low if gap ≥3). Metadata in full_report.cross_verification. Runs in main + identity-retry paths, fail-open.
+8. UI: PremiumBuildingDashboard stage "Cross-Verifying"; PremiumReportV2 "Cross-verified" trust strip (v2-cross-verified-strip); player_photo_url in serializer/status + R2 flush.
+### Post-fix consistency measurement (same controlled experiment)
+- AFTER: 4/5 scores identical (mentality 8 vs 7 only), SAME tier "Pro Academy Standard", same core narrative, 1 hallucinated claim ("Perfect Goal Setup") auto-removed by verifier. Internal pass1/pass2 gaps ≤1.
+- All test reports deleted afterwards (preview DB kept clean). Consistency re-run assets: /app/memory/consistency_assets/ (anchors.json + marker.jpg; re-download video from report ddd9eb8b via signed media URL).
+### Cost note
+Full report now ~+60-70% LLM cost (second video pass). Preview unchanged. seed param must NOT be re-added (proxy rejects).
+### Known small backlog
+- Admin dashboard "latest report" widget shows retry-404 card for stale legacy failed reports (cosmetic, pre-existing).
+- Old category values (training/drill/freestyle) still exist on historical reports — display-only, harmless.
