@@ -1,5 +1,12 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 5, 2026 — part 2) — INSTAGRAM AUTO-POST + MANYCHAT GUIDE ✅ (self-tested API + screenshot)
+- **NEW `instagram_publish.py`** (built per integration_expert Meta Graph API v25.0 playbook): admin pastes long-lived token + IG business ID → verified live against Graph API (`/{ig_id}?fields=username,account_type`) → stored in settings key `instagram_publish`. Publish flow: PNG slides converted to JPEG (Meta requires JPEG) → child IMAGE containers (is_carousel_item) → CAROUSEL container → media_publish → permalink fetched. Status tracked on carousel job (instagram_status publishing/published/failed + permalink/error). Endpoints: GET/PUT/DELETE /api/instagram/config, POST /api/instagram/publish/{job_id} (origin_url from frontend for public image URLs). Router mounted in server.py.
+- **CarouselStudioAdmin updated**: "Instagram connection" card (connect form w/ inline how-to, connected-as @username, disconnect) + per-job "Post to Instagram" button (disabled until connected, gradient IG style), publishing spinner, "On Instagram ↗" permalink link, failure row w/ retry hint.
+- **VERIFIED**: compile OK; curl — config not-connected, invalid token → 400 w/ real Meta error, publish w/o config → 400, no-auth → 401; screenshot — Marketing tab shows connect card + disabled Post button on demo carousel. **NOT testable end-to-end: real publish requires user's Meta token (user hasn't completed Meta Business setup yet) — feature ships ready, unlocks when token pasted.**
+- **ManyChat guide delivered** in chat (klik-for-klik + DM texts linking to scoutmeplay.com/guide), saved at `/app/memory/MANYCHAT_GUIDE.md`.
+- ⚠️ REQUIRES REDEPLOY. Note: publishing from PREVIEW would put preview-URL images on IG — works, but production origin (scoutmeplay.com) is the intended path.
+
 ## Session (Aug 5, 2026) — INSTAGRAM FUNNEL FASE 1 + BLOG PUBLISH + WEEKLY ON + WELCOME EMAIL ✅ (iter74 15/15 + HIGH fix verified)
 - **User tapped all 4 next-action items**: publish draft, weekly auto-draft ON, build Funnel Phase 1, newsletter welcome email.
 - **Blog**: draft "How to Help Your Child Bounce Back After a Tough Match" published w/ new realistic cover (`/api/blog/uploads/cover-bounce-back.jpg`) → 6 live articles. `blog_studio` auto_weekly = **TRUE** (a fresh draft lands weekly for review).
