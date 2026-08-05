@@ -3195,9 +3195,11 @@ async def call_gemini_with_video(
         # extra_params which _build_completion_params merges into the final call.
         # Session 124: tightened from 240 → 150 s (httpx socket timeout) and
         # 300 → 180 s (asyncio outer cancel) so worst-case retry is 6 min not 10.
-        # temperature 0.2 → deterministic scoring: the same video should
+        # temperature 0.0 → maximum determinism: the same video should
         # produce the same scores run-to-run (score-stability requirement).
-        chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0, "temperature": 0.2}
+        # NOTE: `seed` is NOT supported for gemini through the LLM proxy
+        # (verified Aug 5 2026 — UnsupportedParamsError) — do not re-add it.
+        chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0, "temperature": 0.0}
         response = await asyncio.wait_for(chat.send_message(user_message), timeout=180)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
@@ -3267,7 +3269,7 @@ async def call_gemini_with_video(
             "commentary."
         ),
     ).with_model("gemini", "gemini-2.5-pro")
-    retry_chat.extra_params = {"timeout": 150.0, "temperature": 0.2}
+    retry_chat.extra_params = {"timeout": 150.0, "temperature": 0.0}
     retry_message = UserMessage(text=strict_prompt, file_contents=file_contents)
 
     # Session 124: retry-transparency — surface to the frontend that we are
@@ -4965,6 +4967,9 @@ async def upload_video_and_create_preview(
     preferred_foot: str = Form(...),
     current_club: Optional[str] = Form(None),
     jersey_number: Optional[str] = Form(None),
+    country: Optional[str] = Form(None),
+    photo_source: Optional[str] = Form(None),   # 'upload' | 'video_crop' — required
+    player_photo: Optional[UploadFile] = File(None),
     video_type: str = Form(...),
     description: str = Form(...),
     user=Depends(get_current_user),
@@ -5067,6 +5072,20 @@ async def upload_video_and_create_preview(
     with marker_path.open("wb") as buffer:
         shutil.copyfileobj(marker_image.file, buffer)
 
+    # ============== REQUIRED PLAYER PHOTO + COUNTRY (Step 3) ==============
+    country_clean = (country or "").strip()[:80]
+    if not country_clean:
+        raise HTTPException(status_code=400, detail="Player country is required.")
+    if photo_source not in ("upload", "video_crop"):
+        raise HTTPException(status_code=400, detail="Player photo is required — upload a photo or use the locked video image.")
+    player_photo_filename = None
+    if photo_source == "upload":
+        if player_photo is None:
+            raise HTTPException(status_code=400, detail="Player photo file missing.")
+        player_photo_filename = f"{report_id}-player-photo.jpg"
+        with (UPLOAD_DIR / player_photo_filename).open("wb") as buffer:
+            shutil.copyfileobj(player_photo.file, buffer)
+
     # ============== CACHE RAW MARKER DATA FOR BACKGROUND TASK ==============
     # Heavy work (ffmpeg transcoding, fingerprinting, poster, preview clip, audio
     # peaks, duration validation) used to run inline here. On Cloudflare-fronted
@@ -5106,6 +5125,7 @@ async def upload_video_and_create_preview(
         "preferred_foot": preferred_foot,
         "current_club": current_club or "Independent",
         "jersey_number": (str(jersey_number).strip()[:4] or None) if jersey_number else None,
+        "country": country_clean,
         "video_type": video_type,
         "description": description,
     }
@@ -5127,6 +5147,8 @@ async def upload_video_and_create_preview(
         "poster_filename": None,                    # populated by background task
         "marker_filename": marker_filename,
         "marker_timestamp": float(marker_timestamp),
+        "player_photo_filename": player_photo_filename,  # None when photo_source == "video_crop" (set post-crop)
+        "photo_source": photo_source,
         # Raw JSON strings — parsed inside the bg task so we never crash the upload
         "raw_marker_box": raw_marker_box,
         "raw_marker_anchors": raw_marker_anchors,
@@ -5303,6 +5325,15 @@ def _resolve_display_crop_url(doc: dict) -> Optional[str]:
     return f"/api/uploads/{df}" if df else None
 
 
+def _resolve_player_photo_url(doc: dict) -> Optional[str]:
+    """Resolve the required Step-3 player photo URL (upload or video crop)."""
+    override = doc.get("player_photo_url_override")
+    if override:
+        return override
+    pf = doc.get("player_photo_filename")
+    return f"/api/uploads/{pf}" if pf else None
+
+
 @api_router.get("/reports/{report_id}/status")
 async def get_report_status(report_id: str, user=Depends(get_current_user)):
     """Lightweight polling endpoint used by the frontend during async preview generation.
@@ -5353,6 +5384,7 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
             "marker_url": _resolve_marker_url(doc),
             "subject_crop_url": _resolve_subject_crop_url(doc),
             "display_crop_url": _resolve_display_crop_url(doc),
+            "player_photo_url": _resolve_player_photo_url(doc),
             "is_paid": bool(doc.get("is_paid")),
             "created_at": doc.get("created_at"),
         })
@@ -5526,6 +5558,34 @@ async def analyze_preview_task(report_id: str):
             {"$set": {"video_duration_sec": duration_sec}},
         )
 
+        # ============== CATEGORY MIN-DURATION (match ≥30s, skills/highlights ≥15s) ==============
+        _vt_intent = str((details or {}).get("video_type") or "").lower()
+        _min_sec = 30 if _vt_intent == "match" else 15
+        if duration_sec and duration_sec < (_min_sec - 1):
+            _cat_label = "Match" if _vt_intent == "match" else ("Skills & Technical Training" if _vt_intent == "skills" else "Highlights")
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {
+                    "analysis_status": "failed",
+                    "analysis_error": (
+                        f"Video is {duration_sec:.0f} seconds — the {_cat_label} category needs at "
+                        f"least {_min_sec} seconds so the analysis has enough to work with. "
+                        "Please upload a longer clip."
+                    ),
+                    "progress_step": 5,
+                }},
+            )
+            try:
+                await _refund_upload_eligibility(report_id)
+            except Exception as re:
+                logger.warning(f"Eligibility refund failed for {report_id}: {re}")
+            transcode_task.add_done_callback(_drop_transcode_output)
+            try:
+                marker_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return
+
         # ============== PRECISION SCOUT — VISUAL FINGERPRINT (anchor 1) ==============
         fingerprint_payload = None
         crop_filename = None
@@ -5692,6 +5752,13 @@ async def analyze_preview_task(report_id: str):
                 "fingerprint": fingerprint_payload,
                 "subject_crop_filename": crop_filename,
                 "display_crop_filename": display_crop_filename,
+                # Required Step-3 photo — "use the locked video image" resolves
+                # to the high-quality square display crop generated above.
+                **({"player_photo_filename": display_crop_filename}
+                   if (doc.get("photo_source") == "video_crop"
+                       and display_crop_filename
+                       and not doc.get("player_photo_filename"))
+                   else {}),
                 "anchors": extra_anchors_payload,
                 **_wd_heartbeat(),
             }},
@@ -6218,6 +6285,24 @@ async def _flush_preview_artifacts_to_r2(report_id: str):
                 except Exception as e:
                     logger.warning(f"R2 flush display_crop failed {report_id}: {e}")
 
+    # Required Step-3 player photo (may equal the display crop when the user
+    # chose "use the locked video image" — same durable-URL pattern).
+    if not doc.get("player_photo_url_override"):
+        ppf = doc.get("player_photo_filename")
+        if ppf and ppf == doc.get("display_crop_filename"):
+            _dc_url = updates.get("display_crop_url_override") or doc.get("display_crop_url_override")
+            if _dc_url:
+                updates["player_photo_url_override"] = _dc_url
+        elif ppf:
+            ppp = UPLOAD_DIR / ppf
+            if ppp.exists() and ppp.stat().st_size > 0:
+                try:
+                    key = f"reports/{report_id}/{ppf}"
+                    url = await asyncio.to_thread(r2_storage.upload_file, key, ppp, "image/jpeg")
+                    updates["player_photo_url_override"] = url
+                except Exception as e:
+                    logger.warning(f"R2 flush player_photo failed {report_id}: {e}")
+
     if updates:
         await db.reports.update_one({"id": report_id}, {"$set": updates})
 
@@ -6462,6 +6547,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "marker_url": _resolve_marker_url(doc),
         "subject_crop_url": _resolve_subject_crop_url(doc),
         "display_crop_url": _resolve_display_crop_url(doc),
+        "player_photo_url": _resolve_player_photo_url(doc),
         "share_enabled": bool(doc.get("share_enabled")),
         "share_token": doc.get("share_token") if doc.get("share_enabled") else None,
         "fingerprint": doc.get("fingerprint"),

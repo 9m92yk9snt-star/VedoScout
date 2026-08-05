@@ -107,6 +107,9 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
   const [hints, setHints] = useState([]);
   const [sceneCuts, setSceneCuts] = useState([]);
   const [frameCache, setFrameCache] = useState([]);
+  /* Guided-UX state — intro coach card + "player locked" confirmation flash */
+  const [introSeen, setIntroSeen] = useState(false);
+  const [lockFlash, setLockFlash] = useState(false);
 
   /* Marking phase state */
   // queue: ordered list of hint indices to present.  When user skips a
@@ -143,6 +146,8 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       setDraftBox(null);
       setZoom(1);
       setPan({ x: 0, y: 0 });
+      setIntroSeen(false);
+      setLockFlash(false);
     }
   }, [open]);
 
@@ -445,6 +450,12 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
         hintT, source: "user", skipped: false,
       },
     }));
+    // Guided zoom flow: confirming zooms the video back out automatically
+    // and flashes a "Player locked" confirmation before advancing.
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setLockFlash(true);
+    setTimeout(() => setLockFlash(false), 900);
     setTimeout(advance, 350); // brief "locked" beat so user sees confirmation
   }, [draftBox, currentHintIdx, hints, advance]);
 
@@ -604,6 +615,58 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
           />
         )}
 
+        {/* Guided intro — one-time coach card explaining the tap flow */}
+        {phase === "MARKING" && !introSeen && (
+          <div
+            className="absolute inset-0 flex items-center justify-center bg-ink/85 backdrop-blur-sm px-6"
+            style={{ zIndex: 60 }}
+            data-testid="scout-intro-overlay"
+          >
+            <div className="w-full max-w-sm bg-ink border border-[#CCFF00]/40 p-6 shadow-[0_0_44px_rgba(204,255,0,0.25)]">
+              <div className="text-[#CCFF00] text-[10px] uppercase tracking-[0.3em] font-black mb-3">
+                How to lock your player
+              </div>
+              <div className="space-y-3.5">
+                {[
+                  ["1", "Zoom in if the players look small — use the + button below."],
+                  ["2", "Tap directly on YOUR player. A green box locks around them."],
+                  ["3", "Tap Confirm. We zoom back out and move to the next moment."],
+                ].map(([n, t]) => (
+                  <div key={n} className="flex items-start gap-3">
+                    <span className="w-6 h-6 shrink-0 bg-[#CCFF00] text-ink font-black text-[12px] flex items-center justify-center">{n}</span>
+                    <span className="text-white/90 text-[13px] leading-snug">{t}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-white/55 text-[11.5px] leading-snug">
+                Every tap teaches us exactly who to follow — only YOUR player is analysed. Not visible in a frame? Skip it.
+              </p>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setIntroSeen(true); }}
+                data-testid="scout-intro-gotit"
+                className="mt-5 w-full h-12 bg-[#CCFF00] text-ink font-black text-[13px] uppercase tracking-widest hover:bg-white transition-colors"
+              >
+                Got it — start tapping
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* "Player locked" confirmation flash after each confirm */}
+        {lockFlash && (
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ zIndex: 55 }}
+            data-testid="scout-lock-flash"
+          >
+            <div className="flex items-center gap-2.5 px-5 py-3 bg-ink/92 border border-[#CCFF00] shadow-[0_0_36px_rgba(204,255,0,0.55)]">
+              <Check className="w-5 h-5 text-[#CCFF00]" strokeWidth={3} />
+              <span className="text-[#CCFF00] font-black text-[14px] uppercase tracking-widest">Player locked</span>
+            </div>
+          </div>
+        )}
+
         {/* Live frame strip — orientation aid during marking. Shows all
             captured frames as small thumbs with status icons; tap to jump. */}
         {phase === "MARKING" && (
@@ -697,9 +760,9 @@ function PremiumBootOverlay({ progress, stage }) {
   }, []);
   const pct = Math.round(progress * 100);
   const stageLabel =
-    stage === "uploading" ? "Uploading video"
-    : stage === "analysing" ? "Analysing footage"
-    : "Generating player screenshots";
+    stage === "uploading" ? "Preparing your video"
+    : stage === "analysing" ? "Finding key moments"
+    : "Capturing frames to tap";
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink/97 backdrop-blur-md text-white px-8" style={{ zIndex: 50 }}>
@@ -734,9 +797,9 @@ function PremiumBootOverlay({ progress, stage }) {
       </div>
       <div className="text-white/55 text-[12px] mb-8 text-center max-w-xs">
         {stage === "uploading"
-          ? "Preparing your video for analysis…"
+          ? "Loading your clip on this device — the analysis hasn't started yet."
           : stage === "analysing"
-          ? "Finding the natural breakpoints in the match…"
+          ? "Choosing the best frames for you to tap your player…"
           : "Capturing 10 key moments to mark your player."}
       </div>
 

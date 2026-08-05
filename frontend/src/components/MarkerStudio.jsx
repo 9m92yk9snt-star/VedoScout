@@ -189,6 +189,10 @@ export default function MarkerStudio({
   // into the existing handleDone() pipeline — no upload-payload changes at
   // the call-site. If the user cancels, MANUAL mode is the fallback.
   const [scoutOpen, setScoutOpen] = useState(false);
+  // Set when the user explicitly closes Scout Mode (X) — prevents the
+  // auto-open effect from forcing Scout Mode back open (the old infinite
+  // reopen loop users described as "another editor keeps appearing").
+  const [scoutDismissed, setScoutDismissed] = useState(false);
 
   const [multiPoseRef, setMultiPoseRef] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
@@ -242,6 +246,7 @@ export default function MarkerStudio({
       setSuggestedTapT(null);
       setReplaceIdx(null);
       setScoutOpen(false);
+      setScoutDismissed(false);
       if (enrollAbortRef.current) {
         enrollAbortRef.current.abort();
         enrollAbortRef.current = null;
@@ -1012,10 +1017,11 @@ export default function MarkerStudio({
     if (!open) return;
     if (!videoReady) return;
     if (scoutOpen) return;
+    if (scoutDismissed) return; // user closed Scout Mode — respect it, MANUAL is the fallback
     if (anchors.length > 0) return; // user already started — don't reopen
     const t = setTimeout(() => { setScoutOpen(true); }, 250);
     return () => clearTimeout(t);
-  }, [open, videoReady, scoutOpen, anchors.length]);
+  }, [open, videoReady, scoutOpen, scoutDismissed, anchors.length]);
 
   /* ── DONE button in MANUAL mode → route through the AnchorPreview screen
    *    instead of submitting directly. Improvement #3 of the Trust Stack.
@@ -1180,8 +1186,26 @@ export default function MarkerStudio({
       const bw = Math.max(8, Math.round(nw * w));
       const bh = Math.max(8, Math.round(nh * h));
 
-      // Re-emit the same anchor.box in proper rendered-video coords for backend
-      const finalAnchors = allAnchors.map((a, idx) => idx === 0 ? { ...a, box: { x: nx, y: ny, w: nw, h: nh } } : a);
+      // Re-emit ALL anchors in proper rendered-video coords for backend.
+      // (Old bug: only anchor 0 was converted — anchors 2..5 kept wrapper
+      // coords with letterbox offsets baked in, shifting their crops.)
+      const toVideoCoords = (b) => {
+        const abx = b.x * wrapperW;
+        const aby = b.y * wrapperH;
+        const abw = b.w * wrapperW;
+        const abh = b.h * wrapperH;
+        const vx2 = clamp((abx - bounds.x) / bounds.w, 0, 1);
+        const vy2 = clamp((aby - bounds.y) / bounds.h, 0, 1);
+        return {
+          x: vx2,
+          y: vy2,
+          w: clamp(abw / bounds.w, MIN_BOX_FRAC, 1 - vx2),
+          h: clamp(abh / bounds.h, MIN_BOX_FRAC, 1 - vy2),
+        };
+      };
+      const finalAnchors = allAnchors.map((a, idx) => idx === 0
+        ? { ...a, box: { x: nx, y: ny, w: nw, h: nh } }
+        : { ...a, box: toVideoCoords(a.box) });
 
       ctx.save();
       ctx.fillStyle = "rgba(5, 10, 15, 0.45)";
@@ -1696,7 +1720,13 @@ export default function MarkerStudio({
         videoUrl={videoUrl}
         duration={videoRef.current?.duration || 0}
         onConfirm={handleScoutConfirm}
-        onCancel={() => setScoutOpen(false)}
+        onCancel={() => {
+          // Explicit dismissal — flag it so the auto-open effect can't force
+          // Scout Mode back open (old bug: infinite reopen loop after X).
+          setScoutDismissed(true);
+          setScoutOpen(false);
+          toast.info("Guided mode closed — you're in manual mode. Draw a box around your player, or tap ✕ to exit.", { duration: 5000 });
+        }}
       />
 
       {/* Local keyframes */}

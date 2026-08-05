@@ -15,7 +15,10 @@ import { isPremiumUser } from "@/lib/premium";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
-import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp, ShieldCheck, Clock, FileText, Lightbulb, Play, Maximize2, User, Calendar, Shirt, Hash, Video, Heart, Footprints, TrendingUp, CheckCircle2, Rocket, ZoomIn, ScanSearch, EyeOff, LocateFixed } from "lucide-react";
+import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp, ShieldCheck, Clock, FileText, Lightbulb, Play, Maximize2, User, Calendar, Shirt, Hash, Video, Heart, Footprints, TrendingUp, CheckCircle2, Rocket, ZoomIn, ScanSearch, EyeOff, LocateFixed, Globe, Camera, ChevronsUpDown, X as XIcon } from "lucide-react";
+import { COUNTRIES } from "@/lib/countries";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const LIME = "#ccff00";
 
@@ -57,9 +60,15 @@ export default function UploadPage() {
     preferred_foot: "right",
     current_club: "",
     jersey_number: "",
-    video_type: "highlight",
+    country: "",
+    video_type: "match",
     description: "",
   });
+  // ── Step 3 required player photo (upload OR the locked video image) ──
+  const [playerPhoto, setPlayerPhoto] = useState(null); // { dataUrl } — compressed ≤512px JPEG
+  const [photoSource, setPhotoSource] = useState(null); // 'upload' | 'video_crop'
+  const [countryOpen, setCountryOpen] = useState(false);
+  const photoInputRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
   const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
@@ -89,6 +98,43 @@ export default function UploadPage() {
   const navigate = useNavigate();
 
   const setField = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
+
+  /* ── Player photo helpers — compress to ≤512px JPEG so it's small enough
+     for FormData AND sessionStorage (Google sign-in round trip). ── */
+  const compressPhoto = (f) => new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(f);
+    img.onload = () => {
+      try {
+        const maxSide = 512;
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL("image/jpeg", 0.85));
+      } catch (err) { URL.revokeObjectURL(url); reject(err); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
+    img.src = url;
+  });
+
+  const handlePhotoFile = async (f) => {
+    if (!f) return;
+    if (!/^image\//.test(f.type)) {
+      toast.error("Please choose an image file (JPG, PNG, HEIC…).");
+      return;
+    }
+    try {
+      const dataUrl = await compressPhoto(f);
+      setPlayerPhoto({ dataUrl });
+      setPhotoSource("upload");
+      toast.success("Player photo added.");
+    } catch (_) {
+      toast.error("Couldn't read that image — try another photo.");
+    }
+  };
 
   // Stage 5 — saved players on this account (identity memory) for one-tap pre-fill
   useEffect(() => {
@@ -423,6 +469,25 @@ export default function UploadPage() {
       toast.error("Please fill out all required fields");
       return;
     }
+    if (!form.country) {
+      toast.error("Please select the player's country — it's required.");
+      return;
+    }
+    if (!(photoSource === "video_crop" || (photoSource === "upload" && playerPhoto?.dataUrl))) {
+      toast.error("Please add a player photo — upload one or use the locked video image.");
+      return;
+    }
+    // Category duration rules (client-side fast feedback — backend re-checks)
+    const dur = videoMeta?.duration;
+    const minSec = form.video_type === "match" ? 30 : 15;
+    if (dur && dur < minSec - 0.5) {
+      toast.error(`This category needs at least ${minSec} seconds of video — your clip is ${Math.round(dur)}s. Choose a longer clip or a different category.`, { duration: 8000 });
+      return;
+    }
+    if (dur && dur > 305) {
+      toast.error("Maximum video length is 5 minutes — please trim your clip.");
+      return;
+    }
     if (!user) {
       // Guest — the video is already uploading/uploaded in the background.
       // Creating the account is the LAST step; analysis starts right after.
@@ -440,6 +505,8 @@ export default function UploadPage() {
     const _markerBox = o.markerBox !== undefined ? o.markerBox : markerBox;
     const _markerAnchors = o.markerAnchors !== undefined ? o.markerAnchors : markerAnchors;
     const _form = o.form || form;
+    const _photoSource = o.photoSource !== undefined ? o.photoSource : photoSource;
+    const _playerPhoto = o.playerPhoto !== undefined ? o.playerPhoto : playerPhoto;
 
     setSubmitting(true);
     const fd = new FormData();
@@ -521,6 +588,15 @@ export default function UploadPage() {
     Object.entries(_form).forEach(([k, v]) => {
       if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v));
     });
+    // Required player photo — either an uploaded (compressed) photo or the
+    // locked video image (backend uses the high-quality display crop).
+    if (_photoSource) fd.append("photo_source", _photoSource);
+    if (_photoSource === "upload" && _playerPhoto?.dataUrl) {
+      try {
+        const photoBlob = await (await fetch(_playerPhoto.dataUrl)).blob();
+        fd.append("player_photo", photoBlob, "player-photo.jpg");
+      } catch (_) { /* backend validates */ }
+    }
 
     try {
       setUploadPct(0);
@@ -675,6 +751,8 @@ export default function UploadPage() {
       markerAnchors,
       markerDataUrl,
       form,
+      photoSource,
+      playerPhotoDataUrl: photoSource === "upload" ? playerPhoto?.dataUrl || null : null,
     };
     try {
       sessionStorage.setItem("smp_resume_upload", JSON.stringify(state));
@@ -713,6 +791,10 @@ export default function UploadPage() {
         setMarkerBox(st.markerBox || null);
         setMarkerAnchors(st.markerAnchors || null);
         if (st.form) setForm((prev) => ({ ...prev, ...st.form }));
+        const resumedPhotoSource = st.photoSource || null;
+        const resumedPhoto = st.playerPhotoDataUrl ? { dataUrl: st.playerPhotoDataUrl } : null;
+        if (resumedPhotoSource) setPhotoSource(resumedPhotoSource);
+        if (resumedPhoto) setPlayerPhoto(resumedPhoto);
         let blob = null;
         if (st.markerDataUrl) {
           blob = await (await fetch(st.markerDataUrl)).blob();
@@ -732,6 +814,8 @@ export default function UploadPage() {
           markerBox: st.markerBox || null,
           markerAnchors: st.markerAnchors || null,
           form: st.form || form,
+          photoSource: resumedPhotoSource,
+          playerPhoto: resumedPhoto,
         });
       } catch (_) { /* corrupted resume state — user can submit manually */ }
     })();
@@ -1389,6 +1473,45 @@ export default function UploadPage() {
                       </div>
                     </div>
                     <div>
+                      <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Country <span className="text-forest">*</span></label>
+                      <Popover open={countryOpen} onOpenChange={setCountryOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            data-testid="upload-player-country"
+                            className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-left focus:outline-none focus:border-forest relative flex items-center justify-between"
+                          >
+                            <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
+                            <span className={form.country ? "text-ink" : "text-ink/40"}>
+                              {form.country || "Select country"}
+                            </span>
+                            <ChevronsUpDown className="w-3.5 h-3.5 text-ink/40 shrink-0" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="p-0 w-[260px]" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search country…" data-testid="upload-country-search" />
+                            <CommandList className="max-h-56">
+                              <CommandEmpty>No country found.</CommandEmpty>
+                              <CommandGroup>
+                                {COUNTRIES.map((c) => (
+                                  <CommandItem
+                                    key={c}
+                                    value={c}
+                                    data-testid={`upload-country-item-${c.toLowerCase().replace(/[^a-z]/g, "-")}`}
+                                    onSelect={() => { setField("country", c); setCountryOpen(false); }}
+                                  >
+                                    <Check className={`mr-2 h-4 w-4 ${form.country === c ? "opacity-100 text-forest" : "opacity-0"}`} />
+                                    {c}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div>
                       <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Current club / team</label>
                       <div className="relative">
                         <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink/40 pointer-events-none" />
@@ -1428,21 +1551,86 @@ export default function UploadPage() {
                           data-testid="upload-video-type"
                           className="w-full bg-white border border-gray-border rounded-xl pl-10 pr-3 py-2.5 sm:py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-1 focus:ring-forest"
                         >
-                          <option value="highlight">Highlight reel — best moments from real games</option>
-                          <option value="match">Match clip — live game footage (1v1 / 5v5 / full game)</option>
-                          <option value="training">Training clip — passing rondos, possession drills</option>
-                          <option value="drill">Drills — cones, agility, ball-mastery, technical work</option>
-                          <option value="freestyle">Freestyle — solo ball-juggling / tricks</option>
+                          <option value="match">Match — full match, training match or small-sided game</option>
+                          <option value="skills">Skills &amp; Technical Training — drills, ball mastery, tricks, juggling, shooting</option>
+                          <option value="highlight">Highlights — best moments, multiple matches combined</option>
                         </select>
                       </div>
-                      <p className="mt-1.5 text-[10.5px] text-ink/55 leading-snug">
-                        {form.video_type === "highlight" && "We'll judge game IQ + finishing — best moments only, expect short evidence."}
-                        {form.video_type === "match" && "We'll judge tactical decisions, duels, off-ball runs and game-pace technique."}
-                        {form.video_type === "training" && "We'll judge passing weight, body shape and decision-making vs teammates."}
-                        {form.video_type === "drill" && "We'll judge ball mastery, body shape and rep consistency — NO match-action commentary."}
-                        {form.video_type === "freestyle" && "We'll judge ball control and creativity only — no tactical scoring."}
+                      <p className="mt-1.5 text-[10.5px] text-ink/55 leading-snug" data-testid="upload-video-type-hint">
+                        {form.video_type === "match" && "Live game footage — we'll judge decisions, duels, off-ball runs and game-pace technique. Minimum 30 seconds · maximum 5 minutes."}
+                        {form.video_type === "skills" && "Cone drills, technical exercises, ball mastery, tricks, juggling, passing or shooting practice. Minimum 15 seconds · maximum 5 minutes."}
+                        {form.video_type === "highlight" && "Best moments — can combine several matches. We'll judge game IQ + execution per moment. Minimum 15 seconds · maximum 5 minutes."}
                       </p>
                     </div>
+                  </div>
+
+                  {/* ── Required player photo — upload OR use the locked video image ── */}
+                  <div data-testid="upload-player-photo-section">
+                    <label className="text-[11px] font-bold text-ink/70 block mb-1.5">Player photo <span className="text-forest">*</span></label>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => { handlePhotoFile(e.target.files?.[0]); e.target.value = ""; }}
+                      data-testid="upload-player-photo-input"
+                    />
+                    {photoSource ? (
+                      <div className="rounded-2xl bg-cream-base/70 border border-forest/25 p-3 flex items-center gap-3.5" data-testid="upload-photo-preview">
+                        <img
+                          src={photoSource === "upload" ? playerPhoto?.dataUrl : markerPreviewUrl}
+                          alt="Player"
+                          className="w-14 h-14 rounded-xl object-cover bg-black border border-ink/10 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="flex items-center gap-1.5 text-[13px] font-black text-ink">
+                            <CheckCircle2 className="w-4 h-4 text-forest shrink-0" />
+                            {photoSource === "upload" ? "Photo added" : "Using the locked video image"}
+                          </p>
+                          <p className="text-[11px] text-ink/55 mt-0.5">Shown on the player's report profile.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setPlayerPhoto(null); setPhotoSource(null); }}
+                          data-testid="upload-photo-remove"
+                          className="shrink-0 rounded-xl border border-ink/15 hover:border-forest text-ink/60 hover:text-forest p-2 transition-colors"
+                          aria-label="Remove photo"
+                        >
+                          <XIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => photoInputRef.current?.click()}
+                          data-testid="upload-photo-upload-btn"
+                          className="rounded-2xl border-2 border-dashed border-ink/20 hover:border-forest bg-cream-base/50 px-3 py-3.5 flex items-center justify-center gap-2.5 transition-colors"
+                        >
+                          <Camera className="w-4.5 h-4.5 text-forest shrink-0" />
+                          <span className="text-left">
+                            <span className="block font-barlow font-black uppercase tracking-wide text-[12px] text-ink leading-none">Upload photo</span>
+                            <span className="block text-ink/50 text-[10px] mt-1">From your device</span>
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!markerPreviewUrl) { toast.error("Lock onto your player in step 2 first."); return; }
+                            setPhotoSource("video_crop");
+                            toast.success("We'll use the locked video image as the player photo.");
+                          }}
+                          data-testid="upload-photo-crop-btn"
+                          className={`rounded-2xl border-2 border-dashed px-3 py-3.5 flex items-center justify-center gap-2.5 transition-colors ${markerPreviewUrl ? "border-ink/20 hover:border-forest bg-cream-base/50" : "border-ink/10 bg-cream-base/30 opacity-50"}`}
+                        >
+                          <Crosshair className="w-4.5 h-4.5 text-forest shrink-0" />
+                          <span className="text-left">
+                            <span className="block font-barlow font-black uppercase tracking-wide text-[12px] text-ink leading-none">Use video image</span>
+                            <span className="block text-ink/50 text-[10px] mt-1">Your locked player frame</span>
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div>
