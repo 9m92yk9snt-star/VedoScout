@@ -194,13 +194,32 @@ def build_seo_social_router(*, db: Any, admin_dep: Any):
             raise HTTPException(400, "Please enter a valid email address")
         if await db.newsletter_subscribers.find_one({"email": email}):
             return {"ok": True, "already": True}
+        sub_id = str(uuid.uuid4())
         await db.newsletter_subscribers.insert_one({
-            "id": str(uuid.uuid4()),
+            "id": sub_id,
             "email": email,
             "source": (payload.source or "blog")[:40],
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
+        try:
+            import asyncio as _asyncio
+            from email_service import send_email_async as _send_async
+            from email_templates import _site_url as _su
+            from guide_emails import render_newsletter_welcome_email
+            unsub = f"{_su()}/api/newsletter/unsubscribe/{sub_id}"
+            html, text, subject = render_newsletter_welcome_email(unsub)
+            _asyncio.create_task(_send_async(email, subject, html, text))
+        except Exception:
+            logger.exception("newsletter welcome email failed to queue")
         return {"ok": True}
+
+    @router.get("/newsletter/unsubscribe/{sub_id}")
+    async def newsletter_unsubscribe(sub_id: str):
+        await db.newsletter_subscribers.delete_one({"id": sub_id})
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse("""<html><body style="font-family:Arial;background:#F5F1E8;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+        <div style="text-align:center;"><h2 style="color:#1F4F2F;">You're unsubscribed 👋</h2>
+        <p style="color:#555;">No more weekly letters from us. You're welcome back anytime.</p></div></body></html>""")
 
     @router.get("/admin/newsletter")
     async def admin_newsletter(_=Depends(admin_dep)):

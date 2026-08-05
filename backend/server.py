@@ -11322,6 +11322,7 @@ async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_cur
             ui_mode="embedded",
             mode="payment",
             redirect_on_completion="if_required",
+            allow_promotion_codes=True,
             line_items=[{
                 "price_data": {
                     "currency": PRICE_CURRENCY,
@@ -11397,6 +11398,7 @@ async def embedded_unlock(payload: CheckoutInit, user=Depends(get_current_user))
             ui_mode="embedded",
             mode="payment",
             redirect_on_completion="if_required",
+            allow_promotion_codes=True,
             line_items=[{
                 "price_data": {
                     "currency": PRICE_CURRENCY,
@@ -13153,6 +13155,10 @@ api_router.include_router(build_seo_social_router(db=db, admin_dep=get_current_a
 
 from blog_studio import build_blog_studio_router, blog_studio_weekly_loop
 api_router.include_router(build_blog_studio_router(db=db, admin_dep=get_current_admin))
+from carousel_studio import build_carousel_router
+api_router.include_router(build_carousel_router(db=db, admin_dep=get_current_admin))
+from growth_funnel import build_growth_funnel_router, guide_funnel_loop
+api_router.include_router(build_growth_funnel_router(db=db, admin_dep=get_current_admin, get_single_price=get_current_single_price))
 api_router.include_router(build_url_fetch_router(
     upload_dir=UPLOAD_DIR,
     get_current_user=get_current_user_optional,

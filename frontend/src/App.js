@@ -22,6 +22,7 @@ import PrivacyPage from "@/pages/PrivacyPage";
 import MethodologyPage from "@/pages/MethodologyPage";
 import TermsPage from "@/pages/TermsPage";
 import BlogIndexPage from "@/pages/BlogIndexPage";
+import GuidePage from "@/pages/GuidePage";
 import BlogArticlePage from "@/pages/BlogArticlePage";
 import TrajectoryPage from "@/pages/TrajectoryPage";
 import ScoutsLandingPage from "@/pages/ScoutsLandingPage";
@@ -103,6 +104,7 @@ function AnimatedRoutes() {
         <Route path="/methodology" element={<PageTransition><MethodologyPage /></PageTransition>} />
         <Route path="/terms" element={<PageTransition><TermsPage /></PageTransition>} />
         <Route path="/blog" element={<PageTransition><BlogIndexPage /></PageTransition>} />
+        <Route path="/guide" element={<PageTransition><GuidePage /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogArticlePage /></PageTransition>} />
         <Route path="/scouts" element={<PageTransition><ScoutsLandingPage /></PageTransition>} />
         <Route path="/s/:token" element={<PageTransition><SharedTeaserPage /></PageTransition>} />
