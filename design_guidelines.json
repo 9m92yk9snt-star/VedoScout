@@ -1,77 +1,163 @@
 {
-  "theme": "Light",
-  "archetype": "2 (Performance Pro) - Adapted for Tactical Football Scouting",
-  "domain": "Premium Football Scout Report (SaaS)",
   "typography": {
     "headings": {
-      "family": "Barlow Condensed",
-      "classes": "font-barlow font-black uppercase tracking-tight",
-      "usage": "Section titles, Axis labels, and major numerical callouts."
+      "font": "Barlow Condensed, sans-serif",
+      "weights": ["800", "900"],
+      "transformation": "uppercase",
+      "usage": "Use for all card titles, stats numbers, and primary labels. Ensure tight tracking (`tracking-tight` or `tracking-tighter`) for an athletic, intense feel."
     },
     "body": {
-      "family": "DM Sans",
-      "classes": "font-sans text-base leading-relaxed text-ink/70",
-      "usage": "Descriptions, scout notes, tactical key."
-    },
-    "hierarchy": {
-      "section_header": "text-5xl md:text-6xl text-[#F5F1E8] mb-4 drop-shadow-lg",
-      "axis_labels": "text-xl md:text-2xl text-[#CCFF00] tracking-widest",
-      "scores": "text-3xl md:text-4xl text-[#CCFF00]"
+      "font": "DM Sans, sans-serif",
+      "weights": ["400", "500", "700"],
+      "usage": "Use for descriptions, quotes, and secondary labels. Clean, readable, and human."
     }
   },
   "colors": {
-    "background": "#F5F1E8",
-    "primary": "#1F4F2F",
-    "accent": "#2D6B3D",
-    "highlight": "#CCFF00",
-    "dark": "#0A0F0D",
-    "radar_tiers": {
-      "standard": "stroke-[#F5F1E8]/20",
-      "strong": "stroke-[#F5F1E8]/40",
-      "pro": "stroke-[#2D6B3D]",
-      "elite": "stroke-[#CCFF00]/60"
-    }
+    "brand": {
+      "forest_green_dark": "#12402A",
+      "forest_green_light": "#1F4F2F",
+      "volt_lime": "#CCFF00",
+      "cream": "#FBF9F3",
+      "ink": "#182016",
+      "gold": "#F5C443"
+    },
+    "rules": [
+      "NEVER use pure black (#000000) or fully black backgrounds for the cards. Use forest_green_dark (#12402A) or ink (#182016) tinted with green.",
+      "Volt lime is for high-emphasis data points, icons, or primary CTAs. Do not overuse.",
+      "Cream is for soft, human, breathable backgrounds.",
+      "Gold is used for qualitative accents (e.g., 'superpowers', stars, or premium insights)."
+    ]
   },
-  "layout": {
-    "section_container": "relative w-full max-w-none px-6 py-24 md:py-32 overflow-hidden bg-[#0A0F0D] my-16 rounded-3xl shadow-2xl",
-    "grid_structure": "grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center max-w-7xl mx-auto relative z-10",
-    "left_content": "lg:col-span-4 flex flex-col justify-center",
-    "right_radar": "lg:col-span-8 relative aspect-square w-full max-w-2xl mx-auto"
+  "visual_enhancers": {
+    "depth_and_life": "To prevent cards from feeling flat, use layered elements. Add noise textures, subtle inner glows (`box-shadow: inset 0 0 20px rgba(204,255,0,0.05)`), and overlapping absolute-positioned badges.",
+    "glassmorphism": "Use high-quality glassmorphism for blurred answers/names. Formula: `bg-white/10 backdrop-blur-md border border-white/20` (dark mode) or `bg-[#12402A]/5 backdrop-blur-md border border-[#12402A]/10` (light mode).",
+    "image_overlays": "When using background images, NEVER use flat black overlays. Use gradients: `bg-gradient-to-t from-[#12402A]/90 via-[#12402A]/40 to-transparent`. This preserves the life of the photo while ensuring text readability."
   },
-  "motion_and_interactions": {
-    "radar_entrance": "Framer Motion: `staggerChildren` to draw the axes first, then fade in the reference rings, then animate the player shape.",
-    "shape_draw_in": "Animate the player's polygon path using Framer Motion `initial={{ pathLength: 0, fillOpacity: 0 }} animate={{ pathLength: 1, fillOpacity: 0.25 }}` with an `easeOut` duration of 1.5s.",
-    "rings_shimmer": "Apply a subtle infinite pulse to the 'Elite' and 'Pro' reference rings: `animate={{ opacity: [0.4, 0.8, 0.4] }} transition={{ duration: 4, repeat: Infinity }}`.",
-    "hover_states": "Hovering over a score callout or axis label scales the label up (`scale: 1.1`), brightens the #CCFF00 stroke, and highlights the specific vertex point."
+  "component_name": "SampleReportCarousel",
+  "grids_layouts": {
+    "carousel_container": "flex gap-6 overflow-x-auto snap-x snap-mandatory px-4 md:px-8 pb-12 pt-4 scrollbar-hide",
+    "card_base": "w-[330px] md:w-[380px] min-h-[440px] flex-shrink-0 snap-center rounded-3xl overflow-hidden relative flex flex-col justify-between group",
+    "card_padding": "p-6 md:p-8"
   },
-  "component_instructions": {
-    "radar_implementation": "REPLACE Recharts. Build a custom 4-axis SVG radar using `framer-motion`. A 4-axis radar is mathematically simple (a diamond). This is MANDATORY to achieve the requested cinematic path drawing and precise score positioning.",
-    "score_callouts": "Anchor the 4 scores (Technical, Tactical, Physical, Mental) directly at the poles of the SVG (Top, Right, Bottom, Left) using absolute positioning. Do NOT put them in a separate grid. Format them as bold tactical badges.",
-    "legend_and_tiers": "Design a 'Tactical Key' floating panel (backdrop-blur) in the bottom corner. Do not use standard colored squares. Use dashed line segments that match the SVG strokes for Standard (4), Strong (6), Pro (8), Elite (9.5)."
+  "motion": {
+    "hover": "Apply `group-hover:scale-105` to background images. Add slight Y-axis lift on inner cards/elements during hover.",
+    "active_pulse": "Use `animate-pulse` on locked icons, live dots, or progress bars to make the data feel 'live' and 'current'.",
+    "progress_bars": "Animate width from 0 to actual value using CSS keyframes or transition delays on mount."
   },
   "media": {
-    "background_image": {
-      "url": "https://images.unsplash.com/photo-1706675780107-7c43cc487928?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzN8MHwxfHNlYXJjaHwyfHxmb290YmFsbCUyMHN0YWRpdW0lMjBsaWdodHMlMjBuaWdodHxlbnwwfHx8fDE3ODI4NjYyOTF8MA&ixlib=rb-4.1.0&q=85",
-      "description": "Cinematic night football stadium with floodlights. Used as absolute background for the radar section, heavily overlaid with #0A0F0D (Ink) at 85% opacity to make it a moody, dramatic centerpiece.",
-      "category": "section_background"
-    },
-    "tactical_texture": {
-      "url": "https://images.unsplash.com/photo-1546608235-3310a2494cdf?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHx0YWN0aWNzJTIwYm9hcmQlMjBmb290YmFsbHxlbnwwfHx8fDE3ODI4NjYyOTF8MA&ixlib=rb-4.1.0&q=85",
-      "description": "Tactics board green. Can be used with mix-blend-overlay at 5-10% opacity over the right-side radar container to give it a 'chalkboard' feel.",
-      "category": "texture_overlay"
+    "image_urls": {
+      "golden_hour_silhouette": "https://images.unsplash.com/photo-1494177310973-4841f7d5a882?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHw0fHx5b3V0aCUyMHNvY2NlciUyMGdvbGRlbiUyMGhvdXJ8ZW58MHx8fHwxNzg1OTIxMjc4fDA&ixlib=rb-4.1.0&q=85",
+      "stadium_tunnel_smoke": "https://images.unsplash.com/photo-1679391029864-d46f366a456b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwyfHxzb2NjZXIlMjBzdGFkaXVtJTIwdHVubmVsJTIwbGlnaHR8ZW58MHx8fHwxNzg1OTIxMjc4fDA&ixlib=rb-4.1.0&q=85",
+      "muddy_legs_ball": "https://images.unsplash.com/photo-1630939598999-67d86c7365a5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxzb2NjZXIlMjBwbGF5ZXIlMjBtdWRkeSUyMGJvb3RzfGVufDB8fHx8MTc4NTkyMTI3OHww&ixlib=rb-4.1.0&q=85",
+      "parent_child_foggy": "https://images.unsplash.com/photo-1574772135913-d519461c3996?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxwYXJlbnQlMjBhbmQlMjBjaGlsZCUyMHdhbGtpbmclMjBzb2NjZXIlMjBmaWVsZHxlbnwwfHx8fDE3ODU5MjEyNzh8MA&ixlib=rb-4.1.0&q=85",
+      "stadium_floodlight": "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxzb2NjZXIlMjBzdGFkaXVtJTIwdHVubmVsJTIwbGlnaHR8ZW58MHx8fHwxNzg1OTIxMjc4fDA&ixlib=rb-4.1.0&q=85",
+      "dark_portrait": "https://images.unsplash.com/photo-1600985366045-c20ec2d3298a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMHNvY2NlciUyMHBsYXllciUyMHBvcnRyYWl0JTIwZGFyayUyMGNpbmVtYXRpY3xlbnwwfHx8fDE3ODU5MjEyODR8MA&ixlib=rb-4.1.0&q=85"
     }
   },
+  "cards_structure": [
+    {
+      "id": 1,
+      "title": "Dossier Overview",
+      "theme": "dark",
+      "background": "bg-[#12402A]",
+      "content": "Blurred name pill ('J**** S****'). Huge '8.2' overall rating in Volt Lime. Quote in gold: 'Exceptional scanning before receiving.' Identity-locked trust box at the bottom using glassmorphism.",
+      "vibe": "Exclusive, premium, data-driven."
+    },
+    {
+      "id": 2,
+      "title": "The Four Pillars",
+      "theme": "light",
+      "background": "bg-[#FBF9F3] border border-[#12402A]/10",
+      "content": "4 horizontal progress bars (Technical, Game Intelligence, Physical, Mentality). Use Volt Lime for the fill on a dark green track. Add a glowing dot at the end of each bar.",
+      "vibe": "Analytical but approachable."
+    },
+    {
+      "id": 3,
+      "title": "Superpowers & Focus",
+      "theme": "dark_accent",
+      "background": "bg-[#1F4F2F]",
+      "content": "Split layout. Top: 'SUPERPOWERS' with Volt Lime check icons. Bottom: 'PRIORITY TO TRAIN' on a slightly darker floating card with a target icon. Adds depth.",
+      "vibe": "Actionable, positive, honest."
+    },
+    {
+      "id": 4,
+      "title": "Physical Reality",
+      "theme": "photo",
+      "background_image": "muddy_legs_ball",
+      "overlay": "bg-[#12402A]/70",
+      "content": "Large glowing stats: '24.1 KM/H MAX', '7 SPRINTS'. Includes an SVG dashed path line indicating movement across the card. Feels visceral.",
+      "vibe": "Raw effort, cinematic."
+    },
+    {
+      "id": 5,
+      "title": "Parent Curiosity",
+      "theme": "photo",
+      "background_image": "parent_child_foggy",
+      "overlay": "bg-gradient-to-t from-[#12402A] via-[#12402A]/80 to-[#12402A]/30",
+      "content": "Questions like 'Is he making the right decisions?' fading into blur. A pulsing lock icon in the center with text 'Unlock the full picture'. Sells the experience.",
+      "vibe": "Curiosity, self-discovery, emotional."
+    },
+    {
+      "id": 6,
+      "title": "Honest Answers",
+      "theme": "light",
+      "background": "bg-[#FBF9F3]",
+      "content": "Accordion style rows. Text in Ink. One row expanded: 'How to support without pressure?' -> 'A real scout's advice on sideline behavior.'",
+      "vibe": "Warm, human, educational."
+    },
+    {
+      "id": 7,
+      "title": "90-Day Plan",
+      "theme": "dark",
+      "background": "bg-[#12402A]",
+      "content": "A vertical roadmap/timeline. 3 nodes connected by a Volt Lime dashed line. 'Today', 'Week 4', 'Week 12'.",
+      "vibe": "Future, learning, roadmap."
+    },
+    {
+      "id": 8,
+      "title": "The Road Ahead",
+      "theme": "photo",
+      "background_image": "golden_hour_silhouette",
+      "overlay": "bg-[#1F4F2F]/60 mix-blend-multiply",
+      "content": "Typography heavy. 'THE ROAD AHEAD'. A glowing Gold path graphic. Text: 'From the local pitch to the scout's notebook.' Sells the dream.",
+      "vibe": "Dreams, future, aspirational."
+    },
+    {
+      "id": 9,
+      "title": "Scout Reply",
+      "theme": "light",
+      "background": "bg-[#FBF9F3] shadow-xl shadow-[#12402A]/5",
+      "content": "Chat bubble layout. Human avatar. 'Hi there! I watched your 3 matches. Your scan rate is incredible...' Include a 'Play Voice Note' visual pill.",
+      "vibe": "Human connection, real feedback."
+    },
+    {
+      "id": 10,
+      "title": "Scout Library",
+      "theme": "dark_gradient",
+      "background": "bg-gradient-to-br from-[#12402A] to-[#182016]",
+      "content": "'YOU'VE BEEN SPOTTED'. A glowing map graphic or radar UI. 'A scout from Denmark viewed your profile today.' Pulsing Volt Lime dot.",
+      "vibe": "Excitement, validation."
+    },
+    {
+      "id": 11,
+      "title": "CTA",
+      "theme": "photo",
+      "background_image": "stadium_tunnel_smoke",
+      "overlay": "bg-gradient-to-t from-[#12402A] to-transparent",
+      "content": "Big bold text: 'IT STARTS WITH ONE VIDEO'. Volt Lime button: 'Upload Your Video'.",
+      "vibe": "High energy, conversion."
+    }
+  ],
+  "accessibility": {
+    "contrast": "Ensure text over images has sufficient contrast. Use drop-shadow on text if the image overlay is light.",
+    "testing": "All interactive elements and cards MUST have `data-testid` attributes (e.g., `data-testid='sample-card-dossier'`)."
+  },
   "instructions_to_main_agent": [
-    "In /app/frontend/src/pages/ReportPage.jsx, locate the performance radar block inside the unlocked content (around line 2673).",
-    "Discard the Recharts `<RadarChart>` implementation. It is too rigid for the required cinematic feel.",
-    "Break the container out of the standard card `bg-surface`. Make it a massive dark centerpiece: `bg-ink text-[#F5F1E8] my-16 rounded-3xl overflow-hidden relative`.",
-    "Implement the stadium background image as an absolute positioned layer with object-cover and a heavy dark overlay (`bg-ink/85`).",
-    "Create a grid layout: Left side contains the section title 'Performance Radar' (Barlow, text-6xl, text-white) and the 'Tactical Key' legend. Right side contains the custom SVG radar.",
-    "Build the custom SVG radar with Framer Motion. 4 axes = simple coordinate math (e.g., center is 50%,50%, top is 50%,0%, right is 100%,50%, etc). Scale the 0-10 data to these coordinates.",
-    "Draw the 4 reference rings (Standard 4, Strong 6, Pro 8, Elite 9.5) as dashed SVG paths behind the main shape. Add subtle pulse animation to the Elite ring.",
-    "Draw the player's shape with `stroke='#CCFF00' fill='#CCFF00'` and animate it in using `pathLength: 1`.",
-    "Place the 4 axis labels and scores absolutely at the ends of the axes, utilizing `text-volt` (#CCFF00) for the scores.",
-    "Add hover interactions to the axis labels to highlight the corresponding point on the radar.",
-    "Ensure all new interactive or key elements have `data-testid` attributes."
-  ]
+    "DO NOT CREATE GENERIC CARDS. Implement the specific 11 cards outlined in `cards_structure`.",
+    "Use standard React + Tailwind. No extra heavy libraries inside the cards. Use CSS keyframes for animations (pulse, slide).",
+    "Ensure the carousel container has `snap-x snap-mandatory` and `overflow-x-auto`, while hiding the scrollbar using CSS.",
+    "Strictly follow the color palette. No fully black backgrounds.",
+    "Use Lucide React icons for UI elements (locks, checks, targets, maps)."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": "Do not make generic centered layouts. Create depth through layered design elements with z-index hierarchy. Use glass-morphism effects. Avoid universal transitions (`transition: all`). Never use AI emojis for icons. Use generous spacing."
 }
