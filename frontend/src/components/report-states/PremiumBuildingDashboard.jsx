@@ -14,7 +14,7 @@ import api, { ASSET_BASE } from "@/lib/api";
 const LIME = "#CCFF00";
 const INKG = "#0B1F14";
 
-const STAGES = ["Video Uploaded", "Player Tracked", "Deep Analysis", "Writing Report", "Creating PDF", "Final Check"];
+const STAGES = ["Video Uploaded", "Player Tracked", "Deep Analysis", "Cross-Verifying", "Writing Report", "Final Check"];
 const GAUGES = [
   { label: "Technical", target: 92 },
   { label: "Tactical", target: 85 },

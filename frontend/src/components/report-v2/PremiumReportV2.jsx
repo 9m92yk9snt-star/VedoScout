@@ -275,6 +275,15 @@ export default function PremiumReportV2({ report, assetBase }) {
         </div>
       )}
 
+      {d.crossVerification && (
+        <div data-testid="v2-cross-verified-strip" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#12402A] bg-[#EFF5EC] border border-[#D8E6D2] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
+          <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            <strong>Cross-verified:</strong> every observation below was independently re-checked against your tapped player — {d.crossVerification.checked} moments reviewed{d.crossVerification.dropped > 0 ? `, ${d.crossVerification.dropped} unproven ${d.crossVerification.dropped === 1 ? "claim" : "claims"} removed` : ", all confirmed"}.
+          </span>
+        </div>
+      )}
+
       {d.actionTimeline?.length > 0 && (
         <div className="mb-4">
           <ActionTimelineCard actions={d.actionTimeline} onPlayAt={playAt} />

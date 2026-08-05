@@ -66,3 +66,31 @@ detected type.
 ## Test assets
 /tmp/audit_test_video.webm (20s VP9) — headless-safe. H.264 mp4 does NOT decode in headless Chrome
 (videoReady never true → studio black screen, no user-facing error — known iter60 backlog item).
+
+## FASE 2/3 IMPLEMENTED (same day)
+1. Editor loop FIXED: scoutDismissed state in MarkerStudio (auto-open respects X). Verified in browser.
+2. MANUAL anchors 2..N coordinate conversion FIXED (toVideoCoords in handleDone).
+3. Guided ScoutMode UX: intro coach card (scout-intro-overlay), lock flash (scout-lock-flash),
+   auto zoom-out on confirm, honest boot labels.
+4. Step 3: player photo REQUIRED (upload compressed 512px OR video_crop→display crop), country
+   REQUIRED (searchable combobox, /app/frontend/src/lib/countries.js). Backend 400s enforced.
+5. Categories: match(30s min)/skills(15s)/highlight(15s), max 305s. Backend min-check in
+   analyze_preview_task with refund. Verified: 20s match upload → failed with friendly error.
+6. temperature 0.0 both Gemini call sites. seed NOT supported by proxy (UnsupportedParamsError).
+7. INTELLIGENT DUAL-PASS (cross-verification):
+   - VERIFICATION_PROMPT + _apply_cross_verification + _cross_verify_full_report in server.py
+   - Pass 2 re-watches video, verdicts per timeline claim (identity+event), independent scores
+   - Deterministic merge: drop WRONG_PLAYER/NOT_SEEN, track-window drop (8s), timestamp snap (2s),
+     scores = rounded mean, scores_confidence=low if gap>=3, meta in full_report.cross_verification
+   - Runs in main path AND identity-retry path. Fail-open on error.
+   - UI: PremiumBuildingDashboard stage "Cross-Verifying"; PremiumReportV2 v2-cross-verified-strip
+8. player_photo_url exposed in serializer+status; R2 flush handles photo (reuses display crop URL
+   when photo_source=video_crop).
+
+## Consistency measurements (same 41s video, identical 6 taps, admin uploads)
+- BEFORE (temp 0.2, single pass): A vs B → technical 3 vs 8, ALL 5 scores differed,
+  tier Strong_club vs Pro_academy, timeline narratives contradictory (defensive vs goal-scoring).
+- Reports A=3ad7ef64… B=65d45868… kept for comparison until cleanup.
+- AFTER (temp 0.0 + dual-pass): runs C=c7d76766… D=63caff03… → results pending below.
+- Assets for re-runs: /app/memory/consistency_assets/ (video.mp4, marker.jpg, anchors.json, token).
+- CLEANUP TODO: delete test reports A/B/C/D + MinDur(41d71f82…) via admin, remove assets dir.

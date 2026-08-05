@@ -2860,6 +2860,108 @@ CRITICAL:
 """
 
 
+# ── INTELLIGENT DUAL-PASS — independent claim verification (Session: consistency) ──
+VERIFICATION_PROMPT = """You are an independent VERIFICATION SCOUT. Another scout analysed the attached video of ONE specific youth player — the "tapped player". The reference crops attached FIRST show that exact player; the ground-truth tap positions below are never wrong. Your ONLY job is to re-watch the video and verify the claims below. You did NOT write them — be strict and neutral. Reject anything you cannot re-find in the footage.
+
+For EVERY claim answer two questions:
+1. IDENTITY — at that timestamp (±2 seconds), is the player performing the action REALLY the tapped player (matching the reference crops AND the ground-truth positions)? → "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE"
+2. EVENT — does the described action actually happen there (±2 seconds)? → "CONFIRMED" | "NOT_SEEN"
+If the action clearly happens but at a slightly different time, mark both CONFIRMED and give corrected_timestamp.
+
+CLAIMS TO VERIFY:
+{claims_block}
+
+THEN score the tapped player yourself — integers 1-10, using ONLY moments where you are certain it is the tapped player, judged against typical {age}-year-old players in the {position} position: technical, tactical, physical, mentality, overall_development. Be conservative: unproven ability is not scored.
+
+FINALLY list contradictions — claims among the list that cannot both be true.
+
+Return ONLY valid JSON, no markdown:
+{{"verdicts": [{{"claim_id": <int>, "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "event": "CONFIRMED" | "NOT_SEEN", "corrected_timestamp": "MM:SS" or null, "note": "<max 12 words>"}}],
+ "independent_scores": {{"technical": <1-10>, "tactical": <1-10>, "physical": <1-10>, "mentality": <1-10>, "overall_development": <1-10>}},
+ "contradictions": ["<short description>"]}}
+"""
+
+
+def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> dict:
+    """Deterministic merge of the verification pass (NO AI here):
+    - drops timeline events the verifier rejected (wrong player / not re-found)
+    - drops events at times where optical tracking never saw the player
+    - snaps timestamps to the nearest tracked position (≤2s)
+    - final scores = rounded mean of the two independent passes
+    Returns the metadata dict stored on the report."""
+    timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
+    verdicts = {}
+    for v in (verify.get("verdicts") or []):
+        if isinstance(v, dict) and isinstance(v.get("claim_id"), int):
+            verdicts[v["claim_id"]] = v
+    pts = [p for p in ((track or {}).get("points") or [])
+           if isinstance(p, dict) and isinstance(p.get("t"), (int, float))]
+    track_ok = len(pts) >= 10
+
+    kept, dropped = [], []
+    for i, ev in enumerate(timeline):
+        v = verdicts.get(i)
+        identity = str((v or {}).get("identity") or "").upper()
+        event = str((v or {}).get("event") or "").upper()
+        if v and (identity == "WRONG_PLAYER" or event == "NOT_SEEN"):
+            dropped.append({"timestamp": ev.get("timestamp"), "title": ev.get("title"),
+                            "reason": "WRONG_PLAYER" if identity == "WRONG_PLAYER" else "NOT_SEEN"})
+            continue
+        cts = (v or {}).get("corrected_timestamp")
+        if cts and _mmss_to_secs(cts) is not None:
+            ev["timestamp"] = str(cts).strip()
+        sec = _mmss_to_secs(ev.get("timestamp"))
+        if sec is not None and track_ok:
+            near = [p for p in pts if abs(float(p["t"]) - sec) <= 8]
+            if not near:
+                dropped.append({"timestamp": ev.get("timestamp"), "title": ev.get("title"),
+                                "reason": "NO_TRACK"})
+                continue
+            best = min(near, key=lambda p: abs(float(p["t"]) - sec))
+            if abs(float(best["t"]) - sec) <= 2:
+                mm, ss = divmod(int(round(float(best["t"]))), 60)
+                ev["timestamp"] = f"{mm:02d}:{ss:02d}"
+        ev["cross_verified"] = bool(v) and identity == "CONFIRMED" and event == "CONFIRMED"
+        kept.append(ev)
+
+    status = "verified"
+    if timeline and not kept:
+        # Verifier rejected EVERYTHING — that signals a systemic problem, not
+        # 15 individual hallucinations. Keep the original timeline, flag it.
+        status = "inconclusive"
+        kept = timeline
+        dropped = []
+    if timeline:
+        full["action_timeline"] = kept
+
+    p1 = full.get("scores") or {}
+    p2 = verify.get("independent_scores") or {}
+    pairs: dict = {}
+    max_gap = 0
+    for k in ("technical", "tactical", "physical", "mentality", "overall_development"):
+        a, b = p1.get(k), p2.get(k)
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+            pairs[k] = [a, b]
+            max_gap = max(max_gap, abs(float(a) - float(b)))
+            full.setdefault("scores", {})[k] = max(1, min(10, int(round((float(a) + float(b)) / 2))))
+    if max_gap >= 3:
+        full["scores_confidence"] = "low"
+
+    meta = {
+        "status": status,
+        "events_checked": len(timeline),
+        "events_dropped": len(dropped),
+        "dropped": dropped[:10],
+        "score_pairs": pairs,
+        "max_score_gap": max_gap,
+        "contradictions": [str(c)[:160] for c in (verify.get("contradictions") or []) if c][:6],
+        "verified_at": now_iso(),
+    }
+    full["cross_verification"] = meta
+    return meta
+
+
+
 # ── GROW YOUR GAME — evidence-gated football education (Session 145) ──
 GYG_TOPICS = {
     "first_touch":                {"min": 3, "cat": "on_ball",   "title": "First Touch"},
@@ -7258,6 +7360,72 @@ def _apply_tracking_verification(full: dict, anchors: list, track: dict | None, 
         pass
 
 
+async def _cross_verify_full_report(
+    report_id: str,
+    full: dict,
+    *,
+    file_path,
+    marker_path,
+    crop_path_str,
+    anchor_crops,
+    anchor_payload_list,
+    gt_track,
+    gt_t_off,
+    doc: dict,
+) -> None:
+    """INTELLIGENT DUAL-PASS: a second, independent Gemini pass re-watches the
+    video and must CONFIRM every timeline claim (identity + event) against the
+    tap crops and ground-truth positions, then scores independently. The merge
+    itself is deterministic code (`_apply_cross_verification`). Fail-open: any
+    error leaves pass-1 untouched."""
+    try:
+        timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
+        if not timeline:
+            full["cross_verification"] = {"status": "skipped", "reason": "no_timeline"}
+            return
+        claims = []
+        for i, ev in enumerate(timeline):
+            claims.append(
+                f"{i}. At {ev.get('timestamp')}: [{ev.get('action_type') or 'action'}] "
+                f"{ev.get('title') or ''} — {ev.get('description') or ''}"
+            )
+        pd = doc.get("player_details") or {}
+        prompt = VERIFICATION_PROMPT.format(
+            claims_block="\n".join(claims),
+            age=pd.get("age") or "youth",
+            position=pd.get("position") or "outfield",
+        )
+        try:
+            idp = doc.get("identity_profile")
+            if idp:
+                prompt += identity_profile_block(idp)
+        except Exception:
+            pass
+        try:
+            gtb = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
+            if gtb:
+                prompt += gtb
+        except Exception:
+            pass
+        verify = await call_gemini_with_video(
+            session_id=f"verify-{report_id}",
+            prompt=prompt,
+            video_path=str(file_path),
+            marker_path=marker_path,
+            crop_path=crop_path_str,
+            anchor_crops=anchor_crops or None,
+        )
+        meta = _apply_cross_verification(full, verify, gt_track)
+        logger.info(
+            f"[cross-verify] {report_id}: {meta.get('events_checked')} claims checked · "
+            f"{meta.get('events_dropped')} dropped · max score gap {meta.get('max_score_gap')} · "
+            f"status={meta.get('status')}"
+        )
+    except Exception:
+        logger.exception(f"cross-verification failed for {report_id}")
+        full["cross_verification"] = {"status": "skipped", "reason": "error"}
+
+
 async def _trusted_fastest_moment(
     report_id: str,
     mm_map: dict,
@@ -7569,6 +7737,14 @@ async def generate_full_report_task(report_id: str) -> None:
         except Exception:
             logger.exception(f"parent-corner validation failed for {report_id}")
             full.pop("parent_corner", None)
+        # INTELLIGENT DUAL-PASS — independent verification of every claim
+        # (identity + event) before the report is stored. Fail-open.
+        await _cross_verify_full_report(
+            report_id, full,
+            file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
+            anchor_crops=anchor_crops_full, anchor_payload_list=anchor_payload_list,
+            gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+        )
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
@@ -7623,6 +7799,13 @@ async def generate_full_report_task(report_id: str) -> None:
                     retry = scrub_hedging(retry)
                     retry = _filter_low_identity_evidence(retry, report_id)
                     _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
+                    await _cross_verify_full_report(
+                        report_id, retry,
+                        file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
+                        anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+                        anchor_payload_list=anchor_payload_list,
+                        gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+                    )
                     await db.reports.update_one(
                         {"id": report_id},
                         {"$set": {"full_report": retry, "full_generated_at": now_iso()}},

@@ -296,6 +296,12 @@ export function deriveV2(report) {
     ? "Some moments are shown as text only — an image is displayed only when an independent identity check confirms your player with certainty."
     : null;
 
+  // ---- Cross-verification (intelligent dual-pass trust signal) ----
+  const cvRaw = full.cross_verification;
+  const crossVerification = cvRaw && cvRaw.status === "verified" && (cvRaw.events_checked || 0) > 0
+    ? { checked: cvRaw.events_checked, dropped: cvRaw.events_dropped || 0 }
+    : null;
+
   return {
     playerType: full.player_type || "",
     overall, ageBracket,
@@ -304,6 +310,6 @@ export function deriveV2(report) {
     topStrengths, devPriorities, ageComparison, snapshot, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
     matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
-    parentMetrics, growYourGame, parentCorner,
+    parentMetrics, growYourGame, parentCorner, crossVerification,
   };
 }
