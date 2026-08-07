@@ -515,3 +515,62 @@ def render_discount_campaign_email(name, percent, hours_valid):
         f"Reply to this email to opt out of offers."
     )
     return _wrap_html(inner, preheader), plaintext, subject
+
+
+def render_activation_nudge_email(first, stage: int = 1):
+    """Signed up but never uploaded — warm nudge with filming help.
+    stage 1 = 24h, stage 2 = 72h (last reminder). Returns (html, text, subject)."""
+    hi = f"Hi {first}," if first else "Hi,"
+    upload_url = f"{_site_url()}/upload"
+    guide_url = f"{_site_url()}/guide"
+    if stage == 1:
+        subject = "Your free player analysis is waiting"
+        preheader = "No video yet? Filming this weekend's match takes 2 minutes to get right."
+        headline = "Your free analysis is ready when you are"
+        body_top = (
+            "You created your ScoutMePlay account &mdash; the next step is the fun one: "
+            "upload a short clip of your player and get a free preview of what a professional "
+            "video report sees in their game."
+        )
+        body_mid = (
+            "<strong>No video yet?</strong> No problem. Most parents film at the next match or "
+            "training &mdash; a phone from the sideline is all you need. Our short guide shows "
+            "exactly where to stand and what to capture."
+        )
+    else:
+        subject = "Still here when you're ready — one clip is all it takes"
+        preheader = "A 30-second match clip is enough to start your player's first report."
+        headline = "One short clip &mdash; that&apos;s all it takes"
+        body_top = (
+            "Just a friendly last nudge: your free preview is still waiting. "
+            "A 30-second match clip &mdash; or 15 seconds of skills training &mdash; is enough "
+            "to see what a video report can show you about your player."
+        )
+        body_mid = (
+            "Film this weekend&apos;s match from the sideline, tap your player in the clip, "
+            "and we take it from there. We won&apos;t email you about this again."
+        )
+    inner = f"""
+    <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
+      {headline}
+    </h1>
+    <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">{hi}</p>
+    <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">{body_top}</p>
+    <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">{body_mid}</p>
+    {_btn("Upload your clip", upload_url)}
+    <p style="margin:18px 0 0 0; font-size:13.5px; line-height:1.6; color:#1F2724;">
+      New to filming? <a href="{guide_url}" style="color:#1F4F2F; font-weight:700;">Read the 2-minute filming guide</a>.
+    </p>
+    <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
+      You get this because you created a ScoutMePlay account. If football isn&apos;t on the plan right now, simply ignore this &mdash; we keep your spot ready.
+    </p>
+    """
+    html = _wrap_html(inner, preheader)
+    text = (
+        f"{hi}\n\n"
+        "Your free player analysis is waiting. Upload a short clip (30 seconds of a match "
+        "or 15 seconds of skills training) and see what a professional video report shows "
+        f"about your player.\n\nUpload: {upload_url}\nFilming guide: {guide_url}\n"
+    )
+    return html, text, subject

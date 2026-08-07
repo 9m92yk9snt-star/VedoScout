@@ -70,12 +70,52 @@ def email_enabled() -> bool:
     return _smtp_config() is not None
 
 
+# ── Email log + open tracking (admin visibility) ─────────────────────────────
+_LOG = {"col": None}
+
+
+def enable_email_log(mongo_url: str, db_name: str) -> None:
+    """Called once at startup. Sync pymongo client — send_email runs in
+    executor threads, so sync writes are safe and simple here."""
+    try:
+        from pymongo import MongoClient
+        _LOG["col"] = MongoClient(mongo_url)[db_name]["email_log"]
+        logger.info("email log enabled")
+    except Exception as exc:
+        logger.warning("email log disabled: %s", exc)
+
+
+def _public_site_url() -> str:
+    url = os.environ.get("SITE_PUBLIC_URL") or os.environ.get("FRONTEND_URL")
+    return url.rstrip("/") if url else "https://scoutmeplay.com"
+
+
+def _log_email(log_id: str, to: str, subject: str, category: Optional[str], status: str) -> None:
+    col = _LOG["col"]
+    if col is None:
+        return
+    try:
+        from datetime import datetime, timezone
+        col.insert_one({
+            "id": log_id,
+            "to": (to or "").lower()[:120],
+            "subject": (subject or "")[:200],
+            "category": (category or "other")[:40],
+            "status": status,
+            "ts": datetime.now(timezone.utc),
+            "opened_at": None,
+        })
+    except Exception as exc:
+        logger.warning("email log insert failed: %s", exc)
+
+
 def send_email(
     to: str,
     subject: str,
     html_body: str,
     text_body: Optional[str] = None,
     reply_to: Optional[str] = None,
+    category: Optional[str] = None,
 ) -> bool:
     """Send ONE email synchronously via Gmail SMTP.
 
@@ -90,6 +130,16 @@ def send_email(
     if not to or "@" not in to:
         logger.warning("Skipping email — invalid recipient: %r", to)
         return False
+
+    # open-tracking pixel (best-effort — some clients block remote images)
+    import uuid as _uuid
+    log_id = _uuid.uuid4().hex
+    pixel = (f'<img src="{_public_site_url()}/api/email/open/{log_id}.png" '
+             f'width="1" height="1" style="display:none" alt="">')
+    if "</body>" in html_body:
+        html_body = html_body.replace("</body>", pixel + "</body>", 1)
+    else:
+        html_body = html_body + pixel
 
     msg = EmailMessage()
     msg["From"] = formataddr((cfg["from_name"], cfg["from_email"]))
@@ -107,6 +157,7 @@ def send_email(
             server.login(cfg["user"], cfg["password"])
             server.send_message(msg)
         logger.info("Sent email to %s (subject: %s)", to, subject)
+        _log_email(log_id, to, subject, category, "sent")
         return True
     except smtplib.SMTPAuthenticationError as exc:
         logger.error(
@@ -114,9 +165,11 @@ def send_email(
             "Details: %s",
             exc,
         )
+        _log_email(log_id, to, subject, category, "failed")
         return False
     except (smtplib.SMTPException, OSError) as exc:
         logger.error("SMTP failure sending to %s: %s", to, exc)
+        _log_email(log_id, to, subject, category, "failed")
         return False
 
 
@@ -126,13 +179,14 @@ async def send_email_async(
     html_body: str,
     text_body: Optional[str] = None,
     reply_to: Optional[str] = None,
+    category: Optional[str] = None,
 ) -> bool:
     """Non-blocking wrapper — runs the sync send in a thread executor so it
     can be awaited from FastAPI endpoints without blocking the event loop."""
     return await asyncio.get_running_loop().run_in_executor(
         None,
         send_email,
-        to, subject, html_body, text_body, reply_to,
+        to, subject, html_body, text_body, reply_to, category,
     )
 
 

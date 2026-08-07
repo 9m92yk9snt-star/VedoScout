@@ -18,7 +18,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin, Volleyball } from "lucide-react";
+import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin, Volleyball, FileText } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
@@ -271,6 +271,13 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             >
               <PlayCircle className="w-4 h-4" /> How it works
             </a>
+            <Link
+              to="/sample-report"
+              data-testid="hero-sample-report-cta"
+              className="inline-flex items-center justify-center gap-2 text-forest hover:text-ink font-barlow font-black uppercase tracking-[0.18em] text-sm border-2 border-forest/40 hover:border-ink/40 px-7 py-4 transition-colors w-full sm:w-auto"
+            >
+              <FileText className="w-4 h-4" /> See a sample report
+            </Link>
           </motion.div>
 
           {/* Trust line + sign-in nudge */}

@@ -28,6 +28,7 @@ import TrajectoryPage from "@/pages/TrajectoryPage";
 import ScoutsLandingPage from "@/pages/ScoutsLandingPage";
 import SharedTeaserPage from "@/pages/SharedTeaserPage";
 import PlayersDatabasePage from "@/pages/PlayersDatabasePage";
+import DemoReportPage from "@/pages/DemoReportPage";
 import AuthCallback from "@/components/auth/AuthCallback";
 import CookieBanner from "@/components/CookieBanner";
 import MobileBottomTabs from "@/components/MobileBottomTabs";
@@ -106,6 +107,7 @@ function AnimatedRoutes() {
         <Route path="/terms" element={<PageTransition><TermsPage /></PageTransition>} />
         <Route path="/blog" element={<PageTransition><BlogIndexPage /></PageTransition>} />
         <Route path="/guide" element={<PageTransition><GuidePage /></PageTransition>} />
+        <Route path="/sample-report" element={<PageTransition><DemoReportPage /></PageTransition>} />
         <Route path="/blog/:slug" element={<PageTransition><BlogArticlePage /></PageTransition>} />
         <Route path="/scouts" element={<PageTransition><ScoutsLandingPage /></PageTransition>} />
         <Route path="/s/:token" element={<PageTransition><SharedTeaserPage /></PageTransition>} />

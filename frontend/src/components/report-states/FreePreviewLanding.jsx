@@ -320,6 +320,56 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
         {/* ── The Path — dream roadmap teaser ── */}
         <DreamPathTeaser playerName={pd.player_name} onUnlock={scrollToPackages} />
 
+        {/* ── The full report, section by section (locked) ── */}
+        <div className="bg-white rounded-2xl border border-[#E9E4D5] p-5 mt-4 shadow-sm" data-testid="fpl-locked-sections">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5C7A00] mb-1">Locked in {pFirst ? `${pFirst}'s` : "the"} full report</p>
+          <h3 className="font-black text-ink text-lg uppercase tracking-tight mb-4">Everything waiting inside — section by section</h3>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
+            {[
+              [Zap, "Action timeline — every involvement, timestamped"],
+              [Star, "25 skill ratings across 4 categories"],
+              [BarChart3, "Level benchmark + realistic next step"],
+              [Map, "12-month development roadmap"],
+              [ClipboardList, "Weekly training plan with 5 drills"],
+              [Brain, "Grow Your Game — video-proven lessons"],
+              [Users, "Parents' package: watch-together guide + car-ride tips"],
+              [MessageSquare, "Personal letter written to your player"],
+              [Target, "3 printable next-match missions"],
+              [FileText, "Coach notes for their trainer"],
+            ].map(([Icon, label], i) => (
+              <div key={i} className="flex items-center gap-3" data-testid={`fpl-locked-section-${i}`}>
+                <span className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[#E9E4D5] flex items-center justify-center shrink-0">
+                  <Icon className="w-3.5 h-3.5 text-[#5C7A00]" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12.5px] font-bold text-ink/85 leading-tight truncate">{label}</p>
+                  <div className="mt-1 h-2 rounded bg-gradient-to-r from-ink/15 to-ink/5 blur-[2.5px] select-none" aria-hidden />
+                </div>
+                <Lock className="w-3.5 h-3.5 text-ink/30 shrink-0" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 flex flex-col sm:flex-row items-center gap-3">
+            <button
+              type="button"
+              onClick={scrollToPackages}
+              data-testid="fpl-locked-sections-unlock"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-ink text-white font-black text-[12px] uppercase tracking-wider px-6 py-3.5 rounded-xl hover:bg-[#1F4F2F] transition-colors"
+            >
+              Unlock the full report <ChevronRight className="w-4 h-4" />
+            </button>
+            <a
+              href="/sample-report"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="fpl-locked-sections-sample"
+              className="text-[12px] font-bold text-[#1F4F2F] underline underline-offset-2 hover:text-ink"
+            >
+              Curious? See a full sample report first
+            </a>
+          </div>
+        </div>
+
         {/* ── You've only seen 10% ── */}
         <div className="bg-white rounded-2xl border border-[#E9E4D5] p-5 mt-4 flex flex-col sm:flex-row items-center gap-5 shadow-sm" data-testid="fpl-seen-ring">
           <div className="relative w-24 h-24 flex-shrink-0">

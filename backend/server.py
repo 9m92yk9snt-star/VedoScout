@@ -6795,6 +6795,15 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
     return out
 
 
+@api_router.get("/demo-report")
+async def get_demo_report():
+    """Public sample report (fictional player) — powers /sample-report."""
+    doc = await db.reports.find_one({"id": "demo-sample-report", "demo": True})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Demo report not available")
+    return await _serialize_report(doc, include_full=True)
+
+
 @api_router.get("/reports/{report_id}")
 async def get_report(report_id: str, user=Depends(get_current_user)):
     doc = await db.reports.find_one({"id": report_id}, {"_id": 0})
@@ -10696,7 +10705,8 @@ async def admin_deactivate_campaign(campaign_id: str, _=Depends(get_current_admi
 @api_router.post("/admin/conversion-sweep")
 async def admin_run_conversion_sweep(dry_run: bool = True, _=Depends(get_current_admin)):
     results = await conversion_sweep(db, get_current_single_price, dry_run=dry_run)
-    return {"dry_run": dry_run, "results": results}
+    activation = await activation_sweep(db, dry_run=dry_run)
+    return {"dry_run": dry_run, "results": results, "activation": activation}
 
 
 # ============== PAYMENTS (STRIPE) ==============
@@ -13371,6 +13381,7 @@ from growth import (
     get_auto_discount_percent,
     growth_emails_enabled,
     conversion_sweep,
+    activation_sweep,
     conversion_loop,
 )
 from share_teaser import ensure_teaser_cards
@@ -13430,6 +13441,10 @@ from growth_funnel import build_growth_funnel_router, guide_funnel_loop
 api_router.include_router(build_growth_funnel_router(db=db, admin_dep=get_current_admin, get_single_price=get_current_single_price))
 from analytics_tracking import build_analytics_router
 api_router.include_router(build_analytics_router(db=db, admin_dep=get_current_admin))
+from email_log import build_email_log_router
+api_router.include_router(build_email_log_router(db=db, admin_dep=get_current_admin))
+from email_service import enable_email_log
+enable_email_log(os.environ["MONGO_URL"], os.environ["DB_NAME"])
 from instagram_publish import build_instagram_router
 api_router.include_router(build_instagram_router(db=db, admin_dep=get_current_admin))
 api_router.include_router(build_url_fetch_router(

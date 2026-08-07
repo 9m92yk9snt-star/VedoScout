@@ -105,7 +105,7 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
                 if sm and sm.get("discovery"):
                     if not dry_run:
                         html, text, subject = render_conv_discovery_email(first, report_url)
-                        if await send_email_async(email, subject, html, text):
+                        if await send_email_async(email, subject, html, text, category="conversion"):
                             await db.reports.update_one(
                                 {"id": doc["id"]}, {"$set": {"conv_mail3_sent_at": now.isoformat()}})
                     results.append({"report_id": doc["id"], "mail": "discovery_72h", "to": email})
@@ -122,7 +122,7 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
                 if not dry_run:
                     html, text, subject = render_conv_discount_email(
                         first, report_url, pct, base, discounted_price(base, disc), hours=48)
-                    if await send_email_async(email, subject, html, text):
+                    if await send_email_async(email, subject, html, text, category="conversion"):
                         await db.reports.update_one(
                             {"id": doc["id"]},
                             {"$set": {"discount": disc, "conv_mail2_sent_at": now.isoformat()}})
@@ -136,7 +136,7 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
                 if not dry_run:
                     html, text, subject = render_conv_waiting_email(
                         first, total, unlocked.get("label"), unlocked.get("score"), report_url)
-                    if await send_email_async(email, subject, html, text):
+                    if await send_email_async(email, subject, html, text, category="conversion"):
                         await db.reports.update_one(
                             {"id": doc["id"]}, {"$set": {"conv_mail1_sent_at": now.isoformat()}})
                 results.append({"report_id": doc["id"], "mail": "waiting_24h", "to": email, "numbers": total})
@@ -177,13 +177,61 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
         try:
             if not dry_run:
                 html, text, subject = render_abandoned_checkout_email(first, resume_url)
-                if await send_email_async(email, subject, html, text):
+                if await send_email_async(email, subject, html, text, category="abandoned_checkout"):
                     await db.payment_transactions.update_one(
                         {"id": txn["id"]}, {"$set": {"abandon_mail_sent_at": now.isoformat()}})
             results.append({"txn_id": txn["id"], "mail": "abandoned_checkout", "to": email})
         except Exception:
             logger.exception("[conversion] abandoned-checkout mail failed for txn %s", txn.get("id"))
 
+    return results
+
+
+# ── Activation sweep — signed up but never uploaded (24h + 72h nudges) ──────
+async def activation_sweep(db, dry_run: bool = False) -> list:
+    """Users who created an account but never uploaded a video.
+    24h: warm 'your free analysis is waiting + how to film' nudge.
+    72h: last friendly reminder. Flags on the user doc = sent at most once."""
+    if not email_enabled() and not dry_run:
+        return []
+    from email_templates import render_activation_nudge_email
+    now = _now()
+    results = []
+    cur = db.users.find({
+        "role": {"$nin": ["admin", "scout"]},
+        "activation_mail2_sent_at": {"$exists": False},
+    }).sort("created_at", -1).limit(200)
+    async for u in cur:
+        email = (u.get("email") or "").lower()
+        created = _parse_iso(u.get("created_at"))
+        if not email or "@" not in email or email.endswith("@example.com") or not created:
+            continue
+        age_h = (now - created).total_seconds() / 3600.0
+        if age_h < 24 or age_h > MAX_AGE_HOURS:
+            continue
+        if await db.reports.count_documents({"user_id": u.get("id")}, limit=1):
+            continue
+        first = str(u.get("full_name") or u.get("name") or "").split(" ")[0] or None
+        try:
+            mail1_at = _parse_iso(u.get("activation_mail1_sent_at"))
+            if age_h >= 72 and mail1_at:
+                if (now - mail1_at).total_seconds() < 24 * 3600:
+                    continue
+                if not dry_run:
+                    html, text, subject = render_activation_nudge_email(first, stage=2)
+                    if await send_email_async(email, subject, html, text, category="activation"):
+                        await db.users.update_one(
+                            {"id": u["id"]}, {"$set": {"activation_mail2_sent_at": now.isoformat()}})
+                results.append({"user_id": u.get("id"), "mail": "activation_72h", "to": email})
+            elif not u.get("activation_mail1_sent_at"):
+                if not dry_run:
+                    html, text, subject = render_activation_nudge_email(first, stage=1)
+                    if await send_email_async(email, subject, html, text, category="activation"):
+                        await db.users.update_one(
+                            {"id": u["id"]}, {"$set": {"activation_mail1_sent_at": now.isoformat()}})
+                results.append({"user_id": u.get("id"), "mail": "activation_24h", "to": email})
+        except Exception:
+            logger.exception("[activation] mail failed for user %s", u.get("id"))
     return results
 
 
@@ -195,6 +243,9 @@ async def conversion_loop(db, get_single_price):
                 sent = await conversion_sweep(db, get_single_price)
                 if sent:
                     logger.info("[conversion] processed %d item(s)", len(sent))
+                acts = await activation_sweep(db)
+                if acts:
+                    logger.info("[activation] processed %d item(s)", len(acts))
         except Exception:
             logger.exception("[conversion] sweep crashed")
         await asyncio.sleep(15 * 60)

@@ -43,6 +43,100 @@ function StatusPill({ status }) {
   );
 }
 
+/* ── Sent log — every outgoing email + open tracking ───────────────────── */
+function EmailSentLog() {
+  const [data, setData] = useState(null);
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const load = (query = q) => {
+    api.get(`/admin/email-log?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`)
+      .then(({ data }) => setData(data))
+      .catch(() => setData({ items: [], total: 0, opened: 0 }));
+  };
+  useEffect(() => { if (open) load(); }, [open]); // eslint-disable-line
+
+  const fmt = (iso) => {
+    try { const d = new Date(iso); return `${d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`; }
+    catch { return String(iso).slice(0, 16); }
+  };
+
+  return (
+    <div className="border border-gray-border bg-white p-4" data-testid="email-sent-log">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        data-testid="email-sent-log-toggle"
+        className="w-full flex items-center justify-between gap-3"
+      >
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-forest" />
+          <span className="text-[11px] uppercase tracking-[0.2em] font-black text-ink/70">Sent log — who received &amp; opened what</span>
+        </div>
+        <span className="text-[11px] font-bold text-ink/45">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && load()}
+              placeholder="Search by recipient email…"
+              data-testid="email-log-search"
+              className="flex-1 min-w-[200px] border border-gray-border px-3 py-2 text-[13px] focus:outline-none focus:border-forest"
+            />
+            <button type="button" onClick={() => load()} data-testid="email-log-search-btn"
+              className="px-4 py-2 text-[11px] font-black uppercase tracking-wider bg-ink text-white hover:bg-forest transition-colors">
+              Search
+            </button>
+            {data && (
+              <span className="text-[11.5px] text-ink/55" data-testid="email-log-stats">
+                {data.total} sent · {data.opened} opened{data.total ? ` (${Math.round((data.opened / data.total) * 100)}%)` : ""}
+              </span>
+            )}
+          </div>
+          <p className="text-[10.5px] text-ink/40 mb-2">
+            "Opened" uses an invisible tracking pixel — never 100% exact (Apple Mail &amp; some Gmail setups block or pre-load images), but a reliable engagement signal.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-ink/45 text-left border-b border-gray-border">
+                  <th className="py-2 pr-2">Sent</th><th className="pr-2">To</th><th className="pr-2">Category</th><th className="pr-2">Subject</th><th className="pr-2">Status</th><th>Opened</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.items || []).map((m) => (
+                  <tr key={m.id} className="border-b border-gray-border/60 text-ink/80" data-testid={`email-log-row-${m.id}`}>
+                    <td className="py-2 pr-2 whitespace-nowrap text-ink/55">{fmt(m.ts)}</td>
+                    <td className="pr-2">{m.to}</td>
+                    <td className="pr-2"><span className="px-1.5 py-0.5 bg-forest/8 text-forest font-bold text-[10.5px] uppercase">{m.category}</span></td>
+                    <td className="pr-2 max-w-[240px] truncate">{m.subject}</td>
+                    <td className="pr-2">
+                      {m.status === "sent"
+                        ? <span className="text-forest font-bold">sent</span>
+                        : <span className="text-red-500 font-bold">failed</span>}
+                    </td>
+                    <td>
+                      {m.opened_at
+                        ? <span className="text-forest font-black">✓ {fmt(m.opened_at)}</span>
+                        : <span className="text-ink/35">—</span>}
+                    </td>
+                  </tr>
+                ))}
+                {data && !data.items.length && (
+                  <tr><td colSpan={6} className="py-4 text-ink/45">No emails logged yet — the log starts with the next email sent.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmailAdmin() {
   const [smtpEnabled, setSmtpEnabled] = useState(true);
   const [smtpNote, setSmtpNote] = useState(null);
@@ -197,6 +291,9 @@ export default function EmailAdmin() {
           <RefreshCw className="w-3 h-3" /> Refresh
         </button>
       </div>
+
+      {/* Sent log — every outgoing email with open tracking */}
+      <EmailSentLog />
 
       {/* SMTP status banner */}
       {smtpEnabled ? (
