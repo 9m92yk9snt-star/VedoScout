@@ -47,7 +47,7 @@ function StatusPill({ status }) {
 function EmailSentLog() {
   const [data, setData] = useState(null);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const load = (query = q) => {
     api.get(`/admin/email-log?limit=100${query ? `&q=${encodeURIComponent(query)}` : ""}`)
