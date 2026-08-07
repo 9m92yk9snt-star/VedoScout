@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { trackSignUp } from "@/lib/pixels";
+import { trackFunnel } from "@/lib/analytics";
 import SEO from "@/components/SEO";
 import { Mail, Lock, User, Eye, EyeOff, UserPlus, ArrowRight, CheckCircle2 } from "lucide-react";
 import {
@@ -49,6 +50,7 @@ export default function Signup() {
     try {
       await signup(email, password, fullName, honeypot);
       trackSignUp();
+      trackFunnel("signup");
       toast.success("Account created. Let's upload your video.");
       navigate(resolvedNext || "/upload");
     } catch (err) {

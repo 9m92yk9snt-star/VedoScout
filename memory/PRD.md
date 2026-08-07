@@ -3168,3 +3168,20 @@ Full report now ~+60-70% LLM cost (second video pass). Preview unchanged. seed p
 ### Known small backlog
 - Admin dashboard "latest report" widget shows retry-404 card for stale legacy failed reports (cosmetic, pre-existing).
 - Old category values (training/drill/freestyle) still exist on historical reports — display-only, harmless.
+
+## 2026-08-07 — First-Party Analytics & Funnel Tracking (user-approved, built + self-tested E2E)
+Context: Meta ads deliver cheap registrations (7.34 kr) but no sales — user needs visibility into where visitors drop off. Built cookie-less first-party analytics into admin.
+### Backend (/app/backend/analytics_tracking.py, mounted in server.py)
+- POST /api/track (public): batched events {sid, device, events[]} — types pageview/leave/click/funnel. Caps: 25 events/batch, string limits, /admin paths ignored. No cookies/IPs/fingerprints; anonymous sessionStorage sid; TTL 180 days (indexes: ts TTL, type+ts, sid+ts).
+- GET /api/admin/analytics/overview?days=N (admin): daily series (visitors/pageviews/signups/paid), conversion funnel (Visitors→Signups→Upload started→Player tapped→Analysis submitted→Preview viewed→Checkout started→Paid, % of prev step), top pages (+avg time/scroll from leave events), exit pages (last pageview per session), top CTA clicks (data-testid names), UTM campaigns (fbclid fallback → "facebook-click"), devices, blog readership, landing scroll/time.
+- Signups counted from users collection, Paid from payment_transactions (payment_status=paid) — zero-touch on auth/payment code.
+### Frontend
+- /app/frontend/src/lib/analytics.js: sid in sessionStorage, UTM captured once/session, route pageviews + leave (seconds + max scroll) via App.js AnimatedRoutes, global click capture ONLY on elements with data-testid, batch flush 8s / sendBeacon on pagehide.
+- Funnel hooks: UploadPage (upload_started in handleFile, player_tapped in handleStudioConfirm, analysis_submitted post-upload), ReportPage (preview_viewed once via previewTrackedRef, checkout_started before /payments/checkout), Signup.jsx + AccountGateModal (signup).
+- Admin tab "Analytics" (AdminPage, id=analytics) → /app/frontend/src/components/admin/AnalyticsDashboard.jsx: recharts daily AreaChart, funnel bars with drop-off % (red <30%), top pages/exits/clicks/campaigns/devices/blog cards, 7/14/30/90d ranges. Light-theme colors (admin page is cream — dark-theme classes were fixed via sed).
+### Tested (self, E2E)
+- curl: /api/track stores events; overview aggregates all sections correctly; 401 without admin.
+- Real browser session with ?utm_source=meta-test → counted as visitor; admin tab screenshot verified readable.
+- Synthetic test events deleted afterwards. NOTE: preview DB only — production data will populate after deploy.
+### Conversion backlog (user has full text plan in chat, not built yet)
+P1: activation emails (registered-no-upload 24/72h), "no video yet?" flow, clickable demo report on landing, preview paywall teaser (blurred locked sections) + first-report discount deadline, abandoned checkout email, dedicated ad landing page, Meta pixel retargeting events.

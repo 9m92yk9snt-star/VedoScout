@@ -15,6 +15,7 @@ import { isPremiumUser } from "@/lib/premium";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
+import { trackFunnel } from "@/lib/analytics";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp, ShieldCheck, Clock, FileText, Lightbulb, Play, Maximize2, User, Calendar, Shirt, Hash, Video, Heart, Footprints, TrendingUp, CheckCircle2, Rocket, ZoomIn, ScanSearch, EyeOff, LocateFixed, Globe, Camera, ChevronsUpDown, X as XIcon } from "lucide-react";
 import { COUNTRIES } from "@/lib/countries";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -292,6 +293,7 @@ export default function UploadPage() {
     if (markerPreviewUrl) URL.revokeObjectURL(markerPreviewUrl);
     setFile(f);
     setVideoUrl(URL.createObjectURL(f));
+    trackFunnel("upload_started");
     setMarkerBlob(null);
     setMarkerPreviewUrl(null);
     setMarkerTimestamp(0);
@@ -376,6 +378,7 @@ export default function UploadPage() {
     setMarkerBox(nbox || null);
     setMarkerAnchors(anchors && anchors.length ? anchors : null);
     setStudioOpen(false);
+    trackFunnel("player_tapped");
     const count = anchors?.length || 1;
     toast.success(
       count > 1
@@ -620,6 +623,7 @@ export default function UploadPage() {
       // status === "ready" (success) or "failed" (rejected/error).
       let finalData = data;
       reportIdRef.current = data?.id || null;
+      if (data?.id) trackFunnel("analysis_submitted");
       if (data?.analysis_status === "analyzing") {
         const start = Date.now();
         const MAX_WAIT_MS = 10 * 60 * 1000; // 10 minute hard ceiling

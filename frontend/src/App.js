@@ -32,6 +32,7 @@ import AuthCallback from "@/components/auth/AuthCallback";
 import CookieBanner from "@/components/CookieBanner";
 import MobileBottomTabs from "@/components/MobileBottomTabs";
 import { initPixels, trackPageView } from "@/lib/pixels";
+import { initAnalytics, analyticsPageView } from "@/lib/analytics";
 import BackgroundAnalysisTracker from "@/components/BackgroundAnalysisTracker";
 
 function RequireAuth({ children, adminOnly = false }) {
@@ -77,8 +78,8 @@ function LandingRoute() {
    AnimatePresence detects the change. */
 function AnimatedRoutes() {
   const location = useLocation();
-  useEffect(() => { initPixels(); }, []);
-  useEffect(() => { trackPageView(); }, [location.pathname]);
+  useEffect(() => { initPixels(); initAnalytics(); }, []);
+  useEffect(() => { trackPageView(); analyticsPageView(location.pathname); }, [location.pathname]);
   // Emergent Google OAuth callback — must run BEFORE any protected route.
   // Synchronous render-time check on useLocation().hash (per playbook).
   if (location.hash && location.hash.includes("session_id=")) {

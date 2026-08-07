@@ -24,9 +24,11 @@ import TickerAdmin from "@/components/admin/TickerAdmin";
 import SeoAdmin from "@/components/admin/SeoAdmin";
 import SocialFollowAdmin from "@/components/admin/SocialFollowAdmin";
 import { MarketingAdmin } from "@/components/admin/MarketingAdmin";
+import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
+  { id: "analytics", label: "Analytics", role: "admin" },
   { id: "growth", label: "Growth", role: "admin" },
   { id: "marketing", label: "Marketing", role: "admin" },
   { id: "ticker", label: "Ticker", role: "admin" },
@@ -453,6 +455,8 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+
+              {activeTab === "analytics" && <AnalyticsDashboard />}
 
               {activeTab === "growth" && <GrowthAdmin />}
 

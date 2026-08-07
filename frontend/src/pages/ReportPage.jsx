@@ -15,6 +15,7 @@ import { PillarIcon, AnimatedScore, SkillMeter, MomentCard, PitchDecoration } fr
 import PerformanceRadarHero from "@/components/report/PerformanceRadarHero";
 import SkillsBreakdown from "@/components/report/SkillsBreakdown";
 import api, { ASSET_BASE } from "@/lib/api";
+import { trackFunnel } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import {
   Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles, IdCard,
@@ -1620,6 +1621,7 @@ export default function ReportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [report, setReport] = useState(null);
+  const previewTrackedRef = useRef(false);
   const [price, setPrice] = useState(1);
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
@@ -1677,6 +1679,10 @@ export default function ReportPage() {
         api.get("/settings/price"),
       ]);
       setReport(r.data);
+      if (r.data?.preview && !r.data?.is_paid && !previewTrackedRef.current) {
+        previewTrackedRef.current = true;
+        trackFunnel("preview_viewed");
+      }
       setPrice(Number(p.data.single_price) || p.data.price);
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Failed to load report");
@@ -1851,6 +1857,7 @@ export default function ReportPage() {
     }
 
     setCheckoutModal({ open: true, state: "preparing", errorMessage: null });
+    trackFunnel("checkout_started");
     try {
       const { data } = await api.post("/payments/checkout", {
         report_id: id,

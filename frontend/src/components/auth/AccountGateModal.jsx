@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { trackSignUp } from "@/lib/pixels";
+import { trackFunnel } from "@/lib/analytics";
 import { Mail, Lock, Eye, EyeOff, UserPlus, LogIn, ShieldCheck, X, CheckCircle2, Loader2 } from "lucide-react";
 import { AuthInput, GoogleButton, OrDivider } from "@/components/auth/AuthShell";
 import { PASSWORD_RULES } from "@/pages/Signup";
@@ -39,6 +40,7 @@ export default function AccountGateModal({ open, onClose, onAuthed, onGoogleRedi
     try {
       if (tab === "signup") {
         await signup(email, password, deriveName(email), "");
+        trackFunnel("signup");
         trackSignUp();
         toast.success("Account created — starting your analysis now.");
       } else {
