@@ -523,6 +523,7 @@ def render_activation_nudge_email(first, stage: int = 1):
     hi = f"Hi {first}," if first else "Hi,"
     upload_url = f"{_site_url()}/upload"
     guide_url = f"{_site_url()}/guide"
+    sample_url = f"{_site_url()}/sample-report"
     if stage == 1:
         subject = "Your free player analysis is waiting"
         preheader = "No video yet? Filming this weekend's match takes 2 minutes to get right."
@@ -560,6 +561,11 @@ def render_activation_nudge_email(first, stage: int = 1):
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">{body_mid}</p>
     {_btn("Upload your clip", upload_url)}
     <p style="margin:18px 0 0 0; font-size:13.5px; line-height:1.6; color:#1F2724;">
+      Curious what the report actually looks like?
+      <a href="{sample_url}" style="color:#1F4F2F; font-weight:700;">See a complete sample report</a>
+      &mdash; every score, every insight, exactly what your family receives.
+    </p>
+    <p style="margin:12px 0 0 0; font-size:13.5px; line-height:1.6; color:#1F2724;">
       New to filming? <a href="{guide_url}" style="color:#1F4F2F; font-weight:700;">Read the 2-minute filming guide</a>.
     </p>
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
@@ -571,6 +577,6 @@ def render_activation_nudge_email(first, stage: int = 1):
         f"{hi}\n\n"
         "Your free player analysis is waiting. Upload a short clip (30 seconds of a match "
         "or 15 seconds of skills training) and see what a professional video report shows "
-        f"about your player.\n\nUpload: {upload_url}\nFilming guide: {guide_url}\n"
+        f"about your player.\n\nUpload: {upload_url}\nSee a complete sample report: {sample_url}\nFilming guide: {guide_url}\n"
     )
     return html, text, subject

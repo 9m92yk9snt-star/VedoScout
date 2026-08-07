@@ -1,5 +1,10 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 8, 2026) — DEMO-LINK I AKTIVERINGS-MAILS + KOMPAKTE PRIS-KORT PÅ MOBIL ✅ (self-tested: unit test + mobil/desktop screenshots)
+- **1. Demo i emails** (`email_templates.py render_activation_nudge_email`): begge stadier (24h+72h) har nu "See a complete sample report" link → `{site}/sample-report` i HTML + plaintext. Linket bliver automatisk klik-tracket (rewrite-laget fra Aug 7). Unit-testet begge stadier.
+- **2. Pris-kort (DreamPricingTiers.jsx — delt på landing/LandingMinimal/ReportPage/Dashboard/FreePreviewLanding)**: mobil-komprimering via `md:`-prefikser — INTET fjernet/skjult, desktop (≥768px) 100% uændret. Mobil: titel 27→21px, tagline 13.5→12.5, billede h-44→h-28, plan-navn 20→17px, pris 46→38px (discount 42→36), features space-y-3→2 + 13→12.5px + check-cirkler 20→18px, CTA mt-7→5 py-3.5→3, body-padding reduceret, TrustStrip mt-7→5/ikoner 9→8, wrapper py-6→4 px-4→3. RESULTAT: kort-højde ~880→700px = HELE kortet inkl. CTA-knap synligt på én telefon-skærm (390×844). Verificeret: mobil-screenshots (fuldt free-kort m. Start Here synlig) + desktop 1440 regression (4 kolonner uændret).
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Session (Aug 7, 2026 — part 2) — PROD BLOG FIX + STRIPE PRIS-SYNC + EMAIL KLIK-TRACKING ✅ (self-tested: rigtig Stripe, rigtig LLM+image-gen, curl+screenshots)
 - **User (prod-bugs)**: (1) blog tom på scoutmeplay.com + genererede artikler viser intet, (2) prisændringer i admin opdaterer IKKE Stripe (checkout opkræver gammelt beløb), (3) ønske: klik-tracking i emails.
 - **1. BLOG (root cause: `uploads/blog/` er git-ignoreret → covers deployes aldrig; artikler lå kun i preview-DB → prod-DB tom; Blog Studio lavede kun kladder uden cover)**:

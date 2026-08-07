@@ -138,17 +138,17 @@ const TIERS = {
 
 function FeatureRow({ label, ok, t }) {
   return (
-    <li className="flex items-start gap-2.5">
+    <li className="flex items-start gap-2 md:gap-2.5">
       <span
         aria-hidden
-        className="shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center"
+        className="shrink-0 mt-0.5 w-[18px] h-[18px] md:w-5 md:h-5 rounded-full flex items-center justify-center"
         style={{ background: ok ? t.check.on : t.check.off }}
       >
         {ok
           ? <Check className="w-3 h-3" style={{ color: t.check.onIcon }} strokeWidth={3.2} />
           : <X className="w-3 h-3" style={{ color: t.check.offIcon }} strokeWidth={3} />}
       </span>
-      <span className={`text-[13px] leading-snug ${ok ? t.check.text : t.check.textOff}`}>{label}</span>
+      <span className={`text-[12.5px] md:text-[13px] leading-snug ${ok ? t.check.text : t.check.textOff}`}>{label}</span>
     </li>
   );
 }
@@ -162,17 +162,17 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
     <article data-testid={testid} className="relative flex flex-col rounded-[22px] overflow-hidden snap-center shrink-0 w-[82vw] max-w-[320px] sm:w-[46%] sm:max-w-none lg:w-auto lg:shrink" style={{ ...t.cardStyle, transform: "translateZ(0)", WebkitBackfaceVisibility: "hidden" }}>
       {/* ── Header: icon + emotive title + tagline + atmosphere image ── */}
       <div className="relative">
-        <div className="pt-7 px-5 text-center relative z-10">
-          <TIcon className="w-6 h-6 mx-auto" style={{ color: t.titleLines[t.titleLines.length - 1][1] }} strokeWidth={2} />
-          <h3 className="mt-3 font-barlow font-black uppercase text-[27px] leading-[0.92] tracking-tight">
+        <div className="pt-5 md:pt-7 px-5 text-center relative z-10">
+          <TIcon className="w-5 h-5 md:w-6 md:h-6 mx-auto" style={{ color: t.titleLines[t.titleLines.length - 1][1] }} strokeWidth={2} />
+          <h3 className="mt-2 md:mt-3 font-barlow font-black uppercase text-[21px] md:text-[27px] leading-[0.92] tracking-tight">
             {t.titleLines.map(([txt, col]) => (
               <span key={txt} className="block" style={{ color: col }}>{txt}</span>
             ))}
           </h3>
-          <p className={`mt-3 text-[13.5px] leading-snug max-w-[210px] mx-auto ${t.taglineCls}`}>{t.tagline}</p>
+          <p className={`mt-2 md:mt-3 text-[12.5px] md:text-[13.5px] leading-snug max-w-[210px] mx-auto ${t.taglineCls}`}>{t.tagline}</p>
         </div>
         <div
-          className="relative mt-4 h-44 md:h-48"
+          className="relative mt-3 md:mt-4 h-28 md:h-48"
           style={{ clipPath: "polygon(0 0, 100% 0, 100% calc(100% - 13px), 56% calc(100% - 13px), 50% 100%, 44% calc(100% - 13px), 0 calc(100% - 13px))" }}
         >
           <img
@@ -198,14 +198,14 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
       </div>
 
       {/* ── Body: plan name, price, features, CTA ── */}
-      <div className="px-5 pt-6 pb-6 flex flex-col flex-1">
-        <div className={`text-center font-barlow font-black uppercase text-[20px] tracking-wide ${t.nameCls}`}>{t.name}</div>
+      <div className="px-4 md:px-5 pt-4 md:pt-6 pb-4 md:pb-6 flex flex-col flex-1">
+        <div className={`text-center font-barlow font-black uppercase text-[17px] md:text-[20px] tracking-wide ${t.nameCls}`}>{t.name}</div>
 
         {tier === "single" && discount?.discounted != null ? (
-          <div className="text-center mt-1.5">
+          <div className="text-center mt-1 md:mt-1.5">
             <span className="text-lg font-bold line-through opacity-40" style={{ color: "#16281C" }}>{priceParts(singleFull).main}{priceParts(singleFull).dec}</span>
-            <span className={`ml-2 font-barlow font-black text-[42px] leading-none ${t.priceCls}`} data-testid="paywall-discounted-price">
-              {priceParts(discount.discounted).main}<span className="text-[26px]">{priceParts(discount.discounted).dec}</span>
+            <span className={`ml-2 font-barlow font-black text-[36px] md:text-[42px] leading-none ${t.priceCls}`} data-testid="paywall-discounted-price">
+              {priceParts(discount.discounted).main}<span className="text-[22px] md:text-[26px]">{priceParts(discount.discounted).dec}</span>
             </span>
             <div className="mt-2">
               <span className="inline-block text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full" style={{ background: "#CCFF00", color: "#12211A" }} data-testid="paywall-discount-chip">
@@ -214,15 +214,15 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
             </div>
           </div>
         ) : (
-          <div className="text-center mt-1.5">
-            <span className={`font-barlow font-black text-[46px] leading-none ${t.priceCls}`}>
-              {p.main}<span className="text-[28px]">{p.dec}</span>
+          <div className="text-center mt-1 md:mt-1.5">
+            <span className={`font-barlow font-black text-[38px] md:text-[46px] leading-none ${t.priceCls}`}>
+              {p.main}<span className="text-[24px] md:text-[28px]">{p.dec}</span>
             </span>
           </div>
         )}
-        <div className={`text-center mt-1.5 text-[11px] uppercase tracking-[0.24em] font-bold ${t.periodCls}`}>{period}</div>
+        <div className={`text-center mt-1 md:mt-1.5 text-[10.5px] md:text-[11px] uppercase tracking-[0.24em] font-bold ${t.periodCls}`}>{period}</div>
 
-        <ul className="mt-6 space-y-3 flex-1">
+        <ul className="mt-4 md:mt-6 space-y-2 md:space-y-3 flex-1">
           {t.features.map((f) => <FeatureRow key={f.label} {...f} t={t} />)}
         </ul>
 
@@ -231,7 +231,7 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
           onClick={onCta}
           disabled={loading || disabled}
           data-testid={ctaTestid}
-          className={`mt-7 w-full rounded-lg font-barlow font-black uppercase tracking-[0.16em] text-[13px] py-3.5 flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-wait ${t.ctaCls}`}
+          className={`mt-5 md:mt-7 w-full rounded-lg font-barlow font-black uppercase tracking-[0.16em] text-[13px] py-3 md:py-3.5 flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-wait ${t.ctaCls}`}
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
             <>
@@ -255,13 +255,13 @@ function TrustStrip() {
     { icon: Gem, color: "#B98A2E", text: ["Maximum exposure.", "Maximum opportunity."] },
   ];
   return (
-    <div className="mt-7 pt-6 border-t border-[#12402A26] grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4" data-testid="dream-pricing-trust">
+    <div className="mt-5 md:mt-7 pt-4 md:pt-6 border-t border-[#12402A26] grid grid-cols-2 lg:grid-cols-4 gap-x-3 md:gap-x-4 gap-y-3 md:gap-y-4" data-testid="dream-pricing-trust">
       {items.map(({ icon: Icon, color, text }, i) => (
-        <div key={i} className="flex items-center gap-3 justify-center lg:justify-start">
-          <span className="shrink-0 w-9 h-9 rounded-lg border flex items-center justify-center bg-white/60" style={{ borderColor: `${color}55` }}>
+        <div key={i} className="flex items-center gap-2.5 md:gap-3 justify-center lg:justify-start">
+          <span className="shrink-0 w-8 h-8 md:w-9 md:h-9 rounded-lg border flex items-center justify-center bg-white/60" style={{ borderColor: `${color}55` }}>
             <Icon className="w-4 h-4" style={{ color }} strokeWidth={2} />
           </span>
-          <span className="text-[12px] leading-snug text-[#3D4A38] font-semibold">
+          <span className="text-[11px] md:text-[12px] leading-snug text-[#3D4A38] font-semibold">
             {text[0]}<br />{text[1]}
           </span>
         </div>
@@ -348,7 +348,7 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   };
 
   return (
-    <div data-testid="dream-pricing-tiers" className="rounded-[26px] px-4 sm:px-6 py-6 md:py-8" style={{ background: "linear-gradient(170deg, #F3EFE1 0%, #E9E4D0 100%)", border: "1px solid rgba(18,64,42,0.16)", boxShadow: "0 18px 44px -22px rgba(18,64,42,0.35)" }}>
+    <div data-testid="dream-pricing-tiers" className="rounded-[22px] md:rounded-[26px] px-3 sm:px-6 py-4 md:py-8" style={{ background: "linear-gradient(170deg, #F3EFE1 0%, #E9E4D0 100%)", border: "1px solid rgba(18,64,42,0.16)", boxShadow: "0 18px 44px -22px rgba(18,64,42,0.35)" }}>
       <div className="relative">
         <div ref={trackRef} onScroll={updateEdge} className="flex lg:grid lg:grid-cols-4 gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory scroll-smooth pb-2 lg:pb-0 items-stretch smp-dream-scroll" style={{ scrollbarWidth: "none", msOverflowStyle: "none", overscrollBehaviorX: "contain", WebkitOverflowScrolling: "touch", transform: "translateZ(0)" }}>
         <TierCard
@@ -390,7 +390,7 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
           <ChevronRight className="w-5 h-5" style={{ color: "#F5C443", animation: edge.end ? "none" : "smp-arrow-nudge-r 1.1s ease-in-out infinite" }} />
         </button>
       </div>
-      <p className="lg:hidden mt-3 text-center text-[10px] uppercase tracking-[0.22em] font-bold text-[#12402A66]">
+      <p className="lg:hidden mt-2 text-center text-[10px] uppercase tracking-[0.22em] font-bold text-[#12402A66]">
         Swipe to compare all plans →
       </p>
       <TrustStrip />
