@@ -12756,15 +12756,71 @@ async def admin_update_pricing(payload: PricingUpdate, _=Depends(get_current_adm
     # Alias the two extra-report keys to the shorter public names expected by the frontend
     snap["premium_extra_price"] = snap.pop("premium_extra_report_price")
     snap["vip_extra_price"] = snap.pop("vip_extra_report_price")
+
+    # ── Stripe sync: recurring Prices are immutable, so we create a NEW Price
+    # on the same Product at the new amount, archive the old one, and point the
+    # settings cache at the new price_id. New subscriptions checkout at the new
+    # amount immediately; existing subscribers keep the price they signed up at.
+    stripe_synced: list[str] = []
+    stripe_sync_error: Optional[str] = None
+    if stripe_sync_required:
+        if not _embedded_ready():
+            stripe_sync_error = "Stripe keys missing — checkout still charges the previous amount"
+        else:
+            _arm_real_stripe()
+            for tier, key in (("premium", "premium_price"), ("vip", "vip_price")):
+                if not any(k == key for k, _ in updates):
+                    continue
+                new_amount = snap[key]
+                settings_key = f"stripe_subscription_{tier}"
+                try:
+                    cached = ((await db.settings.find_one({"key": settings_key}, {"_id": 0})) or {}).get("value") or {}
+                    if cached.get("price_id") and abs(float(cached.get("amount") or 0) - new_amount) < 0.005:
+                        continue  # Stripe already at this amount
+                    product_id = cached.get("product_id")
+                    if not product_id:
+                        conf = SUBSCRIPTION_TIERS[tier]
+                        product = stripe_sdk.Product.create(
+                            name=conf["name"], description=conf["description"],
+                            metadata={**_SCOUTMEPLAY_METADATA, "tier": tier, "tier_kind": "subscription"},
+                        )
+                        product_id = product.id
+                    price = stripe_sdk.Price.create(
+                        unit_amount=int(round(new_amount * 100)),
+                        currency=PRICE_CURRENCY,
+                        recurring={"interval": "month"},
+                        product=product_id,
+                        metadata={"tier": tier},
+                    )
+                    old_price_id = cached.get("price_id")
+                    if old_price_id:
+                        try:
+                            stripe_sdk.Price.modify(old_price_id, active=False)
+                        except Exception:
+                            logger.warning("Could not archive old Stripe price %s", old_price_id)
+                    await db.settings.update_one(
+                        {"key": settings_key},
+                        {"$set": {"key": settings_key, "value": {
+                            "product_id": product_id, "price_id": price.id,
+                            "amount": new_amount, "currency": PRICE_CURRENCY,
+                        }, "updated_at": now}},
+                        upsert=True,
+                    )
+                    stripe_synced.append(tier)
+                    logger.info("Stripe price synced: %s → %s ($%s/mo)", tier, price.id, new_amount)
+                except Exception as e:
+                    logger.exception("Stripe price sync failed for tier %s", tier)
+                    stripe_sync_error = f"{tier}: {str(e)[:160]}"
+
     return {
         **snap,
         "currency": PRICE_CURRENCY,
-        "stripe_sync_required": stripe_sync_required,
+        "stripe_synced": stripe_synced,
+        "stripe_sync_error": stripe_sync_error,
         "note": (
-            "Premium/VIP subscription changes update the displayed price on the website immediately. "
-            "Stripe subscription Price IDs are immutable, so the actual checkout amount "
-            "stays at the originally configured value until the Stripe Prices are re-created."
-        ) if stripe_sync_required else None,
+            "New Stripe monthly price created — all NEW subscriptions charge the new amount. "
+            "Existing subscribers keep the price they signed up at."
+        ) if stripe_synced else None,
     }
 
 
@@ -13608,6 +13664,15 @@ async def on_startup():
         await _ensure_scout_access_products()
     except Exception:
         logger.exception("Scout-access product provisioning failed on startup (will retry lazily)")
+
+    # Blog bootstrap — restores bundled cover images into the (git-ignored)
+    # uploads dir and seeds the launch articles into fresh databases so the
+    # production blog is never empty.
+    try:
+        from blog_seed import ensure_blog_seed
+        await ensure_blog_seed(db)
+    except Exception:
+        logger.exception("Blog seed failed (non-fatal)")
 
     # ── Session 131 — analysis pipeline watchdog ──
     # ROOT CAUSE FIX for "stuck at step 4" recurrence: `background.add_task`

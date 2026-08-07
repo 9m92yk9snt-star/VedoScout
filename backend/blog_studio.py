@@ -1,8 +1,12 @@
-"""Blog Studio — warm-tone article generator (creates DRAFTS) + weekly auto-draft loop."""
+"""Blog Studio — warm-tone article generator (draft or instant publish) + weekly auto-draft loop.
+Every generated article also gets a photorealistic cover image (Gemini image model)
+in the same style as the launch covers."""
 
 from __future__ import annotations
 
 import asyncio
+import base64
+import io
 import logging
 import os
 import re
@@ -14,7 +18,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
-from blog_routes import now_iso, slugify, make_excerpt, reading_time_min
+from blog_routes import UPLOAD_DIR, now_iso, slugify, make_excerpt, reading_time_min
 
 load_dotenv()
 logger = logging.getLogger("blog_studio")
@@ -29,6 +33,14 @@ Voice rules (non-negotiable):
 - NEVER use the standalone word "AI". Never use the word "percentile". If you reference the product's analysis, call it "ScoutMe Pro Intelligence" or simply "the report".
 - Practical over abstract: give parents and players things they can actually do this week.
 - Short paragraphs. Concrete examples. British-neutral English."""
+
+COVER_STYLE = (
+    "Photorealistic editorial photograph for a youth football journal. "
+    "Grassroots football setting, warm golden-hour natural light, shallow depth of field, "
+    "authentic candid documentary feel — real kids, parents or coaches on real local pitches, "
+    "muddy boots, worn goals, sideline moments. Landscape composition. "
+    "Absolutely no text, no lettering, no logos, no watermarks in the image."
+)
 
 
 def _user_prompt(topic: str, keyword: str, existing: list) -> str:
@@ -63,7 +75,52 @@ CATEGORY: <one of: Training | Scouting Tips | Parent's Guide | Pro Player Path>
 <markdown body>"""
 
 
-async def _generate_article(db: Any, topic: str = "", keyword: str = "") -> dict:
+async def _generate_cover(slug: str, title: str, category: str) -> str | None:
+    """Generates a style-matched cover photo. Returns the public URL or None.
+    Never raises — a missing cover must not block the article."""
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from PIL import Image
+
+        chat = LlmChat(
+            api_key=os.environ["EMERGENT_LLM_KEY"],
+            session_id=f"blog-cover-{uuid.uuid4().hex[:8]}",
+            system_message="You generate photorealistic images.",
+        )
+        chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+        msg = UserMessage(
+            text=f"{COVER_STYLE}\n\nArticle title: \"{title}\" (category: {category}). "
+                 "Create ONE cover photograph that captures the article's emotional core."
+        )
+        _text, images = await chat.send_message_multimodal_response(msg)
+        if not images:
+            logger.warning("cover generation returned no image for %s", slug)
+            return None
+
+        raw = base64.b64decode(images[0]["data"])
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        if img.width > 1600:
+            img = img.resize((1600, int(img.height * 1600 / img.width)), Image.LANCZOS)
+        fname = f"gen-cover-{slug[:60]}.jpg"
+        out_path = UPLOAD_DIR / fname
+        img.save(out_path, "JPEG", quality=86)
+        url = f"/api/blog/uploads/{fname}"
+
+        # Flush to R2 so the cover survives redeploys (uploads/ dir is ephemeral).
+        try:
+            import r2_storage
+            if r2_storage.is_configured():
+                await asyncio.to_thread(r2_storage.upload_file, f"blog/{fname}", out_path, "image/jpeg")
+                url = f"/api/media/blog/{fname}"
+        except Exception:
+            logger.warning("blog cover R2 flush failed for %s (using local URL)", fname, exc_info=True)
+        return url
+    except Exception:
+        logger.exception("cover generation failed for %s", slug)
+        return None
+
+
+async def _generate_article(db: Any, topic: str = "", keyword: str = "", publish: bool = False) -> dict:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
 
     existing = []
@@ -99,6 +156,9 @@ async def _generate_article(db: Any, topic: str = "", keyword: str = "") -> dict
     slug = f"{slugify(title)[:70]}-{uuid.uuid4().hex[:4]}"
     now = now_iso()
     excerpt = make_excerpt(body_md)
+
+    cover_url = await _generate_cover(slug, title, category)
+
     doc = {
         "id": str(uuid.uuid4()),
         "slug": slug,
@@ -106,13 +166,13 @@ async def _generate_article(db: Any, topic: str = "", keyword: str = "") -> dict
         "subtitle": grab("SUBTITLE") or None,
         "content_md": body_md,
         "excerpt": excerpt,
-        "cover_image_url": None,
+        "cover_image_url": cover_url,
         "cover_image_alt": title,
         "category": category,
         "tags": keywords[:4],
         "author_name": "ScoutMePlay Editorial",
-        "status": "draft",
-        "published_at": None,
+        "status": "published" if publish else "draft",
+        "published_at": now if publish else None,
         "meta_title": (grab("META_TITLE") or title)[:70],
         "meta_description": (grab("META_DESCRIPTION") or excerpt)[:160],
         "meta_keywords": keywords,
@@ -122,12 +182,14 @@ async def _generate_article(db: Any, topic: str = "", keyword: str = "") -> dict
         "updated_at": now,
     }
     await db.blog_posts.insert_one(doc)
-    return {"post_id": doc["id"], "slug": slug, "title": title, "category": category}
+    return {"post_id": doc["id"], "slug": slug, "title": title, "category": category,
+            "status": doc["status"], "cover_image_url": cover_url}
 
 
 class GenerateRequest(BaseModel):
     topic: str = Field(default="", max_length=200)
     keyword: str = Field(default="", max_length=100)
+    publish_now: bool = False
 
 
 class StudioConfig(BaseModel):
@@ -137,9 +199,9 @@ class StudioConfig(BaseModel):
 def build_blog_studio_router(*, db: Any, admin_dep: Any):
     router = APIRouter(prefix="/blog-studio", tags=["blog-studio"])
 
-    async def _run_job(job_id: str, topic: str, keyword: str):
+    async def _run_job(job_id: str, topic: str, keyword: str, publish: bool):
         try:
-            result = await _generate_article(db, topic, keyword)
+            result = await _generate_article(db, topic, keyword, publish=publish)
             await db.blog_studio_jobs.update_one(
                 {"id": job_id},
                 {"$set": {"status": "done", **result, "finished_at": now_iso()}},
@@ -153,9 +215,10 @@ def build_blog_studio_router(*, db: Any, admin_dep: Any):
 
     @router.post("/generate")
     async def generate(payload: GenerateRequest, _=Depends(admin_dep)):
-        job = {"id": str(uuid.uuid4()), "status": "running", "topic": payload.topic, "keyword": payload.keyword, "created_at": now_iso()}
+        job = {"id": str(uuid.uuid4()), "status": "running", "topic": payload.topic,
+               "keyword": payload.keyword, "publish_now": payload.publish_now, "created_at": now_iso()}
         await db.blog_studio_jobs.insert_one(job)
-        asyncio.create_task(_run_job(job["id"], payload.topic, payload.keyword))
+        asyncio.create_task(_run_job(job["id"], payload.topic, payload.keyword, payload.publish_now))
         return {"job_id": job["id"], "status": "running"}
 
     @router.get("/jobs")

@@ -109,6 +109,22 @@ def _log_email(log_id: str, to: str, subject: str, category: Optional[str], stat
         logger.warning("email log insert failed: %s", exc)
 
 
+def _track_links(html: str, log_id: str) -> str:
+    """Rewrites every http(s) link through /api/email/click/{log_id} so clicks
+    are measurable. The click endpoint only redirects to our own domains."""
+    import re
+    from urllib.parse import quote
+    base = f"{_public_site_url()}/api/email/click/{log_id}"
+
+    def _sub(m):
+        url = m.group(2)
+        if "/api/email/" in url:
+            return m.group(0)
+        return f'{m.group(1)}{base}?u={quote(url, safe="")}{m.group(3)}'
+
+    return re.sub(r'(href=")(https?://[^"]+)(")', _sub, html or "")
+
+
 def send_email(
     to: str,
     subject: str,
@@ -140,6 +156,8 @@ def send_email(
         html_body = html_body.replace("</body>", pixel + "</body>", 1)
     else:
         html_body = html_body + pixel
+    # click tracking — every link becomes measurable via /api/email/click/{id}
+    html_body = _track_links(html_body, log_id)
 
     msg = EmailMessage()
     msg["From"] = formataddr((cfg["from_name"], cfg["from_email"]))

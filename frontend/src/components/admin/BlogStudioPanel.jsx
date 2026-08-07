@@ -1,12 +1,13 @@
-// BlogStudioPanel — warm-tone one-click article generator + weekly auto-draft toggle.
+// BlogStudioPanel — warm-tone article generator (with auto cover photo) + weekly auto-draft toggle.
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { PenLine, Loader2, X, CalendarClock, Sparkles } from "lucide-react";
+import { PenLine, Loader2, X, CalendarClock, Sparkles, ImageIcon } from "lucide-react";
 import api from "@/lib/api";
 
 export default function BlogStudioPanel({ onClose, onSaved }) {
   const [topic, setTopic] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [publishNow, setPublishNow] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [autoWeekly, setAutoWeekly] = useState(false);
   const [lastAutoAt, setLastAutoAt] = useState(null);
@@ -37,9 +38,13 @@ export default function BlogStudioPanel({ onClose, onSaved }) {
   const generate = async () => {
     setGenerating(true);
     try {
-      const { data } = await api.post("/blog-studio/generate", { topic: topic.trim(), keyword: keyword.trim() });
+      const { data } = await api.post("/blog-studio/generate", {
+        topic: topic.trim(),
+        keyword: keyword.trim(),
+        publish_now: publishNow,
+      });
       const jobId = data.job_id;
-      toast.info("Writing your article in the ScoutMePlay voice — this takes ~1 minute…");
+      toast.info("Writing your article + creating a cover photo — this takes ~2 minutes…");
       pollRef.current = setInterval(async () => {
         try {
           const r = await api.get("/blog-studio/jobs");
@@ -48,7 +53,9 @@ export default function BlogStudioPanel({ onClose, onSaved }) {
           clearInterval(pollRef.current);
           setGenerating(false);
           if (job.status === "done") {
-            toast.success(`Draft ready: "${job.title}" — review it in the list and publish when happy`);
+            toast.success(job.publish_now
+              ? `Published live: "${job.title}" — it's on the blog and front page now`
+              : `Draft ready: "${job.title}" — review it in the list and publish when happy`);
             setTopic(""); setKeyword("");
             onSaved?.();
           } else {
@@ -75,9 +82,10 @@ export default function BlogStudioPanel({ onClose, onSaved }) {
         </button>
       </div>
 
-      <p className="text-sm text-ink/70 mb-4">
-        One click writes a complete article in the same warm, human ScoutMePlay tone as the rest of the platform.
-        It is always saved as a <b>draft</b> — nothing goes live without you.
+      <p className="text-sm text-ink/70 mb-4 flex items-center gap-1.5 flex-wrap">
+        One click writes a complete article in the warm ScoutMePlay tone
+        <ImageIcon className="w-3.5 h-3.5 text-forest inline" />
+        <span>and creates a matching realistic cover photo automatically.</span>
       </p>
 
       <div className="grid md:grid-cols-[1fr_240px_auto] gap-2">
@@ -106,13 +114,26 @@ export default function BlogStudioPanel({ onClose, onSaved }) {
         </button>
       </div>
 
+      <label className="mt-3 flex items-center gap-2.5 cursor-pointer select-none w-fit" data-testid="blog-studio-publish-now">
+        <input
+          type="checkbox"
+          checked={publishNow}
+          onChange={(e) => setPublishNow(e.target.checked)}
+          className="w-4 h-4 accent-[#1F4F2F]"
+        />
+        <span className="text-sm text-ink/80">
+          <b>Publish immediately</b> — the article goes live on the blog and front page as soon as it's ready.
+          Untick to save it as a draft for review first.
+        </span>
+      </label>
+
       <div className="mt-5 pt-4 border-t border-forest/20 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2.5">
           <CalendarClock className="w-4 h-4 text-forest" />
           <div>
             <div className="text-sm font-bold text-ink">Weekly auto-draft</div>
             <div className="text-xs text-ink/55">
-              Every week a new draft appears here for your review.
+              Every week a new draft (with cover) appears here for your review.
               {lastAutoAt && <> Last: {lastAutoAt.split("T")[0]}</>}
             </div>
           </div>

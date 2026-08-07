@@ -92,18 +92,18 @@ function EmailSentLog() {
             </button>
             {data && (
               <span className="text-[11.5px] text-ink/55" data-testid="email-log-stats">
-                {data.total} sent · {data.opened} opened{data.total ? ` (${Math.round((data.opened / data.total) * 100)}%)` : ""}
+                {data.total} sent · {data.opened} opened · {data.clicked ?? 0} clicked{data.total ? ` (${Math.round(((data.clicked ?? 0) / data.total) * 100)}% CTR)` : ""}
               </span>
             )}
           </div>
           <p className="text-[10.5px] text-ink/40 mb-2">
-            "Opened" uses an invisible tracking pixel — never 100% exact (Apple Mail &amp; some Gmail setups block or pre-load images), but a reliable engagement signal.
+            "Opened" uses an invisible tracking pixel — never 100% exact (Apple Mail &amp; some Gmail setups block or pre-load images). "Clicked" is exact — every link in our emails is measured.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="text-ink/45 text-left border-b border-gray-border">
-                  <th className="py-2 pr-2">Sent</th><th className="pr-2">To</th><th className="pr-2">Category</th><th className="pr-2">Subject</th><th className="pr-2">Status</th><th>Opened</th>
+                  <th className="py-2 pr-2">Sent</th><th className="pr-2">To</th><th className="pr-2">Category</th><th className="pr-2">Subject</th><th className="pr-2">Status</th><th className="pr-2">Opened</th><th>Clicked</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,15 +118,20 @@ function EmailSentLog() {
                         ? <span className="text-forest font-bold">sent</span>
                         : <span className="text-red-500 font-bold">failed</span>}
                     </td>
-                    <td>
+                    <td className="pr-2">
                       {m.opened_at
                         ? <span className="text-forest font-black">✓ {fmt(m.opened_at)}</span>
+                        : <span className="text-ink/35">—</span>}
+                    </td>
+                    <td>
+                      {m.clicked_at
+                        ? <span className="text-forest font-black" data-testid={`email-log-clicked-${m.id}`}>✓ {fmt(m.clicked_at)}</span>
                         : <span className="text-ink/35">—</span>}
                     </td>
                   </tr>
                 ))}
                 {data && !data.items.length && (
-                  <tr><td colSpan={6} className="py-4 text-ink/45">No emails logged yet — the log starts with the next email sent.</td></tr>
+                  <tr><td colSpan={7} className="py-4 text-ink/45">No emails logged yet — the log starts with the next email sent.</td></tr>
                 )}
               </tbody>
             </table>

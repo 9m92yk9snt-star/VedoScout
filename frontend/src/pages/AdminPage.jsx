@@ -86,7 +86,7 @@ export default function AdminPage() {
   const [tierPrices, setTierPrices] = useState({ single: 129, premium: 29.99, vip: 49.99, premiumExtra: 89, vipExtra: 59 });
   const [tierInputs, setTierInputs] = useState({ single: "129", premium: "29.99", vip: "49.99", premiumExtra: "89", vipExtra: "59" });
   const [savingTierPrices, setSavingTierPrices] = useState(false);
-  const [stripeSyncWarning, setStripeSyncWarning] = useState(false);
+  const [stripeSyncWarning, setStripeSyncWarning] = useState(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -249,8 +249,12 @@ export default function AdminPage() {
         premiumExtra: Number(data.premium_extra_price) || pe,
         vipExtra:     Number(data.vip_extra_price)     || ve,
       });
-      setStripeSyncWarning(!!data.stripe_sync_required);
-      toast.success("Plan pricing saved — site updates immediately");
+      setStripeSyncWarning(data.stripe_sync_error || null);
+      if (data.stripe_synced?.length) {
+        toast.success(`Prices saved — Stripe updated for ${data.stripe_synced.join(" + ")}. New subscribers pay the new amount.`);
+      } else {
+        toast.success("Plan pricing saved — site updates immediately");
+      }
     } catch (err) {
       const detail = err?.response?.data?.detail || "Failed to save pricing";
       toast.error(detail);
@@ -1007,7 +1011,8 @@ export default function AdminPage() {
                     <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
                       <p className="text-[11px] text-ink/45 max-w-xl leading-relaxed">
                         Single Report is a real one-time checkout &mdash; the saved value is what the buyer pays.
-                        Premium / VIP affect the displayed price; Stripe subscription Price IDs are immutable.
+                        Premium / VIP saves also update Stripe automatically: a new monthly price is created and used
+                        for all new subscriptions. Existing subscribers keep the price they signed up at.
                       </p>
                       <button
                         type="button"
@@ -1026,8 +1031,8 @@ export default function AdminPage() {
                         data-testid="admin-stripe-sync-warning"
                         className="mt-3 text-[11px] text-amber-500 leading-relaxed"
                       >
-                        Note: Premium / VIP DISPLAY price updated. The recurring Stripe Price ID was created at the
-                        original amount and stays immutable until re-created via Stripe Dashboard.
+                        Stripe sync problem: {stripeSyncWarning}. The site shows the new price, but checkout may
+                        still charge the previous amount &mdash; try saving again.
                       </p>
                     )}
                   </div>
