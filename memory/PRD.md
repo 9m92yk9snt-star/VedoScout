@@ -1,5 +1,9 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 8, 2026 — part 5) — KOMPAKT COOKIE-BANNER ✅ (self-tested: mobil+desktop screenshots, accept-flow verificeret)
+- **User**: cookie-banneret dækkede for meget af skærmen ved besøg. Redesignet first-visit banneret i `CookieBanner.jsx` fra stor full-width blok → lille kompakt kort: mobil = slank card (~100px) over bund-tabs, desktop = 360px kort nede til venstre. Én linje tekst + Accept / Reject / ⚙-customise (GDPR-ligeværdige valg bevaret), Privacy-link intakt, samme testids (cookie-banner, cookie-accept-all, cookie-reject-all, cookie-customise-open). Customise-modal + reopen-chip uændret. Verificeret: accept → banner væk + reopen-chip, hero fuldt synlig bag banner.
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Session (Aug 8, 2026 — part 4) — MOBIL HORISONTAL OVERFLOW FIXET ✅ (audit: 0 issues @ 320/375/390/430, gæst+auth+klik-navigation)
 - **User-bug**: sider blev bredere end telefonskærmen efter navigation (pinch-zoom nødvendig). ROOT CAUSE: `Navigation.jsx` — højre knap-gruppe havde `shrink-0` og kunne ikke være der på små skærme: gæst 331px@320 (11px overflow), logget ind 377px@320 (57px — Upload-pill + logout + burger tilføjes efter login → "bredere efter klik"). `overflow-x: clip` fandtes allerede på html/body men indholdet VAR bredere → mobil-browser udvider layout-viewport.
 - **Fix (Navigation.jsx)**: højre gruppe shrink-0→min-w-0 + gap-1.5; logo 17px→xl→2xl trinvis (tracking 0.08→0.14em); Upload-CTA px-3 + tekst skjult <400px (ikon-pill, teksten findes i bund-tab), chevron skjult <360px; logout p-1.5; Get started px-3.5 <400px; container px-3 <400px. Alle knapper stadig synlige og klikbare — intet fjernet.

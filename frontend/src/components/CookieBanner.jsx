@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Cookie, Shield, X } from "lucide-react";
+import { Cookie, X, SlidersHorizontal } from "lucide-react";
 
 const STORAGE_KEY = "smp_cookie_consent_v1";
 // Detect consent storage. Returns null if user hasn't decided yet.
@@ -186,53 +186,49 @@ export default function CookieBanner() {
     );
   }
 
-  // First-visit banner
+  // First-visit banner — compact, non-blocking card (mobile: slim card above
+  // the bottom tabs; desktop: small card bottom-left). Never covers the page.
   return (
     <div
       data-testid="cookie-banner"
-      className="fixed bottom-0 left-0 right-0 z-[70] px-2 sm:px-6 pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 sm:right-auto sm:left-5 z-[70] px-3 sm:px-0 pointer-events-none"
       style={{
-        // Lift the banner ABOVE the mobile bottom tabs (~64px tall) on mobile,
-        // and respect iPhone safe-area. Desktop: just a normal bottom margin.
-        paddingBottom:
-          "calc(env(safe-area-inset-bottom, 0px) + 76px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 70px)",
       }}
     >
       <div
-        className="max-w-5xl mx-auto bg-deepnavy border-2 border-volt p-3 sm:p-6 grid sm:grid-cols-[auto,1fr,auto] gap-3 sm:gap-6 items-center pointer-events-auto shadow-2xl"
-        style={{
-          boxShadow:
-            "0 28px 60px -22px rgba(10,15,13,0.45), 0 12px 24px -8px rgba(31,79,47,0.18)",
-        }}
+        className="max-w-[420px] sm:max-w-[360px] mx-auto sm:mx-0 bg-deepnavy border border-volt/70 rounded-xl p-3 sm:p-3.5 pointer-events-auto"
+        style={{ boxShadow: "0 16px 40px -14px rgba(10,15,13,0.5)" }}
       >
-        <div className="hidden sm:flex w-12 h-12 rounded-full bg-volt items-center justify-center shrink-0">
-          <Cookie className="w-6 h-6 text-ink" strokeWidth={1.6} />
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-3 h-3 text-volt sm:hidden" />
-            <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.22em] sm:tracking-[0.25em] font-bold text-volt">
-              Your privacy
-            </span>
-          </div>
-          <h3 className="font-barlow font-black uppercase text-[15px] sm:text-xl tracking-tight leading-tight text-ink">
-            Cookies — you choose.
-          </h3>
-          <p className="mt-1 text-[11px] sm:text-sm text-ink/65 leading-snug">
-            Strictly necessary cookies keep ScoutMePlay running. Analytics + marketing are optional.{" "}
-            <Link
-              to="/privacy"
-              data-testid="cookie-link-privacy"
-              className="text-forest hover:text-forest-pop underline underline-offset-2 font-bold"
-            >
-              Privacy
-            </Link>
-            .
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 sm:flex sm:flex-row gap-1.5 sm:gap-2 shrink-0">
+        <p className="text-[11.5px] leading-snug text-ink/75">
+          <Cookie className="inline w-3.5 h-3.5 mr-1 -mt-0.5 text-volt" strokeWidth={2} />
+          <span className="font-bold text-ink">Cookies — you choose.</span>{" "}
+          Necessary ones keep the site running; analytics &amp; marketing only if you say yes.{" "}
+          <Link
+            to="/privacy"
+            data-testid="cookie-link-privacy"
+            className="text-forest hover:text-forest-pop underline underline-offset-2 font-bold"
+          >
+            Privacy
+          </Link>
+        </p>
+        <div className="mt-2.5 flex items-stretch gap-1.5">
+          <button
+            type="button"
+            onClick={acceptAll}
+            data-testid="cookie-accept-all"
+            className="flex-1 px-3 py-2 bg-volt hover:bg-forest-pop text-white text-[10.5px] uppercase tracking-[0.14em] font-bold rounded-lg transition-colors whitespace-nowrap"
+          >
+            Accept
+          </button>
+          <button
+            type="button"
+            onClick={rejectAll}
+            data-testid="cookie-reject-all"
+            className="flex-1 px-3 py-2 border border-gray-border text-ink/70 hover:text-ink hover:border-forest text-[10.5px] uppercase tracking-[0.14em] font-bold rounded-lg transition-colors whitespace-nowrap"
+          >
+            Reject
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -240,25 +236,11 @@ export default function CookieBanner() {
               setCustomising(true);
             }}
             data-testid="cookie-customise-open"
-            className="px-2 sm:px-4 py-2 sm:py-2.5 border border-gray-border bg-transparent text-ink/70 hover:text-ink hover:border-forest text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
+            aria-label="Customise cookie preferences"
+            title="Customise"
+            className="shrink-0 w-9 flex items-center justify-center border border-gray-border text-ink/60 hover:text-ink hover:border-forest rounded-lg transition-colors"
           >
-            Customise
-          </button>
-          <button
-            type="button"
-            onClick={rejectAll}
-            data-testid="cookie-reject-all"
-            className="px-2 sm:px-4 py-2 sm:py-2.5 border border-gray-border bg-transparent text-ink/70 hover:text-ink hover:border-forest text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
-          >
-            Reject
-          </button>
-          <button
-            type="button"
-            onClick={acceptAll}
-            data-testid="cookie-accept-all"
-            className="px-2 sm:px-5 py-2 sm:py-2.5 bg-volt hover:bg-forest-pop text-white text-[10px] sm:text-[11px] uppercase tracking-[0.14em] sm:tracking-[0.18em] font-bold transition-colors whitespace-nowrap"
-          >
-            Accept
+            <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={2.2} />
           </button>
         </div>
       </div>
