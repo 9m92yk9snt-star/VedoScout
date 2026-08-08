@@ -145,7 +145,6 @@ export function deriveV2(report) {
     biggestStrength: snap.biggest_strength || firstSentences(scoutView.key_strengths?.[0], 45) || "—",
     developmentArea: snap.biggest_development_area || firstSentences(scoutView.development_priorities?.[0], 45) || "—",
     hiddenTalent: snap.hidden_talent || firstSentences(scoutView.key_strengths?.slice(-1)[0], 45) || "—",
-    nextMilestone: snap.next_milestone || firstSentences(pa.three_month_focus, 45) || "—",
     progressNote: snap.overall_progress_note || "On the right track!",
   };
 
@@ -206,13 +205,25 @@ export function deriveV2(report) {
       timestamp: ev?.timestamp || null,
       thumb: ev ? snapCloseFrame(ev.timestamp) : null,
       annot: forcedAnnot || SNAP_ANNOT_BY_TYPE[String(ev?.action_type || "").toLowerCase()] || "circle",
+      glance: null,
     };
   };
-  const snapshotMoments = [
+  const explicitMoments = Array.isArray(full.snapshot_moments) && full.snapshot_moments.length >= 4
+    ? full.snapshot_moments.slice(0, 4).map((x) => ({
+        key: x.key,
+        title: x.title || "—",
+        desc: x.desc || "—",
+        timestamp: x.timestamp || null,
+        thumb: x.frame_url || null,
+        annot: x.annot || "circle",
+        glance: x.glance || null,
+      }))
+    : null;
+  const snapshotMoments = explicitMoments || [
     buildSnapMoment("strength", snapshot.biggestStrength, "positive", null),
-    buildSnapMoment("develop", snapshot.developmentArea, "issue", "space"),
+    buildSnapMoment("noticed", snap.scout_discovery || "scanning awareness vision decision space between the lines", "positive", "scan"),
     buildSnapMoment("hidden", snapshot.hiddenTalent, "positive", "run"),
-    buildSnapMoment("discovery", snap.scout_discovery || "scanning awareness vision decision space between the lines", "positive", "scan"),
+    buildSnapMoment("develop", snapshot.developmentArea, "issue", "circle"),
   ];
 
   // ---- Roadmap ----
@@ -373,7 +384,7 @@ export function deriveV2(report) {
     overall, ageBracket,
     stars: overall != null ? Math.round(overall / 2) : 0,
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
-    topStrengths, devPriorities, ageComparison, snapshot, roadmap,
+    topStrengths, devPriorities, ageComparison, snapshot, snapshotMoments, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
     matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
     parentMetrics, growYourGame, parentCorner, crossVerification,

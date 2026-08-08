@@ -6,11 +6,12 @@ import React, { useRef, useState, useCallback } from "react";
 import { Star, Users, ShieldCheck } from "lucide-react";
 import { deriveV2, tsToSeconds } from "./derive";
 import {
-  V2Card, V2Title, SnapshotCard, MatchStatsCard, AgeComparisonCard,
+  V2Card, V2Title, MatchStatsCard, AgeComparisonCard,
   TopStrengthsCard, DevPrioritiesCard, RoadmapCard, TrainingPlanCard,
   ParentTipsCard, VideoHighlightCard, CoachNotesCard, ScoutOutlookCard,
   ActionTimelineCard,
 } from "./sections";
+import { SnapshotsSection } from "./snapshots";
 import { MovementMapCard } from "./movement";
 import { PaceCard } from "./pace";
 import { VerifiedIdentityStrip } from "./verification";
@@ -228,6 +229,7 @@ export default function PremiumReportV2({ report, assetBase }) {
 
   // Resolve derived thumbnail URLs against the API base
   const topStrengths = d.topStrengths.map((s) => ({ ...s, thumb: fixThumb(s.thumb) }));
+  const snapshotMoments = d.snapshotMoments.map((m) => ({ ...m, thumb: fixThumb(m.thumb) }));
   const videoHighlight = d.videoHighlight ? { ...d.videoHighlight, thumb: fixThumb(d.videoHighlight.thumb) } : null;
 
   return (
@@ -249,9 +251,19 @@ export default function PremiumReportV2({ report, assetBase }) {
         !report.demo && <ProgressTeaser playerName={pd.player_name} />
       )}
 
-      {/* Row 2 — snapshot / match stats / age comparison */}
-      <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-[1fr_0.96fr_1.04fr]" : "lg:grid-cols-2"}`}>
-        <SnapshotCard snapshot={d.snapshot} />
+      {/* Row 2 — SNAPSHOTS (full-width photo moments) */}
+      <div className="mb-4">
+        <SnapshotsSection
+          snapshot={d.snapshot}
+          moments={snapshotMoments}
+          demo={!!report.demo}
+          onPlayAt={videoUrl ? playAt : null}
+          playerName={pd.player_name}
+        />
+      </div>
+
+      {/* Row 2b — match stats / age comparison */}
+      <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-2" : ""}`}>
         <MatchStatsCard matchStats={d.matchStats} />
         <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
       </div>

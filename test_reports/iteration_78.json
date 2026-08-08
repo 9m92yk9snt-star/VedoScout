@@ -1,0 +1,22 @@
+{
+  "summary": "Iter78: SNAPSHOTS section redesign verified across Sample Report, Free Preview and Premium Report. Backend demo API returns 4 snapshot_moments with correct keys and frame URLs (all 4 demo images HTTP 200). Sample Report renders v2-snapshots-section with amber demo note, 4 photo cards (00:58 / 01:28 / 03:59 / 02:40), no 'Next Milestone', glance strip, quote bar. No horizontal overflow at 390px. All regression sections (hero, parent-summary, overall, match-stats + age-comparison in 2-col row below snapshots, top-strengths, dev-priorities, roadmap, footer) still render. Free Preview (locked report seeded via disposable user smtest.iter78) shows fpl-snapshots with '1 of 4 unlocked' pill, ONE unlocked card with real strength title 'Explosive 1v1 dribbling' + real poster + timestamp, THREE locked blurred cards with lock icons and 'Unlocks with the full report', and 'Unlock all 4 moments' button that correctly scrolls to #scout-packages. No premium content leaked. Premium Report (unlocked seeded report) shows real-mode snapshots: snapshot-real-note (not demo-note), 4 cards derived from action_timeline with real timestamps (00:15, 01:32, 02:40) and titles ('Wing burst past defender', 'Scan then switch', 'Weak-foot slip'), stylized dark-green pitch fallback for cards without matching verified frames (hidden, develop). No red console errors on any page. Test data cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/seed_iter78_fpl.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "snapshots.jsx: for real (non-demo) reports, if buildSnapMoment cannot find a matching event for a snapshot key (e.g. hidden talent when tokens don't overlap action_timeline), the card has no timestamp and no 'See moment' button in the glance strip (see hidden key in test). Acceptable but consider a fallback timestamp from the source event even when title comes from snapshot.hidden_talent.",
+    "PremiumReportV2.jsx test-ids: v2-action-timeline and v2-training-week do not exist as data-testids on the rendered sample report (only v2-match-stats-card, v2-age-comparison-card, v2-top-strengths-card, v2-dev-priorities-card, v2-roadmap-card, v2-report-footer are exposed). Minor gap for automated regression coverage."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Used admin@elitescout.com / Admin@2026!Elite (existing) + disposable smtest.iter78@example.com / Test@2026!Iter78 (DELETED after test).",
+  "seed_data_creation": "Created disposable user smtest.iter78@example.com with two reports (1 locked, 1 unlocked with is_paid=true+manually_unlocked=true). All test data (user + 2 reports) DELETED after test completed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iter78 SNAPSHOTS redesign fully verified. To retest premium report with a real unlocked report, seed via /app/backend/tests/seed_iter78_fpl.py then update the unlocked report with is_paid=true and manually_unlocked=true (the API sanitizer strips full_report unless the payment/unlocked flags are set). The unlocked flag on the raw doc alone is NOT sufficient — the server checks is_paid/manually_unlocked in the read path."
+}

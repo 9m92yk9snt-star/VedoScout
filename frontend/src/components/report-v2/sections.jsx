@@ -3,7 +3,7 @@
 
 import React from "react";
 import {
-  Star, Target, Flame, Trophy, TrendingUp, BarChart3, Medal, Camera,
+  Star, Target, Flame, Trophy, BarChart3, Medal,
   PersonStanding, CircleDot, HeartPulse, Lightbulb, Play, Footprints,
   Bell, Brain, Wand2, Dumbbell, Timer, MonitorPlay, Route, ClipboardList,
   Check, Sprout, BedDouble, Heart, ShieldCheck, Clipboard, Binoculars, ArrowRight,
@@ -28,40 +28,6 @@ export const V2Title = ({ icon: Icon, children, tone = "green", right = null }) 
 );
 
 /* ── ROW 2 ─────────────────────────────────────────────── */
-
-const SNAP_META = [
-  { key: "biggestStrength", label: "Biggest Strength", Icon: Star, cls: "bg-[#E9F1E6] text-[#1E5B3C]" },
-  { key: "developmentArea", label: "Biggest Development Area", Icon: Target, cls: "bg-[#FDECEC] text-[#D9534F]" },
-  { key: "hiddenTalent", label: "Hidden Talent", Icon: Flame, cls: "bg-[#FDF3EA] text-[#DD6B20]" },
-  { key: "nextMilestone", label: "Next Milestone", Icon: Trophy, cls: "bg-[#FBF4DE] text-[#C89B18]" },
-];
-
-export function SnapshotCard({ snapshot }) {
-  return (
-    <V2Card testid="v2-snapshot-card">
-      <V2Title icon={Camera}>Snapshot</V2Title>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        {SNAP_META.map(({ key, label, Icon, cls }) => (
-          <div key={key} className="bg-[#FBF9F3] border border-[#E5DFCE] rounded-[11px] p-3 text-center">
-            <div className={`w-9 h-9 rounded-full mx-auto mb-2 flex items-center justify-center ${cls}`}>
-              <Icon className="w-4 h-4" />
-            </div>
-            <div className="text-[9px] font-extrabold tracking-[0.09em] uppercase text-[#75816F] leading-[1.45]">{label}</div>
-            <div className="text-[12px] font-bold mt-1.5 leading-snug line-clamp-3">{snapshot[key]}</div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 bg-[#F0F5EC] border border-[#DCE8D6] rounded-[11px] px-4 py-3 flex items-center gap-3.5">
-        <span className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-[#12402A]">Overall Progress</span>
-        <TrendingUp className="w-5 h-5 text-[#1E5B3C] shrink-0" />
-        <div>
-          <div className="text-[13px] font-bold leading-tight">{snapshot.progressNote}</div>
-          <div className="text-[11px] text-[#68766B]">Keep working and enjoying the game.</div>
-        </div>
-      </div>
-    </V2Card>
-  );
-}
 
 export function MatchStatsCard({ matchStats }) {
   if (!matchStats) return null;
