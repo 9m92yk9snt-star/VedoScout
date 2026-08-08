@@ -166,7 +166,7 @@ export default function Navigation() {
         style={scrolled ? { boxShadow: "0 8px 30px -16px rgba(0,0,0,0.7)" } : undefined}
       >
         <div
-          className={`max-w-7xl mx-auto px-4 sm:px-6 md:px-10 flex items-center justify-between gap-3 transition-all duration-300 ${
+          className={`max-w-7xl mx-auto px-3 min-[400px]:px-4 sm:px-6 md:px-10 flex items-center justify-between gap-2 sm:gap-3 transition-all duration-300 ${
             scrolled ? "py-2.5" : "py-3 sm:py-4"
           }`}
         >
@@ -183,7 +183,7 @@ export default function Navigation() {
             }}
             aria-label="ScoutMePlay — home"
           >
-            <span className="font-barlow font-black uppercase text-white text-xl sm:text-2xl tracking-[0.14em] sm:tracking-[0.16em] whitespace-nowrap flex items-baseline gap-[1px]">
+            <span className="font-barlow font-black uppercase text-white text-[17px] min-[400px]:text-xl sm:text-2xl tracking-[0.08em] min-[400px]:tracking-[0.14em] sm:tracking-[0.16em] whitespace-nowrap flex items-baseline gap-[1px]">
               <span>SCOUT</span>
               <span
                 className="relative inline-block px-[3px] text-ink transition-colors duration-300"
@@ -241,7 +241,7 @@ export default function Navigation() {
           </nav>
 
           {/* === RIGHT — auth / user CTAs === */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             {user ? (
               <>
                 <Link
@@ -267,21 +267,21 @@ export default function Navigation() {
                 <Link
                   to="/upload"
                   data-testid="nav-upload-cta"
-                  className={`${uploadCtaPulse ? "scoutme-unlock-pulse " : ""}group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-2 transition-all`}
+                  className={`${uploadCtaPulse ? "scoutme-unlock-pulse " : ""}group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs sm:text-sm px-3 min-[400px]:px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-1.5 sm:gap-2 shrink-0 transition-all`}
                   onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 24px 2px ${LIME}40`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
                 >
-                  <Upload className="w-4 h-4" />
+                  <Upload className="w-4 h-4 shrink-0" />
                   <span className="hidden xl:inline">Upload video</span>
                   <span className="hidden sm:inline xl:hidden">Upload</span>
-                  <span className="sm:hidden">Upload</span>
-                  <ChevronRight className="w-3.5 h-3.5 group-hover/cta:translate-x-0.5 transition-transform" />
+                  <span className="hidden min-[400px]:inline sm:hidden">Upload</span>
+                  <ChevronRight className="hidden min-[360px]:block w-3.5 h-3.5 shrink-0 group-hover/cta:translate-x-0.5 transition-transform" />
                 </Link>
                 <button
                   onClick={handleLogout}
                   data-testid="nav-logout-btn"
                   aria-label="Sign out"
-                  className="text-white/55 hover:text-white border border-white/15 hover:border-white/40 p-2 transition-colors"
+                  className="text-white/55 hover:text-white border border-white/15 hover:border-white/40 p-1.5 sm:p-2 shrink-0 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -298,7 +298,7 @@ export default function Navigation() {
                 <Link
                   to="/upload"
                   data-testid="nav-signup-btn"
-                  className="group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-[11px] sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all"
+                  className="group/cta relative bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-[11px] sm:text-sm px-3 min-[400px]:px-4 sm:px-5 py-2 sm:py-2.5 rounded-full flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all"
                   onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 28px 2px ${LIME}55`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}
                 >
@@ -314,7 +314,7 @@ export default function Navigation() {
               onClick={() => setMobileOpen(true)}
               data-testid="nav-mobile-menu-btn"
               aria-label="Open menu"
-              className="lg:hidden text-white/75 hover:text-white p-1.5 -mr-1 transition-colors"
+              className="lg:hidden text-white/75 hover:text-white p-1.5 -mr-1 shrink-0 transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
