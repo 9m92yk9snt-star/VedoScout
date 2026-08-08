@@ -20,27 +20,53 @@ export function AuthProvider({ children }) {
     setUser(userObj);
   }, []);
 
+  // Redeem growth codes saved pre-signup (?ref= teammate link, exit-intent
+  // claim). One attempt each — the codes are removed regardless of outcome.
+  const redeemGrowthCodes = useCallback(() => {
+    try {
+      const ref = localStorage.getItem("smp_ref");
+      if (ref) {
+        api.post("/referral/redeem", { code: ref })
+          .catch(() => {})
+          .finally(() => localStorage.removeItem("smp_ref"));
+      }
+      const raw = localStorage.getItem("smp_exit_offer");
+      if (raw) {
+        const { code } = JSON.parse(raw);
+        if (code) {
+          api.post("/exit-offer/attach", { code })
+            .catch(() => {})
+            .finally(() => localStorage.removeItem("smp_exit_offer"));
+        } else {
+          localStorage.removeItem("smp_exit_offer");
+        }
+      }
+    } catch { /* corrupted storage — ignore */ }
+  }, []);
+
   const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/login", { email, password });
       persist(data.access_token, data.user);
+      redeemGrowthCodes();
       return data.user;
     } finally {
       setLoading(false);
     }
-  }, [persist]);
+  }, [persist, redeemGrowthCodes]);
 
   const signup = useCallback(async (email, password, full_name, honeypot = "") => {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/signup", { email, password, full_name, website: honeypot });
       persist(data.access_token, data.user);
+      redeemGrowthCodes();
       return data.user;
     } finally {
       setLoading(false);
     }
-  }, [persist]);
+  }, [persist, redeemGrowthCodes]);
 
   const logout = useCallback(() => {
     localStorage.removeItem("elite_token");

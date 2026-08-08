@@ -51,19 +51,31 @@ async def get_auto_discount_percent(db) -> float:
 
 
 async def get_active_discount(db, report: dict | None = None) -> dict | None:
-    """Best active discount: report-level 48h offer wins over global campaign."""
+    """Best active discount across: report-level 48h offer, user-level credits
+    (exit-intent claim / teammate referral), global campaign. Highest % wins."""
     now = _now().isoformat()
+    candidates = []
     if report:
         d = report.get("discount")
         if isinstance(d, dict) and d.get("percent") and str(d.get("expires_at", "")) > now:
-            return {"percent": float(d["percent"]), "expires_at": d["expires_at"],
-                    "source": d.get("source", "auto_48h")}
+            candidates.append({"percent": float(d["percent"]), "expires_at": d["expires_at"],
+                               "source": d.get("source", "auto_48h")})
+        uid = report.get("user_id")
+        if uid:
+            u = await db.users.find_one({"id": uid}, {"exit_offer": 1, "referral_credit": 1})
+            for field, src in (("exit_offer", "exit_intent"), ("referral_credit", "referral")):
+                cr = (u or {}).get(field)
+                if isinstance(cr, dict) and cr.get("percent") and str(cr.get("expires_at", "")) > now:
+                    candidates.append({"percent": float(cr["percent"]),
+                                       "expires_at": cr["expires_at"], "source": src})
     c = await db.discount_campaigns.find_one(
         {"active": True, "expires_at": {"$gt": now}}, sort=[("created_at", -1)])
     if c:
-        return {"percent": float(c["percent"]), "expires_at": c["expires_at"],
-                "source": "campaign", "name": c.get("name")}
-    return None
+        candidates.append({"percent": float(c["percent"]), "expires_at": c["expires_at"],
+                           "source": "campaign", "name": c.get("name")})
+    if not candidates:
+        return None
+    return max(candidates, key=lambda x: x["percent"])
 
 
 def discounted_price(base: float, disc: dict) -> float:

@@ -13,6 +13,8 @@ import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
 import GrowthAdmin from "@/components/admin/GrowthAdmin";
 import PromoEmailsAdmin from "@/components/admin/PromoEmailsAdmin";
+import ExitOfferAdmin from "@/components/admin/ExitOfferAdmin";
+import ReferralAdmin from "@/components/admin/ReferralAdmin";
 import ReviewsAdmin from "@/components/admin/ReviewsAdmin";
 import FAQAdmin from "@/components/admin/FAQAdmin";
 import EmailAdmin from "@/components/admin/EmailAdmin";
@@ -465,7 +467,13 @@ export default function AdminPage() {
 
               {activeTab === "analytics" && <AnalyticsDashboard />}
 
-              {activeTab === "growth" && <GrowthAdmin />}
+              {activeTab === "growth" && (
+                <>
+                  <GrowthAdmin />
+                  <ExitOfferAdmin />
+                  <ReferralAdmin />
+                </>
+              )}
 
               {activeTab === "marketing" && <MarketingAdmin />}
 

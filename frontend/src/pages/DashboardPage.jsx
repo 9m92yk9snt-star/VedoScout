@@ -6,6 +6,7 @@ import { MiniPitch } from "@/components/FootballAccents";
 import ReviewPrompt from "@/components/ReviewPrompt";
 import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
+import ReferralInviteCard from "@/components/ReferralInviteCard";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { trackPurchase } from "@/lib/pixels";
@@ -351,6 +352,8 @@ export default function DashboardPage() {
               {/* PROFILE & VISIBILITY — Phase 1 of the paid Scout Database.
                  Players opt in here so scouts can find them via /players-database. */}
               <ProfileVisibilityCard latestReportId={reports[0]?.id} />
+
+              <ReferralInviteCard />
 
               {reports.length > 0 && <ReviewPrompt />}
 

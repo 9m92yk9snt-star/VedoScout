@@ -10467,6 +10467,185 @@ async def admin_send_test_email(payload: TestEmailPayload, _=Depends(get_current
     return {"ok": True, "subject": subject}
 
 
+# ============== EXIT-INTENT OFFER + TEAMMATE REFERRAL (growth) ==============
+
+EXIT_OFFER_DEFAULTS = {"enabled": False, "percent": 10.0, "countdown_minutes": 15,
+                       "valid_hours": 24.0,
+                       "headline": "Wait — see what the video says first"}
+REFERRAL_DEFAULTS = {"enabled": True, "percent": 15.0, "valid_days": 30}
+
+
+async def _get_growth_config(key: str, defaults: dict) -> dict:
+    doc = await db.settings.find_one({"key": key})
+    cfg = dict(defaults)
+    if doc and isinstance(doc.get("value"), dict):
+        cfg.update({k: doc["value"][k] for k in defaults if k in doc["value"]})
+    return cfg
+
+
+@api_router.get("/exit-offer/config")
+async def exit_offer_config():
+    cfg = await _get_growth_config("exit_offer_config", EXIT_OFFER_DEFAULTS)
+    return {k: cfg[k] for k in ("enabled", "percent", "countdown_minutes", "headline")}
+
+
+@api_router.post("/exit-offer/claim")
+async def exit_offer_claim():
+    cfg = await _get_growth_config("exit_offer_config", EXIT_OFFER_DEFAULTS)
+    if not cfg["enabled"]:
+        raise HTTPException(status_code=404, detail="Offer not available")
+    expires = (datetime.now(timezone.utc) + timedelta(hours=float(cfg["valid_hours"]))).isoformat()
+    code = uuid.uuid4().hex[:10]
+    await db.exit_offer_claims.insert_one({
+        "id": str(uuid.uuid4()), "code": code, "percent": float(cfg["percent"]),
+        "expires_at": expires, "created_at": now_iso(), "attached_user_id": None,
+    })
+    return {"code": code, "percent": cfg["percent"], "expires_at": expires}
+
+
+class ExitOfferAttach(BaseModel):
+    code: str
+
+
+@api_router.post("/exit-offer/attach")
+async def exit_offer_attach(payload: ExitOfferAttach, user=Depends(get_current_user)):
+    claim = await db.exit_offer_claims.find_one({"code": (payload.code or "").strip()})
+    if not claim:
+        raise HTTPException(status_code=404, detail="Unknown offer code")
+    if claim.get("attached_user_id") and claim["attached_user_id"] != user["id"]:
+        raise HTTPException(status_code=409, detail="Offer already used")
+    if str(claim.get("expires_at", "")) <= now_iso():
+        raise HTTPException(status_code=410, detail="Offer expired")
+    await db.exit_offer_claims.update_one(
+        {"code": claim["code"]},
+        {"$set": {"attached_user_id": user["id"], "attached_at": now_iso()}})
+    await db.users.update_one({"id": user["id"]}, {"$set": {"exit_offer": {
+        "percent": float(claim["percent"]), "expires_at": claim["expires_at"],
+        "code": claim["code"], "source": "exit_intent"}}})
+    return {"ok": True, "percent": claim["percent"], "expires_at": claim["expires_at"]}
+
+
+@api_router.get("/admin/exit-offer")
+async def admin_exit_offer(_=Depends(get_current_admin)):
+    cfg = await _get_growth_config("exit_offer_config", EXIT_OFFER_DEFAULTS)
+    claims = await db.exit_offer_claims.count_documents({})
+    attached = await db.exit_offer_claims.count_documents({"attached_user_id": {"$ne": None}})
+    return {"config": cfg, "stats": {"claims": claims, "attached": attached}}
+
+
+class ExitOfferConfigUpdate(BaseModel):
+    enabled: bool
+    percent: float
+    countdown_minutes: int
+    valid_hours: float
+    headline: str
+
+
+@api_router.post("/admin/exit-offer")
+async def admin_set_exit_offer(payload: ExitOfferConfigUpdate, _=Depends(get_current_admin)):
+    if not 1 <= payload.percent <= 90:
+        raise HTTPException(status_code=400, detail="Percent must be 1-90")
+    if not 1 <= payload.countdown_minutes <= 120:
+        raise HTTPException(status_code=400, detail="Countdown must be 1-120 minutes")
+    if not 1 <= payload.valid_hours <= 168:
+        raise HTTPException(status_code=400, detail="Validity must be 1-168 hours")
+    await db.settings.update_one({"key": "exit_offer_config"},
+                                 {"$set": {"value": payload.dict()}}, upsert=True)
+    return {"ok": True}
+
+
+def _mask_email(e: str) -> str:
+    try:
+        name, dom = str(e).split("@", 1)
+        return f"{name[:2]}***@{dom}"
+    except Exception:
+        return "***"
+
+
+@api_router.get("/referral/me")
+async def referral_me(user=Depends(get_current_user)):
+    cfg = await _get_growth_config("referral_config", REFERRAL_DEFAULTS)
+    u = await db.users.find_one({"id": user["id"]})
+    code = (u or {}).get("referral_code")
+    if not code:
+        code = uuid.uuid4().hex[:8]
+        await db.users.update_one({"id": user["id"]}, {"$set": {"referral_code": code}})
+    site = (os.environ.get("SITE_PUBLIC_URL") or os.environ.get("FRONTEND_URL") or "https://scoutmeplay.com").rstrip("/")
+    invited = []
+    async for r in db.referrals.find({"referrer_id": user["id"]}).sort("created_at", -1).limit(50):
+        invited.append({"name": r.get("referred_name") or "", "email": _mask_email(r.get("referred_email") or ""),
+                        "date": r.get("created_at"), "status": r.get("status", "rewarded")})
+    credit = (u or {}).get("referral_credit")
+    active_credit = credit if (isinstance(credit, dict) and str(credit.get("expires_at", "")) > now_iso()) else None
+    return {"enabled": bool(cfg["enabled"]), "percent": cfg["percent"], "valid_days": cfg["valid_days"],
+            "code": code, "link": f"{site}/?ref={code}", "invited": invited, "credit": active_credit}
+
+
+class ReferralRedeem(BaseModel):
+    code: str
+
+
+@api_router.post("/referral/redeem")
+async def referral_redeem(payload: ReferralRedeem, user=Depends(get_current_user)):
+    cfg = await _get_growth_config("referral_config", REFERRAL_DEFAULTS)
+    if not cfg["enabled"]:
+        raise HTTPException(status_code=404, detail="Referral program is not active")
+    code = (payload.code or "").strip()
+    referrer = await db.users.find_one({"referral_code": code})
+    if not referrer:
+        raise HTTPException(status_code=404, detail="Unknown referral code")
+    if referrer["id"] == user["id"]:
+        raise HTTPException(status_code=400, detail="You can't refer yourself")
+    me = await db.users.find_one({"id": user["id"]})
+    if (me or {}).get("referred_by"):
+        raise HTTPException(status_code=409, detail="Referral already redeemed")
+    created = str((me or {}).get("created_at") or "")
+    if created and created < (datetime.now(timezone.utc) - timedelta(days=7)).isoformat():
+        raise HTTPException(status_code=403, detail="Referral codes are for new accounts")
+    paid = await db.reports.count_documents({"user_id": user["id"], "is_paid": True})
+    if paid:
+        raise HTTPException(status_code=403, detail="Referral codes are for new customers")
+    pct = float(cfg["percent"])
+    expires = (datetime.now(timezone.utc) + timedelta(days=float(cfg["valid_days"]))).isoformat()
+    credit = {"percent": pct, "expires_at": expires, "source": "referral"}
+    await db.users.update_one({"id": user["id"]}, {"$set": {"referral_credit": credit, "referred_by": referrer["id"]}})
+    await db.users.update_one({"id": referrer["id"]}, {"$set": {"referral_credit": credit}})
+    await db.referrals.insert_one({
+        "id": str(uuid.uuid4()), "code": code,
+        "referrer_id": referrer["id"], "referrer_name": referrer.get("full_name"), "referrer_email": referrer.get("email"),
+        "referred_id": user["id"], "referred_name": (me or {}).get("full_name"), "referred_email": (me or {}).get("email"),
+        "percent": pct, "expires_at": expires, "status": "rewarded", "created_at": now_iso(),
+    })
+    return {"ok": True, "percent": pct, "expires_at": expires}
+
+
+@api_router.get("/admin/referrals")
+async def admin_referrals(_=Depends(get_current_admin)):
+    cfg = await _get_growth_config("referral_config", REFERRAL_DEFAULTS)
+    rows = []
+    async for r in db.referrals.find({}).sort("created_at", -1).limit(200):
+        rows.append({k: r.get(k) for k in ("id", "referrer_name", "referrer_email", "referred_name",
+                                           "referred_email", "percent", "status", "created_at", "expires_at")})
+    return {"config": cfg, "referrals": rows, "total": await db.referrals.count_documents({})}
+
+
+class ReferralConfigUpdate(BaseModel):
+    enabled: bool
+    percent: float
+    valid_days: int
+
+
+@api_router.post("/admin/referral-settings")
+async def admin_set_referral(payload: ReferralConfigUpdate, _=Depends(get_current_admin)):
+    if not 1 <= payload.percent <= 90:
+        raise HTTPException(status_code=400, detail="Percent must be 1-90")
+    if not 1 <= payload.valid_days <= 365:
+        raise HTTPException(status_code=400, detail="Validity must be 1-365 days")
+    await db.settings.update_one({"key": "referral_config"},
+                                 {"$set": {"value": payload.dict()}}, upsert=True)
+    return {"ok": True}
+
+
 # ============== SHARE REPORT (public PDF link) ==============
 
 @api_router.post("/reports/{report_id}/share")

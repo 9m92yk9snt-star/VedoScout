@@ -25,6 +25,7 @@ import ReviewsStrip from "@/components/ReviewsStrip";
 import SampleReportShowcase from "@/components/SampleReportShowcase";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
 import StickyPricingCTA from "@/components/StickyPricingCTA";
+import ExitIntentManager from "@/components/ExitIntentOffer";
 import SEO, { organizationJsonLd, faqJsonLd } from "@/components/SEO";
 import {
   TrustStrip,
@@ -124,6 +125,7 @@ export default function LandingMinimal() {
         <DreamPricingTiers isLoggedIn={!!user} />
       </div>
       <StickyPricingCTA isLoggedIn={!!user} />
+      <ExitIntentManager />
       <ReviewsStrip />
       <SocialFollowSection />
       <BlogHighlights />

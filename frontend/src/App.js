@@ -81,6 +81,13 @@ function AnimatedRoutes() {
   const location = useLocation();
   useEffect(() => { initPixels(); initAnalytics(); }, []);
   useEffect(() => { trackPageView(); analyticsPageView(location.pathname); }, [location.pathname]);
+  // Capture teammate-referral code from ?ref= links — redeemed after signup.
+  useEffect(() => {
+    const ref = new URLSearchParams(location.search).get("ref");
+    if (ref) {
+      try { localStorage.setItem("smp_ref", ref); } catch { /* private mode */ }
+    }
+  }, [location.search]);
   // Emergent Google OAuth callback — must run BEFORE any protected route.
   // Synchronous render-time check on useLocation().hash (per playbook).
   if (location.hash && location.hash.includes("session_id=")) {

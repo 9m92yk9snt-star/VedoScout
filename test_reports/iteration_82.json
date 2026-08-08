@@ -1,0 +1,26 @@
+{
+  "summary": "Iter82 — Full backend + frontend testing of Exit-Intent Offer and Teammate Referral growth features. All 15 pytest backend tests pass; frontend flows verified end-to-end (admin config, preview popup, visitor exit-intent trigger, once-per-session gating, dashboard referral card, ?ref capture, cross-user credit badges). Preview DB restored: exit_offer disabled (defaults), referral enabled 15% / 30 days, all disposable users/referrals/claims deleted.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter82_growth_exit_referral.py",
+    "/app/test_reports/pytest/iter82.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now 14,583 lines — well beyond the 700-line guideline. Growth section (exit-offer + referral, ~180 lines around L10470-10646) is a clean candidate to extract into a dedicated router module (e.g. /app/backend/routes/growth_offers.py) to keep server.py maintainable.",
+    "growth.py get_active_discount() fetches only exit_offer + referral_credit projection from users — good. But the referral_credit is written to BOTH users at redeem-time; ensure downstream 'burn on use' logic clears it after checkout (not verified in this test — verify report checkout flow clears user.referral_credit / user.exit_offer after successful payment to prevent unlimited reuse).",
+    "Referral link in /api/referral/me falls back to hardcoded 'https://scoutmeplay.com' when SITE_PUBLIC_URL/FRONTEND_URL env is unset. In this preview env the link points to scoutmeplay.com instead of the preview URL, which works for prod but breaks local ?ref= sharing during preview testing. Consider deriving from REACT_APP_BACKEND_URL or the request Host header.",
+    "Nice-to-have: /api/exit-offer/claim is unauthenticated and creates a DB doc per call — trivial to flood (10-char code per POST). Consider a light IP rate-limit or cap total unattached claims per hour."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter82_growth_exit_referral.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100%"},
+  "test_credentials": "Admin admin@elitescout.com / Admin@2026!Elite (from /app/memory/test_credentials.md). Disposable users seeded directly in Mongo (bcrypt) and deleted after test.",
+  "seed_data_creation": "Seeded 2 disposable users (bdf4539b + a798da6a) via bcrypt+Mongo insert for FE test, plus 3 more (A/B/C) inside pytest module fixture. All 5 users + 1 referral doc DELETED after tests. Exit offer restored to disabled default; referral settings restored to enabled/15%/30d.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoints verified: GET /api/exit-offer/config (public, defaults enabled=false), POST /api/exit-offer/claim (404 disabled / 200 enabled), POST /api/exit-offer/attach (200 first user, 409 duplicate, 404 unknown), GET+POST /api/admin/exit-offer (validation: percent>90 → 400, countdown_minutes>120 → 400, valid_hours>168 → 400), GET /api/referral/me (default enabled=true, 15%, 30d, code + link), POST /api/referral/redeem (200 happy path, 400 self, 404 unknown, 409 dup, 404 disabled), GET /api/admin/referrals, POST /api/admin/referral-settings (validation). growth.get_active_discount() verified to pick highest % from exit_offer + referral_credit + campaign. Frontend verified: admin Growth tab shows exit-offer-admin + referral-admin sections with all input testids, preview popup opens with countdown/headline/claim (claim shows preview-only toast, no navigation), Save enables offer, visitor landing page triggers popup on mouseout after seeing #pricing-section, popup once per sessionStorage(smp_exit_shown), claim stores localStorage(smp_exit_offer) and navigates to /upload, /?ref=CODE captures smp_ref in localStorage, auth-context auto-redeems on login (smp_ref cleared, credit badge appears on both users' dashboards), copy button does not crash. NO regressions in landing page or admin Manual Campaign tab.",
+  "rca of the issue": "N/A — no bugs found."
+}
