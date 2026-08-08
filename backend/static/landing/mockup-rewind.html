@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Rewind-knap</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@800;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:#F2EDE2; padding:26px; }
+  .wrap { display:grid; grid-template-columns: 1.05fr 1fr; gap:22px; max-width:1240px; margin:0 auto; align-items:start; }
+  .card { background:#FBF9F3; border:1px solid #E5DFCE; border-radius:18px; padding:22px; }
+  .title { font-family:'Barlow Condensed'; font-weight:900; font-size:24px; text-transform:uppercase; color:#101B12; display:flex; align-items:center; gap:10px; }
+  .title .ic { width:34px; height:34px; border-radius:10px; background:#E9F1E6; color:#1E5B3C; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .finding { display:flex; align-items:flex-start; gap:12px; padding:14px 0; border-bottom:1px solid #EFEADB; }
+  .finding:last-child { border-bottom:none; }
+  .dot { width:8px; height:8px; border-radius:50%; margin-top:7px; flex-shrink:0; }
+  .g { background:#1E5B3C; } .o { background:#DD6B20; } .r { background:#D9534F; }
+  .ftxt { flex:1; }
+  .ftxt b { display:block; font-size:15px; color:#12211A; }
+  .ftxt span { font-size:12.5px; color:#5C6657; }
+  .rewind {
+    flex-shrink:0; display:inline-flex; align-items:center; gap:7px;
+    background:#12211A; color:#fff; border-radius:999px; padding:7px 13px;
+    font-size:11.5px; font-weight:700; cursor:pointer; border:none;
+  }
+  .rewind .tri { width:0; height:0; border-left:8px solid #CCFF00; border-top:5px solid transparent; border-bottom:5px solid transparent; }
+  .rewind.active { background:#1E5B3C; box-shadow:0 0 0 3px rgba(204,255,0,.5); }
+  .hint { margin-top:12px; font-size:11.5px; color:#8B957F; font-style:italic; }
+  /* video side */
+  .player { position:relative; border-radius:18px; overflow:hidden; border:1px solid #E5DFCE; background:#000; }
+  .player img { width:100%; height:340px; object-fit:cover; display:block; }
+  .toast { position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    background:#12211A; color:#fff; font-size:12px; font-weight:700; padding:8px 16px; border-radius:999px; white-space:nowrap; }
+  .toast b { color:#CCFF00; }
+  .bar { position:absolute; bottom:0; left:0; right:0; padding:12px 16px; background:linear-gradient(transparent, rgba(0,0,0,.85)); }
+  .timeline { position:relative; height:6px; background:rgba(255,255,255,.25); border-radius:3px; }
+  .fill { position:absolute; left:0; top:0; bottom:0; width:29%; background:#CCFF00; border-radius:3px; }
+  .marker { position:absolute; top:50%; left:29%; transform:translate(-50%,-50%);
+    width:16px; height:16px; border-radius:50%; background:#CCFF00; border:3px solid #12211A; }
+  .mark2 { position:absolute; top:-22px; left:29%; transform:translateX(-50%);
+    background:#CCFF00; color:#12211A; font-family:'Barlow Condensed'; font-weight:900; font-size:13px; padding:2px 8px; border-radius:6px; }
+  .tlabels { display:flex; justify-content:space-between; color:rgba(255,255,255,.8); font-size:10.5px; margin-top:7px; }
+  .arrow { position:absolute; left:-34px; top:120px; font-size:40px; color:#1E5B3C; }
+  .pcol { position:relative; }
+  .expl { margin-top:14px; background:#EAF2E3; border:1px solid #D8E6D2; border-radius:14px; padding:14px 16px; font-size:13px; color:#12402A; }
+  .expl b { display:block; margin-bottom:3px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Venstre: rapportens fund med rewind-knapper -->
+    <div class="card">
+      <div class="title"><span class="ic">&#9889;</span> Dine styrker &amp; fund</div>
+      <div class="finding">
+        <span class="dot g"></span>
+        <div class="ftxt"><b>1v1-dribling der skaber mål</b><span>Eksplosivt retningsskift slår forsvareren og fører til farlig afslutning.</span></div>
+        <button class="rewind active"><span class="tri"></span> SE BEVISET &middot; 00:58</button>
+      </div>
+      <div class="finding">
+        <span class="dot g"></span>
+        <div class="ftxt"><b>Scanner banen før pasningen</b><span>Tjekker skulderen to gange og ser rummet før bolden ankommer.</span></div>
+        <button class="rewind"><span class="tri"></span> SE BEVISET &middot; 01:28</button>
+      </div>
+      <div class="finding">
+        <span class="dot o"></span>
+        <div class="ftxt"><b>Back-post-løb timet perfekt</b><span>Intelligent bevægelse mod bagerste stolpe skaber en klar chance.</span></div>
+        <button class="rewind"><span class="tri"></span> SE BEVISET &middot; 03:59</button>
+      </div>
+      <div class="finding">
+        <span class="dot r"></span>
+        <div class="ftxt"><b>Venstre fod var en mulighed</b><span>God situation til at bruge venstre fod — mere mod her gør dig uforudsigelig.</span></div>
+        <button class="rewind"><span class="tri"></span> SE BEVISET &middot; 02:40</button>
+      </div>
+      <div class="hint">Hvert eneste fund i rapporten har sin egen knap — vi påstår intet, du kan SE det selv.</div>
+    </div>
+    <!-- Højre: videoen der hopper til sekundet -->
+    <div class="pcol">
+      <div class="arrow">&#10230;</div>
+      <div class="player">
+        <img src="/api/uploads/demo-frame-dribble.jpg" alt="">
+        <div class="toast">&#9654; Hopper til <b>00:58</b> — dit bevis-øjeblik</div>
+        <div class="bar">
+          <div class="timeline">
+            <div class="fill"></div>
+            <span class="mark2">00:58</span>
+            <span class="marker"></span>
+          </div>
+          <div class="tlabels"><span>00:00</span><span>04:30</span></div>
+        </div>
+      </div>
+      <div class="expl">
+        <b>Sådan virker det:</b>
+        Ét tryk på "SE BEVISET" &rarr; videoen (som allerede ligger øverst i rapporten) spoler automatisk til det præcise sekund og afspiller. Ingen søgen, ingen tvivl.
+      </div>
+    </div>
+  </div>
+</body>
+</html>

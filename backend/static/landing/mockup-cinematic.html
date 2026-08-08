@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<title>Mockup — Cinematic Match Story</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@800;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:#F2EDE2; }
+  .scene {
+    position:relative; height:620px; overflow:hidden; background:#050D08;
+  }
+  .scene img.bg {
+    position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    opacity:.5; filter:saturate(.8);
+  }
+  .vignette { position:absolute; inset:0;
+    background:radial-gradient(ellipse at center, transparent 20%, rgba(5,13,8,.92) 85%),
+               linear-gradient(to top, rgba(5,13,8,.95), transparent 40%);
+  }
+  .bars { position:absolute; left:0; right:0; height:56px; background:#000; }
+  .bars.top { top:0; } .bars.bottom { bottom:0; }
+  .content { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; }
+  .eyebrow { font-size:12px; letter-spacing:.45em; font-weight:700; color:#CCFF00; text-transform:uppercase; }
+  h1 { font-family:'Barlow Condensed'; font-weight:900; font-size:76px; letter-spacing:.02em; text-transform:uppercase; margin-top:14px; line-height:.95; }
+  .line { margin-top:18px; font-size:22px; font-weight:500; color:rgba(255,255,255,.92); }
+  .line b { color:#CCFF00; font-weight:700; }
+  .score { margin-top:26px; display:flex; align-items:baseline; gap:14px; }
+  .score .num { font-family:'Barlow Condensed'; font-weight:900; font-size:110px; color:#CCFF00; line-height:1; text-shadow:0 0 60px rgba(204,255,0,.35); }
+  .score .lab { font-size:13px; letter-spacing:.3em; text-transform:uppercase; color:rgba(255,255,255,.7); text-align:left; line-height:1.5; }
+  .ts { position:absolute; top:76px; right:36px; background:rgba(11,31,20,.85); border:1px solid rgba(204,255,0,.4); color:#fff; font-family:'Barlow Condensed'; font-weight:900; font-size:22px; padding:6px 14px; border-radius:10px; }
+  .scroll { position:absolute; bottom:72px; left:0; right:0; text-align:center; color:rgba(255,255,255,.75); font-size:11px; letter-spacing:.35em; text-transform:uppercase; }
+  .scroll .arr { display:block; font-size:20px; color:#CCFF00; margin-top:4px; }
+  /* filmstrip forklaring */
+  .strip { display:flex; gap:14px; padding:22px 26px; background:#F2EDE2; }
+  .step { flex:1; background:#FBF9F3; border:1px solid #E5DFCE; border-radius:14px; overflow:hidden; }
+  .step .ph { height:96px; position:relative; background:#050D08; display:flex; align-items:center; justify-content:center; color:#fff; }
+  .step .ph img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .step .ph .t { position:relative; font-family:'Barlow Condensed'; font-weight:900; font-size:15px; letter-spacing:.06em; text-transform:uppercase; text-shadow:0 1px 4px #000; }
+  .step .cap { padding:10px 12px; font-size:11.5px; color:#5C6657; line-height:1.45; }
+  .step .cap b { color:#12211A; display:block; font-size:12px; margin-bottom:2px; }
+  .dim1 { opacity:.25; } .dim2 { opacity:.55; }
+</style>
+</head>
+<body>
+  <!-- Selve scenen: det brugeren ser i 4 sekunder når rapporten åbnes -->
+  <div class="scene">
+    <img class="bg" src="/api/uploads/demo-frame-dribble.jpg" alt="">
+    <div class="vignette"></div>
+    <div class="bars top"></div>
+    <div class="bars bottom"></div>
+    <span class="ts">00:58</span>
+    <div class="content">
+      <div class="eyebrow">ScoutMePlay præsenterer</div>
+      <h1>Noah Andersen</h1>
+      <div class="line">Minut 00:58. <b>To forsvarere.</b> Én beslutning.</div>
+      <div class="score">
+        <span class="num">8.4</span>
+        <span class="lab">Samlet<br>score</span>
+      </div>
+    </div>
+    <div class="scroll">Din historie starter her<span class="arr">&#8595;</span></div>
+  </div>
+  <!-- Forløbet trin for trin -->
+  <div class="strip">
+    <div class="step">
+      <div class="ph"><img class="dim1" src="/api/uploads/demo-frame-dribble.jpg"><span class="t">1 · Mørk skærm</span></div>
+      <div class="cap"><b>0,5 sek.</b> Rapporten åbner som en biograf — helt mørkt, filmbjælker top/bund.</div>
+    </div>
+    <div class="step">
+      <div class="ph"><img class="dim2" src="/api/uploads/demo-frame-dribble.jpg"><span class="t">2 · Dit øjeblik toner frem</span></div>
+      <div class="cap"><b>1,5 sek.</b> Spillerens BEDSTE frame fra videoen fader ind med navn + dramatisk tekstlinje.</div>
+    </div>
+    <div class="step">
+      <div class="ph"><img src="/api/uploads/demo-frame-dribble.jpg"><span class="t">3 · Scoren tæller op</span></div>
+      <div class="cap"><b>2 sek.</b> Scoren tæller 0.0 &rarr; 8.4 med tick-lyd. Derefter glider intro'en væk og rapporten ruller frem.</div>
+    </div>
+  </div>
+</body>
+</html>
