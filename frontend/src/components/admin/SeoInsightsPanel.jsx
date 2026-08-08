@@ -94,9 +94,9 @@ export default function SeoInsightsPanel() {
             <tbody>
               {(data?.articles || []).map((a) => (
                 <tr key={a.slug} className="border-b border-gray-border/60 text-ink/80" data-testid={`seo-article-${a.slug}`}>
-                  <td className="py-2 pr-3 max-w-[260px]">
-                    <a href={`/blog/${a.slug}`} target="_blank" rel="noreferrer" className="font-bold text-ink hover:text-forest inline-flex items-center gap-1">
-                      <span className="truncate">{a.title}</span> <ExternalLink className="w-3 h-3 shrink-0" />
+                  <td className="py-2 pr-3">
+                    <a href={`/blog/${a.slug}`} target="_blank" rel="noreferrer" className="font-bold text-ink hover:text-forest flex items-center gap-1 max-w-[240px] min-w-0">
+                      <span className="truncate min-w-0">{a.title}</span> <ExternalLink className="w-3 h-3 shrink-0" />
                     </a>
                   </td>
                   <td className="pr-3">
