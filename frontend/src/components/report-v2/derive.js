@@ -200,10 +200,13 @@ export function deriveV2(report) {
     const ev = snapMatchEvent(text, pref);
     const phrase = firstSentences(text, 60);
     const evTitle = firstSentences(ev?.title, 60);
+    const title = (preferEventTitle ? evTitle || phrase : phrase || evTitle) || "—";
+    let desc = firstSentences(ev?.description || (preferEventTitle ? "" : text), 145);
+    if (desc === title) desc = "";
     return {
       key,
-      title: (preferEventTitle ? evTitle || phrase : phrase || evTitle) || "—",
-      desc: firstSentences(ev?.description || (preferEventTitle ? "" : text), 145) || "—",
+      title,
+      desc,
       timestamp: ev?.timestamp || null,
       thumb: ev ? snapCloseFrame(ev.timestamp) : null,
       annot: forcedAnnot || SNAP_ANNOT_BY_TYPE[String(ev?.action_type || "").toLowerCase()] || "circle",

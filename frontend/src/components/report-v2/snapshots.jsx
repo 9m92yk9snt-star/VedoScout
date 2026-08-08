@@ -94,7 +94,9 @@ function SnapCard({ moment }) {
       </div>
       <div className="px-5 py-4 flex-1">
         <div className="text-[18px] md:text-[20px] font-extrabold text-[#12211A] leading-snug" data-testid={`snapshot-title-${moment.key}`}>{moment.title}</div>
-        <p className="text-[13px] text-[#5C6657] leading-relaxed mt-1.5">{moment.desc}</p>
+        {moment.desc && moment.desc !== "—" && (
+          <p className="text-[13px] text-[#5C6657] leading-relaxed mt-1.5">{moment.desc}</p>
+        )}
       </div>
     </div>
   );

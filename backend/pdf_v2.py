@@ -296,8 +296,10 @@ def derive_v2(report):
         ev_title = first_sentences(ev.get("title"), 60)
         title = (ev_title or phrase) if prefer_event_title else (phrase or ev_title)
         desc = first_sentences(ev.get("description") or ("" if prefer_event_title else text), 145)
+        if desc == title:
+            desc = ""
         return {
-            "key": key, "title": title or "—", "desc": desc or "—",
+            "key": key, "title": title or "—", "desc": desc,
             "timestamp": ev.get("timestamp"),
             "thumb": _close_frame(ev.get("timestamp")) if ev else None,
             "annot": forced or _annot_by_type.get(str(ev.get("action_type") or "").lower(), "circle"),
@@ -937,8 +939,10 @@ def _snapshot_moment_card(c, m, x, y, w, h, resolve):
     ty = y + TXT - 10
     ty -= draw_par(c, f"<b>{esc(m.get('title'))}</b>", x + 12, ty, w - 24,
                    _style(F_BOLD, 10.5, INK, leading=12.6), max_h=27) + 3
-    draw_par(c, esc(m.get("desc")), x + 12, ty, w - 24,
-             _style(F_BODY, 7.2, HexColor("#5C6657"), leading=9.6), max_h=max(10, ty - y - 6))
+    desc = m.get("desc")
+    if desc and desc != "—":
+        draw_par(c, esc(desc), x + 12, ty, w - 24,
+                 _style(F_BODY, 7.2, HexColor("#5C6657"), leading=9.6), max_h=max(10, ty - y - 6))
 
 
 def _snapshot_progress_strip(c, note, x, y, w, h):
