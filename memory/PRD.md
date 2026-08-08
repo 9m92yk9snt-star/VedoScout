@@ -1,5 +1,14 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Aug 8, 2026 — part 8) — EMAIL-HUB, GOOGLE FJERNET, ENS NAV, "SCOUT'S FIRST IMPRESSION" ✅ (iter81: 100% backend 18/18 + frontend)
+- **Email-hub (admin → Email)**: NY `PromoEmailsAdmin.jsx` øverst i Email-fanen — alle 11 automatiske/promotion-emails ét sted m. navn + hvornår de sendes + "Send test" til valgfri rigtig mail. Backend: `POST /api/admin/emails/send-test` (server.py ~10440, TestEmailPayload, 11 templates m. realistisk sample-data, subject-prefix "[TEST]"). GrowthAdmin Manual Campaign fik labels: Campaign name / Discount % / Valid for (hours).
+- **Google-login FJERNET** (brugerens valg pga. Emergent-branding på OAuth-skærmen — kan ikke omdøbes uden egen Google OAuth-klient): knap fjernet fra Login.jsx, Signup.jsx og AccountGateModal (onGoogleRedirect-prop fjernet). AuthShell beholder GoogleButton/googleRedirect-exports + AuthCallback-rute (uskadt, klar hvis egen OAuth ønskes senere).
+- **Ens topbar**: Login + Signup renderer nu global `<Navigation />` (samme logo/menu som resten); standalone SmpLogo fjernet fra begge sider. Verificeret 390px uden overflow.
+- **"Parent Summary" → "Scout's First Impression"**: PremiumReportV2 + pdf_v2 (linje ~708). PDF_RENDER_VERSION 25→26 (cache-invalidering). PDF-tekst verificeret m. fitz (indeholder ny titel, ikke gammel).
+- **Sample-link i emails**: verificeret — emails linker bevidst til https://scoutmeplay.com/sample-report (prod). Virker i preview på preview-URL; virker først i prod EFTER REDEPLOY (prod kører gammel build uden /sample-report). Click-tracking redirect-sikkerhed retestet (302, open-redirect afvist).
+- **iter81**: 100% (18/18 backend, alle frontend-checks). Genbrugbare pytest: tests/test_iter81_email_admin.py + test_iter81_pdf_rename.py. SMTP-tests sendes KUN til noreply@scoutmeplay.com.
+- ⚠️ REQUIRES REDEPLOY (især for at sample-links i allerede planlagte emails virker i prod).
+
 ## Session (Aug 8, 2026 — part 7) — SNAPSHOT-DELING + LANDING SWIPE-SEKTIONER ✅ (iter80: backend 13/13, frontend pass; visuel kort-bredde fixet + verificeret)
 - **Snapshot-deling**: NY `/app/backend/snapshot_card.py` (PIL, 1080×1350 PNG): farvet kategori-header m. ikon+timestamp, ægte frame m. taktisk annotering (dashed/solid PIL-primitiver), titel+beskrivelse, ScoutMePlay-branding (wordmark m. volt ME-chip, tagline, scoutmeplay.com). Endpoints i server.py (~10380): `GET /api/demo-report/snapshot-card/{key}.png` (PUBLIC, cache 1h) + `GET /api/reports/{id}/snapshot-card/{key}.png` (owner/admin, 402 hvis ulåst mangler, 404 ukendt key). Cache: `cards/{id}.snap.{key}.v1.png` (SNAP_CARD_VERSION=1 — bump ved designændring).
 - **Frontend**: share-knap (Share2-ikon, testid `snapshot-share-{key}`) på alle 4 snapshot-kort i Sample (public demo-endpoint) + Premium (auth blob via api). navigator.share m. fil hvis muligt, ellers download + sonner-toast. Free Preview: ingen share (låst). `PremiumReportV2` sender reportId.

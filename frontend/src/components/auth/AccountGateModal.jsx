@@ -11,8 +11,8 @@ import { PASSWORD_RULES } from "@/pages/Signup";
 /* Account gate — shown to guests the moment they hit "Start analysis".
    Their video is already uploaded (background chunked upload), the player is
    marked and details are filled — creating the account is the LAST step
-   before analysis starts. Email+password only, or Google. */
-export default function AccountGateModal({ open, onClose, onAuthed, onGoogleRedirect, uploadReady, uploadPct = 0 }) {
+   before analysis starts. Email + password only. */
+export default function AccountGateModal({ open, onClose, onAuthed, uploadReady, uploadPct = 0 }) {
   const [tab, setTab] = useState("signup"); // 'signup' | 'login'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
