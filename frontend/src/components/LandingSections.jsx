@@ -237,7 +237,7 @@ export function HowItWorks() {
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
             data-testid={`how-step-${s.n}`}
-            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 min-w-[82%] sm:min-w-[58%] md:min-w-0 snap-center shrink-0 md:shrink"
+            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 w-[82%] sm:w-[58%] md:w-auto snap-center shrink-0 md:shrink"
           >
             {/* Mobile step circle marker */}
             <span
@@ -346,7 +346,7 @@ export function WhatsInside() {
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.45, delay: idx * 0.06 }}
               data-testid={`feature-${idx}`}
-              className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 transition-colors duration-300 min-w-[85%] sm:min-w-[62%] md:min-w-0 snap-center shrink-0 md:shrink"
+              className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 transition-colors duration-300 w-[85%] sm:w-[62%] md:w-auto snap-center shrink-0 md:shrink"
             >
               <div className="relative aspect-[16/9] overflow-hidden bg-ink">
                 <img
