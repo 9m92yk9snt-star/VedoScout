@@ -15,10 +15,11 @@ export default function ReferralInviteCard() {
 
   if (!data?.enabled) return null;
   const pct = Math.round(data.percent);
+  const link = `${window.location.origin}/?ref=${data.code}`;
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(data.link);
+      await navigator.clipboard.writeText(link);
       setCopied(true);
       toast.success("Invite link copied!");
       setTimeout(() => setCopied(false), 2000);
@@ -28,9 +29,9 @@ export default function ReferralInviteCard() {
   };
 
   const share = async () => {
-    const text = `Get your football game analyzed on ScoutMePlay — sign up with my link and we both get ${pct}% off: ${data.link}`;
+    const text = `Get your football game analyzed on ScoutMePlay — sign up with my link and we both get ${pct}% off: ${link}`;
     if (navigator.share) {
-      try { await navigator.share({ title: "ScoutMePlay", text, url: data.link }); } catch { /* cancelled */ }
+      try { await navigator.share({ title: "ScoutMePlay", text, url: link }); } catch { /* cancelled */ }
     } else {
       copy();
     }
@@ -57,7 +58,7 @@ export default function ReferralInviteCard() {
         </div>
         <div className="shrink-0 w-full md:w-auto">
           <div className="flex items-center gap-2 bg-white border border-ink/15 rounded-xl px-3 py-2.5">
-            <span className="text-[12px] text-ink/70 font-mono truncate max-w-[220px]" data-testid="referral-link-text">{data.link}</span>
+            <span className="text-[12px] text-ink/70 font-mono truncate max-w-[220px]" data-testid="referral-link-text">{link}</span>
             <button type="button" onClick={copy} data-testid="referral-copy-btn" aria-label="Copy invite link"
               className="w-8 h-8 rounded-lg bg-ink text-white flex items-center justify-center hover:bg-forest transition-colors shrink-0">
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
