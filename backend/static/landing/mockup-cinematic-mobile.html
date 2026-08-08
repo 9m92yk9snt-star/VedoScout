@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobil Mockup — Cinematic Intro</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Archivo',sans-serif; background:#0d1a0f; color:#f2efe6; padding:40px 24px; }
+  h1 { font-family:'Archivo Black',sans-serif; font-size:26px; text-align:center; letter-spacing:1px; margin-bottom:6px; color:#c8f542; }
+  .sub { text-align:center; font-size:14px; color:#9fb89a; margin-bottom:36px; }
+  .phones { display:flex; gap:28px; justify-content:center; flex-wrap:wrap; }
+  .phone-wrap { text-align:center; }
+  .phone {
+    width:300px; height:620px; background:#000; border-radius:38px;
+    border:5px solid #2a3a2c; overflow:hidden; position:relative;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);
+  }
+  .notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:110px; height:22px; background:#000; border-radius:0 0 14px 14px; z-index:50; }
+  .step-label { margin-top:16px; font-family:'Archivo Black',sans-serif; font-size:13px; letter-spacing:1.5px; color:#c8f542; text-transform:uppercase; }
+  .step-desc { margin-top:6px; font-size:12.5px; color:#b8c9b3; max-width:300px; line-height:1.5; }
+
+  /* fase 1: mørk skærm */
+  .screen1 { width:100%; height:100%; background:#050505; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; }
+  .bar-top,.bar-bottom { position:absolute; left:0; right:0; height:56px; background:#000; border-bottom:1px solid #1a1a1a; }
+  .bar-top { top:0; } .bar-bottom { bottom:0; border-bottom:none; border-top:1px solid #1a1a1a; }
+  .presents { font-size:10px; letter-spacing:4px; color:#c8f542; text-transform:uppercase; opacity:.85; }
+  .skip { position:absolute; top:34px; right:14px; z-index:60; font-size:10px; letter-spacing:1px; color:#888; border:1px solid #333; border-radius:20px; padding:5px 12px; background:rgba(0,0,0,.5); }
+
+  /* fase 2: spiller-frame */
+  .screen2 { width:100%; height:100%; position:relative; overflow:hidden; }
+  .screen2 img { width:100%; height:100%; object-fit:cover; filter:brightness(.55) saturate(1.1); }
+  .s2-overlay { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:24px; text-align:center; background:linear-gradient(180deg,rgba(0,0,0,.75) 0%,rgba(0,0,0,.15) 45%,rgba(0,0,0,.8) 100%); }
+  .s2-presents { font-size:9px; letter-spacing:4px; color:#c8f542; text-transform:uppercase; margin-bottom:10px; }
+  .s2-name { font-family:'Archivo Black',sans-serif; font-size:34px; line-height:1.02; color:#fff; text-transform:uppercase; }
+  .s2-moment { margin-top:14px; font-size:14px; color:#e8e4d8; line-height:1.5; }
+  .s2-moment b { color:#c8f542; }
+  .ts-chip { position:absolute; top:34px; left:14px; font-family:'Archivo Black',sans-serif; font-size:12px; color:#c8f542; border:1px solid #c8f54255; border-radius:8px; padding:4px 9px; background:rgba(0,0,0,.55); }
+
+  /* fase 3: score */
+  .screen3 { width:100%; height:100%; position:relative; overflow:hidden; }
+  .screen3 img { width:100%; height:100%; object-fit:cover; filter:brightness(.3) blur(2px); }
+  .s3-overlay { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:24px; }
+  .s3-score { font-family:'Archivo Black',sans-serif; font-size:96px; color:#c8f542; line-height:1; text-shadow:0 0 40px rgba(200,245,66,.35); }
+  .s3-label { font-size:11px; letter-spacing:4px; color:#cfd8c8; text-transform:uppercase; margin-top:8px; }
+  .s3-cta { margin-top:44px; font-size:10px; letter-spacing:3px; color:#9fb89a; text-transform:uppercase; }
+  .s3-arrow { margin-top:8px; font-size:20px; color:#c8f542; animation:bounce 1.4s infinite; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+  .sound-toggle { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); font-size:10px; color:#777; border:1px solid #333; border-radius:20px; padding:5px 14px; background:rgba(0,0,0,.5); }
+
+  .note { max-width:680px; margin:40px auto 0; background:#13241680; border:1px solid #2a3a2c; border-radius:14px; padding:18px 22px; font-size:13px; line-height:1.6; color:#cfd8c8; }
+  .note b { color:#c8f542; }
+</style>
+</head>
+<body>
+  <h1>CINEMATIC INTRO — PÅ MOBIL</h1>
+  <p class="sub">Fuldskærm i 8–12 sekunder · "Spring over" er altid synlig · Derefter glider den væk og rapporten vises normalt</p>
+
+  <div class="phones">
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen1">
+          <div class="bar-top"></div>
+          <div class="skip">SPRING OVER ✕</div>
+          <div class="presents">SCOUTMEPLAY PRÆSENTERER</div>
+          <div class="bar-bottom"></div>
+        </div>
+      </div>
+      <div class="step-label">1 · Mørk åbning (0,5 sek.)</div>
+      <div class="step-desc">Biograf-mørke med filmbjælker. "Spring over"-knappen er synlig fra første sekund — ingen føler sig fanget.</div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen2">
+          <img src="/api/uploads/demo-frame-dribble.jpg" alt="">
+          <div class="skip">SPRING OVER ✕</div>
+          <div class="ts-chip">00:58</div>
+          <div class="s2-overlay">
+            <div class="s2-presents">SCOUTMEPLAY PRÆSENTERER</div>
+            <div class="s2-name">Noah<br>Andersen</div>
+            <div class="s2-moment">Minut 00:58. <b>To forsvarere.</b><br>Én beslutning.</div>
+          </div>
+        </div>
+      </div>
+      <div class="step-label">2 · Dit øjeblik (1,5 sek.)</div>
+      <div class="step-desc">Spillerens bedste frame fra videoen fylder hele skærmen. Navn + dramatisk tekstlinje toner frem.</div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen3">
+          <img src="/api/uploads/demo-frame-dribble.jpg" alt="">
+          <div class="skip">SPRING OVER ✕</div>
+          <div class="s3-overlay">
+            <div class="s3-score">8.4</div>
+            <div class="s3-label">SAMLET SCORE</div>
+            <div class="s3-cta">DIN HISTORIE STARTER HER</div>
+            <div class="s3-arrow">↓</div>
+          </div>
+          <div class="sound-toggle">🔇 Lyd fra</div>
+        </div>
+      </div>
+      <div class="step-label">3 · Scoren tæller op (2 sek.)</div>
+      <div class="step-desc">0.0 → 8.4 tæller op. Derefter glider introen automatisk væk, og rapporten ruller frem som normalt.</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Vigtigt på mobil:</b> Introen vises kun <b>første gang</b> rapporten åbnes (eller når spilleren selv trykker "Afspil intro igen"). Den kan altid springes over med ét tryk. Ingen lyd uden spilleren selv slår den til. Efter introen er rapporten 100% som i dag — intet er flyttet eller ændret.
+  </div>
+</body>
+</html>
