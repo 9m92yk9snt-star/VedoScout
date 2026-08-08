@@ -5,7 +5,9 @@
 // Pure presentation — all data comes pre-derived from derive.js.
 
 import React, { useState } from "react";
-import { Camera, Star, Eye, Flame, Target, TrendingUp } from "lucide-react";
+import { Camera, Star, Eye, Flame, Target, TrendingUp, Share2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import api from "@/lib/api";
 
 export const SNAP_CARD_META = {
   strength: { label: "Biggest Strength", Icon: Star, header: "linear-gradient(90deg,#1E3D25,#2E5435)" },
@@ -75,7 +77,7 @@ export function SnapFrame({ thumb, annot, Icon }) {
   );
 }
 
-function SnapCard({ moment }) {
+function SnapCard({ moment, onShare, sharing }) {
   const meta = SNAP_CARD_META[moment.key] || SNAP_CARD_META.noticed;
   return (
     <div data-testid={`snapshot-card-${moment.key}`} className="rounded-[16px] overflow-hidden border border-[#E5DFCE] bg-[#FBFAF2] shadow-[0_3px_14px_rgba(30,50,35,0.08)] flex flex-col">
@@ -92,10 +94,23 @@ function SnapCard({ moment }) {
       <div className="relative h-[200px] md:h-[245px] bg-[#0B1F14] shrink-0">
         <SnapFrame thumb={moment.thumb} annot={moment.annot} Icon={meta.Icon} />
       </div>
-      <div className="px-5 py-4 flex-1">
-        <div className="text-[18px] md:text-[20px] font-extrabold text-[#12211A] leading-snug" data-testid={`snapshot-title-${moment.key}`}>{moment.title}</div>
+      <div className="px-5 py-4 flex-1 relative">
+        <div className={`text-[18px] md:text-[20px] font-extrabold text-[#12211A] leading-snug ${onShare ? "pr-10" : ""}`} data-testid={`snapshot-title-${moment.key}`}>{moment.title}</div>
         {moment.desc && moment.desc !== "—" && (
           <p className="text-[13px] text-[#5C6657] leading-relaxed mt-1.5">{moment.desc}</p>
+        )}
+        {onShare && (
+          <button
+            type="button"
+            onClick={onShare}
+            disabled={sharing}
+            data-testid={`snapshot-share-${moment.key}`}
+            aria-label="Share this snapshot"
+            title="Share this snapshot"
+            className="absolute top-3.5 right-4 w-9 h-9 rounded-full border border-[#DCE8D6] bg-white text-[#1E5B3C] flex items-center justify-center hover:bg-[#E9F1E6] transition-colors disabled:opacity-50"
+          >
+            {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+          </button>
         )}
       </div>
     </div>
@@ -104,10 +119,36 @@ function SnapCard({ moment }) {
 
 const ORDER = ["strength", "noticed", "hidden", "develop"];
 
-export function SnapshotsSection({ snapshot, moments, demo = false, playerName = "" }) {
+export function SnapshotsSection({ snapshot, moments, demo = false, playerName = "", reportId = null }) {
   const byKey = Object.fromEntries((moments || []).map((m) => [m.key, m]));
   const pFirst = String(playerName || "").trim().split(" ")[0];
   const who = demo ? (pFirst ? `${pFirst}'s` : "this") : "your";
+  const canShare = demo || !!reportId;
+  const [sharingKey, setSharingKey] = useState(null);
+
+  const shareSnapshot = async (key) => {
+    setSharingKey(key);
+    try {
+      const path = demo ? `/demo-report/snapshot-card/${key}.png` : `/reports/${reportId}/snapshot-card/${key}.png`;
+      const res = await api.get(path, { responseType: "blob" });
+      const file = new File([res.data], "ScoutMePlay_Snapshot.png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "ScoutMePlay Snapshot" });
+      } else {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Snapshot image downloaded — ready to share!");
+      }
+    } catch (e) {
+      if (e?.name !== "AbortError") toast.error("Could not create the share image. Please try again.");
+    } finally {
+      setSharingKey(null);
+    }
+  };
 
   return (
     <div data-testid="v2-snapshots-section" className="bg-[#F6F3E8] border border-[#E5DFCE] rounded-[22px] p-4 md:p-6 shadow-[0_2px_10px_rgba(30,50,35,0.05)]">
@@ -131,7 +172,16 @@ export function SnapshotsSection({ snapshot, moments, demo = false, playerName =
 
       {/* ── 2×2 moment cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-        {ORDER.map((k) => (byKey[k] ? <SnapCard key={k} moment={byKey[k]} /> : null))}
+        {ORDER.map((k) =>
+          byKey[k] ? (
+            <SnapCard
+              key={k}
+              moment={byKey[k]}
+              onShare={canShare ? () => shareSnapshot(k) : null}
+              sharing={sharingKey === k}
+            />
+          ) : null
+        )}
       </div>
 
       {/* ── Overall progress ── */}

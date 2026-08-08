@@ -17,7 +17,7 @@
  *  SocialProof       — Parent testimonial + player portrait
  *  FinalCta          — Bottom conversion strip
  */
-import React from "react";
+import React, { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -34,6 +34,32 @@ import {
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL;
 const IMG = (name) => `${ASSET_BASE}/api/static/landing/${name}`;
+
+/* Mobile swipe-carousel helpers (md+ falls back to the original grids). */
+function useCarousel(count) {
+  const ref = useRef(null);
+  const [active, setActive] = useState(0);
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    const max = Math.max(1, el.scrollWidth - el.clientWidth);
+    setActive(Math.min(count - 1, Math.max(0, Math.round((el.scrollLeft / max) * (count - 1)))));
+  };
+  return { ref, active, onScroll };
+}
+
+function CarouselDots({ count, active, testid }) {
+  return (
+    <div className="md:hidden flex items-center justify-center gap-2 mt-5" data-testid={testid}>
+      {Array.from({ length: count }).map((_, i) => (
+        <span
+          key={i}
+          className={`rounded-full transition-all duration-300 ${i === active ? "w-6 h-2 bg-forest" : "w-2 h-2 bg-forest/30"}`}
+        />
+      ))}
+    </div>
+  );
+}
 
 /* ────────────────────────────────────────────────────────────────────── */
 /*  Generic section wrapper — tighter vertical rhythm than v1, optional   */
@@ -163,6 +189,7 @@ export function TrustStrip() {
 /*  "01 / 02 / 03" numeral bottom-right. Premium product-walkthrough feel. */
 /* ────────────────────────────────────────────────────────────────────── */
 export function HowItWorks() {
+  const car = useCarousel(3);
   const steps = [
     {
       n: "01",
@@ -195,12 +222,13 @@ export function HowItWorks() {
       sub="From phone-footage to a real scout report in under five minutes of your time."
       tight
     >
-      <div className="relative grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
-        {/* Vertical timeline line — only visible on mobile (stacked layout) */}
-        <span
-          aria-hidden
-          className="md:hidden absolute left-7 top-12 bottom-12 w-[2px] bg-gradient-to-b from-forest via-forest/30 to-forest"
-        />
+      <div
+        ref={car.ref}
+        onScroll={car.onScroll}
+        data-testid="how-steps-carousel"
+        className="flex md:grid md:grid-cols-3 gap-4 md:gap-5 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-6 px-6 md:mx-0 md:px-0 pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: "none" }}
+      >
         {steps.map((s, idx) => (
           <motion.div
             key={s.n}
@@ -209,9 +237,9 @@ export function HowItWorks() {
             viewport={{ once: true, margin: "-60px" }}
             transition={{ duration: 0.5, delay: idx * 0.08 }}
             data-testid={`how-step-${s.n}`}
-            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 md:ml-0 ml-0"
+            className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 hover:-translate-y-0.5 transition-all duration-300 min-w-[82%] sm:min-w-[58%] md:min-w-0 snap-center shrink-0 md:shrink"
           >
-            {/* Mobile step circle marker — sits on the vertical timeline */}
+            {/* Mobile step circle marker */}
             <span
               aria-hidden
               className="md:hidden absolute top-4 left-4 z-10 w-7 h-7 rounded-full bg-forest text-white border-2 border-cream-base flex items-center justify-center font-barlow font-black text-[11px]"
@@ -255,6 +283,7 @@ export function HowItWorks() {
           </motion.div>
         ))}
       </div>
+      <CarouselDots count={steps.length} active={car.active} testid="how-steps-dots" />
     </Section>
   );
 }
@@ -264,6 +293,7 @@ export function HowItWorks() {
 /*  thumbnail strip on the right of each card.                            */
 /* ────────────────────────────────────────────────────────────────────── */
 export function WhatsInside() {
+  const car = useCarousel(4);
   const features = [
     {
       img: "inside-seen.jpg",
@@ -299,7 +329,13 @@ export function WhatsInside() {
       sub="Not cold numbers — a personal story about your game: what shines today, and what takes you further tomorrow."
       tight
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+      <div
+        ref={car.ref}
+        onScroll={car.onScroll}
+        data-testid="whats-inside-carousel"
+        className="flex md:grid md:grid-cols-2 gap-5 md:gap-6 overflow-x-auto md:overflow-visible snap-x snap-mandatory -mx-6 px-6 md:mx-0 md:px-0 pb-1 md:pb-0 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: "none" }}
+      >
         {features.map((f, idx) => {
           const Icon = f.icon;
           return (
@@ -310,7 +346,7 @@ export function WhatsInside() {
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.45, delay: idx * 0.06 }}
               data-testid={`feature-${idx}`}
-              className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 transition-colors duration-300"
+              className="group relative bg-cream-card border border-gray-border overflow-hidden hover:border-forest/40 transition-colors duration-300 min-w-[85%] sm:min-w-[62%] md:min-w-0 snap-center shrink-0 md:shrink"
             >
               <div className="relative aspect-[16/9] overflow-hidden bg-ink">
                 <img
@@ -336,6 +372,7 @@ export function WhatsInside() {
           );
         })}
       </div>
+      <CarouselDots count={features.length} active={car.active} testid="whats-inside-dots" />
     </Section>
   );
 }

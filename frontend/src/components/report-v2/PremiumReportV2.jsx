@@ -258,6 +258,7 @@ export default function PremiumReportV2({ report, assetBase }) {
           moments={snapshotMoments}
           demo={!!report.demo}
           playerName={pd.player_name}
+          reportId={report.id}
         />
       </div>
 

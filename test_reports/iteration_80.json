@@ -1,0 +1,42 @@
+{
+  "summary": "Iter80 — snapshot card sharing + landing carousels. Backend: 13/13 pytest passed (public demo endpoint, auth report endpoint with 401/403/402/404/200 flows, PNG magic bytes valid). Frontend: /sample-report share buttons trigger downloads + toast (no console errors); premium report share buttons visible & authenticated download works (no 401s); landing mobile 390px carousels scroll horizontally with dots updating and no page overflow; landing desktop 1920px preserves 3-col + 2x2 grid with dots hidden. One minor UI observation on mobile card sizing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Landing mobile (390px) — How it works & What's inside carousels",
+        "issues": [
+          "Cards render much wider than spec: measured getBoundingClientRect().width = 761px for how-step-01 and 735px for feature-0 at 390px viewport (~195% of viewport width). Spec says cards should be ~82% of viewport (~320px) so users see one full card + a peek of next. Currently only ~50% of a card is visible before scrolling. Carousel is functionally correct (horizontal scroll works, dots update, no page overflow), but visual peek/snap is off. Likely min-w-[82%] resolving against a wider intrinsic base — check aspect-[16/10] image tile + shrink-0 combination on mobile."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter80_snapshot_cards.py",
+    "/app/backend/tests/seed_iter80_frontend.py",
+    "/app/test_reports/pytest/iter80_snapshot_cards.xml"
+  ],
+  "action_items": [
+    "Investigate mobile card width on /  How it works and What's inside carousels — cards render ~195% of viewport instead of ~82%. Functionality is fine (scroll+dots+no overflow) but visual card peek is missing."
+  ],
+  "critical_code_review_comments": [
+    "server.py line 10415 correctly restricts /reports/{id}/snapshot-card/{key}.png to owner (or admin) with 403 for other users and 402 for unpaid — verified with pytest.",
+    "seed_iter78_fpl.py uses 'unlocked: True' but the new snapshot-card endpoint (server.py line 10417) checks 'is_paid' or 'manually_unlocked' — the old seed field 'unlocked' will NOT unlock these new endpoints. Any future test/seed reuse must set is_paid=True or manually_unlocked=True (or user must be admin)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter80_snapshot_cards.py (new — 13 tests)",
+    "/app/backend/tests/seed_iter80_frontend.py (new — persistent seed helper for FE premium test)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "95% (share flows + carousel functionality all pass; one visual-only card-width observation on mobile)"},
+  "test_credentials": "Used disposable seeded user (smtest.iter80.fe_<hex>@example.com) — DELETED after test. Admin (admin@elitescout.com) not needed.",
+  "seed_data_creation": "Seeded 1 disposable user + 1 unlocked report for frontend premium test; pytest seeded 2 disposable users + 2 reports (locked+unlocked). ALL cleaned up (verified: users deleted=1, reports deleted=1 in cleanup script; pytest fixture teardown removed the others).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest at /app/backend/tests/test_iter80_snapshot_cards.py covers all snapshot-card endpoints (public + auth). Persistent seed helper at /app/backend/tests/seed_iter80_frontend.py inserts a user directly into DB (bypasses signup rate limit) then logs in via /api/auth/login. IMPORTANT: signup endpoint /api/auth/signup is rate-limited per network (429 'Too many signups from this network'). For future FE tests, prefer direct DB insert of user + bcrypt password_hash then POST /api/auth/login to obtain token. Auth is via localStorage keys 'elite_token' + 'elite_user'. Landing mobile carousel cards render wider than spec (761px vs expected ~320px at 390 vw) — functionally fine but visual peek missing.",
+  "rca of the issue": "Mobile carousel card width bug (design_issue): parent flex container width=390px, but children with min-w-[82%] measure at 761px width. Likely because aspect-[16/10] on the inner image tile + shrink-0 pushes intrinsic (max-content) card width above the 82% minimum. Suggest adding max-w to card (e.g. max-w-[82%]) OR explicit basis-[82%] with shrink-0. Verified: parent scrollWidth=2546px = 3×~761 + gaps (confirms all 3 cards oversized, not just first). Same pattern on whats-inside (feature-0 = 735px)."
+}

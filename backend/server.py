@@ -10376,6 +10376,54 @@ async def download_player_card(report_id: str, user=Depends(get_current_user)):
     )
 
 
+# ============== SHAREABLE SNAPSHOT MOMENT CARD (PNG, 1080x1350) ==============
+
+SNAP_CARD_VERSION = 1
+_SNAP_KEYS = {"strength", "noticed", "hidden", "develop"}
+
+
+async def _build_snapshot_card_file(doc: dict, key: str) -> Path:
+    path = CARDS_DIR / f"{doc['id']}.snap.{key}.v{SNAP_CARD_VERSION}.png"
+    if not path.exists():
+        from snapshot_card import build_snapshot_card
+        await asyncio.to_thread(build_snapshot_card, doc, key, str(path), _pdf_image_resolver)
+    return path
+
+
+@api_router.get("/demo-report/snapshot-card/{moment_key}.png")
+async def demo_snapshot_card(moment_key: str):
+    """Public branded share image for a demo/sample snapshot moment."""
+    if moment_key not in _SNAP_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown snapshot")
+    doc = await db.reports.find_one({"id": "demo-sample-report"})
+    if not doc or not doc.get("full_report"):
+        raise HTTPException(status_code=404, detail="Sample report not available")
+    path = await _build_snapshot_card_file(doc, moment_key)
+    return FileResponse(str(path), media_type="image/png",
+                        filename=f"ScoutMePlay_Snapshot_{moment_key}.png",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
+@api_router.get("/reports/{report_id}/snapshot-card/{moment_key}.png")
+async def report_snapshot_card(report_id: str, moment_key: str, user=Depends(get_current_user)):
+    """Branded share image (1080x1350 PNG) for one snapshot moment of a premium report."""
+    if moment_key not in _SNAP_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown snapshot")
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"):
+        raise HTTPException(status_code=402, detail="Payment required")
+    if not doc.get("full_report"):
+        raise HTTPException(status_code=400, detail="Full report not generated yet")
+    path = await _build_snapshot_card_file(doc, moment_key)
+    player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
+    return FileResponse(str(path), media_type="image/png",
+                        filename=f"ScoutMePlay_{player_name_safe}_Snapshot.png")
+
+
 # ============== SHARE REPORT (public PDF link) ==============
 
 @api_router.post("/reports/{report_id}/share")
