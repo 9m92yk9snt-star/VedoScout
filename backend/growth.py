@@ -71,6 +71,12 @@ def discounted_price(base: float, disc: dict) -> float:
 
 
 # ── Conversion sweep ────────────────────────────────────────────────────────
+def _is_self(user_full_name, player_first) -> bool:
+    """Account holder IS the player (first names match) → player-voice emails."""
+    uf = str(user_full_name or "").strip().split(" ")[0].lower()
+    return bool(uf) and uf == str(player_first or "").strip().lower()
+
+
 async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
     """One pass over unpaid completed reports + abandoned checkouts.
     Timeline per report: 24h numbers-waiting → 48h discount → 72h discovery."""
@@ -97,6 +103,8 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
             continue
         pd = doc.get("player_details") or {}
         first = str(pd.get("player_name") or "your player").split(" ")[0]
+        u = await db.users.find_one({"id": doc.get("user_id")}, {"full_name": 1}) or {}
+        selfp = _is_self(u.get("full_name"), first)
         report_url = f"{_site_url()}/report/{doc['id']}"
 
         try:
@@ -104,7 +112,7 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
                 sm = build_score_meaning(doc)
                 if sm and sm.get("discovery"):
                     if not dry_run:
-                        html, text, subject = render_conv_discovery_email(first, report_url)
+                        html, text, subject = render_conv_discovery_email(first, report_url, self_player=selfp)
                         if await send_email_async(email, subject, html, text, category="conversion"):
                             await db.reports.update_one(
                                 {"id": doc["id"]}, {"$set": {"conv_mail3_sent_at": now.isoformat()}})
@@ -121,7 +129,7 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
                         "source": "auto_48h"}
                 if not dry_run:
                     html, text, subject = render_conv_discount_email(
-                        first, report_url, pct, base, discounted_price(base, disc), hours=48)
+                        first, report_url, pct, base, discounted_price(base, disc), hours=48, self_player=selfp)
                     if await send_email_async(email, subject, html, text, category="conversion"):
                         await db.reports.update_one(
                             {"id": doc["id"]},
@@ -164,6 +172,7 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
         if age_h < 1:
             continue
         first, resume_url = "your player", f"{_site_url()}/dashboard"
+        selfp = False
         rid = txn.get("report_id")
         if rid:
             rdoc = await db.reports.find_one({"id": rid}, {"is_paid": 1, "player_details": 1})
@@ -174,9 +183,11 @@ async def conversion_sweep(db, get_single_price, dry_run: bool = False) -> list:
                 continue
             first = str((rdoc.get("player_details") or {}).get("player_name") or "your player").split(" ")[0]
             resume_url = f"{_site_url()}/report/{rid}"
+            u = await db.users.find_one({"id": txn.get("user_id")}, {"full_name": 1}) or {}
+            selfp = _is_self(u.get("full_name"), first)
         try:
             if not dry_run:
-                html, text, subject = render_abandoned_checkout_email(first, resume_url)
+                html, text, subject = render_abandoned_checkout_email(first, resume_url, self_player=selfp)
                 if await send_email_async(email, subject, html, text, category="abandoned_checkout"):
                     await db.payment_transactions.update_one(
                         {"id": txn["id"]}, {"$set": {"abandon_mail_sent_at": now.isoformat()}})

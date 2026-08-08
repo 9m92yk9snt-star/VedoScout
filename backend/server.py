@@ -4953,6 +4953,29 @@ async def admin_upload_demo_poster(file: UploadFile = File(...), _=Depends(get_c
 
 # ============== ROUTES: VIDEO UPLOAD & FREE PREVIEW ==============
 
+class StickyCtaUpdate(BaseModel):
+    enabled: bool = True
+    text: str = Field(default="Get My Report", max_length=40)
+
+
+@api_router.get("/settings/sticky-cta")
+async def get_sticky_cta():
+    """Public — landing sticky mobile CTA config (admin-editable)."""
+    doc = await db.settings.find_one({"key": "sticky_cta"}, {"_id": 0})
+    val = (doc or {}).get("value") or {}
+    return {"enabled": bool(val.get("enabled", True)), "text": str(val.get("text") or "Get My Report")[:40]}
+
+
+@api_router.put("/admin/sticky-cta")
+async def update_sticky_cta(payload: StickyCtaUpdate, _=Depends(get_current_admin)):
+    await db.settings.update_one(
+        {"key": "sticky_cta"},
+        {"$set": {"key": "sticky_cta", "value": {"enabled": payload.enabled, "text": payload.text.strip()[:40] or "Get My Report"}}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
 @api_router.get("/settings/pixels")
 async def public_pixels():
     """Public — the frontend loads marketing pixels (Meta/TikTok) from these IDs
@@ -6570,7 +6593,7 @@ async def _curve_reminder_sweep(dry_run: bool = False) -> list:
         ).to_list(100)
         if any(_norm_player_name((n.get("player_details") or {}).get("player_name")) == name for n in newer):
             continue
-        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1, "name": 1})
+        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1, "full_name": 1})
         email = (u or {}).get("email")
         if not email:
             continue
@@ -6583,7 +6606,10 @@ async def _curve_reminder_sweep(dry_run: bool = False) -> list:
         results.append({"report_id": doc["id"], "player": pd.get("player_name"), "email": email, "weeks": weeks})
         if dry_run:
             continue
-        html, text, subject = render_curve_reminder_email(u.get("name"), pd.get("player_name"), weeks)
+        html, text, subject = render_curve_reminder_email(
+            u.get("full_name"), pd.get("player_name"), weeks,
+            self_player=_is_self(u.get("full_name"), str(pd.get("player_name") or "").split(" ")[0]),
+        )
         ok = await send_email_async(email, subject, html, text)
         if ok:
             await db.reports.update_one(
@@ -6604,14 +6630,16 @@ async def _send_report_ready_email(report_id: str):
         )
         if not doc or doc.get("report_ready_email_sent_at") or doc.get("demo"):
             return
-        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1, "name": 1})
+        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1, "full_name": 1})
         email = (u or {}).get("email")
         if not email:
             return
+        pname = (doc.get("player_details") or {}).get("player_name")
+        selfp = _is_self((u or {}).get("full_name"), str(pname or "").split(" ")[0])
         site = (os.environ.get("SITE_PUBLIC_URL") or os.environ.get("FRONTEND_URL") or "https://scoutmeplay.com").rstrip("/")
         html, text, subject = render_report_ready_email(
-            u.get("name"), (doc.get("player_details") or {}).get("player_name"),
-            f"{site}/report/{report_id}",
+            u.get("full_name"), pname,
+            f"{site}/report/{report_id}", self_player=selfp,
         )
         ok = await send_email_async(email, subject, html, text)
         if ok:
@@ -13439,6 +13467,7 @@ from growth import (
     conversion_sweep,
     activation_sweep,
     conversion_loop,
+    _is_self,
 )
 from share_teaser import ensure_teaser_cards
 from email_templates import render_discount_campaign_email
@@ -13499,6 +13528,8 @@ from analytics_tracking import build_analytics_router
 api_router.include_router(build_analytics_router(db=db, admin_dep=get_current_admin))
 from email_log import build_email_log_router
 api_router.include_router(build_email_log_router(db=db, admin_dep=get_current_admin))
+from seo_insights import build_seo_insights_router
+api_router.include_router(build_seo_insights_router(db=db, admin_dep=get_current_admin))
 from email_service import enable_email_log
 enable_email_log(os.environ["MONGO_URL"], os.environ["DB_NAME"])
 from instagram_publish import build_instagram_router

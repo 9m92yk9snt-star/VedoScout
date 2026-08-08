@@ -15,6 +15,8 @@ import GrowthAdmin from "@/components/admin/GrowthAdmin";
 import ReviewsAdmin from "@/components/admin/ReviewsAdmin";
 import FAQAdmin from "@/components/admin/FAQAdmin";
 import EmailAdmin from "@/components/admin/EmailAdmin";
+import SeoInsightsPanel from "@/components/admin/SeoInsightsPanel";
+import StickyCtaAdminCard from "@/components/admin/StickyCtaAdminCard";
 import ScoutVerificationAdmin from "@/components/admin/ScoutVerificationAdmin";
 import DemoVideosAdmin from "@/components/admin/DemoVideosAdmin";
 import GrantAccessAdmin from "@/components/admin/GrantAccessAdmin";
@@ -470,6 +472,7 @@ export default function AdminPage() {
 
               {activeTab === "seo" && (
                 <div className="space-y-8">
+                  <SeoInsightsPanel />
                   <SocialFollowAdmin />
                   <SeoAdmin />
                 </div>
@@ -824,6 +827,7 @@ export default function AdminPage() {
 
               {activeTab === "settings" && (
                 <div className="space-y-6 max-w-3xl">
+                  <StickyCtaAdminCard />
                   {/* ── Marketing pixels (Meta + TikTok) ── */}
                   <div data-testid="admin-pixels-card" className="bg-surface border border-gray-border p-6 md:p-8">
                     <div className="flex items-center gap-2 mb-1">

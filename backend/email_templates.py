@@ -116,10 +116,10 @@ def render_welcome_email(user_name: Optional[str] = None) -> tuple[str, str, str
         <strong style="color:#1F4F2F;">01</strong> &nbsp;&nbsp; Upload a video from a real match or training (5&ndash;15 min ideal).
       </td></tr>
       <tr><td style="padding:0 0 10px 0; font-size:14px; color:#1F2724;">
-        <strong style="color:#1F4F2F;">02</strong> &nbsp;&nbsp; Mark your player in 10 taps so we know who to analyse.
+        <strong style="color:#1F4F2F;">02</strong> &nbsp;&nbsp; Mark the player in 10 taps &mdash; yourself or your player &mdash; so we know who to analyse.
       </td></tr>
       <tr><td style="padding:0 0 10px 0; font-size:14px; color:#1F2724;">
-        <strong style="color:#1F4F2F;">03</strong> &nbsp;&nbsp; Watch every number become a <strong>story about your player</strong> &mdash; across 4 pillars: Technical, Tactical, Physical, Mindset.
+        <strong style="color:#1F4F2F;">03</strong> &nbsp;&nbsp; Watch every number become a <strong>story about the player</strong> &mdash; across 4 pillars: Technical, Tactical, Physical, Mindset.
       </td></tr>
     </table>
     {_btn("Upload your first video", f"{site}/upload")}
@@ -142,24 +142,30 @@ def render_curve_reminder_email(
     parent_name: Optional[str],
     player_name: Optional[str],
     weeks_since: int,
+    self_player: bool = False,
 ) -> tuple[str, str, str]:
     site = _site_url()
     player = (player_name or "your player").strip() or "your player"
     first = player.split(" ")[0]
+    poss = "your" if self_player else f"{first}&apos;s"
+    Poss = "Your" if self_player else f"{first}&apos;s"
+    grown = "you&apos;ve grown" if self_player else f"{first} has grown"
+    because = "you have" if self_player else f"{first} has"
     greet = (parent_name or "").strip()
     greet_line = f"Hi {greet}," if greet else "Hi,"
-    subject = f"{first}'s development curve is waiting for its next point"
-    preheader = f"It's been {weeks_since} weeks — upload a new video and see exactly how much {first} has grown."
+    subject = ("Your development curve is waiting for its next point" if self_player
+               else f"{first}'s development curve is waiting for its next point")
+    preheader = f"It's been {weeks_since} weeks — upload a new video and see exactly how much {'you have grown' if self_player else first + ' has grown'}."
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
-      {first}&apos;s next chapter is ready to be measured.
+      {Poss} next chapter is ready to be measured.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
       {greet_line}
     </p>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      It&apos;s been <strong>{weeks_since} weeks</strong> since {first}&apos;s last analysis &mdash; the perfect window for real, visible development.
+      It&apos;s been <strong>{weeks_since} weeks</strong> since {poss} last analysis &mdash; the perfect window for real, visible development.
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
       Upload a new video and your next report will <strong>automatically compare every skill</strong> against last time:
@@ -169,18 +175,18 @@ def render_curve_reminder_email(
         <p style="margin:0 0 8px 0; font-size:14px; color:#1F4F2F; font-weight:800; letter-spacing:1px; text-transform:uppercase;">The Development Curve shows you</p>
         <p style="margin:0 0 6px 0; font-size:14px; color:#1F2724;">&#9650;&nbsp; Category deltas &mdash; e.g. <strong>Technical 6.2 &rarr; 7.0</strong></p>
         <p style="margin:0 0 6px 0; font-size:14px; color:#1F2724;">&#127942;&nbsp; Biggest improvements &mdash; did the home drills pay off?</p>
-        <p style="margin:0; font-size:14px; color:#1F2724;">&#128200;&nbsp; From the 3rd analysis: {first}&apos;s full progress chart over time</p>
+        <p style="margin:0; font-size:14px; color:#1F2724;">&#128200;&nbsp; From the 3rd analysis: {poss} full progress chart over time</p>
       </td></tr>
     </table>
     {_btn("Upload a new video", f"{site}/upload")}
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
       Tip: film the same type of footage as last time (match or training) &mdash; it makes the comparison strongest.
-      You receive this because {first} has a ScoutMePlay analysis. Reply to this email to opt out of reminders.
+      You receive this because {because} a ScoutMePlay analysis. Reply to this email to opt out of reminders.
     </p>
     """
     plaintext = (
         f"{greet_line}\n\n"
-        f"It's been {weeks_since} weeks since {player}'s last ScoutMePlay analysis — the perfect window for visible development.\n\n"
+        f"It's been {weeks_since} weeks since {'your' if self_player else player + chr(39) + 's'} last ScoutMePlay analysis — the perfect window for visible development.\n\n"
         f"Upload a new video and the next report automatically compares every skill against last time: "
         f"category deltas (e.g. Technical 6.2 -> 7.0), biggest improvements, and from the 3rd analysis a full progress chart.\n\n"
         f"Upload here: {site}/upload\n\n"
@@ -195,34 +201,50 @@ def render_report_ready_email(
     parent_name: Optional[str],
     player_name: Optional[str],
     report_url: str,
+    self_player: bool = False,
 ) -> tuple[str, str, str]:
     player = (player_name or "your player").strip() or "your player"
     first = player.split(" ")[0]
     greet = (parent_name or "").strip()
     greet_line = f"Hi {greet}," if greet else "Hi,"
-    subject = f"{first}'s report is ready"
-    preheader = f"The full analysis of {first} is done — open the report now."
+    subject = "Your report is ready" if self_player else f"{first}'s report is ready"
+    preheader = ("Your full analysis is done — open the report now." if self_player
+                 else f"The full analysis of {first} is done — open the report now.")
+    h1 = "Your report is ready." if self_player else f"{first}&apos;s report is ready."
+    body = (
+        "ScoutMe Pro Intelligence has finished your full analysis. The report is live now &mdash; "
+        "your scores, strengths, development plan, home drills and a personal message written to you."
+        if self_player else
+        f"ScoutMe Pro Intelligence has finished the full analysis of <strong>{player}</strong>. The report is live now &mdash; scores, strengths, development plan, home drills and the personal message to {first}."
+    )
+    tip = (
+        "Tip: watch your clip alongside the report &mdash; it points to the exact moments to pause and learn from."
+        if self_player else
+        f"Tip: watch the video together with {first} first &mdash; the report includes exact moments to pause and praise."
+    )
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
-      {first}&apos;s report is ready.
+      {h1}
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
       {greet_line}
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      ScoutMe Pro Intelligence has finished the full analysis of <strong>{player}</strong>. The report is live now &mdash; scores, strengths, development plan, home drills and the personal message to {first}.
+      {body}
     </p>
     {_btn("Open the report", report_url)}
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
-      Tip: watch the video together with {first} first &mdash; the report includes exact moments to pause and praise.
+      {tip}
     </p>
     """
     plaintext = (
         f"{greet_line}\n\n"
-        f"The full analysis of {player} is ready.\n\n"
-        f"Open the report: {report_url}\n\n"
-        f"Tip: watch the video together first — the report includes exact moments to pause and praise."
+        + ("Your full analysis is ready.\n\n" if self_player else f"The full analysis of {player} is ready.\n\n")
+        + f"Open the report: {report_url}\n\n"
+        + ("Tip: watch your clip alongside the report — it points to exact moments to learn from."
+           if self_player else
+           "Tip: watch the video together first — the report includes exact moments to pause and praise.")
     )
     return _wrap_html(inner, preheader), plaintext, subject
 
@@ -350,70 +372,91 @@ def render_admin_sale_notification(
 
 
 # ── CONVERSION: 24h — the numbers are waiting ─────────────────────────────
-def render_conv_waiting_email(first, total_numbers, open_label, open_score, report_url):
+def render_conv_waiting_email(first, total_numbers, open_label, open_score, report_url, self_player=False):
     score_str = f"{open_score:.1f}" if isinstance(open_score, (int, float)) else None
     open_line = (
         f"One story is already open &mdash; <strong>{open_label}: {score_str}</strong>. "
         if (open_label and score_str) else ""
     )
-    subject = f"{first}'s {total_numbers} numbers are still waiting"
-    preheader = f"Every one of them is a discovery about {first} — with the proof on video."
+    poss = "your" if self_player else f"{first}&apos;s"
+    Poss = "Your" if self_player else f"{first}&apos;s"
+    subject = (f"Your {total_numbers} numbers are still waiting" if self_player
+               else f"{first}'s {total_numbers} numbers are still waiting")
+    preheader = (f"Every one of them is a discovery about your game — with the proof on video." if self_player
+                 else f"Every one of them is a discovery about {first} — with the proof on video.")
+    what_line = (
+        "what you do that most players your age don&apos;t, the exact moment it happened on video, and what it means for where you can go next."
+        if self_player else
+        "what he does that most players his age don&apos;t, the exact moment it happened on video, and what it means for where he can go next."
+    )
+    clarity_line = (
+        "Most players never get to see their own game this clearly. You&apos;re one click away."
+        if self_player else
+        "Most parents never get to see their player this clearly. You&apos;re one click away."
+    )
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
-      {first}&apos;s story didn&apos;t stop at the whistle.
+      {Poss} story didn&apos;t stop at the whistle.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      {open_line}There are <strong>{total_numbers} numbers</strong> in {first}&apos;s report &mdash; and every one of them
-      is a small discovery: what he does that most players his age don&apos;t, the exact moment it happened on video,
-      and what it means for where he can go next.
+      {open_line}There are <strong>{total_numbers} numbers</strong> in {poss} report &mdash; and every one of them
+      is a small discovery: {what_line}
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      Most parents never get to see their player this clearly. You&apos;re one click away.
+      {clarity_line}
     </p>
-    {_btn(f"See all {total_numbers} of {first}'s numbers", report_url)}
+    {_btn(f"See all {total_numbers} of {'your' if self_player else first + chr(39) + 's'} numbers", report_url)}
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
       Every number is real, measured from your own video &mdash; nothing is invented.
     </p>
     """
+    poss_txt = "your" if self_player else f"{first}'s"
     plaintext = (
-        f"{first}'s story didn't stop at the whistle.\n\n"
-        f"There are {total_numbers} numbers in {first}'s report — each one a discovery with its proof on video.\n\n"
+        f"{'Your' if self_player else first + chr(39) + 's'} story didn't stop at the whistle.\n\n"
+        f"There are {total_numbers} numbers in {poss_txt} report — each one a discovery with its proof on video.\n\n"
         f"See them here: {report_url}\n"
     )
     return _wrap_html(inner, preheader), plaintext, subject
 
 
 # ── CONVERSION: 48h — honest limited discount ─────────────────────────────
-def render_conv_discount_email(first, report_url, percent, base_price, new_price, hours=48):
+def render_conv_discount_email(first, report_url, percent, base_price, new_price, hours=48, self_player=False):
     pct = int(percent) if float(percent).is_integer() else percent
-    subject = f"{pct}% off {first}'s full report — for the next {hours} hours"
+    poss = "your" if self_player else f"{first}&apos;s"
+    Poss = "Your" if self_player else f"{first}&apos;s"
+    poss_txt = "your" if self_player else f"{first}'s"
+    subject = f"{pct}% off {poss_txt} full report — for the next {hours} hours"
     preheader = f"${new_price:.2f} instead of ${base_price:.2f}. Real deadline, no games."
+    inside_line = (
+        "Inside: every number translated into meaning, the video proof behind it, your development plan &mdash; and the road from where you are now to where you could be."
+        if self_player else
+        "Inside: every number translated into meaning, the video proof behind it, his development plan &mdash; and the road from where he is now to where he could be."
+    )
     inner = f"""
     <span style="display:inline-block; padding:4px 10px; background:#CCFF00; color:#0A0F0D; font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:800;">
       {pct}% off &mdash; {hours} hours only
     </span>
     <h1 style="margin:14px 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
-      {first}&apos;s full story &mdash; with {pct}% off.
+      {Poss} full story &mdash; with {pct}% off.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      For the next <strong>{hours} hours</strong>, {first}&apos;s complete report is
+      For the next <strong>{hours} hours</strong>, {poss} complete report is
       <strong style="color:#1F4F2F;">${new_price:.2f}</strong>
       <span style="color:#6B6B6B; text-decoration:line-through;">${base_price:.2f}</span>.
       The discount is applied automatically at checkout &mdash; no code needed.
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      Inside: every number translated into meaning, the video proof behind it, his development plan
-      &mdash; and the road from where he is now to where he could be.
+      {inside_line}
     </p>
-    {_btn(f"Open {first}'s full report", report_url)}
+    {_btn(f"Open {poss_txt} full report", report_url)}
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
       This is a real deadline &mdash; when it passes, the price simply goes back. No fake countdowns here.
     </p>
     """
     plaintext = (
-        f"{pct}% off {first}'s full report — for the next {hours} hours.\n\n"
+        f"{pct}% off {poss_txt} full report — for the next {hours} hours.\n\n"
         f"${new_price:.2f} instead of ${base_price:.2f} — applied automatically at checkout.\n\n"
         f"Open the report: {report_url}\n"
     )
@@ -421,51 +464,71 @@ def render_conv_discount_email(first, report_url, percent, base_price, new_price
 
 
 # ── CONVERSION: 72h — the position secret ─────────────────────────────────
-def render_conv_discovery_email(first, report_url):
-    subject = f"The match whispered something about {first}…"
-    preheader = f"There's a possibility in {first}'s game most people would never guess."
+def render_conv_discovery_email(first, report_url, self_player=False):
+    poss = "your" if self_player else f"{first}&apos;s"
+    poss_txt = "your" if self_player else f"{first}'s"
+    subject = ("The match whispered something about you…" if self_player
+               else f"The match whispered something about {first}…")
+    preheader = f"There's a possibility in {poss_txt} game most people would never guess."
+    body_1 = (
+        f"While analysing your video, the numbers lined up in a way that pointed somewhere unexpected &mdash; a hint about <strong>where on the pitch you could also belong</strong>."
+        if self_player else
+        f"While analysing {poss} video, the numbers lined up in a way that pointed somewhere unexpected &mdash; a hint about <strong>where on the pitch he could also belong</strong>."
+    )
+    body_2 = (
+        "It&apos;s not a verdict. It&apos;s a possibility &mdash; backed by what you actually did in the match. The kind of thing that changes how you approach your next game."
+        if self_player else
+        "It&apos;s not a verdict. It&apos;s a possibility &mdash; backed by what he actually did in the match. The kind of thing that changes how you watch his next game."
+    )
+    waiting = "It&apos;s waiting inside your full report." if self_player else "It&apos;s waiting inside his full report."
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
-      There&apos;s something in {first}&apos;s game<br>most people would never guess.
+      There&apos;s something in {poss} game<br>most people would never guess.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      While analysing {first}&apos;s video, the numbers lined up in a way that pointed somewhere unexpected &mdash;
-      a hint about <strong>where on the pitch he could also belong</strong>.
+      {body_1}
     </p>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      It&apos;s not a verdict. It&apos;s a possibility &mdash; backed by what he actually did in the match.
-      The kind of thing that changes how you watch his next game.
+      {body_2}
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      It&apos;s waiting inside his full report.
+      {waiting}
     </p>
-    {_btn(f"See what was discovered about {first}", report_url)}
+    {_btn(f"See what was discovered about {'you' if self_player else first}", report_url)}
     <p style="margin:24px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
       Based only on real moments from your own video &mdash; nothing is invented.
     </p>
     """
     plaintext = (
-        f"There's something in {first}'s game most people would never guess.\n\n"
-        f"The numbers pointed somewhere unexpected — a hint about where on the pitch he could also belong. "
-        f"It's waiting inside his full report.\n\n"
-        f"See it here: {report_url}\n"
+        f"There's something in {poss_txt} game most people would never guess.\n\n"
+        + ("The numbers pointed somewhere unexpected — a hint about where on the pitch you could also belong. It's waiting inside your full report.\n\n"
+           if self_player else
+           "The numbers pointed somewhere unexpected — a hint about where on the pitch he could also belong. It's waiting inside his full report.\n\n")
+        + f"See it here: {report_url}\n"
     )
     return _wrap_html(inner, preheader), plaintext, subject
 
 
 # ── CONVERSION: abandoned checkout ─────────────────────────────────────────
-def render_abandoned_checkout_email(first, resume_url):
-    subject = f"You were 30 seconds from {first}'s full story"
+def render_abandoned_checkout_email(first, resume_url, self_player=False):
+    poss = "your" if self_player else f"{first}&apos;s"
+    poss_txt = "your" if self_player else f"{first}'s"
+    subject = f"You were 30 seconds from {poss_txt} full story"
     preheader = "Everything is still exactly where you left it."
+    left_line = (
+        "Everything is still exactly where you left it: your numbers, your proof moments, your road forward."
+        if self_player else
+        "Everything is still exactly where you left it: his numbers, his proof moments, his road forward."
+    )
     inner = f"""
     <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
       You were 30 seconds away.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      Your checkout for <strong>{first}&apos;s full report</strong> didn&apos;t finish &mdash; it happens.
-      Everything is still exactly where you left it: his numbers, his proof moments, his road forward.
+      Your checkout for <strong>{poss} full report</strong> didn&apos;t finish &mdash; it happens.
+      {left_line}
     </p>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
       If something felt unclear, just reply to this email &mdash; a real person answers.
@@ -476,7 +539,7 @@ def render_abandoned_checkout_email(first, resume_url):
     </p>
     """
     plaintext = (
-        f"You were 30 seconds from {first}'s full story.\n\n"
+        f"You were 30 seconds from {poss_txt} full story.\n\n"
         f"Your checkout didn't finish — everything is still where you left it.\n\n"
         f"Continue here: {resume_url}\n\nYou were charged nothing."
     )
@@ -494,7 +557,7 @@ def render_discount_campaign_email(name, percent, hours_valid):
       {name} &mdash; {pct}% off
     </span>
     <h1 style="margin:14px 0 8px 0; font-size:26px; letter-spacing:-0.5px; color:#0A0F0D; text-transform:uppercase; font-weight:900; line-height:1.1;">
-      Your player&apos;s full story &mdash; {pct}% off.
+      The full story behind every number &mdash; {pct}% off.
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 14px 0; font-size:15px; line-height:1.6; color:#1F2724;">
@@ -530,25 +593,25 @@ def render_activation_nudge_email(first, stage: int = 1):
         headline = "Your free analysis is ready when you are"
         body_top = (
             "You created your ScoutMePlay account &mdash; the next step is the fun one: "
-            "upload a short clip of your player and get a free preview of what a professional "
-            "video report sees in their game."
+            "upload a short clip &mdash; you or your player in action &mdash; and get a free preview "
+            "of what a professional video report sees in the game."
         )
         body_mid = (
-            "<strong>No video yet?</strong> No problem. Most parents film at the next match or "
+            "<strong>No video yet?</strong> No problem. Most people film at the next match or "
             "training &mdash; a phone from the sideline is all you need. Our short guide shows "
             "exactly where to stand and what to capture."
         )
     else:
         subject = "Still here when you're ready — one clip is all it takes"
-        preheader = "A 30-second match clip is enough to start your player's first report."
+        preheader = "A 30-second match clip is enough to start the first report."
         headline = "One short clip &mdash; that&apos;s all it takes"
         body_top = (
             "Just a friendly last nudge: your free preview is still waiting. "
             "A 30-second match clip &mdash; or 15 seconds of skills training &mdash; is enough "
-            "to see what a video report can show you about your player."
+            "to see what a video report can show about your game, or your player&apos;s."
         )
         body_mid = (
-            "Film this weekend&apos;s match from the sideline, tap your player in the clip, "
+            "Film this weekend&apos;s match from the sideline, tap the player in the clip, "
             "and we take it from there. We won&apos;t email you about this again."
         )
     inner = f"""
@@ -577,6 +640,6 @@ def render_activation_nudge_email(first, stage: int = 1):
         f"{hi}\n\n"
         "Your free player analysis is waiting. Upload a short clip (30 seconds of a match "
         "or 15 seconds of skills training) and see what a professional video report shows "
-        f"about your player.\n\nUpload: {upload_url}\nSee a complete sample report: {sample_url}\nFilming guide: {guide_url}\n"
+        f"about the player.\n\nUpload: {upload_url}\nSee a complete sample report: {sample_url}\nFilming guide: {guide_url}\n"
     )
     return html, text, subject

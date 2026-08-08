@@ -153,13 +153,18 @@ function FeatureRow({ label, ok, t }) {
   );
 }
 
-function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disabled, discount, singleFull, testid, ctaTestid }) {
+function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disabled, discount, singleFull, testid, ctaTestid, valueLine = null, bestValue = false }) {
   const t = TIERS[tier];
   const TIcon = t.icon;
   const NIcon = t.notchIcon;
   const p = priceParts(price);
   return (
     <article data-testid={testid} className="relative flex flex-col rounded-[22px] overflow-hidden snap-center shrink-0 w-[82vw] max-w-[320px] sm:w-[46%] sm:max-w-none lg:w-auto lg:shrink" style={{ ...t.cardStyle, transform: "translateZ(0)", WebkitBackfaceVisibility: "hidden" }}>
+      {bestValue && (
+        <div data-testid={`best-value-badge-${tier}`} className="text-center text-[9.5px] font-black uppercase tracking-[0.24em] py-1" style={{ background: "#E8C258", color: "#12211A" }}>
+          Best value per report
+        </div>
+      )}
       {/* ── Header: icon + emotive title + tagline + atmosphere image ── */}
       <div className="relative">
         <div className="pt-5 md:pt-7 px-5 text-center relative z-10">
@@ -221,6 +226,11 @@ function TierCard({ tier, price, period, cta, ctaIconLeft, onCta, loading, disab
           </div>
         )}
         <div className={`text-center mt-1 md:mt-1.5 text-[10.5px] md:text-[11px] uppercase tracking-[0.24em] font-bold ${t.periodCls}`}>{period}</div>
+        {valueLine && (
+          <div data-testid={`value-line-${tier}`} className={`text-center mt-1.5 text-[10.5px] md:text-[11px] font-extrabold ${t.nameCls}`} style={{ letterSpacing: "0.02em" }}>
+            {valueLine}
+          </div>
+        )}
 
         <ul className="mt-4 md:mt-6 space-y-2 md:space-y-3 flex-1">
           {t.features.map((f) => <FeatureRow key={f.label} {...f} t={t} />)}
@@ -316,6 +326,12 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
 
   const goFree = () => navigate("/upload");
 
+  // Best-price math — recalculates live from admin prices
+  const perPremium = prices.premium / 2;
+  const perVip = prices.vip / 4;
+  const savePct = (per) => Math.max(0, Math.round((1 - per / (prices.single || 1)) * 100));
+  const bestTier = perVip <= perPremium ? "vip" : "premium";
+
   const goSingle = async () => {
     if (!isLoggedIn) { navigate("/signup?plan=single&next=/upload"); return; }
     if (onUnlockSingle) { onUnlockSingle(); return; }
@@ -364,11 +380,15 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
         <TierCard
           tier="premium" price={prices.premium} period="/ Month" cta="Start Improving"
           onCta={() => startSubscription("premium")} loading={busyTier === "premium"} disabled={!!busyTier && busyTier !== "premium"}
+          valueLine={`2 reports/mo ≈ $${perPremium.toFixed(2)} each — save ${savePct(perPremium)}%`}
+          bestValue={bestTier === "premium"}
           testid="dream-card-premium" ctaTestid="paywall-premium-cta"
         />
         <TierCard
           tier="vip" price={prices.vip} period="/ Month" cta="Go VIP" ctaIconLeft
           onCta={() => startSubscription("vip")} loading={busyTier === "vip"} disabled={!!busyTier && busyTier !== "vip"}
+          valueLine={`4 reports/mo ≈ $${perVip.toFixed(2)} each — save ${savePct(perVip)}%`}
+          bestValue={bestTier === "vip"}
           testid="dream-card-vip" ctaTestid="paywall-vip-cta"
         />
         </div>

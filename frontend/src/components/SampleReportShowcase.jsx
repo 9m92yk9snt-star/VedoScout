@@ -148,7 +148,7 @@ function OverviewCard() {
               <span className="text-[9.5px] font-black uppercase tracking-[0.14em] text-white">Identity locked</span>
             </div>
             <p className="text-[10.5px] text-white/70 leading-relaxed mt-1">
-              Marked with 10 taps · optical tracking · dual verification. This is about <span className="text-white font-bold">your child</span> — never a lookalike.
+              Marked with 10 taps · optical tracking · dual verification. This is about <span className="text-white font-bold">your player</span> — never a lookalike.
             </p>
           </div>
         </div>
@@ -513,7 +513,7 @@ function ScoutReplyCard() {
         <div className="relative mt-auto pt-4 flex items-start gap-2.5 smp-a smp-a-rise" style={{ animationDelay: "0.9s" }}>
           <MessageCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: GOLD }} />
           <p className="text-[11px] text-[#8A937F] leading-relaxed">
-            A real, experienced scout reads the report and writes back — <span className="font-bold text-[#3D4A38]">personal words about your child&apos;s game</span>, never a template.
+            A real, experienced scout reads the report and writes back — <span className="font-bold text-[#3D4A38]">personal words about the player&apos;s game</span>, never a template.
           </p>
         </div>
       </div>

@@ -174,8 +174,8 @@ export function HowItWorks() {
     {
       n: "02",
       img: IMG("step-mark.png"),
-      title: "Mark your player",
-      body: "Tap your player on 10 frames so ScoutMe Pro Intelligence locks onto them. No guessing, no wrong player.",
+      title: "Mark the player",
+      body: "Tap the player — yourself or your player — on 10 frames so ScoutMe Pro Intelligence locks onto them. No guessing, no wrong player.",
       eyebrow: "Step 02 · mark",
     },
     {

@@ -24,6 +24,7 @@ import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
 import SampleReportShowcase from "@/components/SampleReportShowcase";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
+import StickyPricingCTA from "@/components/StickyPricingCTA";
 import SEO, { organizationJsonLd, faqJsonLd } from "@/components/SEO";
 import {
   TrustStrip,
@@ -52,11 +53,11 @@ const FAQ_ITEMS = [
   },
   {
     q: "What if my video isn't great quality?",
-    a: "A phone camera at training or a game is perfectly fine. We need to see your player on the pitch with the ball. Wider shots (showing more of the pitch) are better than tight close-ups, and a clear view of the player's movement helps the scout review. If our scout can't fairly assess the video, we contact you and either offer a re-upload or a refund.",
+    a: "A phone camera at training or a game is perfectly fine. We need to see the player on the pitch with the ball. Wider shots (showing more of the pitch) are better than tight close-ups, and a clear view of the player's movement helps the scout review. If our scout can't fairly assess the video, we contact you and either offer a re-upload or a refund.",
   },
   {
     q: "How is this different from my child's coach feedback?",
-    a: "A coach knows your player from the inside — that's irreplaceable. A scout looks from the outside, comparing your player against thousands of others in a structured 4-pillar framework (Technical, Tactical, Physical, Mentality). Coaches build your player day by day. ScoutMePlay tells you where they stand right now and what to focus on next.",
+    a: "A coach knows the player from the inside — that's irreplaceable. A scout looks from the outside, comparing the player against thousands of others in a structured 4-pillar framework (Technical, Tactical, Physical, Mentality). Coaches build players day by day. ScoutMePlay tells you where they stand right now and what to focus on next.",
   },
   {
     q: "Does this guarantee a trial or contract?",
@@ -122,6 +123,7 @@ export default function LandingMinimal() {
       <div id="pricing-section" data-testid="pricing-section">
         <DreamPricingTiers isLoggedIn={!!user} />
       </div>
+      <StickyPricingCTA isLoggedIn={!!user} />
       <ReviewsStrip />
       <SocialFollowSection />
       <BlogHighlights />

@@ -1295,7 +1295,7 @@ def _movement_map_card(c, mm, x, y, w, h):
         c.restoreState()
         draw_par(
             c,
-            esc("Only moments with a secure lock on your player are drawn — when the tracker is unsure, it stops honestly instead of guessing."),
+            esc("Only moments with a secure lock on the selected player are drawn — when the tracker is unsure, it stops honestly instead of guessing."),
             pl_x, ly - 7, pl_w, _style(F_BODY, 6.0, MUTED, leading=8.6),
         )
 
@@ -1366,7 +1366,7 @@ def _movement_map_card(c, mm, x, y, w, h):
     if py - (y + 6) > 26:
         draw_par(
             c,
-            esc("What was measured: your player's position, frame by frame, in your own clip. "
+            esc("What was measured: the selected player's position, frame by frame, in your own clip. "
                 "How: optical tracking seeded by your taps — pure mathematics, no guessing. "
                 "Why trust it: the fastest moment is only reported from an identity-verified second."),
             rx, py, rw, _style(F_BODY, 6.0, MUTED, leading=8.6),
