@@ -705,7 +705,7 @@ def _hero_card(c, d, pd, x, y, w, h, photo_path):
 def _parent_summary_card(c, ps, x, y, w, h):
     card(c, x, y, w, h)
     ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Parent Summary", w - 2 * PAD)
+    ty -= card_title(c, x + PAD, ty, "Scout's First Impression", w - 2 * PAD)
     ty -= draw_par(c, f"<b>{esc(ps['headline'])}</b>", x + PAD, ty, w - 2 * PAD,
                    _style(F_BOLD, 10, HexColor("#174A30"), leading=12.6)) + 6
     # Measure the Good News box first so paragraphs never run underneath it.

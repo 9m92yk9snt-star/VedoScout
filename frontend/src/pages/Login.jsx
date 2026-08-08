@@ -5,9 +5,10 @@ import { useAuth } from "@/lib/auth-context";
 import SEO from "@/components/SEO";
 import { Mail, Lock, Eye, EyeOff, LogIn, ShieldCheck, ArrowRight } from "lucide-react";
 import {
-  AuthShell, AuthHeroImage, SmpLogo, AuthInput, GoogleButton, OrDivider,
-  BenefitsStrip, TrustedBadge, googleRedirect,
+  AuthShell, AuthHeroImage, AuthInput,
+  BenefitsStrip, TrustedBadge,
 } from "@/components/auth/AuthShell";
+import Navigation from "@/components/Navigation";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -49,15 +50,15 @@ export default function Login() {
   };
 
   return (
-    <AuthShell>
+    <>
+      <Navigation />
+      <AuthShell>
       <SEO pageKey="login" title="Log In" url="/login" />
       <AuthHeroImage />
 
       <div className="relative">
-        <SmpLogo />
-
         {/* Headline */}
-        <div className="mt-8 md:mt-10 max-w-[62%] md:max-w-[58%]">
+        <div className="mt-2 md:mt-4 max-w-[62%] md:max-w-[58%]">
           <h1 className="font-barlow font-black uppercase tracking-tight leading-[0.95] text-4xl sm:text-5xl text-[#161C12]" data-testid="login-headline">
             WELCOME BACK{" "}
             <span className="block text-[#63A61F] mt-1">CONTINUE YOUR FOOTBALL JOURNEY</span>
@@ -155,9 +156,6 @@ export default function Login() {
             </button>
           </form>
 
-          <OrDivider />
-          <GoogleButton onClick={() => googleRedirect("/dashboard")} testId="login-google-btn" />
-
           <p className="mt-5 text-center text-[15px] text-[#3D4435]">
             Don&apos;t have an account?{" "}
             <Link
@@ -178,6 +176,7 @@ export default function Login() {
           <TrustedBadge />
         </div>
       </div>
-    </AuthShell>
+      </AuthShell>
+    </>
   );
 }

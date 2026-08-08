@@ -83,12 +83,21 @@ export default function GrowthAdmin() {
         <h3 className="font-barlow font-black uppercase text-ink flex items-center gap-2"><Plus className="w-4 h-4 text-forest" /> Manual campaign</h3>
         <p className="text-xs text-ink/55 mt-1">Discount on the single report for ALL users — optionally emailed to everyone.</p>
         <div className="grid sm:grid-cols-4 gap-3 mt-3">
-          <input placeholder="Name (e.g. Summer offer)" value={form.name} data-testid="campaign-name-input"
-            onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${inp} sm:col-span-2`} />
-          <input type="number" min="1" max="90" value={form.percent} data-testid="campaign-percent"
-            onChange={(e) => setForm({ ...form, percent: Number(e.target.value) })} className={inp} title="% off" />
-          <input type="number" min="1" max="720" value={form.hours_valid} data-testid="campaign-hours-input"
-            onChange={(e) => setForm({ ...form, hours_valid: Number(e.target.value) })} className={inp} title="Hours valid" />
+          <div className="sm:col-span-2">
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink/55 mb-1">Campaign name</label>
+            <input placeholder="Name (e.g. Summer offer)" value={form.name} data-testid="campaign-name-input"
+              onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${inp} w-full`} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink/55 mb-1">Discount %</label>
+            <input type="number" min="1" max="90" value={form.percent} data-testid="campaign-percent"
+              onChange={(e) => setForm({ ...form, percent: Number(e.target.value) })} className={`${inp} w-full`} title="% off" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-extrabold uppercase tracking-wider text-ink/55 mb-1">Valid for (hours)</label>
+            <input type="number" min="1" max="720" value={form.hours_valid} data-testid="campaign-hours-input"
+              onChange={(e) => setForm({ ...form, hours_valid: Number(e.target.value) })} className={`${inp} w-full`} title="Hours valid" />
+          </div>
         </div>
         <label className="flex items-center gap-2 mt-3 text-sm text-ink/70">
           <input type="checkbox" checked={form.send_email} data-testid="campaign-email-check"

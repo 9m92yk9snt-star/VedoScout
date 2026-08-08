@@ -121,7 +121,7 @@ function PlayerHeroCard({ playerDetails, photoCandidates, positionAbbr }) {
 function ParentSummaryCard({ parentSummary }) {
   return (
     <V2Card testid="v2-parent-summary-card">
-      <V2Title icon={Users}>Parent Summary</V2Title>
+      <V2Title icon={Users}>Scout&rsquo;s First Impression</V2Title>
       <div className="text-[16.5px] font-extrabold text-[#174A30] leading-[1.35] mb-3" data-testid="v2-parent-headline">
         {parentSummary.headline}
       </div>

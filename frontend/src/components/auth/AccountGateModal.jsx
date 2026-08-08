@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { trackSignUp } from "@/lib/pixels";
 import { trackFunnel } from "@/lib/analytics";
 import { Mail, Lock, Eye, EyeOff, UserPlus, LogIn, ShieldCheck, X, CheckCircle2, Loader2 } from "lucide-react";
-import { AuthInput, GoogleButton, OrDivider } from "@/components/auth/AuthShell";
+import { AuthInput } from "@/components/auth/AuthShell";
 import { PASSWORD_RULES } from "@/pages/Signup";
 
 /* Account gate — shown to guests the moment they hit "Start analysis".
@@ -186,19 +186,6 @@ export default function AccountGateModal({ open, onClose, onAuthed, onGoogleRedi
             {tab === "signup" ? "Create account & start analysis" : "Log in & start analysis"}
           </button>
         </form>
-
-        <OrDivider />
-        <GoogleButton
-          onClick={onGoogleRedirect}
-          disabled={!uploadReady}
-          label={uploadReady ? "Continue with Google" : `Finishing upload… ${Math.min(99, uploadPct)}%`}
-          testId="gate-google-btn"
-        />
-        {!uploadReady && (
-          <p className="mt-2 text-center text-[11px] text-[#6B7261]">
-            Google sign-in opens as soon as your video finishes uploading.
-          </p>
-        )}
       </div>
     </div>
   );

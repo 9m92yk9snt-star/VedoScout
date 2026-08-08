@@ -102,7 +102,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 25  # v25 = full-page SNAPSHOT section (2x2 moment cards + overall progress)
+PDF_RENDER_VERSION = 26  # v26 = "Scout's First Impression" title (was Parent Summary)
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -10422,6 +10422,49 @@ async def report_snapshot_card(report_id: str, moment_key: str, user=Depends(get
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
     return FileResponse(str(path), media_type="image/png",
                         filename=f"ScoutMePlay_{player_name_safe}_Snapshot.png")
+
+
+# ============== ADMIN: TEST-SEND ANY AUTOMATED / PROMOTION EMAIL ==============
+
+class TestEmailPayload(BaseModel):
+    template: str
+    to: str
+
+
+@api_router.post("/admin/emails/send-test")
+async def admin_send_test_email(payload: TestEmailPayload, _=Depends(get_current_admin)):
+    """Renders any automated/promotion email with realistic sample data and
+    sends it to a real inbox so the admin can see exactly how it looks."""
+    to = (payload.to or "").strip()
+    if "@" not in to:
+        raise HTTPException(status_code=400, detail="Valid recipient email required")
+    from email_templates import (
+        render_welcome_email, render_activation_nudge_email, render_conv_waiting_email,
+        render_conv_discount_email, render_conv_discovery_email, render_abandoned_checkout_email,
+        render_discount_campaign_email, render_report_ready_email, render_purchase_confirmation,
+        render_curve_reminder_email, _site_url,
+    )
+    site = _site_url()
+    builders = {
+        "welcome": lambda: render_welcome_email("Alex"),
+        "activation_24h": lambda: render_activation_nudge_email("Alex", 1),
+        "activation_72h": lambda: render_activation_nudge_email("Alex", 2),
+        "conv_waiting": lambda: render_conv_waiting_email("Noah", 19, "Finishing", 8.4, f"{site}/dashboard"),
+        "conv_discount": lambda: render_conv_discount_email("Noah", f"{site}/dashboard", 20, 49.99, 39.99, 48),
+        "conv_discovery": lambda: render_conv_discovery_email("Noah", f"{site}/dashboard"),
+        "abandoned_checkout": lambda: render_abandoned_checkout_email("Alex", f"{site}/upload"),
+        "discount_campaign": lambda: render_discount_campaign_email("Test campaign", 20, 72),
+        "report_ready": lambda: render_report_ready_email("Alex", "Noah Demo", f"{site}/sample-report"),
+        "purchase_confirmation": lambda: render_purchase_confirmation("Alex", "Premium Player Report", 4999, "USD"),
+        "curve_reminder": lambda: render_curve_reminder_email("Alex", "Noah Demo", 5),
+    }
+    if payload.template not in builders:
+        raise HTTPException(status_code=400, detail="Unknown email template")
+    html, text, subject = builders[payload.template]()
+    ok = await send_email_async(to, f"[TEST] {subject}", html, text, category="test")
+    if not ok:
+        raise HTTPException(status_code=502, detail="SMTP send failed — check email configuration")
+    return {"ok": True, "subject": subject}
 
 
 # ============== SHARE REPORT (public PDF link) ==============

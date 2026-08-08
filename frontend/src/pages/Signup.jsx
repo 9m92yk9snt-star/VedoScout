@@ -7,9 +7,10 @@ import { trackFunnel } from "@/lib/analytics";
 import SEO from "@/components/SEO";
 import { Mail, Lock, User, Eye, EyeOff, UserPlus, ArrowRight, CheckCircle2 } from "lucide-react";
 import {
-  AuthShell, AuthHeroImage, SmpLogo, AuthInput, GoogleButton, OrDivider,
-  BenefitsStrip, TrustedBadge, googleRedirect,
+  AuthShell, AuthHeroImage, AuthInput,
+  BenefitsStrip, TrustedBadge,
 } from "@/components/auth/AuthShell";
+import Navigation from "@/components/Navigation";
 
 export const PASSWORD_RULES = [
   { key: "len", label: "At least 8 characters", test: (p) => p.length >= 8 },
@@ -61,15 +62,15 @@ export default function Signup() {
   };
 
   return (
-    <AuthShell>
+    <>
+      <Navigation />
+      <AuthShell>
       <SEO pageKey="signup" title="Create Your Free Account" url="/signup" />
       <AuthHeroImage />
 
       <div className="relative">
-        <SmpLogo />
-
         {/* Headline */}
-        <div className="mt-8 md:mt-10 max-w-[62%] md:max-w-[58%]">
+        <div className="mt-2 md:mt-4 max-w-[62%] md:max-w-[58%]">
           <h1 className="font-barlow font-black uppercase tracking-tight leading-[0.95] text-4xl sm:text-5xl text-[#161C12]" data-testid="signup-headline">
             DISCOVER YOUR{" "}
             <span className="block text-[#63A61F] mt-1">TRUE FOOTBALL LEVEL</span>
@@ -184,9 +185,6 @@ export default function Signup() {
               </Link>
             </p>
           </form>
-
-          <OrDivider />
-          <GoogleButton onClick={() => googleRedirect("/dashboard")} testId="signup-google-btn" />
         </div>
 
         {/* Benefits + avatars + trust */}
@@ -197,6 +195,7 @@ export default function Signup() {
           <TrustedBadge withAvatars />
         </div>
       </div>
-    </AuthShell>
+      </AuthShell>
+    </>
   );
 }

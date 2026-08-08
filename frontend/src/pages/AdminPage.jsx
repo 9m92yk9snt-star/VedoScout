@@ -12,6 +12,7 @@ import {
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
 import GrowthAdmin from "@/components/admin/GrowthAdmin";
+import PromoEmailsAdmin from "@/components/admin/PromoEmailsAdmin";
 import ReviewsAdmin from "@/components/admin/ReviewsAdmin";
 import FAQAdmin from "@/components/admin/FAQAdmin";
 import EmailAdmin from "@/components/admin/EmailAdmin";
@@ -493,7 +494,12 @@ export default function AdminPage() {
 
               {activeTab === "faq" && <FAQAdmin />}
 
-              {activeTab === "email" && <EmailAdmin />}
+              {activeTab === "email" && (
+                <>
+                  <PromoEmailsAdmin />
+                  <EmailAdmin />
+                </>
+              )}
 
               {activeTab === "reports" && (() => {
                 const isFailedOrEmpty = (r) =>
