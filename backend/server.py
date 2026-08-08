@@ -13705,6 +13705,14 @@ async def on_startup():
     except Exception:
         logger.exception("Blog seed failed (non-fatal)")
 
+    # Demo sample report — restores bundled demo images and seeds/refreshes the
+    # public /sample-report content (production ships with an empty DB).
+    try:
+        from seed_demo_report import ensure_demo_report
+        await ensure_demo_report(db)
+    except Exception:
+        logger.exception("Demo report seed failed (non-fatal)")
+
     # ── Session 131 — analysis pipeline watchdog ──
     # ROOT CAUSE FIX for "stuck at step 4" recurrence: `background.add_task`
     # runs in-memory only, so a worker restart mid-analysis (deploy rollout,
