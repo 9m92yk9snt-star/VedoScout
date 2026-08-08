@@ -267,41 +267,53 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           </div>
         </div>
 
-        {/* ── Snapshots teaser: 1 real moment unlocked, 3 locked ── */}
-        <div className="mt-5" data-testid="fpl-snapshots">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.16em] uppercase text-[#12402A]">
-              <Camera className="w-4 h-4" /> Snapshots
-              <span className="text-[#8B957F] normal-case tracking-normal font-bold">— the moments that shaped the report</span>
+        {/* ── Snapshot teaser: 1 real moment unlocked, 3 locked (same design as premium) ── */}
+        <div className="mt-5 bg-[#F6F3E8] border border-[#E5DFCE] rounded-[22px] p-4 md:p-5" data-testid="fpl-snapshots">
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div className="flex items-start gap-3">
+              <span className="w-[44px] h-[44px] rounded-[13px] bg-[#E9F1E6] flex items-center justify-center shrink-0">
+                <Camera className="w-5 h-5 text-[#1E5B3C]" />
+              </span>
+              <div>
+                <div className="font-barlow font-black text-[22px] md:text-[26px] leading-none tracking-[0.01em] text-[#101B12] uppercase">Snapshot</div>
+                <p className="text-[12.5px] text-[#3C4A40] mt-1">
+                  The key moments we found in <span className="text-[#1E5B3C] font-semibold">{selfPlayer ? "your" : pFirst ? `${pFirst}'s` : "the"}</span> match.
+                </p>
+              </div>
             </div>
             <span className="inline-flex items-center gap-1.5 bg-[#12211A] text-white text-[9.5px] font-extrabold tracking-[0.08em] uppercase px-2.5 py-1 rounded-full" data-testid="fpl-snapshots-count">
               1 of 4 unlocked
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {/* Unlocked card — 100% real: the user's own frame + confirmed strength */}
-            <div data-testid="fpl-snapshot-open" className="relative rounded-2xl overflow-hidden border border-[#E9E4D5] shadow-sm min-h-[250px] flex flex-col justify-end bg-[#0B1F14]">
-              {poster ? (
-                <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
-              ) : (
-                <div className="absolute inset-0" style={{ background: "linear-gradient(160deg,#1B4430,#0B1F14)" }} />
-              )}
-              <SnapshotAnnot type="path" />
-              <span className={`absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-[9.5px] font-extrabold tracking-[0.09em] uppercase shadow-md ${SNAP_CARD_META.strength.badge}`}>
-                <Star className="w-3 h-3" /> {SNAP_CARD_META.strength.label}
-              </span>
-              {keyMomentT && (
-                <span className="absolute top-3 right-3 z-10 bg-[#0B1F14]/85 text-white font-barlow font-black text-[12px] tabular-nums px-2.5 py-1 rounded-[8px]">{keyMomentT}</span>
-              )}
-              <div className="relative z-10 p-4 pt-14 bg-gradient-to-t from-[#0B1F14]/95 via-[#0B1F14]/55 to-transparent">
-                <div className="font-barlow font-black text-white text-[17px] leading-tight" data-testid="fpl-snapshot-open-title">
+            <div data-testid="fpl-snapshot-open" className="rounded-[16px] overflow-hidden border border-[#E5DFCE] bg-[#FBFAF2] shadow-[0_3px_14px_rgba(30,50,35,0.08)] flex flex-col">
+              <div className="flex items-center gap-2.5 px-4 h-[42px] text-white shrink-0" style={{ background: SNAP_CARD_META.strength.header }}>
+                <Star className="w-4 h-4 shrink-0" />
+                <span className="text-[11.5px] font-extrabold tracking-[0.07em] uppercase truncate">{SNAP_CARD_META.strength.label}</span>
+                {keyMomentT && (
+                  <>
+                    <span className="ml-auto w-px h-5 bg-white/25 shrink-0" />
+                    <span className="font-barlow font-black text-[14px] tabular-nums shrink-0">{keyMomentT}</span>
+                  </>
+                )}
+              </div>
+              <div className="relative h-[180px] md:h-[200px] bg-[#0B1F14] shrink-0">
+                {poster ? (
+                  <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
+                ) : (
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(160deg,#1B4430,#0B1F14)" }} />
+                )}
+                <SnapshotAnnot type="path" />
+              </div>
+              <div className="px-4 py-3.5 flex-1">
+                <div className="text-[16px] font-extrabold text-[#12211A] leading-snug" data-testid="fpl-snapshot-open-title">
                   {strengths[0] || "Strongest area of the match"}
                 </div>
-                <p className="text-white/80 text-[11.5px] leading-snug mt-1">
+                <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
                   {selfPlayer ? "A real moment from your match — confirmed by our analysis." : pFirst ? `A real moment from ${pFirst}'s match — confirmed by our analysis.` : "A real moment from the uploaded match — confirmed by our analysis."}
                 </p>
               </div>
-              <div className="relative z-10 h-[5px] w-full" style={{ background: SNAP_CARD_META.strength.accent }} />
             </div>
             {/* Locked cards */}
             {[
@@ -311,21 +323,25 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             ].map(({ key, tease }, i) => {
               const meta = SNAP_CARD_META[key];
               return (
-                <div key={key} data-testid={`fpl-snapshot-locked-${i}`} className="relative rounded-2xl overflow-hidden border border-[#E9E4D5] shadow-sm min-h-[250px] flex flex-col justify-end bg-[#0B1F14]">
-                  {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover blur-[9px] scale-110 opacity-60" aria-hidden />}
-                  <span className={`absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 text-[9.5px] font-extrabold tracking-[0.09em] uppercase shadow-md ${meta.badge}`}>
-                    <meta.Icon className="w-3 h-3" /> {meta.label}
-                  </span>
-                  <span className="absolute inset-0 flex items-center justify-center z-10">
-                    <span className="w-11 h-11 rounded-full bg-[#12211A] border border-white/20 flex items-center justify-center shadow-lg">
-                      <Lock className="w-4 h-4 text-white" />
-                    </span>
-                  </span>
-                  <div className="relative z-10 p-4 pt-10 bg-gradient-to-t from-[#0B1F14]/95 via-[#0B1F14]/50 to-transparent">
-                    <p className="text-white/85 text-[12px] font-bold leading-snug">{tease}</p>
-                    <p className="text-white/55 text-[10.5px] font-extrabold uppercase tracking-[0.08em] mt-1">Unlocks with the full report</p>
+                <div key={key} data-testid={`fpl-snapshot-locked-${i}`} className="rounded-[16px] overflow-hidden border border-[#E5DFCE] bg-[#FBFAF2] shadow-[0_3px_14px_rgba(30,50,35,0.08)] flex flex-col">
+                  <div className="flex items-center gap-2.5 px-4 h-[42px] text-white shrink-0" style={{ background: meta.header }}>
+                    <meta.Icon className="w-4 h-4 shrink-0" />
+                    <span className="text-[11.5px] font-extrabold tracking-[0.07em] uppercase truncate">{meta.label}</span>
+                    <span className="ml-auto w-px h-5 bg-white/25 shrink-0" />
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
                   </div>
-                  <div className="relative z-10 h-[5px] w-full opacity-60" style={{ background: meta.accent }} />
+                  <div className="relative h-[180px] md:h-[200px] bg-[#0B1F14] shrink-0">
+                    {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover blur-[9px] scale-110 opacity-60" aria-hidden />}
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="w-11 h-11 rounded-full bg-[#12211A] border border-white/20 flex items-center justify-center shadow-lg">
+                        <Lock className="w-4 h-4 text-white" />
+                      </span>
+                    </span>
+                  </div>
+                  <div className="px-4 py-3.5 flex-1">
+                    <div className="text-[14px] font-extrabold text-[#12211A] leading-snug">{tease}</div>
+                    <p className="text-[11px] text-[#8B957F] font-extrabold uppercase tracking-[0.08em] mt-1">Unlocks with the full report</p>
+                  </div>
                 </div>
               );
             })}
@@ -334,7 +350,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             type="button"
             onClick={scrollToPackages}
             data-testid="fpl-snapshots-unlock"
-            className="mt-3 w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-ink text-white font-black text-[12px] uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-[#1F4F2F] transition-colors"
+            className="mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-ink text-white font-black text-[12px] uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-[#1F4F2F] transition-colors"
           >
             Unlock all 4 moments <ChevronRight className="w-4 h-4" />
           </button>

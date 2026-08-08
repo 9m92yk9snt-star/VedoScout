@@ -257,7 +257,6 @@ export default function PremiumReportV2({ report, assetBase }) {
           snapshot={d.snapshot}
           moments={snapshotMoments}
           demo={!!report.demo}
-          onPlayAt={videoUrl ? playAt : null}
           playerName={pd.player_name}
         />
       </div>

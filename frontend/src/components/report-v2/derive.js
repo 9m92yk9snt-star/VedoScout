@@ -196,12 +196,14 @@ export function deriveV2(report) {
     dribble: "path", pass: "arrow", shot: "arrow", off_ball_run: "run",
     duel: "circle", defensive_action: "run", first_touch: "circle",
   };
-  const buildSnapMoment = (key, text, pref, forcedAnnot) => {
+  const buildSnapMoment = (key, text, pref, forcedAnnot, preferEventTitle = false) => {
     const ev = snapMatchEvent(text, pref);
+    const phrase = firstSentences(text, 60);
+    const evTitle = firstSentences(ev?.title, 60);
     return {
       key,
-      title: firstSentences(ev?.title, 60) || firstSentences(text, 60) || "—",
-      desc: firstSentences(ev?.description || text, 145) || "—",
+      title: (preferEventTitle ? evTitle || phrase : phrase || evTitle) || "—",
+      desc: firstSentences(ev?.description || (preferEventTitle ? "" : text), 145) || "—",
       timestamp: ev?.timestamp || null,
       thumb: ev ? snapCloseFrame(ev.timestamp) : null,
       annot: forcedAnnot || SNAP_ANNOT_BY_TYPE[String(ev?.action_type || "").toLowerCase()] || "circle",
@@ -221,7 +223,7 @@ export function deriveV2(report) {
     : null;
   const snapshotMoments = explicitMoments || [
     buildSnapMoment("strength", snapshot.biggestStrength, "positive", null),
-    buildSnapMoment("noticed", snap.scout_discovery || "scanning awareness vision decision space between the lines", "positive", "scan"),
+    buildSnapMoment("noticed", snap.scout_discovery || "scanning awareness vision decision space between the lines", "positive", "scan", !snap.scout_discovery),
     buildSnapMoment("hidden", snapshot.hiddenTalent, "positive", "run"),
     buildSnapMoment("develop", snapshot.developmentArea, "issue", "circle"),
   ];

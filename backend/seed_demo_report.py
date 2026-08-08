@@ -20,7 +20,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 logger = logging.getLogger("demo_seed")
 
 DEMO_ID = "demo-sample-report"
-DEMO_VERSION = 2
+DEMO_VERSION = 3
 NOW = datetime.now(timezone.utc).isoformat()
 
 EV = lambda ts, obs: {"timestamp": ts, "observation": obs}  # noqa: E731
@@ -145,10 +145,10 @@ FULL_REPORT = {
         "overall_progress_note": "A standout profile developing exactly the right habits — keep going!",
     },
     "snapshot_moments": [
-        {"key": "strength", "title": "1v1 dribbling creates the goal", "desc": "Explosive double feint beats two defenders on the touchline — three metres of separation that leads straight to a dangerous finish.", "timestamp": "00:58", "frame_url": "/api/uploads/demo-frame-dribble.jpg", "annot": "path", "glance": "1v1 dribbling that produces goals"},
-        {"key": "noticed", "title": "Great scan before the pass", "desc": "Checks his shoulder twice and spots the space early — sees the game one step ahead of everyone around him.", "timestamp": "01:28", "frame_url": "/api/uploads/demo-frame-scan.jpg", "annot": "scan", "glance": "Sees opportunities before the ball arrives"},
-        {"key": "hidden", "title": "Back-post run timed perfectly", "desc": "Starts the curved run the moment the passer's head lifts — intelligent movement that creates a clear scoring opportunity.", "timestamp": "03:59", "frame_url": "/api/uploads/demo-frame-shot.jpg", "annot": "run", "glance": "Back-post runs timed like an older player"},
-        {"key": "develop", "title": "Left foot option was available", "desc": "A clear situation to release with the left foot — more confidence here will make him genuinely unpredictable.", "timestamp": "02:40", "frame_url": "/api/uploads/demo-frame-space.jpg", "annot": "circle", "glance": "Left foot not yet a consistent option"},
+        {"key": "strength", "title": "One-v-one dribbling that produces goals", "desc": "Explosive change of direction beats the defender and leads to a dangerous finish.", "timestamp": "00:58", "frame_url": "/api/uploads/demo-frame-dribble.jpg", "annot": "path"},
+        {"key": "noticed", "title": "Great scan before the pass", "desc": "Checks shoulder and spots the space early — sees the game one step ahead.", "timestamp": "01:28", "frame_url": "/api/uploads/demo-frame-scan.jpg", "annot": "scan"},
+        {"key": "hidden", "title": "Back-post runs timed like an older player", "desc": "Intelligent movement to the far post creates a clear scoring opportunity.", "timestamp": "03:59", "frame_url": "/api/uploads/demo-frame-shot.jpg", "annot": "run"},
+        {"key": "develop", "title": "Left foot as a real option", "desc": "Good situation to use the left foot — more confidence will make him unpredictable.", "timestamp": "02:40", "frame_url": "/api/uploads/demo-frame-space.jpg", "annot": "circle"},
     ],
     "development_roadmap": {
         "now": "Daily 10-minute left-foot routine",

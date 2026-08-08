@@ -227,9 +227,98 @@ def derive_v2(report):
         "biggestStrength": snap.get("biggest_strength") or first_sentences(ks[0] if ks else "", 45) or "—",
         "developmentArea": snap.get("biggest_development_area") or first_sentences(dp[0] if dp else "", 45) or "—",
         "hiddenTalent": snap.get("hidden_talent") or first_sentences(ks[-1] if ks else "", 45) or "—",
-        "nextMilestone": snap.get("next_milestone") or first_sentences(pa.get("three_month_focus"), 45) or "—",
         "progressNote": snap.get("overall_progress_note") or "On the right track!",
     }
+
+    # ---- Snapshot moments (2x2 photo cards — mirrors derive.js) ----
+    timeline_ev = [a for a in (full.get("action_timeline") or [])
+                   if isinstance(a, dict) and a.get("timestamp") and (a.get("title") or a.get("description"))
+                   and str(a.get("identity_confidence") or "").lower() != "low"]
+    frame_entries = [
+        {"sec": ts_to_seconds(c.get("timestamp")), "ts": c.get("timestamp"), "url": c["frame_url"]}
+        for c in (full.get("video_comments") or [])
+        if isinstance(c, dict) and c.get("frame_url") and c.get("identity_verified") is not False and c.get("timestamp")
+    ]
+    used_frames, used_ev = set(), set()
+
+    def _close_frame(ts):
+        sec = ts_to_seconds(ts)
+        best = None
+        for e in frame_entries:
+            if e["url"] in used_frames:
+                continue
+            if ts and e["ts"] == ts:
+                best = e
+                break
+            if sec is not None and e["sec"] is not None:
+                dd = abs(e["sec"] - sec)
+                if dd <= 8 and (best is None or dd < abs((best["sec"] or 999) - sec)):
+                    best = e
+        if best:
+            used_frames.add(best["url"])
+            return best["url"]
+        return None
+
+    def _sm_tokens(s):
+        return [w for w in re.split(r"[^a-z]+", str(s or "").lower()) if len(w) > 3]
+
+    def _sm_match_event(text, pref):
+        want = _sm_tokens(text)
+        best, best_score = None, 0.0
+        for e in timeline_ev:
+            if id(e) in used_ev:
+                continue
+            r = str(e.get("rating") or "").lower()
+            if pref == "positive" and r == "negative":
+                continue
+            if pref == "issue" and r == "positive":
+                continue
+            sc = 0.25 if (pref == "issue" and r == "neutral") else 0.0
+            have = _sm_tokens(f"{e.get('title')} {e.get('description')} {e.get('action_type')}")
+            for w in have:
+                if any(w.startswith(t[:4]) or t.startswith(w[:4]) for t in want):
+                    sc += 1
+            oc = str(e.get("outcome") or "").lower()
+            if pref == "positive" and oc in ("goal", "assist"):
+                sc += 0.5
+            if sc > best_score:
+                best, best_score = e, sc
+        if best:
+            used_ev.add(id(best))
+        return best
+
+    _annot_by_type = {"dribble": "path", "pass": "arrow", "shot": "arrow", "off_ball_run": "run",
+                      "duel": "circle", "defensive_action": "run", "first_touch": "circle"}
+
+    def _sm_moment(key, text, pref, forced, prefer_event_title=False):
+        ev = _sm_match_event(text, pref) or {}
+        phrase = first_sentences(text, 60)
+        ev_title = first_sentences(ev.get("title"), 60)
+        title = (ev_title or phrase) if prefer_event_title else (phrase or ev_title)
+        desc = first_sentences(ev.get("description") or ("" if prefer_event_title else text), 145)
+        return {
+            "key": key, "title": title or "—", "desc": desc or "—",
+            "timestamp": ev.get("timestamp"),
+            "thumb": _close_frame(ev.get("timestamp")) if ev else None,
+            "annot": forced or _annot_by_type.get(str(ev.get("action_type") or "").lower(), "circle"),
+        }
+
+    sm_raw = full.get("snapshot_moments")
+    if isinstance(sm_raw, list) and len([x for x in sm_raw if isinstance(x, dict)]) >= 4:
+        snapshot_moments = [{
+            "key": x.get("key"), "title": x.get("title") or "—", "desc": x.get("desc") or "—",
+            "timestamp": x.get("timestamp"), "thumb": x.get("frame_url"),
+            "annot": x.get("annot") or "circle",
+        } for x in sm_raw[:4] if isinstance(x, dict)]
+    else:
+        scout_disc = snap.get("scout_discovery")
+        snapshot_moments = [
+            _sm_moment("strength", snapshot["biggestStrength"], "positive", None),
+            _sm_moment("noticed", scout_disc or "scanning awareness vision decision space between the lines",
+                       "positive", "scan", prefer_event_title=not scout_disc),
+            _sm_moment("hidden", snapshot["hiddenTalent"], "positive", "run"),
+            _sm_moment("develop", snapshot["developmentArea"], "issue", "circle"),
+        ]
 
     rm = full.get("development_roadmap") or {}
     roadmap = [
@@ -335,6 +424,7 @@ def derive_v2(report):
         "positionAbbr": POSITION_ABBR.get(pd.get("position"), pd.get("position") or "—"),
         "topStrengths": top_strengths, "devPriorities": dev_priorities,
         "ageComparison": age_comparison, "snapshot": snapshot, "roadmap": roadmap,
+        "snapshotMoments": snapshot_moments,
         "trainingWeek": training_week, "parentSummary": parent_summary,
         "parentTips": parent_tips, "coachNotes": coach_notes, "scoutOutlook": scout_outlook,
         "matchStats": match_stats, "videoHighlight": video_highlight,
@@ -695,29 +785,241 @@ def _overall_score_card(c, d, x, y, w, h, ctx=None, bracket=None):
              max_h=ty - 24 - y - PAD + 6)
 
 
-def _snapshot_card(c, snap, x, y, w, h):
-    card(c, x, y, w, h)
-    ty = y + h - PAD
-    ty -= card_title(c, x + PAD, ty, "Player Snapshot", w - 2 * PAD)
-    rows = [("BIGGEST STRENGTH", snap["biggestStrength"]),
-            ("DEVELOPMENT AREA", snap["developmentArea"]),
-            ("HIDDEN TALENT", snap["hiddenTalent"]),
-            ("NEXT MILESTONE", snap["nextMilestone"])]
-    for k, v in rows:
-        c.setFillColor(MUTED)
-        c.setFont(F_BOLD, 5.8)
-        c.drawString(x + PAD, ty - 6, k)
-        ty -= 9
-        ty -= draw_par(c, f"<b>{esc(v)}</b>", x + PAD, ty, w - 2 * PAD,
-                       _style(F_BOLD, 7.8, INK, leading=9.8)) + 6
-    note = Paragraph(f"<b>{esc(snap['progressNote'])}</b>", _style(F_BOLD, 7.2, GREEN, leading=9.6, align=TA_CENTER))
-    _, nh = note.wrap(w - 2 * PAD - 12, 60)
+SNAP_HEADER_COLORS = {
+    "strength": (HexColor("#1E3D25"), HexColor("#2E5435")),
+    "noticed": (HexColor("#1E3D25"), HexColor("#2E5435")),
+    "hidden": (HexColor("#7A4A10"), HexColor("#B26D1C")),
+    "develop": (HexColor("#5E1D1B"), HexColor("#98322B")),
+}
+SNAP_LABELS = {"strength": "BIGGEST STRENGTH", "noticed": "SCOUT NOTICED",
+               "hidden": "HIDDEN TALENT", "develop": "BIGGEST DEVELOPMENT AREA"}
+
+
+def _snap_icon(c, key, cx, cy, r=4.4):
+    white = HexColor("#FFFFFF")
     c.saveState()
-    c.setFillColor(SOFT)
-    c.setStrokeColor(SOFT_BORDER)
-    c.roundRect(x + PAD, y + 9, w - 2 * PAD, nh + 12, 7, stroke=1, fill=1)
+    if key == "strength":
+        draw_star(c, cx, cy, r + 0.6, white)
+    elif key == "noticed":
+        c.setStrokeColor(white)
+        c.setLineWidth(1.0)
+        c.ellipse(cx - r * 1.3, cy - r * 0.75, cx + r * 1.3, cy + r * 0.75, stroke=1, fill=0)
+        c.setFillColor(white)
+        c.circle(cx, cy, r * 0.4, stroke=0, fill=1)
+    elif key == "hidden":
+        c.setFillColor(white)
+        p = c.beginPath()
+        p.moveTo(cx, cy + r * 1.15)
+        p.curveTo(cx + r * 1.05, cy + r * 0.25, cx + r * 0.8, cy - r * 0.9, cx, cy - r)
+        p.curveTo(cx - r * 0.8, cy - r * 0.9, cx - r * 1.05, cy + r * 0.25, cx, cy + r * 1.15)
+        p.close()
+        c.drawPath(p, stroke=0, fill=1)
+    else:  # develop → target
+        c.setStrokeColor(white)
+        c.setLineWidth(1.0)
+        c.circle(cx, cy, r, stroke=1, fill=0)
+        c.circle(cx, cy, r * 0.55, stroke=1, fill=0)
+        c.setFillColor(white)
+        c.circle(cx, cy, r * 0.2, stroke=0, fill=1)
     c.restoreState()
-    note.drawOn(c, x + PAD + 6, y + 15)
+
+
+def _snap_arrowhead(c, x, y, angle, size=4.2):
+    c.saveState()
+    c.translate(x, y)
+    c.rotate(angle)
+    p = c.beginPath()
+    p.moveTo(-size, size * 0.7)
+    p.lineTo(0, 0)
+    p.lineTo(-size, -size * 0.7)
+    c.drawPath(p, stroke=1, fill=0)
+    c.restoreState()
+
+
+def _snap_annot(c, kind, x, y, w, h):
+    """Generic tactical overlay on top of the frame (mirrors web SnapshotAnnot)."""
+    if not kind:
+        return
+    kind = "circle" if kind == "space" else kind
+    c.saveState()
+    c.setLineJoin(1)
+    c.setLineCap(1)
+    if kind in ("path", "arrow"):
+        c.setStrokeColor(HexColor("#7ED321"))
+        c.setLineWidth(1.6)
+        x1, y1 = x + 0.38 * w, y + 0.36 * h
+        x2, y2 = x + 0.58 * w, y + 0.54 * h
+        c.line(x1, y1, x2, y2)
+        _snap_arrowhead(c, x2, y2, math.degrees(math.atan2(y2 - y1, x2 - x1)))
+        if kind == "path":
+            c.setDash(4, 3)
+            c.ellipse(x + 0.14 * w, y + 0.10 * h, x + 0.46 * w, y + 0.24 * h, stroke=1, fill=0)
+    elif kind == "scan":
+        c.setStrokeColor(HexColor("#FFFFFF"))
+        c.setLineWidth(1.5)
+        yy = y + 0.79 * h
+        c.setDash(4, 4)
+        c.line(x + 0.72 * w, yy, x + 0.48 * w, yy)
+        c.setDash()
+        _snap_arrowhead(c, x + 0.46 * w, yy, 180)
+        c.setFillColor(HexColor("#FFFFFF"))
+        c.circle(x + 0.75 * w, yy, 1.6, stroke=0, fill=1)
+    elif kind == "run":
+        c.setStrokeColor(HexColor("#F5A623"))
+        c.setLineWidth(1.6)
+        c.setDash(5, 4)
+        p = c.beginPath()
+        p.moveTo(x + 0.20 * w, y + 0.16 * h)
+        p.curveTo(x + 0.34 * w, y + 0.34 * h, x + 0.46 * w, y + 0.46 * h, x + 0.58 * w, y + 0.62 * h)
+        c.drawPath(p, stroke=1, fill=0)
+        c.ellipse(x + 0.58 * w, y + 0.66 * h, x + 0.72 * w, y + 0.82 * h, stroke=1, fill=0)
+        c.setDash()
+        _snap_arrowhead(c, x + 0.58 * w, y + 0.62 * h, 55)
+    else:  # circle
+        c.setStrokeColor(HexColor("#E8442E"))
+        c.setLineWidth(1.6)
+        c.setDash(5, 4)
+        c.ellipse(x + 0.44 * w, y + 0.10 * h, x + 0.78 * w, y + 0.26 * h, stroke=1, fill=0)
+    c.restoreState()
+
+
+def _snapshot_moment_card(c, m, x, y, w, h, resolve):
+    HB = 24.0   # colored header bar
+    TXT = 72.0  # text block under the photo
+    card(c, x, y, w, h, fill=HexColor("#FBFAF2"), r=10)
+    # header bar (rounded top corners via card clip)
+    g1, g2 = SNAP_HEADER_COLORS.get(m.get("key"), SNAP_HEADER_COLORS["noticed"])
+    c.saveState()
+    p = c.beginPath()
+    p.roundRect(x, y, w, h, 10)
+    c.clipPath(p, stroke=0, fill=0)
+    p2 = c.beginPath()
+    p2.rect(x, y + h - HB, w, HB)
+    c.clipPath(p2, stroke=0, fill=0)
+    try:
+        c.linearGradient(x, y + h - HB, x + w, y + h - HB, (g1, g2), extend=False)
+    except Exception:
+        c.setFillColor(g2)
+        c.rect(x, y + h - HB, w, HB, stroke=0, fill=1)
+    c.restoreState()
+    hy = y + h - HB / 2
+    _snap_icon(c, m.get("key"), x + 13, hy)
+    c.setFillColor(HexColor("#FFFFFF"))
+    c.setFont(F_BOLD, 7.2)
+    c.drawString(x + 22, hy - 2.6, SNAP_LABELS.get(m.get("key"), ""))
+    ts = m.get("timestamp")
+    if ts:
+        c.setFont(F_BLACK, 9)
+        tw_ = c.stringWidth(str(ts), F_BLACK, 9)
+        c.drawRightString(x + w - 10, hy - 3, str(ts))
+        c.saveState()
+        c.setStrokeColor(HexColor("#FFFFFF"))
+        c.setStrokeAlpha(0.3)
+        c.setLineWidth(0.8)
+        c.line(x + w - 18 - tw_, y + h - HB + 5, x + w - 18 - tw_, y + h - 5)
+        c.restoreState()
+    # photo (or stylized pitch fallback — never an invented image)
+    ph = h - HB - TXT
+    py = y + TXT
+    thumb = resolve(m.get("thumb")) if m.get("thumb") else None
+    if not (thumb and draw_cover_image(c, thumb, x + 1, py, w - 2, ph)):
+        c.saveState()
+        c.setFillColor(HexColor("#12301F"))
+        c.rect(x + 1, py, w - 2, ph, stroke=0, fill=1)
+        c.setStrokeColor(HexColor("#FFFFFF"))
+        c.setStrokeAlpha(0.10)
+        c.setLineWidth(0.8)
+        c.line(x + 1, py + ph / 2, x + w - 1, py + ph / 2)
+        c.circle(x + w / 2, py + ph / 2, min(w, ph) * 0.18, stroke=1, fill=0)
+        c.restoreState()
+    _snap_annot(c, m.get("annot"), x + 1, py, w - 2, ph)
+    # title + description
+    ty = y + TXT - 10
+    ty -= draw_par(c, f"<b>{esc(m.get('title'))}</b>", x + 12, ty, w - 24,
+                   _style(F_BOLD, 10.5, INK, leading=12.6), max_h=27) + 3
+    draw_par(c, esc(m.get("desc")), x + 12, ty, w - 24,
+             _style(F_BODY, 7.2, HexColor("#5C6657"), leading=9.6), max_h=max(10, ty - y - 6))
+
+
+def _snapshot_progress_strip(c, note, x, y, w, h):
+    c.saveState()
+    c.setFillColor(HexColor("#EAF2E3"))
+    c.setStrokeColor(HexColor("#D8E6D2"))
+    c.setLineWidth(0.8)
+    c.roundRect(x, y, w, h, 10, stroke=1, fill=1)
+    c.setFillColor(GREEN)
+    c.setFont(F_BLACK, 10)
+    c.drawString(x + 16, y + h - 17, "OVERALL")
+    c.drawString(x + 16, y + h - 28, "PROGRESS")
+    # trend-up arrow
+    ax, ay = x + 80, y + h / 2 - 3
+    c.setStrokeColor(GREEN)
+    c.setLineWidth(1.6)
+    c.setLineJoin(1)
+    c.setLineCap(1)
+    p = c.beginPath()
+    p.moveTo(ax, ay - 3)
+    p.lineTo(ax + 7, ay + 3)
+    p.lineTo(ax + 11, ay)
+    p.lineTo(ax + 18, ay + 6)
+    c.drawPath(p, stroke=1, fill=0)
+    c.line(ax + 13, ay + 6, ax + 18, ay + 6)
+    c.line(ax + 18, ay + 6, ax + 18, ay + 1)
+    c.setStrokeColor(HexColor("#C9DBC0"))
+    c.setLineWidth(0.8)
+    c.line(x + 108, y + 7, x + 108, y + h - 7)
+    c.restoreState()
+    ty = y + h - 11
+    ty -= draw_par(c, f"<b>{esc(note)}</b>", x + 120, ty, w - 134,
+                   _style(F_BOLD, 9.5, INK, leading=11.5), max_h=24) + 2
+    draw_par(c, "Keep working and enjoying the game.", x + 120, ty, w - 134,
+             _style(F_BODY, 7, HexColor("#5C6657"), leading=9), max_h=12)
+
+
+def _snapshot_page(c, d, report_doc, page_no, total_pages, resolve):
+    """Full SNAPSHOT page — 2x2 moment cards + overall progress strip."""
+    _page_bg(c)
+    player_name = (report_doc.get("player_details") or {}).get("player_name") or "Player"
+    mh = _mini_header(c, player_name)
+    yy = H - M - mh - 6
+    # section header: camera chip + SNAPSHOT + subtitle
+    c.saveState()
+    c.setFillColor(HexColor("#E9F1E6"))
+    c.roundRect(M, yy - 34, 34, 34, 9, stroke=0, fill=1)
+    c.setStrokeColor(GREEN)
+    c.setLineWidth(1.3)
+    c.roundRect(M + 8, yy - 25.5, 18, 12.5, 3, stroke=1, fill=0)
+    c.circle(M + 17, yy - 19.2, 3.2, stroke=1, fill=0)
+    c.restoreState()
+    c.setFillColor(INK)
+    c.setFont(F_BLACK, 21)
+    c.drawString(M + 44, yy - 17, "SNAPSHOT")
+    is_demo = bool(report_doc.get("demo"))
+    who = f"{player_name.split()[0]}'s" if is_demo else "your"
+    c.setFillColor(BODY)
+    c.setFont(F_BODY, 9)
+    c.drawString(M + 44, yy - 30, f"The key moments we found in {who} match.")
+    yy -= 42
+    if is_demo:
+        c.setFillColor(HexColor("#8A6D3B"))
+        c.setFont(F_BODY, 6.6)
+        c.drawString(M, yy - 4, "Sample visuals — screenshots and timestamps in this demo are example placements. "
+                               "In a premium report, every frame is a real moment from the match.")
+        yy -= 13
+    moments = {m.get("key"): m for m in (d.get("snapshotMoments") or []) if isinstance(m, dict)}
+    strip_h = 42.0
+    grid_h = yy - M - strip_h - 2 * GAP
+    ch = (grid_h - GAP) / 2
+    cw2 = (CW - GAP) / 2
+    pos = [(M, yy - ch), (M + cw2 + GAP, yy - ch),
+           (M, yy - 2 * ch - GAP), (M + cw2 + GAP, yy - 2 * ch - GAP)]
+    for k, (px, pyy) in zip(("strength", "noticed", "hidden", "develop"), pos):
+        if moments.get(k):
+            _snapshot_moment_card(c, moments[k], px, pyy, cw2, ch, resolve)
+    _snapshot_progress_strip(c, (d.get("snapshot") or {}).get("progressNote") or "On the right track!",
+                             M, M, CW, strip_h)
+    _page_footer(c, page_no, total_pages)
+    c.showPage()
 
 
 def _match_stats_card(c, stats, x, y, w, h):
@@ -2601,7 +2903,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     gyg = (report_doc.get("full_report") or {}).get("grow_your_game")
     gyg = gyg if isinstance(gyg, dict) and (gyg.get("lessons") or []) else None
     has_p4 = bool(mm.get("trail") or fifa_lens or prog)
-    total_pages = 4 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
+    total_pages = 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0) + (1 if has_print else 0)
 
     date_src = report_doc.get("full_generated_at") or report_doc.get("paid_at") or report_doc.get("created_at")
     try:
@@ -2629,14 +2931,11 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     row2_top = row1_top - h1 - GAP
     h2 = 240
     if d["matchStats"]:
-        cw3 = (CW - 2 * GAP) / 3
-        _snapshot_card(c, d["snapshot"], M, row2_top - h2, cw3, h2)
-        _match_stats_card(c, d["matchStats"], M + cw3 + GAP, row2_top - h2, cw3, h2)
-        _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + 2 * (cw3 + GAP), row2_top - h2, cw3, h2)
-    else:
         cw2 = (CW - GAP) / 2
-        _snapshot_card(c, d["snapshot"], M, row2_top - h2, cw2, h2)
+        _match_stats_card(c, d["matchStats"], M, row2_top - h2, cw2, h2)
         _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2)
+    else:
+        _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M, row2_top - h2, CW, h2)
 
     # signature quote strip in remaining space (progress strip when a curve exists)
     strip_top = row2_top - h2 - GAP
@@ -2656,7 +2955,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _page_footer(c, 1, total_pages)
     c.showPage()
 
-    # ── PAGE 2 — top strengths / dev priorities · roadmap / training / tips ──
+    # ── PAGE 2 — SNAPSHOT (2x2 key-moment photo cards + overall progress) ──
+    _snapshot_page(c, d, report_doc, 2, total_pages, resolve)
+
+    # ── PAGE 3 — top strengths / dev priorities · roadmap / training / tips ──
     _page_bg(c)
     mh = _mini_header(c, player_name)
     row3_top = H - M - mh - 4
@@ -2671,10 +2973,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     _roadmap_card(c, d["roadmap"], M, row4_top - h4, cw3, h4)
     _training_week_card(c, d["trainingWeek"], M + cw3 + GAP, row4_top - h4, cw3, h4)
     _parent_tips_card(c, d["parentTips"], M + 2 * (cw3 + GAP), row4_top - h4, cw3, h4)
-    _page_footer(c, 2, total_pages)
+    _page_footer(c, 3, total_pages)
     c.showPage()
 
-    # ── PAGE 3 — video highlight / coach notes / scout outlook + footer ──
+    # ── PAGE 4 — video highlight / coach notes / scout outlook + footer ──
     _page_bg(c)
     mh = _mini_header(c, player_name)
     row5_top = H - M - mh - 4
@@ -2707,10 +3009,10 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
         dy -= 9
     c.drawCentredString(W / 2, dy,
                         "Independent player development analysis based on submitted video. Not a recruitment guarantee.")
-    _page_footer(c, 3, total_pages)
+    _page_footer(c, 4, total_pages)
     c.showPage()
 
-    # ── PAGE 4 — development curve + measured movement map + FIFA player twin ──
+    # ── PAGE 5 — development curve + measured movement map + FIFA player twin ──
     if has_p4:
         _page_bg(c)
         mh = _mini_header(c, player_name)
@@ -2749,18 +3051,18 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 h_tw = min(255.0, yy - M - 30)
                 if h_tw > 150:
                     _player_twin_card(c, fifa_lens, fifa_neighbors, M, yy - h_tw, CW, h_tw)
-        _page_footer(c, 4, total_pages)
+        _page_footer(c, 5, total_pages)
         c.showPage()
 
     # ── PAGE — The numbers, translated (meaning + proof) / score guide fallback ──
     if sm:
-        _score_meaning_page(c, sm, player_name, 4 + (1 if has_p4 else 0), total_pages)
+        _score_meaning_page(c, sm, player_name, 5 + (1 if has_p4 else 0), total_pages)
     elif sctx:
-        _score_guide_page(c, sctx, d, player_name, 4 + (1 if has_p4 else 0), total_pages)
+        _score_guide_page(c, sctx, d, player_name, 5 + (1 if has_p4 else 0), total_pages)
 
     # ── PAGE — GROW YOUR GAME (evidence-gated football education) ──
     if gyg:
-        _gyg_page(c, gyg, player_name, 4 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0), total_pages)
+        _gyg_page(c, gyg, player_name, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0), total_pages)
 
     # ── PAGE — Parents Package (home drills / watch together / letter) ──
     if pp:
@@ -2787,7 +3089,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 yy -= cols_h + GAP
         if pm and yy - M - 20 >= h_pm:
             _parent_metrics_strip(c, pm, M, yy - h_pm, CW, h_pm)
-        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0), total_pages)
+        _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0), total_pages)
         c.showPage()
 
     # ── PAGE — Printables (mission card + training week planner) ──
@@ -2809,7 +3111,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 _week_planner_print(c, d["trainingWeek"],
                                     ((report_doc.get("full_report") or {}).get("training_plan") or {}).get("weekly_focus"),
                                     M, yy - h_wp, CW, h_wp)
-        _page_footer(c, 4 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
+        _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0) + (1 if pp else 0), total_pages)
         c.showPage()
 
     # ── FINAL PAGE — printable certificate / diploma ──
