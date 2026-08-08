@@ -149,6 +149,72 @@ export function deriveV2(report) {
     progressNote: snap.overall_progress_note || "On the right track!",
   };
 
+  // ---- Snapshot moments (photo cards: real frame + timestamp + annotation) ----
+  const snapEvents = (Array.isArray(full.action_timeline) ? full.action_timeline : [])
+    .filter((a) => a && a.timestamp && (a.title || a.description)
+      && String(a.identity_confidence || "").toLowerCase() !== "low");
+  const snapFrameEntries = (full.video_comments || [])
+    .filter((c) => c && c.frame_url && c.identity_verified !== false && c.timestamp)
+    .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url }));
+  const snapUsedFrames = new Set();
+  const snapCloseFrame = (ts) => {
+    const sec = tsToSeconds(ts);
+    let best = null;
+    for (const e of snapFrameEntries) {
+      if (snapUsedFrames.has(e.url)) continue;
+      if (ts && e.ts === ts) { best = e; break; }
+      if (sec != null && e.sec != null) {
+        const d = Math.abs(e.sec - sec);
+        if (d <= 8 && (!best || d < Math.abs(best.sec - sec))) best = e;
+      }
+    }
+    if (best) snapUsedFrames.add(best.url);
+    return best ? best.url : null;
+  };
+  const snapTokens = (s) => String(s || "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
+  const snapTokMatch = (a, b) => a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4));
+  const snapUsedEv = new Set();
+  const snapMatchEvent = (text, pref) => {
+    const want = snapTokens(text);
+    let best = null;
+    let bestScore = 0;
+    for (const e of snapEvents) {
+      if (snapUsedEv.has(e)) continue;
+      const r = String(e.rating || "").toLowerCase();
+      if (pref === "positive" && r === "negative") continue;
+      if (pref === "issue" && r === "positive") continue;
+      let sc = pref === "issue" && r === "neutral" ? 0.25 : 0;
+      const have = snapTokens(`${e.title} ${e.description} ${e.action_type}`);
+      for (const w of have) if (want.some((t) => snapTokMatch(w, t))) sc += 1;
+      const oc = String(e.outcome || "").toLowerCase();
+      if (pref === "positive" && (oc === "goal" || oc === "assist")) sc += 0.5;
+      if (sc > bestScore) { best = e; bestScore = sc; }
+    }
+    if (best) snapUsedEv.add(best);
+    return best;
+  };
+  const SNAP_ANNOT_BY_TYPE = {
+    dribble: "path", pass: "arrow", shot: "arrow", off_ball_run: "run",
+    duel: "circle", defensive_action: "run", first_touch: "circle",
+  };
+  const buildSnapMoment = (key, text, pref, forcedAnnot) => {
+    const ev = snapMatchEvent(text, pref);
+    return {
+      key,
+      title: firstSentences(ev?.title, 60) || firstSentences(text, 60) || "—",
+      desc: firstSentences(ev?.description || text, 145) || "—",
+      timestamp: ev?.timestamp || null,
+      thumb: ev ? snapCloseFrame(ev.timestamp) : null,
+      annot: forcedAnnot || SNAP_ANNOT_BY_TYPE[String(ev?.action_type || "").toLowerCase()] || "circle",
+    };
+  };
+  const snapshotMoments = [
+    buildSnapMoment("strength", snapshot.biggestStrength, "positive", null),
+    buildSnapMoment("develop", snapshot.developmentArea, "issue", "space"),
+    buildSnapMoment("hidden", snapshot.hiddenTalent, "positive", "run"),
+    buildSnapMoment("discovery", snap.scout_discovery || "scanning awareness vision decision space between the lines", "positive", "scan"),
+  ];
+
   // ---- Roadmap ----
   const rm = full.development_roadmap || {};
   const roadmap = [
