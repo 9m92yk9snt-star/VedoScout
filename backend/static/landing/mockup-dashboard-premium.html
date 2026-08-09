@@ -3,52 +3,53 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mockup v2 — PREMIUM Player Dashboard</title>
+<title>Mockup v3 — PREMIUM Player Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
   :root { --bg:#F6F4EE; --card:#FFFFFF; --green:#2E7D32; --green-dark:#1B5E20; --green-deep:#0F1F14; --green-soft:#E8F2E8; --ink:#15201A; --muted:#75816F; --border:#ECE8DC; --volt:#B9E93C; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); display:flex; justify-content:center; }
   .app { width:860px; background:var(--bg); padding-bottom:110px; }
+  .sv { width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
   .hdr { background:#fff; border-bottom:1px solid var(--border); padding:16px 26px; display:flex; align-items:center; justify-content:space-between; position:relative; z-index:5; }
   .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:22px; }
-  .logo .mark { width:34px; height:34px; }
   .logo small { display:block; font-size:10px; letter-spacing:.18em; color:var(--muted); font-weight:700; }
-  .hdr-r { display:flex; align-items:center; gap:18px; }
-  .ico { position:relative; font-size:20px; color:#4A5548; }
-  .badge { position:absolute; top:-8px; right:-10px; background:var(--green); color:#fff; font-size:10px; font-weight:700; min-width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0 3px; }
+  .hdr-r { display:flex; align-items:center; gap:20px; }
+  .hico { position:relative; color:#4A5548; }
+  .badge { position:absolute; top:-8px; right:-9px; background:var(--green); color:#fff; font-size:10px; font-weight:700; min-width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0 3px; }
   .avatar { width:42px; height:42px; border-radius:50%; overflow:hidden; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.12); }
   .avatar img { width:100%; height:100%; object-fit:cover; }
 
-  .hero { position:relative; padding:30px 26px 12px; overflow:hidden; }
-  .hero img.player { position:absolute; right:-10px; top:-8px; width:340px; height:220px; object-fit:cover; object-position:top; -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 30%); mask-image:linear-gradient(90deg,transparent 0,#000 30%); opacity:.92; }
-  .hero h1 { font-size:32px; font-weight:800; position:relative; }
-  .hero p { color:#4A5548; font-size:16px; margin-top:6px; max-width:340px; position:relative; line-height:1.45; }
-  .prem-chip { position:relative; display:inline-flex; align-items:center; gap:8px; background:var(--green-deep); color:var(--volt); font-weight:700; font-size:14px; padding:10px 20px; border-radius:12px; margin-top:16px; }
+  .hero { position:relative; padding:34px 26px 10px; overflow:hidden; min-height:210px; }
+  .hero img.player { position:absolute; right:0; top:0; width:400px; height:250px; object-fit:cover; -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 25%); mask-image:linear-gradient(90deg,transparent 0,#000 25%); }
+  .hero h1 { font-size:32px; font-weight:800; position:relative; z-index:2; }
+  .hero p { color:#4A5548; font-size:16px; margin-top:8px; max-width:340px; position:relative; z-index:2; line-height:1.5; }
+  .prem-chip { position:relative; z-index:2; display:inline-flex; align-items:center; gap:8px; background:var(--green-deep); color:var(--volt); font-weight:700; font-size:14px; padding:10px 20px; border-radius:12px; margin-top:16px; }
 
   .pad { padding:0 26px; }
   .card { background:var(--card); border:1px solid var(--border); border-radius:18px; box-shadow:0 1px 6px rgba(30,50,35,.05); }
+  .viewall { font-size:13px; font-weight:700; color:var(--green); }
 
-  /* performance dark band */
-  .perf { margin-top:14px; background:var(--green-deep); border-radius:20px; color:#fff; display:grid; grid-template-columns:auto 1fr auto auto; gap:26px; padding:26px 28px; align-items:center; }
+  .perf { margin-top:14px; background:var(--green-deep); border-radius:20px; color:#fff; display:grid; grid-template-columns:auto 1fr auto auto; gap:26px; padding:26px 28px; align-items:center; position:relative; z-index:3; }
   .score-ring { width:120px; height:120px; border-radius:50%; background:conic-gradient(var(--volt) 0 82%, #2b4232 82% 100%); display:flex; align-items:center; justify-content:center; position:relative; }
   .score-ring::after { content:""; position:absolute; inset:10px; background:var(--green-deep); border-radius:50%; }
-  .score-ring .v { position:relative; z-index:2; text-align:center; font-weight:800; font-size:36px; }
+  .score-ring .v { position:relative; z-index:2; text-align:center; font-weight:800; font-size:34px; }
   .score-ring .v small { display:block; font-size:12px; color:#9DB694; font-weight:700; }
-  .crown { position:absolute; top:-6px; left:50%; transform:translateX(-50%); z-index:3; font-size:15px; }
+  .crown { position:absolute; top:-9px; left:50%; transform:translateX(-50%); z-index:3; width:26px; height:26px; border-radius:50%; background:var(--volt); color:var(--green-deep); display:flex; align-items:center; justify-content:center; }
   .score-lbl { font-size:11px; letter-spacing:.14em; color:#C9D6C4; text-align:center; margin-top:10px; text-transform:uppercase; font-weight:700; }
   .perf-mid .l1 { font-size:14px; color:#C9D6C4; }
   .perf-mid .l2 { font-size:24px; font-weight:800; color:#8FE05A; margin-top:2px; }
   .perf-mid .l3 { font-size:13px; color:#C9D6C4; margin-top:4px; }
   .btn-volt { display:inline-flex; align-items:center; gap:9px; background:var(--green); color:#fff; font-weight:700; font-size:14.5px; padding:12px 22px; border-radius:12px; margin-top:16px; }
-  .sk { display:flex; flex-direction:column; gap:7px; min-width:170px; }
-  .sk div { display:flex; align-items:center; gap:9px; font-size:13.5px; color:#D6E2CF; }
+  .sk { display:flex; flex-direction:column; gap:8px; min-width:165px; }
+  .sk div { display:flex; align-items:center; gap:10px; font-size:13.5px; color:#D6E2CF; }
+  .sk .sv { width:15px; height:15px; color:#8FB08A; }
   .sk b { margin-left:auto; color:#8FE05A; font-size:14px; }
 
   .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:16px; }
-  .stat { padding:20px; border-radius:18px; }
-  .stat .ic { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:14px; background:var(--green-soft); color:var(--green); }
+  .stat { padding:20px; }
+  .stat .ic { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; margin-bottom:14px; background:var(--green-soft); color:var(--green); }
   .stat .ic.or { background:#FFF2E2; color:#E08A1E; }
   .stat .num { font-size:32px; font-weight:800; line-height:1; }
   .stat .num small { font-size:17px; color:var(--muted); font-weight:700; }
@@ -58,9 +59,7 @@
   .spark { margin-top:12px; height:34px; }
   .spark polyline { fill:none; stroke:var(--green); stroke-width:2.5; }
   .spark.or polyline { stroke:#E08A1E; }
-  .viewall { font-size:13px; font-weight:700; color:var(--green); }
 
-  /* latest report */
   .latest { margin-top:16px; background:var(--green-deep); border-radius:20px; color:#fff; padding:22px 26px; }
   .lat-h { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
   .lat-h b { font-size:19px; font-weight:800; }
@@ -69,28 +68,29 @@
   .vid { position:relative; border-radius:14px; overflow:hidden; height:190px; }
   .vid img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .vid .play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-  .vid .play span { width:52px; height:52px; border-radius:50%; background:#ffffffd9; color:var(--green-deep); display:flex; align-items:center; justify-content:center; font-size:19px; }
+  .vid .play span { width:52px; height:52px; border-radius:50%; background:#ffffffd9; color:var(--green-deep); display:flex; align-items:center; justify-content:center; }
   .lat-mid { text-align:center; }
   .lat-mid .g { font-size:18px; font-weight:800; }
   .lat-mid .d { font-size:12.5px; color:#9DB694; margin-top:3px; }
   .mini-ring { width:104px; height:104px; margin:16px auto 0; border-radius:50%; background:conic-gradient(var(--volt) 0 82%, #2b4232 82% 100%); display:flex; align-items:center; justify-content:center; position:relative; }
   .mini-ring::after { content:""; position:absolute; inset:9px; background:var(--green-deep); border-radius:50%; }
-  .mini-ring .v { position:relative; z-index:2; font-weight:800; font-size:28px; }
+  .mini-ring .v { position:relative; z-index:2; font-weight:800; font-size:26px; }
   .mini-ring .v small { display:block; font-size:11px; color:#9DB694; }
   .gp { color:#8FE05A; font-size:13px; font-weight:700; margin-top:10px; }
   .lat-cta { display:flex; gap:10px; justify-content:center; margin-top:14px; }
   .btn-w { background:#fff; color:var(--green-deep); font-weight:700; font-size:13.5px; padding:10px 18px; border-radius:11px; }
-  .btn-dl { background:#ffffff22; color:#fff; font-weight:700; font-size:13.5px; padding:10px 13px; border-radius:11px; }
+  .btn-dl { background:#ffffff22; color:#fff; font-weight:700; padding:10px 13px; border-radius:11px; display:flex; align-items:center; }
   .sk2 { display:flex; flex-direction:column; gap:8px; }
   .sk2 div { display:flex; align-items:center; gap:10px; font-size:14px; color:#D6E2CF; border-bottom:1px solid #ffffff12; padding-bottom:8px; }
   .sk2 div:last-child { border-bottom:none; }
+  .sk2 .sv { width:15px; height:15px; color:#8FB08A; }
   .sk2 b { margin-left:auto; color:#8FE05A; }
 
   .twocol { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
   .lh { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 8px; }
   .lh b { font-size:17px; font-weight:800; }
   .row { display:flex; gap:12px; padding:12px 20px; align-items:flex-start; }
-  .row .ric { width:42px; height:42px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .row .ric { width:42px; height:42px; border-radius:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .row b { font-size:14px; display:block; }
   .row p { font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.4; }
   .row .t { margin-left:auto; font-size:11px; color:#A9B2A2; white-space:nowrap; }
@@ -105,56 +105,83 @@
   .comm-h b { font-size:17px; font-weight:800; }
   .comm-g { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
   .cst .top { display:flex; align-items:center; gap:9px; }
-  .cst .cic { width:34px; height:34px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .cst .cic { width:36px; height:36px; border-radius:11px; display:flex; align-items:center; justify-content:center; }
+  .cst .cic .sv { width:18px; height:18px; }
   .cst .num { font-size:23px; font-weight:800; }
   .cst .lbl { font-size:12px; color:#3E4A3C; margin-top:6px; font-weight:500; line-height:1.3; }
   .cst .wk { font-size:11px; color:var(--green); font-weight:700; margin-top:5px; display:block; }
 
   .trials { margin-top:16px; padding:20px 22px 14px; }
-  .trow { display:flex; align-items:center; gap:13px; padding:11px 0; border-bottom:1px solid #F2EFE5; }
+  .trow { display:flex; align-items:center; gap:13px; padding:12px 0; border-bottom:1px solid #F2EFE5; }
   .trow:last-of-type { border-bottom:none; }
-  .crest { width:42px; height:42px; border-radius:12px; background:#12233F; color:#F2C94C; display:flex; align-items:center; justify-content:center; font-size:18px; }
+  .crest { width:42px; height:42px; border-radius:12px; background:#13253F; color:#F2C94C; display:flex; align-items:center; justify-content:center; }
+  .crest .sv { width:19px; height:19px; }
   .trow b { font-size:14.5px; display:block; }
   .trow .sub { font-size:12.5px; color:var(--muted); margin-top:2px; }
   .newb { background:var(--green-dark); color:#fff; font-size:11px; font-weight:700; padding:5px 12px; border-radius:8px; margin-left:auto; }
   .tleft { font-size:12.5px; color:var(--muted); width:52px; text-align:right; }
-  .chev { color:#B7BFAF; font-size:22px; }
+  .chev { color:#B7BFAF; font-size:24px; }
   .seeall { display:block; text-align:center; border:1.5px solid var(--border); border-radius:12px; padding:12px; color:var(--green-dark); font-weight:700; font-size:14px; margin-top:12px; }
 
   .nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:860px; background:#fff; border-top:1px solid var(--border); display:flex; justify-content:space-around; align-items:center; padding:10px 0 14px; z-index:20; }
   .nv { text-align:center; font-size:11.5px; color:#7C877A; font-weight:600; position:relative; }
-  .nv .i { font-size:20px; display:block; margin-bottom:2px; }
+  .nv .sv { width:21px; height:21px; display:block; margin:0 auto 3px; }
   .nv.on { color:var(--green-dark); font-weight:800; }
-  .upl { width:52px; height:52px; border-radius:50%; background:var(--green); color:#fff; font-size:26px; display:flex; align-items:center; justify-content:center; margin-top:-30px; box-shadow:0 6px 14px rgba(46,125,50,.4); }
-  .nv .badge { top:-4px; right:2px; }
+  .upl { width:52px; height:52px; border-radius:50%; background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center; margin-top:-30px; box-shadow:0 6px 14px rgba(46,125,50,.4); }
+  .nv .badge { top:-4px; right:4px; }
   .mock { text-align:center; font-size:11px; color:#A9B2A2; letter-spacing:.14em; text-transform:uppercase; padding:24px 0 8px; }
 </style>
 </head>
 <body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-brief" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+</svg>
+
 <div class="app">
   <div class="hdr">
     <div class="logo">
-      <svg class="mark" viewBox="0 0 40 40"><path d="M4 30 L15 17 L22 24 L36 8" stroke="#2E7D32" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 8 h9 v9" stroke="#2E7D32" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg width="34" height="34" viewBox="0 0 40 40"><path d="M4 30 L15 17 L22 24 L36 8" stroke="#2E7D32" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 8 h9 v9" stroke="#2E7D32" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <div>ScoutMePlay<span style="color:var(--muted);font-weight:500;">.com</span><small>PLAYER DASHBOARD</small></div>
     </div>
     <div class="hdr-r">
-      <div class="ico">🔔<span class="badge">3</span></div>
-      <div class="ico">✉️<span class="badge">2</span></div>
+      <span class="hico"><svg class="sv"><use href="#i-bell"/></svg><span class="badge">3</span></span>
+      <span class="hico"><svg class="sv"><use href="#i-mail"/></svg><span class="badge">2</span></span>
       <div class="avatar"><img src="/api/uploads/demo-player.jpg"></div>
     </div>
   </div>
 
   <div class="hero">
-    <img class="player" src="/api/uploads/demo-player.jpg" alt="">
+    <img class="player" src="hero-premium.jpg" alt="">
     <h1>Welcome back, Player! ⚽</h1>
     <p>You're on the right path. Keep pushing, your next opportunity is closer than you think.</p>
-    <span class="prem-chip">👑 Premium Member</span>
+    <span class="prem-chip"><svg class="sv" style="width:16px;height:16px;"><use href="#i-crown"/></svg> Premium Member</span>
   </div>
 
   <div class="pad">
     <div class="perf">
       <div>
-        <div class="score-ring"><span class="crown">👑</span><div class="v">82<small>/100</small></div></div>
+        <div class="score-ring"><span class="crown"><svg class="sv" style="width:14px;height:14px;"><use href="#i-crown"/></svg></span><div class="v">82<small>/100</small></div></div>
         <div class="score-lbl">Overall Score</div>
       </div>
       <div class="perf-mid">
@@ -164,12 +191,12 @@
         <span class="btn-volt">View Full Report →</span>
       </div>
       <div class="sk">
-        <div>⚙️ Technical <b>7.8</b></div>
-        <div>🧠 Tactical <b>8.4</b></div>
-        <div>⚡ Physical <b>7.6</b></div>
-        <div>🧭 Mental <b>8.6</b></div>
-        <div>🎯 Attacking <b>8.3</b></div>
-        <div>🛡 Defending <b>6.7</b></div>
+        <div><svg class="sv"><use href="#i-wrench"/></svg> Technical <b>7.8</b></div>
+        <div><svg class="sv"><use href="#i-compass"/></svg> Tactical <b>8.4</b></div>
+        <div><svg class="sv"><use href="#i-zap"/></svg> Physical <b>7.6</b></div>
+        <div><svg class="sv"><use href="#i-activity"/></svg> Mental <b>8.6</b></div>
+        <div><svg class="sv"><use href="#i-target"/></svg> Attacking <b>8.3</b></div>
+        <div><svg class="sv"><use href="#i-shield"/></svg> Defending <b>6.7</b></div>
       </div>
       <svg width="200" height="180" viewBox="0 0 200 180">
         <polygon points="100,14 176,56 176,124 100,166 24,124 24,56" fill="none" stroke="#3a5244" stroke-width="1"/>
@@ -185,30 +212,30 @@
     </div>
 
     <div class="stats">
-      <div class="card stat"><div class="ic">📝</div><div class="num">12</div><div class="lbl">Reports Created</div><div class="wk" style="color:var(--muted);font-weight:500;">View all</div><svg class="spark" width="100%" viewBox="0 0 140 34"><polyline points="2,28 20,24 38,26 56,18 74,20 92,12 110,14 138,4"/></svg></div>
-      <div class="card stat"><div class="ic">⭐</div><div class="num">7.9 <small>/10</small></div><div class="lbl">Average Score</div><div class="wk">↗ 0.8 this month</div><svg class="spark" width="100%" viewBox="0 0 140 34"><polyline points="2,30 20,26 38,27 56,20 74,22 92,14 110,15 138,6"/></svg></div>
-      <div class="card stat"><div class="ic">👁</div><div class="num">248</div><div class="lbl">Profile Views</div><div class="wk">↗ 24 this week</div><svg class="spark" width="100%" viewBox="0 0 140 34"><polyline points="2,29 20,27 38,22 56,24 74,16 92,18 110,10 138,4"/></svg></div>
-      <div class="card stat"><div class="ic or">📈</div><div class="num">86</div><div class="lbl">Library Exposure</div><div class="wk or">↗ 15 this week</div><svg class="spark or" width="100%" viewBox="0 0 140 34"><polyline points="2,30 20,25 38,27 56,19 74,21 92,13 110,15 138,5"/></svg></div>
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-file"/></svg></div><div class="num">12</div><div class="lbl">Reports Created</div><div class="wk" style="color:var(--muted);font-weight:500;">View all</div><svg class="spark" width="100%" viewBox="0 0 140 34"><polyline points="2,28 20,24 38,26 56,18 74,20 92,12 110,14 138,4"/></svg></div>
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-star"/></svg></div><div class="num">7.9 <small>/10</small></div><div class="lbl">Average Score</div><div class="wk">↗ 0.8 this month</div><svg class="spark" width="100%" viewBox="0 0 140 34"><polyline points="2,30 20,26 38,27 56,20 74,22 92,14 110,15 138,6"/></svg></div>
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-eye"/></svg></div><div class="num">248</div><div class="lbl">Profile Views</div><div class="wk">↗ 24 this week</div><svg class="spark" width="100%" viewBox="0 0 140 34"><polyline points="2,29 20,27 38,22 56,24 74,16 92,18 110,10 138,4"/></svg></div>
+      <div class="card stat"><div class="ic or"><svg class="sv"><use href="#i-trend"/></svg></div><div class="num">86</div><div class="lbl">Library Exposure</div><div class="wk or">↗ 15 this week</div><svg class="spark or" width="100%" viewBox="0 0 140 34"><polyline points="2,30 20,25 38,27 56,19 74,21 92,13 110,15 138,5"/></svg></div>
     </div>
 
     <div class="latest">
       <div class="lat-h"><b>Latest Report</b><span class="prem-b">Premium</span></div>
       <div class="lat-g">
-        <div class="vid"><img src="/api/uploads/demo-frame-dribble.jpg"><div class="play"><span>▶</span></div></div>
+        <div class="vid"><img src="/api/uploads/demo-frame-dribble.jpg"><div class="play"><span><svg class="sv" style="width:18px;height:18px;"><use href="#i-play"/></svg></span></div></div>
         <div class="lat-mid">
           <div class="g">Game vs FC United</div>
           <div class="d">Jul 2, 2026 • Full Match</div>
           <div class="mini-ring"><div class="v">8.2<small>/10</small></div></div>
           <div class="gp">Great Performance!</div>
-          <div class="lat-cta"><span class="btn-w">View Full Report</span><span class="btn-dl">⬇</span></div>
+          <div class="lat-cta"><span class="btn-w">View Full Report</span><span class="btn-dl"><svg class="sv" style="width:16px;height:16px;"><use href="#i-dl"/></svg></span></div>
         </div>
         <div class="sk2">
-          <div>⚙️ Technical <b>8.4</b></div>
-          <div>🧠 Tactical <b>8.6</b></div>
-          <div>⚡ Physical <b>7.6</b></div>
-          <div>🧭 Mental <b>8.3</b></div>
-          <div>🎯 Attacking <b>8.7</b></div>
-          <div>🛡 Defending <b>6.5</b></div>
+          <div><svg class="sv"><use href="#i-wrench"/></svg> Technical <b>8.4</b></div>
+          <div><svg class="sv"><use href="#i-compass"/></svg> Tactical <b>8.6</b></div>
+          <div><svg class="sv"><use href="#i-zap"/></svg> Physical <b>7.6</b></div>
+          <div><svg class="sv"><use href="#i-activity"/></svg> Mental <b>8.3</b></div>
+          <div><svg class="sv"><use href="#i-target"/></svg> Attacking <b>8.7</b></div>
+          <div><svg class="sv"><use href="#i-shield"/></svg> Defending <b>6.5</b></div>
         </div>
       </div>
     </div>
@@ -216,9 +243,9 @@
     <div class="twocol">
       <div class="card">
         <div class="lh"><b>Notifications</b><span class="viewall">View all</span></div>
-        <div class="row"><div class="ric c-green">🛡</div><div><b>Your report is ready!</b><p>Your latest Premium Report is now available.</p><p style="color:#A9B2A2;margin-top:4px;">2h ago</p></div><span class="gdot"></span></div>
-        <div class="row"><div class="ric c-orange">✉️</div><div><b>New message from Agent</b><p>An agent has sent you a message.</p><p style="color:#A9B2A2;margin-top:4px;">5h ago</p></div><span class="gdot"></span></div>
-        <div class="row" style="padding-bottom:20px;"><div class="ric c-blue">📈</div><div><b>Your profile is getting views!</b><p>Your profile has been viewed 23 times this week.</p><p style="color:#A9B2A2;margin-top:4px;">1d ago</p></div><span class="gdot"></span></div>
+        <div class="row"><div class="ric c-green"><svg class="sv" style="width:18px;height:18px;"><use href="#i-shield"/></svg></div><div><b>Your report is ready!</b><p>Your latest Premium Report is now available.</p><p style="color:#A9B2A2;margin-top:4px;">2h ago</p></div><span class="gdot"></span></div>
+        <div class="row"><div class="ric c-orange"><svg class="sv" style="width:18px;height:18px;"><use href="#i-mail"/></svg></div><div><b>New message from Agent</b><p>An agent has sent you a message.</p><p style="color:#A9B2A2;margin-top:4px;">5h ago</p></div><span class="gdot"></span></div>
+        <div class="row" style="padding-bottom:20px;"><div class="ric c-blue"><svg class="sv" style="width:18px;height:18px;"><use href="#i-trend"/></svg></div><div><b>Your profile is getting views!</b><p>Your profile has been viewed 23 times this week.</p><p style="color:#A9B2A2;margin-top:4px;">1d ago</p></div><span class="gdot"></span></div>
       </div>
       <div class="card">
         <div class="lh"><b>Messages</b><span class="viewall">View all</span></div>
@@ -231,30 +258,30 @@
     <div class="card comm">
       <div class="comm-h"><b>ScoutMePlay Community</b><span class="viewall">View all</span></div>
       <div class="comm-g">
-        <div class="cst"><div class="top"><span class="cic c-green">🧑‍🤝‍🧑</span><span class="num">2,847</span></div><span class="lbl">Players in Library</span><span class="wk">↗ 146 this week</span></div>
-        <div class="cst"><div class="top"><span class="cic c-orange">🛡</span><span class="num">312</span></div><span class="lbl">Clubs Looking for Players</span><span class="wk">↗ 12 this week</span></div>
-        <div class="cst"><div class="top"><span class="cic c-blue">👁</span><span class="num">156</span></div><span class="lbl">Scouts Searching Players</span><span class="wk">↗ 8 this week</span></div>
-        <div class="cst"><div class="top"><span class="cic c-purple">🧑‍💼</span><span class="num">24</span></div><span class="lbl">Active Agents</span><span class="wk">↗ 4 this week</span></div>
-        <div class="cst"><div class="top"><span class="cic c-gold">🏆</span><span class="num">18</span></div><span class="lbl">Players Invited to Trials</span><span class="wk">↗ 3 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-green"><svg class="sv"><use href="#i-users"/></svg></span><span class="num">2,847</span></div><span class="lbl">Players in Library</span><span class="wk">↗ 146 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-orange"><svg class="sv"><use href="#i-shield"/></svg></span><span class="num">312</span></div><span class="lbl">Clubs Looking for Players</span><span class="wk">↗ 12 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-blue"><svg class="sv"><use href="#i-search"/></svg></span><span class="num">156</span></div><span class="lbl">Scouts Searching Players</span><span class="wk">↗ 8 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-purple"><svg class="sv"><use href="#i-brief"/></svg></span><span class="num">24</span></div><span class="lbl">Active Agents</span><span class="wk">↗ 4 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-gold"><svg class="sv"><use href="#i-trophy"/></svg></span><span class="num">18</span></div><span class="lbl">Players Invited to Trials</span><span class="wk">↗ 3 this week</span></div>
       </div>
     </div>
 
     <div class="card trials">
       <div class="comm-h"><b>Trials &amp; Opportunities</b><span class="viewall">View all</span></div>
-      <div class="trow"><div class="crest">🛡</div><div><b>Elite Football Academy Trials</b><span class="sub">U16 • London, UK</span></div><span class="newb">New</span><span class="tleft">2d left</span><span class="chev">›</span></div>
-      <div class="trow"><div class="crest">🛡</div><div><b>Northern FC Talent ID</b><span class="sub">U15 • Manchester, UK</span></div><span class="newb">New</span><span class="tleft">5d left</span><span class="chev">›</span></div>
+      <div class="trow"><div class="crest"><svg class="sv"><use href="#i-shield"/></svg></div><div><b>Elite Football Academy Trials</b><span class="sub">U16 • London, UK</span></div><span class="newb">New</span><span class="tleft">2d left</span><span class="chev">›</span></div>
+      <div class="trow"><div class="crest"><svg class="sv"><use href="#i-shield"/></svg></div><div><b>Northern FC Talent ID</b><span class="sub">U15 • Manchester, UK</span></div><span class="newb">New</span><span class="tleft">5d left</span><span class="chev">›</span></div>
       <span class="seeall">See all opportunities</span>
     </div>
 
-    <div class="mock">Mockup v2 · Premium dashboard · identical structure to your reference</div>
+    <div class="mock">Mockup v3 · Premium dashboard</div>
   </div>
 
   <div class="nav">
-    <div class="nv on"><span class="i">🏠</span>Dashboard</div>
-    <div class="nv"><span class="i">📄</span>My Reports</div>
-    <div class="upl">+</div>
-    <div class="nv"><span class="i">✉️</span>Messages<span class="badge">2</span></div>
-    <div class="nv"><span class="i">☰</span>Menu</div>
+    <div class="nv on"><svg class="sv"><use href="#i-home"/></svg>Dashboard</div>
+    <div class="nv"><svg class="sv"><use href="#i-file"/></svg>My Reports</div>
+    <div class="upl"><svg class="sv" style="width:24px;height:24px;"><use href="#i-plus"/></svg></div>
+    <div class="nv"><svg class="sv"><use href="#i-mail"/></svg>Messages<span class="badge">2</span></div>
+    <div class="nv"><svg class="sv"><use href="#i-menu"/></svg>Menu</div>
   </div>
 </div>
 </body>
