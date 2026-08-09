@@ -10,6 +10,7 @@ Formål: komplet liste over ALT der allerede findes, så nye forslag aldrig gent
 - Proof mini-player: alle timestamp-klik åbner bottom-sheet videoafspiller (seek ts−6s) — INGEN scroll-hop; demo viser taktisk frame + premium-note; mobil "SEE THE PROOF"-pills på top strengths (jun 2026)
 - Intro share clip: delbar 1080×1920 story-MP4 af cinematic-introen (server-genereret, cached) m. "Share intro clip"-knap i rapport-header — demo public + premium auth (jun 2026)
 - Free preview: cinematic intro (potential 84/100 count-up → "UNLOCK THE FULL STORY") + proof-player (ægte video på åbent snapshot/key moment, låste kort → locked sheet m. unlock-CTA) (jun 2026)
+- Social feature-consent (GDPR): valgfrit "get featured"-samtykke på upload + Dashboard-toggle + admin Featured Clips-liste m. klip-download + privacy-sektion 9 (jun 2026)
 - PDF-rapport (reportlab, 7+ sider, inkl. SNAPSHOT-side, cache m. PDF_RENDER_VERSION)
 - Sample/demo-rapport (/sample-report, seedet, DEMO_VERSION-styret) m. demo-note
 - Snapshot-deling: branded 1080×1350 PNG pr. snapshot-kort (demo public + premium auth) m. share/download-knap

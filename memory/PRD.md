@@ -1,5 +1,16 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 4) — SOCIAL FEATURE CONSENT (GDPR) ✅ (iter85: 100% backend 6/6 + frontend)
+- **Formål**: ejeren må dele spilleres cinematic intro-klip på Instagram/Facebook — med gyldigt, VALGFRIT samtykke (GDPR art. 7: aldrig krav for upload, tilbagekaldeligt, dokumenteret, positivt formuleret "Show off your talent — get featured!").
+- **Backend (server.py)**: upload-endpoint tager `feature_consent` Form-felt (~5100) → `report.feature_consent {granted, at, text_version "2026-06-v1"}` + spejles på `user.feature_consent {status granted}` (~5300). Endpoints under "SOCIAL FEATURE CONSENT" (~10430): GET/PUT `/api/account/feature-consent` (granted/withdrawn), GET `/api/admin/featured-clips` (admin; kun rapporter m. report-consent OG ejers aktuelle status=granted — withdrawal skjuler ALT).
+- **Frontend**: UploadPage valgfrit u-afkrydset consent-kort (`upload-feature-consent-card/-checkbox`, ~1656 — vises efter player-lock step, samme sektion som submit); Dashboard `FeatureConsentCard.jsx` ("Share the spotlight"-toggle, persisterer); Admin Marketing-tab `FeaturedClipsAdmin.jsx` (rows m. Clip ready/Preview only-badge, intro-clip MP4 blob-download disabled u. full_report, /report/{id}-link); PrivacyPage ny sektion "9. Social media features (optional consent)" (gamle 9-11 → 10-12).
+- **iter85: 100%** — grant/withdraw/401/403, seeded liste + withdrawal-fjernelse, toggle+persistens, privacy-nummerering, regression OK. Temp-data slettet; admin-consent resat til withdrawn. Genbrugsseed: `/app/backend/tests/seed_iter85.py` (seed|withdraw|grant|clean|reset_admin).
+- Kendt begrænsning: upload-consent-kortets UI kunne ikke klikkes E2E (kræver ægte video m. detekterbar spiller til player-lock) — verificeret via kode + form-data-path. Præ-eksisterende falsk hydration-warning i CarouselStudioAdmin ignoreret (koden er gyldig).
+- ⚠️ REQUIRES REDEPLOY.
+
+## AFVENTER BESLUTNING: Free preview-hastighedsplan (research færdig, IKKE implementeret)
+- Godkendt research: klip ∥ anchor-crops (~4s), lyd ∥ content gate (~1-2s), poster ∥ Gemini preview (~1s), parallel R2-publish (~3-4s) → free preview ~52s→~42s. VIGTIGT: gate ∥ preview er IKKE sikker (gate-output føder preview-prompten) — droppet. Bruger har set planen men endnu ikke sagt "byg".
+
 ## Session (Jun 2026 — part 3) — FREE PREVIEW: CINEMATIC INTRO + PROOF PLAYER ✅ (iter84: 100%, 0 issues, sample-regression OK)
 - **User-valg**: (1a) free preview-intro tæller POTENTIAL op (84/100, label "OVERALL POTENTIAL") og slutter m. volt "UNLOCK THE FULL STORY"; (2a) ægte video-proof KUN på åbent snapshot + key moment; 3 låste kort får låst "SEE THE PROOF 🔒" → sheet i LOCKED mode (blurred poster + lås + note + volt "Unlock the full report"-knap → luk + scroll til #scout-packages).
 - **`cinematic.jsx`**: nye props scoreDecimals/scoreSuffix/scoreLabel/endLine/endEmphasis (defaults = premium-adfærd), testid `cinematic-end-line`. target=null → intet count-up (ingen opfundne tal — brand-regel).
