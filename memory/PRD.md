@@ -3313,3 +3313,25 @@ Context: Meta ads deliver cheap registrations (7.34 kr) but no sales — user ne
 - Synthetic test events deleted afterwards. NOTE: preview DB only — production data will populate after deploy.
 ### Conversion backlog (user has full text plan in chat, not built yet)
 P1: activation emails (registered-no-upload 24/72h), "no video yet?" flow, clickable demo report on landing, preview paywall teaser (blurred locked sections) + first-report discount deadline, abandoned checkout email, dedicated ad landing page, Meta pixel retargeting events.
+
+## 2026-08-09 — Player Dashboard Redesign + Dashboard Hub (user-approved via mockups, built + testing-agent verified 19/19)
+Context: User approved dashboard mockups v4 (mockup-dashboard-free.html / mockup-dashboard-premium.html in backend/static/landing) with 2 corrections: (1) Trials & Opportunities PREMIUM-ONLY, (2) header/logo identical to scoutmeplay.com. User also demanded: radar chart replaced with something better, and free/new profiles must sell the dream (hope/FOMO tone).
+### Backend (/app/backend/dashboard_hub.py, included in server.py ~line 13920)
+- GET /api/dashboard/community (auth) + GET/PUT /api/admin/dashboard/community — admin-controlled ScoutMePlay Network numbers (settings key `dashboard_community`, defaults: 2847 players/312 clubs/156 scouts/24 agents/18 trial invites + weekly deltas, enabled toggle).
+- Messages/notifications: POST/GET/DELETE /api/admin/dashboard/messages (kind notification|message, sender_type admin|scout|agent|club, sender_name, target all|free|premium|vip OR target_email for one user). GET /api/dashboard/inbox — free users NEVER receive scout/agent/club message content, only locked_message_count (FOMO); admin notifications visible to all eligible. POST /api/dashboard/inbox/{id}/read + /read-all. Collections: dashboard_messages, dashboard_message_reads.
+- Opportunities: admin CRUD /api/admin/dashboard/opportunities; GET /api/dashboard/opportunities returns locked=true+empty items for free users. Collection: dashboard_opportunities.
+- GET /api/dashboard/performance — latest unlocked report's full_report.scores (technical/tactical/physical/mentality + overall_development).
+- Premium access = active subscription OR legacy pass credits OR ≥1 unlocked report OR admin/scout role.
+### Frontend (DashboardPage.jsx rewritten; new components in components/dashboard/)
+- DashboardHero (hero-free/hero-premium images, dream copy, membership chip Free/Premium/VIP, upload CTA), FreeMembershipBand (FREE ring + 1-free-upload tracker + See Plans scroll), SkillBars (NEW animated gradient bars — radar chart REMOVED), PerformancePanel (dark HQ: overall ring + verdict + skill bars; aspirational empty state), ScoutPreviewUpsell (free FOMO: demo-tagged 82/100 preview + perks + players-count FOMO line), InboxPanels (notifications + messages; free = blurred locked overlay + waiting-count + upgrade CTA), CommunityPulse (network numbers, hidden if disabled/zero), OpportunitiesPanel (premium only — free never renders it).
+- All existing functionality preserved: SubscriptionCard cancel/resume/change-tier, UpgradeBanner free/at-limit variants with DreamPricingTiers, LegacyPassActiveBanner, reports grid + VideoShareRow, ProfileVisibilityCard, ReferralInviteCard, FeatureConsentCard, ReviewPrompt, players/trajectories, subscribe_session Stripe polling, paid-scout redirect.
+### Admin UI
+- New AdminPage tab "Player Dashboard" (id player-dashboard) → components/admin/DashboardHubAdmin.jsx: network numbers editor, message/notification composer (segment or single email targeting) + sent list w/ read counts + delete, opportunities CRUD w/ show/hide toggle.
+### Seed demo content live in preview DB (intentional, keep)
+- 1 scout message "Impressive footage" (Scout Fatima A., target all) → free users see "1 message waiting" locked teaser; 1 opportunity "Elite Football Academy Trials" (U16, London, deadline 2026-08-20).
+### Tested
+- iteration_86.json: 19/19 backend pytest + all frontend flows (admin/free), mobile 390px no overflow, zero console errors. Reusable regression: /app/backend/tests/test_iter86_dashboard_hub.py (self-cleaning).
+### Backlog from this feature
+- Profile/report view counters (user asked earlier; no truth source yet — first-party analytics could feed it once defined).
+- Nav header unread badges (bell/mail) like mockup — dashboard shows badges today.
+- MobileBottomTabs still Home/Reports/Upload/Profile (mockup showed Messages tab — not requested to change).

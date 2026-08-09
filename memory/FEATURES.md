@@ -72,3 +72,9 @@ Formål: komplet liste over ALT der allerede findes, så nye forslag aldrig gent
 - Familie/søskende-bundle
 - VIP-rabat via referral (kræver Stripe coupons)
 - Rapport-repeatability (P0 fra tidligere — stadig åben)
+
+## Player Dashboard 2.0 + Dashboard Hub (2026-08-09)
+- Nyt dashboard-layout (Free + Premium/VIP) efter godkendte mockups; scoutmeplay.com-header; radar erstattet med animerede SkillBars
+- Free: FREE-medlemsbånd, Scout Preview-upsell (demo-tagget), låste beskeder m/ FOMO-tæller, INGEN Trials & Opportunities
+- Premium: Performance HQ (overall-ring + skill bars fra seneste premium-rapport), rigtige beskeder, Trials & Opportunities
+- Admin-tab "Player Dashboard": netværkstal (demo-FOMO, kan slås fra), besked/notifikations-komponist (all/free/premium/vip eller enkelt email, sender-type scout/agent/club/admin), opportunities CRUD
