@@ -78,6 +78,7 @@ export default function AdminPage() {
   );
 
   const [activeTab, setActiveTab] = useState(isScoutRole ? "scouts" : "stats");
+  const [composerPrefill, setComposerPrefill] = useState(null);
   const [stats, setStats] = useState(null);
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
@@ -487,7 +488,7 @@ export default function AdminPage() {
 
               {activeTab === "ticker" && <TickerAdmin />}
 
-              {activeTab === "player-dashboard" && <DashboardHubAdmin />}
+              {activeTab === "player-dashboard" && <DashboardHubAdmin prefillEmail={composerPrefill} />}
 
               {activeTab === "seo" && (
                 <div className="space-y-8">
@@ -683,6 +684,14 @@ export default function AdminPage() {
                                 <td className="p-3 text-ink/70 text-xs">{u.report_count ?? 0}</td>
                                 <td className="p-3 text-ink/65 text-xs">{new Date(u.created_at).toLocaleDateString()}</td>
                                 <td className="p-3 text-right">
+                                  <button
+                                    onClick={() => { setComposerPrefill({ email: u.email, ts: Date.now() }); setActiveTab("player-dashboard"); }}
+                                    data-testid={`admin-message-user-${u.id}`}
+                                    title={`Send a dashboard message to ${u.email}`}
+                                    className="text-volt hover:bg-volt hover:text-white p-2 transition-colors"
+                                  >
+                                    <Mail className="w-4 h-4" />
+                                  </button>
                                   {canDelete ? (
                                     <button
                                       onClick={() => handleDeleteUser(u)}

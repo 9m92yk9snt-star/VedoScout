@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { TrendingUp, Send, Trophy, Trash2, Loader2, Eye, EyeOff, MessageSquare } from "lucide-react";
+import { TrendingUp, Send, Trophy, Trash2, Loader2, Eye, EyeOff, MessageSquare, Users } from "lucide-react";
 
 const inp = "bg-white border border-gray-border rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-forest w-full";
 const lbl = "block text-[10px] font-extrabold uppercase tracking-wider text-ink/55 mb-1";
@@ -18,11 +18,11 @@ const NUM_FIELDS = [
   ["trial_invites", "Trial invites", "trials_wk", "+/week"],
 ];
 
-export default function DashboardHubAdmin() {
+export default function DashboardHubAdmin({ prefillEmail = null }) {
   return (
     <div data-testid="dashboard-hub-admin">
       <CommunityNumbersCard />
-      <MessageComposerCard />
+      <MessageComposerCard prefillEmail={prefillEmail} />
       <OpportunitiesCard />
     </div>
   );
@@ -41,7 +41,7 @@ function CommunityNumbersCard() {
   const save = async () => {
     setBusy(true);
     try {
-      const payload = { enabled: !!cfg.enabled };
+      const payload = { enabled: !!cfg.enabled, use_live_players: !!cfg.use_live_players };
       NUM_FIELDS.forEach(([k, , wk]) => {
         payload[k] = Number(cfg[k]) || 0;
         payload[wk] = Number(cfg[wk]) || 0;
@@ -74,6 +74,21 @@ function CommunityNumbersCard() {
         />
         Show the Network section on dashboards
       </label>
+      <div className="mt-3 flex flex-wrap items-center gap-3 bg-forest/5 border border-forest/20 rounded-xl px-3.5 py-2.5">
+        <span className="text-[12px] font-bold text-forest" data-testid="community-live-count">
+          Live right now: {cfg.live_players_in_library ?? 0} discoverable player{(cfg.live_players_in_library ?? 0) === 1 ? "" : "s"} (real)
+          {cfg.live_players_wk > 0 ? ` · +${cfg.live_players_wk} this week` : ""}
+        </span>
+        <label className="flex items-center gap-2 text-[12px] text-ink/75 font-semibold">
+          <input
+            type="checkbox"
+            checked={!!cfg.use_live_players}
+            data-testid="community-use-live-toggle"
+            onChange={(e) => setCfg({ ...cfg, use_live_players: e.target.checked })}
+          />
+          Use the REAL live count for "Players in library" (instead of the manual number)
+        </label>
+      </div>
       <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
         {NUM_FIELDS.map(([k, label, wk, wkLabel]) => (
           <div key={k}>
@@ -114,11 +129,17 @@ const EMPTY_MSG = {
   link: "",
 };
 
-function MessageComposerCard() {
+function MessageComposerCard({ prefillEmail = null }) {
   const [form, setForm] = useState(EMPTY_MSG);
   const [sent, setSent] = useState([]);
   const [busy, setBusy] = useState(false);
   const [openReplies, setOpenReplies] = useState({});
+
+  useEffect(() => {
+    if (prefillEmail?.email) {
+      setForm((f) => ({ ...f, target_email: prefillEmail.email }));
+    }
+  }, [prefillEmail]);
 
   const load = () => {
     api.get("/admin/dashboard/messages").then(({ data }) => setSent(data.messages || [])).catch(() => {});
@@ -180,6 +201,7 @@ function MessageComposerCard() {
       <p className="text-xs text-ink/55 mt-1">
         Send in-app notifications or messages to all users, a membership segment, or one specific user.
         Scout/agent/club-style messages are ONLY visible to Premium/VIP members — free users see a locked teaser.
+        Sending a scout/agent/club <b>message</b> also emails the eligible members ("You have a new message").
       </p>
       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
@@ -289,11 +311,25 @@ function OpportunitiesCard() {
   const [form, setForm] = useState(EMPTY_OPP);
   const [items, setItems] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [openApplicants, setOpenApplicants] = useState({});
 
   const load = () => {
     api.get("/admin/dashboard/opportunities").then(({ data }) => setItems(data.items || [])).catch(() => {});
   };
   useEffect(load, []);
+
+  const toggleApplicants = async (id) => {
+    if (openApplicants[id]) {
+      setOpenApplicants((prev) => ({ ...prev, [id]: null }));
+      return;
+    }
+    try {
+      const { data } = await api.get(`/admin/dashboard/opportunities/${id}/interest`);
+      setOpenApplicants((prev) => ({ ...prev, [id]: data.applicants || [] }));
+    } catch {
+      toast.error("Could not load applicants");
+    }
+  };
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -379,20 +415,47 @@ function OpportunitiesCard() {
       {items.length > 0 && (
         <ul className="mt-5 divide-y divide-gray-border border border-gray-border rounded-xl overflow-hidden">
           {items.map((o) => (
-            <li key={o.id} className={`flex items-center gap-3 px-3.5 py-2.5 ${o.active ? "bg-white" : "bg-gray-50 opacity-60"}`} data-testid={`opp-row-${o.id}`}>
-              <div className="min-w-0 flex-1">
-                <b className="block text-[13px] text-ink truncate">{o.title}</b>
-                <span className="block text-[11px] text-ink/50 truncate">
-                  {[o.club_name, o.age_band, o.location].filter(Boolean).join(" • ")}
-                  {o.deadline ? ` · deadline ${o.deadline}` : ""}
-                </span>
+            <li key={o.id} className={o.active ? "bg-white" : "bg-gray-50 opacity-60"} data-testid={`opp-row-${o.id}`}>
+              <div className="flex items-center gap-3 px-3.5 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <b className="block text-[13px] text-ink truncate">{o.title}</b>
+                  <span className="block text-[11px] text-ink/50 truncate">
+                    {[o.club_name, o.age_band, o.location].filter(Boolean).join(" • ")}
+                    {o.deadline ? ` · deadline ${o.deadline}` : ""}
+                  </span>
+                </div>
+                {(o.interest_count || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => toggleApplicants(o.id)}
+                    data-testid={`opp-applicants-${o.id}`}
+                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-forest bg-forest/10 hover:bg-forest/20 px-2 py-1 rounded-full transition-colors"
+                  >
+                    <Users className="w-3 h-3" /> {o.interest_count} interested
+                  </button>
+                )}
+                <button type="button" onClick={() => toggleActive(o)} data-testid={`opp-toggle-${o.id}`} className="text-ink/50 hover:text-forest p-1.5 shrink-0" aria-label={o.active ? "Deactivate" : "Activate"} title={o.active ? "Visible — click to hide" : "Hidden — click to show"}>
+                  {o.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+                <button type="button" onClick={() => del(o.id)} data-testid={`opp-delete-${o.id}`} className="text-ink/40 hover:text-red-600 p-1.5 shrink-0" aria-label="Delete opportunity">
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <button type="button" onClick={() => toggleActive(o)} data-testid={`opp-toggle-${o.id}`} className="text-ink/50 hover:text-forest p-1.5 shrink-0" aria-label={o.active ? "Deactivate" : "Activate"} title={o.active ? "Visible — click to hide" : "Hidden — click to show"}>
-                {o.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              </button>
-              <button type="button" onClick={() => del(o.id)} data-testid={`opp-delete-${o.id}`} className="text-ink/40 hover:text-red-600 p-1.5 shrink-0" aria-label="Delete opportunity">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {openApplicants[o.id] && (
+                <div className="px-3.5 pb-3 space-y-1.5" data-testid={`opp-applicant-list-${o.id}`}>
+                  {openApplicants[o.id].length === 0 ? (
+                    <p className="text-[12px] text-ink/50">No applicants yet.</p>
+                  ) : (
+                    openApplicants[o.id].map((a) => (
+                      <div key={a.id} className="bg-forest/5 border border-forest/15 rounded-lg px-3 py-2 text-[12px] text-ink/80 flex flex-wrap items-center gap-x-2">
+                        <b className="text-forest">{a.user_name || a.user_email}</b>
+                        <span className="text-ink/55">{a.user_email}</span>
+                        <span className="text-ink/45 ml-auto">{new Date(a.created_at).toLocaleString()}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
