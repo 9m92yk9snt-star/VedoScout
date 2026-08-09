@@ -3,7 +3,9 @@
 // all values come from the existing full_report analysis via derive.js.
 
 import React, { useRef, useState, useCallback } from "react";
-import { Star, Users, ShieldCheck, Play } from "lucide-react";
+import { Star, Users, ShieldCheck, Play, Clapperboard, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import api from "@/lib/api";
 import { deriveV2, tsToSeconds } from "./derive";
 import {
   V2Card, V2Title, MatchStatsCard, AgeComparisonCard,
@@ -39,7 +41,7 @@ const fmtDate = (iso) => {
   } catch { return ""; }
 };
 
-function V2PageHeader({ reportDate, onReplayIntro }) {
+function V2PageHeader({ reportDate, onReplayIntro, onShareClip, clipBusy }) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
       {/* Wordmark only — no logo mark per spec */}
@@ -58,16 +60,30 @@ function V2PageHeader({ reportDate, onReplayIntro }) {
       <div className="md:text-right">
         <div className="text-[11px] tracking-[0.14em] font-bold text-[#8B957F] uppercase">Report Date</div>
         <div className="text-[14px] font-extrabold mt-0.5" data-testid="v2-report-date">{reportDate}</div>
-        {onReplayIntro && (
-          <button
-            type="button"
-            onClick={onReplayIntro}
-            data-testid="cinematic-replay-btn"
-            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold tracking-[0.12em] uppercase text-[#1E5B3C] hover:text-[#12402A] transition-colors"
-          >
-            <Play className="w-2.5 h-2.5 fill-current" /> Play intro
-          </button>
-        )}
+        <div className="mt-1 flex md:justify-end items-center gap-3.5">
+          {onReplayIntro && (
+            <button
+              type="button"
+              onClick={onReplayIntro}
+              data-testid="cinematic-replay-btn"
+              className="inline-flex items-center gap-1 text-[10px] font-bold tracking-[0.12em] uppercase text-[#1E5B3C] hover:text-[#12402A] transition-colors"
+            >
+              <Play className="w-2.5 h-2.5 fill-current" /> Play intro
+            </button>
+          )}
+          {onShareClip && (
+            <button
+              type="button"
+              onClick={onShareClip}
+              disabled={clipBusy}
+              data-testid="intro-clip-share-btn"
+              className="inline-flex items-center gap-1 text-[10px] font-bold tracking-[0.12em] uppercase text-[#1E5B3C] hover:text-[#12402A] transition-colors disabled:opacity-60"
+            >
+              {clipBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clapperboard className="w-3 h-3" />}
+              {clipBusy ? "Creating clip…" : "Share intro clip"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -252,6 +268,34 @@ export default function PremiumReportV2({ report, assetBase }) {
     setShowCine(false);
   };
 
+  // Shareable intro clip (MP4) — generated server-side, cached per report.
+  const [clipBusy, setClipBusy] = useState(false);
+  const shareIntroClip = async () => {
+    setClipBusy(true);
+    const slow = setTimeout(() => toast("Creating your intro clip — this takes a moment the first time…"), 2500);
+    try {
+      const path = report.demo ? "/demo-report/intro-clip.mp4" : `/reports/${report.id}/intro-clip.mp4`;
+      const res = await api.get(path, { responseType: "blob", timeout: 120000 });
+      const file = new File([res.data], "ScoutMePlay_Intro.mp4", { type: "video/mp4" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "ScoutMePlay Intro" });
+      } else {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Intro clip downloaded — ready to post!");
+      }
+    } catch (e) {
+      if (e?.name !== "AbortError") toast.error("Could not create the intro clip. Please try again.");
+    } finally {
+      clearTimeout(slow);
+      setClipBusy(false);
+    }
+  };
+
   // Resolve derived thumbnail URLs against the API base
   const topStrengths = d.topStrengths.map((s) => ({ ...s, thumb: fixThumb(s.thumb) }));
   const snapshotMoments = d.snapshotMoments.map((m) => ({ ...m, thumb: fixThumb(m.thumb) }));
@@ -285,6 +329,8 @@ export default function PremiumReportV2({ report, assetBase }) {
       <V2PageHeader
         reportDate={fmtDate(report.full_generated_at || report.paid_at || report.created_at)}
         onReplayIntro={() => setShowCine(true)}
+        onShareClip={shareIntroClip}
+        clipBusy={clipBusy}
       />
 
       {/* Row 1 — hero / parent summary / score */}

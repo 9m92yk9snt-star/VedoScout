@@ -10424,6 +10424,49 @@ async def report_snapshot_card(report_id: str, moment_key: str, user=Depends(get
                         filename=f"ScoutMePlay_{player_name_safe}_Snapshot.png")
 
 
+# ============== SHAREABLE CINEMATIC INTRO CLIP (MP4, 1080x1920) ==============
+
+INTRO_CLIP_VERSION = 1
+
+
+async def _build_intro_clip_file(doc: dict) -> Path:
+    path = CARDS_DIR / f"{doc['id']}.intro.v{INTRO_CLIP_VERSION}.mp4"
+    if not path.exists():
+        from intro_clip import build_intro_clip
+        await asyncio.to_thread(build_intro_clip, doc, str(path), _pdf_image_resolver)
+    return path
+
+
+@api_router.get("/demo-report/intro-clip.mp4")
+async def demo_intro_clip():
+    """Public shareable cinematic intro clip for the demo/sample report."""
+    doc = await db.reports.find_one({"id": "demo-sample-report"})
+    if not doc or not doc.get("full_report"):
+        raise HTTPException(status_code=404, detail="Sample report not available")
+    path = await _build_intro_clip_file(doc)
+    return FileResponse(str(path), media_type="video/mp4",
+                        filename="ScoutMePlay_Intro.mp4",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+
+@api_router.get("/reports/{report_id}/intro-clip.mp4")
+async def report_intro_clip(report_id: str, user=Depends(get_current_user)):
+    """Shareable cinematic intro clip (1080x1920 MP4) for a premium report."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if doc["user_id"] != user["id"] and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if not (doc.get("is_paid") or doc.get("manually_unlocked") or user["role"] == "admin"):
+        raise HTTPException(status_code=402, detail="Payment required")
+    if not doc.get("full_report"):
+        raise HTTPException(status_code=400, detail="Full report not generated yet")
+    path = await _build_intro_clip_file(doc)
+    player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
+    return FileResponse(str(path), media_type="video/mp4",
+                        filename=f"ScoutMePlay_{player_name_safe}_Intro.mp4")
+
+
 # ============== ADMIN: TEST-SEND ANY AUTOMATED / PROMOTION EMAIL ==============
 
 class TestEmailPayload(BaseModel):

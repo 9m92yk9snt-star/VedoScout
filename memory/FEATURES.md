@@ -8,6 +8,7 @@ Formål: komplet liste over ALT der allerede findes, så nye forslag aldrig gent
 - Rapport V2: hero, Scout's First Impression (tidl. Parent Summary), samlet score, match stats, alderssammenligning, SNAPSHOT 2×2 (frames+timestamps+annoteringer), top strengths (frames), udviklingsprioriteter, action timeline, roadmap, træningsplan, parent tips, video highlight, coach notes, scout outlook, FIFA player twin, development curve, movement map, score-forklaring, Grow Your Game, printables (mission card + ugeplan), diplom
 - Cinematic intro: film-åbning ved første rapport-visning (mørk scene → bedste frame + navn + moment-linje → score-count-up), skip altid, lyd fra default, replay-knap, demo-badge på sample (jun 2026)
 - Proof mini-player: alle timestamp-klik åbner bottom-sheet videoafspiller (seek ts−6s) — INGEN scroll-hop; demo viser taktisk frame + premium-note; mobil "SEE THE PROOF"-pills på top strengths (jun 2026)
+- Intro share clip: delbar 1080×1920 story-MP4 af cinematic-introen (server-genereret, cached) m. "Share intro clip"-knap i rapport-header — demo public + premium auth (jun 2026)
 - PDF-rapport (reportlab, 7+ sider, inkl. SNAPSHOT-side, cache m. PDF_RENDER_VERSION)
 - Sample/demo-rapport (/sample-report, seedet, DEMO_VERSION-styret) m. demo-note
 - Snapshot-deling: branded 1080×1350 PNG pr. snapshot-kort (demo public + premium auth) m. share/download-knap
