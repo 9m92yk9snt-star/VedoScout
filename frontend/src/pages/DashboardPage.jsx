@@ -7,6 +7,7 @@ import ReviewPrompt from "@/components/ReviewPrompt";
 import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
 import ReferralInviteCard from "@/components/ReferralInviteCard";
+import FeatureConsentCard from "@/components/FeatureConsentCard";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { trackPurchase } from "@/lib/pixels";
@@ -354,6 +355,8 @@ export default function DashboardPage() {
               <ProfileVisibilityCard latestReportId={reports[0]?.id} />
 
               <ReferralInviteCard />
+
+              <FeatureConsentCard />
 
               {reports.length > 0 && <ReviewPrompt />}
 

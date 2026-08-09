@@ -68,6 +68,7 @@ export default function UploadPage() {
   // ── Step 3 required player photo (upload OR the locked video image) ──
   const [playerPhoto, setPlayerPhoto] = useState(null); // { dataUrl } — compressed ≤512px JPEG
   const [photoSource, setPhotoSource] = useState(null); // 'upload' | 'video_crop'
+  const [featureConsent, setFeatureConsent] = useState(false); // optional social-feature consent (GDPR: never required)
   const [countryOpen, setCountryOpen] = useState(false);
   const photoInputRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
@@ -594,6 +595,7 @@ export default function UploadPage() {
     // Required player photo — either an uploaded (compressed) photo or the
     // locked video image (backend uses the high-quality display crop).
     if (_photoSource) fd.append("photo_source", _photoSource);
+    fd.append("feature_consent", featureConsent ? "true" : "false");
     if (_photoSource === "upload" && _playerPhoto?.dataUrl) {
       try {
         const photoBlob = await (await fetch(_playerPhoto.dataUrl)).blob();
@@ -1652,6 +1654,39 @@ export default function UploadPage() {
                       />
                     </div>
                   </div>
+
+                  {/* OPTIONAL social-feature consent — never required, default OFF (GDPR art. 7) */}
+                  <button
+                    type="button"
+                    onClick={() => setFeatureConsent((v) => !v)}
+                    data-testid="upload-feature-consent-card"
+                    className={`w-full text-left rounded-2xl border-2 px-4 py-3.5 transition-colors ${featureConsent ? "border-forest bg-forest/5" : "border-dashed border-ink/20 bg-cream-base/50 hover:border-forest/50"}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        data-testid="upload-feature-consent-checkbox"
+                        aria-checked={featureConsent}
+                        role="checkbox"
+                        className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${featureConsent ? "bg-forest border-forest" : "bg-white border-ink/30"}`}
+                      >
+                        {featureConsent && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+                      </span>
+                      <span>
+                        <span className="flex items-center gap-1.5 font-barlow font-black uppercase tracking-wide text-[12.5px] text-ink leading-none">
+                          <Zap className="w-3.5 h-3.5 text-forest" style={{ fill: "#A6C800", color: "#A6C800" }} />
+                          Show off your talent — get featured!
+                        </span>
+                        <span className="block text-[12px] text-ink/65 leading-snug mt-1.5">
+                          Yes — ScoutMePlay may share {form.player_name?.trim() ? `${form.player_name.trim().split(" ")[0]}'s` : "my player's"} cinematic
+                          intro clip on our Instagram &amp; Facebook, celebrating real players and inspiring the next ones.
+                        </span>
+                        <span className="block text-[10.5px] text-ink/45 leading-snug mt-1.5">
+                          100% optional — your report works exactly the same without it. Withdraw anytime in your
+                          Dashboard. For players under 18 this consent is given by the parent/guardian.
+                        </span>
+                      </span>
+                    </div>
+                  </button>
 
                   <div>
                     <button

@@ -111,14 +111,30 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="9. Security">
+          <Section title="9. Social media features (optional consent)">
+            <p>
+              If — and only if — you actively opt in (the "feature my intro clip" checkbox at upload, or the
+              "Share the spotlight" toggle in your Dashboard), ScoutMePlay may share your player's cinematic
+              intro clip (player name, video moments and overall score) on our official Instagram and Facebook
+              channels for promotion and inspiration. This is entirely optional and never a condition for
+              using the service.
+            </p>
+            <p>
+              You can withdraw this consent at any time in your Dashboard — withdrawal stops all future
+              sharing immediately, and on request we will also remove already-published posts. When a clip is
+              shared, it is processed by Meta Platforms (Instagram/Facebook) under their own terms. For
+              players under 18, this consent must be given by the parent or guardian who holds the account.
+            </p>
+          </Section>
+
+          <Section title="10. Security">
             <p>
               Passwords are stored with bcrypt hashing. Payment details never touch our servers — Stripe
               handles all card processing. All connections use HTTPS / TLS 1.2+.
             </p>
           </Section>
 
-          <Section title="10. Right to complain">
+          <Section title="11. Right to complain">
             <p>
               If you believe we've handled your data unlawfully, you have the right to complain to the Danish
               Data Protection Agency (<a className="text-volt underline" href="https://www.datatilsynet.dk">Datatilsynet</a>),
@@ -126,7 +142,7 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          <Section title="11. Changes to this policy">
+          <Section title="12. Changes to this policy">
             <p>
               We may update this policy from time to time. The "Last updated" date at the top tells you when.
               Material changes will be communicated by email to all active users.

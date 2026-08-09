@@ -5097,6 +5097,7 @@ async def upload_video_and_create_preview(
     player_photo: Optional[UploadFile] = File(None),
     video_type: str = Form(...),
     description: str = Form(...),
+    feature_consent: Optional[str] = Form(None),  # "true" when the OPTIONAL social-feature consent box is ticked
     user=Depends(get_current_user),
 ):
     # ============== UPLOAD GATE ==============
@@ -5301,8 +5302,24 @@ async def upload_video_and_create_preview(
                         else ("prepaid" if upload_will_be_paid
                               else "free_preview")))
         ),
+        # OPTIONAL social-feature consent — documented per report (GDPR art. 7).
+        "feature_consent": (
+            {"granted": True, "at": now_iso(), "text_version": FEATURE_CONSENT_TEXT_VERSION}
+            if str(feature_consent).lower() == "true" else None
+        ),
     }
     await db.reports.insert_one(report_doc)
+
+    # Mirror the consent on the user account (master switch for withdrawal).
+    if report_doc["feature_consent"]:
+        await db.users.update_one(
+            {"id": user["id"]},
+            {"$set": {"feature_consent": {
+                "status": "granted",
+                "updated_at": now_iso(),
+                "text_version": FEATURE_CONSENT_TEXT_VERSION,
+            }}},
+        )
 
     # ============== LINK TO PLAYER PROFILE ==============
     try:
@@ -10422,6 +10439,63 @@ async def report_snapshot_card(report_id: str, moment_key: str, user=Depends(get
     player_name_safe = re.sub(r"[^A-Za-z0-9_-]", "_", doc["player_details"].get("player_name") or "Player")
     return FileResponse(str(path), media_type="image/png",
                         filename=f"ScoutMePlay_{player_name_safe}_Snapshot.png")
+
+
+# ============== SOCIAL FEATURE CONSENT (optional, GDPR art. 7) ==============
+
+FEATURE_CONSENT_TEXT_VERSION = "2026-06-v1"
+
+
+class FeatureConsentUpdate(BaseModel):
+    granted: bool
+
+
+@api_router.get("/account/feature-consent")
+async def get_feature_consent(user=Depends(get_current_user)):
+    fc = user.get("feature_consent") or {}
+    return {"status": fc.get("status"), "updated_at": fc.get("updated_at")}
+
+
+@api_router.put("/account/feature-consent")
+async def update_feature_consent(payload: FeatureConsentUpdate, user=Depends(get_current_user)):
+    status_val = "granted" if payload.granted else "withdrawn"
+    fc = {"status": status_val, "updated_at": now_iso(), "text_version": FEATURE_CONSENT_TEXT_VERSION}
+    await db.users.update_one({"id": user["id"]}, {"$set": {"feature_consent": fc}})
+    return {"status": status_val, "updated_at": fc["updated_at"]}
+
+
+@api_router.get("/admin/featured-clips")
+async def admin_featured_clips(user=Depends(get_current_user)):
+    """Reports that may be shared on socials: consent ticked at upload AND the
+    owner's account-level consent is still granted (not withdrawn)."""
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    cursor = db.reports.find(
+        {"feature_consent.granted": True},
+        {"_id": 0, "id": 1, "user_id": 1, "user_email": 1, "player_details": 1,
+         "feature_consent": 1, "full_report": 1, "analysis_status": 1, "created_at": 1},
+    ).sort("created_at", -1)
+    reports = await cursor.to_list(300)
+    user_ids = list({r.get("user_id") for r in reports if r.get("user_id")})
+    owners = {}
+    if user_ids:
+        async for u in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "feature_consent": 1}):
+            owners[u["id"]] = (u.get("feature_consent") or {}).get("status")
+    clips = []
+    for r in reports:
+        if owners.get(r.get("user_id")) != "granted":
+            continue  # withdrawn — never list
+        pd = r.get("player_details") or {}
+        clips.append({
+            "report_id": r["id"],
+            "player_name": pd.get("player_name"),
+            "age": pd.get("age"),
+            "user_email": r.get("user_email"),
+            "granted_at": (r.get("feature_consent") or {}).get("at"),
+            "full_report_ready": bool(r.get("full_report")),
+            "analysis_status": r.get("analysis_status"),
+        })
+    return {"clips": clips}
 
 
 # ============== SHAREABLE CINEMATIC INTRO CLIP (MP4, 1080x1920) ==============
