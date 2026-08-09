@@ -11712,6 +11712,206 @@ async def get_subscription_status(session_id: str, user=Depends(get_current_user
     }
 
 
+# ============== GUEST CHECKOUT (pay first, account after) ==============
+
+class GuestCheckoutInit(BaseModel):
+    tier: str  # "premium" | "vip" | "single"
+    origin_url: str
+
+
+@api_router.post("/payments/guest/checkout")
+async def create_guest_checkout(payload: GuestCheckoutInit, request: Request):
+    """Direct-to-Stripe for logged-out visitors — no signup wall before payment.
+    Premium/VIP → subscription session; single → one-time report credit.
+    The account is auto-created AFTER payment from the Stripe email
+    (see /payments/guest/status/{session_id})."""
+    tier = (payload.tier or "").lower().strip()
+    if tier not in ("premium", "vip", "single"):
+        raise HTTPException(400, "Unknown tier")
+    if tier in ("premium", "vip") and not _embedded_ready():
+        raise HTTPException(503, "Checkout not configured. Add Stripe keys to enable.")
+
+    origin = payload.origin_url.rstrip("/")
+    success_url = f"{origin}/welcome?guest_session={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin}/?checkout_canceled=1"
+    kind = "guest_subscription" if tier in ("premium", "vip") else "guest_single"
+    metadata = _build_embedded_metadata({"kind": kind, "tier": tier})
+
+    if tier in ("premium", "vip"):
+        price_id = await _get_subscription_price_id(tier)
+        if not price_id:
+            await _ensure_subscription_products()
+            price_id = await _get_subscription_price_id(tier)
+            if not price_id:
+                raise HTTPException(503, f"Stripe price for tier '{tier}' is not provisioned yet — try again in a moment.")
+        try:
+            _arm_real_stripe()
+            session = stripe_sdk.checkout.Session.create(
+                mode="subscription",
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata=metadata,
+                subscription_data={"metadata": metadata},
+                allow_promotion_codes=True,
+            )
+        except Exception as e:
+            logger.exception("Guest subscription session create failed")
+            raise HTTPException(500, f"Stripe error: {e}")
+        session_id, session_url = session.id, session.url
+        amount = SUBSCRIPTION_TIERS[tier]["amount"]
+    else:
+        price, _src = await get_extra_report_price_for_user({})
+        host_url = str(request.base_url)
+        webhook_url = f"{host_url}api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=STRIPE_API_KEY, webhook_url=webhook_url)
+        session_req = CheckoutSessionRequest(
+            amount=float(price),
+            currency=PRICE_CURRENCY,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata=metadata,
+        )
+        try:
+            session = await stripe_checkout.create_checkout_session(session_req)
+        except Exception as e:
+            logger.exception("Guest single session create failed")
+            raise HTTPException(500, f"Stripe error: {e}")
+        session_id, session_url = session.session_id, session.url
+        amount = float(price)
+
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session_id,
+        "user_id": None,
+        "user_email": None,
+        "report_id": None,
+        "kind": kind,
+        "tier": tier,
+        "brand": "ScoutMePlay",
+        "amount": amount,
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    })
+    return {"url": session_url, "session_id": session_id}
+
+
+@api_router.get("/payments/guest/status/{session_id}")
+async def get_guest_checkout_status(session_id: str):
+    """Unauthenticated poll endpoint for the /welcome page. On first `paid`
+    observation it finalizes: finds-or-creates the account from the Stripe
+    email, attaches the subscription (or +1 prepaid report credit) and, for
+    new accounts, issues a one-time set-password token (48h). Idempotent."""
+    txn = await db.payment_transactions.find_one(
+        {"session_id": session_id, "kind": {"$in": ["guest_subscription", "guest_single"]}},
+        {"_id": 0},
+    )
+    if not txn:
+        raise HTTPException(404, "Checkout session not found")
+
+    async def _result(t):
+        token = t.get("guest_setup_token")
+        if token:
+            tdoc = await db.password_reset_tokens.find_one({"token": token, "used": False}, {"_id": 1})
+            if not tdoc:
+                token = None
+        return {
+            "payment_status": "paid",
+            "status": "complete",
+            "kind": t["kind"],
+            "tier": t.get("tier"),
+            "email": t.get("buyer_email"),
+            "account_status": t.get("account_status"),
+            "setup_token": token,
+        }
+
+    if txn.get("payment_status") == "paid" and txn.get("credited"):
+        return await _result(txn)
+
+    if not _embedded_ready() and txn["kind"] == "guest_subscription":
+        raise HTTPException(503, "Stripe not configured.")
+    try:
+        if txn["kind"] == "guest_single":
+            # Single sessions are created via the emergent test/proxy key —
+            # instantiating StripeCheckout re-arms the shared stripe module.
+            StripeCheckout(api_key=STRIPE_API_KEY)
+            session = stripe_sdk.checkout.Session.retrieve(session_id)
+        else:
+            _arm_real_stripe()
+            session = stripe_sdk.checkout.Session.retrieve(session_id, expand=["subscription"])
+    except Exception as e:
+        logger.exception("Guest checkout status retrieve failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    new_payment_status = session.payment_status or "unpaid"
+    if new_payment_status != "paid":
+        await db.payment_transactions.update_one(
+            {"session_id": session_id},
+            {"$set": {"payment_status": new_payment_status, "status": session.status or "open", "updated_at": now_iso()}},
+        )
+        return {"payment_status": new_payment_status, "status": session.status or "open", "kind": txn["kind"], "tier": txn.get("tier")}
+
+    email = None
+    if getattr(session, "customer_details", None):
+        email = session.customer_details.email
+    email = (email or getattr(session, "customer_email", None) or "").lower().strip()
+    if not email:
+        raise HTTPException(500, "No buyer email on the Stripe session")
+
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    account_status = "existing"
+    setup_token = None
+    if not user:
+        account_status = "created"
+        full_name = None
+        if getattr(session, "customer_details", None):
+            full_name = session.customer_details.name
+        full_name = (full_name or email.split("@")[0].replace(".", " ").title()).strip()
+        user = {
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "full_name": full_name,
+            "password_hash": hash_password(secrets.token_urlsafe(24)),
+            "role": "user",
+            "created_at": now_iso(),
+            "auth_provider": "guest_checkout",
+        }
+        await db.users.insert_one({**user})
+        setup_token = _generate_reset_token()
+        await db.password_reset_tokens.insert_one({
+            "token": setup_token,
+            "user_id": user["id"],
+            "created_at": now_iso(),
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=48),
+            "used": False,
+            "purpose": "guest_setup",
+        })
+
+    if txn["kind"] == "guest_subscription" and session.subscription:
+        sub_state = _subscription_state_from_stripe(session.subscription)
+        sub_state["tier"] = txn.get("tier") or sub_state.get("tier")
+        sub_state["started_at"] = now_iso()
+        await db.users.update_one({"id": user["id"]}, {"$set": {"subscription": sub_state}})
+    elif txn["kind"] == "guest_single":
+        await db.users.update_one({"id": user["id"]}, {"$inc": {"prepaid_uploads": 1}})
+
+    await db.payment_transactions.update_one(
+        {"session_id": session_id, "credited": {"$ne": True}},
+        {"$set": {
+            "payment_status": "paid", "status": "complete", "credited": True,
+            "user_id": user["id"], "user_email": email, "buyer_email": email,
+            "account_status": account_status, "guest_setup_token": setup_token,
+            "updated_at": now_iso(),
+        }},
+    )
+    txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
+    return await _result(txn)
+
+
 @api_router.get("/me/subscription")
 async def get_my_subscription(user=Depends(get_current_user)):
     """Return the user's current subscription block (or null if none), plus a

@@ -333,12 +333,12 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   const bestTier = perVip <= perPremium ? "vip" : "premium";
 
   const goSingle = async () => {
-    if (!isLoggedIn) { navigate("/signup?plan=single&next=/upload"); return; }
-    if (onUnlockSingle) { onUnlockSingle(); return; }
+    if (isLoggedIn && onUnlockSingle) { onUnlockSingle(); return; }
     if (busyTier) return;
     setBusyTier("single");
     try {
-      const { data } = await api.post("/payments/prepay-upload", { origin_url: window.location.origin });
+      const endpoint = isLoggedIn ? "/payments/prepay-upload" : "/payments/guest/checkout";
+      const { data } = await api.post(endpoint, { tier: "single", origin_url: window.location.origin });
       if (!data?.url) throw new Error("No checkout URL received");
       trackInitiateCheckout();
       window.location.href = data.url;
@@ -349,11 +349,11 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   };
 
   const startSubscription = async (tier) => {
-    if (!isLoggedIn) { navigate(`/signup?plan=${tier}&next=/?subscribe=${tier}`); return; }
     if (busyTier) return;
     setBusyTier(tier);
     try {
-      const { data } = await api.post("/payments/subscribe", { tier, origin_url: window.location.origin });
+      const endpoint = isLoggedIn ? "/payments/subscribe" : "/payments/guest/checkout";
+      const { data } = await api.post(endpoint, { tier, origin_url: window.location.origin });
       if (!data?.url) throw new Error("No checkout URL received");
       trackInitiateCheckout();
       window.location.href = data.url;

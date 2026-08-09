@@ -13,6 +13,7 @@ import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
+import GuestWelcomePage from "@/pages/GuestWelcomePage";
 import UploadPage from "@/pages/UploadPage";
 import ReportPage from "@/pages/ReportPage";
 import AdminPage from "@/pages/AdminPage";
@@ -102,6 +103,7 @@ function AnimatedRoutes() {
         <Route path="/register" element={<Navigate to="/signup" replace />} />
         <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
+        <Route path="/welcome" element={<PageTransition><GuestWelcomePage /></PageTransition>} />
         {/* /upload is PUBLIC — guests upload first, create an account right before analysis */}
         <Route path="/upload" element={<PageTransition><UploadPage /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><RequireAuth><DashboardPage /></RequireAuth></PageTransition>} />

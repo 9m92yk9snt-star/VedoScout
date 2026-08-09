@@ -121,16 +121,14 @@ export default function PricingTiers() {
     navigate("/upload");
   };
 
-  // Single Report: one-time prepay flow. Logged-out users go to signup.
+  // Single Report: one-time prepay flow. Logged-out users go straight to Stripe (guest checkout).
   const goSingleReport = async () => {
-    if (!user) {
-      navigate("/signup?plan=single&next=/upload");
-      return;
-    }
     if (busyTier) return;
     setBusyTier("single");
     try {
-      const { data } = await api.post("/payments/prepay-upload", {
+      const endpoint = user ? "/payments/prepay-upload" : "/payments/guest/checkout";
+      const { data } = await api.post(endpoint, {
+        tier: "single",
         origin_url: window.location.origin,
       });
       if (!data?.url) throw new Error("No checkout URL received");
@@ -144,14 +142,11 @@ export default function PricingTiers() {
   };
 
   const startSubscription = async (tier) => {
-    if (!user) {
-      navigate(`/signup?plan=${tier}&next=/?subscribe=${tier}`);
-      return;
-    }
     if (busyTier) return;
     setBusyTier(tier);
     try {
-      const { data } = await api.post("/payments/subscribe", {
+      const endpoint = user ? "/payments/subscribe" : "/payments/guest/checkout";
+      const { data } = await api.post(endpoint, {
         tier,
         origin_url: window.location.origin,
       });

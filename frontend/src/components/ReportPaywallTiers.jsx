@@ -58,17 +58,27 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle,
     return () => { alive = false; };
   }, []);
 
-  const handleSingle = () => {
-    if (!isLoggedIn) { navigate("/signup?plan=single&next=/dashboard"); return; }
-    if (onUnlockSingle) onUnlockSingle();
+  const handleSingle = async () => {
+    if (isLoggedIn) { if (onUnlockSingle) onUnlockSingle(); return; }
+    if (busyTier) return;
+    setBusyTier("single");
+    try {
+      const { data } = await api.post("/payments/guest/checkout", { tier: "single", origin_url: window.location.origin });
+      if (!data?.url) throw new Error("No checkout URL received");
+      trackInitiateCheckout();
+      window.location.href = data.url;
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || err.message || "Could not start checkout.", { duration: 8000 });
+      setBusyTier(null);
+    }
   };
 
   const startSubscription = async (tier) => {
-    if (!isLoggedIn) { navigate(`/signup?plan=${tier}&next=/?subscribe=${tier}`); return; }
     if (busyTier) return;
     setBusyTier(tier);
     try {
-      const { data } = await api.post("/payments/subscribe", { tier, origin_url: window.location.origin });
+      const endpoint = isLoggedIn ? "/payments/subscribe" : "/payments/guest/checkout";
+      const { data } = await api.post(endpoint, { tier, origin_url: window.location.origin });
       if (!data?.url) throw new Error("No checkout URL received");
       trackInitiateCheckout();
       window.location.href = data.url;
