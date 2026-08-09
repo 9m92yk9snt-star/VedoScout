@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Camera, Upload, Eye, EyeOff, Loader2, Shield, Trash2, Sparkles,
-  UserCircle2, CheckCircle2, Info, X,
+  UserCircle2, CheckCircle2, Info, X, Lock,
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -18,7 +18,7 @@ const isMinor = (birthYear) => {
   return currentYear - Number(birthYear) < 16;
 };
 
-export default function ProfileVisibilityCard({ latestReportId }) {
+export default function ProfileVisibilityCard({ latestReportId, premiumAccess = true }) {
   const [profile, setProfile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -61,6 +61,10 @@ export default function ProfileVisibilityCard({ latestReportId }) {
   };
 
   const toggleDiscoverable = async (next) => {
+    if (next && !premiumAccess) {
+      toast.info("Scout Library visibility is a Premium feature. Upgrade to be visible to scouts.", { duration: 6000 });
+      return;
+    }
     if (next && minor && !profile.parent_consent) {
       toast.info("Parental consent required for players under 16.", { duration: 6000 });
       setExpanded(true);
@@ -241,6 +245,9 @@ export default function ProfileVisibilityCard({ latestReportId }) {
                 {isDiscoverable ? (
                   <>You appear in the paid scout database. Scouts, agents and clubs with an active
                   subscription can search, view your stats and request contact.</>
+                ) : !premiumAccess ? (
+                  <>Scout Library visibility is a <strong>Premium privilege</strong> — scouts, agents
+                  and clubs can only discover Premium players.</>
                 ) : (
                   <>Turn this on to let professional scouts, agents and clubs discover you. Your
                   private data (email, phone) is never shown — only your stats and video preview.</>
@@ -259,16 +266,37 @@ export default function ProfileVisibilityCard({ latestReportId }) {
               className={`shrink-0 relative w-14 h-8 border-2 transition-colors ${
                 isDiscoverable
                   ? "bg-forest border-forest"
+                  : !premiumAccess
+                  ? "bg-cream-base border-ink/15 opacity-60 cursor-not-allowed"
                   : "bg-cream-base border-ink/20"
               }`}
             >
-              <span
-                className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white transition-transform ${
-                  isDiscoverable ? "translate-x-6" : "translate-x-0"
-                }`}
-              />
+              {!premiumAccess && !isDiscoverable ? (
+                <Lock className="absolute inset-0 m-auto w-3.5 h-3.5 text-ink/40" />
+              ) : (
+                <span
+                  className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white transition-transform ${
+                    isDiscoverable ? "translate-x-6" : "translate-x-0"
+                  }`}
+                />
+              )}
             </button>
           </div>
+
+          {/* Free-plan lock notice */}
+          {!premiumAccess && (
+            <div
+              className="mt-2 border border-amber-400 bg-amber-50 p-3 flex gap-2.5"
+              data-testid="visibility-locked-notice"
+            >
+              <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
+              <div className="flex-1 text-[13px] leading-snug">
+                <strong className="text-amber-800">On the Free plan your uploads can't be seen by scouts.</strong>{" "}
+                Upgrade to Premium to enter the Scout Library. Want exposure anyway? Opt in to
+                social-media featuring further down the page — that's the one place we can show your clip.
+              </div>
+            </div>
+          )}
 
           {/* Minor consent notice */}
           {minor && (

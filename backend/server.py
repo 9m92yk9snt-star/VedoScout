@@ -4407,11 +4407,31 @@ async def get_my_profile(user=Depends(get_current_user)):
     return _public_profile_of(full_doc)
 
 
+async def _user_has_premium_access(user: dict) -> bool:
+    """Premium privilege check: subscription, legacy pass credits, unlocked report, or staff."""
+    if user.get("role") in ("admin", "scout"):
+        return True
+    if _has_active_subscription(user):
+        return True
+    pp = user.get("progress_pass") or {}
+    try:
+        if int(pp.get("credits_remaining") or 0) > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    n = await db.reports.count_documents({
+        "user_id": user["id"],
+        "$or": [{"is_paid": True}, {"manually_unlocked": True}],
+    })
+    return n > 0
+
+
 @api_router.put("/profile/me")
 async def update_my_profile(payload: ProfileVisibilityUpdate, user=Depends(get_current_user)):
     """Update visibility toggles + public profile fields.
     Enforces parental-consent gate for minors — a discoverable=True from a user
     with birth_year making them <16 is rejected unless parent_consent is also True.
+    Scout Library visibility (discoverable=True) is a Premium privilege.
     """
     updates: dict = {}
     if payload.birth_year is not None:
@@ -4423,6 +4443,11 @@ async def update_my_profile(payload: ProfileVisibilityUpdate, user=Depends(get_c
     if payload.discoverable is not None:
         want_discoverable = bool(payload.discoverable)
         if want_discoverable:
+            if not await _user_has_premium_access(user):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Scout Library visibility is a Premium feature. On Free, your uploads can't be seen by scouts — upgrade to be visible.",
+                )
             effective_by = updates.get("birth_year", user.get("birth_year"))
             effective_pc = updates.get("parent_consent", user.get("parent_consent"))
             if _is_minor(effective_by) and not effective_pc:
@@ -6209,6 +6234,7 @@ async def analyze_preview_task(report_id: str):
                 **_wd_heartbeat(step=5),
             }},
         )
+        await _notify_dashboard_report(report_id, "preview")
 
         # A watchdog/timeout may have REFUNDED the credit while this task was
         # still running (slow prod CPU / restart race). The analysis DID succeed,
@@ -6666,6 +6692,45 @@ async def _send_report_ready_email(report_id: str):
             )
     except Exception:
         logger.exception(f"report-ready email failed for {report_id}")
+
+
+async def _notify_dashboard_report(report_id: str, kind: str):
+    """Insert a dashboard notification when a report finishes (kind: 'preview'|'full'). Once per kind."""
+    try:
+        flag = f"dash_notified_{kind}"
+        doc = await db.reports.find_one(
+            {"id": report_id},
+            {"user_id": 1, "player_details.player_name": 1, "demo": 1, flag: 1},
+        )
+        if not doc or doc.get("demo") or doc.get(flag):
+            return
+        u = await db.users.find_one({"id": doc["user_id"]}, {"email": 1})
+        email = (u or {}).get("email")
+        if not email:
+            return
+        pname = (doc.get("player_details") or {}).get("player_name") or "your player"
+        if kind == "full":
+            subject = "Your Premium Report is ready!"
+            body = f"The full scout report for {pname} is now available — open it to see the complete breakdown, scores and key moments."
+        else:
+            subject = "Your free preview is ready!"
+            body = f"The free scout preview for {pname} is ready. Remember: scouts only see premium reports — upgrade to make {pname} visible."
+        await db.dashboard_messages.insert_one({
+            "id": str(uuid.uuid4()),
+            "kind": "notification",
+            "sender_type": "admin",
+            "sender_name": "ScoutMePlay",
+            "subject": subject,
+            "body": body,
+            "target": "all",
+            "target_email": email.lower(),
+            "link": f"/report/{report_id}",
+            "created_at": now_iso(),
+            "created_by": "system",
+        })
+        await db.reports.update_one({"id": report_id}, {"$set": {flag: now_iso()}})
+    except Exception:
+        logger.exception(f"dashboard report notification failed for {report_id}")
 
 
 async def _curve_reminder_loop():
@@ -7885,6 +7950,7 @@ async def generate_full_report_task(report_id: str) -> None:
         except Exception:
             logger.exception(f"Failed to queue agent_review for {report_id}")
         await _send_report_ready_email(report_id)
+        await _notify_dashboard_report(report_id, "full")
     except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
         # Persist a friendly failure marker so the frontend can surface "Try again".
@@ -14508,6 +14574,15 @@ async def players_database_player_detail(player_id: str, user=Depends(_require_s
     p = await db.users.find_one({"id": player_id, "discoverable": True}, {"_id": 0, "password_hash": 0})
     if not p:
         raise HTTPException(404, "Player not found or not discoverable")
+    if user["id"] != p["id"]:
+        try:
+            await db.profile_view_events.insert_one({
+                "player_user_id": p["id"],
+                "viewer_id": user["id"],
+                "ts": now_iso(),
+            })
+        except Exception:
+            pass
     r_cursor = db.reports.find(
         {"user_id": p["id"], "$or": [{"is_paid": True}, {"manually_unlocked": True}]},
         {"_id": 0, "id": 1, "player_details": 1, "preview": 1, "poster_filename": 1, "created_at": 1},

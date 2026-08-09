@@ -3,7 +3,7 @@
 for the player dashboard. Premium gating: free users never receive
 scout/agent/club message content — only a locked count for the UI."""
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -55,6 +55,10 @@ class ComposeMessage(BaseModel):
 
 class ReadAllPayload(BaseModel):
     kind: Optional[str] = None
+
+
+class ReplyPayload(BaseModel):
+    body: str
 
 
 class OpportunityIn(BaseModel):
@@ -200,6 +204,15 @@ def build_dashboard_hub_router(db, user_dep, admin_dep) -> APIRouter:
         for m in visible:
             item = {**m, "read": m["id"] in read_ids}
             (messages if m.get("kind") == "message" else notifications).append(item)
+        msg_ids = [m["id"] for m in messages]
+        if msg_ids:
+            replies_by_msg = {}
+            async for r in db.dashboard_message_replies.find(
+                {"message_id": {"$in": msg_ids}, "user_id": user["id"]}, {"_id": 0}
+            ).sort("created_at", 1):
+                replies_by_msg.setdefault(r["message_id"], []).append(r)
+            for m in messages:
+                m["replies"] = replies_by_msg.get(m["id"], [])
         return {
             "premium_access": has_premium,
             "notifications": notifications,
@@ -232,6 +245,77 @@ def build_dashboard_hub_router(db, user_dep, admin_dep) -> APIRouter:
                 upsert=True,
             )
         return {"ok": True, "marked": len(ids)}
+
+    @router.get("/dashboard/inbox/badges")
+    async def inbox_badges(user=Depends(user_dep)):
+        has_premium, visible, locked = await _visible_messages(user)
+        read_ids = set()
+        async for r in db.dashboard_message_reads.find(
+            {"user_id": user["id"]}, {"_id": 0, "message_id": 1}
+        ):
+            read_ids.add(r.get("message_id"))
+        un_n = sum(1 for m in visible if m.get("kind") != "message" and m["id"] not in read_ids)
+        un_m = sum(1 for m in visible if m.get("kind") == "message" and m["id"] not in read_ids)
+        return {
+            "premium_access": has_premium,
+            "unread_notifications": un_n,
+            "unread_messages": un_m,
+            "locked_messages": locked,
+            "total": un_n + un_m + locked,
+        }
+
+    @router.post("/dashboard/inbox/{message_id}/reply")
+    async def reply_to_message(message_id: str, payload: ReplyPayload, user=Depends(user_dep)):
+        body = (payload.body or "").strip()
+        if not body:
+            raise HTTPException(400, "body is required")
+        if len(body) > 2000:
+            raise HTTPException(400, "Reply is too long (max 2000 characters)")
+        msg = await db.dashboard_messages.find_one({"id": message_id}, {"_id": 0})
+        if not msg:
+            raise HTTPException(404, "Message not found")
+        if msg.get("kind") != "message":
+            raise HTTPException(400, "You can only reply to messages")
+        has_premium = await _premium_access(user)
+        tier = _active_tier(user)
+        if not _visible_to(user, has_premium, tier, msg):
+            raise HTTPException(403, "This message is not in your inbox")
+        if msg.get("sender_type") in EXTERNAL_SENDERS and not has_premium:
+            raise HTTPException(403, "Replying to scouts, agents and clubs is a Premium feature")
+        reply = {
+            "id": str(uuid.uuid4()),
+            "message_id": message_id,
+            "user_id": user["id"],
+            "user_email": (user.get("email") or "").lower(),
+            "user_name": user.get("full_name") or user.get("email"),
+            "body": body,
+            "created_at": _now_iso(),
+        }
+        await db.dashboard_message_replies.insert_one({**reply})
+        await db.dashboard_message_reads.update_one(
+            {"user_id": user["id"], "message_id": message_id},
+            {"$set": {"read_at": _now_iso()}},
+            upsert=True,
+        )
+        return reply
+
+    # ── Profile views (scout database detail opens) ───────────────────
+    @router.get("/dashboard/profile-views")
+    async def profile_views(user=Depends(user_dep)):
+        has_premium = await _premium_access(user)
+        if not has_premium:
+            return {"locked": True, "total": 0, "this_week": 0}
+        total = await db.profile_view_events.count_documents({"player_user_id": user["id"]})
+        week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        this_week = await db.profile_view_events.count_documents(
+            {"player_user_id": user["id"], "ts": {"$gte": week_ago}}
+        )
+        return {
+            "locked": False,
+            "total": total,
+            "this_week": this_week,
+            "discoverable": bool(user.get("discoverable")),
+        }
 
     # ── Admin messages ────────────────────────────────────────────────
     @router.post("/admin/dashboard/messages")
@@ -275,9 +359,22 @@ def build_dashboard_hub_router(db, user_dep, admin_dep) -> APIRouter:
             [{"$group": {"_id": "$message_id", "n": {"$sum": 1}}}]
         ):
             counts[row["_id"]] = row["n"]
+        rcounts = {}
+        async for row in db.dashboard_message_replies.aggregate(
+            [{"$group": {"_id": "$message_id", "n": {"$sum": 1}}}]
+        ):
+            rcounts[row["_id"]] = row["n"]
         for m in msgs:
             m["read_count"] = counts.get(m["id"], 0)
+            m["reply_count"] = rcounts.get(m["id"], 0)
         return {"messages": msgs}
+
+    @router.get("/admin/dashboard/messages/{message_id}/replies")
+    async def admin_message_replies(message_id: str, admin=Depends(admin_dep)):
+        replies = await db.dashboard_message_replies.find(
+            {"message_id": message_id}, {"_id": 0}
+        ).sort("created_at", 1).to_list(500)
+        return {"replies": replies}
 
     @router.delete("/admin/dashboard/messages/{message_id}")
     async def admin_delete_message(message_id: str, admin=Depends(admin_dep)):
@@ -285,6 +382,7 @@ def build_dashboard_hub_router(db, user_dep, admin_dep) -> APIRouter:
         if res.deleted_count == 0:
             raise HTTPException(404, "Message not found")
         await db.dashboard_message_reads.delete_many({"message_id": message_id})
+        await db.dashboard_message_replies.delete_many({"message_id": message_id})
         return {"ok": True}
 
     # ── Opportunities (user) ──────────────────────────────────────────

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import api from "@/lib/api";
-import { Bell, Mail, Lock, ShieldCheck, Briefcase, Search, CheckCheck } from "lucide-react";
+import { Bell, Mail, Lock, ShieldCheck, Briefcase, Search, CheckCheck, Send, CornerDownRight } from "lucide-react";
 
 const timeAgo = (iso) => {
   if (!iso) return "";
@@ -28,6 +30,8 @@ const FAKE_LOCKED_ROWS = [
 export default function InboxPanels({ onUpgrade }) {
   const [inbox, setInbox] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [sendingReply, setSendingReply] = useState(false);
 
   const fetchInbox = () => {
     api.get("/dashboard/inbox").then(({ data }) => setInbox(data)).catch(() => {});
@@ -58,40 +62,104 @@ export default function InboxPanels({ onUpgrade }) {
     } catch { /* non-critical */ }
   };
 
+  const sendReply = async (m) => {
+    const text = (replyDrafts[m.id] || "").trim();
+    if (!text || sendingReply) return;
+    setSendingReply(true);
+    try {
+      const { data } = await api.post(`/dashboard/inbox/${m.id}/reply`, { body: text });
+      setInbox((prev) => ({
+        ...prev,
+        messages: prev.messages.map((x) =>
+          x.id === m.id ? { ...x, read: true, replies: [...(x.replies || []), data] } : x
+        ),
+      }));
+      setReplyDrafts((d) => ({ ...d, [m.id]: "" }));
+      toast.success("Reply sent");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not send reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const { notifications, messages, premium_access: premium, locked_message_count: lockedCount } = inbox;
 
-  const Row = ({ m }) => {
+  const Row = ({ m, canReply = false }) => {
     const meta = SENDER_ICON[m.sender_type] || SENDER_ICON.admin;
     const { Icon } = meta;
+    const internalLink = m.link && m.link.startsWith("/");
     return (
-      <button
-        type="button"
-        onClick={() => markRead(m)}
-        data-testid={`inbox-row-${m.id}`}
-        className="w-full text-left flex gap-3 px-5 py-3 hover:bg-cream-soft/60 transition-colors items-start"
-      >
-        <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${meta.cls}`}>
-          <Icon className="w-4.5 h-4.5 w-[18px] h-[18px]" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-black text-ink truncate">{m.subject}</span>
-          <span className={`block text-[12px] text-ink/60 mt-0.5 ${openId === m.id ? "" : "truncate"}`}>{m.body}</span>
-          {m.sender_type !== "admin" && (
-            <span className="block text-[10px] uppercase tracking-[0.14em] font-bold text-ink/40 mt-1">
-              {m.sender_name} · {m.sender_type}
-            </span>
-          )}
-          {openId === m.id && m.link && (
-            <a href={m.link} target="_blank" rel="noreferrer" className="inline-block mt-1.5 text-[11px] font-bold text-forest underline">
-              Open link →
-            </a>
-          )}
-        </span>
-        <span className="shrink-0 flex flex-col items-end gap-1.5">
-          <span className="text-[10px] text-ink/40 whitespace-nowrap">{timeAgo(m.created_at)}</span>
-          {!m.read && <span className="w-2.5 h-2.5 rounded-full bg-forest" data-testid={`inbox-unread-dot-${m.id}`} />}
-        </span>
-      </button>
+      <div>
+        <button
+          type="button"
+          onClick={() => markRead(m)}
+          data-testid={`inbox-row-${m.id}`}
+          className="w-full text-left flex gap-3 px-5 py-3 hover:bg-cream-soft/60 transition-colors items-start"
+        >
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${meta.cls}`}>
+            <Icon className="w-[18px] h-[18px]" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-black text-ink truncate">{m.subject}</span>
+            <span className={`block text-[12px] text-ink/60 mt-0.5 ${openId === m.id ? "" : "truncate"}`}>{m.body}</span>
+            {m.sender_type !== "admin" && (
+              <span className="block text-[10px] uppercase tracking-[0.14em] font-bold text-ink/40 mt-1">
+                {m.sender_name} · {m.sender_type}
+              </span>
+            )}
+            {openId === m.id && m.link && (
+              internalLink ? (
+                <Link to={m.link} className="inline-block mt-1.5 text-[11px] font-bold text-forest underline">
+                  Open →
+                </Link>
+              ) : (
+                <a href={m.link} target="_blank" rel="noreferrer" className="inline-block mt-1.5 text-[11px] font-bold text-forest underline">
+                  Open link →
+                </a>
+              )
+            )}
+          </span>
+          <span className="shrink-0 flex flex-col items-end gap-1.5">
+            <span className="text-[10px] text-ink/40 whitespace-nowrap">{timeAgo(m.created_at)}</span>
+            {!m.read && <span className="w-2.5 h-2.5 rounded-full bg-forest" data-testid={`inbox-unread-dot-${m.id}`} />}
+          </span>
+        </button>
+        {openId === m.id && canReply && (
+          <div className="px-5 pb-4 sm:pl-[72px]" data-testid={`reply-thread-${m.id}`}>
+            {(m.replies || []).map((r) => (
+              <div key={r.id} className="flex gap-2 items-start mb-2" data-testid={`reply-${r.id}`}>
+                <CornerDownRight className="w-3.5 h-3.5 text-forest mt-1 shrink-0" />
+                <div className="bg-forest/5 border border-forest/15 rounded-xl px-3 py-2 text-[12px] text-ink/75 flex-1">
+                  {r.body}
+                  <span className="block text-[10px] text-ink/40 mt-1">You · {timeAgo(r.created_at)}</span>
+                </div>
+              </div>
+            ))}
+            <div className="flex gap-2 items-end">
+              <textarea
+                value={replyDrafts[m.id] || ""}
+                onChange={(e) => setReplyDrafts((d) => ({ ...d, [m.id]: e.target.value }))}
+                rows={2}
+                maxLength={2000}
+                placeholder="Write a reply…"
+                data-testid={`reply-input-${m.id}`}
+                className="flex-1 border border-gray-border rounded-xl px-3 py-2 text-[13px] focus:outline-none focus:border-forest bg-white resize-none"
+              />
+              <button
+                type="button"
+                onClick={() => sendReply(m)}
+                disabled={sendingReply || !(replyDrafts[m.id] || "").trim()}
+                data-testid={`reply-send-${m.id}`}
+                className="bg-forest hover:bg-forest-pop text-white p-2.5 rounded-xl transition-colors disabled:opacity-40"
+                aria-label="Send reply"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -130,7 +198,7 @@ export default function InboxPanels({ onUpgrade }) {
           <div className="flex items-center gap-2">
             <Mail className="w-4 h-4 text-forest" />
             <h3 className="font-barlow font-black uppercase text-lg tracking-tight">Messages</h3>
-            {premium && inbox.unread_messages > 0 && (
+            {inbox.unread_messages > 0 && (
               <span className="bg-forest text-white text-[10px] font-black min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1" data-testid="messages-unread-badge">
                 {inbox.unread_messages}
               </span>
@@ -149,11 +217,15 @@ export default function InboxPanels({ onUpgrade }) {
               No messages yet — scouts, agents and clubs reach players right here.
             </p>
           ) : (
-            <div className="pb-3">{messages.slice(0, 6).map((m) => <Row key={m.id} m={m} />)}</div>
+            <div className="pb-3">{messages.slice(0, 6).map((m) => <Row key={m.id} m={m} canReply />)}</div>
           )
         ) : (
-          <div className="relative" data-testid="messages-locked">
-            <div className="blur-[4px] opacity-50 select-none pointer-events-none pb-3" aria-hidden>
+          <div data-testid="messages-locked">
+            {messages.length > 0 && (
+              <div className="pb-1">{messages.slice(0, 4).map((m) => <Row key={m.id} m={m} canReply />)}</div>
+            )}
+            <div className="relative">
+              <div className="blur-[4px] opacity-50 select-none pointer-events-none pb-3" aria-hidden>
               {FAKE_LOCKED_ROWS.map((f) => (
                 <div key={f.name} className="flex gap-3 px-5 py-3 items-start">
                   <span className="w-10 h-10 rounded-full bg-forest/15 shrink-0" />
@@ -185,6 +257,7 @@ export default function InboxPanels({ onUpgrade }) {
               >
                 Upgrade to Premium
               </button>
+            </div>
             </div>
           </div>
         )}

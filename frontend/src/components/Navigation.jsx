@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import api from "@/lib/api";
-import { LogOut, Shield, LayoutDashboard, Upload, ChevronRight, ChevronDown, Menu, X, Home, ArrowUp } from "lucide-react";
+import { LogOut, Shield, LayoutDashboard, Upload, ChevronRight, ChevronDown, Menu, X, Home, ArrowUp, Bell, Mail } from "lucide-react";
 
 const LIME = "#ccff00";
 
@@ -101,6 +101,21 @@ export default function Navigation() {
     return () => { cancelled = true; };
   }, [user]);
 
+  // Inbox badges — unread notifications/messages shown in the header (mockup parity).
+  const [inboxBadges, setInboxBadges] = useState(null);
+  useEffect(() => {
+    if (!user) { setInboxBadges(null); return; }
+    let alive = true;
+    const load = () => {
+      api.get("/dashboard/inbox/badges")
+        .then(({ data }) => { if (alive) setInboxBadges(data); })
+        .catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 90000);
+    return () => { alive = false; clearInterval(t); };
+  }, [user]);
+
   // Cross-page anchor: ?scroll=<testid>
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -111,7 +126,7 @@ export default function Navigation() {
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "start" });
         window.history.replaceState({}, "", location.pathname);
-      } else if (attempt < 12) {
+      } else if (attempt < 30) {
         setTimeout(() => tryScroll(attempt + 1), 120);
       }
     };
@@ -244,6 +259,44 @@ export default function Navigation() {
           <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
             {user ? (
               <>
+                <Link
+                  to="/dashboard?scroll=dashboard-inbox-anchor"
+                  data-testid="nav-notifications-btn"
+                  title="Notifications"
+                  aria-label="Notifications"
+                  className="hidden sm:flex relative text-white/70 hover:text-white p-1 shrink-0 transition-colors"
+                >
+                  <Bell className="w-5 h-5" />
+                  {(inboxBadges?.unread_notifications || 0) > 0 && (
+                    <span
+                      data-testid="nav-notifications-badge"
+                      className="absolute -top-1 -right-1.5 min-w-[16px] h-4 rounded-full text-[9px] font-black flex items-center justify-center px-1"
+                      style={{ background: LIME, color: "#0A0F0D" }}
+                    >
+                      {inboxBadges.unread_notifications > 9 ? "9+" : inboxBadges.unread_notifications}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  to="/dashboard?scroll=dashboard-inbox-anchor"
+                  data-testid="nav-messages-btn"
+                  title="Messages"
+                  aria-label="Messages"
+                  className="hidden min-[360px]:flex relative text-white/70 hover:text-white p-1 shrink-0 transition-colors"
+                >
+                  <Mail className="w-5 h-5" />
+                  {((inboxBadges?.unread_messages || 0) + (inboxBadges?.locked_messages || 0)) > 0 && (
+                    <span
+                      data-testid="nav-messages-badge"
+                      className="absolute -top-1 -right-1.5 min-w-[16px] h-4 rounded-full text-[9px] font-black flex items-center justify-center px-1"
+                      style={{ background: LIME, color: "#0A0F0D" }}
+                    >
+                      {(inboxBadges.unread_messages + inboxBadges.locked_messages) > 9
+                        ? "9+"
+                        : inboxBadges.unread_messages + inboxBadges.locked_messages}
+                    </span>
+                  )}
+                </Link>
                 <Link
                   to="/dashboard"
                   data-testid="nav-dashboard-btn"
@@ -392,6 +445,22 @@ export default function Navigation() {
                     className="flex items-center gap-2 text-white/85 hover:text-white text-sm uppercase tracking-widest font-bold py-1.5"
                   >
                     <LayoutDashboard className="w-4 h-4" /> Dashboard
+                  </Link>
+                  <Link
+                    to="/dashboard?scroll=dashboard-inbox-anchor"
+                    onClick={() => setMobileOpen(false)}
+                    data-testid="nav-mobile-inbox-btn"
+                    className="flex items-center gap-2 text-white/85 hover:text-white text-sm uppercase tracking-widest font-bold py-1.5"
+                  >
+                    <Mail className="w-4 h-4" /> Messages
+                    {(inboxBadges?.total || 0) > 0 && (
+                      <span
+                        className="min-w-[16px] h-4 rounded-full text-[9px] font-black flex items-center justify-center px-1"
+                        style={{ background: LIME, color: "#0A0F0D" }}
+                      >
+                        {inboxBadges.total > 9 ? "9+" : inboxBadges.total}
+                      </span>
+                    )}
                   </Link>
                   {user.role === "admin" && (
                     <Link

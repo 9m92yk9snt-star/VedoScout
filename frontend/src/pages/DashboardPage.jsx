@@ -20,7 +20,7 @@ import { trackPurchase } from "@/lib/pixels";
 import {
   Plus, Lock, CheckCircle2, Film, Loader2, TrendingUp,
   Activity, ArrowRight, Sparkles, Crown, Calendar, XCircle, RefreshCw,
-  Globe2, Copy,
+  Globe2, Copy, Eye,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -42,6 +42,8 @@ export default function DashboardPage() {
   const [usage, setUsage] = useState(null);
   // Admin-controlled ScoutMePlay Network numbers
   const [community, setCommunity] = useState(null);
+  // Profile views (scout database detail opens) — premium only
+  const [profileViews, setProfileViews] = useState(null);
 
   const fetchAll = () => {
     Promise.allSettled([
@@ -49,6 +51,7 @@ export default function DashboardPage() {
       api.get("/progress/players").then(({ data }) => setPlayers(data.items || [])),
       api.get("/progress/pass/status").then(({ data }) => setPassState(data)),
       api.get("/dashboard/community").then(({ data }) => setCommunity(data)),
+      api.get("/dashboard/profile-views").then(({ data }) => setProfileViews(data)),
       api.get("/me/subscription").then(({ data }) => {
         setSubscription(data.subscription);
         setTiers(data.tiers || {});
@@ -198,7 +201,21 @@ export default function DashboardPage() {
                   accent
                   testid="qs-premium"
                 />
-                <QuickStatTile icon={Activity} label="Tracked players" value={trackedPlayers} testid="qs-players" />
+                <QuickStatTile
+                  icon={Eye}
+                  label="Profile views"
+                  value={profileViews?.locked ? "—" : (profileViews?.total ?? 0)}
+                  sub={
+                    profileViews?.locked
+                      ? "Scouts can't see you on Free — upgrade to be visible"
+                      : profileViews?.this_week > 0
+                      ? `+${profileViews.this_week} this week`
+                      : profileViews?.discoverable
+                      ? "Visible in the Scout Library"
+                      : "Turn on visibility to be found"
+                  }
+                  testid="qs-views"
+                />
                 <QuickStatTile
                   icon={planLabel === "VIP Premium" ? Crown : planLabel === "Premium" ? TrendingUp : Sparkles}
                   label="Current plan"
@@ -348,7 +365,9 @@ export default function DashboardPage() {
               </section>
 
               {/* NOTIFICATIONS + MESSAGES */}
-              <InboxPanels onUpgrade={scrollToPlans} />
+              <div data-testid="dashboard-inbox-anchor">
+                <InboxPanels onUpgrade={scrollToPlans} />
+              </div>
 
               {/* SCOUTMEPLAY NETWORK (admin-controlled numbers) */}
               <CommunityPulse data={community} />
@@ -357,7 +376,7 @@ export default function DashboardPage() {
               {premiumAccess && <OpportunitiesPanel />}
 
               {/* PROFILE & VISIBILITY */}
-              <ProfileVisibilityCard latestReportId={reports[0]?.id} />
+              <ProfileVisibilityCard latestReportId={reports[0]?.id} premiumAccess={premiumAccess} />
 
               <ReferralInviteCard />
 

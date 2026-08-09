@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { TrendingUp, Send, Trophy, Trash2, Loader2, Eye, EyeOff } from "lucide-react";
+import { TrendingUp, Send, Trophy, Trash2, Loader2, Eye, EyeOff, MessageSquare } from "lucide-react";
 
 const inp = "bg-white border border-gray-border rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-forest w-full";
 const lbl = "block text-[10px] font-extrabold uppercase tracking-wider text-ink/55 mb-1";
@@ -118,11 +118,25 @@ function MessageComposerCard() {
   const [form, setForm] = useState(EMPTY_MSG);
   const [sent, setSent] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [openReplies, setOpenReplies] = useState({});
 
   const load = () => {
     api.get("/admin/dashboard/messages").then(({ data }) => setSent(data.messages || [])).catch(() => {});
   };
   useEffect(load, []);
+
+  const toggleReplies = async (id) => {
+    if (openReplies[id]) {
+      setOpenReplies((prev) => ({ ...prev, [id]: null }));
+      return;
+    }
+    try {
+      const { data } = await api.get(`/admin/dashboard/messages/${id}/replies`);
+      setOpenReplies((prev) => ({ ...prev, [id]: data.replies || [] }));
+    } catch {
+      toast.error("Could not load replies");
+    }
+  };
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -225,19 +239,41 @@ function MessageComposerCard() {
           <h4 className="text-[11px] font-extrabold uppercase tracking-wider text-ink/55">Sent ({sent.length})</h4>
           <ul className="mt-2 divide-y divide-gray-border border border-gray-border rounded-xl overflow-hidden">
             {sent.slice(0, 20).map((m) => (
-              <li key={m.id} className="flex items-center gap-3 px-3.5 py-2.5 bg-white" data-testid={`sent-message-${m.id}`}>
-                <span className={`text-[9px] uppercase tracking-wider font-black px-2 py-0.5 rounded-full shrink-0 ${m.kind === "message" ? "bg-blue-100 text-blue-700" : "bg-forest/10 text-forest"}`}>
-                  {m.kind}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <b className="block text-[13px] text-ink truncate">{m.subject}</b>
-                  <span className="block text-[11px] text-ink/50 truncate">
-                    {m.sender_name} ({m.sender_type}) → {m.target_email || m.target} · {m.read_count || 0} read
+              <li key={m.id} className="bg-white" data-testid={`sent-message-${m.id}`}>
+                <div className="flex items-center gap-3 px-3.5 py-2.5">
+                  <span className={`text-[9px] uppercase tracking-wider font-black px-2 py-0.5 rounded-full shrink-0 ${m.kind === "message" ? "bg-blue-100 text-blue-700" : "bg-forest/10 text-forest"}`}>
+                    {m.kind}
                   </span>
+                  <div className="min-w-0 flex-1">
+                    <b className="block text-[13px] text-ink truncate">{m.subject}</b>
+                    <span className="block text-[11px] text-ink/50 truncate">
+                      {m.sender_name} ({m.sender_type}) → {m.target_email || m.target} · {m.read_count || 0} read
+                    </span>
+                  </div>
+                  {(m.reply_count || 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleReplies(m.id)}
+                      data-testid={`view-replies-${m.id}`}
+                      className="shrink-0 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-forest bg-forest/10 hover:bg-forest/20 px-2 py-1 rounded-full transition-colors"
+                    >
+                      <MessageSquare className="w-3 h-3" /> {m.reply_count} {m.reply_count === 1 ? "reply" : "replies"}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => del(m.id)} data-testid={`delete-message-${m.id}`} className="text-ink/40 hover:text-red-600 p-1.5 shrink-0" aria-label="Delete message">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button type="button" onClick={() => del(m.id)} data-testid={`delete-message-${m.id}`} className="text-ink/40 hover:text-red-600 p-1.5 shrink-0" aria-label="Delete message">
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {openReplies[m.id] && (
+                  <div className="px-3.5 pb-3 space-y-1.5" data-testid={`replies-list-${m.id}`}>
+                    {openReplies[m.id].map((r) => (
+                      <div key={r.id} className="bg-forest/5 border border-forest/15 rounded-lg px-3 py-2 text-[12px] text-ink/80">
+                        <b className="text-forest">{r.user_name || r.user_email}</b> · <span className="text-ink/45">{new Date(r.created_at).toLocaleString()}</span>
+                        <p className="mt-0.5">{r.body}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

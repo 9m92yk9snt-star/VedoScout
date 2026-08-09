@@ -44,6 +44,14 @@ export default function ScoutPreviewUpsell({ playersCount, onSeePlans }) {
             <span className="text-forest">{Number(playersCount).toLocaleString()} players</span> are already visible to scouts. Don't stay unseen.
           </p>
         ) : null}
+        <div
+          className="mt-3 border border-amber-300/70 bg-amber-50 rounded-xl px-3.5 py-2.5 text-[12px] text-amber-900 leading-snug"
+          data-testid="upsell-visibility-notice"
+        >
+          <b>Heads up:</b> on the Free plan your uploads are <b>not visible to scouts</b>. Upgrade to
+          enter the Scout Library — or opt in to social-media featuring (below) if you'd like us to
+          show off your clip.
+        </div>
       </div>
       <div>
         <div className="relative rounded-2xl p-5 text-white overflow-hidden" style={{ background: "#0F1F14" }}>
