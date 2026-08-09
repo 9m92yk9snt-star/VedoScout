@@ -91,3 +91,9 @@ Formål: komplet liste over ALT der allerede findes, så nye forslag aldrig gent
 - Email-alarm: scout/agent/klub-beskeder udløser email til berettigede medlemmer (aldrig free)
 - Trial-ansøgning: Premium trykker "I'm interested" → admin ser ansøgerliste pr. trial
 - Live library-tal: admin ser ægte antal synlige spillere og kan vælge live-tal eller fiktive pr. Network-sektionen
+
+## Direct-to-Stripe guest checkout (2026-08-09)
+- Premium/VIP/Single-kort for ikke-indloggede går direkte til Stripe (ingen signup-væg) — alle steder på sitet
+- /welcome-side efter betaling: konto auto-oprettes fra Stripe-email, køber vælger kun adgangskode og logges ind
+- Single-køb giver 1 prepaid premium-rapport og sender køberen til /upload
+- Eksisterende konto med samme email får købet koblet på automatisk

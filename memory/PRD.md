@@ -3369,3 +3369,19 @@ User rule enforced: free users have fewer privileges and MUST know their uploads
 - iteration_88.json: 16/16 backend + all frontend flows. Regression pytest: /app/backend/tests/test_iter88_dashboard_hub_new.py (email-alarm branches: scout=fire, notification=no, admin-sender=no, free-target=no).
 ### Review backlog (not blocking)
 - Unique compound index (user_id, opportunity_id) on dashboard_opportunity_interest + indexes for alert recipient queries; split dashboard_hub.py if it grows past ~700 lines; log when 500-recipient cap hit.
+
+## 2026-08-09 (4) — Direct-to-Stripe guest checkout (built + testing-agent 100%, iteration_89)
+User decision: Premium/VIP AND Single Report CTAs for logged-out visitors go STRAIGHT to Stripe — no signup wall. Account is auto-created AFTER payment. Single buyers are routed to /upload with a paid premium report credit.
+### Backend (server.py, after subscribe/status ~line 11720)
+- POST /api/payments/guest/checkout {tier premium|vip|single, origin_url} (no auth): premium/vip → live stripe_sdk subscription session (cs_live, _arm_real_stripe, existing price ids); single → emergentintegrations StripeCheckout test/proxy one-time session (cs_test) at public single price via get_extra_report_price_for_user({}). success_url {origin}/welcome?guest_session={CHECKOUT_SESSION_ID}. Txn kinds guest_subscription/guest_single.
+- GET /api/payments/guest/status/{session_id} (no auth, idempotent finalize): retrieves session with the RIGHT key per kind (guest_single re-arms via StripeCheckout(api_key=STRIPE_API_KEY) — proxy; guest_subscription via _arm_real_stripe). On paid: find-or-create user from Stripe email (random unusable password, auth_provider=guest_checkout), attach subscription state (_subscription_state_from_stripe) or $inc prepaid_uploads; for NEW accounts issues one-time 48h setup token in password_reset_tokens (purpose guest_setup) returned until used. Response: {payment_status, kind, tier, email, account_status created|existing, setup_token}.
+- Password setup reuses existing POST /auth/reset-password (consumes token, returns access_token+user → auto-login).
+### Frontend
+- New page /welcome (GuestWelcomePage.jsx, route in App.js): polls status 2s×15; paid+created → one-field password form → setAuthFromResponse → navigate (/upload for single, /dashboard for subs); paid+existing → "linked to your account" + login; error/timeout states.
+- Guest branches added to: DreamPricingTiers (goSingle + startSubscription), ReportPaywallTiers, PricingTiers, StickyPricingCTA — all call /payments/guest/checkout when logged out (old /signup?plan= redirects removed).
+### Tested (iteration_89)
+- Full E2E: test-card 4242 single purchase → welcome → password → auto-login → /upload; prepaid_uploads=1; token single-use; same-email second purchase → existing panel + credit=2; premium/vip cs_live URL shape verified (NEVER complete live payments). Regressions OK. pytest: /app/backend/tests/test_iter89_guest_checkout.py.
+### Notes / backlog
+- Premium/VIP guest subs run on LIVE Stripe key — end-to-end completion only verifiable with a real card (user can test in production).
+- Review suggestions (non-blocking): _arm_test_stripe() helper symmetry; server.py modularization; welcome-page poll countdown UI.
+- Danish translation question from user is STILL PENDING (they were asked full-Danish vs DA/EN switcher + report/email language — no answer yet).
