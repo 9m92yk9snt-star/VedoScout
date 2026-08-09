@@ -256,9 +256,13 @@ def render_purchase_confirmation(
     amount_cents: int,
     currency: str = "USD",
     extra_details: Optional[str] = None,
+    cta_label: str = "Go to your dashboard",
+    cta_path: str = "/dashboard",
+    next_note: Optional[str] = None,
 ) -> tuple[str, str, str]:
     """extra_details: e.g. 'Extra report — Premium subscriber rate' shown as
-    a small subtitle under the product name.
+    a small subtitle under the product name. cta_label/cta_path/next_note
+    drive the kind-specific "NEXT STEP" block (upload / report / dashboard).
     """
     site = _site_url()
     display_name = (user_name or "").strip() or "there"
@@ -267,6 +271,7 @@ def render_purchase_confirmation(
     subject = f"Payment received — {product_name} · ScoutMePlay"
     preheader = f"Thanks for your purchase — {amount_str} · {product_name}"
     details_html = f'<div style="margin-top:4px; font-size:12px; color:#6B6B6B;">{extra_details}</div>' if extra_details else ""
+    next_note_html = f'<p style="margin:8px 0 14px 0; font-size:14px; line-height:1.6; color:#1F2724;">{next_note}</p>' if next_note else '<div style="height:10px;"></div>'
     inner = f"""
     <span style="display:inline-block; padding:4px 10px; background:#1F4F2F; color:#CCFF00; font-size:10px; letter-spacing:2px; text-transform:uppercase; font-weight:800;">
       Payment received
@@ -276,7 +281,7 @@ def render_purchase_confirmation(
     </h1>
     <div style="height:3px; width:48px; background:#CCFF00; margin:0 0 20px 0;"></div>
     <p style="margin:0 0 22px 0; font-size:15px; line-height:1.6; color:#1F2724;">
-      Your purchase went through successfully. Your account is updated and you can start uploading right away.
+      Your payment went through successfully and your account has been updated.
     </p>
     <table role="presentation" cellspacing="0" cellpadding="0" width="100%" style="background:#F5F1E8; border:1px solid #D4CFC1; margin:0 0 24px 0;">
       <tr><td style="padding:16px 18px;">
@@ -286,7 +291,9 @@ def render_purchase_confirmation(
         <div style="margin-top:10px; font-size:24px; font-weight:900; color:#1F4F2F; letter-spacing:-0.5px;">{amount_str}</div>
       </td></tr>
     </table>
-    {_btn("Go to your dashboard", f"{site}/dashboard")}
+    <div style="font-size:9.5px; letter-spacing:2px; text-transform:uppercase; font-weight:800; color:#1F4F2F;">Next step</div>
+    {next_note_html}
+    {_btn(cta_label, f"{site}{cta_path}")}
     <p style="margin:22px 0 0 0; font-size:12px; color:#6B6B6B; line-height:1.6;">
       A receipt is automatically issued via Stripe. If you need an invoice for accounting, reply to this email
       and we&apos;ll send one over.
@@ -296,7 +303,8 @@ def render_purchase_confirmation(
         f"Payment received — {amount_str}\n"
         f"Product: {product_name}\n"
         f"{(extra_details + chr(10)) if extra_details else ''}"
-        f"\nGo to your dashboard: {site}/dashboard\n\n"
+        f"\nNEXT STEP: {next_note or cta_label}\n"
+        f"{cta_label}: {site}{cta_path}\n\n"
         f"Thanks for backing ScoutMePlay."
     )
     return _wrap_html(inner, preheader), plaintext, subject

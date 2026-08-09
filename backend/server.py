@@ -10638,7 +10638,12 @@ async def admin_send_test_email(payload: TestEmailPayload, _=Depends(get_current
         "abandoned_checkout": lambda: render_abandoned_checkout_email("Alex", f"{site}/upload"),
         "discount_campaign": lambda: render_discount_campaign_email("Test campaign", 20, 72),
         "report_ready": lambda: render_report_ready_email("Alex", "Noah Demo", f"{site}/sample-report"),
-        "purchase_confirmation": lambda: render_purchase_confirmation("Alex", "Premium Player Report", 4999, "USD"),
+        "purchase_confirmation": lambda: render_purchase_confirmation(
+            "Alex", "ScoutMePlay Premium", 2999, "USD",
+            extra_details="Monthly subscription — cancel anytime",
+            cta_label="Go to your dashboard", cta_path="/dashboard",
+            next_note="2 video reports every month. Upload your first match — your scout report is built automatically.",
+        ),
         "curve_reminder": lambda: render_curve_reminder_email("Alex", "Noah Demo", 5),
     }
     if payload.template not in builders:
@@ -11702,6 +11707,9 @@ async def get_subscription_status(session_id: str, user=Depends(get_current_user
 
     await db.payment_transactions.update_one({"session_id": session_id}, {"$set": update})
 
+    if new_payment_status == "paid":
+        await _send_receipt_email_for_session(session_id, session)
+
     u = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password_hash": 0})
     return {
         "payment_status": new_payment_status,
@@ -11911,6 +11919,7 @@ async def get_guest_checkout_status(session_id: str):
             "updated_at": now_iso(),
         }},
     )
+    await _send_receipt_email_for_session(session_id, session)
     txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     return await _result(txn)
 
@@ -12622,6 +12631,7 @@ async def embedded_status(session_id: str, user=Depends(get_current_user)):
                     {"id": txn["report_id"]},
                     {"$set": {"is_paid": True, "paid_at": now_iso()}},
                 )
+        await _send_receipt_email_for_session(session_id, session)
 
     return {
         "payment_status": new_payment_status,
@@ -12630,6 +12640,121 @@ async def embedded_status(session_id: str, user=Depends(get_current_user)):
         "currency": session.currency,
         "kind": txn.get("kind") or "report_unlock",
     }
+
+
+async def _send_receipt_email_for_session(session_id: str, session_obj=None) -> None:
+    """Branded receipt + next-step email (and admin sale notification) — sent
+    exactly ONCE per paid checkout session, whichever of webhook / status-poll
+    observes the payment first (atomic claim on the txn doc). Never raises."""
+    try:
+        txn = await db.payment_transactions.find_one_and_update(
+            {"session_id": session_id, "receipt_email_sent": {"$ne": True}},
+            {"$set": {"receipt_email_sent": True, "receipt_email_sent_at": now_iso()}},
+        )
+        if not txn:
+            return  # already sent, or unknown session
+
+        kind = txn.get("kind") or "report_unlock"
+        tier = (txn.get("tier") or "").lower()
+        metadata = txn.get("metadata") or {}
+
+        # Resolve recipient: txn fields → user doc → Stripe session email
+        user_email = txn.get("buyer_email") or txn.get("user_email")
+        user_name = None
+        if txn.get("user_id"):
+            u = await db.users.find_one({"id": txn["user_id"]}, {"_id": 0, "email": 1, "full_name": 1})
+            if u:
+                user_email = user_email or u.get("email")
+                user_name = u.get("full_name")
+        if not user_email and session_obj is not None:
+            details = session_obj.get("customer_details") or {}
+            user_email = details.get("email") or session_obj.get("customer_email")
+        if not user_email:
+            return
+
+        # Amount: prefer the Stripe session total (reflects promo codes)
+        if session_obj is not None and session_obj.get("amount_total") is not None:
+            amount_cents = int(session_obj.get("amount_total"))
+            currency = (session_obj.get("currency") or txn.get("currency") or "USD").upper()
+        else:
+            amount_cents = int(round(float(txn.get("amount") or 0) * 100))
+            currency = (txn.get("currency") or "USD").upper()
+
+        tier_label = "VIP" if tier == "vip" else "Premium"
+        if kind in ("subscription", "guest_subscription"):
+            product_name = f"ScoutMePlay {tier_label}"
+            extra_details = "Monthly subscription — cancel anytime"
+            cta_label, cta_path = "Go to your dashboard", "/dashboard"
+            next_note = (
+                "4 video reports every month + Real Scout Review (48h). Upload your first match — your scout report is built automatically."
+                if tier == "vip"
+                else "2 video reports every month. Upload your first match — your scout report is built automatically."
+            )
+        elif kind == "report_unlock":
+            product_name = "Full Scout Report Unlock"
+            extra_details = None
+            rid = txn.get("report_id") or ""
+            cta_label = "Open your report"
+            cta_path = f"/report/{rid}" if rid else "/dashboard"
+            next_note = "Your full scout report is being built right now — it appears on that page automatically (usually within minutes)."
+        elif kind in ("prepay_upload", "guest_single"):
+            price_tier = (metadata.get("price_tier") or "single").lower()
+            product_name = "Single Scout Report" if price_tier == "single" else "Extra Scout Report"
+            extra_details = {
+                "premium": "Premium subscriber rate",
+                "vip": "VIP subscriber rate — deepest per-report discount",
+            }.get(price_tier)
+            cta_label, cta_path = "Upload your match video", "/upload"
+            next_note = "Your report credit is on your account. Upload your match video and your full scout report is built automatically."
+        elif kind == "progress_pass":
+            product_name = "Season Progress Pass"
+            extra_details = None
+            cta_label, cta_path = "Go to your dashboard", "/dashboard"
+            next_note = None
+        elif kind == "scout_access":
+            product_name = SCOUT_ACCESS_TIERS.get(tier, {}).get("name") or "Scout Access"
+            extra_details = "Scout database access — search + reveal player contacts"
+            cta_label, cta_path = "Open the scout library", "/players-database"
+            next_note = None
+        else:
+            product_name = "ScoutMePlay purchase"
+            extra_details = None
+            cta_label, cta_path = "Go to your dashboard", "/dashboard"
+            next_note = None
+
+        html, text, subject = render_purchase_confirmation(
+            user_name=user_name,
+            product_name=product_name,
+            amount_cents=amount_cents,
+            currency=currency,
+            extra_details=extra_details,
+            cta_label=cta_label,
+            cta_path=cta_path,
+            next_note=next_note,
+        )
+        asyncio.create_task(send_email_async(user_email, subject, html, text, category="receipt"))
+
+        # Realtime admin sales notification (operator inbox)
+        admin_recipient = (
+            os.environ.get("ADMIN_SALES_EMAIL")
+            or os.environ.get("SMTP_FROM_EMAIL")
+            or os.environ.get("SMTP_USERNAME")
+        )
+        if admin_recipient:
+            adm_html, adm_text, adm_subject = render_admin_sale_notification(
+                product_name=product_name,
+                amount_cents=amount_cents,
+                currency=currency,
+                buyer_email=user_email,
+                buyer_name=user_name,
+                extra_details=extra_details,
+                session_id=session_id,
+            )
+            asyncio.create_task(
+                send_email_async(admin_recipient, adm_subject, adm_html, adm_text, category="sale_notification")
+            )
+    except Exception as exc:  # noqa: BLE001 — never block payment flows on email
+        logger.warning("Receipt email dispatch failed for %s: %s", session_id, exc)
 
 
 @api_router.post("/webhook/stripe-embedded")
@@ -12805,78 +12930,10 @@ async def stripe_webhook_embedded(request: Request):
                     }},
                 )
 
-        # ── Purchase confirmation email — fire-and-forget for every paid kind ──
-        # Runs AFTER we've credited the user in Mongo so if SMTP is slow, the
-        # user's dashboard is already updated. Never blocks the webhook response.
-        try:
-            user_email = None
-            user_name = None
-            user_id_for_email = metadata.get("user_id") or (txn or {}).get("user_id")
-            if user_id_for_email:
-                u = await db.users.find_one({"id": user_id_for_email}, {"email": 1, "full_name": 1, "_id": 0})
-                if u:
-                    user_email = u.get("email")
-                    user_name = u.get("full_name")
-            if not user_email:
-                # Fallback — Stripe attaches the buyer's email to the customer
-                user_email = (session.get("customer_details") or {}).get("email") or session.get("customer_email")
-            if user_email:
-                amount_cents = int(session.get("amount_total") or 0)
-                currency = (session.get("currency") or "USD").upper()
-                product_name = {
-                    "prepay_upload": "Extra Scout Report",
-                    "report_unlock": "Full Scout Report Unlock",
-                    "subscription":  f"{metadata.get('tier', '').title() or 'Premium'} Subscription",
-                    "progress_pass": "Season Progress Pass",
-                    "scout_access":  f"{SCOUT_ACCESS_TIERS.get(metadata.get('tier') or '', {}).get('name') or 'Scout Access'}",
-                }.get(kind, "ScoutMePlay purchase")
-                extra_details = None
-                if kind == "prepay_upload":
-                    price_tier = metadata.get("price_tier") or "single"
-                    extra_details = {
-                        "single":  "One-off single-report purchase",
-                        "premium": "Premium subscriber rate — cheaper than single-report price",
-                        "vip":     "VIP subscriber rate — deepest per-report discount",
-                    }.get(price_tier)
-                elif kind == "scout_access":
-                    extra_details = "Monthly scout database access — search + reveal player contacts"
-                html, text, subject = render_purchase_confirmation(
-                    user_name=user_name,
-                    product_name=product_name,
-                    amount_cents=amount_cents,
-                    currency=currency,
-                    extra_details=extra_details,
-                )
-                # Use asyncio.create_task since we're already inside an async webhook
-                asyncio.create_task(send_email_async(user_email, subject, html, text))
-
-                # ── Realtime admin sales-notification ──
-                # Fires to the ScoutMePlay operator inbox on EVERY paid checkout
-                # (subscription / single-report / extra-report / progress-pass).
-                # Uses SMTP_FROM_EMAIL as the recipient (defaults to scoutmeplay@gmail.com).
-                try:
-                    admin_recipient = (
-                        os.environ.get("ADMIN_SALES_EMAIL")
-                        or os.environ.get("SMTP_FROM_EMAIL")
-                        or os.environ.get("SMTP_USERNAME")
-                    )
-                    if admin_recipient:
-                        adm_html, adm_text, adm_subject = render_admin_sale_notification(
-                            product_name=product_name,
-                            amount_cents=amount_cents,
-                            currency=currency,
-                            buyer_email=user_email,
-                            buyer_name=user_name,
-                            extra_details=extra_details,
-                            session_id=session_id,
-                        )
-                        asyncio.create_task(
-                            send_email_async(admin_recipient, adm_subject, adm_html, adm_text)
-                        )
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Admin sale-notification email dispatch failed: %s", exc)
-        except Exception as exc:  # noqa: BLE001 — never block webhook on email failure
-            logger.warning("Purchase-confirmation email dispatch failed: %s", exc)
+        # ── Receipt + admin sale emails — exactly once per session (shared
+        # atomic claim with the status-poll endpoints, so webhook retries and
+        # page polling can never double-send). Runs AFTER crediting. ──
+        await _send_receipt_email_for_session(session_id, session)
     elif event["type"] in (
         "customer.subscription.updated",
         "customer.subscription.deleted",
