@@ -30,6 +30,7 @@ import ScoutsLandingPage from "@/pages/ScoutsLandingPage";
 import SharedTeaserPage from "@/pages/SharedTeaserPage";
 import PlayersDatabasePage from "@/pages/PlayersDatabasePage";
 import DemoReportPage from "@/pages/DemoReportPage";
+import CheckoutPage from "@/pages/CheckoutPage";
 import AuthCallback from "@/components/auth/AuthCallback";
 import CookieBanner from "@/components/CookieBanner";
 import MobileBottomTabs from "@/components/MobileBottomTabs";
@@ -104,6 +105,7 @@ function AnimatedRoutes() {
         <Route path="/forgot-password" element={<PageTransition><ForgotPassword /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/welcome" element={<PageTransition><GuestWelcomePage /></PageTransition>} />
+        <Route path="/checkout/:tier" element={<PageTransition><CheckoutPage /></PageTransition>} />
         {/* /upload is PUBLIC — guests upload first, create an account right before analysis */}
         <Route path="/upload" element={<PageTransition><UploadPage /></PageTransition>} />
         <Route path="/dashboard" element={<PageTransition><RequireAuth><DashboardPage /></RequireAuth></PageTransition>} />

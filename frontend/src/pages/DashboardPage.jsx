@@ -762,36 +762,9 @@ function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportI
   const extraPrice = usage?.extra_report_price;
   const extraTierLabel = isVipAtLimit ? "VIP" : "Premium";
 
-  const startSubscription = async (tier) => {
-    if (busy) return;
-    setBusy(tier);
-    try {
-      const { data } = await api.post("/payments/subscribe", {
-        tier,
-        origin_url: window.location.origin,
-      });
-      if (!data?.url) throw new Error("No checkout URL received");
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Could not start checkout.", { duration: 7000 });
-      setBusy(null);
-    }
-  };
+  const startSubscription = (tier) => navigate(`/checkout/${tier}`);
 
-  const buyExtraReport = async () => {
-    if (busy) return;
-    setBusy("extra");
-    try {
-      const { data } = await api.post("/payments/prepay-upload", {
-        origin_url: window.location.origin,
-      });
-      if (!data?.url) throw new Error("No checkout URL received");
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Could not start checkout.", { duration: 7000 });
-      setBusy(null);
-    }
-  };
+  const buyExtraReport = () => navigate("/checkout/single");
 
   const vip = tiers?.vip || { amount: 49.99 };
   const monthlyLimit = usage?.monthly_limit ?? (isVipAtLimit ? 4 : 2);

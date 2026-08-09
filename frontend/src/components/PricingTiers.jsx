@@ -121,44 +121,10 @@ export default function PricingTiers() {
     navigate("/upload");
   };
 
-  // Single Report: one-time prepay flow. Logged-out users go straight to Stripe (guest checkout).
-  const goSingleReport = async () => {
-    if (busyTier) return;
-    setBusyTier("single");
-    try {
-      const endpoint = user ? "/payments/prepay-upload" : "/payments/guest/checkout";
-      const { data } = await api.post(endpoint, {
-        tier: "single",
-        origin_url: window.location.origin,
-      });
-      if (!data?.url) throw new Error("No checkout URL received");
-      trackInitiateCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      const detail = err?.response?.data?.detail || err.message || "Could not start checkout.";
-      toast.error(detail, { duration: 8000 });
-      setBusyTier(null);
-    }
-  };
+  // Single Report: branded in-page checkout (guest + logged-in).
+  const goSingleReport = () => navigate("/checkout/single");
 
-  const startSubscription = async (tier) => {
-    if (busyTier) return;
-    setBusyTier(tier);
-    try {
-      const endpoint = user ? "/payments/subscribe" : "/payments/guest/checkout";
-      const { data } = await api.post(endpoint, {
-        tier,
-        origin_url: window.location.origin,
-      });
-      if (!data?.url) throw new Error("No checkout URL received");
-      trackInitiateCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      const detail = err?.response?.data?.detail || err.message || "Could not start checkout.";
-      toast.error(detail, { duration: 8000 });
-      setBusyTier(null);
-    }
-  };
+  const startSubscription = (tier) => navigate(`/checkout/${tier}`);
 
   const goPremium = () => startSubscription("premium");
   const goVip     = () => startSubscription("vip");

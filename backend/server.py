@@ -11835,10 +11835,13 @@ async def get_guest_checkout_status(session_id: str):
     if not _embedded_ready() and txn["kind"] == "guest_subscription":
         raise HTTPException(503, "Stripe not configured.")
     try:
-        if txn["kind"] == "guest_single":
-            # Single sessions are created via the emergent test/proxy key —
+        if txn["kind"] == "guest_single" and txn.get("ui_mode") != "embedded":
+            # Legacy hosted single sessions were created via the emergent proxy key —
             # instantiating StripeCheckout re-arms the shared stripe module.
             StripeCheckout(api_key=STRIPE_API_KEY)
+            session = stripe_sdk.checkout.Session.retrieve(session_id)
+        elif txn["kind"] == "guest_single":
+            _arm_real_stripe()
             session = stripe_sdk.checkout.Session.retrieve(session_id)
         else:
             _arm_real_stripe()
@@ -11910,6 +11913,168 @@ async def get_guest_checkout_status(session_id: str):
     )
     txn = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
     return await _result(txn)
+
+
+# ============== EMBEDDED CHECKOUT PAGE SESSIONS (/checkout/{tier}) ==============
+
+@api_router.post("/payments/guest/embedded")
+async def create_guest_embedded_checkout(payload: GuestCheckoutInit):
+    """Embedded (in-page) Stripe checkout session for logged-out visitors —
+    powers the branded /checkout/{tier} page. Crediting is identical to the
+    hosted guest flow: /welcome polls /payments/guest/status/{session_id}."""
+    tier = (payload.tier or "").lower().strip()
+    if tier not in ("premium", "vip", "single"):
+        raise HTTPException(400, "Unknown tier")
+    if not _embedded_ready():
+        raise HTTPException(503, "Checkout not configured. Add Stripe keys to enable.")
+
+    origin = payload.origin_url.rstrip("/")
+    return_url = f"{origin}/welcome?guest_session={{CHECKOUT_SESSION_ID}}"
+    kind = "guest_subscription" if tier in ("premium", "vip") else "guest_single"
+    metadata = _build_embedded_metadata({"kind": kind, "tier": tier})
+
+    try:
+        if tier in ("premium", "vip"):
+            price_id = await _get_subscription_price_id(tier)
+            if not price_id:
+                await _ensure_subscription_products()
+                price_id = await _get_subscription_price_id(tier)
+                if not price_id:
+                    raise HTTPException(503, f"Stripe price for tier '{tier}' is not provisioned yet — try again in a moment.")
+            _arm_real_stripe()
+            session = stripe_sdk.checkout.Session.create(
+                ui_mode="embedded",
+                mode="subscription",
+                redirect_on_completion="if_required",
+                line_items=[{"price": price_id, "quantity": 1}],
+                return_url=return_url,
+                metadata=metadata,
+                subscription_data={"metadata": metadata},
+                allow_promotion_codes=True,
+            )
+            amount = SUBSCRIPTION_TIERS[tier]["amount"]
+        else:
+            price, _src = await get_extra_report_price_for_user({})
+            _arm_real_stripe()
+            session = stripe_sdk.checkout.Session.create(
+                ui_mode="embedded",
+                mode="payment",
+                redirect_on_completion="if_required",
+                allow_promotion_codes=True,
+                line_items=[{
+                    "price_data": {
+                        "currency": PRICE_CURRENCY,
+                        "product_data": {
+                            "name": "Single Scout Report",
+                            "description": "A complete professional scout report from your match.",
+                        },
+                        "unit_amount": int(round(float(price) * 100)),
+                    },
+                    "quantity": 1,
+                }],
+                return_url=return_url,
+                metadata=metadata,
+                payment_intent_data={"metadata": metadata},
+            )
+            amount = float(price)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Guest embedded session create failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.id,
+        "user_id": None,
+        "user_email": None,
+        "report_id": None,
+        "kind": kind,
+        "tier": tier,
+        "ui_mode": "embedded",
+        "brand": "ScoutMePlay",
+        "amount": amount,
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    })
+    return {"client_secret": session.client_secret, "session_id": session.id, "amount": amount, "currency": PRICE_CURRENCY}
+
+
+@api_router.post("/payments/embedded/subscribe")
+async def create_embedded_subscription_checkout(payload: SubscribeInit, user=Depends(get_current_user)):
+    """Embedded (in-page) subscription checkout for logged-in users — powers
+    /checkout/{tier}. Crediting is identical to /payments/subscribe: the frontend
+    polls /payments/subscribe/status/{session_id} (txn kind="subscription")."""
+    tier = (payload.tier or "").lower().strip()
+    if tier not in SUBSCRIPTION_TIERS:
+        raise HTTPException(400, "Unknown subscription tier")
+    if not _embedded_ready():
+        raise HTTPException(503, "Subscription checkout not configured. Add Stripe live keys to enable.")
+    if _has_active_subscription(user):
+        raise HTTPException(409, "You already have an active subscription. Use the dashboard to change tier instead.")
+
+    price_id = await _get_subscription_price_id(tier)
+    if not price_id:
+        await _ensure_subscription_products()
+        price_id = await _get_subscription_price_id(tier)
+        if not price_id:
+            raise HTTPException(503, f"Stripe price for tier '{tier}' is not provisioned yet — try again in a moment.")
+
+    origin = payload.origin_url.rstrip("/")
+    return_url = f"{origin}/dashboard?subscribe_session={{CHECKOUT_SESSION_ID}}"
+    metadata = _build_embedded_metadata({
+        "kind": "subscription",
+        "tier": tier,
+        "user_id": user["id"],
+        "user_email": user["email"],
+    })
+
+    try:
+        _arm_real_stripe()
+        existing_sub = (user.get("subscription") or {})
+        customer_id = existing_sub.get("stripe_customer_id")
+        session_kwargs = dict(
+            ui_mode="embedded",
+            mode="subscription",
+            redirect_on_completion="if_required",
+            line_items=[{"price": price_id, "quantity": 1}],
+            return_url=return_url,
+            metadata=metadata,
+            subscription_data={"metadata": metadata},
+            allow_promotion_codes=True,
+        )
+        if customer_id:
+            session_kwargs["customer"] = customer_id
+        else:
+            session_kwargs["customer_email"] = user["email"]
+        session = stripe_sdk.checkout.Session.create(**session_kwargs)
+    except Exception as e:
+        logger.exception("Stripe embedded subscription session create failed")
+        raise HTTPException(500, f"Stripe error: {e}")
+
+    await db.payment_transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session.id,
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "report_id": None,
+        "kind": "subscription",
+        "tier": tier,
+        "ui_mode": "embedded",
+        "brand": "ScoutMePlay",
+        "amount": SUBSCRIPTION_TIERS[tier]["amount"],
+        "currency": PRICE_CURRENCY,
+        "metadata": metadata,
+        "payment_status": "initiated",
+        "status": "open",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    })
+    return {"client_secret": session.client_secret, "session_id": session.id, "amount": SUBSCRIPTION_TIERS[tier]["amount"], "currency": PRICE_CURRENCY}
 
 
 @api_router.get("/me/subscription")
@@ -12261,7 +12426,8 @@ def _build_embedded_metadata(extra: Dict[str, str]) -> Dict[str, str]:
 async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_current_user)):
     if not _embedded_ready():
         raise HTTPException(status_code=503, detail="Embedded checkout not configured. Add Stripe pk_/sk_ keys.")
-    price = await get_current_single_price()
+    # Subscribers pay their tier's extra-report price (matches the dashboard button)
+    price, price_tier = await get_extra_report_price_for_user(user)
     _disc = await get_active_discount(db, None)
     if _disc:
         price = discounted_price(price, _disc)
@@ -12274,6 +12440,7 @@ async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_cur
         "kind": "prepay_upload",
         "user_id": user["id"],
         "user_email": user["email"],
+        "price_tier": price_tier,
     })
 
     try:
@@ -12321,7 +12488,7 @@ async def embedded_prepay_upload(payload: PrepayUploadInit, user=Depends(get_cur
     }
     await db.payment_transactions.insert_one(txn)
 
-    return {"client_secret": session.client_secret, "session_id": session.id}
+    return {"client_secret": session.client_secret, "session_id": session.id, "amount": float(price), "currency": PRICE_CURRENCY}
 
 
 @api_router.post("/payments/embedded/unlock")
@@ -12397,7 +12564,7 @@ async def embedded_unlock(payload: CheckoutInit, user=Depends(get_current_user))
     }
     await db.payment_transactions.insert_one(txn)
 
-    return {"client_secret": session.client_secret, "session_id": session.id}
+    return {"client_secret": session.client_secret, "session_id": session.id, "amount": float(price), "currency": PRICE_CURRENCY}
 
 
 @api_router.get("/payments/embedded/status/{session_id}")

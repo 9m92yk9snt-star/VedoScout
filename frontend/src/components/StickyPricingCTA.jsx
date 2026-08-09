@@ -29,15 +29,9 @@ export default function StickyPricingCTA({ isLoggedIn = false }) {
 
   if (!cfg?.enabled) return null;
 
-  const onClick = async () => {
+  const onClick = () => {
     if (isLoggedIn) { navigate("/upload"); return; }
-    try {
-      const { data } = await api.post("/payments/guest/checkout", { tier: "single", origin_url: window.location.origin });
-      if (data?.url) { window.location.href = data.url; return; }
-      navigate("/upload");
-    } catch {
-      navigate("/upload");
-    }
+    navigate("/checkout/single");
   };
 
   return (

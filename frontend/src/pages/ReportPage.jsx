@@ -1849,7 +1849,7 @@ export default function ReportPage() {
       const { data: cfg } = await api.get("/config/stripe");
       if (cfg.embedded_available) {
         setUnlocking(false);
-        setEmbeddedOpen(true);
+        navigate(`/checkout/single?report=${id}`);
         return;
       }
     } catch (_) {

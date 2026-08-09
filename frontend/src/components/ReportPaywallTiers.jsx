@@ -58,35 +58,12 @@ export default function ReportPaywallTiers({ isLoggedIn = false, onUnlockSingle,
     return () => { alive = false; };
   }, []);
 
-  const handleSingle = async () => {
+  const handleSingle = () => {
     if (isLoggedIn) { if (onUnlockSingle) onUnlockSingle(); return; }
-    if (busyTier) return;
-    setBusyTier("single");
-    try {
-      const { data } = await api.post("/payments/guest/checkout", { tier: "single", origin_url: window.location.origin });
-      if (!data?.url) throw new Error("No checkout URL received");
-      trackInitiateCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || err.message || "Could not start checkout.", { duration: 8000 });
-      setBusyTier(null);
-    }
+    navigate("/checkout/single");
   };
 
-  const startSubscription = async (tier) => {
-    if (busyTier) return;
-    setBusyTier(tier);
-    try {
-      const endpoint = isLoggedIn ? "/payments/subscribe" : "/payments/guest/checkout";
-      const { data } = await api.post(endpoint, { tier, origin_url: window.location.origin });
-      if (!data?.url) throw new Error("No checkout URL received");
-      trackInitiateCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || err.message || "Could not start checkout.", { duration: 8000 });
-      setBusyTier(null);
-    }
-  };
+  const startSubscription = (tier) => navigate(`/checkout/${tier}`);
 
   const CtaBtn = ({ testid, onClick, loading, children, dark = false }) => (
     <button

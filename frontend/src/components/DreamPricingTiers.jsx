@@ -332,36 +332,12 @@ export default function DreamPricingTiers({ isLoggedIn = false, onUnlockSingle =
   const savePct = (per) => Math.max(0, Math.round((1 - per / (prices.single || 1)) * 100));
   const bestTier = perVip <= perPremium ? "vip" : "premium";
 
-  const goSingle = async () => {
+  const goSingle = () => {
     if (isLoggedIn && onUnlockSingle) { onUnlockSingle(); return; }
-    if (busyTier) return;
-    setBusyTier("single");
-    try {
-      const endpoint = isLoggedIn ? "/payments/prepay-upload" : "/payments/guest/checkout";
-      const { data } = await api.post(endpoint, { tier: "single", origin_url: window.location.origin });
-      if (!data?.url) throw new Error("No checkout URL received");
-      trackInitiateCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || err.message || "Could not start checkout.", { duration: 8000 });
-      setBusyTier(null);
-    }
+    navigate("/checkout/single");
   };
 
-  const startSubscription = async (tier) => {
-    if (busyTier) return;
-    setBusyTier(tier);
-    try {
-      const endpoint = isLoggedIn ? "/payments/subscribe" : "/payments/guest/checkout";
-      const { data } = await api.post(endpoint, { tier, origin_url: window.location.origin });
-      if (!data?.url) throw new Error("No checkout URL received");
-      trackInitiateCheckout();
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || err.message || "Could not start checkout.", { duration: 8000 });
-      setBusyTier(null);
-    }
-  };
+  const startSubscription = (tier) => navigate(`/checkout/${tier}`);
 
   return (
     <div data-testid="dream-pricing-tiers" className="rounded-[22px] md:rounded-[26px] px-3 sm:px-6 py-4 md:py-8" style={{ background: "linear-gradient(170deg, #F3EFE1 0%, #E9E4D0 100%)", border: "1px solid rgba(18,64,42,0.16)", boxShadow: "0 18px 44px -22px rgba(18,64,42,0.35)" }}>
