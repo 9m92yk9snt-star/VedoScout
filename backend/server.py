@@ -14463,6 +14463,42 @@ async def _full_report_watchdog_loop() -> None:
             logger.exception("[full-report-watchdog] sweep raised (loop continues)")
 
 
+def _ensure_payment_method_domains_sync() -> None:
+    """Register the site's domain(s) as Stripe payment method domains so wallet
+    buttons (Apple Pay / Google Pay) render in EMBEDDED checkout. Idempotent —
+    safe every boot. Apple Pay validation requires the domain to serve
+    /.well-known/apple-developer-merchantid-domain-association (bundled in
+    frontend/public). Re-validates on boot until apple_pay is active."""
+    if not _embedded_ready():
+        return
+    domains = {"scoutmeplay.com", "www.scoutmeplay.com"}
+    site = (os.environ.get("SITE_PUBLIC_URL") or os.environ.get("FRONTEND_URL") or "").strip()
+    if site:
+        host = site.split("://")[-1].split("/")[0].strip()
+        if host:
+            domains.add(host)
+    try:
+        _arm_real_stripe()
+        existing = {d["domain_name"]: d for d in stripe_sdk.PaymentMethodDomain.list(limit=100)["data"]}
+        for domain in sorted(domains):
+            try:
+                pmd = existing.get(domain)
+                if not pmd:
+                    pmd = stripe_sdk.PaymentMethodDomain.create(domain_name=domain)
+                    logger.info(f"[stripe] payment method domain registered: {domain}")
+                apple_status = ((pmd.get("apple_pay") or {}).get("status"))
+                if apple_status != "active":
+                    pmd = stripe_sdk.PaymentMethodDomain.validate(pmd["id"])
+                    logger.info(
+                        f"[stripe] domain {domain} validated — apple_pay: "
+                        f"{((pmd.get('apple_pay') or {}).get('status'))}"
+                    )
+            except Exception as e:
+                logger.warning(f"[stripe] payment method domain setup failed for {domain}: {e}")
+    except Exception as e:
+        logger.warning(f"[stripe] payment method domain sweep failed: {e}")
+
+
 @app.on_event("startup")
 async def on_startup():
     # ── Security indexes (idempotent, safe to call every boot) ──
@@ -14482,6 +14518,12 @@ async def on_startup():
         await db.login_attempts.create_index("key", unique=True, background=True)
     except Exception:
         logger.exception("Security index creation failed (non-fatal)")
+
+    # Wallet buttons (Apple Pay / Google Pay) in embedded checkout — fire-and-forget.
+    try:
+        asyncio.get_event_loop().run_in_executor(None, _ensure_payment_method_domains_sync)
+    except Exception:
+        logger.exception("payment-method-domain sweep scheduling failed (non-fatal)")
 
     # Ensure admin user exists (idempotent)
     existing = await db.users.find_one({"email": ADMIN_EMAIL.lower()})
