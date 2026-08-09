@@ -1,0 +1,25 @@
+{
+  "summary": "Iter86 Dashboard Hub — full backend + frontend validation. 19/19 pytest tests PASS covering community numbers, admin compose validation (subject/body/kind/sender/target/target_email), list & delete, free-user gating (scout/agent/club messages locked, only counted; admin notifications targeted 'all' visible; premium-only invisible; direct-to-email visible), read/read-all with 404 on unknown, opportunities CRUD + admin toggle, free-user opportunities returns locked=true empty, performance no-report returns has_report=false, admin guards (401/403 for no token & free-user token). Frontend: /dashboard as admin renders all expected testids (hero, chip, upload-btn, quick-stats, performance-panel-empty, inbox-panels with notifications-panel + messages-panel, community-pulse with community-stat-players_in_library showing 2,847, opportunities-panel). /admin → player-dashboard tab renders DashboardHubAdmin; composed a notification (toast + appears in sent list) and created an opportunity (appears in list) — both cleaned up. Free-user /dashboard renders free-membership-band, free-band-see-plans-btn, scout-preview-upsell with skill-bars and no radar polygon, messages-locked overlay with messages-upgrade-btn, community-pulse, dashboard-upgrade-banner. opportunities-panel is NOT rendered for free user. Clicking free-band-see-plans-btn scrolls upgrade banner into viewport. Mobile 390x844 no horizontal overflow (scrollWidth=390). ProfileVisibilityCard and dashboard-empty-upload-btn regression testids present. Zero console errors observed. Cleanup complete: no ITER86 leftovers, disposable free users deleted, players_in_library reset to 2847, seed 'Impressive footage' and 'Elite Football Academy Trials' preserved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter86_dashboard_hub.py",
+    "/app/test_reports/pytest/iter86.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DashboardPage.jsx is 1059 lines — consider splitting FreeMembershipBand, LegacyPassActiveBanner, SubscriptionCard, share/player-row helpers into their own files (file-size guideline >700).",
+    "_visible_messages in dashboard_hub.py performs N+1-style filter but pulls to_list(200) — OK for now; add a mongo index on dashboard_messages.created_at + dashboard_message_reads.user_id for scale.",
+    "GET /api/dashboard/opportunities returns count=n_active for free users — that leaks the fact that some opportunities exist, which is fine per spec, but consider whether that count is meant to be surfaced in UI (currently OpportunitiesPanel is not rendered for free at all, so the field is unused)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter86_dashboard_hub.py (new)"
+  ],
+  "success_rate": {"backend": "100% (19/19)", "frontend": "100% (all testids + flows verified)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (from /app/memory/test_credentials.md). Disposable free users created via /api/auth/signup and deleted via /api/admin/users/{id}.",
+  "seed_data_creation": "None left behind. All test-created users/messages/opportunities cleaned up. Community.players_in_library reset to 2847. Seed message 'Impressive footage' from Scout Fatima A. and seed opportunity 'Elite Football Academy Trials' preserved.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest at /app/backend/tests/test_iter86_dashboard_hub.py — covers all Dashboard Hub endpoints. It self-cleans (creates disposable free user, deletes on teardown; cleanup test at end deletes all ITER86-prefixed messages/opportunities and resets players_in_library to 2847). Safe to re-run as regression.",
+  "rca of the issue": "N/A — feature works end-to-end. Initial admin-dashboard playwright timeout was caused by admin login redirecting to /admin rather than /dashboard; solved by explicit navigation to /dashboard after login."
+}

@@ -8,21 +8,20 @@ import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
 import ReferralInviteCard from "@/components/ReferralInviteCard";
 import FeatureConsentCard from "@/components/FeatureConsentCard";
+import DashboardHero from "@/components/dashboard/DashboardHero";
+import PerformancePanel from "@/components/dashboard/PerformancePanel";
+import ScoutPreviewUpsell from "@/components/dashboard/ScoutPreviewUpsell";
+import InboxPanels from "@/components/dashboard/InboxPanels";
+import CommunityPulse from "@/components/dashboard/CommunityPulse";
+import OpportunitiesPanel from "@/components/dashboard/OpportunitiesPanel";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { trackPurchase } from "@/lib/pixels";
 import {
-  Plus, Lock, CheckCircle2, Film, Loader2, Rocket, TrendingUp, AlertCircle,
-  Activity, ArrowRight, Sparkles, Zap, Crown, Calendar, XCircle, RefreshCw,
+  Plus, Lock, CheckCircle2, Film, Loader2, TrendingUp,
+  Activity, ArrowRight, Sparkles, Crown, Calendar, XCircle, RefreshCw,
   Globe2, Copy,
 } from "lucide-react";
-
-const VERDICT_META = {
-  ahead: { label: "Ahead", icon: Rocket, color: "bg-forest-pop text-white" },
-  on_track: { label: "On track", icon: TrendingUp, color: "bg-forest text-white" },
-  plateau: { label: "Plateau", icon: AlertCircle, color: "bg-amber-600 text-white" },
-  first_report: { label: "Baseline", icon: Activity, color: "bg-cream-soft text-ink" },
-};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -41,12 +40,15 @@ export default function DashboardPage() {
   const [tiers, setTiers] = useState({});
   // Monthly upload usage — drives the "Premium at limit → VIP only" banner variant
   const [usage, setUsage] = useState(null);
+  // Admin-controlled ScoutMePlay Network numbers
+  const [community, setCommunity] = useState(null);
 
   const fetchAll = () => {
     Promise.allSettled([
       api.get("/reports/mine").then(({ data }) => setReports(data)),
       api.get("/progress/players").then(({ data }) => setPlayers(data.items || [])),
       api.get("/progress/pass/status").then(({ data }) => setPassState(data)),
+      api.get("/dashboard/community").then(({ data }) => setCommunity(data)),
       api.get("/me/subscription").then(({ data }) => {
         setSubscription(data.subscription);
         setTiers(data.tiers || {});
@@ -102,10 +104,7 @@ export default function DashboardPage() {
   }, [location.search]);
 
   // One-shot first-visit pulse on the locked Unlock pills, à la Linear /
-  // Stripe Express. Reads a localStorage flag once on mount; if absent,
-  // applies the pulse for ~1.6 s and then sets the flag so subsequent
-  // visits stay calm. The flag is namespaced per-user so a different
-  // free user on the same browser still gets their own first-touch hint.
+  // Stripe Express.
   const [unlockPulseOn, setUnlockPulseOn] = useState(false);
   useEffect(() => {
     if (passState?.active) return; // premium user — no upgrade hint needed
@@ -115,7 +114,6 @@ export default function DashboardPage() {
       if (window.localStorage.getItem(key)) return;
       setUnlockPulseOn(true);
       window.localStorage.setItem(key, "1");
-      // turn the class off after the animation completes so the DOM stays clean
       const t = setTimeout(() => setUnlockPulseOn(false), 1900);
       return () => clearTimeout(t);
     } catch {
@@ -123,7 +121,7 @@ export default function DashboardPage() {
     }
   }, [passState?.active, players?.length]);
 
-  // ─── derived stats for the quick-stats row ───
+  // ─── derived stats ───
   const totalReports = reports.length;
   const premiumReports = reports.filter((r) => r.is_paid || r.manually_unlocked).length;
   const trackedPlayers = players.length;
@@ -137,74 +135,25 @@ export default function DashboardPage() {
     : premiumReports > 0
     ? "Pay-per-report"
     : "Free";
+  // Premium access (dashboard-wide): active subscription, legacy pass,
+  // at least one unlocked report, or admin.
+  const premiumAccess =
+    !!subscription?.tier || !!passState?.active || premiumReports > 0 || user?.role === "admin";
+  const heroTier = subscription?.tier === "vip" ? "vip" : premiumAccess ? "premium" : "free";
+
+  const scrollToPlans = () => {
+    const el =
+      document.querySelector('[data-testid="dashboard-upgrade-banner"]') ||
+      document.querySelector('[data-testid="dashboard-subscription-card"]');
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   return (
     <div className="min-h-screen bg-cream-base text-ink">
       <Navigation />
-      <div className="pt-28 pb-16 px-6">
+      <div className="pt-20 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div>
-              <span className="text-forest text-xs uppercase tracking-[0.25em] font-bold inline-flex items-center gap-2">
-                <span className="relative flex items-center justify-center w-2 h-2 shrink-0" aria-hidden>
-                  <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
-                  <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
-                </span>
-                Your dashboard
-              </span>
-              <h1 className="mt-3 font-barlow font-black uppercase text-4xl md:text-5xl tracking-tighter leading-[0.95]">
-                Welcome,{" "}
-                <span className="text-forest">
-                  {user?.full_name?.split(" ")[0] || "Player"}
-                </span>
-              </h1>
-              <p className="mt-2 text-ink/65 text-sm">
-                Track growth across reports, manage uploads, unlock premium analysis.
-              </p>
-            </div>
-            <Link
-              to="/upload"
-              data-testid="dashboard-upload-btn"
-              className="bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-sm px-6 py-3 transition-colors flex items-center gap-2 self-start md:self-end"
-              style={{
-                boxShadow:
-                  "0 18px 36px -16px rgba(31, 79, 47, 0.45), 0 8px 16px -8px rgba(31, 79, 47, 0.3)",
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              New upload
-            </Link>
-          </div>
-
-          {/* QUICK STATS ROW — establishes hierarchy immediately. Hidden while loading. */}
-          {!loading && (
-            <div
-              data-testid="dashboard-quick-stats"
-              className="mt-6 md:mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"
-            >
-              <QuickStatTile icon={Film} label="Total uploads" value={totalReports} testid="qs-uploads" />
-              <QuickStatTile icon={CheckCircle2} label="Premium reports" value={premiumReports} accent testid="qs-premium" />
-              <QuickStatTile icon={Activity} label="Tracked players" value={trackedPlayers} testid="qs-players" />
-              <QuickStatTile
-                icon={planLabel === "VIP Premium" ? Crown : planLabel === "Premium" ? TrendingUp : Sparkles}
-                label="Current plan"
-                value={planLabel}
-                small
-                testid="qs-plan"
-              />
-            </div>
-          )}
-
-          {/* Last activity meta */}
-          {!loading && lastReport && (
-            <p className="mt-3 text-[11px] uppercase tracking-[0.2em] font-bold text-ink/50">
-              Last upload ·{" "}
-              <span className="text-forest">
-                {lastReport.player_details?.player_name || "—"}
-              </span>{" "}
-              · {new Date(lastReport.created_at).toLocaleDateString()}
-            </p>
-          )}
+          <DashboardHero user={user} tier={heroTier} />
 
           {loading ? (
             <div className="text-center py-16">
@@ -212,8 +161,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* PROGRESS PASS BANNER (legacy holders only) — new users
-                 see <UpgradeBanner /> below instead. */}
+              {/* PROGRESS PASS BANNER (legacy holders only) */}
               {passState?.active && (
                 <LegacyPassActiveBanner passState={passState} />
               )}
@@ -225,13 +173,63 @@ export default function DashboardPage() {
                 onChange={(s) => setSubscription(s)}
               />
 
-              {/* UPGRADE BANNER — shown to:
-                 (a) free users without any subscription, and
-                 (b) Premium subscribers who have hit their monthly limit → banner
-                     shows "Buy 1 extra report for $89" + VIP upgrade side by side.
-                 (c) VIP subscribers who have hit their 4/month limit → banner
-                     shows "Buy 1 extra report for $59" only (no further upgrade).
-                 Skipped when: legacy Progress Pass is active. */}
+              {/* FREE MEMBERSHIP BAND — free users only */}
+              {!premiumAccess && (
+                <FreeMembershipBand totalReports={totalReports} onSeePlans={scrollToPlans} />
+              )}
+
+              {/* QUICK STATS ROW */}
+              <div
+                data-testid="dashboard-quick-stats"
+                className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4"
+              >
+                <QuickStatTile
+                  icon={Film}
+                  label="Reports created"
+                  value={totalReports}
+                  sub={totalReports === 0 ? "Your journey starts with one video" : null}
+                  testid="qs-uploads"
+                />
+                <QuickStatTile
+                  icon={CheckCircle2}
+                  label="Premium reports"
+                  value={premiumReports}
+                  sub={!premiumAccess ? "Scouts only see premium reports" : null}
+                  accent
+                  testid="qs-premium"
+                />
+                <QuickStatTile icon={Activity} label="Tracked players" value={trackedPlayers} testid="qs-players" />
+                <QuickStatTile
+                  icon={planLabel === "VIP Premium" ? Crown : planLabel === "Premium" ? TrendingUp : Sparkles}
+                  label="Current plan"
+                  value={planLabel}
+                  small
+                  testid="qs-plan"
+                />
+              </div>
+
+              {/* Last activity meta */}
+              {lastReport && (
+                <p className="mt-3 text-[11px] uppercase tracking-[0.2em] font-bold text-ink/50">
+                  Last upload ·{" "}
+                  <span className="text-forest">
+                    {lastReport.player_details?.player_name || "—"}
+                  </span>{" "}
+                  · {new Date(lastReport.created_at).toLocaleDateString()}
+                </p>
+              )}
+
+              {/* PERFORMANCE HQ (premium) or SCOUT PREVIEW UPSELL (free) */}
+              {premiumAccess ? (
+                <PerformancePanel />
+              ) : (
+                <ScoutPreviewUpsell
+                  playersCount={community?.enabled !== false ? community?.players_in_library : null}
+                  onSeePlans={scrollToPlans}
+                />
+              )}
+
+              {/* UPGRADE BANNER — free users + subscribers at their monthly limit */}
               {(() => {
                 const isPremiumAtLimit =
                   subscription?.tier === "premium" && usage?.exhausted;
@@ -257,8 +255,7 @@ export default function DashboardPage() {
                 );
               })()}
 
-              {/* REPORTS (Library) — moved to top: this is the most-used
-                 part of the dashboard; users want to jump to a report. */}
+              {/* REPORTS (Library) */}
               <section className="mt-10">
                 <SectionHeader
                   icon={Film}
@@ -269,8 +266,8 @@ export default function DashboardPage() {
                 {reports.length === 0 ? (
                   <div className="mt-4 border border-ink/10 bg-cream-card p-12 text-center">
                     <Film className="w-12 h-12 text-forest mx-auto mb-4" strokeWidth={1.5} />
-                    <h3 className="font-barlow font-black uppercase text-2xl">No uploads yet</h3>
-                    <p className="mt-2 text-ink/65 text-sm">Upload your first football video and receive an instant free scout preview.</p>
+                    <h3 className="font-barlow font-black uppercase text-2xl">Your story starts here</h3>
+                    <p className="mt-2 text-ink/65 text-sm">Upload your first football video and receive an instant free scout preview — the first step to being seen.</p>
                     <Link
                       to="/upload"
                       data-testid="dashboard-empty-upload-btn"
@@ -350,8 +347,16 @@ export default function DashboardPage() {
                 )}
               </section>
 
-              {/* PROFILE & VISIBILITY — Phase 1 of the paid Scout Database.
-                 Players opt in here so scouts can find them via /players-database. */}
+              {/* NOTIFICATIONS + MESSAGES */}
+              <InboxPanels onUpgrade={scrollToPlans} />
+
+              {/* SCOUTMEPLAY NETWORK (admin-controlled numbers) */}
+              <CommunityPulse data={community} />
+
+              {/* TRIALS & OPPORTUNITIES — premium only */}
+              {premiumAccess && <OpportunitiesPanel />}
+
+              {/* PROFILE & VISIBILITY */}
               <ProfileVisibilityCard latestReportId={reports[0]?.id} />
 
               <ReferralInviteCard />
@@ -360,7 +365,7 @@ export default function DashboardPage() {
 
               {reports.length > 0 && <ReviewPrompt />}
 
-              {/* PLAYERS / TRAJECTORIES — moved BELOW reports. */}
+              {/* PLAYERS / TRAJECTORIES */}
               {players.length > 0 && (
                 <section className="mt-12" data-testid="dashboard-players-section">
                   <SectionHeader
@@ -375,12 +380,7 @@ export default function DashboardPage() {
                         key={p.id}
                         p={p}
                         isPremium={!!subscription?.tier || !!passState?.active}
-                        onUpgradeClick={() => {
-                          // Scroll the user to the dashboard's upgrade banner so they
-                          // see ALL plan options instead of a single modal.
-                          const target = document.querySelector('[data-testid="dashboard-upgrade-banner"]');
-                          if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-                        }}
+                        onUpgradeClick={scrollToPlans}
                         pulse={unlockPulseOn}
                       />
                     ))}
@@ -395,10 +395,57 @@ export default function DashboardPage() {
   );
 }
 
-/* ── VideoShareRow — parent-consent toggle for permanent video links.
- *    Default OFF: video links are private and expire. When the parent
- *    explicitly says yes, the raw video link works permanently until
- *    they switch it off again. */
+/* ── FreeMembershipBand — the FREE-member card from the approved mockup:
+ *    membership ring + free-upload tracker + "Unlock your full potential". */
+function FreeMembershipBand({ totalReports, onSeePlans }) {
+  const used = Math.min(totalReports, 1);
+  const left = 1 - used;
+  return (
+    <div
+      data-testid="free-membership-band"
+      className="mt-8 bg-cream-card border border-gray-border rounded-3xl p-5 md:p-6 flex flex-col md:flex-row md:items-center gap-5 md:gap-7"
+    >
+      <div className="flex items-center gap-5">
+        <div className="w-[96px] h-[96px] rounded-full border-[6px] border-forest/25 bg-forest/5 flex flex-col items-center justify-center shrink-0">
+          <span className="font-barlow font-black text-lg text-forest leading-none">FREE</span>
+          <span className="text-[10px] font-bold text-forest/80 tracking-wider">MEMBER</span>
+        </div>
+        <div>
+          <b className="text-base text-ink" data-testid="free-band-upload-status">
+            {left > 0 ? "You have 1 free upload" : "Free preview used"}
+          </b>
+          <div className="mt-2 flex items-center gap-2.5 text-[13px] font-bold text-ink/60">
+            {used}
+            <span className="w-[160px] h-2 rounded-full bg-ink/10 overflow-hidden">
+              <span className="block h-full rounded-full bg-forest" style={{ width: `${used * 100 || 4}%` }} />
+            </span>
+            1
+          </div>
+          <p className="mt-1.5 text-[12px] text-ink/50">
+            {left > 0 ? "1 upload left — make it count" : "Unlock premium to keep growing"}
+          </p>
+        </div>
+      </div>
+      <div className="hidden md:block w-px self-stretch bg-ink/10" aria-hidden />
+      <div className="flex-1">
+        <b className="text-base text-ink">Unlock your full potential</b>
+        <p className="mt-1 text-[13px] text-ink/60 max-w-sm">
+          Complete analysis, PDF scout reports, benchmarks, Scout Library visibility and messages from agents &amp; scouts.
+        </p>
+        <button
+          type="button"
+          onClick={onSeePlans}
+          data-testid="free-band-see-plans-btn"
+          className="mt-3 inline-flex items-center gap-2 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-widest text-xs px-5 py-2.5 rounded-full transition-colors"
+        >
+          See plans <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── VideoShareRow — parent-consent toggle for permanent video links. */
 function VideoShareRow({ report, onChanged }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -509,11 +556,7 @@ function VideoShareRow({ report, onChanged }) {
   );
 }
 
-/* ── Shared panel header used by both "Library · Your reports" and
- *    "Track progress · Your players" sections. Establishes a consistent,
- *    premium hierarchy: section icon · eyebrow label · vertical separator
- *    · title on the left, count chip on the right, then a 2-tone hairline
- *    rule (small forest segment + ink/15) for a subtle premium accent. */
+/* ── Shared panel header used by dashboard sections. */
 function SectionHeader({ icon: Icon, eyebrow, title, countLabel }) {
   return (
     <header className="relative">
@@ -548,18 +591,10 @@ function SectionHeader({ icon: Icon, eyebrow, title, countLabel }) {
   );
 }
 
-/* ── Compact row in the "Your players" list. Replaces the previous
- *    PlayerCard grid because a divided row-list reads as a scannable
- *    register (Linear / Stripe Express pattern) and uses screen real
- *    estate efficiently — especially on mobile. The right-hand premium
- *    pill mirrors the report cards so users have a consistent visual
- *    language for "what's unlocked vs locked." */
+/* ── Compact row in the "Your players" list. */
 function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
   return (
     <li className="relative">
-      {/* Left status stripe — forest when the user is on Premium / has the
-          Progress Pass active, soft ink otherwise. Mirrors the report-card
-          PREMIUM badge so users have a consistent visual cue. */}
       <span
         aria-hidden="true"
         className={`absolute left-0 top-0 bottom-0 w-[3px] ${
@@ -571,13 +606,11 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
         data-testid={`player-card-${p.id}`}
         className="group flex items-center gap-3 sm:gap-4 pl-5 pr-4 py-3.5 hover:bg-cream-soft/60 transition-colors"
       >
-        {/* Left rail: position badge */}
         <div className="flex-shrink-0 min-w-[88px] sm:min-w-[124px]">
           <span className="inline-flex bg-forest/10 text-forest font-barlow font-black uppercase text-[10px] tracking-[0.18em] px-2 py-1 leading-none">
             {p.last_position || "Player"}
           </span>
         </div>
-        {/* Centre: name + meta */}
         <div className="flex-1 min-w-0">
           <h3 className="font-barlow font-black uppercase text-base sm:text-lg text-ink group-hover:text-forest transition-colors leading-tight truncate">
             {p.name}
@@ -588,10 +621,6 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
             {` · ${p.report_count} ${p.report_count === 1 ? "report" : "reports"}`}
           </p>
         </div>
-        {/* Right: premium pill (when applicable) + spacer-reservation for
-            the locked-upgrade button (which renders OUTSIDE this Link to
-            keep the HTML valid — buttons must not be descendants of <a>) +
-            navigation arrow. */}
         <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {isPremium ? (
             <>
@@ -602,9 +631,6 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
             </>
           ) : (
             <>
-              {/* Reserved width so the arrow stays in the same column as
-                  the premium rows — the upgrade button is absolutely
-                  positioned over this space (see sibling block below). */}
               <span aria-hidden="true" className="hidden sm:inline-block w-[78px] h-[22px]" />
               <span aria-hidden="true" className="sm:hidden inline-block w-7 h-7" />
             </>
@@ -612,11 +638,6 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
           <ArrowRight className="w-4 h-4 text-forest group-hover:translate-x-1 transition-transform" />
         </div>
       </Link>
-      {/* Upgrade button — sibling of the Link (not nested!) so we don't
-          produce <button> inside <a> which is invalid HTML. Absolutely
-          positioned over the reserved space so it visually sits in the
-          row. Tapping it opens the Progress Pass checkout without
-          triggering the row navigation. */}
       {!isPremium && onUpgradeClick && (
         <>
           <button
@@ -644,22 +665,17 @@ function PlayerRow({ p, isPremium, onUpgradeClick, pulse = false }) {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────
- *  QuickStatTile — small KPI tile used in the dashboard's top stats row.
- *  Cream-card body, forest icon badge, big number, uppercase label. Mirrors
- *  the visual language of the rest of the dashboard so the new row feels
- *  native, not bolted on.
- * ──────────────────────────────────────────────────────────────────────── */
-function QuickStatTile({ icon: Icon, label, value, accent = false, small = false, testid }) {
+/* ── QuickStatTile — KPI tile in the top stats row. */
+function QuickStatTile({ icon: Icon, label, value, sub = null, accent = false, small = false, testid }) {
   return (
     <div
       data-testid={testid}
-      className={`relative bg-cream-card border ${
+      className={`relative bg-cream-card border rounded-2xl ${
         accent ? "border-forest/40" : "border-gray-border"
       } p-4 md:p-5 flex items-start gap-3 md:gap-4 hover:border-forest/50 transition-colors`}
     >
       <span
-        className={`shrink-0 w-9 h-9 md:w-10 md:h-10 flex items-center justify-center border ${
+        className={`shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center border ${
           accent ? "bg-forest text-white border-forest" : "bg-forest/10 text-forest border-forest/20"
         }`}
       >
@@ -676,17 +692,17 @@ function QuickStatTile({ icon: Icon, label, value, accent = false, small = false
         <div className="mt-1.5 text-[10px] md:text-[11px] uppercase tracking-[0.18em] font-bold text-ink/55">
           {label}
         </div>
+        {sub && (
+          <div className="mt-1 text-[10px] text-ink/45 leading-snug normal-case tracking-normal font-medium">
+            {sub}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────
- *  LEGACY PROGRESS PASS BANNER — shows the remaining credits + expiry
- *  ONLY for users who already purchased the $399 12-month Progress Pass
- *  before subscriptions launched. New users no longer see this product;
- *  the marketing/buy variant has been retired in favour of Premium / VIP.
- * ──────────────────────────────────────────────────────────────────────── */
+/* ── LEGACY PROGRESS PASS BANNER — legacy $399 pass holders only. */
 function LegacyPassActiveBanner({ passState }) {
   if (!passState?.active) return null;
   return (
@@ -717,15 +733,7 @@ function LegacyPassActiveBanner({ passState }) {
 }
 
 
-/* ────────────────────────────────────────────────────────────────────────
- *  UPGRADE BANNER — shown on the dashboard ONLY when the user has no
- *  active subscription and no legacy Progress Pass. Two compact cards
- *  side-by-side (Premium and VIP) reuse the same /payments/subscribe
- *  endpoint as the landing pricing section — clicking either card
- *  full-redirects to Stripe Checkout in `mode=subscription`.
- *  Once the subscription is active <SubscriptionCard /> takes over and
- *  this banner is hidden, so we never double-promote.
- * ──────────────────────────────────────────────────────────────────────── */
+/* ── UPGRADE BANNER — free users + subscribers at their monthly limit. */
 function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportId = null }) {
   const navigate = useNavigate();
   const [busy, setBusy] = useState(null); // "premium" | "vip" | "extra" | null
@@ -751,10 +759,6 @@ function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportI
     }
   };
 
-  // Buys ONE extra report at the current user's discounted subscriber rate
-  // (Premium: $89 default, VIP: $59 default — admin-editable). Reuses the
-  // same /payments/prepay-upload endpoint as free users; the backend now
-  // switches the price to the subscriber rate automatically based on tier.
   const buyExtraReport = async () => {
     if (busy) return;
     setBusy("extra");
@@ -886,9 +890,7 @@ function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportI
         </div>
       ) : (
         <div className="relative mt-6">
-          {/* Unified 3-tier pricing (Single / Premium / VIP) — same component
-              as the report paywall and the post-analysis HeroTeaser so free
-              users see ONE consistent offer everywhere. */}
+          {/* Unified 3-tier pricing (Single / Premium / VIP) */}
           <DreamPricingTiers
             isLoggedIn
             onUnlockSingle={() => {
@@ -910,12 +912,7 @@ function UpgradeBanner({ tiers, mode = "free", usage = null, latestLockedReportI
 }
 
 
-/* ────────────────────────────────────────────────────────────────────────
- *  SUBSCRIPTION CARD — surfaces the user's active monthly plan (Premium /
- *  VIP) with self-serve Cancel / Resume / Upgrade actions. Hidden entirely
- *  for users without a subscription so the dashboard stays uncluttered for
- *  one-time-purchase customers and free users.
- * ──────────────────────────────────────────────────────────────────────── */
+/* ── SUBSCRIPTION CARD — the user's active monthly plan (Premium / VIP). */
 function SubscriptionCard({ subscription, tiers, onChange }) {
   const [busy, setBusy] = useState(null); // "cancel" | "resume" | "change" | null
 

@@ -30,6 +30,7 @@ import TickerAdmin from "@/components/admin/TickerAdmin";
 import SeoAdmin from "@/components/admin/SeoAdmin";
 import SocialFollowAdmin from "@/components/admin/SocialFollowAdmin";
 import { MarketingAdmin } from "@/components/admin/MarketingAdmin";
+import DashboardHubAdmin from "@/components/admin/DashboardHubAdmin";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 
 const ALL_TABS = [
@@ -47,6 +48,7 @@ const ALL_TABS = [
   { id: "reports", label: "Reports", role: "admin" },
   { id: "users", label: "Users", role: "admin" },
   { id: "messages", label: "Messages", role: "admin" },
+  { id: "player-dashboard", label: "Player Dashboard", role: "admin" },
   { id: "email", label: "Email", role: "admin" },
   { id: "faq", label: "FAQ", role: "admin" },
   { id: "blog", label: "Blog", role: "admin" },
@@ -484,6 +486,8 @@ export default function AdminPage() {
               )}
 
               {activeTab === "ticker" && <TickerAdmin />}
+
+              {activeTab === "player-dashboard" && <DashboardHubAdmin />}
 
               {activeTab === "seo" && (
                 <div className="space-y-8">

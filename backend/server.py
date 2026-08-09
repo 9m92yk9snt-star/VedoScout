@@ -13917,6 +13917,8 @@ from email_log import build_email_log_router
 api_router.include_router(build_email_log_router(db=db, admin_dep=get_current_admin))
 from seo_insights import build_seo_insights_router
 api_router.include_router(build_seo_insights_router(db=db, admin_dep=get_current_admin))
+from dashboard_hub import build_dashboard_hub_router
+api_router.include_router(build_dashboard_hub_router(db=db, user_dep=get_current_user, admin_dep=get_current_admin))
 from email_service import enable_email_log
 enable_email_log(os.environ["MONGO_URL"], os.environ["DB_NAME"])
 from instagram_publish import build_instagram_router
