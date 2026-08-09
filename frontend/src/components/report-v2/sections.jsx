@@ -88,6 +88,16 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
             <div className="flex-1 min-w-0">
               <div className="text-[13.5px] font-extrabold tracking-[0.05em] uppercase">{s.name}</div>
               <p className="text-[12px] text-[#68766B] leading-[1.5] mt-0.5 line-clamp-2 max-w-[280px]">{s.note}</p>
+              {s.timestamp && (
+                <button
+                  type="button"
+                  onClick={() => onPlayAt?.(s.timestamp)}
+                  data-testid={`v2-strength-proof-${i}`}
+                  className="md:hidden mt-2 inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
+                >
+                  <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof · {s.timestamp}
+                </button>
+              )}
             </div>
             <div className="font-barlow font-black text-[22px] text-[#12402A] w-[62px] shrink-0">
               {Number(s.score).toFixed(1)}<span className="text-[13px] text-[#A5AF9E] font-bold">/10</span>

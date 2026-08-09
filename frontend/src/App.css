@@ -4,3 +4,39 @@
   background-color: #050A0F;
   color: #ffffff;
 }
+
+/* Proof mini-player + cinematic report intro */
+@keyframes smpProofSlide {
+  from { transform: translateY(26px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.smp-proof-slide { animation: smpProofSlide 0.3s cubic-bezier(0.22, 0.9, 0.3, 1) both; }
+
+@keyframes smpCineFade {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.smp-cine-fadein { animation: smpCineFade 0.7s ease both; }
+
+@keyframes smpCineOut {
+  to { opacity: 0; visibility: hidden; }
+}
+.smp-cine-out { animation: smpCineOut 0.7s ease forwards; }
+
+@keyframes smpCineKB {
+  from { transform: scale(1); }
+  to { transform: scale(1.09); }
+}
+.smp-cine-kenburns { animation: smpCineKB 9s ease-out forwards; }
+
+@keyframes smpCineBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+.smp-cine-bounce { animation: smpCineBounce 1.4s ease-in-out infinite; }
+
+@keyframes smpCinePulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.smp-cine-pulse { animation: smpCinePulse 1.2s ease-in-out infinite; }

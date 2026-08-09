@@ -1,0 +1,45 @@
+{
+  "summary": "Frontend-only testing of the new Cinematic Intro + Proof Mini-Player features on /sample-report at desktop (1920) and mobile (390). All 20 planned checks passed with 0 console errors and 0 horizontal overflow. Real-premium-with-video path was NOT executed to keep preview DB clean (would require seeding a temp user + full_report doc); wiring is verified indirectly via demo path + code review.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results_detail": {
+    "cinematic_intro_first_load": "PASS — [data-testid=cinematic-intro] visible on fresh /sample-report",
+    "cinematic_sample_badge": "PASS — cinematic-sample-badge rendered on demo",
+    "cinematic_skip_btn": "PASS — dismisses intro immediately at any phase",
+    "cinematic_sound_toggle": "PASS — label toggles 'Sound off' <-> 'Sound on' with no errors",
+    "cinematic_player_name_phase": "PASS — showed 'Noah (Sample Player)'",
+    "cinematic_score_phase": "PASS — cinematic-score element reached after ~3.8s",
+    "sessionStorage_show_once": "PASS — sessionStorage['smp_cine_seen_demo-sample-report']='1'; reload in same session does NOT re-show intro",
+    "cinematic_replay_btn": "PASS — cinematic-replay-btn in report header re-opens intro",
+    "action_row_opens_sheet_no_scroll": "PASS — v2-action-row-0 opened proof-player-sheet, scrollY diff=0 (before=2143, after=2143)",
+    "demo_sheet_shows_note_not_video": "PASS — proof-player-demo-note contains 'Demo sample — available in the premium report'; no proof-player-video element",
+    "proof_sheet_close_button": "PASS — proof-player-close closes sheet",
+    "proof_sheet_escape_key": "PASS — Escape key closes sheet",
+    "desktop_floating_panel": "PASS — sheet x=1466, width=430, vw=1920 (floats bottom-right)",
+    "mobile_no_horizontal_overflow": "PASS — 0px overflow at 390px",
+    "mobile_strength_proof_pills": "PASS — 4 v2-strength-proof-N pills present",
+    "mobile_pill_opens_sheet": "PASS — pill click opens sheet, scroll diff=0",
+    "mobile_sheet_position": "PASS — sheet height=313 (< 75% vh 844), bottom edge=782 == vh(844)-62 (exactly above bottom tab bar)",
+    "console_errors": "PASS — 0 console errors across desktop + mobile flows",
+    "real_premium_report_video_seek": "NOT TESTED — would require seeding temp report doc; owner wants preview DB clean. Wiring reviewed in code: proofplayer.jsx sets v.currentTime = tsToSeconds(ts)-6 and calls v.play() with muted-autoplay fallback; PremiumReportV2 passes videoUrl only when !demo. Recommend main-agent self-test with an admin premium upload."
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "cinematic.jsx: correct cleanup of timers/RAF via doneRef guard; body scroll lock is properly restored on unmount — good.",
+    "proofplayer.jsx: seek+play uses readyState guard + loadedmetadata listener + muted-autoplay fallback — robust for cross-browser autoplay policies.",
+    "Minor: proofplayer.jsx demoFrame selection loop assumes frames[].sec numeric; if a frame lacks sec it falls through to frames[0].url which is acceptable, but consider guarding when frames is empty (currently handled via frames?.length check — OK)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100% (18/18 executed checks)"},
+  "test_credentials": "Admin admin@elitescout.com / Admin@2026!Elite — not used (real-premium path skipped to keep DB clean).",
+  "seed_data_creation": "None — no DB writes performed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Cinematic intro + Proof mini-player features on /sample-report are fully working on desktop 1920 and mobile 390: intro phases, skip, sound toggle, sessionStorage show-once, replay button, action-row + mobile strength pill open the proof sheet with scrollY diff=0, demo note (no video) rendered, close + Escape both work, sheet floats bottom-right on desktop (x=1466 w=430) and sits at bottom-[62px] on mobile (exact bottom=vh-62). 0 console errors. Only untested path is real premium report with actual video seek+play — recommend seeding a temp full_report doc for admin OR having main agent self-verify on an admin premium upload since backend was untouched.",
+  "rca of the issue": "N/A — no bugs found."
+}

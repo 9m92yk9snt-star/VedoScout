@@ -3,7 +3,7 @@
 // all values come from the existing full_report analysis via derive.js.
 
 import React, { useRef, useState, useCallback } from "react";
-import { Star, Users, ShieldCheck } from "lucide-react";
+import { Star, Users, ShieldCheck, Play } from "lucide-react";
 import { deriveV2, tsToSeconds } from "./derive";
 import {
   V2Card, V2Title, MatchStatsCard, AgeComparisonCard,
@@ -24,6 +24,8 @@ import { ProgressCard, ProgressTeaser } from "./progress";
 import { MissionsCard } from "./missions";
 import { ScoreGuideCard } from "./scoreguide";
 import { ScoreMeaningSection } from "./scoremeaning";
+import { ProofPlayerSheet } from "./proofplayer";
+import { CinematicIntro } from "./cinematic";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -37,7 +39,7 @@ const fmtDate = (iso) => {
   } catch { return ""; }
 };
 
-function V2PageHeader({ reportDate }) {
+function V2PageHeader({ reportDate, onReplayIntro }) {
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
       {/* Wordmark only — no logo mark per spec */}
@@ -56,6 +58,16 @@ function V2PageHeader({ reportDate }) {
       <div className="md:text-right">
         <div className="text-[11px] tracking-[0.14em] font-bold text-[#8B957F] uppercase">Report Date</div>
         <div className="text-[14px] font-extrabold mt-0.5" data-testid="v2-report-date">{reportDate}</div>
+        {onReplayIntro && (
+          <button
+            type="button"
+            onClick={onReplayIntro}
+            data-testid="cinematic-replay-btn"
+            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold tracking-[0.12em] uppercase text-[#1E5B3C] hover:text-[#12402A] transition-colors"
+          >
+            <Play className="w-2.5 h-2.5 fill-current" /> Play intro
+          </button>
+        )}
       </div>
     </div>
   );
@@ -209,32 +221,71 @@ export default function PremiumReportV2({ report, assetBase }) {
 
   const fixThumb = (u) => resolveUrl(u, assetBase);
 
+  // Proof mini-player: "see the proof" opens a bottom sheet — the reader's
+  // scroll position never moves. Replaces the old scroll-to-video behaviour.
+  const [proof, setProof] = useState(null);
   const playAt = useCallback((ts) => {
-    const v = videoRef.current;
-    if (!v) return;
-    const sec = tsToSeconds(ts);
-    const seekPlay = () => {
-      if (sec != null) { try { v.currentTime = sec; } catch { /* noop */ } }
-      const p = v.play();
-      // Unmuted autoplay can be rejected — retry muted so playback always starts.
-      if (p?.catch) p.catch(() => { v.muted = true; v.play().catch(() => {}); });
-    };
-    v.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (v.readyState >= 1) seekPlay();
-    else {
-      v.addEventListener("loadedmetadata", seekPlay, { once: true });
-      try { v.load(); } catch { /* noop */ }
-    }
+    try { videoRef.current?.pause(); } catch { /* noop */ }
+    setProof({ ts: ts || null, key: Date.now() });
   }, []);
+
+  const proofFrames = [
+    ...(report.full_report?.snapshot_moments || [])
+      .filter((m) => m && m.frame_url)
+      .map((m) => ({ sec: tsToSeconds(m.timestamp), url: resolveUrl(m.frame_url, assetBase) })),
+    ...(report.full_report?.video_comments || [])
+      .filter((c) => c && c.frame_url && c.identity_verified !== false)
+      .map((c) => ({ sec: tsToSeconds(c.timestamp), url: resolveUrl(c.frame_url, assetBase) })),
+  ];
+
+  // Cinematic intro: shown once per report (demo: once per session).
+  const cineKey = `smp_cine_seen_${report.id || "report"}`;
+  const cineStore = () => (report.demo ? window.sessionStorage : window.localStorage);
+  const [showCine, setShowCine] = useState(() => {
+    try {
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return false;
+      return !cineStore().getItem(cineKey);
+    } catch { return false; }
+  });
+  const closeCine = () => {
+    try { cineStore().setItem(cineKey, "1"); } catch { /* noop */ }
+    setShowCine(false);
+  };
 
   // Resolve derived thumbnail URLs against the API base
   const topStrengths = d.topStrengths.map((s) => ({ ...s, thumb: fixThumb(s.thumb) }));
   const snapshotMoments = d.snapshotMoments.map((m) => ({ ...m, thumb: fixThumb(m.thumb) }));
   const videoHighlight = d.videoHighlight ? { ...d.videoHighlight, thumb: fixThumb(d.videoHighlight.thumb) } : null;
 
+  const cineMoment = snapshotMoments.find((m) => m.thumb && m.timestamp) || snapshotMoments.find((m) => m.thumb) || null;
+  const cineImage = cineMoment?.thumb || photoCandidates[0] || posterUrl || null;
+
   return (
     <div className="max-w-[1440px] mx-auto text-[#1C2B21]" data-testid="premium-report-v2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <V2PageHeader reportDate={fmtDate(report.full_generated_at || report.paid_at || report.created_at)} />
+      {showCine && (
+        <CinematicIntro
+          playerName={pd.player_name}
+          overall={d.overall}
+          momentTs={cineMoment?.timestamp}
+          momentTitle={cineMoment?.title}
+          image={cineImage}
+          demo={!!report.demo}
+          onDone={closeCine}
+        />
+      )}
+      <ProofPlayerSheet
+        proof={proof}
+        videoUrl={videoUrl}
+        posterUrl={posterUrl}
+        frames={proofFrames}
+        demo={!!report.demo}
+        onClose={() => setProof(null)}
+      />
+
+      <V2PageHeader
+        reportDate={fmtDate(report.full_generated_at || report.paid_at || report.created_at)}
+        onReplayIntro={() => setShowCine(true)}
+      />
 
       {/* Row 1 — hero / parent summary / score */}
       <div className="grid lg:grid-cols-[1fr_1.22fr_1fr] gap-4 mb-4">
