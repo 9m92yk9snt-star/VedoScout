@@ -14576,11 +14576,18 @@ async def players_database_player_detail(player_id: str, user=Depends(_require_s
         raise HTTPException(404, "Player not found or not discoverable")
     if user["id"] != p["id"]:
         try:
-            await db.profile_view_events.insert_one({
-                "player_user_id": p["id"],
-                "viewer_id": user["id"],
-                "ts": now_iso(),
-            })
+            # Dedupe: one view per viewer per player per 6h window — keeps counts honest.
+            _six_h_ago = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+            _dup = await db.profile_view_events.find_one(
+                {"player_user_id": p["id"], "viewer_id": user["id"], "ts": {"$gte": _six_h_ago}},
+                {"_id": 1},
+            )
+            if not _dup:
+                await db.profile_view_events.insert_one({
+                    "player_user_id": p["id"],
+                    "viewer_id": user["id"],
+                    "ts": now_iso(),
+                })
         except Exception:
             pass
     r_cursor = db.reports.find(

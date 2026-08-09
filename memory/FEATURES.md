@@ -78,3 +78,10 @@ Formål: komplet liste over ALT der allerede findes, så nye forslag aldrig gent
 - Free: FREE-medlemsbånd, Scout Preview-upsell (demo-tagget), låste beskeder m/ FOMO-tæller, INGEN Trials & Opportunities
 - Premium: Performance HQ (overall-ring + skill bars fra seneste premium-rapport), rigtige beskeder, Trials & Opportunities
 - Admin-tab "Player Dashboard": netværkstal (demo-FOMO, kan slås fra), besked/notifikations-komponist (all/free/premium/vip eller enkelt email, sender-type scout/agent/club/admin), opportunities CRUD
+
+## Dashboard extras (2026-08-09)
+- Auto-notifikation på dashboard når preview/premium-rapport er klar (idempotent, system-afsender)
+- Header-badges (klokke + kuvert m/ lime-tal) i topmenu, scroller til indbakken; også i mobilmenu
+- Visningstæller "Profile views" (ægte data fra spillerdatabase-åbninger, dedupe 6t, selv-visninger tælles ikke) — låst for free
+- Premium kan svare på scout/agent/klub-beskeder fra dashboardet; admin ser svar i Player Dashboard-tabben
+- Scout Library-synlighed er nu PREMIUM-privilegium (403 for free) + tydelig free-besked: uploads ses ikke af scouts, kun social media hvis opt-in

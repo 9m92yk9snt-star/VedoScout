@@ -3335,3 +3335,23 @@ Context: User approved dashboard mockups v4 (mockup-dashboard-free.html / mockup
 - Profile/report view counters (user asked earlier; no truth source yet — first-party analytics could feed it once defined).
 - Nav header unread badges (bell/mail) like mockup — dashboard shows badges today.
 - MobileBottomTabs still Home/Reports/Upload/Profile (mockup showed Messages tab — not requested to change).
+
+## 2026-08-09 (2) — Dashboard extras: report notifications, header badges, view counter, message replies (built + testing-agent 19/19, iteration_87)
+User rule enforced: free users have fewer privileges and MUST know their uploads can't be seen by scouts unless premium (only social-media featuring if opted in).
+### Backend
+- server.py: `_notify_dashboard_report(report_id, kind)` (~line 6672) — auto dashboard notification on preview-ready (analyze_preview_task) and full-report-ready (generate_full_report_task), idempotent via `dash_notified_{kind}` flag on report, skips demo reports, target_email + link=/report/{id}.
+- dashboard_hub.py: GET /dashboard/inbox/badges (unread notif/msg + locked count for header); POST /dashboard/inbox/{id}/reply (premium only for scout/agent/club senders; free reply to external → 403; stores in dashboard_message_replies, marks read); GET /dashboard/profile-views (free → locked:true; premium → total + this_week from profile_view_events); admin: reply_count on messages list + GET /admin/dashboard/messages/{id}/replies; message delete cascades replies.
+- server.py players_database_player_detail: inserts profile_view_events (self-views excluded, deduped per viewer/player/6h window).
+- server.py update_my_profile: discoverable=true now requires `_user_has_premium_access` (sub/pass/unlocked report/staff) → 403 for free ("On Free, your uploads can't be seen by scouts"). discoverable=false always allowed. NOTE: Scout Library visibility is now a PREMIUM privilege.
+### Frontend
+- Navigation.jsx: bell + mail header icons with lime unread badges (poll /dashboard/inbox/badges every 90s), link to /dashboard?scroll=dashboard-inbox-anchor (scroll retries bumped 12→30); mobile menu "Messages" item with total badge.
+- InboxPanels.jsx: expandable messages with reply thread (reply-input-*/reply-send-*, own replies shown), internal links use router Link; free users with direct admin messages see them ABOVE the locked teaser; unread badge shown for free too.
+- DashboardPage.jsx: "Profile views" tile (qs-views) replaced Tracked players tile — free: "—" + "Scouts can't see you on Free"; premium: total/+week/discoverable hint. dashboard-inbox-anchor wrapper. premiumAccess passed to ProfileVisibilityCard.
+- ProfileVisibilityCard.jsx: premiumAccess prop — free: locked toggle (Lock icon), premium-privilege copy + amber visibility-locked-notice incl. social-media alternative.
+- ScoutPreviewUpsell.jsx: upsell-visibility-notice (uploads not visible to scouts on Free).
+- DashboardHubAdmin.jsx: "N replies" pill per sent message → expands replies-list with sender + text.
+### Tested
+- iteration_87.json: 19/19 backend + all frontend flows (admin/free, desktop + mobile 390px). Regression tests: /app/backend/tests/test_iter87_dashboard_extras.py (+ iter86 file). Post-test fix: profile view dedupe (6h window) added + verified compile/restart.
+### Review backlog (from testing agent, not blocking)
+- Mongo indexes on dashboard_messages.created_at / message_reads.user_id / replies.message_id (scale).
+- Nav badge instant refresh via window event after reply/read (currently 90s poll).
