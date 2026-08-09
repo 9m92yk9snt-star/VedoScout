@@ -5,7 +5,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 
-export function CinematicIntro({ playerName, overall, momentTs, momentTitle, image, demo, onDone }) {
+export function CinematicIntro({
+  playerName, overall, momentTs, momentTitle, image, demo, onDone,
+  scoreDecimals = 1, scoreSuffix = null, scoreLabel = "Overall score",
+  endLine = "Your story starts here", endEmphasis = false,
+}) {
   const [phase, setPhase] = useState(0); // 0 dark · 1 moment · 2 score · 3 fade-out
   const [score, setScore] = useState(0);
   const [soundOn, setSoundOn] = useState(false);
@@ -162,12 +166,13 @@ export function CinematicIntro({ playerName, overall, momentTs, momentTitle, ima
                   data-testid="cinematic-score"
                   className="font-barlow font-black text-[#CCFF00] leading-none text-[26vw] md:text-[150px] drop-shadow-[0_0_60px_rgba(204,255,0,0.3)] tabular-nums mt-3"
                 >
-                  {score.toFixed(1)}
+                  {score.toFixed(scoreDecimals)}
+                  {scoreSuffix && <span className="text-[7vw] md:text-[44px] text-white/50 font-bold">{scoreSuffix}</span>}
                 </div>
-                <div className="text-white/70 text-[10px] md:text-[12px] tracking-[0.4em] font-bold uppercase mt-2">Overall score</div>
+                <div className="text-white/70 text-[10px] md:text-[12px] tracking-[0.4em] font-bold uppercase mt-2">{scoreLabel}</div>
               </>
             )}
-            <div className="text-white/50 text-[10px] tracking-[0.32em] font-bold uppercase mt-8">Your story starts here</div>
+            <div className={`text-[10px] tracking-[0.32em] font-bold uppercase mt-8 ${endEmphasis ? "text-[#CCFF00]" : "text-white/50"}`} data-testid="cinematic-end-line">{endLine}</div>
             <div className="text-[#CCFF00] text-xl mt-1 smp-cine-bounce" aria-hidden>↓</div>
           </div>
         )}

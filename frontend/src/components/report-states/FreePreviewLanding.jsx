@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { ASSET_BASE } from "@/lib/api";
 import { SnapshotAnnot, SNAP_CARD_META } from "@/components/report-v2/snapshots";
+import { CinematicIntro } from "@/components/report-v2/cinematic";
+import { ProofPlayerSheet } from "@/components/report-v2/proofplayer";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
 import { DreamPathTeaser } from "@/components/report-v2/dreampath";
 import { ScoreMeaningTeaser } from "@/components/report-v2/scoremeaning";
@@ -113,8 +115,57 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
 
   const stars = potential ? Math.round(potential / 20) : 0;
 
+  // ── Proof mini-player: real video proof for the open moment + key moment,
+  //    locked teaser for the 3 locked snapshot cards ──
+  const [proof, setProof] = useState(null);
+  const openProof = (ts) => {
+    try { videoRef.current?.pause(); } catch { /* noop */ }
+    setProof({ ts: ts || null, key: Date.now() });
+  };
+  const openLockedProof = () => setProof({ ts: null, locked: true, key: Date.now() });
+
+  // ── Cinematic intro (free preview variant): potential counts up, ends on
+  //    "Unlock the full story". Separate seen-key so the premium intro still
+  //    plays after purchase. ──
+  const cineKey = `smp_cine_seen_${report.id || "report"}_fp`;
+  const [showCine, setShowCine] = useState(() => {
+    try {
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return false;
+      return !window.localStorage.getItem(cineKey);
+    } catch { return false; }
+  });
+  const closeCine = () => {
+    try { window.localStorage.setItem(cineKey, "1"); } catch { /* noop */ }
+    setShowCine(false);
+  };
+
   return (
     <div className="pt-24 md:pt-28 px-4 md:px-6 pb-10" data-testid="free-preview-landing">
+      {showCine && (
+        <CinematicIntro
+          playerName={pd.player_name}
+          overall={typeof potential === "number" ? potential : null}
+          momentTs={keyMomentT}
+          momentTitle={strengths[0]}
+          image={poster ? `${ASSET_BASE}${poster}` : null}
+          demo={false}
+          onDone={closeCine}
+          scoreDecimals={0}
+          scoreSuffix="/100"
+          scoreLabel="Overall potential"
+          endLine="Unlock the full story"
+          endEmphasis
+        />
+      )}
+      <ProofPlayerSheet
+        proof={proof}
+        videoUrl={report.video_url ? `${ASSET_BASE}${report.video_url}` : null}
+        posterUrl={poster ? `${ASSET_BASE}${poster}` : null}
+        frames={[]}
+        demo={false}
+        onClose={() => setProof(null)}
+        onUnlock={scrollToPackages}
+      />
       <div className="max-w-[880px] mx-auto">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3" data-testid="fpl-header">
@@ -140,6 +191,15 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
             <span className="inline-flex items-center gap-1.5 bg-white border border-[#E5DFCE] rounded-full px-3.5 py-2 text-[10px] font-extrabold tracking-[0.08em] uppercase text-[#12211A]">
               Preview complete <CheckCircle2 className="w-3.5 h-3.5 text-[#2F8F4E]" />
             </span>
+            <button
+              type="button"
+              onClick={() => setShowCine(true)}
+              data-testid="cinematic-replay-btn"
+              className="inline-flex items-center gap-1.5 bg-[#12211A] rounded-full px-3.5 py-2 text-[10px] font-extrabold tracking-[0.08em] uppercase hover:bg-[#1F4F2F] transition-colors"
+              style={{ color: LIME }}
+            >
+              <Play className="w-3 h-3 fill-current" /> Play intro
+            </button>
           </div>
         </div>
 
@@ -313,6 +373,16 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
                   {selfPlayer ? "A real moment from your match — confirmed by our analysis." : pFirst ? `A real moment from ${pFirst}'s match — confirmed by our analysis.` : "A real moment from the uploaded match — confirmed by our analysis."}
                 </p>
+                {keyMomentT && (
+                  <button
+                    type="button"
+                    onClick={() => openProof(keyMomentT)}
+                    data-testid="fpl-proof-open"
+                    className="mt-2.5 inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
+                  >
+                    <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof · {keyMomentT}
+                  </button>
+                )}
               </div>
             </div>
             {/* Locked cards */}
@@ -341,6 +411,14 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                   <div className="px-4 py-3.5 flex-1">
                     <div className="text-[14px] font-extrabold text-[#12211A] leading-snug">{tease}</div>
                     <p className="text-[11px] text-[#8B957F] font-extrabold uppercase tracking-[0.08em] mt-1">Unlocks with the full report</p>
+                    <button
+                      type="button"
+                      onClick={openLockedProof}
+                      data-testid={`fpl-proof-locked-${i}`}
+                      className="mt-2.5 inline-flex items-center gap-1.5 bg-[#EDE9DB] text-[#5C6657] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform hover:bg-[#E3DECB]"
+                    >
+                      <Lock className="w-2.5 h-2.5" /> See the proof
+                    </button>
                   </div>
                 </div>
               );
@@ -377,9 +455,19 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                   {selfPlayer ? "See what ScoutMe Pro Intelligence noticed about you in this exact moment." : pFirst ? `See what ScoutMe Pro Intelligence noticed about ${pFirst} in this exact moment.` : "Unlock the full report to see what ScoutMe Pro Intelligence noticed in this moment."}
                 </p>
                 {keyMomentT && (
-                  <span className="inline-block bg-[#F0EDE5] text-[#12211A] text-[11px] font-extrabold px-2.5 py-1 rounded-md mt-2.5" data-testid="fpl-key-moment-t">
-                    {keyMomentT}
-                  </span>
+                  <div className="flex items-center gap-2 mt-2.5">
+                    <span className="inline-block bg-[#F0EDE5] text-[#12211A] text-[11px] font-extrabold px-2.5 py-1 rounded-md" data-testid="fpl-key-moment-t">
+                      {keyMomentT}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openProof(keyMomentT)}
+                      data-testid="fpl-proof-keymoment"
+                      className="inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

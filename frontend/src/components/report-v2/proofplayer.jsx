@@ -4,15 +4,16 @@
 // premium-availability note instead of video.
 
 import React, { useEffect, useRef } from "react";
-import { X, Play, ShieldCheck } from "lucide-react";
+import { X, Play, ShieldCheck, Lock, ChevronRight } from "lucide-react";
 import { tsToSeconds } from "./derive";
 
 const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onClose }) {
+export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onClose, onUnlock }) {
   const vidRef = useRef(null);
   const sec = tsToSeconds(proof?.ts);
   const startAt = sec != null ? Math.max(0, sec - 6) : 0;
+  const locked = !!proof?.locked;
 
   useEffect(() => {
     if (!proof) return undefined;
@@ -22,7 +23,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
   }, [proof, onClose]);
 
   useEffect(() => {
-    if (!proof || demo || !videoUrl) return;
+    if (!proof || demo || locked || !videoUrl) return;
     const v = vidRef.current;
     if (!v) return;
     const seekPlay = () => {
@@ -35,7 +36,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
       v.addEventListener("loadedmetadata", seekPlay, { once: true });
       try { v.load(); } catch { /* noop */ }
     }
-  }, [proof, demo, videoUrl, startAt]);
+  }, [proof, demo, locked, videoUrl, startAt]);
 
   if (!proof) return null;
 
@@ -62,7 +63,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
         <div className="w-9 h-1 rounded-full bg-white/20 mx-auto mt-2 md:hidden" aria-hidden />
         <div className="flex items-center justify-between px-4 pt-2 pb-2.5">
           <div className="flex items-center gap-1.5 text-[#CCFF00] text-[11px] font-extrabold tracking-[0.08em] uppercase">
-            <Play className="w-3 h-3 fill-[#CCFF00]" /> Proof{proof.ts ? ` · ${proof.ts}` : ""}
+            {locked ? <Lock className="w-3 h-3" /> : <Play className="w-3 h-3 fill-[#CCFF00]" />} Proof{proof.ts ? ` · ${proof.ts}` : ""}
           </div>
           <button
             type="button"
@@ -76,7 +77,16 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
         </div>
         <div className="px-2.5 pb-2.5">
           <div className="relative rounded-[12px] overflow-hidden bg-black aspect-video">
-            {demo ? (
+            {locked ? (
+              <>
+                {posterUrl && <img src={posterUrl} alt="" className="absolute inset-0 w-full h-full object-cover blur-[9px] scale-110 opacity-60" />}
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="w-12 h-12 rounded-full bg-black/70 border border-white/25 flex items-center justify-center">
+                    <Lock className="w-5 h-5 text-white" />
+                  </span>
+                </span>
+              </>
+            ) : demo ? (
               <>
                 {demoFrame && <img src={demoFrame} alt="" className="absolute inset-0 w-full h-full object-cover" />}
                 <span className="absolute top-2 left-2 bg-black/70 text-[#CCFF00] text-[9px] font-extrabold tracking-[0.12em] px-2 py-0.5 rounded">DEMO SAMPLE</span>
@@ -97,7 +107,21 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
               />
             )}
           </div>
-          {demo ? (
+          {locked ? (
+            <>
+              <p data-testid="proof-player-locked-note" className="text-white/65 text-[11px] leading-[1.5] px-1.5 pt-2">
+                <span className="text-[#CCFF00] font-bold">Unlocks with the full report</span> — the video jumps straight to the exact second and plays this moment as proof.
+              </p>
+              <button
+                type="button"
+                onClick={() => { onClose(); onUnlock?.(); }}
+                data-testid="proof-player-unlock-btn"
+                className="mt-2.5 mb-1 mx-1.5 w-[calc(100%-12px)] inline-flex items-center justify-center gap-1.5 bg-[#CCFF00] text-[#12211A] font-barlow font-black uppercase tracking-[0.05em] text-[13px] px-5 py-2.5 rounded-full hover:brightness-95 transition-[filter] active:scale-[0.98]"
+              >
+                Unlock the full report <ChevronRight className="w-4 h-4" />
+              </button>
+            </>
+          ) : demo ? (
             <p data-testid="proof-player-demo-note" className="text-white/65 text-[11px] leading-[1.5] px-1.5 pt-2 pb-1">
               <span className="text-[#CCFF00] font-bold">Demo sample</span> — available in the premium report: your own match video jumps straight to {proof.ts || "the exact second"} and plays the proof.
             </p>
