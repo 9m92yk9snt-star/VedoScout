@@ -3355,3 +3355,17 @@ User rule enforced: free users have fewer privileges and MUST know their uploads
 ### Review backlog (from testing agent, not blocking)
 - Mongo indexes on dashboard_messages.created_at / message_reads.user_id / replies.message_id (scale).
 - Nav badge instant refresh via window event after reply/read (currently 90s poll).
+
+## 2026-08-09 (3) — Admin direct messaging, email alarm, trial applications, live library counts (built + testing-agent 16/16, iteration_88)
+### Backend (dashboard_hub.py; server.py include now passes email_sender=send_email_async + email_enabled)
+- Email alarm: composing kind=message + sender_type scout/agent/club fires async `_send_message_email_alert` — emails eligible members only (target_email → that user; segments → active subs by tier + paid-report users; target=free → NOBODY, free never gets external-message emails). Branded HTML with CTA to /dashboard?scroll=dashboard-inbox-anchor. Cap 500 recipients. Log line: "message alert emails sent: N/M".
+- Trial applications: POST/DELETE /api/dashboard/opportunities/{id}/interest (premium only, 403 free, 404 unknown, idempotent upsert in dashboard_opportunity_interest); GET opportunities items include interested flag; admin list includes interest_count; GET /api/admin/dashboard/opportunities/{id}/interest → applicant list; opportunity delete cascades interest docs.
+- Live library counts: community endpoints compute live_players_in_library/live_players_wk (users discoverable=true, wk via discoverable_updated_at 7d); setting use_live_players=true makes the player-facing players_in_library use the REAL count; manual/fictive numbers otherwise. Admin GET/PUT return both.
+### Frontend
+- AdminPage Users tab: admin-message-user-{id} mail button per row → switches to Player Dashboard tab with composer target_email prefilled (composerPrefill state → DashboardHubAdmin prefillEmail prop).
+- DashboardHubAdmin: "Live right now: N discoverable players (real)" + community-use-live-toggle; composer note about email alarm; opportunities rows show "N interested" pill (opp-applicants-{id}) → expandable applicant list.
+- OpportunitiesPanel: "I'm interested" toggle button (opportunity-interest-{id}) with toasts; hidden for closed deadlines.
+### Tested
+- iteration_88.json: 16/16 backend + all frontend flows. Regression pytest: /app/backend/tests/test_iter88_dashboard_hub_new.py (email-alarm branches: scout=fire, notification=no, admin-sender=no, free-target=no).
+### Review backlog (not blocking)
+- Unique compound index (user_id, opportunity_id) on dashboard_opportunity_interest + indexes for alert recipient queries; split dashboard_hub.py if it grows past ~700 lines; log when 500-recipient cap hit.

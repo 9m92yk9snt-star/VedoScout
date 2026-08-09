@@ -85,3 +85,9 @@ Formål: komplet liste over ALT der allerede findes, så nye forslag aldrig gent
 - Visningstæller "Profile views" (ægte data fra spillerdatabase-åbninger, dedupe 6t, selv-visninger tælles ikke) — låst for free
 - Premium kan svare på scout/agent/klub-beskeder fra dashboardet; admin ser svar i Player Dashboard-tabben
 - Scout Library-synlighed er nu PREMIUM-privilegium (403 for free) + tydelig free-besked: uploads ses ikke af scouts, kun social media hvis opt-in
+
+## Admin messaging & trials 2.0 (2026-08-09)
+- "Send besked"-knap på hver bruger i admin Users-listen → composer prefilled med deres email
+- Email-alarm: scout/agent/klub-beskeder udløser email til berettigede medlemmer (aldrig free)
+- Trial-ansøgning: Premium trykker "I'm interested" → admin ser ansøgerliste pr. trial
+- Live library-tal: admin ser ægte antal synlige spillere og kan vælge live-tal eller fiktive pr. Network-sektionen
