@@ -41,8 +41,9 @@ export default function GuestWelcomePage() {
         }
         if (attempts >= 15) { setState("pending_timeout"); return; }
         setTimeout(poll, 2000);
-      } catch {
+      } catch (err) {
         if (!alive) return;
+        if (err?.response?.status === 404) { setState("error"); return; }
         if (attempts >= 15) { setState("error"); return; }
         setTimeout(poll, 2500);
       }
