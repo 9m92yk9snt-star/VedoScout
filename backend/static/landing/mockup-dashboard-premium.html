@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — PREMIUM Player Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --cream:#F4EFE6; --card:#FFFFFF; --forest:#1F4F2F; --forest-deep:#12402A; --pop:#2D6B3D; --ink:#0A0F0D; --volt:#CCFF00; --border:#E5DFCE; --muted:#68766B; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--cream); color:var(--ink); }
+  .wrap { max-width:1200px; margin:0 auto; padding:0 20px 60px; }
+  .hdr { background:var(--ink); color:#fff; padding:14px 0; }
+  .hdr-in { max-width:1200px; margin:0 auto; padding:0 20px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { font-family:'Barlow Condensed'; font-weight:900; font-size:24px; letter-spacing:.5px; }
+  .logo .me { background:var(--volt); color:var(--ink); padding:0 5px; border-radius:3px; }
+  .hdr-r { display:flex; align-items:center; gap:16px; }
+  .ico { position:relative; width:34px; height:34px; border:1px solid #ffffff33; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .badge { position:absolute; top:-6px; right:-6px; background:var(--volt); color:var(--ink); font-size:10px; font-weight:700; width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .avatar { width:36px; height:36px; border-radius:50%; background:#2a3a2c; overflow:hidden; border:2px solid var(--volt); }
+  .avatar img { width:100%; height:100%; object-fit:cover; }
+
+  .hero { display:flex; justify-content:space-between; align-items:flex-end; padding:34px 0 22px; }
+  h1 { font-family:'Barlow Condensed'; font-weight:900; font-size:42px; text-transform:uppercase; line-height:.95; }
+  .hero p { color:var(--muted); margin-top:8px; font-size:14.5px; }
+  .chip-prem { display:inline-flex; align-items:center; gap:7px; background:var(--forest-deep); color:var(--volt); font-weight:700; font-size:12px; letter-spacing:.14em; padding:9px 18px; border-radius:999px; text-transform:uppercase; }
+
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; box-shadow:0 2px 10px rgba(30,50,35,.05); }
+  .sec-h { display:flex; justify-content:space-between; align-items:center; margin:26px 0 12px; }
+  .sec-h h2 { font-family:'Barlow Condensed'; font-weight:900; font-size:21px; text-transform:uppercase; letter-spacing:.03em; }
+  .viewall { font-size:11px; font-weight:700; letter-spacing:.12em; color:var(--pop); text-transform:uppercase; }
+  .btn-volt { display:inline-flex; align-items:center; gap:8px; background:var(--volt); color:var(--forest-deep); font-family:'Barlow Condensed'; font-weight:900; text-transform:uppercase; letter-spacing:.05em; font-size:15px; padding:10px 22px; border-radius:999px; }
+  .btn-line { display:inline-flex; align-items:center; gap:7px; border:2px solid var(--forest); color:var(--forest); font-weight:700; font-size:11px; letter-spacing:.1em; text-transform:uppercase; padding:8px 16px; border-radius:999px; }
+
+  /* performance band (dark) */
+  .perf { background:var(--forest-deep); border-radius:14px; color:#fff; display:grid; grid-template-columns:auto 1fr auto; gap:30px; padding:26px 32px; align-items:center; }
+  .ring { width:130px; height:130px; border-radius:50%; background:conic-gradient(var(--volt) 0 82%, #2b5138 82% 100%); display:flex; align-items:center; justify-content:center; position:relative; }
+  .ring::after { content:""; position:absolute; inset:11px; background:var(--forest-deep); border-radius:50%; }
+  .ring b { position:relative; z-index:2; font-family:'Barlow Condensed'; font-weight:900; font-size:40px; color:var(--volt); }
+  .ring small { position:relative; z-index:2; font-size:12px; color:#9DB694; }
+  .perf-mid b.big { display:block; font-family:'Barlow Condensed'; font-weight:900; font-size:26px; text-transform:uppercase; color:var(--volt); }
+  .perf-mid span { color:#BFCDB8; font-size:13px; }
+  .skills { display:grid; grid-template-columns:1fr 1fr; gap:5px 26px; font-size:13px; min-width:270px; }
+  .skills div { display:flex; justify-content:space-between; gap:14px; border-bottom:1px solid #ffffff14; padding:4px 0; color:#D6E2CF; }
+  .skills b { color:var(--volt); font-family:'Barlow Condensed'; font-weight:900; font-size:15px; }
+
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:14px; }
+  .stat { padding:18px 20px; }
+  .stat .ic { width:38px; height:38px; border-radius:10px; background:#EFF5EC; color:var(--pop); display:flex; align-items:center; justify-content:center; font-size:17px; margin-bottom:12px; }
+  .stat .num { font-family:'Barlow Condensed'; font-weight:900; font-size:34px; line-height:1; }
+  .stat .lbl { font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+  .stat .sub { font-size:11.5px; margin-top:7px; color:var(--pop); font-weight:700; }
+  .spark { margin-top:10px; height:26px; background:linear-gradient(180deg,#2D6B3D22,#2D6B3D05); border-radius:5px; position:relative; overflow:hidden; }
+  .spark::after { content:""; position:absolute; left:0; right:0; bottom:6px; height:2px; background:var(--pop); transform:rotate(-4deg); }
+
+  /* latest report dark */
+  .latest { margin-top:26px; background:var(--forest-deep); border-radius:14px; color:#fff; display:grid; grid-template-columns:1.1fr 1fr 1fr; overflow:hidden; }
+  .lat-vid { position:relative; min-height:230px; }
+  .lat-vid img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .lat-vid .play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .lat-vid .play span { width:54px; height:54px; border-radius:50%; background:#ccff00e6; color:var(--forest-deep); display:flex; align-items:center; justify-content:center; font-size:20px; }
+  .lat-vid .tag { position:absolute; top:12px; left:12px; background:var(--volt); color:var(--forest-deep); font-size:10px; font-weight:700; letter-spacing:.12em; padding:4px 10px; border-radius:999px; }
+  .lat-mid { padding:26px; text-align:center; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+  .lat-mid .g { font-family:'Barlow Condensed'; font-weight:900; font-size:20px; text-transform:uppercase; }
+  .lat-mid .d { font-size:11.5px; color:#9DB694; margin-top:2px; }
+  .lat-mid .score { font-family:'Barlow Condensed'; font-weight:900; font-size:52px; color:var(--volt); line-height:1; margin-top:14px; }
+  .lat-mid .gp { color:#BFCDB8; font-size:12px; margin:4px 0 14px; }
+  .lat-skills { padding:26px 28px; display:flex; flex-direction:column; justify-content:center; gap:6px; border-left:1px solid #ffffff14; }
+  .lat-skills div { display:flex; justify-content:space-between; font-size:13px; color:#D6E2CF; border-bottom:1px solid #ffffff10; padding:4px 0; }
+  .lat-skills b { color:var(--volt); font-family:'Barlow Condensed'; font-weight:900; }
+
+  .twocol { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:8px; }
+  .list { padding:6px 0; }
+  .row { display:flex; gap:12px; padding:13px 20px; border-bottom:1px solid #F0EBDD; align-items:flex-start; }
+  .row:last-child { border-bottom:none; }
+  .row .ric { width:36px; height:36px; border-radius:10px; background:#EFF5EC; color:var(--pop); display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; }
+  .row .ric.admin { background:var(--forest-deep); color:var(--volt); }
+  .row b { font-size:13.5px; display:block; }
+  .row p { font-size:12px; color:var(--muted); margin-top:2px; line-height:1.45; }
+  .row .t { margin-left:auto; font-size:10.5px; color:#A7AFA0; white-space:nowrap; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--pop); margin-top:6px; flex-shrink:0; }
+  .unread { background:var(--forest); color:#fff; font-size:10px; font-weight:700; min-width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-top:4px; }
+  .cta-s { display:inline-block; margin-top:7px; font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--pop); }
+
+  .net { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; }
+  .net .stat .num { color:var(--forest); font-size:30px; }
+
+  .trow { display:flex; align-items:center; gap:14px; padding:15px 20px; border-bottom:1px solid #F0EBDD; }
+  .trow:last-child { border-bottom:none; }
+  .tlogo { width:40px; height:40px; border-radius:10px; background:var(--forest-deep); color:var(--volt); font-family:'Barlow Condensed'; font-weight:900; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .tnew { background:var(--forest); color:#fff; font-size:10px; font-weight:700; letter-spacing:.1em; padding:4px 10px; border-radius:999px; }
+  .tdays { font-size:11.5px; color:var(--muted); }
+  .tcta { margin-left:auto; }
+
+  .mem { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  .mem .card { padding:20px 22px; }
+  .mem b { font-family:'Barlow Condensed'; font-weight:900; text-transform:uppercase; font-size:17px; display:block; }
+  .mem p { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5; }
+
+  .mock { text-align:center; font-size:11px; color:#A7AFA0; letter-spacing:.15em; text-transform:uppercase; padding:26px 0 0; }
+</style>
+</head>
+<body>
+  <div class="hdr"><div class="hdr-in">
+    <div class="logo">SCOUT<span class="me">ME</span>PLAY</div>
+    <div class="hdr-r">
+      <div class="ico">🔔<span class="badge">3</span></div>
+      <div class="ico">✉️<span class="badge">2</span></div>
+      <div class="avatar"><img src="/api/uploads/demo-player.jpg" alt=""></div>
+    </div>
+  </div></div>
+
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1>Welcome back, Noah!</h1>
+        <p>You're on the right path. Your next opportunity is closer than you think.</p>
+      </div>
+      <span class="chip-prem">👑 Premium member</span>
+    </div>
+
+    <!-- performance band -->
+    <div class="perf">
+      <div style="text-align:center;">
+        <div class="ring"><div style="position:relative;z-index:2;text-align:center;"><b>8.2</b><br><small>/10</small></div></div>
+        <div style="font-size:10px;letter-spacing:.2em;color:#9DB694;margin-top:8px;text-transform:uppercase;">Overall score</div>
+      </div>
+      <div class="perf-mid">
+        <b class="big">Above average</b>
+        <span>Keep working and stay consistent — your development curve is climbing.</span><br>
+        <span class="btn-volt" style="margin-top:14px;">View full report →</span>
+      </div>
+      <div class="skills">
+        <div>Technical <b>7.8</b></div><div>Tactical <b>8.4</b></div>
+        <div>Physical <b>7.6</b></div><div>Mental <b>8.6</b></div>
+        <div>Attacking <b>8.3</b></div><div>Defending <b>6.7</b></div>
+      </div>
+    </div>
+
+    <!-- stats -->
+    <div class="stats">
+      <div class="card stat"><div class="ic">📋</div><div class="num">12</div><div class="lbl">Reports created</div><div class="sub">View all →</div><div class="spark"></div></div>
+      <div class="card stat"><div class="ic">⭐</div><div class="num">7.9<span style="font-size:18px;color:var(--muted);">/10</span></div><div class="lbl">Average score</div><div class="sub">↗ +0.8 this month</div><div class="spark"></div></div>
+      <div class="card stat"><div class="ic">👁</div><div class="num">248</div><div class="lbl">Profile views</div><div class="sub">↗ +24 this week</div><div class="spark"></div></div>
+      <div class="card stat"><div class="ic">📈</div><div class="num">86</div><div class="lbl">Library exposure</div><div class="sub">↗ +15 this week</div><div class="spark"></div></div>
+    </div>
+
+    <!-- latest report -->
+    <div class="latest">
+      <div class="lat-vid">
+        <img src="/api/uploads/demo-frame-dribble.jpg" alt="">
+        <span class="tag">LATEST · PREMIUM</span>
+        <div class="play"><span>▶</span></div>
+      </div>
+      <div class="lat-mid">
+        <div class="g">Game vs FC United</div>
+        <div class="d">Jul 2 · Full match</div>
+        <div class="score">8.2<span style="font-size:20px;color:#9DB694;">/10</span></div>
+        <div class="gp">Great performance!</div>
+        <div style="display:flex;gap:10px;">
+          <span class="btn-volt" style="font-size:13px;padding:8px 18px;">View full report</span>
+          <span class="btn-volt" style="font-size:13px;padding:8px 14px;background:#ffffff22;color:#fff;">⬇ PDF</span>
+        </div>
+      </div>
+      <div class="lat-skills">
+        <div>Technical <b>8.4</b></div><div>Tactical <b>8.6</b></div><div>Physical <b>7.6</b></div>
+        <div>Mental <b>8.3</b></div><div>Attacking <b>8.7</b></div><div>Defending <b>6.5</b></div>
+      </div>
+    </div>
+
+    <!-- notifications + messages -->
+    <div class="sec-h" style="margin-top:30px;"><h2>Notifications &amp; messages</h2></div>
+    <div class="twocol">
+      <div class="card list">
+        <div class="row" style="padding-top:16px;"><b style="font-size:12px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;">Notifications</b><span class="t viewall">View all</span></div>
+        <div class="row"><div class="ric admin">S</div><div><b>ScoutMePlay · New feature for you</b><p>Your cinematic intro clip is ready to share.</p><span class="cta-s">Read more →</span></div><span class="t">2h</span><span class="dot"></span></div>
+        <div class="row"><div class="ric">🛡</div><div><b>Your Premium report is ready!</b><p>Game vs FC United — full analysis available.</p><span class="cta-s">View report →</span></div><span class="t">5h</span><span class="dot"></span></div>
+        <div class="row"><div class="ric">🏆</div><div><b>Trial invitation received</b><p>Elite Football Academy invited your player to trials.</p><span class="cta-s">See opportunity →</span></div><span class="t">1d</span><span class="dot"></span></div>
+        <div class="row"><div class="ric">📈</div><div><b>Your profile is getting views!</b><p>Viewed 23 times this week by scouts &amp; clubs.</p></div><span class="t">1d</span></div>
+      </div>
+      <div class="card list">
+        <div class="row" style="padding-top:16px;"><b style="font-size:12px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;">Messages</b><span class="t viewall">View all</span></div>
+        <div class="row"><div class="avatar" style="width:36px;height:36px;"><img src="/api/uploads/demo-player.jpg"></div><div><b>Agent Said M. <span style="font-weight:400;color:var(--muted);font-size:11px;">· Agent</span></b><p>Hi! We are interested in seeing more of your games.</p><span class="cta-s">View message →</span></div><span class="t">1h</span><span class="unread">1</span></div>
+        <div class="row"><div class="avatar" style="width:36px;height:36px;"><img src="/api/uploads/demo-player.jpg"></div><div><b>Scout Fatima A. <span style="font-weight:400;color:var(--muted);font-size:11px;">· Scout</span></b><p>Great performance! Keep up the amazing work.</p><span class="cta-s">View message →</span></div><span class="t">1d</span><span class="unread">1</span></div>
+        <div class="row"><div class="avatar" style="width:36px;height:36px;"><img src="/api/uploads/demo-player.jpg"></div><div><b>Ibrahim K. <span style="font-weight:400;color:var(--muted);font-size:11px;">· Club</span></b><p>We have upcoming trials next month. Are you available?</p><span class="cta-s">View message →</span></div><span class="t">2d</span></div>
+      </div>
+    </div>
+
+    <!-- network -->
+    <div class="sec-h"><h2>ScoutMePlay Network</h2><span class="viewall">You are visible in the Scout Library ✓</span></div>
+    <div class="net">
+      <div class="card stat"><div class="ic">👥</div><div class="num">2,847</div><div class="lbl">Players in Scout Library</div><div class="sub">↗ +146 this week</div></div>
+      <div class="card stat"><div class="ic">🛡</div><div class="num">312</div><div class="lbl">Clubs looking for players</div><div class="sub">↗ +12 this week</div></div>
+      <div class="card stat"><div class="ic">🔎</div><div class="num">156</div><div class="lbl">Scouts searching now</div><div class="sub">↗ +8 this week</div></div>
+      <div class="card stat"><div class="ic">🤝</div><div class="num">24</div><div class="lbl">Active agents</div><div class="sub">↗ +4 this week</div></div>
+      <div class="card stat"><div class="ic">🏆</div><div class="num">18</div><div class="lbl">Players invited to trials</div><div class="sub">↗ +3 this week</div></div>
+    </div>
+
+    <!-- trials -->
+    <div class="sec-h"><h2>Trials &amp; opportunities</h2><span class="viewall">View all</span></div>
+    <div class="card">
+      <div class="trow"><div class="tlogo">EA</div><div><b style="font-size:14px;">Elite Football Academy Trials</b><div class="tdays">U16 · London, UK</div></div><span class="tnew">NEW</span><span class="tdays">2d left</span><span class="btn-line tcta">See opportunity</span></div>
+      <div class="trow"><div class="tlogo">NF</div><div><b style="font-size:14px;">Northern FC Talent ID</b><div class="tdays">U15 · Manchester, UK</div></div><span class="tnew">NEW</span><span class="tdays">5d left</span><span class="btn-line tcta">See opportunity</span></div>
+    </div>
+
+    <!-- membership -->
+    <div class="sec-h"><h2>My membership</h2></div>
+    <div class="mem">
+      <div class="card"><b>Buy a new report</b><p>Analyse your next match — included reports: 1 left this month.</p><span class="btn-volt" style="margin-top:10px;background:var(--forest-deep);color:#fff;font-size:13px;">Buy report</span></div>
+      <div class="card"><b>Manage membership</b><p>Premium · renews 1 July. Upgrade to VIP or downgrade anytime.</p><span class="btn-line" style="margin-top:10px;">Change plan</span></div>
+      <div class="card"><b>Payments &amp; account</b><p>Receipts, payment method, account settings.</p><span class="btn-line" style="margin-top:10px;">Manage</span></div>
+    </div>
+
+    <div class="mock">Mockup · Premium dashboard · numbers are demo</div>
+  </div>
+</body>
+</html>
