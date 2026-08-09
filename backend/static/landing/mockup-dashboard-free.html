@@ -4,20 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mockup v3 — FREE Player Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#F6F4EE; --card:#FFFFFF; --green:#2E7D32; --green-dark:#1B5E20; --green-deep:#0F1F14; --green-soft:#E8F2E8; --ink:#15201A; --muted:#75816F; --border:#ECE8DC; --volt:#B9E93C; }
+  :root { --bg:#F6F4EE; --card:#FFFFFF; --green:#2E7D32; --green-dark:#1B5E20; --green-deep:#0F1F14; --green-soft:#E8F2E8; --ink:#15201A; --muted:#75816F; --border:#ECE8DC; --volt:#B9E93C; --lime:#CCFF00; --nav-ink:#0A0F0D; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); display:flex; justify-content:center; }
   .app { width:860px; background:var(--bg); padding-bottom:110px; }
   .sv { width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 
-  .hdr { background:#fff; border-bottom:1px solid var(--border); padding:16px 26px; display:flex; align-items:center; justify-content:space-between; position:relative; z-index:5; }
-  .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:22px; }
-  .logo small { display:block; font-size:10px; letter-spacing:.18em; color:var(--muted); font-weight:700; }
-  .hdr-r { display:flex; align-items:center; gap:20px; }
-  .hico { position:relative; color:#4A5548; }
-  .badge { position:absolute; top:-8px; right:-9px; background:var(--green); color:#fff; font-size:10px; font-weight:700; min-width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0 3px; }
+  .hdr { background:var(--nav-ink); position:relative; z-index:5; }
+  .hdr-in { padding:14px 26px 12px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { display:flex; flex-direction:column; }
+  .wm { font-family:'Barlow Condensed',sans-serif; font-weight:900; text-transform:uppercase; color:#fff; font-size:26px; letter-spacing:.14em; line-height:1; display:flex; align-items:baseline; gap:1px; }
+  .wm .me { background:var(--lime); color:var(--nav-ink); padding:0 4px; }
+  .tag { display:flex; align-items:center; gap:6px; font-size:9px; color:rgba(255,255,255,.55); font-weight:700; text-transform:uppercase; letter-spacing:.16em; margin-top:7px; }
+  .tag i { width:4px; height:4px; border-radius:50%; background:var(--lime); box-shadow:0 0 6px rgba(204,255,0,.6); }
+  .hdr-r { display:flex; align-items:center; gap:18px; }
+  .hico { position:relative; color:rgba(255,255,255,.78); }
+  .upcta { display:inline-flex; align-items:center; gap:8px; background:#1F4F2F; color:#fff; font-family:'Barlow Condensed',sans-serif; font-weight:800; text-transform:uppercase; letter-spacing:.12em; font-size:14px; padding:9px 20px; border-radius:999px; }
+  .strip { height:2px; background:rgba(255,255,255,.06); }
+  .strip i { display:block; height:100%; width:22%; background:var(--lime); box-shadow:0 0 8px rgba(204,255,0,.6); }
+  .badge { position:absolute; top:-8px; right:-9px; background:var(--lime); color:var(--nav-ink); font-size:10px; font-weight:800; min-width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0 3px; }
   .avatar { width:42px; height:42px; border-radius:50%; overflow:hidden; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.12); background:#DCE5D8; }
   .avatar img { width:100%; height:100%; object-fit:cover; }
 
@@ -101,17 +108,6 @@
   .cst .wk { font-size:11.5px; color:var(--green); font-weight:700; margin-top:5px; display:block; }
   .c-green { background:#E8F2E8; color:#2E7D32; } .c-orange { background:#FFF2E2; color:#E08A1E; } .c-blue { background:#E7F0FB; color:#3B78D8; } .c-purple { background:#F1EAFB; color:#8B5CD6; }
 
-  .trials { margin-top:16px; padding:20px 22px 14px; }
-  .trow { display:flex; align-items:center; gap:13px; padding:12px 0; border-bottom:1px solid #F2EFE5; }
-  .trow:last-of-type { border-bottom:none; }
-  .crest { width:42px; height:42px; border-radius:12px; background:#13253F; color:#F2C94C; display:flex; align-items:center; justify-content:center; }
-  .crest .sv { width:19px; height:19px; }
-  .trow b { font-size:14.5px; display:block; }
-  .trow .sub { font-size:12.5px; color:var(--muted); margin-top:2px; }
-  .newb { background:var(--green-dark); color:#fff; font-size:11px; font-weight:700; padding:5px 12px; border-radius:8px; margin-left:auto; }
-  .tleft { font-size:12.5px; color:var(--muted); width:52px; text-align:right; }
-  .seeall { display:block; text-align:center; border:1.5px solid var(--border); border-radius:12px; padding:12px; color:var(--green-dark); font-weight:700; font-size:14px; margin-top:12px; }
-
   .nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:860px; background:#fff; border-top:1px solid var(--border); display:flex; justify-content:space-around; align-items:center; padding:10px 0 14px; z-index:20; }
   .nv { text-align:center; font-size:11.5px; color:#7C877A; font-weight:600; position:relative; }
   .nv .sv { width:21px; height:21px; display:block; margin:0 auto 3px; }
@@ -138,19 +134,24 @@
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
   <symbol id="i-crown" viewBox="0 0 24 24"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
 </svg>
 
 <div class="app">
   <div class="hdr">
-    <div class="logo">
-      <svg width="34" height="34" viewBox="0 0 40 40"><path d="M4 30 L15 17 L22 24 L36 8" stroke="#2E7D32" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M27 8 h9 v9" stroke="#2E7D32" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div>ScoutMePlay<span style="color:var(--muted);font-weight:500;">.com</span><small>PLAYER DASHBOARD</small></div>
+    <div class="hdr-in">
+      <div class="logo">
+        <span class="wm">SCOUT<span class="me">ME</span>PLAY</span>
+        <span class="tag"><i></i> See your game like never before</span>
+      </div>
+      <div class="hdr-r">
+        <span class="hico"><svg class="sv"><use href="#i-bell"/></svg><span class="badge">2</span></span>
+        <span class="hico"><svg class="sv"><use href="#i-mail"/></svg><span class="badge">1</span></span>
+        <span class="upcta"><svg class="sv" style="width:15px;height:15px;"><use href="#i-up"/></svg> Upload video</span>
+        <div class="avatar"><svg class="sv" style="width:100%;height:100%;padding:9px;color:#8B978A;"><use href="#i-users"/></svg></div>
+      </div>
     </div>
-    <div class="hdr-r">
-      <span class="hico"><svg class="sv"><use href="#i-bell"/></svg><span class="badge">2</span></span>
-      <span class="hico"><svg class="sv"><use href="#i-mail"/></svg><span class="badge">1</span></span>
-      <div class="avatar"><svg class="sv" style="width:100%;height:100%;padding:9px;color:#8B978A;"><use href="#i-users"/></svg></div>
-    </div>
+    <div class="strip"><i></i></div>
   </div>
 
   <div class="hero">
@@ -253,14 +254,7 @@
       </div>
     </div>
 
-    <div class="card trials">
-      <div class="comm-h"><b>Trials &amp; Opportunities</b><span class="viewall">View all</span></div>
-      <div class="trow"><div class="crest"><svg class="sv"><use href="#i-shield"/></svg></div><div><b>Elite Football Academy Trials</b><span class="sub">U16 • London, UK</span></div><span class="newb">New</span><span class="tleft">2d left</span><span class="chev">›</span></div>
-      <div class="trow"><div class="crest"><svg class="sv"><use href="#i-shield"/></svg></div><div><b>Northern FC Talent ID</b><span class="sub">U15 • Manchester, UK</span></div><span class="newb">New</span><span class="tleft">5d left</span><span class="chev">›</span></div>
-      <span class="seeall">See all opportunities</span>
-    </div>
-
-    <div class="mock">Mockup v3 · Free dashboard</div>
+    <div class="mock">Mockup v4 · Free dashboard</div>
   </div>
 
   <div class="nav">
