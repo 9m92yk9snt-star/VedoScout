@@ -1,5 +1,13 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 9) — FRAME/TS-JUSTERING OVERALT: premium + PDF ✅ (self-tested: unit-test + PDF-render 7 sider + premium smoke)
+- **Bruger-krav**: præcisions-reglen fra part 8 skal gælde ALLE steder m. screenshot+proof — free preview, premium OG PDF (PDF skal have screenshots).
+- **Regel implementeret**: når et foto (frame) vises, bliver framens EKSAKTE timestamp det viste ts + proof-videoens seek-mål. Før: ts fra evidence/event, foto op til ±8 sek væk ELLER (værst) VILKÅRLIG ubrugt frame som fallback → foto/ts/video-mismatch.
+- **derive.js (premium frontend)**: buildFrameLookup.find returnerer nu {url, verified, ts}; topStrengths ts = fr.ts || evidence-ts; snapCloseFrame returnerer entry; buildSnapMoment ts = fr.ts || event-ts. Cinematic (cineMoment) arver justeringen automatisk. Proof-player MOMENT-chip fra part 8 gælder også premium (delt komponent).
+- **pdf_v2.py**: _frame_lookup.find + _close_frame returnerer {url, ts}-dicts; top_strengths + _sm_moment viser frame-ts når foto findes. PDF HAR allerede screenshots (foto-kort ~p926, strengths ~p1087, highlight ~p1280) — nu m. matchende timestamps. Highlight/watch-together var allerede aligned by construction.
+- Test: python unit-test (evidence 00:40 + frames 00:52/01:10 → ts=00:52 m. thumb, snap-moment aligned) OK; tests/render_snapshot_pdf.py → 7 sider rendered OK; /sample-report premium smoke → rendered, strength-proof "SEE THE PROOF · 00:58" (frame-aligned). Frontend HTTP 200.
+- ⚠️ REQUIRES REDEPLOY.
+
 ## Session (Jun 2026 — part 8) — FREE PREVIEW: snapshot/proof-video mismatch fikset ✅ (self-tested m. seed + screenshot)
 - **PROD-BUG (bruger, screenshots)**: Snapshot-frame korrekt, men proof-video viste "forkert sted"; samme ts (00:26) overalt; "Playing from 00:20" føltes upræcist. ROOT CAUSE (FreePreviewLanding.jsx): åbent snapshot-kort viste poster-framen (taget ved anchors[0].t = marker_timestamp), men ts-label + proof-seek brugte MIDTERSTE anchor → billede/ts/video pegede på forskellige øjeblikke. Samme keyMomentT blev genbrugt i cinematic + key-moment-teaser → "26 på alt".
 - **Fix**: nyt `snapMomentT` = anchors[0].t (framens EKSAKTE sekund) bruges til snapshot-kort ts + proof-knap + CinematicIntro; `keyMomentT` (key-moment-teaser) = midterste af anchors[1..] (variation, fallback anchors[0]). ProofPlayerSheet (proofplayer.jsx, deles m. premium): pre-roll 6→4 sek; ny "MOMENT AT · {ts}"-chip øverst th. på videoen (data-testid proof-moment-chip) der skifter til pulserende lime "THE MOMENT" når currentTime rammer sekundet (timeupdate ±0.3/+2.5s); ny note "Playing from X so you see the build-up — the moment hits at {ts}".

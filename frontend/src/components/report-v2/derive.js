@@ -88,7 +88,9 @@ function buildFrameLookup(full) {
     }
     if (!best) best = entries.find((e) => !used.has(e.url)) || null;
     if (best) used.add(best.url);
-    return best ? { url: best.url, verified: !!best.verified } : null;
+    // ts included so callers can display the FRAME's exact second — the photo,
+    // the shown timestamp and the proof video must always be the same moment.
+    return best ? { url: best.url, verified: !!best.verified, ts: best.ts || null } : null;
   };
   return { entries, find };
 }
@@ -114,7 +116,7 @@ export function deriveV2(report) {
       return {
         name: s.label, score: s.score, category: s.category,
         note: firstSentences(s.notes, 130),
-        timestamp: ev?.timestamp || null,
+        timestamp: fr?.ts || ev?.timestamp || null,
         thumb: fr?.url || null,
         thumbVerified: !!fr?.verified,
       };
@@ -168,7 +170,7 @@ export function deriveV2(report) {
       }
     }
     if (best) snapUsedFrames.add(best.url);
-    return best ? best.url : null;
+    return best || null;
   };
   const snapTokens = (s) => String(s || "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
   const snapTokMatch = (a, b) => a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4));
@@ -198,6 +200,7 @@ export function deriveV2(report) {
   };
   const buildSnapMoment = (key, text, pref, forcedAnnot, preferEventTitle = false) => {
     const ev = snapMatchEvent(text, pref);
+    const fr = ev ? snapCloseFrame(ev.timestamp) : null;
     const phrase = firstSentences(text, 60);
     const evTitle = firstSentences(ev?.title, 60);
     const title = (preferEventTitle ? evTitle || phrase : phrase || evTitle) || "—";
@@ -207,8 +210,8 @@ export function deriveV2(report) {
       key,
       title,
       desc,
-      timestamp: ev?.timestamp || null,
-      thumb: ev ? snapCloseFrame(ev.timestamp) : null,
+      timestamp: fr?.ts || ev?.timestamp || null,
+      thumb: fr?.url || null,
       annot: forcedAnnot || SNAP_ANNOT_BY_TYPE[String(ev?.action_type || "").toLowerCase()] || "circle",
       glance: null,
     };

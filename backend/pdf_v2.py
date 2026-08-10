@@ -168,7 +168,8 @@ def _frame_lookup(full):
             best = next((e for e in entries if e["url"] not in used), None)
         if best:
             used.add(best["url"])
-            return best["url"]
+            # Return the frame's exact ts too — displayed timestamps must match the photo
+            return {"url": best["url"], "ts": best.get("ts")}
         return None
 
     return find
@@ -190,10 +191,11 @@ def derive_v2(report):
         ev = next((e for e in s["evidence"]
                    if isinstance(e, dict) and e.get("timestamp") and e["timestamp"] != "General"), None)
         ts = ev.get("timestamp") if ev else None
+        fr = find_frame(ts)
         top_strengths.append({
             "name": s["label"], "score": s["score"], "category": s["category"],
             "note": first_sentences(s["notes"], 130),
-            "timestamp": ts, "thumb": find_frame(ts),
+            "timestamp": (fr or {}).get("ts") or ts, "thumb": (fr or {}).get("url"),
         })
 
     dpd = full.get("development_priorities_detailed")
@@ -256,7 +258,7 @@ def derive_v2(report):
                     best = e
         if best:
             used_frames.add(best["url"])
-            return best["url"]
+            return {"url": best["url"], "ts": best.get("ts")}
         return None
 
     def _sm_tokens(s):
@@ -292,6 +294,7 @@ def derive_v2(report):
 
     def _sm_moment(key, text, pref, forced, prefer_event_title=False):
         ev = _sm_match_event(text, pref) or {}
+        fr = _close_frame(ev.get("timestamp")) if ev else None
         phrase = first_sentences(text, 60)
         ev_title = first_sentences(ev.get("title"), 60)
         title = (ev_title or phrase) if prefer_event_title else (phrase or ev_title)
@@ -300,8 +303,8 @@ def derive_v2(report):
             desc = ""
         return {
             "key": key, "title": title or "—", "desc": desc,
-            "timestamp": ev.get("timestamp"),
-            "thumb": _close_frame(ev.get("timestamp")) if ev else None,
+            "timestamp": (fr or {}).get("ts") or ev.get("timestamp"),
+            "thumb": (fr or {}).get("url"),
             "annot": forced or _annot_by_type.get(str(ev.get("action_type") or "").lower(), "circle"),
         }
 
