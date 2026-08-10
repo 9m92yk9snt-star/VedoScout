@@ -94,10 +94,21 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
     return () => document.removeEventListener("mouseleave", onLeave);
   }, [report.id, hasBonus]);
 
+  // The SNAPSHOT card shows the poster frame — captured at the FIRST (marker)
+  // anchor's exact second, so image + timestamp + proof video always match.
+  const snapMomentT = useMemo(() => {
+    const anchors = report.anchors || [];
+    const first = anchors[0];
+    return first?.t != null ? mmss(first.t) : null;
+  }, [report.anchors]);
+
+  // A different real tapped moment for the "Key moment" teaser (variety) —
+  // falls back to the snapshot moment when only one anchor exists.
   const keyMomentT = useMemo(() => {
     const anchors = report.anchors || [];
     if (!anchors.length) return null;
-    const mid = anchors[Math.floor(anchors.length / 2)];
+    const later = anchors.slice(1);
+    const mid = later.length ? later[Math.floor(later.length / 2)] : anchors[0];
     return mid?.t != null ? mmss(mid.t) : null;
   }, [report.anchors]);
 
@@ -145,7 +156,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
         <CinematicIntro
           playerName={pd.player_name}
           overall={typeof potential === "number" ? potential : null}
-          momentTs={keyMomentT}
+          momentTs={snapMomentT || keyMomentT}
           momentTitle={strengths[0]}
           image={poster ? `${ASSET_BASE}${poster}` : null}
           demo={false}
@@ -351,10 +362,10 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
               <div className="flex items-center gap-2.5 px-4 h-[42px] text-white shrink-0" style={{ background: SNAP_CARD_META.strength.header }}>
                 <Star className="w-4 h-4 shrink-0" />
                 <span className="text-[11.5px] font-extrabold tracking-[0.07em] uppercase truncate">{SNAP_CARD_META.strength.label}</span>
-                {keyMomentT && (
+                {snapMomentT && (
                   <>
                     <span className="ml-auto w-px h-5 bg-white/25 shrink-0" />
-                    <span className="font-barlow font-black text-[14px] tabular-nums shrink-0">{keyMomentT}</span>
+                    <span className="font-barlow font-black text-[14px] tabular-nums shrink-0">{snapMomentT}</span>
                   </>
                 )}
               </div>
@@ -373,14 +384,14 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
                 <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
                   {selfPlayer ? "A real moment from your match — confirmed by our analysis." : pFirst ? `A real moment from ${pFirst}'s match — confirmed by our analysis.` : "A real moment from the uploaded match — confirmed by our analysis."}
                 </p>
-                {keyMomentT && (
+                {snapMomentT && (
                   <button
                     type="button"
-                    onClick={() => openProof(keyMomentT)}
+                    onClick={() => openProof(snapMomentT)}
                     data-testid="fpl-proof-open"
                     className="mt-2.5 inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
                   >
-                    <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof · {keyMomentT}
+                    <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof · {snapMomentT}
                   </button>
                 )}
               </div>
