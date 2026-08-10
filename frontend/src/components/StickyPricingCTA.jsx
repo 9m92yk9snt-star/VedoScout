@@ -38,7 +38,7 @@ export default function StickyPricingCTA({ isLoggedIn = false }) {
     <div
       data-testid="sticky-pricing-cta-wrap"
       aria-hidden={!visible}
-      className={`lg:hidden fixed bottom-[62px] md:bottom-0 inset-x-0 z-40 px-4 pb-2 md:pb-4 pt-10 transition-all duration-300 ${
+      className={`lg:hidden fixed bottom-[calc(62px+env(safe-area-inset-bottom,0px))] md:bottom-0 inset-x-0 z-40 px-4 pb-2 md:pb-4 pt-10 transition-all duration-300 ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6 pointer-events-none"
       }`}
       style={{ background: "linear-gradient(to top, rgba(16,24,17,0.5) 30%, transparent)" }}

@@ -12732,7 +12732,7 @@ async def _send_receipt_email_for_session(session_id: str, session_obj=None) -> 
             cta_path=cta_path,
             next_note=next_note,
         )
-        asyncio.create_task(send_email_async(user_email, subject, html, text, category="receipt"))
+        asyncio.create_task(send_email_async(user_email, subject, html, text, category="receipt", track=False))
 
         # Realtime admin sales notification (operator inbox)
         admin_recipient = (

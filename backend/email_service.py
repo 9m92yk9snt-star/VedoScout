@@ -132,6 +132,7 @@ def send_email(
     text_body: Optional[str] = None,
     reply_to: Optional[str] = None,
     category: Optional[str] = None,
+    track: bool = True,
 ) -> bool:
     """Send ONE email synchronously via Gmail SMTP.
 
@@ -147,17 +148,19 @@ def send_email(
         logger.warning("Skipping email — invalid recipient: %r", to)
         return False
 
-    # open-tracking pixel (best-effort — some clients block remote images)
+    # open-tracking pixel (best-effort — some clients block remote images).
+    # Skipped for transactional mail (receipts) — trackers raise spam scores.
     import uuid as _uuid
     log_id = _uuid.uuid4().hex
-    pixel = (f'<img src="{_public_site_url()}/api/email/open/{log_id}.png" '
-             f'width="1" height="1" style="display:none" alt="">')
-    if "</body>" in html_body:
-        html_body = html_body.replace("</body>", pixel + "</body>", 1)
-    else:
-        html_body = html_body + pixel
-    # click tracking — every link becomes measurable via /api/email/click/{id}
-    html_body = _track_links(html_body, log_id)
+    if track:
+        pixel = (f'<img src="{_public_site_url()}/api/email/open/{log_id}.png" '
+                 f'width="1" height="1" style="display:none" alt="">')
+        if "</body>" in html_body:
+            html_body = html_body.replace("</body>", pixel + "</body>", 1)
+        else:
+            html_body = html_body + pixel
+        # click tracking — every link becomes measurable via /api/email/click/{id}
+        html_body = _track_links(html_body, log_id)
 
     msg = EmailMessage()
     msg["From"] = formataddr((cfg["from_name"], cfg["from_email"]))
@@ -198,13 +201,14 @@ async def send_email_async(
     text_body: Optional[str] = None,
     reply_to: Optional[str] = None,
     category: Optional[str] = None,
+    track: bool = True,
 ) -> bool:
     """Non-blocking wrapper — runs the sync send in a thread executor so it
     can be awaited from FastAPI endpoints without blocking the event loop."""
     return await asyncio.get_running_loop().run_in_executor(
         None,
         send_email,
-        to, subject, html_body, text_body, reply_to, category,
+        to, subject, html_body, text_body, reply_to, category, track,
     )
 
 
