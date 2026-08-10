@@ -12786,11 +12786,15 @@ async def stripe_webhook_embedded(request: Request):
             return {"received": True}
 
         txn = await db.payment_transactions.find_one({"session_id": session_id})
+        metadata = session.get("metadata") or {}
+        if not txn and metadata.get("brand") != "ScoutMePlay":
+            # Shared Stripe account — this session belongs to another project
+            # (e.g. 1millionbolde.dk). Never credit or email for foreign sessions.
+            return {"received": True}
         if not txn:
             # Webhook beat the frontend — insert a minimal txn so we can credit
             logger.warning(f"Webhook for unknown session {session_id} — crediting from metadata")
 
-        metadata = session.get("metadata") or {}
         kind = metadata.get("kind") or (txn or {}).get("kind") or "report_unlock"
 
         if kind == "prepay_upload":
