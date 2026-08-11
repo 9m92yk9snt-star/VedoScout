@@ -87,7 +87,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-[13.5px] font-extrabold tracking-[0.05em] uppercase">{s.name}</div>
-              <p className="text-[12px] text-[#68766B] leading-[1.5] mt-0.5 line-clamp-2 max-w-[280px]">{s.note}</p>
+              <p className="text-[12px] text-[#68766B] leading-[1.5] mt-0.5 max-w-[280px]">{s.note}</p>
               {s.timestamp && (
                 <button
                   type="button"
@@ -166,7 +166,7 @@ export function ActionTimelineCard({ actions, onPlayAt }) {
                   </span>
                 )}
               </span>
-              {a.description && <span className="block text-[11.5px] text-[#68766B] leading-[1.45] line-clamp-1">{a.description}</span>}
+              {a.description && <span className="block text-[11.5px] text-[#68766B] leading-[1.45]">{a.description}</span>}
             </span>
             {a.rating != null && (
               <span className="font-barlow font-black text-[17px] shrink-0 tabular-nums" style={{ color: AT_OUTCOME[a.outcome] || "#12402A" }}>
@@ -202,7 +202,7 @@ export function DevPrioritiesCard({ devPriorities }) {
                       {Number(p.score).toFixed(1)}<span className="text-[12px] text-[#C9B49C]">/10</span>
                     </span>
                   )}
-                  <p className="text-[12px] text-[#68766B] leading-[1.55] mt-1 line-clamp-3">{p.issue}</p>
+                  <p className="text-[12px] text-[#68766B] leading-[1.55] mt-1">{p.issue}</p>
                 </div>
               </div>
             );
@@ -219,7 +219,7 @@ export function DevPrioritiesCard({ devPriorities }) {
                 <div className="w-9 h-9 rounded-[10px] bg-[#FDF3EA] border border-[#F3D9BF] text-[#DD6B20] flex items-center justify-center shrink-0">
                   <Icon className="w-3.5 h-3.5" />
                 </div>
-                <p className="text-[12.5px] leading-[1.55] text-[#3C4A40] line-clamp-4">{p.howTo}</p>
+                <p className="text-[12.5px] leading-[1.55] text-[#3C4A40]">{p.howTo}</p>
               </div>
             );
           })}

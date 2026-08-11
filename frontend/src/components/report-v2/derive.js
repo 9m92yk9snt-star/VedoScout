@@ -44,7 +44,10 @@ function firstSentences(text, max = 160) {
   if (clean.length <= max) return clean;
   const cut = clean.slice(0, max);
   const lastDot = cut.lastIndexOf(". ");
-  return lastDot > 60 ? cut.slice(0, lastDot + 1) : cut.trimEnd() + "…";
+  if (lastDot > 40) return cut.slice(0, lastDot + 1);
+  // Never cut mid-sentence: if no boundary fits, show the whole first sentence.
+  const end = clean.indexOf(". ");
+  return end > 0 ? clean.slice(0, end + 1) : clean;
 }
 
 function collectSkills(full) {
@@ -115,7 +118,7 @@ export function deriveV2(report) {
       const fr = frames.find(ev?.timestamp);
       return {
         name: s.label, score: s.score, category: s.category,
-        note: firstSentences(s.notes, 130),
+        note: s.notes,
         timestamp: fr?.ts || ev?.timestamp || null,
         thumb: fr?.url || null,
         thumbVerified: !!fr?.verified,
@@ -126,12 +129,12 @@ export function deriveV2(report) {
   let devPriorities = Array.isArray(full.development_priorities_detailed) && full.development_priorities_detailed.length
     ? full.development_priorities_detailed.slice(0, 3).map((p) => ({
         name: p.name, score: typeof p.score === "number" ? p.score : null,
-        issue: firstSentences(p.issue, 150), howTo: firstSentences(p.how_to_improve, 150),
+        issue: p.issue || "", howTo: p.how_to_improve || "",
       }))
     : [...skills].sort((a, b) => a.score - b.score).slice(0, 3).map((s) => ({
         name: s.label, score: s.score,
-        issue: firstSentences(s.notes, 150),
-        howTo: firstSentences(s.verdict.split("focus on")[1] || s.verdict, 150),
+        issue: s.notes,
+        howTo: (s.verdict.split("focus on")[1] || s.verdict).trim(),
       }));
 
   // ---- Age comparison (6 skills, best percentile first) ----
@@ -156,7 +159,7 @@ export function deriveV2(report) {
       && String(a.identity_confidence || "").toLowerCase() !== "low");
   const snapFrameEntries = (full.video_comments || [])
     .filter((c) => c && c.frame_url && c.identity_verified !== false && c.timestamp)
-    .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url }));
+    .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url, comment: c.comment || "" }));
   const snapUsedFrames = new Set();
   const snapCloseFrame = (ts) => {
     const sec = tsToSeconds(ts);
@@ -171,6 +174,15 @@ export function deriveV2(report) {
     }
     if (best) snapUsedFrames.add(best.url);
     return best || null;
+  };
+  // Frame-first fallback: every snapshot card must show a REAL verified frame.
+  // When no timeline event matches the card's theme, use the next unused
+  // verified frame — displayed timestamp AND caption come from that exact
+  // moment (same-moment rule: photo, timestamp, text always align).
+  const takeAnyFrame = () => {
+    const e = snapFrameEntries.find((x) => !snapUsedFrames.has(x.url)) || null;
+    if (e) snapUsedFrames.add(e.url);
+    return e;
   };
   const snapTokens = (s) => String(s || "").toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 3);
   const snapTokMatch = (a, b) => a.startsWith(b.slice(0, 4)) || b.startsWith(a.slice(0, 4));
@@ -200,11 +212,19 @@ export function deriveV2(report) {
   };
   const buildSnapMoment = (key, text, pref, forcedAnnot, preferEventTitle = false) => {
     const ev = snapMatchEvent(text, pref);
-    const fr = ev ? snapCloseFrame(ev.timestamp) : null;
+    let fr = ev ? snapCloseFrame(ev.timestamp) : null;
+    let frComment = null;
+    if (!fr) {
+      fr = takeAnyFrame();
+      frComment = fr?.comment || null;
+    }
     const phrase = firstSentences(text, 60);
     const evTitle = firstSentences(ev?.title, 60);
-    const title = (preferEventTitle ? evTitle || phrase : phrase || evTitle) || "—";
-    let desc = firstSentences(ev?.description || (preferEventTitle ? "" : text), 145);
+    const fcTitle = firstSentences(frComment, 60);
+    const title = (preferEventTitle ? evTitle || fcTitle || phrase : phrase || evTitle || fcTitle) || "—";
+    // Caption always describes the moment in the photo: the matched event's
+    // description, or the scout's verified comment for the fallback frame.
+    let desc = firstSentences(ev?.description || frComment || (preferEventTitle ? "" : text), 220);
     if (desc === title) desc = "";
     return {
       key,

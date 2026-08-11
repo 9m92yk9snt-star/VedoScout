@@ -43,8 +43,9 @@ function useBuildProgress(reportId) {
   // Honest pacing: full generation typically takes 5-10 min. Ease 72→96 over
   // ~8 min and never claim "final check" until the very end.
   const pct = Math.min(96, Math.round(72 + 24 * (1 - Math.exp(-elapsed / 240))));
-  const etaMin = Math.max(1, Math.ceil((97 - pct) / 6));
-  return { pct, etaMin, elapsed };
+  // Real ticking countdown from the typical 8-minute build window.
+  const remaining = Math.max(0, Math.round(480 - elapsed));
+  return { pct, remaining, elapsed };
 }
 
 function ProgressRing({ pct }) {
@@ -92,7 +93,7 @@ function Gauge({ label, value }) {
 
 export default function PremiumBuildingDashboard({ report, user, error, onRetry }) {
   const navigate = useNavigate();
-  const { pct, etaMin, elapsed } = useBuildProgress(report.id);
+  const { pct, remaining, elapsed } = useBuildProgress(report.id);
   const [showVideo, setShowVideo] = useState(false);
   const [review, setReview] = useState(null);
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -197,9 +198,9 @@ export default function PremiumBuildingDashboard({ report, user, error, onRetry 
         ) : (
         <div className="relative rounded-[24px] overflow-hidden mt-4 shadow-xl" style={{ background: `linear-gradient(120deg, #0E2A1B 0%, ${INKG} 60%, #10241A 100%)` }} data-testid="pbd-hero">
           {heroImg && (
-            <div className="absolute inset-y-0 right-0 w-[46%] hidden sm:block" aria-hidden>
-              <img src={`${ASSET_BASE}${heroImg}`} alt="" className="w-full h-full object-cover opacity-70" />
-              <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${INKG} 0%, rgba(11,31,20,0.45) 55%, rgba(11,31,20,0.25) 100%)` }} />
+            <div className="absolute inset-0" aria-hidden data-testid="pbd-hero-bg">
+              <img src={`${ASSET_BASE}${heroImg}`} alt="" className="w-full h-full object-cover object-top opacity-30" />
+              <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${INKG} 8%, rgba(11,31,20,0.72) 55%, rgba(11,31,20,0.88) 100%)` }} />
             </div>
           )}
           <div className="relative p-6 md:p-8">
@@ -254,10 +255,15 @@ export default function PremiumBuildingDashboard({ report, user, error, onRetry 
             <div className="mt-5 flex flex-col items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-bold text-white" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.18)" }} data-testid="pbd-eta">
                 <Clock className="w-4 h-4" style={{ color: LIME }} />
-                {pct >= 94 ? (
+                {remaining <= 0 || pct >= 96 ? (
                   <>Finishing up — <span style={{ color: LIME }}>almost there</span></>
                 ) : (
-                  <>Estimated ready in <span style={{ color: LIME }}>~{etaMin} min</span></>
+                  <>
+                    Ready in{" "}
+                    <span className="font-barlow font-black text-[16px] tabular-nums tracking-wider" style={{ color: LIME }} data-testid="pbd-countdown">
+                      {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}
+                    </span>
+                  </>
                 )}
               </span>
               {elapsed > 720 && (

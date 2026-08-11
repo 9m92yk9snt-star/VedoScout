@@ -115,7 +115,11 @@ def first_sentences(text, max_len=160):
         return clean
     cut = clean[:max_len]
     last_dot = cut.rfind(". ")
-    return cut[:last_dot + 1] if last_dot > 60 else cut.rstrip() + "…"
+    if last_dot > 40:
+        return cut[:last_dot + 1]
+    # Never cut mid-sentence: fall back to the whole first sentence.
+    end = clean.find(". ")
+    return clean[:end + 1] if end > 0 else clean
 
 
 def _collect_skills(full):
@@ -237,11 +241,20 @@ def derive_v2(report):
                    if isinstance(a, dict) and a.get("timestamp") and (a.get("title") or a.get("description"))
                    and str(a.get("identity_confidence") or "").lower() != "low"]
     frame_entries = [
-        {"sec": ts_to_seconds(c.get("timestamp")), "ts": c.get("timestamp"), "url": c["frame_url"]}
+        {"sec": ts_to_seconds(c.get("timestamp")), "ts": c.get("timestamp"), "url": c["frame_url"],
+         "comment": c.get("comment") or ""}
         for c in (full.get("video_comments") or [])
         if isinstance(c, dict) and c.get("frame_url") and c.get("identity_verified") is not False and c.get("timestamp")
     ]
     used_frames, used_ev = set(), set()
+
+    def _take_any_frame():
+        # Frame-first fallback: snapshot cards must always show a real frame.
+        for e in frame_entries:
+            if e["url"] not in used_frames:
+                used_frames.add(e["url"])
+                return e
+        return None
 
     def _close_frame(ts):
         sec = ts_to_seconds(ts)
@@ -295,10 +308,17 @@ def derive_v2(report):
     def _sm_moment(key, text, pref, forced, prefer_event_title=False):
         ev = _sm_match_event(text, pref) or {}
         fr = _close_frame(ev.get("timestamp")) if ev else None
+        fr_comment = None
+        if not fr:
+            fb = _take_any_frame()
+            if fb:
+                fr = {"url": fb["url"], "ts": fb.get("ts")}
+                fr_comment = fb.get("comment") or None
         phrase = first_sentences(text, 60)
         ev_title = first_sentences(ev.get("title"), 60)
-        title = (ev_title or phrase) if prefer_event_title else (phrase or ev_title)
-        desc = first_sentences(ev.get("description") or ("" if prefer_event_title else text), 145)
+        fc_title = first_sentences(fr_comment, 60)
+        title = (ev_title or fc_title or phrase) if prefer_event_title else (phrase or ev_title or fc_title)
+        desc = first_sentences(ev.get("description") or fr_comment or ("" if prefer_event_title else text), 220)
         if desc == title:
             desc = ""
         return {
