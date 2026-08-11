@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCKUP · Free Preview med kategorier · ScoutMePlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#101B12;--green:#2E7D32;--dgreen:#12402A;--lime:#CCFF00;--bg:#EEF1EC;--muted:#5B6B5E;--card:#fff}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070B09;font-family:'DM Sans',sans-serif;color:var(--ink);display:flex;justify-content:center;padding:24px 0}
+.phone{width:390px;background:var(--bg);min-height:100vh;box-shadow:0 0 60px rgba(0,0,0,.8);padding-bottom:96px}
+.hdr{background:#0B120E;position:sticky;top:0;z-index:9;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;color:#fff;font-family:'Barlow Condensed';font-weight:900;font-size:20px;letter-spacing:.06em}
+.hdr .me{background:var(--lime);color:#0B120E;padding:0 4px;margin:0 1px}
+.hdr small{display:block;font-family:'DM Sans';font-size:7.5px;letter-spacing:.22em;color:#8FA396;font-weight:700;margin-top:1px}
+.wrap{padding:12px}
+.card{background:var(--card);border-radius:16px;box-shadow:0 2px 12px rgba(16,27,18,.07);overflow:hidden}
+.numtag{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:12.5px;letter-spacing:.12em}
+.numtag .n{background:#E7F3E4;color:var(--green);font-family:'Barlow Condensed';font-weight:900;border-radius:99px;padding:3px 10px;font-size:13px}
+.snap{padding:16px}
+.snap .top{display:flex;gap:14px;margin-top:14px;align-items:center}
+.snap img.face{width:96px;height:110px;object-fit:cover;border-radius:12px}
+.snap .who h1{font-family:'Barlow Condensed';font-weight:900;font-size:29px;line-height:.95;text-transform:uppercase}
+.snap .who .pos{color:var(--green);font-weight:800;font-size:13px;margin-top:4px}
+.snap .who .facts{color:var(--muted);font-size:12px;margin-top:5px;line-height:1.5}
+.gauge{margin-left:auto;text-align:center;position:relative;width:88px;flex-shrink:0}
+.gauge svg{transform:rotate(-90deg)}
+.gauge .num{position:absolute;top:24px;left:0;right:0;font-family:'Barlow Condensed';font-weight:900;font-size:30px;color:var(--green);filter:blur(10px)}
+.gauge .lock{position:absolute;top:26px;left:0;right:0;display:flex;justify-content:center}
+.gauge .lock span{width:30px;height:30px;border-radius:50%;background:#12402A;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px rgba(204,255,0,.45)}
+.gauge .lock svg{transform:none;width:14px;height:14px;color:var(--lime)}
+.gauge .lbl{position:absolute;top:58px;left:0;right:0;font-size:7.5px;font-weight:800;letter-spacing:.18em;color:var(--muted)}
+.quote{background:#F0F7EE;border-radius:12px;margin:14px 16px 16px;padding:13px 14px;font-size:13px;line-height:1.55;color:#25402C}
+.quote b{color:var(--green)}
+/* open proof */
+.proof{margin:0 12px;border-radius:16px;overflow:hidden;position:relative;border:2px solid var(--green)}
+.proof img{width:100%;height:190px;object-fit:cover;display:block}
+.proof .grad{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35) 0,transparent 30%,rgba(0,0,0,.88) 74%)}
+.proof .tag{position:absolute;top:10px;left:10px;font-size:9px;font-weight:800;letter-spacing:.13em;background:var(--lime);color:#0B120E;padding:4px 9px;border-radius:99px}
+.proof .open{position:absolute;top:10px;right:10px;font-size:9px;font-weight:800;letter-spacing:.13em;background:rgba(0,0,0,.6);padding:4px 9px;border-radius:99px;color:#fff}
+.proof .btm{position:absolute;left:13px;right:13px;bottom:12px;display:flex;align-items:flex-end;justify-content:space-between;color:#fff}
+.proof .t{font-family:'Barlow Condensed';font-weight:800;font-size:19px;text-transform:uppercase;line-height:1;max-width:200px}
+.proof .t small{display:block;font-family:'DM Sans';font-size:10.5px;color:#CFE0D4;text-transform:none;font-weight:400;margin-top:4px}
+.play{display:inline-flex;align-items:center;gap:5px;background:var(--lime);color:#0B120E;font-weight:800;font-size:11px;border-radius:99px;padding:7px 11px}
+.cats-h{display:flex;align-items:baseline;justify-content:space-between;padding:20px 14px 10px}
+.cats-h h2{font-family:'Barlow Condensed';font-weight:900;font-size:21px;text-transform:uppercase}
+.cats-h span{font-size:10px;color:var(--muted)}
+.cat{background:var(--card);border-radius:14px;box-shadow:0 2px 10px rgba(16,27,18,.06);margin:0 12px 10px;border-left:4px solid #C9D3C6;display:flex;align-items:center;gap:11px;padding:14px 13px;position:relative}
+.cat.open-cat{border-left-color:var(--green)}
+.cnum{color:var(--green);font-family:'Barlow Condensed';font-weight:900;font-size:16px;width:24px;flex-shrink:0}
+.cico{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.cico svg{width:24px;height:24px}
+.ct .t{font-weight:800;font-size:14px}
+.ct .d{color:var(--muted);font-size:11px;margin-top:2px;line-height:1.35}
+.lockchip{margin-left:auto;flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#12402A;display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(204,255,0,.28)}
+.lockchip svg{width:15px;height:15px;color:var(--lime)}
+.chip{margin-left:auto;flex-shrink:0;font-family:'Barlow Condensed';font-weight:900;font-size:18px;background:#DFF3D3;border-radius:10px;padding:6px 12px;color:var(--ink)}
+.blur-sc{filter:blur(7px);user-select:none}
+/* CTA */
+.cta{position:sticky;bottom:0;margin-top:14px;background:#0B120E;padding:13px 14px}
+.cta .row{display:flex;align-items:center;gap:10px}
+.cta .txt{color:#fff}
+.cta .txt .t{font-family:'Barlow Condensed';font-weight:900;font-size:17px;text-transform:uppercase;line-height:1}
+.cta .txt .s{color:#8FA396;font-size:10px;margin-top:2px}
+.cta .btn{margin-left:auto;background:var(--lime);color:#0B120E;font-family:'Barlow Condensed';font-weight:900;font-size:14px;letter-spacing:.08em;text-transform:uppercase;border-radius:99px;padding:12px 18px;white-space:nowrap}
+.mockhint{background:#1B0F00;color:#FFB020;font-size:11px;padding:8px 16px;text-align:center;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="phone">
+<div class="mockhint">MOCKUP — Free Preview med kategorier (dit indhold, ny struktur)</div>
+
+<div class="hdr"><div>SCOUT<span class="me">ME</span>PLAY<small>REAL PLAYERS. REAL OPPORTUNITIES.</small></div>
+<span style="font-size:9px;font-family:'DM Sans';font-weight:800;letter-spacing:.14em;color:#CCFF00;border:1px solid rgba(204,255,0,.35);border-radius:99px;padding:4px 9px">FREE PREVIEW</span></div>
+
+<div class="wrap">
+<!-- 01 SNAPSHOT (teaser) -->
+<div class="card snap">
+  <span class="numtag"><span class="n">01</span> PLAYER SNAPSHOT</span>
+  <div class="top">
+    <img class="face" src="/api/uploads/demo-player.jpg">
+    <div class="who">
+      <h1>Noah<br>Jensen</h1>
+      <div class="pos">Winger (RW)</div>
+      <div class="facts">🇩🇰 Danmark<br>12 år · U13</div>
+    </div>
+    <div class="gauge">
+      <svg width="88" height="88" viewBox="0 0 88 88"><circle cx="44" cy="44" r="38" stroke="#E8EDE6" stroke-width="7" fill="none"/><circle cx="44" cy="44" r="38" stroke="#2E7D32" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="239" stroke-dashoffset="48" opacity=".25"/></svg>
+      <div class="num">8.0</div>
+      <div class="lock"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+      <div class="lbl">OVERALL · LÅST</div>
+    </div>
+  </div>
+  <div class="quote">"Vi fandt noget i din kamp, Noah. <b>Én ting er helt åben herunder</b> — resten venter i din fulde rapport."</div>
+</div>
+
+<!-- DIT ÅBNE BEVIS -->
+<div class="cats-h"><h2>Dit gratis bevis</h2><span>Foto · tidspunkt · video = samme øjeblik</span></div>
+<div class="proof">
+  <img src="/api/uploads/demo-frame-dribble.jpg">
+  <div class="grad"></div>
+  <span class="tag">BIGGEST STRENGTH</span><span class="open">1 AF 4 ÅBEN</span>
+  <div class="btm">
+    <div class="t">Intelligent løb uden bold<small>Du starter dit løb, sekundet før pasningen spilles.</small></div>
+    <span class="play">▶ 00:26</span>
+  </div>
+</div>
+
+<!-- KATEGORIER (låst) -->
+<div class="cats-h"><h2>Din fulde analyse</h2><span>9 kategorier venter</span></div>
+
+<div class="cat open-cat">
+  <span class="cnum">02</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 2a4.5 4.5 0 00-4.4 5.5A4.5 4.5 0 004 16a4.5 4.5 0 005.5 4.4V2zM14.5 2a4.5 4.5 0 014.4 5.5A4.5 4.5 0 0120 16a4.5 4.5 0 01-5.5 4.4V2z"/></svg></span>
+  <div class="ct"><div class="t">FOOTBALL IQ & MENTALITET</div><div class="d">Din stærkeste kategori — se hvorfor i rapporten.</div></div>
+  <span class="chip blur-sc">8.2</span>
+</div>
+<div class="cat"><span class="cnum">03</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/></svg></span><div class="ct"><div class="t">TEKNIK</div><div class="d">Førsteberøring, dribling, afslutninger + video-beviser.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">04</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="4" r="2"/><path d="M4 17l4-1 2-4 3 2 3 6M10 12L8 7l5-1 3 4 4 1"/></svg></span><div class="ct"><div class="t">FYSIK & BEVÆGELSE</div><div class="d">Topfart km/t, sprints og bevægelses-kort.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">05</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div class="ct"><div class="t">TAKTIK</div><div class="d">Positionering, pres og løb uden bold.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">06</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M7 17v-5M12 17V7M17 17v-8"/></svg></span><div class="ct"><div class="t">KAMP-IMPACT</div><div class="d">Statistik + benchmark mod din årgang.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">07</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none"/></svg></span><div class="ct"><div class="t">SCOUT EVIDENCE</div><div class="d">3 låste foto-øjeblikke + 15 kamp-klip.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">08</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 7l-9 9-4-4-6 6"/><path d="M16 7h6v6"/></svg></span><div class="ct"><div class="t">UDVIKLING</div><div class="d">Din træningsplan + 12-mdr. roadmap.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">09</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span><div class="ct"><div class="t">FORÆLDRE-HJØRNET</div><div class="d">Se kampen sammen + brev til spilleren.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+<div class="cat"><span class="cnum">10</span><span class="cico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 01-10 0V4z"/></svg></span><div class="ct"><div class="t">SCOUT VERDICT</div><div class="d">Konklusionen + hvad en scout ser efter næste gang.</div></div><span class="lockchip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></span></div>
+</div>
+
+<div class="cta">
+  <div class="row">
+    <div class="txt"><div class="t">Lås hele analysen op</div><div class="s">9 kategorier · alle beviser · din plan · PDF</div></div>
+    <span class="btn">$129 · Lås op</span>
+  </div>
+</div>
+</div>
+</body>
+</html>

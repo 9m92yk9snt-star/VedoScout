@@ -1,15 +1,15 @@
 // Free Preview Landing — the conversion-first page free users see after the
-// AI preview finishes (permanent until they unlock). Replaces the old long
-// report-style preview. Every visible fact is REAL (video, strengths count,
-// tap timestamps); locked values are never invented — they unlock with payment.
+// preview finishes (permanent until they unlock). Approved category layout
+// (mockup-free-categories.html): 01 Player Snapshot → your free proof →
+// 9 locked numbered categories → teasers → packages. Every visible fact is
+// REAL (video, strengths, tap timestamps); locked values are never invented.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Lock, Play, ShieldCheck, Star, TrendingUp, Zap, Target, FileText,
-  BarChart3, Map, ClipboardList, Brain, Shuffle, Gift, ChevronRight,
-  CheckCircle2, Users, MessageSquare, Download, Camera,
+  Lock, Play, ShieldCheck, Star, FileText, BarChart3, ClipboardList, Brain,
+  Gift, ChevronRight, CheckCircle2, Users, MessageSquare, Download, Zap,
+  Activity, Shield, Video, TrendingUp, Trophy,
 } from "lucide-react";
 import { ASSET_BASE } from "@/lib/api";
-import { SnapshotAnnot, SNAP_CARD_META } from "@/components/report-v2/snapshots";
 import { CinematicIntro } from "@/components/report-v2/cinematic";
 import { ProofPlayerSheet } from "@/components/report-v2/proofplayer";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
@@ -19,16 +19,6 @@ import ShareUnlockModal from "@/components/ShareUnlockModal";
 
 const LIME = "#CCFF00";
 const INKG = "#0B1F14";
-
-const MISSING = [
-  { icon: Zap, label: "25 Skill Ratings" },
-  { icon: Star, label: "Grow Your Game — video-proven lessons" },
-  { icon: BarChart3, label: "Benchmarks & Age Comparisons" },
-  { icon: Map, label: "Position Analysis" },
-  { icon: ClipboardList, label: "Development Plan" },
-  { icon: Brain, label: "Mental & Personality Profile" },
-  { icon: Shuffle, label: "Playing Style & Comparisons" },
-];
 
 const CTA_FEATURES = [
   { icon: FileText, label: "Complete Player Report" },
@@ -40,6 +30,19 @@ const CTA_FEATURES = [
   { icon: MessageSquare, label: "Talk With Scout" },
 ];
 
+// The 9 locked categories — same numbering & names as the premium report.
+const LOCKED_CATS = [
+  { key: "iq", num: "02", icon: Brain, title: "FOOTBALL IQ & MENTALITY", desc: "Scanning, decisions, mentality and attitude.", blurScore: "8.2" },
+  { key: "tech", num: "03", icon: Zap, title: "TECHNIQUE", desc: "First touch, dribbling, finishing + video proof." },
+  { key: "phys", num: "04", icon: Activity, title: "PHYSICAL & MOVEMENT", desc: "Top speed km/h, sprints and movement map." },
+  { key: "tact", num: "05", icon: Shield, title: "TACTICAL", desc: "Positioning, pressing and off-ball runs." },
+  { key: "impact", num: "06", icon: BarChart3, title: "MATCH IMPACT", desc: "Match stats + benchmark against your age group." },
+  { key: "evidence", num: "07", icon: Video, title: "SCOUT EVIDENCE", desc: "3 locked photo moments + timestamped match clips.", proofTease: true },
+  { key: "development", num: "08", icon: TrendingUp, title: "DEVELOPMENT", desc: "Your training plan + 12-month roadmap." },
+  { key: "parents", num: "09", icon: Users, title: "PARENTS' CORNER", desc: "Watch the match together + a letter to the player." },
+  { key: "verdict", num: "10", icon: Trophy, title: "SCOUT VERDICT", desc: "The conclusion + what a scout looks for next time." },
+];
+
 const potentialLabel = (v) =>
   v >= 85 ? "EXCELLENT" : v >= 75 ? "STRONG" : v >= 65 ? "GOOD" : v >= 50 ? "PROMISING" : "DEVELOPING";
 
@@ -48,22 +51,46 @@ const mmss = (t) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-function LockedBlur({ children, testid }) {
+const resolveUrl = (url) => {
+  if (!url) return null;
+  return /^https?:\/\//i.test(url) ? url : `${ASSET_BASE}${url}`;
+};
+
+function FreeGauge({ potential }) {
+  const C = 2 * Math.PI * 38;
+  if (potential != null) {
+    const offset = C * (1 - potential / 100);
+    return (
+      <div className="ml-auto text-center relative w-[92px] shrink-0" data-testid="fpl-gauge-open">
+        <svg width="92" height="92" viewBox="0 0 92 92" className="-rotate-90">
+          <circle cx="46" cy="46" r="38" stroke="#E8EDE6" strokeWidth="7" fill="none" />
+          <circle cx="46" cy="46" r="38" stroke="#2E7D32" strokeWidth="7" fill="none" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={offset} />
+        </svg>
+        <div className="absolute top-[27px] inset-x-0 font-barlow font-black text-[27px] text-[#12402A] leading-none" data-testid="fpl-potential-score">{potential}</div>
+        <div className="absolute top-[55px] inset-x-0 text-[7.5px] font-extrabold tracking-[0.18em] text-[#5B6B5E]">POTENTIAL</div>
+        <div className="mt-1 text-[#2E7D32] text-[10px] font-extrabold">{potentialLabel(potential)}</div>
+      </div>
+    );
+  }
   return (
-    <div className="relative overflow-hidden rounded-xl" data-testid={testid}>
-      <div className="blur-[7px] select-none pointer-events-none" aria-hidden>{children}</div>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="w-10 h-10 rounded-full bg-[#12211A] flex items-center justify-center shadow-lg">
-          <Lock className="w-4 h-4 text-white" />
+    <div className="ml-auto text-center relative w-[92px] shrink-0" data-testid="fpl-gauge-locked">
+      <svg width="92" height="92" viewBox="0 0 92 92" className="-rotate-90">
+        <circle cx="46" cy="46" r="38" stroke="#E8EDE6" strokeWidth="7" fill="none" />
+        <circle cx="46" cy="46" r="38" stroke="#2E7D32" strokeWidth="7" fill="none" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * 0.2} opacity="0.25" />
+      </svg>
+      <div className="absolute top-[27px] inset-x-0 font-barlow font-black text-[27px] text-[#2E7D32] leading-none blur-[10px] select-none" aria-hidden>84</div>
+      <div className="absolute top-[26px] inset-x-0 flex justify-center">
+        <span className="w-8 h-8 rounded-full bg-[#12402A] flex items-center justify-center" style={{ boxShadow: "0 0 16px rgba(204,255,0,0.45)" }}>
+          <Lock className="w-3.5 h-3.5" style={{ color: LIME }} />
         </span>
       </div>
+      <div className="absolute top-[60px] inset-x-0 text-[7.5px] font-extrabold tracking-[0.18em] text-[#5B6B5E]">OVERALL · LOCKED</div>
     </div>
   );
 }
 
 export default function FreePreviewLanding({ report, user, onUnlockSingle, unlocking }) {
   const videoRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
   const pd = report.player_details || {};
   const preview = report.preview || {};
   const teaser = report.teaser || {};
@@ -80,6 +107,8 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
   const [bonusStory, setBonusStory] = useState(null);
   const hasBonus = !!(report.score_meaning_teaser?.bonus || bonusStory);
 
+  const photo = resolveUrl(report.display_crop_url) || resolveUrl(report.subject_crop_url) || resolveUrl(report.marker_url) || resolveUrl(report.poster_url);
+
   useEffect(() => {
     if (hasBonus) return undefined;
     const key = `smp_exit_${report.id}`;
@@ -94,7 +123,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
     return () => document.removeEventListener("mouseleave", onLeave);
   }, [report.id, hasBonus]);
 
-  // The SNAPSHOT card shows the poster frame — captured at the FIRST (marker)
+  // The free proof shows the poster frame — captured at the FIRST (marker)
   // anchor's exact second, so image + timestamp + proof video always match.
   const snapMomentT = useMemo(() => {
     const anchors = report.anchors || [];
@@ -102,32 +131,12 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
     return first?.t != null ? mmss(first.t) : null;
   }, [report.anchors]);
 
-  // A different real tapped moment for the "Key moment" teaser (variety) —
-  // falls back to the snapshot moment when only one anchor exists.
-  const keyMomentT = useMemo(() => {
-    const anchors = report.anchors || [];
-    if (!anchors.length) return null;
-    const later = anchors.slice(1);
-    const mid = later.length ? later[Math.floor(later.length / 2)] : anchors[0];
-    return mid?.t != null ? mmss(mid.t) : null;
-  }, [report.anchors]);
-
-  const startVideo = () => {
-    setPlaying(true);
-    setTimeout(() => {
-      const v = videoRef.current;
-      if (v) { const p = v.play(); if (p?.catch) p.catch(() => {}); }
-    }, 60);
-  };
-
   const scrollToPackages = () => {
     document.getElementById("scout-packages")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const stars = potential ? Math.round(potential / 20) : 0;
-
-  // ── Proof mini-player: real video proof for the open moment + key moment,
-  //    locked teaser for the 3 locked snapshot cards ──
+  // ── Proof mini-player: real video proof for the open moment, locked teaser
+  //    for everything still waiting in the full report ──
   const [proof, setProof] = useState(null);
   const openProof = (ts) => {
     try { videoRef.current?.pause(); } catch { /* noop */ }
@@ -135,9 +144,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
   };
   const openLockedProof = () => setProof({ ts: null, locked: true, key: Date.now() });
 
-  // ── Cinematic intro (free preview variant): potential counts up, ends on
-  //    "Unlock the full story". Separate seen-key so the premium intro still
-  //    plays after purchase. ──
+  // ── Cinematic intro (free preview variant) ──
   const cineKey = `smp_cine_seen_${report.id || "report"}_fp`;
   const [showCine, setShowCine] = useState(() => {
     try {
@@ -156,7 +163,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
         <CinematicIntro
           playerName={pd.player_name}
           overall={typeof potential === "number" ? potential : null}
-          momentTs={snapMomentT || keyMomentT}
+          momentTs={snapMomentT}
           momentTitle={strengths[0]}
           image={poster ? `${ASSET_BASE}${poster}` : null}
           demo={false}
@@ -179,34 +186,22 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
       />
       <div className="max-w-[880px] mx-auto">
         {/* ── Header ── */}
-        <div className="flex flex-wrap items-start justify-between gap-3" data-testid="fpl-header">
+        <div className="flex flex-wrap items-center justify-between gap-3" data-testid="fpl-header">
           <div>
-            <h1 className="font-barlow font-black text-[26px] md:text-[30px] text-[#12211A] leading-tight">
+            <h1 className="font-barlow font-black text-[24px] md:text-[28px] text-[#12211A] leading-tight">
               Hi {firstName}! <span aria-hidden>👋</span>
             </h1>
-            <div className="text-[10.5px] font-extrabold tracking-[0.18em] uppercase text-[#12402A] mt-0.5">
-              ScoutMe Pro Benchmarked Analysis
-            </div>
-            <p className="text-[13px] text-[#5C6657] mt-0.5">Here&rsquo;s your free preview</p>
+            <p className="text-[12.5px] text-[#5C6657] mt-0.5">Here&rsquo;s your free preview</p>
           </div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-[#12211A] flex items-center justify-center">
-                <Lock className="w-3.5 h-3.5" style={{ color: LIME }} />
-              </span>
-              <div className="text-[10px] leading-tight">
-                <div className="font-extrabold text-[#12211A]">100% PRIVATE &amp; SECURE</div>
-                <div className="text-[#5C6657]">Only you can see this preview</div>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1.5 bg-white border border-[#E5DFCE] rounded-full px-3.5 py-2 text-[10px] font-extrabold tracking-[0.08em] uppercase text-[#12211A]">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 bg-white border border-[#E5DFCE] rounded-full px-3 py-1.5 text-[9.5px] font-extrabold tracking-[0.08em] uppercase text-[#12211A]">
               Preview complete <CheckCircle2 className="w-3.5 h-3.5 text-[#2F8F4E]" />
             </span>
             <button
               type="button"
               onClick={() => setShowCine(true)}
               data-testid="cinematic-replay-btn"
-              className="inline-flex items-center gap-1.5 bg-[#12211A] rounded-full px-3.5 py-2 text-[10px] font-extrabold tracking-[0.08em] uppercase hover:bg-[#1F4F2F] transition-colors"
+              className="inline-flex items-center gap-1.5 bg-[#12211A] rounded-full px-3 py-1.5 text-[9.5px] font-extrabold tracking-[0.08em] uppercase hover:bg-[#1F4F2F] transition-colors"
               style={{ color: LIME }}
             >
               <Play className="w-3 h-3 fill-current" /> Play intro
@@ -214,384 +209,120 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           </div>
         </div>
 
-        {/* ── Hero: video + overall potential ── */}
-        <div className="rounded-[22px] overflow-hidden mt-4 grid md:grid-cols-[1.5fr_1fr]" style={{ background: INKG }} data-testid="fpl-hero">
-          <div className="relative aspect-video md:aspect-auto md:min-h-[280px] bg-black">
-            {playing && report.video_url ? (
-              <video
-                ref={videoRef}
-                src={`${ASSET_BASE}${report.video_url}`}
-                poster={poster ? `${ASSET_BASE}${poster}` : undefined}
-                controls playsInline
-                className="absolute inset-0 w-full h-full object-contain bg-black"
-                data-testid="fpl-video-player"
-              />
-            ) : (
-              <button type="button" onClick={startVideo} className="absolute inset-0 w-full group" data-testid="fpl-video">
-                {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover" />}
-                <span className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors" />
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <span className="w-16 h-16 rounded-full bg-white/85 backdrop-blur flex items-center justify-center transition-transform group-hover:scale-110">
-                    <Play className="w-6 h-6 ml-1 text-[#12211A] fill-current" />
-                  </span>
-                </span>
-                <span className="absolute bottom-3 left-3 bg-black/70 text-white text-[10px] font-extrabold tracking-[0.08em] px-2.5 py-1 rounded">
-                  PREVIEW CLIP
-                </span>
-              </button>
+        {/* ── 01 PLAYER SNAPSHOT ── */}
+        <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(16,27,18,0.07)] p-4 mt-4 max-w-[640px] mx-auto md:max-w-none" data-testid="fpl-snapshot-card">
+          <span className="inline-flex items-center gap-2 font-extrabold text-[12.5px] tracking-[0.12em] text-[#101B12]">
+            <span className="bg-[#E7F3E4] text-[#2E7D32] font-barlow font-black rounded-full px-2.5 py-0.5 text-[13px]">01</span>
+            PLAYER SNAPSHOT
+          </span>
+          <div className="flex items-center gap-3.5 mt-3.5">
+            {photo && (
+              <img src={photo} alt={pd.player_name || "Player"} className="w-[94px] h-[108px] object-cover rounded-[12px] shrink-0" data-testid="fpl-player-photo" />
             )}
+            <div className="min-w-0">
+              <h2 className="font-barlow font-black text-[26px] leading-[0.95] uppercase text-[#101B12]" data-testid="fpl-player-name">
+                {pd.player_name || "Your player"}
+              </h2>
+              {pd.position && <div className="text-[#2E7D32] font-extrabold text-[12.5px] mt-1">{pd.position}</div>}
+              <div className="text-[#5B6B5E] text-[12px] mt-1 leading-[1.5]">
+                {[pd.age ? `${pd.age}` : null, pd.preferred_foot ? `${pd.preferred_foot} foot` : null, pd.current_club || null].filter(Boolean).join(" · ")}
+              </div>
+            </div>
+            <FreeGauge potential={typeof potential === "number" ? potential : null} />
           </div>
-          <div className="p-6 flex flex-col justify-center" data-testid="fpl-potential">
-            <div className="text-[10.5px] font-extrabold tracking-[0.18em] uppercase text-white/70">Overall potential</div>
-            {potential ? (
-              <>
-                <div className="flex items-baseline gap-1.5 mt-1">
-                  <span className="font-barlow font-black text-[58px] leading-none" style={{ color: LIME }} data-testid="fpl-potential-score">{potential}</span>
-                  <span className="text-white/60 font-bold text-[16px]">/100</span>
-                </div>
-                <div className="flex items-center gap-1 mt-2">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} className="w-5 h-5" style={{ color: i <= stars ? LIME : "rgba(255,255,255,0.25)", fill: i <= stars ? LIME : "none" }} />
-                  ))}
-                </div>
-                <div className="font-barlow font-black text-[20px] mt-2" style={{ color: LIME }}>{potentialLabel(potential)}</div>
-                <p className="text-white/75 text-[13px] leading-relaxed mt-2">
-                  {selfPlayer ? "You show real potential — everything you could become is ready to open." : pFirst ? `${pFirst} shows real potential — everything he could become is ready to open.` : "The player shows real potential. The complete evaluation is ready to unlock."}
-                </p>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="font-barlow font-black text-[52px] leading-none blur-[9px] select-none" style={{ color: LIME }} aria-hidden>84</span>
-                  <span className="w-11 h-11 rounded-full bg-white/10 border border-white/25 flex items-center justify-center">
-                    <Lock className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
-                  </span>
-                </div>
-                <div className="font-barlow font-black text-[17px] mt-2 text-white/90">SCORE CALCULATED</div>
-                <p className="text-white/70 text-[13px] leading-relaxed mt-1.5">
-                  {selfPlayer ? "Your full 0-100 potential score is written into your complete evaluation — see what the match says you can become." : pFirst ? `${pFirst}'s full 0-100 potential score is written into his complete evaluation — see what the match says he can become.` : "The full 0-100 potential score is computed with the complete evaluation — unlock to reveal it."}
-                </p>
-              </>
-            )}
+          <div className="bg-[#F0F7EE] rounded-[12px] mt-3.5 px-3.5 py-3 text-[13px] leading-[1.55] text-[#25402C]" data-testid="fpl-snapshot-quote">
+            &ldquo;We found something in {selfPlayer ? "your" : pFirst ? `${pFirst}'s` : "this"} match{pFirst && !selfPlayer ? "" : ""}.{" "}
+            <b className="text-[#2E7D32]">One moment is fully open below</b> — the rest is waiting in the full report.&rdquo;
           </div>
         </div>
 
-        {/* ── What we discovered ── */}
-        <div className="rounded-[22px] mt-4 p-6 grid sm:grid-cols-[auto_1fr_auto] items-center gap-5" style={{ background: INKG }} data-testid="fpl-discovered">
-          <span className="w-16 h-16 rounded-full border-[5px] flex items-center justify-center font-barlow font-black text-[28px] mx-auto sm:mx-0" style={{ borderColor: LIME, color: LIME }}>?</span>
-          <div className="text-center sm:text-left">
-            <div className="text-[10.5px] font-extrabold tracking-[0.2em] uppercase" style={{ color: LIME }}>What we discovered…</div>
-            <div className="font-barlow font-black text-white text-[20px] md:text-[22px] leading-tight mt-1">
-              {selfPlayer ? "There's something special in your game that most players never get to see." : pFirst ? `There's something special in ${pFirst}'s game that most parents never get to see.` : "There's something special in this game that most people miss."}
-            </div>
-            <p className="text-white/70 text-[13px] mt-1.5">
-              ScoutMe Pro Intelligence found {strengths.length || "several"} strengths in {selfPlayer ? "your game" : pFirst ? `${pFirst}'s game` : "this clip"} — one could change everything{selfPlayer ? " for you" : pFirst ? " for him" : ""}. Unlock the full report to see what it is.
-            </p>
-          </div>
-          <div className="flex flex-col items-center gap-1.5 mx-auto sm:mx-0">
-            <span className="w-14 h-14 rounded-full bg-[#12211A] border border-white/15 flex items-center justify-center animate-pulse">
-              <Lock className="w-5 h-5 text-white" />
+        {/* ── YOUR FREE PROOF ── */}
+        <div className="flex items-baseline justify-between px-1 pt-6 pb-2.5 max-w-[640px] mx-auto md:max-w-none">
+          <h2 className="font-barlow font-black text-[20px] uppercase tracking-[0.02em] text-[#101B12]">Your free proof</h2>
+          <span className="text-[10px] text-[#5B6B5E]">Photo · timestamp · video = same moment</span>
+        </div>
+        <div className="relative rounded-[16px] overflow-hidden border-2 border-[#2E7D32] max-w-[640px] mx-auto md:max-w-none" data-testid="fpl-free-proof">
+          <div className="relative h-[200px] md:h-[280px] bg-[#0B1F14]">
+            {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />}
+            <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,rgba(0,0,0,0.35) 0,transparent 30%,rgba(0,0,0,0.88) 74%)" }} />
+            <span className="absolute top-2.5 left-2.5 text-[9px] font-extrabold tracking-[0.13em] rounded-full px-2.5 py-1" style={{ background: LIME, color: "#0B120E" }}>
+              BIGGEST STRENGTH
             </span>
-            <span className="text-white/70 text-[9.5px] font-extrabold tracking-[0.08em] uppercase text-center leading-tight">Hidden strength<br />locked</span>
-          </div>
-        </div>
-
-        {/* ── Preview insights ── */}
-        <div className="mt-5" data-testid="fpl-insights">
-          <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.16em] uppercase text-[#12402A]">
-            <TrendingUp className="w-4 h-4" /> Preview insights
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2.5">
-            <div className="bg-white rounded-2xl border border-[#E9E4D5] p-4 text-center shadow-sm" data-testid="fpl-strongest">
-              <div className="text-[9.5px] font-extrabold tracking-[0.12em] uppercase text-[#5C6657]">Strongest area</div>
-              <span className="w-12 h-12 rounded-full bg-[#F3F8E1] flex items-center justify-center mx-auto mt-3">
-                <Zap className="w-5 h-5 text-[#5C7A00]" />
-              </span>
-              <div className="font-barlow font-black text-[15px] text-[#12211A] mt-2.5 leading-tight">
-                {(strengths[0] || "Movement").toUpperCase()}
-              </div>
-              <div className="text-[11.5px] text-[#5C6657] mt-0.5">Above Average</div>
-              <div className="h-1.5 rounded-full bg-[#EDE9DB] mt-3 overflow-hidden">
-                <div className="h-full w-[72%] rounded-full" style={{ background: "linear-gradient(90deg,#2F8F4E,#9FC400)" }} />
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E9E4D5] p-4 text-center shadow-sm">
-              <div className="text-[9.5px] font-extrabold tracking-[0.12em] uppercase text-[#5C6657]">Top strength</div>
-              <LockedBlur testid="fpl-top-strength-locked">
-                <div className="py-5">
-                  <div className="mx-auto w-24 h-4 rounded bg-[#9FC400]/60" />
-                  <div className="mx-auto w-32 h-3 rounded bg-[#C9C4B4] mt-2" />
-                </div>
-              </LockedBlur>
-              <div className="text-[11.5px] font-semibold text-[#12211A] mt-2 leading-snug">{selfPlayer ? "Reveal your biggest strength — the thing you do best" : pFirst ? `Reveal ${pFirst}'s biggest strength — the thing he does best` : "Unlock to reveal your biggest strength"}</div>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E9E4D5] p-4 text-center shadow-sm">
-              <div className="text-[9.5px] font-extrabold tracking-[0.12em] uppercase text-[#5C6657]">Needs to improve</div>
-              <LockedBlur testid="fpl-improve-locked">
-                <div className="py-5">
-                  <div className="mx-auto w-24 h-4 rounded bg-[#8FA0C9]/60" />
-                  <div className="mx-auto w-32 h-3 rounded bg-[#C9C4B4] mt-2" />
-                </div>
-              </LockedBlur>
-              <div className="text-[11.5px] font-semibold text-[#12211A] mt-2 leading-snug">{selfPlayer ? "See where you can grow fastest" : pFirst ? `See where ${pFirst} can grow fastest` : "Unlock to see where you can improve most"}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Snapshot teaser: 1 real moment unlocked, 3 locked (same design as premium) ── */}
-        <div className="mt-5 bg-[#F6F3E8] border border-[#E5DFCE] rounded-[22px] p-4 md:p-5" data-testid="fpl-snapshots">
-          <div className="flex items-start justify-between flex-wrap gap-3">
-            <div className="flex items-start gap-3">
-              <span className="w-[44px] h-[44px] rounded-[13px] bg-[#E9F1E6] flex items-center justify-center shrink-0">
-                <Camera className="w-5 h-5 text-[#1E5B3C]" />
-              </span>
-              <div>
-                <div className="font-barlow font-black text-[22px] md:text-[26px] leading-none tracking-[0.01em] text-[#101B12] uppercase">Snapshot</div>
-                <p className="text-[12.5px] text-[#3C4A40] mt-1">
-                  The key moments we found in <span className="text-[#1E5B3C] font-semibold">{selfPlayer ? "your" : pFirst ? `${pFirst}'s` : "the"}</span> match.
-                </p>
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1.5 bg-[#12211A] text-white text-[9.5px] font-extrabold tracking-[0.08em] uppercase px-2.5 py-1 rounded-full" data-testid="fpl-snapshots-count">
-              1 of 4 unlocked
+            <span className="absolute top-2.5 right-2.5 text-[9px] font-extrabold tracking-[0.13em] rounded-full px-2.5 py-1 bg-black/60 text-white">
+              1 OF 4 OPEN
             </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {/* Unlocked card — 100% real: the user's own frame + confirmed strength */}
-            <div data-testid="fpl-snapshot-open" className="rounded-[16px] overflow-hidden border border-[#E5DFCE] bg-[#FBFAF2] shadow-[0_3px_14px_rgba(30,50,35,0.08)] flex flex-col">
-              <div className="flex items-center gap-2.5 px-4 h-[42px] text-white shrink-0" style={{ background: SNAP_CARD_META.strength.header }}>
-                <Star className="w-4 h-4 shrink-0" />
-                <span className="text-[11.5px] font-extrabold tracking-[0.07em] uppercase truncate">{SNAP_CARD_META.strength.label}</span>
-                {snapMomentT && (
-                  <>
-                    <span className="ml-auto w-px h-5 bg-white/25 shrink-0" />
-                    <span className="font-barlow font-black text-[14px] tabular-nums shrink-0">{snapMomentT}</span>
-                  </>
-                )}
-              </div>
-              <div className="relative h-[180px] md:h-[200px] bg-[#0B1F14] shrink-0">
-                {poster ? (
-                  <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover" aria-hidden />
-                ) : (
-                  <div className="absolute inset-0" style={{ background: "linear-gradient(160deg,#1B4430,#0B1F14)" }} />
-                )}
-                <SnapshotAnnot type="path" />
-              </div>
-              <div className="px-4 py-3.5 flex-1">
-                <div className="text-[16px] font-extrabold text-[#12211A] leading-snug" data-testid="fpl-snapshot-open-title">
-                  {strengths[0] || "Strongest area of the match"}
-                </div>
-                <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
-                  {selfPlayer ? "A real moment from your match — confirmed by our analysis." : pFirst ? `A real moment from ${pFirst}'s match — confirmed by our analysis.` : "A real moment from the uploaded match — confirmed by our analysis."}
-                </p>
-                {snapMomentT && (
-                  <button
-                    type="button"
-                    onClick={() => openProof(snapMomentT)}
-                    data-testid="fpl-proof-open"
-                    className="mt-2.5 inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
-                  >
-                    <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof · {snapMomentT}
-                  </button>
-                )}
-              </div>
-            </div>
-            {/* Locked cards */}
-            {[
-              { key: "noticed", tease: "What our analysis noticed in one exact moment" },
-              { key: "hidden", tease: "A talent most people watching would miss" },
-              { key: "develop", tease: "The fastest way to improve — shown on video" },
-            ].map(({ key, tease }, i) => {
-              const meta = SNAP_CARD_META[key];
-              return (
-                <div key={key} data-testid={`fpl-snapshot-locked-${i}`} className="rounded-[16px] overflow-hidden border border-[#E5DFCE] bg-[#FBFAF2] shadow-[0_3px_14px_rgba(30,50,35,0.08)] flex flex-col">
-                  <div className="flex items-center gap-2.5 px-4 h-[42px] text-white shrink-0" style={{ background: meta.header }}>
-                    <meta.Icon className="w-4 h-4 shrink-0" />
-                    <span className="text-[11.5px] font-extrabold tracking-[0.07em] uppercase truncate">{meta.label}</span>
-                    <span className="ml-auto w-px h-5 bg-white/25 shrink-0" />
-                    <Lock className="w-3.5 h-3.5 shrink-0" />
-                  </div>
-                  <div className="relative h-[180px] md:h-[200px] bg-[#0B1F14] shrink-0">
-                    {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="absolute inset-0 w-full h-full object-cover blur-[9px] scale-110 opacity-60" aria-hidden />}
-                    <span className="absolute inset-0 flex items-center justify-center">
-                      <span className="w-11 h-11 rounded-full bg-[#12211A] border border-white/20 flex items-center justify-center shadow-lg">
-                        <Lock className="w-4 h-4 text-white" />
-                      </span>
-                    </span>
-                  </div>
-                  <div className="px-4 py-3.5 flex-1">
-                    <div className="text-[14px] font-extrabold text-[#12211A] leading-snug">{tease}</div>
-                    <p className="text-[11px] text-[#8B957F] font-extrabold uppercase tracking-[0.08em] mt-1">Unlocks with the full report</p>
-                    <button
-                      type="button"
-                      onClick={openLockedProof}
-                      data-testid={`fpl-proof-locked-${i}`}
-                      className="mt-2.5 inline-flex items-center gap-1.5 bg-[#EDE9DB] text-[#5C6657] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform hover:bg-[#E3DECB]"
-                    >
-                      <Lock className="w-2.5 h-2.5" /> See the proof
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={scrollToPackages}
-            data-testid="fpl-snapshots-unlock"
-            className="mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-ink text-white font-black text-[12px] uppercase tracking-wider px-6 py-3 rounded-xl hover:bg-[#1F4F2F] transition-colors"
-          >
-            Unlock all 4 moments <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* ── Key moment + what you're missing ── */}
-        <div className="grid md:grid-cols-[1fr_1.15fr] gap-4 mt-5">
-          <div data-testid="fpl-key-moment">
-            <div className="flex items-center gap-2 text-[11px] font-extrabold tracking-[0.16em] uppercase text-[#12402A]">
-              <Star className="w-4 h-4" /> Key moment <span className="text-[#8B957F] normal-case tracking-normal font-bold">(preview)</span>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E9E4D5] p-4 mt-2.5 flex gap-4 shadow-sm">
-              <div className="relative w-28 h-28 rounded-xl overflow-hidden flex-shrink-0 bg-[#0E2A1B]">
-                {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="w-full h-full object-cover blur-[8px] scale-110" aria-hidden />}
-                <span className="absolute inset-0 flex items-center justify-center">
-                  <span className="w-10 h-10 rounded-full bg-[#12211A] flex items-center justify-center">
-                    <Lock className="w-4 h-4 text-white" />
-                  </span>
-                </span>
-              </div>
+            <div className="absolute left-3.5 right-3.5 bottom-3 flex items-end justify-between gap-3 text-white">
               <div className="min-w-0">
-                <div className="font-barlow font-black text-[16px] text-[#12211A]">Match Insight Hidden</div>
-                <p className="text-[12px] text-[#5C6657] leading-snug mt-1">
-                  {selfPlayer ? "See what ScoutMe Pro Intelligence noticed about you in this exact moment." : pFirst ? `See what ScoutMe Pro Intelligence noticed about ${pFirst} in this exact moment.` : "Unlock the full report to see what ScoutMe Pro Intelligence noticed in this moment."}
-                </p>
-                {keyMomentT && (
-                  <div className="flex items-center gap-2 mt-2.5">
-                    <span className="inline-block bg-[#F0EDE5] text-[#12211A] text-[11px] font-extrabold px-2.5 py-1 rounded-md" data-testid="fpl-key-moment-t">
-                      {keyMomentT}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openProof(keyMomentT)}
-                      data-testid="fpl-proof-keymoment"
-                      className="inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
-                    >
-                      <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> See the proof
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-[#E9E4D5] p-4 shadow-sm" data-testid="fpl-missing-list">
-            <div className="flex items-center justify-between">
-              <div className="font-barlow font-black text-[15px] text-[#12211A] uppercase">What you&rsquo;re missing</div>
-              <span className="text-[9px] font-extrabold tracking-[0.06em] uppercase px-2 py-1 rounded-md" style={{ background: LIME, color: "#12211A" }}>+ much more</span>
-            </div>
-            <div className="mt-2.5 space-y-2.5">
-              {MISSING.map(({ icon: Icon, label }) => (
-                <div key={label} className="flex items-center gap-2.5">
-                  <Icon className="w-4 h-4 text-[#12402A] flex-shrink-0" />
-                  <span className="text-[12.5px] font-bold text-[#12211A] whitespace-nowrap">{label}</span>
-                  <span className="flex-1 h-2 rounded bg-gradient-to-r from-[#EDE9DB] to-[#F6F2E6]" />
-                  <Lock className="w-3.5 h-3.5 text-[#8B957F] flex-shrink-0" />
+                <div className="font-barlow font-black text-[19px] uppercase leading-[1]" data-testid="fpl-proof-title">
+                  {strengths[0] || "Strongest moment of the match"}
                 </div>
-              ))}
+                <div className="text-[10.5px] text-[#CFE0D4] mt-1">
+                  A real moment from {selfPlayer ? "your" : pFirst ? `${pFirst}'s` : "the"} match — confirmed by our analysis.
+                </div>
+              </div>
+              {snapMomentT && (
+                <button
+                  type="button"
+                  onClick={() => openProof(snapMomentT)}
+                  data-testid="fpl-proof-open"
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-extrabold active:scale-95 transition-transform"
+                  style={{ background: LIME, color: "#0B120E" }}
+                >
+                  <Play className="w-3 h-3 fill-current" /> {snapMomentT}
+                </button>
+              )}
             </div>
           </div>
+        </div>
+
+        {/* ── YOUR FULL ANALYSIS — 9 locked categories ── */}
+        <div className="flex items-baseline justify-between px-1 pt-6 pb-2.5 max-w-[640px] mx-auto md:max-w-none">
+          <h2 className="font-barlow font-black text-[20px] uppercase tracking-[0.02em] text-[#101B12]">Your full analysis</h2>
+          <span className="text-[10px] text-[#5B6B5E]">9 categories waiting</span>
+        </div>
+        <div className="max-w-[640px] mx-auto md:max-w-none" data-testid="fpl-locked-categories">
+          {LOCKED_CATS.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={c.proofTease ? openLockedProof : scrollToPackages}
+              data-testid={`fpl-cat-${c.key}`}
+              className={`w-full bg-white rounded-[14px] shadow-[0_2px_10px_rgba(16,27,18,0.06)] mb-2.5 flex items-center gap-3 px-3.5 py-3.5 text-left border-l-4 active:scale-[0.99] transition-transform ${
+                c.blurScore ? "border-l-[#2E7D32]" : "border-l-[#C9D3C6]"
+              }`}
+            >
+              <span className="font-barlow font-black text-[16px] text-[#2E7D32] w-6 shrink-0">{c.num}</span>
+              <span className="w-9 h-9 shrink-0 flex items-center justify-center text-[#101B12]">
+                <c.icon className="w-6 h-6" strokeWidth={1.8} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-extrabold text-[13.5px] text-[#101B12]">{c.title}</span>
+                <span className="block text-[11px] text-[#5B6B5E] leading-[1.35] mt-0.5">{c.desc}</span>
+              </span>
+              {c.blurScore ? (
+                <span className="ml-auto shrink-0 font-barlow font-black text-[18px] bg-[#DFF3D3] rounded-[10px] px-3 py-1 text-[#101B12] blur-[7px] select-none" aria-hidden>
+                  {c.blurScore}
+                </span>
+              ) : (
+                <span className="ml-auto shrink-0 w-9 h-9 rounded-[10px] bg-[#12402A] flex items-center justify-center" style={{ boxShadow: "0 0 14px rgba(204,255,0,0.28)" }}>
+                  <Lock className="w-4 h-4" style={{ color: LIME }} />
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* ── Limited discount banner (real, server-enforced deadline) ── */}
         {discount && <DiscountBanner discount={discount} pFirst={pFirst} onCta={scrollToPackages} />}
 
-        {/* ── What the numbers really mean — one open score story (1 of 25) ── */}
+        {/* ── What the numbers really mean — one open score story ── */}
         <ScoreMeaningTeaser teaser={report.score_meaning_teaser} playerName={pd.player_name} onUnlock={scrollToPackages} bonusOverride={bonusStory} />
 
         {/* ── The Path — dream roadmap teaser ── */}
         <DreamPathTeaser playerName={pd.player_name} onUnlock={scrollToPackages} />
 
-        {/* ── The full report, section by section (locked) ── */}
-        <div className="bg-white rounded-2xl border border-[#E9E4D5] p-5 mt-4 shadow-sm" data-testid="fpl-locked-sections">
-          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#5C7A00] mb-1">Locked in {selfPlayer ? "your" : pFirst ? `${pFirst}'s` : "the"} full report</p>
-          <h3 className="font-black text-ink text-lg uppercase tracking-tight mb-4">Everything waiting inside — section by section</h3>
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
-            {[
-              [Zap, "Action timeline — every involvement, timestamped"],
-              [Star, "25 skill ratings across 4 categories"],
-              [BarChart3, "Level benchmark + realistic next step"],
-              [Map, "12-month development roadmap"],
-              [ClipboardList, "Weekly training plan with 5 drills"],
-              [Brain, "Grow Your Game — video-proven lessons"],
-              [Users, "Parents' package: watch-together guide + car-ride tips"],
-              [MessageSquare, selfPlayer ? "Personal letter written to you" : "Personal letter written to the player"],
-              [Target, "3 printable next-match missions"],
-              [FileText, "Coach notes for their trainer"],
-            ].map(([Icon, label], i) => (
-              <div key={i} className="flex items-center gap-3" data-testid={`fpl-locked-section-${i}`}>
-                <span className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[#E9E4D5] flex items-center justify-center shrink-0">
-                  <Icon className="w-3.5 h-3.5 text-[#5C7A00]" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12.5px] font-bold text-ink/85 leading-tight truncate">{label}</p>
-                  <div className="mt-1 h-2 rounded bg-gradient-to-r from-ink/15 to-ink/5 blur-[2.5px] select-none" aria-hidden />
-                </div>
-                <Lock className="w-3.5 h-3.5 text-ink/30 shrink-0" />
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 flex flex-col sm:flex-row items-center gap-3">
-            <button
-              type="button"
-              onClick={scrollToPackages}
-              data-testid="fpl-locked-sections-unlock"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-ink text-white font-black text-[12px] uppercase tracking-wider px-6 py-3.5 rounded-xl hover:bg-[#1F4F2F] transition-colors"
-            >
-              Unlock the full report <ChevronRight className="w-4 h-4" />
-            </button>
-            <a
-              href="/sample-report"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-testid="fpl-locked-sections-sample"
-              className="text-[12px] font-bold text-[#1F4F2F] underline underline-offset-2 hover:text-ink"
-            >
-              Curious? See a full sample report first
-            </a>
-          </div>
-        </div>
-
-        {/* ── You've only seen 10% ── */}
-        <div className="bg-white rounded-2xl border border-[#E9E4D5] p-5 mt-4 flex flex-col sm:flex-row items-center gap-5 shadow-sm" data-testid="fpl-seen-ring">
-          <div className="relative w-24 h-24 flex-shrink-0">
-            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-              <circle cx="50" cy="50" r="40" fill="none" stroke="#EDE9DB" strokeWidth="9" />
-              <circle cx="50" cy="50" r="40" fill="none" stroke="#12211A" strokeWidth="9" strokeLinecap="round" strokeDasharray={`${Math.PI * 80 * 0.1} ${Math.PI * 80}`} />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center font-barlow font-black text-[20px] text-[#12211A]">10%</div>
-          </div>
-          <div className="text-center sm:text-left flex-1">
-            <div className="font-barlow font-black text-[18px] text-[#12211A] uppercase">
-              You&rsquo;ve only seen <span className="text-[#5C7A00]">10%</span>
-            </div>
-            <p className="text-[12.5px] text-[#5C6657] mt-0.5">{selfPlayer ? "90% of your story is still locked and waiting for you." : pFirst ? `90% of ${pFirst}'s story is still locked and waiting for you.` : "90% of your ScoutMe Pro analysis is still locked and waiting for you."}</p>
-          </div>
-          <div className="flex gap-2">
-            {["SKILLS", "BENCHMARKS", "REPORT", "PLAN"].map((t) => (
-              <div key={t} className="flex flex-col items-center gap-1">
-                <div className="relative w-12 h-14 rounded-lg overflow-hidden bg-[#0E2A1B]">
-                  {poster && <img src={`${ASSET_BASE}${poster}`} alt="" className="w-full h-full object-cover blur-[6px] opacity-60" aria-hidden />}
-                  <span className="absolute inset-0 flex items-center justify-center">
-                    <span className="w-6 h-6 rounded-full bg-[#12211A] flex items-center justify-center"><Lock className="w-3 h-3 text-white" /></span>
-                  </span>
-                </div>
-                <span className="text-[7.5px] font-extrabold tracking-[0.06em] text-[#8B957F]">{t}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* ── Unlock CTA ── */}
-        <div className="rounded-[22px] mt-4 p-6 text-center" style={{ background: INKG }} data-testid="fpl-unlock-cta">
+        <div className="rounded-[22px] mt-5 p-6 text-center" style={{ background: INKG }} data-testid="fpl-unlock-cta">
           <span className="w-14 h-14 rounded-2xl mx-auto flex items-center justify-center" style={{ background: "rgba(204,255,0,0.12)", border: `1px solid ${LIME}44` }}>
             <Gift className="w-6 h-6" style={{ color: LIME }} />
           </span>
@@ -605,7 +336,7 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           <div className="flex flex-wrap justify-center gap-x-5 gap-y-3 mt-4 max-w-[560px] mx-auto">
             {CTA_FEATURES.map(({ icon: Icon, label }) => (
               <div key={label} className="flex flex-col items-center gap-1 w-[68px]">
-                <Icon className="w-4.5 h-4.5 text-white/85" style={{ width: 18, height: 18 }} />
+                <Icon className="text-white/85" style={{ width: 18, height: 18 }} />
                 <span className="text-white/65 text-[8.5px] font-bold leading-tight text-center">{label}</span>
               </div>
             ))}
@@ -652,12 +383,33 @@ export default function FreePreviewLanding({ report, user, onUnlockSingle, unloc
           </span>
         </div>
       </div>
+
+      {/* ── Sticky unlock bar (mobile) ── */}
+      <div
+        className="lg:hidden fixed bottom-[calc(62px+env(safe-area-inset-bottom,0px))] md:bottom-0 inset-x-0 z-40 bg-[#0B120E] px-4 py-3 flex items-center gap-3"
+        data-testid="fpl-sticky-cta"
+      >
+        <div className="text-white min-w-0">
+          <div className="font-barlow font-black text-[15px] uppercase leading-tight">Unlock the full analysis</div>
+          <div className="text-[#8FA396] text-[10px] truncate">9 categories · all proof · your plan · PDF</div>
+        </div>
+        <button
+          type="button"
+          onClick={scrollToPackages}
+          data-testid="fpl-sticky-cta-btn"
+          className="ml-auto shrink-0 font-barlow font-black text-[13px] tracking-[0.08em] uppercase rounded-full px-4 py-2.5 active:scale-[0.97] transition-transform"
+          style={{ background: LIME, color: "#0B120E" }}
+        >
+          {discount?.discounted ? `$${discount.discounted} · Unlock` : "Unlock now"}
+        </button>
+      </div>
+
       {!hasBonus && (
         <button
           type="button"
           onClick={() => setShareOpen(true)}
           data-testid="share-gift-pill"
-          className="fixed bottom-4 left-4 z-40 inline-flex items-center gap-2 rounded-full pl-3 pr-4 py-2.5 shadow-xl active:scale-[0.97] transition-transform"
+          className="fixed bottom-[calc(134px+env(safe-area-inset-bottom,0px))] lg:bottom-4 left-4 z-40 inline-flex items-center gap-2 rounded-full pl-3 pr-4 py-2.5 shadow-xl active:scale-[0.97] transition-transform"
           style={{ background: "#0B1F14", border: "1px solid rgba(204,255,0,0.4)" }}
         >
           <Gift className="w-4 h-4" style={{ color: LIME }} />

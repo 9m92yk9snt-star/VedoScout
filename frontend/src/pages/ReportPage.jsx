@@ -2141,7 +2141,7 @@ export default function ReportPage() {
               </button>
             </div>
           </div>
-          <PremiumReportV2 report={report} assetBase={ASSET_BASE} />
+          <PremiumReportV2 report={report} assetBase={ASSET_BASE} onDownloadPdf={handleDownloadPdf} downloadingPdf={downloadingPdf} />
           <div className="max-w-[1440px] mx-auto mt-6">
             <ScoutReview reportId={id} />
           </div>

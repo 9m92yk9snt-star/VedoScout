@@ -1,8 +1,10 @@
 // Premium Report V2 — pixel-perfect implementation of the approved reference
 // design (see /public/mockup-report.html for the spec mockup). Pure presentation:
 // all values come from the existing full_report analysis via derive.js.
+// Mobile (<lg) renders the approved numbered-category layout (categories.jsx);
+// desktop keeps the original grid layout unchanged.
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { Star, Users, ShieldCheck, Play, Clapperboard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -28,6 +30,7 @@ import { ScoreGuideCard } from "./scoreguide";
 import { ScoreMeaningSection } from "./scoremeaning";
 import { ProofPlayerSheet } from "./proofplayer";
 import { CinematicIntro } from "./cinematic";
+import { PremiumMobileCategories } from "./categories";
 
 const resolveUrl = (url, base) => {
   if (!url) return null;
@@ -221,10 +224,20 @@ function V2Footer() {
   );
 }
 
-export default function PremiumReportV2({ report, assetBase }) {
+export default function PremiumReportV2({ report, assetBase, onDownloadPdf, downloadingPdf }) {
   const d = deriveV2(report);
   const pd = report.player_details || {};
   const videoRef = useRef(null);
+
+  const [isMobile, setIsMobile] = useState(() => {
+    try { return window.matchMedia("(max-width: 1023px)").matches; } catch { return false; }
+  });
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const fn = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", fn);
+    return () => mq.removeEventListener("change", fn);
+  }, []);
 
   const photoCandidates = [
     resolveUrl(report.display_crop_url, assetBase),
@@ -304,6 +317,8 @@ export default function PremiumReportV2({ report, assetBase }) {
   const cineMoment = snapshotMoments.find((m) => m.thumb && m.timestamp) || snapshotMoments.find((m) => m.thumb) || null;
   const cineImage = cineMoment?.thumb || photoCandidates[0] || posterUrl || null;
 
+  const reportDate = fmtDate(report.full_generated_at || report.paid_at || report.created_at);
+
   return (
     <div className="max-w-[1440px] mx-auto text-[#1C2B21]" data-testid="premium-report-v2" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {showCine && (
@@ -326,151 +341,176 @@ export default function PremiumReportV2({ report, assetBase }) {
         onClose={() => setProof(null)}
       />
 
-      <V2PageHeader
-        reportDate={fmtDate(report.full_generated_at || report.paid_at || report.created_at)}
-        onReplayIntro={() => setShowCine(true)}
-        onShareClip={shareIntroClip}
-        clipBusy={clipBusy}
-      />
-
-      {/* Row 1 — hero / parent summary / score */}
-      <div className="grid lg:grid-cols-[1fr_1.22fr_1fr] gap-4 mb-4">
-        <PlayerHeroCard playerDetails={pd} photoCandidates={photoCandidates} positionAbbr={d.positionAbbr} />
-        <ParentSummaryCard parentSummary={d.parentSummary} />
-        <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} ctx={report.score_context?.overall} bracket={report.score_context?.bracket} />
-      </div>
-
-      {report.progression?.categories?.length > 0 ? (
-        <div className="mb-4">
-          <ProgressCard prog={report.progression} />
-        </div>
-      ) : (
-        !report.demo && <ProgressTeaser playerName={pd.player_name} />
-      )}
-
-      {/* Row 2 — SNAPSHOTS (full-width photo moments) */}
-      <div className="mb-4">
-        <SnapshotsSection
-          snapshot={d.snapshot}
-          moments={snapshotMoments}
-          demo={!!report.demo}
-          playerName={pd.player_name}
-          reportId={report.id}
+      {isMobile ? (
+        <PremiumMobileCategories
+          report={report}
+          d={d}
+          pd={pd}
+          photoCandidates={photoCandidates}
+          topStrengths={topStrengths}
+          snapshotMoments={snapshotMoments}
+          videoHighlight={videoHighlight}
+          videoUrl={videoUrl}
+          posterUrl={posterUrl}
+          videoRef={videoRef}
+          playAt={playAt}
+          reportDate={reportDate}
+          onReplayIntro={() => setShowCine(true)}
+          onShareClip={shareIntroClip}
+          clipBusy={clipBusy}
+          onDownloadPdf={onDownloadPdf}
+          downloadingPdf={downloadingPdf}
+          fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl}
         />
-      </div>
+      ) : (
+        <>
+          <V2PageHeader
+            reportDate={reportDate}
+            onReplayIntro={() => setShowCine(true)}
+            onShareClip={shareIntroClip}
+            clipBusy={clipBusy}
+          />
 
-      {/* Row 2b — match stats / age comparison */}
-      <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-2" : ""}`}>
-        <MatchStatsCard matchStats={d.matchStats} />
-        <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
-      </div>
+          {/* Row 1 — hero / parent summary / score */}
+          <div className="grid lg:grid-cols-[1fr_1.22fr_1fr] gap-4 mb-4">
+            <PlayerHeroCard playerDetails={pd} photoCandidates={photoCandidates} positionAbbr={d.positionAbbr} />
+            <ParentSummaryCard parentSummary={d.parentSummary} />
+            <OverallScoreCard overall={d.overall} playerType={d.playerType} stars={d.stars} ctx={report.score_context?.overall} bracket={report.score_context?.bracket} />
+          </div>
 
-      {/* Row 3 — top strengths / development priorities */}
-      <div className="grid lg:grid-cols-[1.16fr_1fr] gap-4 mb-4">
-        <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl} />
-        <DevPrioritiesCard devPriorities={d.devPriorities} />
-      </div>
+          {report.progression?.categories?.length > 0 ? (
+            <div className="mb-4">
+              <ProgressCard prog={report.progression} />
+            </div>
+          ) : (
+            !report.demo && <ProgressTeaser playerName={pd.player_name} />
+          )}
 
-      {report.verification?.anchors > 0 && (
-        <div className="mb-4">
-          <VerifiedIdentityStrip verification={report.verification} />
-        </div>
+          {/* Row 2 — SNAPSHOTS (full-width photo moments) */}
+          <div className="mb-4">
+            <SnapshotsSection
+              snapshot={d.snapshot}
+              moments={snapshotMoments}
+              demo={!!report.demo}
+              playerName={pd.player_name}
+              reportId={report.id}
+            />
+          </div>
+
+          {/* Row 2b — match stats / age comparison */}
+          <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-2" : ""}`}>
+            <MatchStatsCard matchStats={d.matchStats} />
+            <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
+          </div>
+
+          {/* Row 3 — top strengths / development priorities */}
+          <div className="grid lg:grid-cols-[1.16fr_1fr] gap-4 mb-4">
+            <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl} />
+            <DevPrioritiesCard devPriorities={d.devPriorities} />
+          </div>
+
+          {report.verification?.anchors > 0 && (
+            <div className="mb-4">
+              <VerifiedIdentityStrip verification={report.verification} />
+            </div>
+          )}
+
+          {d.identityNote && (
+            <div data-testid="v2-identity-note" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#8A6D3B] bg-[#FFF8E9] border border-[#F0E3C4] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
+              <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>{d.identityNote}</span>
+            </div>
+          )}
+
+          {d.crossVerification && (
+            <div data-testid="v2-cross-verified-strip" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#12402A] bg-[#EFF5EC] border border-[#D8E6D2] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
+              <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>
+                <strong>Cross-verified:</strong> every observation below was independently re-checked against your tapped player — {d.crossVerification.checked} moments reviewed{d.crossVerification.dropped > 0 ? `, ${d.crossVerification.dropped} unproven ${d.crossVerification.dropped === 1 ? "claim" : "claims"} removed` : ", all confirmed"}.
+              </span>
+            </div>
+          )}
+
+          {d.actionTimeline?.length > 0 && (
+            <div className="mb-4">
+              <ActionTimelineCard actions={d.actionTimeline} onPlayAt={playAt} />
+            </div>
+          )}
+
+          {report.movement_map?.trail?.length > 0 && (
+            <div className="mb-4">
+              <MovementMapCard movement={report.movement_map} pace={report.pace_metrics} onPlayAt={playAt} />
+            </div>
+          )}
+
+          {report.pace_metrics?.top_speed_kmh && (
+            <div className="mb-4">
+              <PaceCard pace={report.pace_metrics} onPlayAt={playAt} />
+            </div>
+          )}
+
+          {report.score_meaning?.skills?.length ? (
+            <div className="mb-4">
+              <ScoreMeaningSection sm={report.score_meaning} playerName={pd.player_name} position={pd.position} onPlayAt={playAt} />
+            </div>
+          ) : report.score_context?.overall ? (
+            <div className="mb-4">
+              <ScoreGuideCard sctx={report.score_context} />
+            </div>
+          ) : null}
+
+          {/* Row 4 — roadmap / training plan / parent tips */}
+          <div className="grid lg:grid-cols-3 gap-4 mb-4">
+            <RoadmapCard roadmap={d.roadmap} />
+            <TrainingPlanCard trainingWeek={d.trainingWeek} />
+            <ParentTipsCard parentTips={d.parentTips} />
+          </div>
+
+          {d.parentMetrics && (
+            <div className="mb-4">
+              <ParentValueMetricsCard metrics={d.parentMetrics} onPlayAt={playAt} />
+            </div>
+          )}
+
+          {d.growYourGame && (
+            <div className="mb-4">
+              <GrowYourGameSection gyg={d.growYourGame} playerName={pd.player_name} onPlayAt={playAt} />
+            </div>
+          )}
+
+          {(d.parentCorner || pd.age) && (
+            <div className="mb-4">
+              <ParentCornerSection parentCorner={d.parentCorner} playerName={pd.player_name} playerAge={pd.age} />
+            </div>
+          )}
+
+          {/* The Path — honest dream roadmap, moves with every analysis */}
+          <div className="mb-4">
+            <DreamPathSection report={report} d={d} playerName={pd.player_name} />
+          </div>
+
+          {d.parentsPackage && (
+            <div className="mb-4">
+              <ParentsPackageSection pack={d.parentsPackage} playerName={pd.player_name} onPlayAt={playAt} />
+            </div>
+          )}
+
+          {d.missions?.length > 0 && (
+            <div className="mb-4">
+              <MissionsCard missions={d.missions} />
+            </div>
+          )}
+
+          {/* Row 5 — video highlight / coach notes / scout outlook */}
+          <div className="grid lg:grid-cols-[1.08fr_1fr_1.1fr] gap-4">
+            <VideoHighlightCard videoHighlight={videoHighlight} videoUrl={videoUrl} posterUrl={posterUrl} videoRef={videoRef} />
+            <CoachNotesCard coachNotes={d.coachNotes} />
+            <ScoutOutlookCard scoutOutlook={d.scoutOutlook} />
+          </div>
+
+          <V2Footer />
+        </>
       )}
-
-      {d.identityNote && (
-        <div data-testid="v2-identity-note" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#8A6D3B] bg-[#FFF8E9] border border-[#F0E3C4] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
-          <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>{d.identityNote}</span>
-        </div>
-      )}
-
-      {d.crossVerification && (
-        <div data-testid="v2-cross-verified-strip" className="mb-4 -mt-1 flex items-start gap-2 text-[11.5px] text-[#12402A] bg-[#EFF5EC] border border-[#D8E6D2] rounded-[10px] px-3.5 py-2.5 leading-[1.5]">
-          <ShieldCheck className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>
-            <strong>Cross-verified:</strong> every observation below was independently re-checked against your tapped player — {d.crossVerification.checked} moments reviewed{d.crossVerification.dropped > 0 ? `, ${d.crossVerification.dropped} unproven ${d.crossVerification.dropped === 1 ? "claim" : "claims"} removed` : ", all confirmed"}.
-          </span>
-        </div>
-      )}
-
-      {d.actionTimeline?.length > 0 && (
-        <div className="mb-4">
-          <ActionTimelineCard actions={d.actionTimeline} onPlayAt={playAt} />
-        </div>
-      )}
-
-      {report.movement_map?.trail?.length > 0 && (
-        <div className="mb-4">
-          <MovementMapCard movement={report.movement_map} pace={report.pace_metrics} onPlayAt={playAt} />
-        </div>
-      )}
-
-      {report.pace_metrics?.top_speed_kmh && (
-        <div className="mb-4">
-          <PaceCard pace={report.pace_metrics} onPlayAt={playAt} />
-        </div>
-      )}
-
-      {report.score_meaning?.skills?.length ? (
-        <div className="mb-4">
-          <ScoreMeaningSection sm={report.score_meaning} playerName={pd.player_name} position={pd.position} onPlayAt={playAt} />
-        </div>
-      ) : report.score_context?.overall ? (
-        <div className="mb-4">
-          <ScoreGuideCard sctx={report.score_context} />
-        </div>
-      ) : null}
-
-      {/* Row 4 — roadmap / training plan / parent tips */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-4">
-        <RoadmapCard roadmap={d.roadmap} />
-        <TrainingPlanCard trainingWeek={d.trainingWeek} />
-        <ParentTipsCard parentTips={d.parentTips} />
-      </div>
-
-      {d.parentMetrics && (
-        <div className="mb-4">
-          <ParentValueMetricsCard metrics={d.parentMetrics} onPlayAt={playAt} />
-        </div>
-      )}
-
-      {d.growYourGame && (
-        <div className="mb-4">
-          <GrowYourGameSection gyg={d.growYourGame} playerName={pd.player_name} onPlayAt={playAt} />
-        </div>
-      )}
-
-      {(d.parentCorner || pd.age) && (
-        <div className="mb-4">
-          <ParentCornerSection parentCorner={d.parentCorner} playerName={pd.player_name} playerAge={pd.age} />
-        </div>
-      )}
-
-      {/* The Path — honest dream roadmap, moves with every analysis */}
-      <div className="mb-4">
-        <DreamPathSection report={report} d={d} playerName={pd.player_name} />
-      </div>
-
-      {d.parentsPackage && (
-        <div className="mb-4">
-          <ParentsPackageSection pack={d.parentsPackage} playerName={pd.player_name} onPlayAt={playAt} />
-        </div>
-      )}
-
-      {d.missions?.length > 0 && (
-        <div className="mb-4">
-          <MissionsCard missions={d.missions} />
-        </div>
-      )}
-
-      {/* Row 5 — video highlight / coach notes / scout outlook */}
-      <div className="grid lg:grid-cols-[1.08fr_1fr_1.1fr] gap-4">
-        <VideoHighlightCard videoHighlight={videoHighlight} videoUrl={videoUrl} posterUrl={posterUrl} videoRef={videoRef} />
-        <CoachNotesCard coachNotes={d.coachNotes} />
-        <ScoutOutlookCard scoutOutlook={d.scoutOutlook} />
-      </div>
-
-      <V2Footer />
     </div>
   );
 }
