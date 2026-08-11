@@ -61,6 +61,25 @@ let webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
+  // Dev-overlay: don't block the screen for browser-internal / benign errors
+  // (Safari's built-in media-controls "EmptyRanges" bug, aborted media play()).
+  devServerConfig.client = {
+    ...(devServerConfig.client || {}),
+    overlay: {
+      errors: true,
+      warnings: false,
+      runtimeErrors: (error) => {
+        const msg = String((error && error.message) || error || "");
+        if (error && error.name === "AbortError") return false;
+        if (msg.includes("EmptyRanges")) return false;
+        if (msg.includes("The operation was aborted")) return false;
+        if (msg.includes("interrupted by a call to pause")) return false;
+        if (msg.includes("ResizeObserver loop")) return false;
+        return true;
+      },
+    },
+  };
+
   // Add health check endpoints if enabled
   if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
     const originalSetupMiddlewares = devServerConfig.setupMiddlewares;

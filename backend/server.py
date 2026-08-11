@@ -3237,6 +3237,7 @@ async def call_gemini_with_video(
     marker_path: Optional[str] = None,
     crop_path: Optional[str] = None,
     anchor_crops: Optional[list[str]] = None,
+    timeout_s: float = 150.0,
 ) -> dict:
     """Send a video file (+ optional marker image, subject crop, and multi-anchor crops)
     + prompt to Gemini and return parsed JSON.
@@ -3297,12 +3298,16 @@ async def call_gemini_with_video(
         # extra_params which _build_completion_params merges into the final call.
         # Session 124: tightened from 240 → 150 s (httpx socket timeout) and
         # 300 → 180 s (asyncio outer cancel) so worst-case retry is 6 min not 10.
+        # Session 134: that 150/180 default is for the SHORT calls (content gate,
+        # preview). The FULL-report call passes timeout_s=420 — the dossier prompt
+        # over a full match video takes 3-7 min and 180 s made every full report
+        # fail with "Generation was interrupted".
         # temperature 0.0 → maximum determinism: the same video should
         # produce the same scores run-to-run (score-stability requirement).
         # NOTE: `seed` is NOT supported for gemini through the LLM proxy
         # (verified Aug 5 2026 — UnsupportedParamsError) — do not re-add it.
-        chat.extra_params = {**(chat.extra_params or {}), "timeout": 150.0, "temperature": 0.0}
-        response = await asyncio.wait_for(chat.send_message(user_message), timeout=180)
+        chat.extra_params = {**(chat.extra_params or {}), "timeout": timeout_s, "temperature": 0.0}
+        response = await asyncio.wait_for(chat.send_message(user_message), timeout=timeout_s + 30)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
         raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
@@ -3371,7 +3376,7 @@ async def call_gemini_with_video(
             "commentary."
         ),
     ).with_model("gemini", "gemini-2.5-pro")
-    retry_chat.extra_params = {"timeout": 150.0, "temperature": 0.0}
+    retry_chat.extra_params = {"timeout": timeout_s, "temperature": 0.0}
     retry_message = UserMessage(text=strict_prompt, file_contents=file_contents)
 
     # Session 124: retry-transparency — surface to the frontend that we are
@@ -3393,7 +3398,7 @@ async def call_gemini_with_video(
             logger.warning(f"could not set retry flag for {_report_id}: {e}")
 
     try:
-        retry_response = await asyncio.wait_for(retry_chat.send_message(retry_message), timeout=180)
+        retry_response = await asyncio.wait_for(retry_chat.send_message(retry_message), timeout=timeout_s + 30)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video retry timeout (session={session_id})")
         if _report_id:
@@ -7533,6 +7538,7 @@ async def _cross_verify_full_report(
             marker_path=marker_path,
             crop_path=crop_path_str,
             anchor_crops=anchor_crops or None,
+            timeout_s=420.0,
         )
         meta = _apply_cross_verification(full, verify, gt_track)
         logger.info(
@@ -7835,6 +7841,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 marker_path=marker_path,
                 crop_path=crop_path_str,
                 anchor_crops=anchor_crops_full if anchor_crops_full else None,
+                timeout_s=420.0,
             ),
             _movement_pace_core(),
         )
@@ -7914,6 +7921,7 @@ async def generate_full_report_task(report_id: str) -> None:
                         marker_path=marker_path,
                         crop_path=crop_path_str,
                         anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+                        timeout_s=420.0,
                     )
                     retry = scrub_hedging(retry)
                     retry = _filter_low_identity_evidence(retry, report_id)
