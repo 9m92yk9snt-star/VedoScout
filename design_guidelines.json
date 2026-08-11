@@ -1,163 +1,115 @@
 {
+  "theme_archetype": "THE PERFORMANCE PRO (Elite Athleticism & Precision)",
+  "philosophy": "We sell hope. High FOMO for locked content, professional scouting credibility. Mobile-first (390px baseline) with zero pinch/zoom. Kill the meta-noise.",
+  "colors": {
+    "background": {
+      "main": "#0D1512",
+      "surface": "#15201A",
+      "cream_card": "#F6F3EA",
+      "glass": "rgba(13, 21, 18, 0.7)"
+    },
+    "accent": {
+      "lime": "#CCFF00",
+      "lime_hover": "#B3E600"
+    },
+    "text": {
+      "on_dark": "#FFFFFF",
+      "on_dark_muted": "#A3B3AA",
+      "on_cream": "#0D1512",
+      "on_cream_muted": "#3D4D43",
+      "on_lime": "#0D1512"
+    },
+    "border": {
+      "dark": "rgba(255, 255, 255, 0.1)",
+      "cream": "rgba(13, 21, 18, 0.1)",
+      "focus": "#CCFF00"
+    }
+  },
   "typography": {
     "headings": {
-      "font": "Barlow Condensed, sans-serif",
-      "weights": ["800", "900"],
-      "transformation": "uppercase",
-      "usage": "Use for all card titles, stats numbers, and primary labels. Ensure tight tracking (`tracking-tight` or `tracking-tighter`) for an athletic, intense feel."
+      "family": "Barlow Condensed, sans-serif",
+      "style": "uppercase, tracking-tighter",
+      "h1_hero": "text-5xl md:text-6xl font-black leading-none",
+      "h2_section": "text-3xl md:text-4xl font-bold leading-tight",
+      "h3_card": "text-2xl font-bold leading-tight",
+      "h4_label": "text-sm font-bold tracking-[0.2em]"
     },
     "body": {
-      "font": "DM Sans, sans-serif",
-      "weights": ["400", "500", "700"],
-      "usage": "Use for descriptions, quotes, and secondary labels. Clean, readable, and human."
+      "family": "DM Sans, sans-serif",
+      "base": "text-base font-normal leading-relaxed",
+      "small": "text-sm font-normal leading-relaxed",
+      "metric": "text-xl font-bold"
     }
   },
-  "colors": {
-    "brand": {
-      "forest_green_dark": "#12402A",
-      "forest_green_light": "#1F4F2F",
-      "volt_lime": "#CCFF00",
-      "cream": "#FBF9F3",
-      "ink": "#182016",
-      "gold": "#F5C443"
+  "visual_hierarchy": {
+    "level_1_the_verdict": "Hero Section: Player photo, massive Overall Score (8.0), Potential Assessment, and ONE unified trust badge.",
+    "level_2_the_evidence": "Top Strengths & Moments. These are the trust anchors. Big photo frames, exact timestamp, and 'See the Proof' video buttons.",
+    "level_3_the_deep_dive": "Data & Ratings. 25 skill ratings categorized into 4 groups. Collapsed by default using accordions to reduce visual noise.",
+    "level_4_the_journey": "Roadmap, Weekly Plan, Parents Package. Supportive content grouped at the bottom, accessible via tabs or expand/collapse."
+  },
+  "design_patterns": {
+    "kill_meta_noise": "Consolidate all individual badges ('verified', 'tier', 'confidence', 'tracked') into ONE global 'Scout Certified Analysis' lockup in the header. Remove repeating metadata from every stat row. If metadata is necessary, hide it inside an info tooltip.",
+    "card_variants": {
+      "hero_card": "Full bleed on mobile, dark background, large typography, lime accent.",
+      "standard_card": "Cream background (#F6F3EA), crisp corners (rounded-md), very dark text. Used for readable content like Parents Package, Roadmap.",
+      "quiet_card": "Dark surface (#15201A) with subtle 1px border. Used for stats and secondary data."
     },
-    "rules": [
-      "NEVER use pure black (#000000) or fully black backgrounds for the cards. Use forest_green_dark (#12402A) or ink (#182016) tinted with green.",
-      "Volt lime is for high-emphasis data points, icons, or primary CTAs. Do not overuse.",
-      "Cream is for soft, human, breathable backgrounds.",
-      "Gold is used for qualitative accents (e.g., 'superpowers', stars, or premium insights)."
+    "the_moment_object": "The core interactive object. Aspect ratio 16:9 or 4:3 photo frame. Overlaid with a dark gradient at the bottom. Contains: large Lime 'Play' icon, exact timestamp (e.g., '14:23'), and 'See the Proof' text.",
+    "progressive_disclosure": "The Premium report is ~17,000px tall. Use Accordions for the '25 skill ratings' (group by 4 categories). Use horizontal scroll (carousels) for the 4 top strengths instead of stacking them vertically.",
+    "locked_fomo_treatment": "On the Free Page: Show the silhouette or heavy blur (backdrop-blur-xl) over locked content. Place a solid black overlay with 50% opacity, and a massive, glowing Lime padlock. Add a high-contrast 'What you are missing' list."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Buttons lift (-translate-y-1) and cast a subtle lime glow (shadow-[0_0_15px_rgba(204,255,0,0.4)]).",
+    "accordions": "Smooth height transition using framer-motion or CSS grid (grid-template-rows: 0fr -> 1fr).",
+    "video_play": "Tap on a 'Moment' ripples and opens a full-screen video modal."
+  },
+  "accessibility": {
+    "contrast": "Do not place Lime text on Cream cards (fails APCA). Use Dark Green buttons with Lime text on Cream cards, or use Lime buttons with Dark Green text.",
+    "touch_targets": "Minimum 48x48px for all interactable elements on mobile.",
+    "testing": "All interactive elements MUST include data-testid attributes (e.g., data-testid='unlock-premium-button')."
+  },
+  "image_urls": {
+    "hero_player": [
+      {
+        "url": "https://images.unsplash.com/photo-1517466787929-bc90951d0974?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHx5b3VuZyUyMG1hbGUlMjBzb2NjZXIlMjBwbGF5ZXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODY0MTg2NDF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Young male soccer player portrait - Use for the hero section."
+      }
+    ],
+    "moments_action": [
+      {
+        "url": "https://images.unsplash.com/photo-1560272564-c83b66b1ad12?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMHNvY2NlciUyMHBsYXllciUyMGtpY2tpbmclMjBiYWxsfGVufDB8fHx8MTc4NjQxODYzNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Action shot - Use for 'Top Strengths' and 'Moments' cards."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODh8MHwxfHNlYXJjaHwzfHx5b3V0aCUyMHNvY2NlciUyMHBsYXllciUyMGtpY2tpbmclMjBiYWxsfGVufDB8fHx8MTc4NjQxODYzNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Alternative action shot."
+      }
+    ],
+    "stadium_backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1629217855633-79a6925d6c47?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwxfHxzb2NjZXIlMjBzdGFkaXVtJTIwbGlnaHRzfGVufDB8fHx8MTc4NjQxODYzNHww&ixlib=rb-4.1.0&q=85",
+        "description": "Stadium lights - Use for dark backgrounds or header overlays with low opacity."
+      }
     ]
   },
-  "visual_enhancers": {
-    "depth_and_life": "To prevent cards from feeling flat, use layered elements. Add noise textures, subtle inner glows (`box-shadow: inset 0 0 20px rgba(204,255,0,0.05)`), and overlapping absolute-positioned badges.",
-    "glassmorphism": "Use high-quality glassmorphism for blurred answers/names. Formula: `bg-white/10 backdrop-blur-md border border-white/20` (dark mode) or `bg-[#12402A]/5 backdrop-blur-md border border-[#12402A]/10` (light mode).",
-    "image_overlays": "When using background images, NEVER use flat black overlays. Use gradients: `bg-gradient-to-t from-[#12402A]/90 via-[#12402A]/40 to-transparent`. This preserves the life of the photo while ensuring text readability."
-  },
-  "component_name": "SampleReportCarousel",
-  "grids_layouts": {
-    "carousel_container": "flex gap-6 overflow-x-auto snap-x snap-mandatory px-4 md:px-8 pb-12 pt-4 scrollbar-hide",
-    "card_base": "w-[330px] md:w-[380px] min-h-[440px] flex-shrink-0 snap-center rounded-3xl overflow-hidden relative flex flex-col justify-between group",
-    "card_padding": "p-6 md:p-8"
-  },
-  "motion": {
-    "hover": "Apply `group-hover:scale-105` to background images. Add slight Y-axis lift on inner cards/elements during hover.",
-    "active_pulse": "Use `animate-pulse` on locked icons, live dots, or progress bars to make the data feel 'live' and 'current'.",
-    "progress_bars": "Animate width from 0 to actual value using CSS keyframes or transition delays on mount."
-  },
-  "media": {
-    "image_urls": {
-      "golden_hour_silhouette": "https://images.unsplash.com/photo-1494177310973-4841f7d5a882?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTB8MHwxfHNlYXJjaHw0fHx5b3V0aCUyMHNvY2NlciUyMGdvbGRlbiUyMGhvdXJ8ZW58MHx8fHwxNzg1OTIxMjc4fDA&ixlib=rb-4.1.0&q=85",
-      "stadium_tunnel_smoke": "https://images.unsplash.com/photo-1679391029864-d46f366a456b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwyfHxzb2NjZXIlMjBzdGFkaXVtJTIwdHVubmVsJTIwbGlnaHR8ZW58MHx8fHwxNzg1OTIxMjc4fDA&ixlib=rb-4.1.0&q=85",
-      "muddy_legs_ball": "https://images.unsplash.com/photo-1630939598999-67d86c7365a5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwzfHxzb2NjZXIlMjBwbGF5ZXIlMjBtdWRkeSUyMGJvb3RzfGVufDB8fHx8MTc4NTkyMTI3OHww&ixlib=rb-4.1.0&q=85",
-      "parent_child_foggy": "https://images.unsplash.com/photo-1574772135913-d519461c3996?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxwYXJlbnQlMjBhbmQlMjBjaGlsZCUyMHdhbGtpbmclMjBzb2NjZXIlMjBmaWVsZHxlbnwwfHx8fDE3ODU5MjEyNzh8MA&ixlib=rb-4.1.0&q=85",
-      "stadium_floodlight": "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxzb2NjZXIlMjBzdGFkaXVtJTIwdHVubmVsJTIwbGlnaHR8ZW58MHx8fHwxNzg1OTIxMjc4fDA&ixlib=rb-4.1.0&q=85",
-      "dark_portrait": "https://images.unsplash.com/photo-1600985366045-c20ec2d3298a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwxfHx5b3V0aCUyMHNvY2NlciUyMHBsYXllciUyMHBvcnRyYWl0JTIwZGFyayUyMGNpbmVtYXRpY3xlbnwwfHx8fDE3ODU5MjEyODR8MA&ixlib=rb-4.1.0&q=85"
-    }
-  },
-  "cards_structure": [
-    {
-      "id": 1,
-      "title": "Dossier Overview",
-      "theme": "dark",
-      "background": "bg-[#12402A]",
-      "content": "Blurred name pill ('J**** S****'). Huge '8.2' overall rating in Volt Lime. Quote in gold: 'Exceptional scanning before receiving.' Identity-locked trust box at the bottom using glassmorphism.",
-      "vibe": "Exclusive, premium, data-driven."
-    },
-    {
-      "id": 2,
-      "title": "The Four Pillars",
-      "theme": "light",
-      "background": "bg-[#FBF9F3] border border-[#12402A]/10",
-      "content": "4 horizontal progress bars (Technical, Game Intelligence, Physical, Mentality). Use Volt Lime for the fill on a dark green track. Add a glowing dot at the end of each bar.",
-      "vibe": "Analytical but approachable."
-    },
-    {
-      "id": 3,
-      "title": "Superpowers & Focus",
-      "theme": "dark_accent",
-      "background": "bg-[#1F4F2F]",
-      "content": "Split layout. Top: 'SUPERPOWERS' with Volt Lime check icons. Bottom: 'PRIORITY TO TRAIN' on a slightly darker floating card with a target icon. Adds depth.",
-      "vibe": "Actionable, positive, honest."
-    },
-    {
-      "id": 4,
-      "title": "Physical Reality",
-      "theme": "photo",
-      "background_image": "muddy_legs_ball",
-      "overlay": "bg-[#12402A]/70",
-      "content": "Large glowing stats: '24.1 KM/H MAX', '7 SPRINTS'. Includes an SVG dashed path line indicating movement across the card. Feels visceral.",
-      "vibe": "Raw effort, cinematic."
-    },
-    {
-      "id": 5,
-      "title": "Parent Curiosity",
-      "theme": "photo",
-      "background_image": "parent_child_foggy",
-      "overlay": "bg-gradient-to-t from-[#12402A] via-[#12402A]/80 to-[#12402A]/30",
-      "content": "Questions like 'Is he making the right decisions?' fading into blur. A pulsing lock icon in the center with text 'Unlock the full picture'. Sells the experience.",
-      "vibe": "Curiosity, self-discovery, emotional."
-    },
-    {
-      "id": 6,
-      "title": "Honest Answers",
-      "theme": "light",
-      "background": "bg-[#FBF9F3]",
-      "content": "Accordion style rows. Text in Ink. One row expanded: 'How to support without pressure?' -> 'A real scout's advice on sideline behavior.'",
-      "vibe": "Warm, human, educational."
-    },
-    {
-      "id": 7,
-      "title": "90-Day Plan",
-      "theme": "dark",
-      "background": "bg-[#12402A]",
-      "content": "A vertical roadmap/timeline. 3 nodes connected by a Volt Lime dashed line. 'Today', 'Week 4', 'Week 12'.",
-      "vibe": "Future, learning, roadmap."
-    },
-    {
-      "id": 8,
-      "title": "The Road Ahead",
-      "theme": "photo",
-      "background_image": "golden_hour_silhouette",
-      "overlay": "bg-[#1F4F2F]/60 mix-blend-multiply",
-      "content": "Typography heavy. 'THE ROAD AHEAD'. A glowing Gold path graphic. Text: 'From the local pitch to the scout's notebook.' Sells the dream.",
-      "vibe": "Dreams, future, aspirational."
-    },
-    {
-      "id": 9,
-      "title": "Scout Reply",
-      "theme": "light",
-      "background": "bg-[#FBF9F3] shadow-xl shadow-[#12402A]/5",
-      "content": "Chat bubble layout. Human avatar. 'Hi there! I watched your 3 matches. Your scan rate is incredible...' Include a 'Play Voice Note' visual pill.",
-      "vibe": "Human connection, real feedback."
-    },
-    {
-      "id": 10,
-      "title": "Scout Library",
-      "theme": "dark_gradient",
-      "background": "bg-gradient-to-br from-[#12402A] to-[#182016]",
-      "content": "'YOU'VE BEEN SPOTTED'. A glowing map graphic or radar UI. 'A scout from Denmark viewed your profile today.' Pulsing Volt Lime dot.",
-      "vibe": "Excitement, validation."
-    },
-    {
-      "id": 11,
-      "title": "CTA",
-      "theme": "photo",
-      "background_image": "stadium_tunnel_smoke",
-      "overlay": "bg-gradient-to-t from-[#12402A] to-transparent",
-      "content": "Big bold text: 'IT STARTS WITH ONE VIDEO'. Volt Lime button: 'Upload Your Video'.",
-      "vibe": "High energy, conversion."
-    }
-  ],
-  "accessibility": {
-    "contrast": "Ensure text over images has sufficient contrast. Use drop-shadow on text if the image overlay is light.",
-    "testing": "All interactive elements and cards MUST have `data-testid` attributes (e.g., `data-testid='sample-card-dossier'`)."
-  },
   "instructions_to_main_agent": [
-    "DO NOT CREATE GENERIC CARDS. Implement the specific 11 cards outlined in `cards_structure`.",
-    "Use standard React + Tailwind. No extra heavy libraries inside the cards. Use CSS keyframes for animations (pulse, slide).",
-    "Ensure the carousel container has `snap-x snap-mandatory` and `overflow-x-auto`, while hiding the scrollbar using CSS.",
-    "Strictly follow the color palette. No fully black backgrounds.",
-    "Use Lucide React icons for UI elements (locks, checks, targets, maps)."
+    "This app uses standard React (.js files, NOT .tsx). Do not write TypeScript.",
+    "Implement a mobile-first (390px) layout. Do not build a desktop dashboard. Scale it up for desktop by restricting max-width to 'max-w-md mx-auto' or using a split-pane layout.",
+    "Never use fully transparent backgrounds for sticky headers. Use backdrop-blur-xl with bg-[#0D1512]/80.",
+    "Use Shadcn UI Accordion components to compress the 25 skill ratings into 4 expandable categories.",
+    "Implement the 'Moment' object exactly as specified: photo frame, exact timestamp overlay, and 'See the Proof' button.",
+    "Kill the meta-noise. Do not render 15 different badges for 'tracked', 'confidence', etc. Replace with a single 'Scout Certified' lockup at the top of the report.",
+    "On the Free page, use 'blur-md' and lock icons to drive FOMO. Include a high-contrast pricing/upgrade strip.",
+    "Ensure the Volt/Lime (#CCFF00) color is used strictly for CTAs and highlighted metrics. Do not overuse it."
   ],
-  "UNIVERSAL GUIDELINES FOR MAIN AGENT": "Do not make generic centered layouts. Create depth through layered design elements with z-index hierarchy. Use glass-morphism effects. Avoid universal transitions (`transition: all`). Never use AI emojis for icons. Use generous spacing."
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not converge toward generic outputs. Use the defined Archetype and color specificities.",
+    "DO NOT use dark colors as gradients.",
+    "Create depth through layered design elements with z-index hierarchy and crisp borders.",
+    "DO NOT apply universal transitions (e.g., transition: all). Target specific properties.",
+    "DO NOT center align the app container in App.css.",
+    "Always use modern button styles (pill-shaped or sharp) with interaction animations.",
+    "Use 2-3x more spacing. Cramped designs look cheap.",
+    "Ensure all interactive elements have data-testid attributes."
+  ]
 }
