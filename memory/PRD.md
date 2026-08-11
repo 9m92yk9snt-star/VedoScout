@@ -3452,3 +3452,17 @@ Note: red overlays only ever appear in Preview (webpack dev overlay) — product
 2. **Mid-sentence "…" truncation everywhere**: `firstSentences` (derive.js) / `first_sentences` (pdf_v2.py) appended "…" when no ". " boundary within max. Fixed both: always end at a sentence boundary, else return the whole first sentence. Top-strength notes now show FULL notes (was 130 chars), dev priorities full issue/how_to_improve, snapshot captions 220. Removed CSS `line-clamp` on top-strength notes, timeline descriptions, dev priority issue/howTo in sections.jsx. PDF width-fit truncations (physical cell limits) intentionally kept.
 3. **Building page**: PremiumBuildingDashboard hero now has full-bleed faded player photo background (opacity-30 + gradient, all breakpoints, testid pbd-hero-bg) and a REAL ticking mm:ss countdown (`pbd-countdown`, 8-min window from sessionStorage build start; "Finishing up" when expired). Verified ticking 7:55→7:53 live.
 All self-tested via data-level repro (node run of derive on the real report JSON) + mobile/desktop screenshots + PDF 200. USER MUST DEPLOY.
+
+## 2026-08-11 (4) — Tapping editor: manual 3-tap player verification (user-approved plan, E2E self-tested)
+User approved: (1) verification AFTER the 10-frame flow, (2) the 3 taps ride along as EXTRA anchors, (3) mandatory 3 taps before continuing.
+### Frontend (`ScoutMode.jsx` — existing 10-frame flow 100% untouched)
+- New VERIFY phase between MARKING and DONE: intro card ("3× TAP YOUR PLAYER 3 TIMES · Drag the timeline · pick 3 clear moments"), free scrubbing (range slider + −1s/+1s fine steps + existing zoom controls), same tap→lime box→confirm mechanic, big 0/3→3/3 counter + 3-segment progress bar, "✓ PLAYER CONFIRMED" overlay at 3/3 → auto-continue to DONE.
+- DONE payload appends the 3 verification anchors ({t, box, segment, verify:true}) AFTER the regular anchors so anchor[0]/marker frame behavior is identical to before.
+- "Not visible · next frame" text is now a clear bordered button with a subtle lime pulse (scoutSkipPulse keyframes) whenever no player has been tapped on the current frame.
+- `MarkerStudio.jsx` handleScoutConfirm now forwards the verify flag.
+### Backend (`server.py`, 2 narrow edits)
+- Anchor identity-crop loop extended `all_anchors[1:10]` → `[1:13]` so the 3 verification taps also get fingerprint/wide crops, R2 flush, identity-profile input and full-report anchor_crops (= real extra tracking support).
+- extra_anchors_payload carries `verify: true` for traceability.
+### Tested (Playwright E2E, webm test clip via /upload as admin)
+- 10-frame flow unchanged → verify intro appears after frame 10 → scrub + 3 taps → counter 1/3→2/3→3/3 → "✓ PLAYER CONFIRMED" → overlay closes → toast "13 anchors locked". Pulsing NOT VISIBLE · NEXT button visible during marking. COMPILE_OK backend+frontend.
+- Note: headless Chromium cannot decode H.264 — use .webm clips for any future ScoutMode automation (e.g. /app/backend/uploads/2ab51964-*.webm).

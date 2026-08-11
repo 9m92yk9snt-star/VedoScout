@@ -111,6 +111,15 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
   const [introSeen, setIntroSeen] = useState(false);
   const [lockFlash, setLockFlash] = useState(false);
 
+  /* VERIFY phase state — manual 3-tap player verification AFTER the normal
+   * 10-frame flow. The user scrubs freely and taps their player 3 times;
+   * those taps become EXTRA anchors (flagged verify:true) for tighter
+   * identity tracking. The existing 10-anchor flow is untouched. */
+  const [verifyMarks, setVerifyMarks] = useState([]);
+  const [verifyT, setVerifyT] = useState(0);
+  const [verifyIntroSeen, setVerifyIntroSeen] = useState(false);
+  const [verifyDone, setVerifyDone] = useState(false);
+
   /* Marking phase state */
   // queue: ordered list of hint indices to present.  When user skips a
   // frame we re-queue it at the END so they can retry once they've gone
@@ -148,6 +157,10 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       setPan({ x: 0, y: 0 });
       setIntroSeen(false);
       setLockFlash(false);
+      setVerifyMarks([]);
+      setVerifyT(0);
+      setVerifyIntroSeen(false);
+      setVerifyDone(false);
     }
   }, [open]);
 
@@ -310,10 +323,10 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     setDraftBox(marks[currentHintIdx] || null);
   }, [phase, currentHintIdx, hints, marks]);
 
-  /* ── Tap on the stage to set the marker ──────────────────────── */
+  /* ── Tap on the stage to set the marker (MARKING + VERIFY phases) ── */
   const handleStageTap = useCallback((e) => {
-    if (phase !== "MARKING") return;
-    if (currentHintIdx == null) return;
+    if (phase !== "MARKING" && phase !== "VERIFY") return;
+    if (phase === "MARKING" && currentHintIdx == null) return;
     const stage = stageRef.current;
     const v = videoRef.current;
     if (!stage || !v?.videoWidth) return;
@@ -417,21 +430,22 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
   const advance = useCallback(() => {
     // Move to the next unmarked frame in the queue.  If we reach the end
     // and there are still skipped frames, loop back to give the user another
-    // chance.  If all frames have been visited, transition to DONE.
+    // chance.  If all frames have been visited, transition to VERIFY (the
+    // manual 3-tap player verification) which then leads to DONE.
     const totalFrames = queue.length;
     let next = queuePos + 1;
     if (next >= totalFrames) {
       // Check if all frames in queue have been either confirmed or are skipped
       const remaining = queue.filter((i) => !marks[i] || marks[i].skipped);
       if (remaining.length === 0) {
-        // All confirmed somehow — go directly to finalise
-        setPhase("DONE");
+        // All confirmed somehow — go directly to verification
+        setPhase("VERIFY");
         return;
       }
       // Otherwise, accept current state — at least MIN_REQUIRED confirmed
       // means we're done.
       if (confirmedCount + 1 >= MIN_REQUIRED) {
-        setPhase("DONE");
+        setPhase("VERIFY");
         return;
       }
       // Loop back to retry the skipped ones
@@ -475,8 +489,49 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
 
   const handleFinishEarly = useCallback(() => {
     if (confirmedCount < MIN_REQUIRED) return;
-    setPhase("DONE");
+    setPhase("VERIFY");
   }, [confirmedCount]);
+
+  /* ── VERIFY: manual 3-tap verification with free scrubbing ───── */
+  useEffect(() => {
+    if (phase !== "VERIFY") return;
+    const v = videoRef.current;
+    try { v?.pause(); } catch { /* noop */ }
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setDraftBox(null);
+    setVerifyT(v?.currentTime || 0);
+  }, [phase]);
+
+  const handleVerifyScrub = useCallback((val) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const dur = vidDur || v.duration || 0;
+    const t = Math.max(0, Math.min(dur, val));
+    try { v.currentTime = t; } catch { /* noop */ }
+    setVerifyT(t);
+    setDraftBox(null);
+  }, [vidDur]);
+
+  const handleVerifyConfirm = useCallback(() => {
+    if (!draftBox) return;
+    const v = videoRef.current;
+    const t = v ? v.currentTime : verifyT;
+    setVerifyMarks((prev) => [...prev, { t, box: { ...draftBox } }]);
+    setDraftBox(null);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setLockFlash(true);
+    setTimeout(() => setLockFlash(false), 700);
+  }, [draftBox, verifyT]);
+
+  useEffect(() => {
+    if (phase !== "VERIFY") return;
+    if (verifyMarks.length < 3) return;
+    setVerifyDone(true);
+    const id = setTimeout(() => setPhase("DONE"), 1600);
+    return () => clearTimeout(id);
+  }, [phase, verifyMarks]);
 
   /* ── DONE: build payload and call onConfirm ─────────────────── */
   useEffect(() => {
@@ -486,25 +541,34 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       .map(Number)
       .filter((i) => marks[i] && !marks[i].skipped)
       .sort((a, b) => a - b);
+    const segFor = (t) => {
+      let seg = 0;
+      for (let s = 0; s < sceneCuts.length; s++) if (t >= sceneCuts[s]) seg = s + 1;
+      return seg;
+    };
     const anchors = indices.map((i) => {
       const m = marks[i];
-      let seg = 0;
-      for (let s = 0; s < sceneCuts.length; s++) if (m.hintT >= sceneCuts[s]) seg = s + 1;
-      return { t: m.hintT, box: { x: m.x, y: m.y, w: m.w, h: m.h }, segment: seg };
+      return { t: m.hintT, box: { x: m.x, y: m.y, w: m.w, h: m.h }, segment: segFor(m.hintT) };
     });
     if (anchors.length < MIN_REQUIRED) {
       // not enough — fall back to MARKING for retry
       setPhase("MARKING");
       return;
     }
+    // The 3 manual verification taps ride along as EXTRA anchors (verify:true)
+    // — appended after the regular ones so anchor[0] stays the first keyframe
+    // tap exactly as before.
+    const verifyAnchors = verifyMarks.map((m) => ({
+      t: m.t, box: { ...m.box }, segment: segFor(m.t), verify: true,
+    }));
     // Pass the first anchor's captured frame as the marker JPEG (data URL).
     // The parent's <video> is unmounted while Scout Mode is open (decoder
     // conflict fix) so we MUST supply the frame ourselves instead of asking
     // the parent to grab it from a null videoRef.
     const firstIdx = indices[0];
     const markerImageDataUrl = frameCache[firstIdx]?.jpegDataUrl || null;
-    onConfirm({ anchors, sceneCuts, markerImageDataUrl });
-  }, [phase, marks, sceneCuts, frameCache, onConfirm]);
+    onConfirm({ anchors: [...anchors, ...verifyAnchors], sceneCuts, markerImageDataUrl });
+  }, [phase, marks, verifyMarks, sceneCuts, frameCache, onConfirm]);
 
   /* ── Render ────────────────────────────────────────────────── */
   if (!open) return null;
@@ -536,17 +600,18 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
         ref={stageRef}
         className="relative flex-1 bg-black overflow-hidden flex items-center justify-center"
         data-testid="scout-stage"
-        onClick={phase === "MARKING" && !draftBox ? handleStageTap : undefined}
+        onClick={(phase === "MARKING" || phase === "VERIFY") && !draftBox ? handleStageTap : undefined}
         onMouseMove={handleBoxPointerMove}
         onMouseUp={handleBoxPointerUp}
         onMouseLeave={handleBoxPointerUp}
         onTouchMove={handleBoxPointerMove}
         onTouchEnd={handleBoxPointerUp}
         style={{
-          cursor: phase === "MARKING" && !draftBox ? "crosshair" : "default",
+          cursor: (phase === "MARKING" || phase === "VERIFY") && !draftBox ? "crosshair" : "default",
           touchAction: "none",
         }}
       >
+        <style>{`@keyframes scoutSkipPulse{0%,100%{box-shadow:0 0 0 0 rgba(204,255,0,0);border-color:rgba(255,255,255,0.28)}50%{box-shadow:0 0 14px rgba(204,255,0,0.45);border-color:rgba(204,255,0,0.8)}}`}</style>
         <video
           ref={videoRef}
           src={videoUrl}
@@ -580,7 +645,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
         />
 
         {/* Draft marker (lime, draggable) */}
-        {phase === "MARKING" && draftBox && videoRef.current?.videoWidth && stageRect.w > 0 && (
+        {(phase === "MARKING" || phase === "VERIFY") && draftBox && videoRef.current?.videoWidth && stageRect.w > 0 && (
           <DraftMarker
             box={draftBox}
             videoEl={videoRef.current}
@@ -609,6 +674,26 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
             onRetap={handleRetap}
             onConfirm={handleConfirmMark}
             onFinishEarly={handleFinishEarly}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onResetZoom={handleResetZoom}
+          />
+        )}
+
+        {/* VERIFY overlay — manual 3-tap player verification */}
+        {phase === "VERIFY" && (
+          <VerifyOverlay
+            count={verifyMarks.length}
+            hasDraft={!!draftBox}
+            duration={vidDur || videoRef.current?.duration || 0}
+            t={verifyT}
+            done={verifyDone}
+            introSeen={verifyIntroSeen}
+            onIntroDone={() => setVerifyIntroSeen(true)}
+            onScrub={handleVerifyScrub}
+            onRetap={handleRetap}
+            onConfirm={handleVerifyConfirm}
+            zoom={zoom}
             onZoomIn={handleZoomIn}
             onZoomOut={handleZoomOut}
             onResetZoom={handleResetZoom}
@@ -931,10 +1016,14 @@ function MarkingOverlay({
               type="button"
               onClick={(e) => { e.stopPropagation(); onSkip(); }}
               data-testid="scout-skip-frame"
-              className="h-11 px-3 flex items-center gap-1.5 text-white/55 hover:text-[#CCFF00] transition-colors"
-              style={{ pointerEvents: "auto", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", background: "transparent", border: "none" }}
+              className="h-11 px-4 flex items-center gap-1.5 bg-ink/85 backdrop-blur border-2 border-white/28 text-white/90 hover:text-[#CCFF00] hover:border-[#CCFF00] transition-colors"
+              style={{
+                pointerEvents: "auto", fontSize: 11, fontWeight: 800,
+                letterSpacing: "0.06em", textTransform: "uppercase",
+                animation: "scoutSkipPulse 2.2s ease-in-out infinite",
+              }}
             >
-              Not visible · next frame
+              Not visible · next
               <ChevronRight className="w-4 h-4" />
             </button>
             {canFinish && (
@@ -1110,5 +1199,215 @@ function FrameStrip({ queue, queuePos, frameCache, marks, onJumpTo }) {
         })}
       </div>
     </div>
+  );
+}
+
+
+/* ── VERIFY overlay — manual "tap your player 3 times" step after the
+ *    normal 10-frame flow. Free scrubbing (slider + fine-step buttons),
+ *    big 0/3 → 3/3 progress, ✓ Player Confirmed at the end. Visual and
+ *    mobile-first: minimal text, large touch targets. */
+
+const fmtT = (s) => {
+  const x = Math.max(0, Math.floor(s || 0));
+  return `${Math.floor(x / 60)}:${String(x % 60).padStart(2, "0")}`;
+};
+
+function VerifyOverlay({
+  count, hasDraft, duration, t, done, introSeen, onIntroDone,
+  onScrub, onRetap, onConfirm, zoom, onZoomIn, onZoomOut, onResetZoom,
+}) {
+  return (
+    <>
+      {/* Top strip */}
+      <div
+        className="absolute left-0 right-0 flex items-center justify-between"
+        style={{
+          top: 0, height: 56, padding: "0 14px",
+          background: "linear-gradient(180deg, rgba(10,15,13,0.94) 0%, rgba(10,15,13,0.65) 75%, rgba(10,15,13,0) 100%)",
+          backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
+          zIndex: 15, pointerEvents: "none",
+        }}
+      >
+        <div className="flex items-baseline gap-2">
+          <span
+            className="text-[#CCFF00] font-black tabular-nums leading-none"
+            style={{ fontSize: 26, letterSpacing: "-0.02em" }}
+            data-testid="scout-verify-counter"
+          >
+            {count}<span className="text-white/35 font-bold text-[16px]">/3</span>
+          </span>
+          <span className="text-white/85 leading-none" style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.02em" }}>
+            {hasDraft ? "Adjust & confirm" : "Tap your player"}
+          </span>
+        </div>
+        <span className="text-white/45 tabular-nums" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em" }}>
+          EXTRA CHECK · {fmtT(t)}
+        </span>
+      </div>
+
+      {/* 3-segment progress bar */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5"
+        style={{ top: 50, zIndex: 14, pointerEvents: "none" }}
+        data-testid="scout-verify-progress"
+      >
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: 26, height: 6, borderRadius: 3,
+              background: i < count ? "#CCFF00" : "rgba(255,255,255,0.22)",
+              boxShadow: i < count ? "0 0 8px rgba(204,255,0,0.6)" : "none",
+              transition: "all 0.3s ease",
+            }}
+          />
+        ))}
+      </div>
+
+      {/* One-time intro card */}
+      {!introSeen && !done && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-ink/85 backdrop-blur-sm px-6"
+          style={{ zIndex: 60 }}
+          data-testid="scout-verify-intro"
+        >
+          <div className="w-full max-w-sm bg-ink border border-[#CCFF00]/40 p-6 text-center shadow-[0_0_44px_rgba(204,255,0,0.25)]">
+            <div className="mx-auto w-16 h-16 flex items-center justify-center border-2 border-[#CCFF00] rounded-full">
+              <span className="text-[#CCFF00] font-black text-[22px]">3×</span>
+            </div>
+            <div className="mt-4 text-white font-black text-[18px] uppercase tracking-wide leading-tight">
+              Tap your player<br />3 times
+            </div>
+            <p className="mt-2 text-white/60 text-[12.5px] leading-snug">
+              Drag the timeline · pick 3 clear moments
+            </p>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onIntroDone(); }}
+              data-testid="scout-verify-start"
+              className="mt-5 w-full h-12 bg-[#CCFF00] text-ink font-black text-[13px] uppercase tracking-widest hover:bg-white transition-colors"
+            >
+              Start
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✓ Player Confirmed */}
+      {done && (
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-ink/80 backdrop-blur-sm"
+          style={{ zIndex: 65 }}
+          data-testid="scout-verify-done"
+        >
+          <div className="flex flex-col items-center gap-3 px-8 py-7 bg-ink/95 border border-[#CCFF00] shadow-[0_0_60px_rgba(204,255,0,0.5)]">
+            <span className="w-16 h-16 rounded-full bg-[#CCFF00] flex items-center justify-center">
+              <Check className="w-9 h-9 text-ink" strokeWidth={3.5} />
+            </span>
+            <span className="text-[#CCFF00] font-black text-[17px] uppercase tracking-[0.2em]">Player confirmed</span>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom controls */}
+      <div className="absolute left-0 right-0 px-3" style={{ bottom: 14, zIndex: 20 }}>
+        {hasDraft ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRetap(); }}
+              data-testid="scout-verify-retap"
+              className="h-12 px-4 flex items-center justify-center gap-1.5 bg-ink/85 backdrop-blur border border-white/22 text-white/85 font-black text-[11px] uppercase tracking-widest hover:text-[#CCFF00] hover:border-[#CCFF00] transition-colors"
+              style={{ pointerEvents: "auto" }}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Re-tap
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onConfirm(); }}
+              data-testid="scout-verify-confirm"
+              className="flex-1 h-12 flex items-center justify-center gap-2 bg-[#CCFF00] text-ink font-black text-[13px] uppercase tracking-wider hover:bg-white transition-colors"
+              style={{ pointerEvents: "auto", letterSpacing: "0.08em" }}
+            >
+              <Check className="w-5 h-5" />
+              Confirm · {Math.min(3, count + 1)}/3
+            </button>
+          </div>
+        ) : (
+          <div style={{ pointerEvents: "auto" }} onClick={(e) => e.stopPropagation()}>
+            {/* Hint pill until the first tap */}
+            {count === 0 && introSeen && !done && (
+              <div className="flex justify-center mb-2 pointer-events-none">
+                <span className="px-3.5 py-1.5 bg-ink/85 backdrop-blur border border-[#CCFF00]/50 text-[#CCFF00] text-[10.5px] font-black uppercase tracking-[0.12em]">
+                  Find a clear moment → tap your player
+                </span>
+              </div>
+            )}
+            {/* Scrub row */}
+            <div className="flex items-center gap-2 bg-ink/80 backdrop-blur border border-white/15 px-3 py-2.5">
+              <button
+                type="button"
+                onClick={() => onScrub(t - 1)}
+                data-testid="scout-verify-back1"
+                className="h-9 px-2.5 flex-shrink-0 flex items-center justify-center text-white/80 hover:text-[#CCFF00] font-black text-[11px] border border-white/22 transition-colors"
+              >
+                −1s
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0.1, duration)}
+                step={0.04}
+                value={Math.min(t, duration || 0)}
+                onChange={(e) => onScrub(parseFloat(e.target.value))}
+                data-testid="scout-verify-scrub"
+                className="flex-1 h-10"
+                style={{ accentColor: "#CCFF00", touchAction: "none" }}
+              />
+              <button
+                type="button"
+                onClick={() => onScrub(t + 1)}
+                data-testid="scout-verify-fwd1"
+                className="h-9 px-2.5 flex-shrink-0 flex items-center justify-center text-white/80 hover:text-[#CCFF00] font-black text-[11px] border border-white/22 transition-colors"
+              >
+                +1s
+              </button>
+            </div>
+            {/* Zoom row */}
+            <div className="flex items-center justify-end gap-1.5 mt-2">
+              <button
+                type="button"
+                onClick={onZoomOut}
+                disabled={zoom <= 1.01}
+                data-testid="scout-verify-zoom-out"
+                className="w-10 h-10 flex items-center justify-center bg-ink/85 backdrop-blur border border-white/22 text-white/85 hover:text-[#CCFF00] hover:border-[#CCFF00] disabled:opacity-30 transition-colors"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onResetZoom}
+                data-testid="scout-verify-zoom-reset"
+                className="h-10 px-2.5 flex items-center justify-center bg-ink/85 backdrop-blur border border-white/22 text-white/75 hover:text-[#CCFF00] hover:border-[#CCFF00] transition-colors tabular-nums"
+                style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em" }}
+              >
+                {zoom.toFixed(1)}×
+              </button>
+              <button
+                type="button"
+                onClick={onZoomIn}
+                disabled={zoom >= 2.99}
+                data-testid="scout-verify-zoom-in"
+                className="w-10 h-10 flex items-center justify-center bg-ink/85 backdrop-blur border border-white/22 text-white/85 hover:text-[#CCFF00] hover:border-[#CCFF00] disabled:opacity-30 transition-colors"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

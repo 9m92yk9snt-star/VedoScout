@@ -1109,6 +1109,7 @@ export default function MarkerStudio({
             box: a.box,
             segment: a.segment ?? 0,
             thumb: a.thumb || undefined,
+            verify: a.verify || undefined,
           })),
           sceneCuts: sceneCuts || [],
           scoutMode: true,

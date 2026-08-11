@@ -5836,9 +5836,11 @@ async def analyze_preview_task(report_id: str):
                     all_anchors = []
             except Exception:
                 all_anchors = []
-            # B1 — use ALL Scout Mode taps (up to 10) as identity anchors,
-            # not just the first six. More sightings = stronger lock.
-            for idx, a in enumerate(all_anchors[1:10], start=2):
+            # B1 — use ALL Scout Mode taps as identity anchors: up to 10 from
+            # the keyframe flow + up to 3 manual verification taps (verify:true)
+            # appended by the "tap your player 3 times" step. More sightings =
+            # stronger lock.
+            for idx, a in enumerate(all_anchors[1:13], start=2):
                 try:
                     t_anchor = float(a.get("t", 0.0))
                     box_anchor = a.get("box") or {}
@@ -5879,6 +5881,7 @@ async def analyze_preview_task(report_id: str):
                             "crop_filename": crop_filename_a,
                             "wide_filename": wide_filename_a if has_wide else None,
                             "thumb_filename": a.get("thumb_filename"),
+                            **({"verify": True} if a.get("verify") else {}),
                         })
                 except Exception as e:
                     logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
