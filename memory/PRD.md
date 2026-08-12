@@ -3499,3 +3499,6 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 
 ## 2026-08-12 (7) — Hero final image (user hated the field version)
 - Replaced with premium campaign-grade shot: lone player from behind in a vast EMPTY golden stadium (dreaming of the big stage), ball under arm, boots visible, warm cinematic grade, top 22% cropped → head at top, stands (not sky) fill the background. Path unchanged. Verified desktop + mobile.
+
+## 2026-08-12 (8) — Hero "alive" pro animation (verified)
+- Layered cinematic motion on the hero photo: Ken Burns drift (16s), mouse parallax (framer-motion useMotionValue+useSpring, photo leans away from cursor, resets on leave), breathing warm radial glow (mix-blend screen, 7s), soft diagonal light sweep (8.5s), 6 drifting golden dust motes (staggered 11-14s, CSS vars for opacity/x-drift). All layers class smp-hero-anim, disabled under prefers-reduced-motion. Verified: two frames 3s apart show motion; no layout break.

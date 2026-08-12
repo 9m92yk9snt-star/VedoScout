@@ -17,7 +17,7 @@
  */
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useSpring } from "framer-motion";
 import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin, Volleyball, FileText, Upload, Crosshair, Eye } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
@@ -150,10 +150,23 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
     { icon: Eye, l1: "Get seen", l2: "by scouts" },
     { icon: ShieldCheck, l1: "Find trials &", l2: "opportunities" },
   ];
+  // Mouse parallax — the photo leans gently away from the cursor (desktop).
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const px = useSpring(mx, { stiffness: 42, damping: 16 });
+  const py = useSpring(my, { stiffness: 42, damping: 16 });
+  const handleHeroMouseMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set(((e.clientX - r.left) / r.width - 0.5) * -14);
+    my.set(((e.clientY - r.top) / r.height - 0.5) * -10);
+  };
+  const resetHeroParallax = () => { mx.set(0); my.set(0); };
   return (
     <section
       id="hero-section"
       data-testid="hero-minimal"
+      onMouseMove={handleHeroMouseMove}
+      onMouseLeave={resetHeroParallax}
       className="relative px-5 md:px-10 pt-6 md:pt-12 pb-12 md:pb-16 border-b border-gray-border overflow-hidden bg-cream-base"
     >
       <div
@@ -165,7 +178,8 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
       <div className="relative max-w-6xl mx-auto">
         {/* ── Copy + player image ── */}
         <div className="relative">
-          {/* Player photo — bleeds right, blends into the cream background */}
+          {/* Player photo — bleeds right, blends into the cream background.
+              "Alive" layers: slow drift + mouse parallax + light sweep + drifting dust motes. */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -175,16 +189,62 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             data-testid="hero-player-photo"
           >
             <style>{`
-              @keyframes smp-hero-drift { from { transform: scale(1.04) translate(0px, 0px); } to { transform: scale(1.12) translate(-12px, -8px); } }
-              @media (prefers-reduced-motion: reduce) { .smp-hero-img { animation: none !important; } }
+              @keyframes smp-hero-drift { from { transform: scale(1.06) translate(0px, 0px); } to { transform: scale(1.14) translate(-14px, -9px); } }
+              @keyframes smp-hero-sweep { 0% { transform: translateX(-160%) rotate(16deg); } 55%, 100% { transform: translateX(320%) rotate(16deg); } }
+              @keyframes smp-hero-mote { 0% { transform: translateY(0) translateX(0); opacity: 0; } 12% { opacity: var(--mo, 0.55); } 82% { opacity: var(--mo, 0.55); } 100% { transform: translateY(-46vh) translateX(var(--mx, 8px)); opacity: 0; } }
+              @keyframes smp-hero-glowpulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.5; } }
+              @media (prefers-reduced-motion: reduce) { .smp-hero-anim { animation: none !important; } }
             `}</style>
-            <img
-              src={heroPlayer}
-              alt=""
-              onError={(e) => { e.currentTarget.style.display = "none"; }}
-              className="smp-hero-img w-full h-full object-cover object-top"
-              style={{ animation: "smp-hero-drift 18s ease-in-out infinite alternate" }}
+            <motion.div className="absolute inset-0" style={{ x: px, y: py }}>
+              <img
+                src={heroPlayer}
+                alt=""
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                className="smp-hero-anim smp-hero-img w-full h-full object-cover object-top"
+                style={{ animation: "smp-hero-drift 16s ease-in-out infinite alternate" }}
+              />
+            </motion.div>
+            {/* warm breathing glow behind the player */}
+            <div
+              className="smp-hero-anim absolute inset-0"
+              style={{
+                background: "radial-gradient(52% 42% at 62% 34%, rgba(255,196,110,0.35) 0%, transparent 70%)",
+                mixBlendMode: "screen",
+                animation: "smp-hero-glowpulse 7s ease-in-out infinite",
+              }}
             />
+            {/* cinematic light sweep */}
+            <span
+              className="smp-hero-anim absolute -inset-y-10 w-[46%]"
+              style={{
+                background: "linear-gradient(90deg, transparent 0%, rgba(255,242,214,0.22) 45%, rgba(255,255,255,0.14) 55%, transparent 100%)",
+                mixBlendMode: "screen",
+                filter: "blur(6px)",
+                animation: "smp-hero-sweep 8.5s ease-in-out infinite",
+              }}
+            />
+            {/* drifting golden dust motes */}
+            {[
+              { l: "22%", b: "8%", s: 5, d: "0s", t: "11s", o: 0.5, x: "14px" },
+              { l: "38%", b: "16%", s: 3, d: "2.2s", t: "13s", o: 0.42, x: "-10px" },
+              { l: "58%", b: "6%", s: 6, d: "4.1s", t: "12s", o: 0.55, x: "10px" },
+              { l: "72%", b: "20%", s: 4, d: "1.4s", t: "14s", o: 0.4, x: "-14px" },
+              { l: "48%", b: "30%", s: 3, d: "5.6s", t: "12.5s", o: 0.45, x: "8px" },
+              { l: "84%", b: "12%", s: 4, d: "3.3s", t: "11.5s", o: 0.5, x: "-8px" },
+            ].map((m, i) => (
+              <span
+                key={i}
+                className="smp-hero-anim absolute rounded-full"
+                style={{
+                  left: m.l, bottom: m.b, width: m.s, height: m.s,
+                  background: "radial-gradient(circle, rgba(255,236,180,0.95) 0%, rgba(255,214,120,0.35) 60%, transparent 100%)",
+                  filter: "blur(0.5px)",
+                  "--mo": m.o, "--mx": m.x,
+                  animation: `smp-hero-mote ${m.t} linear ${m.d} infinite`,
+                  opacity: 0,
+                }}
+              />
+            ))}
             <div
               className="absolute inset-0"
               style={{
