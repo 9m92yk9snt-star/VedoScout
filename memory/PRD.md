@@ -3519,3 +3519,16 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 - Export = client-side canvas render: 4 finished ready-to-upload JPGs (1080x1350, 1080x1920, 1080x1350 FB split-layout, 1080x1080) with brand typography (Barlow Condensed, cream/ink/dark-green, lime #CCFF00 CTA only) + copy .txt for Meta Ads Manager.
 - Reusable pytest: /app/backend/tests/test_ad_studio.py (12 tests). Seed campaign 23bd028c89 (instant_analysis, da) remains in preview DB.
 - Backlog ideas (not built): campaign delete/TTL cleanup, direct Meta Ads publish, A/B result tracking.
+
+## 2026-08-12 (11) — Quality Engine: anti-generic QC for existing content (tested, iteration_93: 100%)
+- Backend `/app/backend/quality_engine.py` → router `/api/admin/quality/*` (wired in server.py after ad_studio). Reuses Ad Studio's FORBIDDEN phrases + PRODUCTS facts registry.
+- Blog QC (button per article in Blog tab, `admin-blog-qc-{id}`): 17 checks in 3 groups (text 9 / seo 4 / image 4) via Gemini 2.5 Pro vision on the cover; scores 0-100 per group; cover classification AUTHENTIC/REVIEW/TOO_GENERIC + KEEP/IMPROVE/REPLACE/GENERATE; proposed fixes (title/excerpt/meta/alt) with CURRENT vs PROPOSED, editable, Approve & Apply writes to blog_posts. Body truncated at sentence boundary (no false grammar flags); image score None when no local cover.
+- Carousel QC (button per job in Marketing tab, `carousel-qc-{id}`): 8 checks (hook, readability, repetition, generic, claims, CTA, caption, brand) on slides 1/mid/last + caption; apply proposed caption.
+- SEO QC (`SeoQualityPanel` at top of SEO & Social): all public pages in one LLM call, per-page score + proposed title/description/keywords, Approve & Apply merges into settings.seo_pages overrides.
+- Duplicates scanner (new 'Quality' admin tab, `quality-scan-duplicates`): no LLM — difflib similarity on blog titles/excerpts/metas/cross-article sentences, SEO descriptions, carousel captions + perceptual dhash near-identical image detection (blog covers/ads/landing). Severity CRITICAL/IMPORTANT/IMPROVEMENT.
+- Overview cards (Quality tab): Blog/Carousel/SEO/Duplicates scores. Checks run as background jobs, stored in db.quality_checks with content-hash STALE detection (re-check-when-changed principle).
+- Engine only analyses + proposes; applies ONLY DB content after admin approval — never edits code (user-approved split).
+- Frontend: QualityCheckDialog.jsx (shared blog/carousel modal), SeoQualityPanel.jsx, QualityAdmin.jsx; buttons wired into BlogAdmin.jsx, CarouselStudioAdmin.jsx, SeoAdmin.jsx; tab in AdminPage.jsx.
+- Reusable pytest: /app/backend/tests/test_iter93_quality_engine.py (15 tests).
+- Known pre-existing non-blocking console warning: '<span> cannot be a child of <option>' somewhere in admin (unrelated).
+- Backlog: full-site page/component scanner (hardcoded JSX copy audit + mobile render checks) from the user's big Quality Engine spec — deferred; approved-changes list → chat handoff for code-level text fixes.

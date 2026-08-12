@@ -5,6 +5,7 @@ import { Globe, Sparkles, ExternalLink } from "lucide-react";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import SeoQualityPanel from "@/components/admin/SeoQualityPanel";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -78,6 +79,7 @@ export default function SeoAdmin() {
 
   return (
     <div className="space-y-6" data-testid="seo-admin">
+      <SeoQualityPanel onApplied={load} />
       {/* Search engine files */}
       <div className="rounded-lg border border-ink/10 bg-white/5 p-4">
         <div className="font-bold text-ink mb-1">Search engine files (automatic)</div>

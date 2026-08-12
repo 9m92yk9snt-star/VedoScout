@@ -1,8 +1,9 @@
 // CarouselStudioAdmin — generate Instagram carousel slides in ScoutMePlay style.
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Images, Loader2, Sparkles, Trash2, Download, Copy, Instagram, Link2, X, Send } from "lucide-react";
+import { Images, Loader2, Sparkles, Trash2, Download, Copy, Instagram, Link2, X, Send, ShieldCheck } from "lucide-react";
 import api from "@/lib/api";
+import QualityCheckDialog from "@/components/admin/QualityCheckDialog";
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -92,6 +93,7 @@ export const CarouselStudioAdmin = () => {
   const [slides, setSlides] = useState(7);
   const [busy, setBusy] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [qcJob, setQcJob] = useState(null);
   const [igConfig, setIgConfig] = useState(null);
   const pollRef = useRef(null);
   const igPollRef = useRef(null);
@@ -249,6 +251,9 @@ export const CarouselStudioAdmin = () => {
                         <Send className="w-3.5 h-3.5" /> Post to Instagram
                       </button>
                     )}
+                    <button onClick={() => setQcJob(j)} className="text-xs uppercase tracking-widest font-bold border border-gray-border hover:border-forest px-3 py-2 flex items-center gap-1.5" data-testid={`carousel-qc-${j.id}`} title="Anti-generic QC">
+                      <ShieldCheck className="w-3.5 h-3.5" /> QC
+                    </button>
                     <button onClick={() => copyCaption(j.caption)} className="text-xs uppercase tracking-widest font-bold border border-gray-border hover:border-forest px-3 py-2 flex items-center gap-1.5" data-testid={`carousel-copy-caption-${j.id}`}>
                       <Copy className="w-3.5 h-3.5" /> Caption
                     </button>
@@ -294,6 +299,15 @@ export const CarouselStudioAdmin = () => {
         ))}
         {jobs.length === 0 && <div className="text-sm text-ink/50">No carousels yet — create your first one above.</div>}
       </div>
+      {qcJob && (
+        <QualityCheckDialog
+          kind="carousel"
+          targetId={qcJob.id}
+          title={qcJob.topic}
+          onClose={() => setQcJob(null)}
+          onApplied={load}
+        />
+      )}
     </div>
   );
 };

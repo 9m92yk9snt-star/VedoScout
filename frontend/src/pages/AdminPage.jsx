@@ -33,6 +33,7 @@ import { MarketingAdmin } from "@/components/admin/MarketingAdmin";
 import DashboardHubAdmin from "@/components/admin/DashboardHubAdmin";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import AdStudioAdmin from "@/components/admin/AdStudioAdmin";
+import QualityAdmin from "@/components/admin/QualityAdmin";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
@@ -40,6 +41,7 @@ const ALL_TABS = [
   { id: "growth", label: "Growth", role: "admin" },
   { id: "marketing", label: "Marketing", role: "admin" },
   { id: "ad-studio", label: "Ad Studio", role: "admin" },
+  { id: "quality", label: "Quality", role: "admin" },
   { id: "ticker", label: "Ticker", role: "admin" },
   { id: "seo", label: "SEO & Social", role: "admin" },
   { id: "reviews", label: "Reviews", role: "admin" },
@@ -491,6 +493,8 @@ export default function AdminPage() {
               {activeTab === "ticker" && <TickerAdmin />}
 
               {activeTab === "ad-studio" && <AdStudioAdmin />}
+
+              {activeTab === "quality" && <QualityAdmin />}
 
               {activeTab === "player-dashboard" && <DashboardHubAdmin prefillEmail={composerPrefill} />}
 

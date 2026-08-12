@@ -4,11 +4,12 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   Plus, Edit3, Trash2, Eye, FileText, Sparkles, Save, Send, Upload, Loader2, X,
-  ImageIcon, Tag as TagIcon, ArrowLeft, Layers, ChevronRight, PenLine, Mail,
+  ImageIcon, Tag as TagIcon, ArrowLeft, Layers, ChevronRight, PenLine, Mail, ShieldCheck,
 } from "lucide-react";
 import api from "@/lib/api";
 import BlogStudioPanel from "@/components/admin/BlogStudioPanel";
 import NewsletterAdmin from "@/components/admin/NewsletterAdmin";
+import QualityCheckDialog from "@/components/admin/QualityCheckDialog";
 
 const STATUS_LABEL = { draft: "Draft", published: "Live" };
 const DEFAULT_AUDIENCE = "parents and ambitious young footballers U7–U21";
@@ -39,6 +40,7 @@ function BlogList({ onNew, onEdit }) {
   const [seriesOpen, setSeriesOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const [subsOpen, setSubsOpen] = useState(false);
+  const [qcPost, setQcPost] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all"); // all | draft | published
 
   const load = async () => {
@@ -234,6 +236,14 @@ function BlogList({ onNew, onEdit }) {
                         </a>
                       )}
                       <button
+                        onClick={() => setQcPost(p)}
+                        data-testid={`admin-blog-qc-${p.id}`}
+                        title="Anti-generic QC"
+                        className="text-ink/60 hover:bg-volt hover:text-white p-2 transition-colors"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => onEdit(p.id)}
                         data-testid={`admin-blog-edit-${p.id}`}
                         title="Edit"
@@ -257,6 +267,15 @@ function BlogList({ onNew, onEdit }) {
           </table>
         </div>
         </>
+      )}
+      {qcPost && (
+        <QualityCheckDialog
+          kind="blog"
+          targetId={qcPost.id}
+          title={qcPost.title}
+          onClose={() => setQcPost(null)}
+          onApplied={load}
+        />
       )}
     </div>
   );
