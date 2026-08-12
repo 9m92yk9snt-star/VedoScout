@@ -3538,3 +3538,10 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 2. **SEO proposals APPLIED (live in preview)**: home/upload/about/scouts/signup now use QC-improved titles/descriptions/keywords (e.g. home title 'Professional Football Analysis for Youth Players'). User must deploy for production.
 3. **Auto-QC new content**: schedule_auto_qc() in quality_engine; called after insert in blog_routes (create post + series save), blog_studio (auto-drafts), carousel_studio (job done). Toggleable via settings key quality_auto_qc (default ON) — GET/PUT /api/admin/quality/config + toggle card in Quality tab (quality-auto-qc-toggle). Verified: temp post triggered auto QC (auto:true, scored 32 — correctly harsh), toggle persists, temp data cleaned up.
 - Post 'How to Prepare for Football Trials Without the Panic' (5f798fc1…) still has NO cover by design — a generated documentary proposal (parent tying bootlace) is stored and awaits the owner's approval in the Blog QC dialog.
+
+## 2026-08-12 (13) — One-click "Fix red marks" (self-tested end-to-end on the user's exact issue)
+- User pain: red-marked carousel slide issues (e.g. 'guide' twice on slide 7) had no easy correction path.
+- Backend: POST /api/admin/quality/carousel/{job_id}/fix → background _fix_carousel: gpt-5.4 rewrites ONLY flagged slide texts (keeps kind/role, honest voice), re-renders affected PNGs via carousel_studio.render_slide, updates slides_data + cache-busted slide_urls (?v=), then auto re-runs QC. Status flow: fixing → checking → ready.
+- Frontend dialog: prominent lime "FIX RED MARKS — rewrite & re-render slides" button when carousel QC fails (qc-fix-red-marks); "fixing" spinner label; poll continues through fixing+checking; onApplied refreshes the job list thumbnails.
+- Blog: "APPLY ALL" button (qc-apply-all) applies every proposed improvement in one click, then re-checks.
+- Verified live: original red mark (guide x2, slide 7) → fix 1 rewrote slide 7, honest re-check caught 'support' repetition (slides 1+7) → fix 2 → PASSED 100/100, all checks green, slide 7 PNG visually verified (no repetition, watermark/counter intact).

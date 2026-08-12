@@ -92,17 +92,20 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
     return data;
   }, [kind, targetId]);
 
-  const startPoll = useCallback(() => {
+  const startPoll = useCallback((onDone) => {
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const data = await load();
-        if (data.status !== "checking") {
-          clearInterval(pollRef.current);
-          setChecking(false);
+        if (data.status === "checking" || data.status === "fixing") {
           setResult(data);
-          if (data.status === "error") toast.error(`Check failed: ${data.error}`);
+          return;
         }
+        clearInterval(pollRef.current);
+        setChecking(false);
+        setResult(data);
+        if (data.status === "error") toast.error(`Check failed: ${data.error}`);
+        else if (onDone) onDone(data);
       } catch { /* keep polling */ }
     }, 3000);
   }, [load]);
@@ -121,7 +124,7 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
   useEffect(() => {
     load().then((data) => {
       if (!data.found) runCheck();
-      else if (data.status === "checking") { setChecking(true); startPoll(); }
+      else if (data.status === "checking" || data.status === "fixing") { setChecking(true); startPoll(); }
       else setResult(data);
       if (data.cover_gen_status === "generating") { setCoverGen(true); pollCover(); }
     }).catch(() => toast.error("Could not load QC state"));
@@ -190,6 +193,36 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
     }
   };
 
+  const fixRedMarks = async () => {
+    setChecking(true);
+    try {
+      await api.post(`/admin/quality/carousel/${targetId}/fix`);
+      toast.info("Fixing the red marks — rewriting and re-rendering the flagged slides…");
+      startPoll((data) => {
+        if (data.passed) toast.success("Fixed ✓ — slides re-rendered and QC now passes");
+        else toast.info("Fixed and re-checked — see remaining marks below");
+        onApplied?.();
+      });
+    } catch {
+      setChecking(false);
+      toast.error("Could not start fix");
+    }
+  };
+
+  const applyAll = async () => {
+    setApplying(true);
+    try {
+      await api.post(`/admin/quality/blog/${targetId}/apply`, { fields: result.proposed });
+      toast.success("All proposed improvements applied");
+      onApplied?.();
+      runCheck();
+    } catch {
+      toast.error("Could not apply");
+    } finally {
+      setApplying(false);
+    }
+  };
+
   const ready = result?.status === "ready";
   const cls = result?.image_classification;
   const showCoverTool = kind === "blog" && ready && !coverDismissed && (
@@ -215,7 +248,11 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
           {checking && (
             <div className="text-center py-10" data-testid="qc-checking">
               <Loader2 className="w-6 h-6 animate-spin text-volt mx-auto" />
-              <div className="mt-3 text-sm text-ink/60">Running the anti-generic quality check…</div>
+              <div className="mt-3 text-sm text-ink/60">
+                {result?.status === "fixing"
+                  ? "Fixing the red marks — rewriting and re-rendering the flagged slides…"
+                  : "Running the anti-generic quality check…"}
+              </div>
             </div>
           )}
 
@@ -247,6 +284,17 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
                   <RefreshCw className="w-3 h-3" /> Re-run
                 </button>
               </div>
+
+              {kind === "carousel" && !result.passed && (
+                <button
+                  data-testid="qc-fix-red-marks"
+                  onClick={fixRedMarks}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black uppercase tracking-wider transition-colors"
+                  style={{ background: "#CCFF00", color: "#0D1512" }}
+                >
+                  <Sparkles className="w-4 h-4" /> Fix red marks — rewrite &amp; re-render slides
+                </button>
+              )}
 
               <ChecksList checks={result.checks} />
 
@@ -320,7 +368,20 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
 
               {result.proposed && Object.keys(result.proposed).length > 0 && (
                 <div className="space-y-3">
-                  <div className="font-barlow font-black uppercase text-sm tracking-tight border-t border-gray-border pt-4">Proposed improvements — you decide</div>
+                  <div className="flex items-center justify-between border-t border-gray-border pt-4">
+                    <div className="font-barlow font-black uppercase text-sm tracking-tight">Proposed improvements — you decide</div>
+                    {kind === "blog" && Object.keys(result.proposed).length > 1 && (
+                      <button
+                        data-testid="qc-apply-all"
+                        onClick={applyAll}
+                        disabled={applying}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider disabled:opacity-50"
+                        style={{ background: "#CCFF00", color: "#0D1512" }}
+                      >
+                        {applying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Apply all
+                      </button>
+                    )}
+                  </div>
                   {Object.entries(result.proposed).map(([k, v]) => (
                     <ProposedField
                       key={k}

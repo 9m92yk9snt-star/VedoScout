@@ -524,6 +524,76 @@ def schedule_auto_qc(db: Any, kind: str, target_id: str):
         logger.warning("auto-qc skipped — no running event loop")
 
 
+# ── One-click carousel fix (rewrite failing slide texts + re-render) ───────
+CAROUSEL_VOICE = (
+    "You are the social voice of ScoutMePlay — warm, human, honest football voice for parents and U7-U21 players. "
+    "Never promise contracts, trials or guaranteed exposure. Never use the standalone word 'AI'. Short punchy lines. " + FORBIDDEN
+)
+
+
+async def _fix_carousel(db: Any, job: dict):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from carousel_studio import render_slide, OUT_DIR
+    job_id = job["id"]
+    try:
+        qc = await db.quality_checks.find_one({"kind": "carousel", "target_id": job_id}) or {}
+        failing = [c for c in (qc.get("checks") or []) if not c.get("pass")]
+        slides = job.get("slides_data") or []
+        chat = LlmChat(
+            api_key=os.environ["EMERGENT_LLM_KEY"],
+            session_id=f"quality-fix-{uuid.uuid4().hex[:6]}",
+            system_message=CAROUSEL_VOICE,
+        ).with_model("openai", "gpt-5.4")
+        prompt = f"""Fix ONLY the flagged issues in this ScoutMePlay Instagram carousel. Keep everything that works.
+TOPIC: {job.get('topic')}
+CAPTION: {job.get('caption')}
+SLIDES (1-based index): {json.dumps(slides, ensure_ascii=False)}
+FLAGGED ISSUES:
+{chr(10).join(f"- {c['label']}: {c.get('issue') or ''}" for c in failing) or '- (none — light polish only where clearly weak)'}
+
+Return ONLY JSON with ONLY what must change:
+{{"slides": {{"<index>": {{"kind": "<same kind>", "title": "...", "lines": ["..."]}}}}, "caption": null_or_fixed_caption}}
+Rules: keep each slide's kind and role, titles max 9 words, lines max 12 words, fix exactly what the issues describe."""
+        resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=120)
+        data = _parse_json(resp if isinstance(resp, str) else getattr(resp, "text", str(resp)))
+
+        changed = data.get("slides") or {}
+        job_dir = OUT_DIR / (job.get("job_dir_id") or "")
+        version = uuid.uuid4().hex[:6]
+        new_urls = list(job.get("slide_urls") or [])
+        for idx_s, s in changed.items():
+            try:
+                i = int(idx_s) - 1
+            except (TypeError, ValueError):
+                continue
+            if not (0 <= i < len(slides)) or not isinstance(s, dict):
+                continue
+            slides[i] = {"kind": slides[i].get("kind") or s.get("kind") or "point",
+                         "title": str(s.get("title") or slides[i].get("title") or "").strip(),
+                         "lines": [str(x).strip() for x in (s.get("lines") or slides[i].get("lines") or []) if str(x).strip()]}
+            img = await asyncio.to_thread(render_slide, slides[i], i, len(slides))
+            await asyncio.to_thread(img.save, job_dir / f"slide-{i + 1}.png", "PNG")
+            if i < len(new_urls):
+                new_urls[i] = new_urls[i].split("?")[0] + f"?v={version}"
+        update = {"slides_data": slides, "slide_urls": new_urls}
+        cap = data.get("caption")
+        if isinstance(cap, str) and cap.strip():
+            update["caption"] = cap.strip()
+        await db.carousel_jobs.update_one({"id": job_id}, {"$set": update})
+
+        fresh = await db.carousel_jobs.find_one({"id": job_id}, {"_id": 0})
+        await db.quality_checks.update_one(
+            {"kind": "carousel", "target_id": job_id},
+            {"$set": {"status": "checking", "fixed_slides": sorted(int(k) for k in changed.keys() if str(k).isdigit()),
+                      "started_at": now_iso()}})
+        await _run_check(db, "carousel", job_id, lambda: _check_carousel(fresh), _carousel_hash(fresh))
+    except Exception as e:
+        logger.exception("carousel fix failed (%s)", job_id)
+        await db.quality_checks.update_one(
+            {"kind": "carousel", "target_id": job_id},
+            {"$set": {"status": "error", "error": f"Fix failed: {str(e)[:250]}"}}, upsert=True)
+
+
 BLOG_APPLY_WHITELIST = {"title", "subtitle", "excerpt", "meta_title", "meta_description", "meta_keywords", "cover_image_alt", "cover_image_url"}
 
 
@@ -601,6 +671,17 @@ def build_quality_router(*, db: Any, admin_dep: Any):
         await db.quality_checks.update_one(
             {"kind": "carousel", "target_id": job_id}, {"$addToSet": {"applied": "caption"}})
         return {"ok": True, "applied": ["caption"]}
+
+    @router.post("/carousel/{job_id}/fix")
+    async def carousel_fix(job_id: str, _=Depends(admin_dep)):
+        job = await db.carousel_jobs.find_one({"id": job_id}, {"_id": 0})
+        if not job:
+            raise HTTPException(404, "Carousel not found")
+        await db.quality_checks.update_one(
+            {"kind": "carousel", "target_id": job_id},
+            {"$set": {"status": "fixing", "error": None, "started_at": now_iso()}}, upsert=True)
+        asyncio.create_task(_fix_carousel(db, job))
+        return {"status": "fixing"}
 
     @router.post("/seo/check")
     async def seo_check(_=Depends(admin_dep)):
