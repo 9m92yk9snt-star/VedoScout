@@ -1,7 +1,7 @@
 // QualityAdmin — Quality tab: cross-content overview + site-wide duplicate scanner.
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Loader2, Copy, ImageIcon, Type, ScanSearch, Camera } from "lucide-react";
+import { ShieldCheck, Loader2, Copy, ImageIcon, Type, ScanSearch, Camera, Check } from "lucide-react";
 import api, { ASSET_BASE } from "@/lib/api";
 
 const SEV_CLS = {
@@ -9,6 +9,64 @@ const SEV_CLS = {
   IMPORTANT: "bg-amber-100 text-amber-800",
   IMPROVEMENT: "bg-sky-100 text-sky-800",
 };
+
+function LandingGenPanel({ img, gen, onGenerate, onApply, busy }) {
+  const [dismissed, setDismissed] = useState(false);
+  const key = img.file;
+  if (gen?.applied_at) {
+    return <div className="mt-2 text-[11px] font-bold text-emerald-700" data-testid={`quality-landing-applied-${key}`}>New photo applied ✓ — old file backed up. Re-run the formula check to re-score.</div>;
+  }
+  if (dismissed) return null;
+  if (gen?.status === "generating" || busy === key) {
+    return (
+      <div className="mt-2 flex items-center gap-2 text-[11px] text-ink/60" data-testid={`quality-landing-generating-${key}`}>
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-volt" /> Shooting a documentary replacement — ~30 seconds…
+      </div>
+    );
+  }
+  if (gen?.status === "ready" && gen.url) {
+    return (
+      <div className="mt-2" data-testid={`quality-landing-proposal-${key}`}>
+        <div className="grid grid-cols-2 gap-2 max-w-md">
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-ink/45 mb-0.5">Current</div>
+            <img src={`${ASSET_BASE}${img.url}`} alt="Current" className="w-full aspect-video object-cover border border-gray-border" />
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-volt mb-0.5">Proposed</div>
+            <img src={`${ASSET_BASE}${gen.url}`} alt="Proposed" className="w-full aspect-video object-cover border-2 border-volt" data-testid={`quality-landing-proposed-img-${key}`} />
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button data-testid={`quality-landing-apply-${key}`} onClick={() => onApply(key)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 bg-volt text-white text-[10px] font-black uppercase tracking-wider">
+            <Check className="w-3 h-3" /> Approve & replace
+          </button>
+          <button data-testid={`quality-landing-regen-${key}`} onClick={() => onGenerate(key)}
+            className="px-3 py-1.5 border border-gray-border text-[10px] font-black uppercase tracking-wider text-ink/60 hover:text-ink">
+            Generate again
+          </button>
+          <button data-testid={`quality-landing-reject-${key}`} onClick={() => setDismissed(true)}
+            className="px-3 py-1.5 border border-gray-border text-[10px] font-black uppercase tracking-wider text-ink/50">
+            Reject
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2">
+      {gen?.status === "error" && <div className="text-[11px] text-rose-700 mb-1">Generation failed: {gen.error} — try again.</div>}
+      <button
+        data-testid={`quality-landing-gen-${key}`}
+        onClick={() => onGenerate(key)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-ink text-cream-base text-[10px] font-black uppercase tracking-wider hover:bg-volt transition-colors"
+      >
+        <Camera className="w-3 h-3" /> Generate documentary replacement
+      </button>
+    </div>
+  );
+}
 
 function OverviewCard({ label, main, sub, testid }) {
   return (
@@ -60,6 +118,50 @@ export default function QualityAdmin() {
     }
   };
 
+  const [genBusy, setGenBusy] = useState("");
+  const genPollRef = useRef(null);
+
+  const pollGen = (file) => {
+    clearInterval(genPollRef.current);
+    const key = file.replace(/\./g, "_");
+    genPollRef.current = setInterval(async () => {
+      try {
+        const d = await loadLanding();
+        const g = (d.gen || {})[key];
+        if (g && g.status !== "generating") {
+          clearInterval(genPollRef.current);
+          setGenBusy("");
+          setLanding(d);
+          if (g.status === "error") toast.error(`Generation failed: ${g.error}`);
+          else toast.success("Replacement ready — compare CURRENT vs PROPOSED and approve");
+        }
+      } catch { /* keep polling */ }
+    }, 4000);
+  };
+
+  const generateReplacement = async (file) => {
+    setGenBusy(file);
+    try {
+      await api.post(`/admin/quality/landing/${file}/generate`);
+      toast.info("Shooting a documentary replacement — ~30 seconds…");
+      pollGen(file);
+    } catch {
+      setGenBusy("");
+      toast.error("Could not start generation");
+    }
+  };
+
+  const applyReplacement = async (file) => {
+    try {
+      await api.post(`/admin/quality/landing/${file}/apply`);
+      toast.success(`${file} replaced on the site — old photo backed up`);
+      const d = await loadLanding();
+      setLanding(d);
+    } catch {
+      toast.error("Could not apply replacement");
+    }
+  };
+
   const loadOverview = () => api.get("/admin/quality/overview").then(({ data }) => setOverview(data)).catch(() => {});
 
   useEffect(() => {
@@ -72,7 +174,7 @@ export default function QualityAdmin() {
       if (d.found && d.status === "ready") setLanding(d);
       else if (d.found && d.status === "checking") { setCheckingLanding(true); pollLanding(); }
     }).catch(() => {});
-    return () => clearInterval(landingPollRef.current);
+    return () => { clearInterval(landingPollRef.current); clearInterval(genPollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -214,6 +316,15 @@ export default function QualityAdmin() {
                     <ul className="mt-1.5 space-y-0.5">
                       {img.issues.map((iss, i) => <li key={i} className="text-[11px] text-rose-700">• {iss}</li>)}
                     </ul>
+                  )}
+                  {img.verdict !== "KEEP" && (
+                    <LandingGenPanel
+                      img={img}
+                      gen={(landing.gen || {})[img.file.replace(/\./g, "_")]}
+                      onGenerate={generateReplacement}
+                      onApply={applyReplacement}
+                      busy={genBusy}
+                    />
                   )}
                 </div>
               </div>

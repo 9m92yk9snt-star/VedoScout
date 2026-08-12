@@ -399,6 +399,8 @@ async def _scan_duplicates(db) -> dict:
     for d, label in ((ADS_DIR, "Ad Studio"), (LANDING_DIR, "Landing")):
         if d.exists():
             for f in sorted(d.glob("*.jpg")):
+                if f.name.startswith("qc-new-"):
+                    continue
                 img_files.append((f"{label} → {f.name}", f))
     hashes = await asyncio.to_thread(lambda: [(loc, _dhash(fp)) for loc, fp in img_files])
     for i in range(len(hashes)):
@@ -671,22 +673,32 @@ Rules: keep each slide's kind and role, titles max 9 words, lines max 12 words, 
 
 # ── Landing photo formula check ────────────────────────────────────────────
 LANDING_PHOTOS = [
-    {"file": "hero-player.jpg", "label": "Homepage hero (day)", "used_on": "Homepage hero — the first impression", "purpose": "ambition, beginning, a young player and the game ahead"},
-    {"file": "hero-player-night.jpg", "label": "Homepage hero (night)", "used_on": "Homepage hero — night variant", "purpose": "ambition, calm evening atmosphere, the game ahead"},
-    {"file": "auth-hero-player.jpg", "label": "Login / signup photo", "used_on": "Login and signup side panel", "purpose": "beginning, belonging, entering something"},
-    {"file": "finalcta-stadium.jpg", "label": "Final CTA photo", "used_on": "Landing final call-to-action section", "purpose": "opportunity, forward movement"},
-    {"file": "hero-free.jpg", "label": "Free dashboard hero", "used_on": "Free user dashboard header", "purpose": "welcome, potential, the next step"},
-    {"file": "hero-premium.jpg", "label": "Premium dashboard hero", "used_on": "Premium user dashboard header", "purpose": "confidence, progression"},
+    {"file": "hero-player.jpg", "label": "Homepage hero (day)", "used_on": "Homepage hero — the first impression", "purpose": "ambition, beginning, a young player and the game ahead",
+     "gen_hint": "Vertical full-bleed website hero: a lone youth player seen from behind standing on a grass pitch looking toward the far goal, figure in the lower half, large calm sky filling the upper half as negative space for a headline. Portrait orientation."},
+    {"file": "hero-player-night.jpg", "label": "Homepage hero (night)", "used_on": "Homepage hero — night variant", "purpose": "ambition, calm evening atmosphere, the game ahead",
+     "gen_hint": "Vertical full-bleed website hero at NIGHT on a real training ground: a lone youth player seen from behind on the grass looking toward the far goal, figure in the lower half. Distant authentic floodlights softly lighting the pitch with natural light pools — absolutely NO visible light beams or rays. Dark navy-black night sky filling the upper half with open space (a moon overlay is added in the UI). Subtle natural ground mist near the grass is welcome. Portrait orientation."},
+    {"file": "auth-hero-player.jpg", "label": "Login / signup photo", "used_on": "Login and signup side panel", "purpose": "beginning, belonging, entering something",
+     "gen_hint": "Vertical portrait for a login page side panel: the feeling of entering something — a young player stepping through an ordinary gate or tunnel doorway out onto a pitch, seen from behind, natural daylight. Portrait orientation."},
+    {"file": "finalcta-stadium.jpg", "label": "Final CTA photo", "used_on": "Landing final call-to-action section", "purpose": "opportunity, forward movement",
+     "gen_hint": "Wide horizontal, grounded and calm: an ordinary grass pitch at late golden hour seen from the touchline, goal in the distance, empty and inviting — no crowd, no hype, no dramatic smoke. Landscape orientation."},
+    {"file": "hero-free.jpg", "label": "Free dashboard hero", "used_on": "Free user dashboard header", "purpose": "welcome, potential, the next step",
+     "gen_hint": "Wide horizontal dashboard header: quiet potential — worn boots and a scuffed ball waiting at the pitch edge before training, morning light, tight documentary detail. Landscape orientation."},
+    {"file": "hero-premium.jpg", "label": "Premium dashboard hero", "used_on": "Premium user dashboard header", "purpose": "confidence, progression",
+     "gen_hint": "Wide horizontal dashboard header: progression — a young player mid training drill between cones, natural daylight, slight motion blur, shot from a low sideline angle. Landscape orientation."},
     {"file": "carousel-bg-1.jpg", "label": "Instagram slide bg 1", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
     {"file": "carousel-bg-2.jpg", "label": "Instagram slide bg 2", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
     {"file": "carousel-bg-4.jpg", "label": "Instagram slide bg 4", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
     {"file": "carousel-bg-6.jpg", "label": "Instagram slide bg 6", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
     {"file": "carousel-bg-7.jpg", "label": "Instagram slide bg 7", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
-    {"file": "radar-hero-stadium.png", "label": "Report radar bg", "used_on": "Report performance-radar section background (data sits on top)", "purpose": "observation, being evaluated"},
-    {"file": "bg-scout-hero.png", "label": "Scout section bg", "used_on": "Report scout section background", "purpose": "observation from the touchline"},
-    {"file": "bg-benchmark-tunnel.png", "label": "Benchmark tunnel bg", "used_on": "Report benchmark section background", "purpose": "preparation, next environment"},
+    {"file": "radar-hero-stadium.png", "label": "Report radar bg", "used_on": "Report performance-radar section background (data sits on top)", "purpose": "observation, being evaluated",
+     "gen_hint": "Very wide horizontal background: an elevated gantry viewpoint over a pitch during evening training under real floodlights — a scout's watching position, dark and calm so data can sit on top. Landscape orientation."},
+    {"file": "bg-scout-hero.png", "label": "Scout section bg", "used_on": "Report scout section background", "purpose": "observation from the touchline",
+     "gen_hint": "Very wide horizontal background: a scout's perspective from the touchline — an out-of-focus shoulder and notebook edge in the foreground, the pitch and small players in the distance, overcast daylight, dark enough for text on top. Landscape orientation."},
+    {"file": "bg-benchmark-tunnel.png", "label": "Benchmark tunnel bg", "used_on": "Report benchmark section background", "purpose": "preparation, next environment",
+     "gen_hint": "Very wide horizontal background: young players walking out of an ordinary academy corridor doorway toward the pitch, natural light ahead, no neon or green tint, documentary and calm. Landscape orientation."},
     {"file": "bg-archetype-aerial.png", "label": "Archetype aerial bg", "used_on": "Report archetype section background", "purpose": "positioning, the shape of a game"},
-    {"file": "footer-hero-turf.png", "label": "Footer turf", "used_on": "Site footer background texture", "purpose": "calm close, real grass"},
+    {"file": "footer-hero-turf.png", "label": "Footer turf", "used_on": "Site footer background texture", "purpose": "calm close, real grass",
+     "gen_hint": "Very wide horizontal macro texture: extremely close, tactile real grass turf with dew and a few worn blades, dark moody natural light, calm — a website footer background. Landscape orientation."},
 ]
 
 SCORE_KEYS = ("authenticity", "football_realism", "emotional_relevance", "originality", "brand_fit")
@@ -743,6 +755,50 @@ Return ONLY JSON: {{"photos": [{{"file": "<file>", "scores": {{"authenticity":0,
         "passed": all(r["verdict"] == "KEEP" for r in results) and not repetition,
         "proposed": {},
     }
+
+
+LANDING_BY_FILE = {p["file"]: p for p in LANDING_PHOTOS}
+LANDING_BACKUP_DIR = LANDING_DIR / "backups"
+
+
+def _lkey(fname: str) -> str:
+    return fname.replace(".", "_")
+
+
+async def _generate_landing_photo(db: Any, spec: dict, issues: list[str]):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from PIL import Image
+    fname = spec["file"]
+    key = _lkey(fname)
+    try:
+        hint = spec.get("gen_hint") or f"{spec['used_on']}. It must communicate: {spec['purpose']}."
+        issues_txt = ("\nThe previous photo failed QC for these reasons — the new one must avoid all of them:\n"
+                      + "\n".join(f"- {i}" for i in issues[:5])) if issues else ""
+        chat = LlmChat(
+            api_key=os.environ["EMERGENT_LLM_KEY"],
+            session_id=f"quality-landing-{uuid.uuid4().hex[:8]}",
+            system_message="You generate photorealistic photographs.",
+        )
+        chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+        msg = UserMessage(text=f"{PHOTO_STYLE}\n\nAssignment: {hint}{issues_txt}")
+        _t, images = await asyncio.wait_for(chat.send_message_multimodal_response(msg), timeout=150)
+        if not images:
+            raise RuntimeError("Image model returned no image")
+        raw = base64.b64decode(images[0]["data"])
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        if img.width > 1800:
+            img = img.resize((1800, int(img.height * 1800 / img.width)), Image.LANCZOS)
+        out_name = f"qc-new-{fname.rsplit('.', 1)[0]}-{uuid.uuid4().hex[:5]}.jpg"
+        img.save(LANDING_DIR / out_name, "JPEG", quality=90)
+        await db.quality_checks.update_one(
+            {"kind": "landing", "target_id": "site"},
+            {"$set": {f"gen.{key}": {"status": "ready", "url": f"/api/static/landing/{out_name}", "file": out_name, "error": None}}},
+            upsert=True)
+    except Exception as e:
+        logger.exception("landing photo generation failed (%s)", fname)
+        await db.quality_checks.update_one(
+            {"kind": "landing", "target_id": "site"},
+            {"$set": {f"gen.{key}": {"status": "error", "error": str(e)[:250]}}}, upsert=True)
 
 
 BLOG_APPLY_WHITELIST = {"title", "subtitle", "excerpt", "meta_title", "meta_description", "meta_keywords", "cover_image_alt", "cover_image_url"}
@@ -921,6 +977,47 @@ def build_quality_router(*, db: Any, admin_dep: Any):
             {"$set": {"status": "checking", "error": None, "started_at": now_iso()}}, upsert=True)
         asyncio.create_task(_run_check(db, "landing", "site", _check_landing, "landing"))
         return {"status": "checking"}
+
+    @router.post("/landing/{fname}/generate")
+    async def landing_generate(fname: str, _=Depends(admin_dep)):
+        spec = LANDING_BY_FILE.get(fname)
+        if not spec:
+            raise HTTPException(404, "Unknown landing photo")
+        doc = await db.quality_checks.find_one({"kind": "landing", "target_id": "site"}) or {}
+        issues = next((i.get("issues") or [] for i in (doc.get("images") or []) if i.get("file") == fname), [])
+        await db.quality_checks.update_one(
+            {"kind": "landing", "target_id": "site"},
+            {"$set": {f"gen.{_lkey(fname)}": {"status": "generating", "error": None}}}, upsert=True)
+        asyncio.create_task(_generate_landing_photo(db, spec, issues))
+        return {"status": "generating"}
+
+    @router.post("/landing/{fname}/apply")
+    async def landing_apply(fname: str, _=Depends(admin_dep)):
+        import shutil
+        if fname not in LANDING_BY_FILE:
+            raise HTTPException(404, "Unknown landing photo")
+        doc = await db.quality_checks.find_one({"kind": "landing", "target_id": "site"}) or {}
+        gen = (doc.get("gen") or {}).get(_lkey(fname)) or {}
+        if gen.get("status") != "ready" or not gen.get("file"):
+            raise HTTPException(400, "No generated replacement ready")
+        src = LANDING_DIR / gen["file"]
+        dst = LANDING_DIR / fname
+        if not src.exists():
+            raise HTTPException(400, "Generated file missing")
+        LANDING_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        if dst.exists():
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+            await asyncio.to_thread(shutil.copy2, dst, LANDING_BACKUP_DIR / f"{fname}.{stamp}.bak")
+        if fname.lower().endswith(".png"):
+            from PIL import Image
+            img = await asyncio.to_thread(Image.open, src)
+            await asyncio.to_thread(img.convert("RGB").save, dst, "PNG")
+        else:
+            await asyncio.to_thread(shutil.copy2, src, dst)
+        await db.quality_checks.update_one(
+            {"kind": "landing", "target_id": "site"},
+            {"$set": {f"gen.{_lkey(fname)}.applied_at": now_iso()}})
+        return {"ok": True, "applied": fname, "backup": True}
 
     @router.post("/duplicates/scan")
     async def duplicates_scan(_=Depends(admin_dep)):
