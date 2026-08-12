@@ -14414,6 +14414,8 @@ from blog_studio import build_blog_studio_router, blog_studio_weekly_loop
 api_router.include_router(build_blog_studio_router(db=db, admin_dep=get_current_admin))
 from carousel_studio import build_carousel_router
 api_router.include_router(build_carousel_router(db=db, admin_dep=get_current_admin))
+from ad_studio import build_ad_studio_router
+api_router.include_router(build_ad_studio_router(db=db, admin_dep=get_current_admin))
 from growth_funnel import build_growth_funnel_router, guide_funnel_loop
 api_router.include_router(build_growth_funnel_router(db=db, admin_dep=get_current_admin, get_single_price=get_current_single_price))
 from analytics_tracking import build_analytics_router

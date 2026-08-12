@@ -3508,3 +3508,14 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 - Day/night: golden stadium image by day; NEW night asset /api/static/landing/hero-player-night.jpg (Gemini edit of the day photo: teal night, floodlight beams from top corners, same pose/ball/boots, cropped 55/25px). Switch on visitor's local hour (night = 18:00–06:00), override with ?hero=night / ?hero=day. All overlay tints (glow, sweep, motes) switch warm→cool at night.
 - Night extras: glowing moving moon (70s drift, testid hero-moon) + 3 twinkling stars. prefers-reduced-motion disables everything.
 - Verified via ?hero=day and ?hero=night screenshots (desktop + mobile): moon only at night, mist both modes, no layout break. USER MUST DEPLOY.
+
+## 2026-08-12 (10) — Ad Studio in Admin (tested, iteration_92: 100% backend + frontend)
+- New admin tab "Ad Studio" (/admin, tab id `ad-studio`).
+- Backend `/app/backend/ad_studio.py` → router `/api/admin/ad-studio/*` (wired in server.py after carousel_studio).
+- 10 products with a facts-registry (only allowed claims — no guaranteed trials/contracts/scouting outcomes).
+- One click → 4 genuinely different concepts (emotional / direct_response / problem_solution / product_value), copy via GPT-5.4, per-concept documentary football photos (portrait + square) via Gemini image gen (`gemini-3.1-flash-image-preview`, same pattern as blog_studio). Photos land in /app/backend/uploads/ads/ (served at /api/uploads/ads/).
+- Mandatory 7-point anti-generic QC (Gemini 2.5 Pro, sees the actual photos): generic_image, too_much_text, weak_cta, repeated_wording, looks_ai, claim_accurate, mobile_readable. One auto-repair pass (copy fix and/or image regen with corrective prompt) then honest re-QC — failures stay visible, never rubber-stamped.
+- Admin UI `/app/frontend/src/components/admin/AdStudioAdmin.jsx`: product grid + facts preview, DA/EN per campaign, stage progress (copy→images→qc), per-format previews (IG Feed 4:5 / Stories 9:16 / FB Feed 4:5 / Square 1:1 — each its own composition, not crops), inline copy editing, per-element regen (photo/hook/text/CTA, each re-QCs), re-run QC, pick winner, recent campaigns list.
+- Export = client-side canvas render: 4 finished ready-to-upload JPGs (1080x1350, 1080x1920, 1080x1350 FB split-layout, 1080x1080) with brand typography (Barlow Condensed, cream/ink/dark-green, lime #CCFF00 CTA only) + copy .txt for Meta Ads Manager.
+- Reusable pytest: /app/backend/tests/test_ad_studio.py (12 tests). Seed campaign 23bd028c89 (instant_analysis, da) remains in preview DB.
+- Backlog ideas (not built): campaign delete/TTL cleanup, direct Meta Ads publish, A/B result tracking.
