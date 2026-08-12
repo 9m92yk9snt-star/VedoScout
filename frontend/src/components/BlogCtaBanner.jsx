@@ -8,6 +8,40 @@ import { ASSET_BASE } from "@/lib/api";
 const LIME = "#CCFF00";
 const INK = "#0B1F14";
 
+/* Slim in-article CTA — dropped mid-article at a section boundary. */
+export function BlogMidCta() {
+  return (
+    <div
+      className="not-prose my-10 rounded-[16px] overflow-hidden"
+      style={{ background: INK, borderLeft: `4px solid ${LIME}` }}
+      data-testid="blog-midcta"
+    >
+      <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4.5 p-5">
+        <div aria-hidden className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none" style={{ background: `radial-gradient(circle, ${LIME}22, transparent 70%)` }} />
+        <span className="w-10 h-10 shrink-0 rounded-full hidden sm:flex items-center justify-center" style={{ background: "rgba(204,255,0,0.14)", border: `1px solid ${LIME}44` }}>
+          <Play className="w-4 h-4" style={{ color: LIME }} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[9px] uppercase tracking-[0.26em] font-bold" style={{ color: LIME }}>
+            Free scout preview
+          </div>
+          <div className="text-white font-barlow font-black uppercase text-[16px] leading-tight mt-0.5">
+            See your player through a scout&rsquo;s eyes — free.
+          </div>
+        </div>
+        <Link
+          to="/signup"
+          data-testid="blog-midcta-btn"
+          className="relative shrink-0 inline-flex items-center justify-center gap-1.5 font-barlow font-black uppercase tracking-widest text-[11px] px-5 py-2.5 rounded-full transition-transform hover:scale-[1.03] active:scale-[0.98]"
+          style={{ background: LIME, color: "#0A1F0F" }}
+        >
+          Try it free <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function BlogCtaBanner({ source = "blog" }) {
   return (
     <section className="max-w-6xl mx-auto px-6 md:px-10 pb-14 md:pb-20" data-testid={`blog-cta-banner-${source}`}>

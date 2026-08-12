@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -8,8 +8,25 @@ import Navigation from "@/components/Navigation";
 import SEO, { articleJsonLd, breadcrumbJsonLd } from "@/components/SEO";
 import BlogShareBar from "@/components/BlogShareBar";
 import NewsletterSignup from "@/components/NewsletterSignup";
-import BlogCtaBanner from "@/components/BlogCtaBanner";
+import BlogCtaBanner, { BlogMidCta } from "@/components/BlogCtaBanner";
 import api from "@/lib/api";
+
+/* Split long markdown at a section boundary near the middle so a slim CTA
+ * can sit where readers are most engaged. Short articles stay untouched. */
+function splitMarkdownForCta(md) {
+  if (!md || md.length < 2200) return [md, null];
+  const blocks = md.split(/\n\n+/);
+  if (blocks.length < 8) return [md, null];
+  const mid = blocks.length / 2;
+  let best = null;
+  blocks.forEach((b, i) => {
+    if (i < 3 || i > blocks.length - 3) return;
+    if (!/^#{2,3}\s/.test(b)) return;
+    if (best == null || Math.abs(i - mid) < Math.abs(best - mid)) best = i;
+  });
+  const cut = best != null ? best : Math.floor(mid);
+  return [blocks.slice(0, cut).join("\n\n"), blocks.slice(cut).join("\n\n")];
+}
 
 const LIME = "#ccff00";
 
@@ -25,6 +42,7 @@ function formatDate(iso) {
 export default function BlogArticlePage() {
   const { slug } = useParams();
   const [post, setPost] = useState(null);
+  const contentParts = useMemo(() => splitMarkdownForCta(post?.content_md), [post?.content_md]);
   const [related, setRelated] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -202,8 +220,16 @@ export default function BlogArticlePage() {
               prose-img:my-8"
           >
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {post.content_md || ""}
+              {contentParts[0] || ""}
             </ReactMarkdown>
+            {contentParts[1] && (
+              <>
+                <BlogMidCta />
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {contentParts[1]}
+                </ReactMarkdown>
+              </>
+            )}
           </motion.div>
 
           {/* Tags */}

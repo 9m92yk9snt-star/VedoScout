@@ -3472,3 +3472,8 @@ User approved: (1) verification AFTER the 10-frame flow, (2) the 3 taps ride alo
 2. **New ScoutMePlay-style bottom CTA banner** (`/app/frontend/src/components/BlogCtaBanner.jsx`): dark ink rounded card with lime radial glow, START SCOUTING eyebrow, "SEE YOUR GAME LIKE A REAL SCOUT.", TRY IT FREE pill → /signup, honest social proof ("Hundreds of players scouted already" + initials avatars), trust line, CSS phone mockup with real demo match frame (/api/uploads/demo-frame-dribble.jpg) + LIVE ANALYSIS badge + Overall 8.0 bar. Replaces the flat green CTA on BOTH BlogIndexPage and BlogArticlePage.
 3. **Related articles polish** (BlogArticlePage): "READ NEXT" eyebrow + "All articles →" link on the Keep Reading section (related posts endpoint already existed).
 Verified via screenshots (mobile 390px): filter shows cards, banners render on index + article, related section present. USER MUST DEPLOY for scoutmeplay.com.
+
+## 2026-08-12 (2) — Mid-article slim CTA (verified in Preview)
+- `BlogMidCta` named export in `/app/frontend/src/components/BlogCtaBanner.jsx`: slim dark bar with lime left accent, "FREE SCOUT PREVIEW / See your player through a scout's eyes — free." + Try It Free pill → /signup. data-testid blog-midcta / blog-midcta-btn.
+- `BlogArticlePage.jsx`: `splitMarkdownForCta()` splits content_md at the H2/H3 boundary closest to the middle (only for articles >2200 chars & ≥8 blocks — short articles untouched); renders part1 → BlogMidCta (not-prose) → part2 via two ReactMarkdown blocks.
+- Verified: mid CTA renders at section boundary before "Hydration matters..." on the long nutrition article (desktop screenshot), mobile stacks correctly (box 342×153). USER MUST DEPLOY.
