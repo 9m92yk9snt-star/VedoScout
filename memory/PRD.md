@@ -3502,3 +3502,9 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 
 ## 2026-08-12 (8) — Hero "alive" pro animation (verified)
 - Layered cinematic motion on the hero photo: Ken Burns drift (16s), mouse parallax (framer-motion useMotionValue+useSpring, photo leans away from cursor, resets on leave), breathing warm radial glow (mix-blend screen, 7s), soft diagonal light sweep (8.5s), 6 drifting golden dust motes (staggered 11-14s, CSS vars for opacity/x-drift). All layers class smp-hero-anim, disabled under prefers-reduced-motion. Verified: two frames 3s apart show motion; no layout break.
+
+## 2026-08-12 (9) — Hero: living mist + day/night switch with moving moon (verified)
+- Living mist: two drifting blurred mist layers (21s/29s ease loops, screen blend) over the grass at the player's feet — warm cream tint by day, cool blue-white by night. testid hero-mist.
+- Day/night: golden stadium image by day; NEW night asset /api/static/landing/hero-player-night.jpg (Gemini edit of the day photo: teal night, floodlight beams from top corners, same pose/ball/boots, cropped 55/25px). Switch on visitor's local hour (night = 18:00–06:00), override with ?hero=night / ?hero=day. All overlay tints (glow, sweep, motes) switch warm→cool at night.
+- Night extras: glowing moving moon (70s drift, testid hero-moon) + 3 twinkling stars. prefers-reduced-motion disables everything.
+- Verified via ?hero=day and ?hero=night screenshots (desktop + mobile): moon only at night, mist both modes, no layout break. USER MUST DEPLOY.

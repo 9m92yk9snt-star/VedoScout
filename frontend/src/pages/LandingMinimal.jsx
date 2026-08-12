@@ -143,7 +143,18 @@ export default function LandingMinimal() {
 /*  Right: stacked images (action shot + floating scout report)  */
 /* ============================================================ */
 function HeroSection({ onPrimaryCta, isLoggedIn }) {
-  const heroPlayer = `${ASSET_BASE}/api/static/landing/hero-player.jpg`;
+  // Day/night hero: golden stadium by day, floodlit night version 18:00–06:00
+  // (visitor's local time). Force with ?hero=night / ?hero=day for preview.
+  const [heroMode] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("hero");
+      if (q === "night" || q === "day") return q;
+      const h = new Date().getHours();
+      return h >= 18 || h < 6 ? "night" : "day";
+    } catch { return "day"; }
+  });
+  const night = heroMode === "night";
+  const heroPlayer = `${ASSET_BASE}/api/static/landing/hero-player${night ? "-night" : ""}.jpg`;
   const CREAM = "#F4EFE6";
   const features = [
     { icon: Crosshair, l1: "Analyse", l2: "your game" },
@@ -193,6 +204,10 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               @keyframes smp-hero-sweep { 0% { transform: translateX(-160%) rotate(16deg); } 55%, 100% { transform: translateX(320%) rotate(16deg); } }
               @keyframes smp-hero-mote { 0% { transform: translateY(0) translateX(0); opacity: 0; } 12% { opacity: var(--mo, 0.55); } 82% { opacity: var(--mo, 0.55); } 100% { transform: translateY(-46vh) translateX(var(--mx, 8px)); opacity: 0; } }
               @keyframes smp-hero-glowpulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.5; } }
+              @keyframes smp-hero-mist1 { 0%, 100% { transform: translateX(-8%); opacity: 0.4; } 50% { transform: translateX(7%); opacity: 0.62; } }
+              @keyframes smp-hero-mist2 { 0%, 100% { transform: translateX(8%); opacity: 0.3; } 50% { transform: translateX(-9%); opacity: 0.5; } }
+              @keyframes smp-hero-moon { 0% { transform: translate(0px, 0px); } 100% { transform: translate(34px, 12px); } }
+              @keyframes smp-hero-star { 0%, 100% { opacity: 0.25; transform: scale(0.9); } 50% { opacity: 0.9; transform: scale(1.15); } }
               @media (prefers-reduced-motion: reduce) { .smp-hero-anim { animation: none !important; } }
             `}</style>
             <motion.div className="absolute inset-0" style={{ x: px, y: py }}>
@@ -204,26 +219,85 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
                 style={{ animation: "smp-hero-drift 16s ease-in-out infinite alternate" }}
               />
             </motion.div>
-            {/* warm breathing glow behind the player */}
+            {/* breathing ambient glow — warm by day, cool floodlight by night */}
             <div
               className="smp-hero-anim absolute inset-0"
               style={{
-                background: "radial-gradient(52% 42% at 62% 34%, rgba(255,196,110,0.35) 0%, transparent 70%)",
+                background: night
+                  ? "radial-gradient(52% 42% at 58% 26%, rgba(170,205,255,0.30) 0%, transparent 70%)"
+                  : "radial-gradient(52% 42% at 62% 34%, rgba(255,196,110,0.35) 0%, transparent 70%)",
                 mixBlendMode: "screen",
                 animation: "smp-hero-glowpulse 7s ease-in-out infinite",
               }}
             />
+            {/* moving moon + twinkling stars (night only) */}
+            {night && (
+              <>
+                <span
+                  className="smp-hero-anim absolute rounded-full"
+                  data-testid="hero-moon"
+                  style={{
+                    top: "5%", left: "16%", width: 34, height: 34,
+                    background: "radial-gradient(circle at 38% 35%, #FFFDF4 0%, #E8EDF5 55%, rgba(210,225,245,0.35) 78%, transparent 100%)",
+                    boxShadow: "0 0 26px 10px rgba(210,230,255,0.4), 0 0 70px 30px rgba(180,210,255,0.16)",
+                    animation: "smp-hero-moon 70s ease-in-out infinite alternate",
+                  }}
+                />
+                {[
+                  { t: "9%", l: "40%", d: "0s" },
+                  { t: "4%", l: "58%", d: "1.6s" },
+                  { t: "12%", l: "74%", d: "3.1s" },
+                ].map((s, i) => (
+                  <span
+                    key={i}
+                    className="smp-hero-anim absolute rounded-full"
+                    style={{
+                      top: s.t, left: s.l, width: 3, height: 3,
+                      background: "#EAF2FF",
+                      boxShadow: "0 0 6px 2px rgba(220,235,255,0.6)",
+                      animation: `smp-hero-star 3.4s ease-in-out ${s.d} infinite`,
+                    }}
+                  />
+                ))}
+              </>
+            )}
             {/* cinematic light sweep */}
             <span
               className="smp-hero-anim absolute -inset-y-10 w-[46%]"
               style={{
-                background: "linear-gradient(90deg, transparent 0%, rgba(255,242,214,0.22) 45%, rgba(255,255,255,0.14) 55%, transparent 100%)",
+                background: night
+                  ? "linear-gradient(90deg, transparent 0%, rgba(205,225,255,0.16) 45%, rgba(255,255,255,0.10) 55%, transparent 100%)"
+                  : "linear-gradient(90deg, transparent 0%, rgba(255,242,214,0.22) 45%, rgba(255,255,255,0.14) 55%, transparent 100%)",
                 mixBlendMode: "screen",
                 filter: "blur(6px)",
                 animation: "smp-hero-sweep 8.5s ease-in-out infinite",
               }}
             />
-            {/* drifting golden dust motes */}
+            {/* living mist drifting over the grass at his feet */}
+            <div
+              className="smp-hero-anim absolute left-[-20%] right-[-20%] bottom-[-2%] h-[30%] pointer-events-none"
+              data-testid="hero-mist"
+              style={{
+                background: night
+                  ? "radial-gradient(60% 85% at 42% 100%, rgba(205,222,245,0.5) 0%, rgba(205,222,245,0.14) 55%, transparent 100%)"
+                  : "radial-gradient(60% 85% at 42% 100%, rgba(248,243,228,0.6) 0%, rgba(248,243,228,0.16) 55%, transparent 100%)",
+                filter: "blur(14px)",
+                mixBlendMode: "screen",
+                animation: "smp-hero-mist1 21s ease-in-out infinite",
+              }}
+            />
+            <div
+              className="smp-hero-anim absolute left-[-20%] right-[-20%] bottom-[6%] h-[22%] pointer-events-none"
+              style={{
+                background: night
+                  ? "radial-gradient(55% 90% at 64% 100%, rgba(190,212,240,0.42) 0%, transparent 75%)"
+                  : "radial-gradient(55% 90% at 64% 100%, rgba(252,246,232,0.5) 0%, transparent 75%)",
+                filter: "blur(18px)",
+                mixBlendMode: "screen",
+                animation: "smp-hero-mist2 29s ease-in-out infinite",
+              }}
+            />
+            {/* drifting motes — golden dust by day, cool sparks by night */}
             {[
               { l: "22%", b: "8%", s: 5, d: "0s", t: "11s", o: 0.5, x: "14px" },
               { l: "38%", b: "16%", s: 3, d: "2.2s", t: "13s", o: 0.42, x: "-10px" },
@@ -237,7 +311,9 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
                 className="smp-hero-anim absolute rounded-full"
                 style={{
                   left: m.l, bottom: m.b, width: m.s, height: m.s,
-                  background: "radial-gradient(circle, rgba(255,236,180,0.95) 0%, rgba(255,214,120,0.35) 60%, transparent 100%)",
+                  background: night
+                    ? "radial-gradient(circle, rgba(225,238,255,0.95) 0%, rgba(180,210,250,0.35) 60%, transparent 100%)"
+                    : "radial-gradient(circle, rgba(255,236,180,0.95) 0%, rgba(255,214,120,0.35) 60%, transparent 100%)",
                   filter: "blur(0.5px)",
                   "--mo": m.o, "--mx": m.x,
                   animation: `smp-hero-mote ${m.t} linear ${m.d} infinite`,
