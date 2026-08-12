@@ -24,15 +24,31 @@ export default function QualityAdmin() {
   const [overview, setOverview] = useState(null);
   const [dup, setDup] = useState(null);
   const [scanning, setScanning] = useState(false);
+  const [autoQc, setAutoQc] = useState(null);
 
   const loadOverview = () => api.get("/admin/quality/overview").then(({ data }) => setOverview(data)).catch(() => {});
 
   useEffect(() => {
     loadOverview();
+    api.get("/admin/quality/config").then(({ data }) => setAutoQc(!!data.auto_qc)).catch(() => {});
     api.get("/admin/quality/latest", { params: { kind: "duplicates", target_id: "site" } })
       .then(({ data }) => { if (data.found && data.status === "ready") setDup(data); })
       .catch(() => {});
   }, []);
+
+  const toggleAutoQc = async () => {
+    const next = !autoQc;
+    setAutoQc(next);
+    try {
+      await api.put("/admin/quality/config", { auto_qc: next });
+      toast.success(next
+        ? "Auto-QC ON — every new article and carousel gets quality-checked automatically"
+        : "Auto-QC OFF");
+    } catch {
+      setAutoQc(!next);
+      toast.error("Could not save setting");
+    }
+  };
 
   const scan = async () => {
     setScanning(true);
@@ -63,6 +79,21 @@ export default function QualityAdmin() {
           Run QC per article in the Blog tab, per carousel in Marketing, and on all SEO pages in SEO &amp; Social.
           Below: overview + the site-wide duplicate scanner.
         </p>
+      </div>
+
+      <div className="bg-surface border border-gray-border p-5 flex items-center justify-between flex-wrap gap-3" data-testid="quality-auto-qc-card">
+        <div>
+          <div className="font-barlow font-black uppercase text-sm tracking-tight">Auto-QC new content</div>
+          <p className="text-xs text-ink/55 mt-0.5 max-w-xl">Every new blog article and carousel is quality-checked automatically the moment it's created — nothing generic slips live unnoticed.</p>
+        </div>
+        <button
+          data-testid="quality-auto-qc-toggle"
+          onClick={toggleAutoQc}
+          disabled={autoQc === null}
+          className={`px-4 py-2 text-xs font-black uppercase tracking-wider transition-colors ${autoQc ? "bg-volt text-white" : "border border-gray-border text-ink/50 hover:text-ink"}`}
+        >
+          {autoQc === null ? "…" : autoQc ? "ON" : "OFF"}
+        </button>
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-cream-soft/40 border border-gray-border">

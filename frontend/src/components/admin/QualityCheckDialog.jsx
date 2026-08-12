@@ -1,8 +1,8 @@
 // QualityCheckDialog — shared anti-generic QC modal for blog articles + carousels.
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
-import { X, ShieldCheck, Loader2, RefreshCw, Check, AlertTriangle } from "lucide-react";
-import api from "@/lib/api";
+import { X, ShieldCheck, Loader2, RefreshCw, Check, AlertTriangle, ImageIcon, Sparkles } from "lucide-react";
+import api, { ASSET_BASE } from "@/lib/api";
 
 const GROUP_LABEL = { text: "Text", seo: "SEO / Keywords", image: "Image" };
 
@@ -82,7 +82,10 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [coverGen, setCoverGen] = useState(false);
+  const [coverDismissed, setCoverDismissed] = useState(false);
   const pollRef = useRef(null);
+  const coverPollRef = useRef(null);
 
   const load = useCallback(async () => {
     const { data } = await api.get(`/admin/quality/latest`, { params: { kind, target_id: targetId } });
@@ -120,9 +123,58 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
       if (!data.found) runCheck();
       else if (data.status === "checking") { setChecking(true); startPoll(); }
       else setResult(data);
+      if (data.cover_gen_status === "generating") { setCoverGen(true); pollCover(); }
     }).catch(() => toast.error("Could not load QC state"));
-    return () => clearInterval(pollRef.current);
+    return () => { clearInterval(pollRef.current); clearInterval(coverPollRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, runCheck, startPoll]);
+
+  const pollCover = () => {
+    clearInterval(coverPollRef.current);
+    coverPollRef.current = setInterval(async () => {
+      try {
+        const data = await load();
+        if (data.cover_gen_status !== "generating") {
+          clearInterval(coverPollRef.current);
+          setCoverGen(false);
+          setResult(data);
+          if (data.cover_gen_status === "error") toast.error(`Cover generation failed: ${data.cover_gen_error}`);
+          else toast.success("New documentary cover ready — approve or reject below");
+        }
+      } catch { /* keep polling */ }
+    }, 3000);
+  };
+
+  const generateCover = async () => {
+    setCoverGen(true);
+    setCoverDismissed(false);
+    try {
+      await api.post(`/admin/quality/blog/${targetId}/generate-cover`);
+      pollCover();
+    } catch {
+      setCoverGen(false);
+      toast.error("Could not start cover generation");
+    }
+  };
+
+  const applyCover = async () => {
+    setApplying(true);
+    try {
+      await api.post(`/admin/quality/blog/${targetId}/apply`, {
+        fields: {
+          cover_image_url: result.proposed_cover.url,
+          cover_image_alt: result.proposed_cover.alt,
+        },
+      });
+      toast.success("New cover applied to the article");
+      setCoverDismissed(true);
+      onApplied?.();
+    } catch {
+      toast.error("Could not apply cover");
+    } finally {
+      setApplying(false);
+    }
+  };
 
   const apply = async (fieldKey, value) => {
     setApplying(true);
@@ -140,6 +192,10 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
 
   const ready = result?.status === "ready";
   const cls = result?.image_classification;
+  const showCoverTool = kind === "blog" && ready && !coverDismissed && (
+    ["TOO_GENERIC", "REVIEW", "NONE"].includes(cls) ||
+    ["REPLACE", "GENERATE"].includes(result?.image_recommendation)
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-ink/60 flex items-start justify-center overflow-y-auto p-4 md:p-10" data-testid="qc-dialog">
@@ -193,6 +249,74 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
               </div>
 
               <ChecksList checks={result.checks} />
+
+              {showCoverTool && (
+                <div className="border border-gray-border p-4 bg-cream-base/50" data-testid="qc-cover-section">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-volt" />
+                    <span className="font-barlow font-black uppercase text-sm tracking-tight">Documentary cover</span>
+                  </div>
+                  <p className="text-[11px] text-ink/55 mt-1">
+                    {cls === "TOO_GENERIC"
+                      ? "The current cover was judged too generic — generate an authentic documentary replacement."
+                      : cls === "NONE"
+                        ? "This article has no analysable cover — generate one in the ScoutMePlay photo standard."
+                        : "The cover could be stronger — generate an authentic documentary alternative."}
+                  </p>
+
+                  {(coverGen || result.cover_gen_status === "generating") && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-ink/60" data-testid="qc-cover-generating">
+                      <Loader2 className="w-4 h-4 animate-spin text-volt" /> Shooting a documentary cover — ~30 seconds…
+                    </div>
+                  )}
+
+                  {!coverGen && result.cover_gen_status === "ready" && result.proposed_cover && (
+                    <div className="mt-3" data-testid="qc-cover-proposal">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-ink/45 mb-1">Current</div>
+                          {result.current?.cover_image_url ? (
+                            <img src={`${ASSET_BASE}${result.current.cover_image_url}`} alt="Current cover" className="w-full aspect-video object-cover border border-gray-border" />
+                          ) : (
+                            <div className="w-full aspect-video border border-dashed border-gray-border flex items-center justify-center text-[10px] text-ink/40">No cover</div>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-volt mb-1">Proposed</div>
+                          <img src={`${ASSET_BASE}${result.proposed_cover.url}`} alt={result.proposed_cover.alt} className="w-full aspect-video object-cover border-2 border-volt" data-testid="qc-cover-proposed-img" />
+                        </div>
+                      </div>
+                      <div className="mt-1.5 text-[10px] text-ink/50 italic">Alt: {result.proposed_cover.alt}</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button data-testid="qc-cover-apply" onClick={applyCover} disabled={applying}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-volt text-white text-[10px] font-black uppercase tracking-wider disabled:opacity-50">
+                          {applying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Approve & apply
+                        </button>
+                        <button data-testid="qc-cover-regen" onClick={generateCover}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 border border-gray-border text-[10px] font-black uppercase tracking-wider text-ink/60 hover:text-ink">
+                          <RefreshCw className="w-3 h-3" /> Generate again
+                        </button>
+                        <button data-testid="qc-cover-reject" onClick={() => setCoverDismissed(true)}
+                          className="px-3 py-1.5 border border-gray-border text-[10px] font-black uppercase tracking-wider text-ink/50">
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!coverGen && result.cover_gen_status !== "generating" && (!result.proposed_cover || result.cover_gen_status === "error") && (
+                    <div className="mt-3">
+                      {result.cover_gen_status === "error" && (
+                        <div className="text-[11px] text-rose-700 mb-2">Failed: {result.cover_gen_error} — try again.</div>
+                      )}
+                      <button data-testid="qc-cover-generate" onClick={generateCover}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-ink text-cream-base text-[10px] font-black uppercase tracking-wider hover:bg-volt transition-colors">
+                        <Sparkles className="w-3.5 h-3.5" /> Generate documentary cover
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {result.proposed && Object.keys(result.proposed).length > 0 && (
                 <div className="space-y-3">

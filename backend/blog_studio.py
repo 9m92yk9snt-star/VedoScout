@@ -182,6 +182,8 @@ async def _generate_article(db: Any, topic: str = "", keyword: str = "", publish
         "updated_at": now,
     }
     await db.blog_posts.insert_one(doc)
+    from quality_engine import schedule_auto_qc
+    schedule_auto_qc(db, "blog", doc["id"])
     return {"post_id": doc["id"], "slug": slug, "title": title, "category": category,
             "status": doc["status"], "cover_image_url": cover_url}
 

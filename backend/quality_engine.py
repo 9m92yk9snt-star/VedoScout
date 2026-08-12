@@ -7,8 +7,10 @@ Detect → propose → admin approves → apply (DB content only). Never edits c
 from __future__ import annotations
 
 import asyncio
+import base64
 import difflib
 import hashlib
+import io
 import json
 import logging
 import os
@@ -21,7 +23,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ad_studio import PRODUCTS, FORBIDDEN
+from ad_studio import PRODUCTS, FORBIDDEN, PHOTO_STYLE
 
 logger = logging.getLogger("elite-scout")
 
@@ -203,6 +205,7 @@ Only fill a "proposed" field when the current one fails a check — keep proposa
             "meta_title": post.get("meta_title"), "meta_description": post.get("meta_description"),
             "meta_keywords": ", ".join(post.get("meta_keywords") or []),
             "cover_image_alt": post.get("cover_image_alt"),
+            "cover_image_url": post.get("cover_image_url"),
         },
     }
 
@@ -441,7 +444,87 @@ class SeoApply(BaseModel):
     pages: dict
 
 
-BLOG_APPLY_WHITELIST = {"title", "subtitle", "excerpt", "meta_title", "meta_description", "meta_keywords", "cover_image_alt"}
+class QualityConfig(BaseModel):
+    auto_qc: bool = True
+
+
+# ── Documentary cover generation (blog) ────────────────────────────────────
+COVER_BRIEF_SYSTEM = (
+    "You are an art director briefing documentary football photography for ScoutMePlay blog covers. " + FORBIDDEN
+)
+
+
+async def _generate_cover(post: dict) -> dict:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from PIL import Image
+    brief_chat = LlmChat(
+        api_key=os.environ["EMERGENT_LLM_KEY"],
+        session_id=f"quality-coverbrief-{uuid.uuid4().hex[:6]}",
+        system_message=COVER_BRIEF_SYSTEM,
+    ).with_model("openai", "gpt-5.4")
+    p = f"""Blog article: "{post.get('title')}" (category: {post.get('category') or 'football'}).
+Excerpt: {post.get('excerpt') or ''}
+Write ONE photography brief for the cover: a specific grass-roots football micro-moment that expresses this article's EMOTION and meaning — not a literal illustration of the title. One sentence. No text/logos/graphics in the image.
+Also write a short factual alt text (max 14 words) describing that photo.
+Return ONLY JSON: {{"brief": "...", "alt": "..."}}"""
+    resp = await asyncio.wait_for(brief_chat.send_message(UserMessage(text=p)), timeout=90)
+    data = _parse_json(resp if isinstance(resp, str) else getattr(resp, "text", str(resp)))
+    brief = str(data.get("brief") or "").strip() or f"A quiet documentary football moment expressing: {post.get('title')}"
+    alt = str(data.get("alt") or "").strip()
+
+    img_chat = LlmChat(
+        api_key=os.environ["EMERGENT_LLM_KEY"],
+        session_id=f"quality-cover-{uuid.uuid4().hex[:8]}",
+        system_message="You generate photorealistic photographs.",
+    )
+    img_chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
+    msg = UserMessage(text=f"{PHOTO_STYLE}\n\nMoment: {brief}\nWide horizontal 16:9 editorial composition with calm negative space — a premium blog cover photograph.")
+    _t, images = await asyncio.wait_for(img_chat.send_message_multimodal_response(msg), timeout=120)
+    if not images:
+        raise RuntimeError("Image model returned no image")
+    raw = base64.b64decode(images[0]["data"])
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    if img.width > 1600:
+        img = img.resize((1600, int(img.height * 1600 / img.width)), Image.LANCZOS)
+    fname = f"qc-cover-{post['id'][:8]}-{uuid.uuid4().hex[:6]}.jpg"
+    img.save(BLOG_UPLOADS / fname, "JPEG", quality=88)
+    return {"url": f"/api/blog/uploads/{fname}", "alt": alt or f"Documentary football photo — {post.get('title')}"}
+
+
+# ── Auto-QC for newly created content ──────────────────────────────────────
+def schedule_auto_qc(db: Any, kind: str, target_id: str):
+    """Fire-and-forget QC for new content. Toggleable (settings key quality_auto_qc, default ON)."""
+    async def _go():
+        try:
+            cfg = await db.settings.find_one({"key": "quality_auto_qc"}) or {}
+            if cfg.get("enabled", True) is False:
+                return
+            if kind == "blog":
+                doc = await db.blog_posts.find_one({"id": target_id}, {"_id": 0})
+                if not doc:
+                    return
+                fn, h = (lambda: _check_blog(doc)), _blog_hash(doc)
+            elif kind == "carousel":
+                doc = await db.carousel_jobs.find_one({"id": target_id}, {"_id": 0})
+                if not doc:
+                    return
+                fn, h = (lambda: _check_carousel(doc)), _carousel_hash(doc)
+            else:
+                return
+            await db.quality_checks.update_one(
+                {"kind": kind, "target_id": target_id},
+                {"$set": {"status": "checking", "error": None, "started_at": now_iso(), "auto": True}},
+                upsert=True)
+            await _run_check(db, kind, target_id, fn, h)
+        except Exception:
+            logger.exception("auto-qc failed (%s/%s)", kind, target_id)
+    try:
+        asyncio.create_task(_go())
+    except RuntimeError:
+        logger.warning("auto-qc skipped — no running event loop")
+
+
+BLOG_APPLY_WHITELIST = {"title", "subtitle", "excerpt", "meta_title", "meta_description", "meta_keywords", "cover_image_alt", "cover_image_url"}
 
 
 def build_quality_router(*, db: Any, admin_dep: Any):
@@ -549,6 +632,44 @@ def build_quality_router(*, db: Any, admin_dep: Any):
         await db.quality_checks.update_one(
             {"kind": "seo", "target_id": "site"}, {"$addToSet": {"applied": {"$each": applied}}})
         return {"ok": True, "applied": applied}
+
+    async def _run_cover_gen(post: dict):
+        try:
+            res = await _generate_cover(post)
+            await db.quality_checks.update_one(
+                {"kind": "blog", "target_id": post["id"]},
+                {"$set": {"cover_gen_status": "ready", "proposed_cover": res, "cover_gen_error": None}},
+                upsert=True)
+        except Exception as e:
+            logger.exception("cover generation failed (%s)", post.get("id"))
+            await db.quality_checks.update_one(
+                {"kind": "blog", "target_id": post["id"]},
+                {"$set": {"cover_gen_status": "error", "cover_gen_error": str(e)[:300]}},
+                upsert=True)
+
+    @router.post("/blog/{post_id}/generate-cover")
+    async def blog_generate_cover(post_id: str, _=Depends(admin_dep)):
+        post = await db.blog_posts.find_one({"id": post_id}, {"_id": 0})
+        if not post:
+            raise HTTPException(404, "Post not found")
+        await db.quality_checks.update_one(
+            {"kind": "blog", "target_id": post_id},
+            {"$set": {"cover_gen_status": "generating", "cover_gen_error": None}},
+            upsert=True)
+        asyncio.create_task(_run_cover_gen(post))
+        return {"status": "generating"}
+
+    @router.get("/config")
+    async def get_config(_=Depends(admin_dep)):
+        cfg = await db.settings.find_one({"key": "quality_auto_qc"}) or {}
+        return {"auto_qc": cfg.get("enabled", True)}
+
+    @router.put("/config")
+    async def put_config(payload: QualityConfig, _=Depends(admin_dep)):
+        await db.settings.update_one(
+            {"key": "quality_auto_qc"},
+            {"$set": {"enabled": payload.auto_qc, "updated_at": now_iso()}}, upsert=True)
+        return {"ok": True, "auto_qc": payload.auto_qc}
 
     @router.post("/duplicates/scan")
     async def duplicates_scan(_=Depends(admin_dep)):

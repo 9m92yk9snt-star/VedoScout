@@ -237,6 +237,8 @@ def build_carousel_router(*, db: Any, admin_dep: Any):
                 {"id": job_id},
                 {"$set": {"status": "done", **result, "finished_at": _now()}},
             )
+            from quality_engine import schedule_auto_qc
+            schedule_auto_qc(db, "carousel", job_id)
         except Exception as e:
             logger.exception("carousel job failed")
             await db.carousel_jobs.update_one(

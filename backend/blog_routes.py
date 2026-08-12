@@ -358,6 +358,8 @@ def build_blog_router(
             "updated_at": now,
         }
         await db[BLOG_POSTS].insert_one(doc)
+        from quality_engine import schedule_auto_qc
+        schedule_auto_qc(db, "blog", doc["id"])
         return public_post(doc)
 
     @router.put("/admin/posts/{post_id}", dependencies=[Depends(get_current_admin)])
@@ -665,6 +667,8 @@ def build_blog_router(
                 "updated_at": now,
             }
             await db[BLOG_POSTS].insert_one(doc)
+            from quality_engine import schedule_auto_qc
+            schedule_auto_qc(db, "blog", doc["id"])
             saved.append({"id": doc["id"], "slug": slug, "title": title})
         return {"saved": saved, "count": len(saved)}
 
