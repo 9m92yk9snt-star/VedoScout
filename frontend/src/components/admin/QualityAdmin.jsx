@@ -1,8 +1,8 @@
 // QualityAdmin — Quality tab: cross-content overview + site-wide duplicate scanner.
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Loader2, Copy, ImageIcon, Type, ScanSearch } from "lucide-react";
-import api from "@/lib/api";
+import { ShieldCheck, Loader2, Copy, ImageIcon, Type, ScanSearch, Camera } from "lucide-react";
+import api, { ASSET_BASE } from "@/lib/api";
 
 const SEV_CLS = {
   CRITICAL: "bg-rose-100 text-rose-800",
@@ -25,6 +25,40 @@ export default function QualityAdmin() {
   const [dup, setDup] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [autoQc, setAutoQc] = useState(null);
+  const [landing, setLanding] = useState(null);
+  const [checkingLanding, setCheckingLanding] = useState(false);
+  const landingPollRef = useRef(null);
+
+  const loadLanding = () => api.get("/admin/quality/latest", { params: { kind: "landing", target_id: "site" } }).then((r) => r.data);
+
+  const pollLanding = () => {
+    clearInterval(landingPollRef.current);
+    landingPollRef.current = setInterval(async () => {
+      try {
+        const d = await loadLanding();
+        if (d.status !== "checking") {
+          clearInterval(landingPollRef.current);
+          setCheckingLanding(false);
+          setLanding(d);
+          loadOverview();
+          if (d.status === "error") toast.error(`Landing check failed: ${d.error}`);
+          else toast.success(`Landing photos scored — overall ${d.scores?.overall}/100`);
+        }
+      } catch { /* keep polling */ }
+    }, 4000);
+  };
+
+  const runLandingCheck = async () => {
+    setCheckingLanding(true);
+    try {
+      await api.post("/admin/quality/landing/check");
+      toast.info("Scoring every landing photo against the image formula — ~1-2 minutes…");
+      pollLanding();
+    } catch {
+      setCheckingLanding(false);
+      toast.error("Could not start landing check");
+    }
+  };
 
   const loadOverview = () => api.get("/admin/quality/overview").then(({ data }) => setOverview(data)).catch(() => {});
 
@@ -34,6 +68,12 @@ export default function QualityAdmin() {
     api.get("/admin/quality/latest", { params: { kind: "duplicates", target_id: "site" } })
       .then(({ data }) => { if (data.found && data.status === "ready") setDup(data); })
       .catch(() => {});
+    loadLanding().then((d) => {
+      if (d.found && d.status === "ready") setLanding(d);
+      else if (d.found && d.status === "checking") { setCheckingLanding(true); pollLanding(); }
+    }).catch(() => {});
+    return () => clearInterval(landingPollRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleAutoQc = async () => {
@@ -121,6 +161,65 @@ export default function QualityAdmin() {
           main={o?.duplicates?.score != null ? `${o.duplicates.score}/100` : "—"}
           sub={o?.duplicates?.scanned ? `${o.duplicates.warnings} warning(s) · ${(o.duplicates.checked_at || "").slice(0, 10)}` : "Not scanned yet"}
         />
+      </div>
+
+      <div className="bg-surface border border-gray-border p-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Camera className="w-5 h-5 text-volt" />
+            <h3 className="font-barlow font-black uppercase text-lg tracking-tight">Landing photos — formula check</h3>
+            {landing?.status === "ready" && (
+              <span className={`px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${landing.scores?.overall >= 85 ? "bg-emerald-100 text-emerald-800" : landing.scores?.overall >= 65 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>
+                Overall {landing.scores?.overall}/100
+              </span>
+            )}
+          </div>
+          <button
+            data-testid="quality-landing-check"
+            onClick={runLandingCheck}
+            disabled={checkingLanding}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-volt text-white text-xs font-black uppercase tracking-wider hover:bg-volt-hover transition-colors disabled:opacity-50"
+          >
+            {checkingLanding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+            {checkingLanding ? "Scoring…" : "Run formula check"}
+          </button>
+        </div>
+        <p className="text-xs text-ink/55 mt-1 max-w-2xl">
+          Scores every hero and landing photo 0-100 on Authenticity, Football realism, Emotional relevance, Originality and Brand fit — the anti-generic image formula.
+        </p>
+
+        {landing?.status === "ready" && (
+          <div className="mt-5 space-y-2" data-testid="quality-landing-results">
+            {(landing.repetition || []).map((r, i) => (
+              <div key={i} className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 font-bold">REPETITION WARNING: {r}</div>
+            ))}
+            {[...(landing.images || [])].sort((a, b) => a.avg - b.avg).map((img) => (
+              <div key={img.file} className="border border-gray-border bg-cream-base/40 p-3 flex gap-3" data-testid={`quality-landing-${img.file.replace(/\./g, "-")}`}>
+                <img src={`${ASSET_BASE}${img.url}`} alt={img.label} className="w-24 h-16 object-cover border border-gray-border shrink-0" loading="lazy" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-bold text-ink">{img.label}</span>
+                    <span className={`px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${img.classification === "AUTHENTIC" ? "bg-emerald-100 text-emerald-800" : img.classification === "REVIEW" ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>{img.classification}</span>
+                    {img.verdict !== "KEEP" && <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-800">{img.verdict}</span>}
+                    <span className="text-[10px] text-ink/40">{img.used_on}</span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {[["authenticity", "Auth"], ["football_realism", "Realism"], ["emotional_relevance", "Emotion"], ["originality", "Original"], ["brand_fit", "Brand"]].map(([k, lbl]) => {
+                      const v = img.scores?.[k];
+                      const tone = v >= 85 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : v >= 65 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200";
+                      return <span key={k} className={`px-1.5 py-0.5 border text-[9px] font-bold uppercase tracking-wider ${tone}`}>{lbl} {v}</span>;
+                    })}
+                  </div>
+                  {(img.issues || []).length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {img.issues.map((iss, i) => <li key={i} className="text-[11px] text-rose-700">• {iss}</li>)}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-surface border border-gray-border p-6">

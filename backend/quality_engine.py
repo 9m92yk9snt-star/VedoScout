@@ -669,6 +669,82 @@ Rules: keep each slide's kind and role, titles max 9 words, lines max 12 words, 
             {"$set": {"status": "error", "error": f"Fix failed: {str(e)[:250]}"}}, upsert=True)
 
 
+# ── Landing photo formula check ────────────────────────────────────────────
+LANDING_PHOTOS = [
+    {"file": "hero-player.jpg", "label": "Homepage hero (day)", "used_on": "Homepage hero — the first impression", "purpose": "ambition, beginning, a young player and the game ahead"},
+    {"file": "hero-player-night.jpg", "label": "Homepage hero (night)", "used_on": "Homepage hero — night variant", "purpose": "ambition, calm evening atmosphere, the game ahead"},
+    {"file": "auth-hero-player.jpg", "label": "Login / signup photo", "used_on": "Login and signup side panel", "purpose": "beginning, belonging, entering something"},
+    {"file": "finalcta-stadium.jpg", "label": "Final CTA photo", "used_on": "Landing final call-to-action section", "purpose": "opportunity, forward movement"},
+    {"file": "hero-free.jpg", "label": "Free dashboard hero", "used_on": "Free user dashboard header", "purpose": "welcome, potential, the next step"},
+    {"file": "hero-premium.jpg", "label": "Premium dashboard hero", "used_on": "Premium user dashboard header", "purpose": "confidence, progression"},
+    {"file": "carousel-bg-1.jpg", "label": "Instagram slide bg 1", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
+    {"file": "carousel-bg-2.jpg", "label": "Instagram slide bg 2", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
+    {"file": "carousel-bg-4.jpg", "label": "Instagram slide bg 4", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
+    {"file": "carousel-bg-6.jpg", "label": "Instagram slide bg 6", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
+    {"file": "carousel-bg-7.jpg", "label": "Instagram slide bg 7", "used_on": "Instagram carousel slide background (text sits on top)", "purpose": "quiet football atmosphere; must stay dark and readable"},
+    {"file": "radar-hero-stadium.png", "label": "Report radar bg", "used_on": "Report performance-radar section background (data sits on top)", "purpose": "observation, being evaluated"},
+    {"file": "bg-scout-hero.png", "label": "Scout section bg", "used_on": "Report scout section background", "purpose": "observation from the touchline"},
+    {"file": "bg-benchmark-tunnel.png", "label": "Benchmark tunnel bg", "used_on": "Report benchmark section background", "purpose": "preparation, next environment"},
+    {"file": "bg-archetype-aerial.png", "label": "Archetype aerial bg", "used_on": "Report archetype section background", "purpose": "positioning, the shape of a game"},
+    {"file": "footer-hero-turf.png", "label": "Footer turf", "used_on": "Site footer background texture", "purpose": "calm close, real grass"},
+]
+
+SCORE_KEYS = ("authenticity", "football_realism", "emotional_relevance", "originality", "brand_fit")
+
+
+async def _check_landing() -> dict:
+    from emergentintegrations.llm.chat import UserMessage
+    items = [p for p in LANDING_PHOTOS if (LANDING_DIR / p["file"]).exists()]
+    results = []
+    for i in range(0, len(items), 4):
+        chunk = items[i:i + 4]
+        listing = "\n".join(
+            f"PHOTO {j + 1}: {p['file']} — used on: {p['used_on']} — must communicate: {p['purpose']}"
+            for j, p in enumerate(chunk))
+        prompt = f"""Judge these {len(chunk)} ScoutMePlay website photos against the anti-generic image formula. The photos are attached IN ORDER.
+{listing}
+
+For EACH photo give the 5 formula scores (0-100): authenticity (observed not generated, human imperfection, believable light), football_realism (anatomy, ball, boots, mechanics, environment), emotional_relevance (does it communicate its stated purpose without text), originality (not a generic stock/AI football cliché), brand_fit (premium documentary feel; natural colours, no green tint/glow/fake branding).
+Classification: AUTHENTIC (all fine) / REVIEW (weak spots) / TOO_GENERIC. Verdict: KEEP / IMPROVE / REPLACE.
+List concrete issues only where real.
+Return ONLY JSON: {{"photos": [{{"file": "<file>", "scores": {{"authenticity":0,"football_realism":0,"emotional_relevance":0,"originality":0,"brand_fit":0}}, "classification": "AUTHENTIC|REVIEW|TOO_GENERIC", "verdict": "KEEP|IMPROVE|REPLACE", "issues": ["..."]}}]}}"""
+        chat = _chat("landing")
+        files = _files([LANDING_DIR / p["file"] for p in chunk])
+        resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt, file_contents=files)), timeout=150)
+        data = _parse_json(resp if isinstance(resp, str) else getattr(resp, "text", str(resp)))
+        by_file = {str(x.get("file")): x for x in (data.get("photos") or []) if isinstance(x, dict)}
+        for j, p in enumerate(chunk):
+            raw = by_file.get(p["file"]) or (list(by_file.values())[j] if j < len(by_file) else {})
+            scores = {k: max(0, min(100, int((raw.get("scores") or {}).get(k, 0) or 0))) for k in SCORE_KEYS}
+            results.append({
+                **p,
+                "url": f"/api/static/landing/{p['file']}",
+                "scores": scores,
+                "avg": round(sum(scores.values()) / 5),
+                "classification": raw.get("classification") or "REVIEW",
+                "verdict": raw.get("verdict") or "KEEP",
+                "issues": [str(x)[:250] for x in (raw.get("issues") or [])][:5],
+            })
+
+    hashes = await asyncio.to_thread(lambda: [(r["file"], _dhash(LANDING_DIR / r["file"])) for r in results])
+    repetition = []
+    for a in range(len(hashes)):
+        for b in range(a + 1, len(hashes)):
+            (fa, ha), (fb, hb) = hashes[a], hashes[b]
+            if ha is None or hb is None or fa.startswith("carousel-bg") and fb.startswith("carousel-bg"):
+                continue
+            if bin(ha ^ hb).count("1") <= 8:
+                repetition.append(f"{fa} and {fb} look nearly identical — vary the moment")
+    overall = round(sum(r["avg"] for r in results) / len(results)) if results else 0
+    return {
+        "images": results,
+        "repetition": repetition,
+        "scores": {"overall": overall},
+        "passed": all(r["verdict"] == "KEEP" for r in results) and not repetition,
+        "proposed": {},
+    }
+
+
 BLOG_APPLY_WHITELIST = {"title", "subtitle", "excerpt", "meta_title", "meta_description", "meta_keywords", "cover_image_alt", "cover_image_url"}
 
 
@@ -837,6 +913,14 @@ def build_quality_router(*, db: Any, admin_dep: Any):
             {"key": "quality_auto_qc"},
             {"$set": {"enabled": payload.auto_qc, "updated_at": now_iso()}}, upsert=True)
         return {"ok": True, "auto_qc": payload.auto_qc}
+
+    @router.post("/landing/check")
+    async def landing_check(_=Depends(admin_dep)):
+        await db.quality_checks.update_one(
+            {"kind": "landing", "target_id": "site"},
+            {"$set": {"status": "checking", "error": None, "started_at": now_iso()}}, upsert=True)
+        asyncio.create_task(_run_check(db, "landing", "site", _check_landing, "landing"))
+        return {"status": "checking"}
 
     @router.post("/duplicates/scan")
     async def duplicates_scan(_=Depends(admin_dep)):
