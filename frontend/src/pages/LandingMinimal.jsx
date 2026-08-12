@@ -148,7 +148,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
   const features = [
     { icon: Crosshair, l1: "Analyse", l2: "your game" },
     { icon: Eye, l1: "Get seen", l2: "by scouts" },
-    { icon: ShieldCheck, l1: "Find trials", l2: "& opportunities" },
+    { icon: ShieldCheck, l1: "Find trials &", l2: "opportunities" },
   ];
   return (
     <section
@@ -188,7 +188,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             <div
               className="absolute inset-0"
               style={{
-                background: `linear-gradient(90deg, ${CREAM} 0%, rgba(244,239,230,0) 38%), linear-gradient(0deg, ${CREAM} 0%, rgba(244,239,230,0) 26%), linear-gradient(180deg, ${CREAM} 0%, rgba(244,239,230,0) 16%), linear-gradient(270deg, ${CREAM} 0%, rgba(244,239,230,0) 6%)`,
+                background: `linear-gradient(90deg, ${CREAM} 0%, rgba(244,239,230,0) 34%), linear-gradient(0deg, ${CREAM} 0%, rgba(244,239,230,0) 24%), linear-gradient(180deg, ${CREAM} 0%, rgba(244,239,230,0) 7%), linear-gradient(270deg, ${CREAM} 0%, rgba(244,239,230,0) 6%)`,
               }}
             />
           </motion.div>
@@ -247,9 +247,9 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
               data-testid="hero-feature-row"
             >
               {features.map(({ icon: Icon, l1, l2 }) => (
-                <div key={l1} className="flex flex-col items-center text-center gap-2 px-1.5 sm:px-3">
-                  <Icon className="w-6 h-6 md:w-7 md:h-7 text-forest" strokeWidth={1.7} />
-                  <span className="text-[9px] md:text-[11px] uppercase tracking-[0.08em] font-black text-ink leading-tight">
+                <div key={l1} className="flex flex-col items-center text-center gap-2 px-1 sm:px-3">
+                  <Icon className="w-6 h-6 md:w-7 md:h-7 text-forest shrink-0" strokeWidth={1.7} />
+                  <span className="text-[9px] sm:text-[10px] md:text-[11px] uppercase tracking-[0.04em] font-black text-ink leading-[1.35] whitespace-nowrap">
                     {l1}<br />{l2}
                   </span>
                 </div>

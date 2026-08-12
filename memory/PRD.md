@@ -3488,3 +3488,8 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 - Hero image re-edited (Gemini image edit): SCOUT ME PLAY print ERASED from shirt (plain black), more cinematic grade (golden-hour rim light, film contrast, haze). Same file path /api/static/landing/hero-player.jpg.
 - Alignment: removed pt-4/pt-6 on the copy column so headline top == image top on all breakpoints.
 - Motion: slow cinematic drift on the image (smp-hero-drift 18s alternate, scale 1.04→1.12 + translate), container overflow-hidden so fades stay intact, prefers-reduced-motion disables it. Verified animationName applied + mobile no overflow.
+
+## 2026-08-12 (5) — Hero round 2 (user feedback, verified)
+- NEW hero image: lone dreamer at misty morning pitch (empty goal, ball under arm, plain black shirt no text), faded cinematic realistic grade. Top 18.5% of file CROPPED (PIL) so the head sits at the very top → headline/photo tops perfectly parallel (measured 120/120 mobile; desktop verified visually). Top fade reduced 16%→7% so the head isn't washed out.
+- Feature row fixed: all three labels uniform size (9/10/11px responsive, tracking 0.04em, nowrap 2 lines each) — "FIND TRIALS & / OPPORTUNITIES" no longer bigger/3-lined.
+- Drift animation + blends retained. Asset path unchanged: /api/static/landing/hero-player.jpg.
