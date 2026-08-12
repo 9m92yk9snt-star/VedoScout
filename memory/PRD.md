@@ -3493,3 +3493,6 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 - NEW hero image: lone dreamer at misty morning pitch (empty goal, ball under arm, plain black shirt no text), faded cinematic realistic grade. Top 18.5% of file CROPPED (PIL) so the head sits at the very top → headline/photo tops perfectly parallel (measured 120/120 mobile; desktop verified visually). Top fade reduced 16%→7% so the head isn't washed out.
 - Feature row fixed: all three labels uniform size (9/10/11px responsive, tracking 0.04em, nowrap 2 lines each) — "FIND TRIALS & / OPPORTUNITIES" no longer bigger/3-lined.
 - Drift animation + blends retained. Asset path unchanged: /api/static/landing/hero-player.jpg.
+
+## 2026-08-12 (6) — Hero round 3 (verified)
+- Final hero image: lone player from behind with football CLEARLY under arm + football boots/socks fully visible, misty grass fills the whole background (empty goal far top), top 24% cropped → virtually NO sky, head at top edge. Same path /api/static/landing/hero-player.jpg. Verified desktop + mobile screenshots.
