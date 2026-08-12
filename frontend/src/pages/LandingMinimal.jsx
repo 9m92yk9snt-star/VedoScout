@@ -18,7 +18,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin, Volleyball, FileText } from "lucide-react";
+import { ArrowRight, ShieldCheck, Send, PlayCircle, Instagram, Facebook, Twitter, Linkedin, Volleyball, FileText, Upload, Crosshair, Eye } from "lucide-react";
 
 import Navigation from "@/components/Navigation";
 import ReviewsStrip from "@/components/ReviewsStrip";
@@ -143,154 +143,166 @@ export default function LandingMinimal() {
 /*  Right: stacked images (action shot + floating scout report)  */
 /* ============================================================ */
 function HeroSection({ onPrimaryCta, isLoggedIn }) {
-  const heroAction = `${ASSET_BASE}/api/static/landing/hero-action.png`;
-  const heroReport = `${ASSET_BASE}/api/static/landing/hero-report-card.png`;
+  const heroPlayer = `${ASSET_BASE}/api/static/landing/hero-player.jpg`;
+  const CREAM = "#F4EFE6";
+  const features = [
+    { icon: Crosshair, l1: "Analyse", l2: "your game" },
+    { icon: Eye, l1: "Get seen", l2: "by scouts" },
+    { icon: ShieldCheck, l1: "Find trials", l2: "& opportunities" },
+  ];
   return (
     <section
       id="hero-section"
       data-testid="hero-minimal"
-      className="relative px-6 md:px-10 pt-12 md:pt-16 pb-14 md:pb-20 border-b border-gray-border overflow-hidden bg-cream-base"
+      className="relative px-5 md:px-10 pt-6 md:pt-12 pb-12 md:pb-16 border-b border-gray-border overflow-hidden bg-cream-base"
     >
-      {/* Layered backdrop: grid + fading dot field + corner accents */}
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.05] pointer-events-none"
-        style={{
-          backgroundImage:
-            "linear-gradient(#1F4F2F 1px, transparent 1px), linear-gradient(90deg, #1F4F2F 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-          maskImage: "radial-gradient(ellipse at center, black 0%, transparent 75%)",
-          WebkitMaskImage: "radial-gradient(ellipse at center, black 0%, transparent 75%)",
-        }}
-      />
       <div
         aria-hidden
         className="absolute -top-10 -left-10 w-72 h-72 rounded-full pointer-events-none"
-        style={{
-          background: "radial-gradient(circle, rgba(204,255,0,0.18) 0%, transparent 70%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute bottom-0 right-0 w-96 h-96 rounded-full pointer-events-none"
-        style={{
-          background: "radial-gradient(circle, rgba(31,79,47,0.22) 0%, transparent 70%)",
-        }}
+        style={{ background: "radial-gradient(circle, rgba(204,255,0,0.16) 0%, transparent 70%)" }}
       />
 
-      <div className="relative max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-        {/* ───────── LEFT — copy + CTA ───────── */}
-        <div className="lg:col-span-6 text-center lg:text-left relative">
-          {/* Eyebrow with chalk line */}
+      <div className="relative max-w-6xl mx-auto">
+        {/* ── Copy + player image ── */}
+        <div className="relative">
+          {/* Player photo — bleeds right, blends into the cream background */}
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="inline-flex items-center gap-2.5 mb-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.9 }}
+            aria-hidden
+            className="absolute inset-y-0 -right-5 md:right-0 w-[60%] sm:w-[52%] lg:w-[46%] pointer-events-none select-none"
+            data-testid="hero-player-photo"
           >
-            <span aria-hidden className="relative flex items-center justify-center w-2 h-2 shrink-0">
-              <span className="absolute inset-0 rounded-full bg-volt animate-ping opacity-75" />
-              <span className="relative rounded-full w-1.5 h-1.5 bg-volt" />
-            </span>
-            <span className="text-forest text-[10px] md:text-[11px] uppercase tracking-[0.28em] font-bold">
-              ScoutMe Pro Intelligence · Instant analysis · 48h scout review
-            </span>
-            <span aria-hidden className="h-px w-8 bg-forest/35" />
+            <img
+              src={heroPlayer}
+              alt=""
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+              className="w-full h-full object-cover object-top"
+            />
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(90deg, ${CREAM} 0%, rgba(244,239,230,0) 38%), linear-gradient(0deg, ${CREAM} 0%, rgba(244,239,230,0) 26%), linear-gradient(180deg, ${CREAM} 0%, rgba(244,239,230,0) 16%), linear-gradient(270deg, ${CREAM} 0%, rgba(244,239,230,0) 6%)`,
+              }}
+            />
           </motion.div>
 
-          {/* Headline — bigger, tighter, with subtle accent */}
-          <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.05 }}
-            data-testid="hero-headline"
-            className="font-barlow font-black uppercase tracking-tighter text-[3.25rem] sm:text-7xl lg:text-[5.75rem] leading-[0.86] text-ink"
-          >
-            See your game<br />
-            like never<br />
-            <span className="relative inline-block text-forest">
-              before.
-              <svg
-                aria-hidden
-                className="absolute -bottom-2 left-0 w-full h-2 text-volt"
-                viewBox="0 0 200 8"
-                preserveAspectRatio="none"
-              >
-                <path
-                  d="M0 5 Q 50 0 100 5 T 200 5"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  fill="none"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-            className="mt-6 text-base md:text-lg text-ink/70 leading-relaxed max-w-xl mx-auto lg:mx-0"
-          >
-            Upload your video. Get an <span className="text-forest font-semibold">instant ScoutMe Pro report</span>, plus a real professional scout&apos;s written follow-up within 48 hours (VIP).
-            Built for ambitious U7&ndash;U21 players chasing the next level.
-          </motion.p>
-
-          {/* CTA row */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.25 }}
-            className="mt-7 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-4 justify-center lg:justify-start"
-          >
-            <style>{`
-              @keyframes smp-hero-glow { 0%,100% { box-shadow: 0 26px 48px -16px rgba(31,79,47,0.5), 0 0 16px rgba(204,255,0,0.15); } 50% { box-shadow: 0 26px 48px -16px rgba(31,79,47,0.5), 0 0 34px rgba(204,255,0,0.45); } }
-              @keyframes smp-hero-shine { 0% { transform: translateX(-160%) skewX(-18deg); } 60%, 100% { transform: translateX(280%) skewX(-18deg); } }
-              @keyframes smp-ball-x { 0% { left: -14%; } 100% { left: 106%; } }
-              @keyframes smp-ball-y { 0%,100% { bottom: 5px; } 50% { bottom: 18px; } }
-              @keyframes smp-ball-spin { 0% { rotate: 0deg; } 100% { rotate: 360deg; } }
-            `}</style>
-            <button
-              type="button"
-              onClick={onPrimaryCta}
-              data-testid="hero-upload-cta"
-              className="group relative overflow-hidden inline-flex items-center justify-center gap-3 bg-forest hover:bg-forest-pop text-white font-barlow font-black uppercase tracking-[0.18em] text-sm md:text-base px-8 md:px-10 py-4 md:py-5 transition-all hover:scale-[1.02] w-full sm:w-auto"
-              style={{ animation: "smp-hero-glow 2.8s ease-in-out infinite" }}
+          {/* Copy column */}
+          <div className="relative z-10 pt-4 md:pt-6">
+            <motion.h1
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.55, delay: 0.05 }}
+              data-testid="hero-headline"
+              className="font-barlow font-black uppercase tracking-tighter leading-[0.88] text-ink text-[2.85rem] sm:text-6xl lg:text-[5.5rem] max-w-[64%] sm:max-w-[58%] lg:max-w-[56%]"
             >
-              <span aria-hidden className="absolute inset-y-0 w-1/3 bg-white/20 pointer-events-none" style={{ animation: "smp-hero-shine 3.2s ease-in-out infinite" }} />
-              <span aria-hidden className="absolute pointer-events-none" style={{ animation: "smp-ball-x 4.6s linear infinite, smp-ball-y 0.72s ease-in-out infinite" }}>
-                <Volleyball className="w-4 h-4" style={{ color: "rgba(204,255,0,0.75)", animation: "smp-ball-spin 1.3s linear infinite" }} />
-              </span>
-              <span className="relative z-10 inline-flex items-center gap-3">
-                Upload your video
-                <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-              </span>
-            </button>
+              Turn your<br />
+              game into<br />
+              <span className="text-forest">opportunity.</span>
+            </motion.h1>
+
+            {/* Hand-drawn brush stroke */}
+            <motion.svg
+              initial={{ opacity: 0, scaleX: 0.6 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ duration: 0.5, delay: 0.35 }}
+              aria-hidden
+              viewBox="0 0 220 12"
+              className="mt-3 h-3 w-[190px] sm:w-[240px] text-ink origin-left"
+              preserveAspectRatio="none"
+            >
+              <path
+                d="M3 8 Q 40 3 85 6 T 160 5 T 217 6"
+                stroke="currentColor"
+                strokeWidth="5"
+                fill="none"
+                strokeLinecap="round"
+              />
+            </motion.svg>
+
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="mt-6 md:mt-8 text-[15px] md:text-lg text-ink/75 leading-relaxed max-w-[58%] sm:max-w-[50%] lg:max-w-[44%]"
+            >
+              Upload your football video and get a detailed{" "}
+              <span className="text-forest font-semibold">ScoutMe Pro analysis</span>.
+              Discover your strengths, improve your game and showcase your talent
+              to scouts looking for players.
+            </motion.p>
+
+            {/* Feature icon row */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.25 }}
+              className="mt-8 md:mt-10 grid grid-cols-3 max-w-[66%] sm:max-w-[56%] lg:max-w-[46%] divide-x divide-ink/15"
+              data-testid="hero-feature-row"
+            >
+              {features.map(({ icon: Icon, l1, l2 }) => (
+                <div key={l1} className="flex flex-col items-center text-center gap-2 px-1.5 sm:px-3">
+                  <Icon className="w-6 h-6 md:w-7 md:h-7 text-forest" strokeWidth={1.7} />
+                  <span className="text-[9px] md:text-[11px] uppercase tracking-[0.08em] font-black text-ink leading-tight">
+                    {l1}<br />{l2}
+                  </span>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </div>
+
+        {/* ── CTA rows — full width ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+          className="relative z-10 mt-8 md:mt-12"
+        >
+          <style>{`
+            @keyframes smp-hero-glow { 0%,100% { box-shadow: 0 22px 44px -14px rgba(51,105,30,0.55), 0 0 14px rgba(204,255,0,0.12); } 50% { box-shadow: 0 22px 44px -14px rgba(51,105,30,0.55), 0 0 30px rgba(204,255,0,0.4); } }
+            @keyframes smp-hero-shine { 0% { transform: translateX(-160%) skewX(-18deg); } 60%, 100% { transform: translateX(280%) skewX(-18deg); } }
+          `}</style>
+          <button
+            type="button"
+            onClick={onPrimaryCta}
+            data-testid="hero-upload-cta"
+            className="group relative overflow-hidden w-full flex items-center gap-4 rounded-[18px] px-5 md:px-7 py-4.5 p-5 transition-transform hover:scale-[1.01] active:scale-[0.99]"
+            style={{
+              background: "linear-gradient(180deg, #79A83D 0%, #4C7A28 45%, #33591C 100%)",
+              border: "1px solid rgba(255,255,255,0.25)",
+              animation: "smp-hero-glow 2.8s ease-in-out infinite",
+            }}
+          >
+            <span aria-hidden className="absolute inset-y-0 w-1/3 bg-white/15 pointer-events-none" style={{ animation: "smp-hero-shine 3.4s ease-in-out infinite" }} />
+            <Upload className="relative z-10 w-6 h-6 md:w-7 md:h-7 text-white shrink-0" strokeWidth={2.2} />
+            <span className="relative z-10 flex-1 text-center font-barlow font-black uppercase tracking-[0.06em] text-white text-[20px] sm:text-[26px] md:text-[30px] leading-none">
+              Upload your video
+            </span>
+            <span aria-hidden className="relative z-10 hidden sm:block w-px h-8 md:h-10 bg-white/35 shrink-0" />
+            <Volleyball className="relative z-10 w-6 h-6 md:w-8 md:h-8 text-white/90 shrink-0 transition-transform group-hover:rotate-45" strokeWidth={1.6} />
+          </button>
+
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <a
               href="#how-it-works-walkthrough"
               data-testid="hero-secondary-cta"
-              className="inline-flex items-center justify-center gap-2 text-ink hover:text-forest font-barlow font-black uppercase tracking-[0.18em] text-sm border-2 border-ink/15 hover:border-forest/60 px-7 py-4 transition-colors w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2.5 rounded-[14px] bg-cream-card border border-ink/10 shadow-[0_4px_14px_-6px_rgba(10,26,18,0.18)] text-ink hover:text-forest hover:border-forest/50 font-barlow font-black uppercase tracking-[0.14em] text-sm md:text-base px-6 py-4 transition-colors"
             >
-              <PlayCircle className="w-4 h-4" /> How it works
+              <PlayCircle className="w-5 h-5" /> How it works
             </a>
             <Link
               to="/sample-report"
               data-testid="hero-sample-report-cta"
-              className="inline-flex items-center justify-center gap-2 text-forest hover:text-ink font-barlow font-black uppercase tracking-[0.18em] text-sm border-2 border-forest/40 hover:border-ink/40 px-7 py-4 transition-colors w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2.5 rounded-[14px] bg-cream-card border border-ink/10 shadow-[0_4px_14px_-6px_rgba(10,26,18,0.18)] text-forest hover:text-ink hover:border-forest/50 font-barlow font-black uppercase tracking-[0.14em] text-sm md:text-base px-6 py-4 transition-colors"
             >
-              <FileText className="w-4 h-4" /> See a sample report
+              <FileText className="w-5 h-5" /> See a sample report
             </Link>
-          </motion.div>
+          </div>
 
           {/* Trust line + sign-in nudge */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="mt-5 flex flex-col sm:flex-row items-center lg:items-start gap-3 sm:gap-5 justify-center lg:justify-start"
-          >
+          <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6">
             <span className="text-[11px] text-ink/55 flex items-center gap-1.5 uppercase tracking-[0.18em] font-bold">
               <ShieldCheck className="w-3.5 h-3.5 text-forest" />
               Free preview · No card to start
@@ -307,131 +319,7 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
                 </Link>
               </span>
             )}
-          </motion.div>
-        </div>
-
-        {/* ───────── RIGHT — Lagdelt billed-komposition ───────── */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.1 }}
-          className="lg:col-span-6 relative w-full max-w-[430px] mx-auto lg:max-w-none"
-          data-testid="hero-composition"
-        >
-          <style>{`
-            @keyframes lm-kenburns { from { transform: scale(1); } to { transform: scale(1.09) translateX(-8px); } }
-            @keyframes lm-float { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-8px) rotate(-2.5deg); } }
-            @keyframes lm-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
-          `}</style>
-          {/* MAIN — action shot frame */}
-          <div className="relative aspect-square sm:aspect-[4/5] w-full bg-ink overflow-hidden border border-gray-border">
-            <img
-              src={heroAction}
-              alt="Young footballer in action"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ animation: "lm-kenburns 16s ease-in-out infinite alternate" }}
-            />
-            {/* Forest gradient overlay for cohesion */}
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-gradient-to-tr from-ink/45 via-transparent to-forest/25 mix-blend-multiply"
-            />
-            {/* Bottom scrim for caption readability */}
-            <div aria-hidden className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent" />
-            {/* Corner brackets */}
-            <span aria-hidden className="absolute top-3 left-3 w-5 h-5 border-l-2 border-t-2" style={{ borderColor: "#F5C443" }} />
-            <span aria-hidden className="absolute top-3 right-3 w-5 h-5 border-r-2 border-t-2" style={{ borderColor: "#F5C443" }} />
-            <span aria-hidden className="absolute bottom-3 left-3 w-5 h-5 border-l-2 border-b-2" style={{ borderColor: "#F5C443" }} />
-            <span aria-hidden className="absolute bottom-3 right-3 w-5 h-5 border-r-2 border-b-2" style={{ borderColor: "#F5C443" }} />
-
-            {/* Floating "TRACKING" badge */}
-            <div className="absolute top-5 left-5">
-              <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] font-black px-2.5 py-1.5 backdrop-blur-sm rounded" style={{ background: "rgba(9,15,12,0.82)", color: "#F5C443", border: "1px solid rgba(245,196,67,0.35)" }}>
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#F5C443" }} />
-                Pro scout · live
-              </span>
-            </div>
-
-            {/* Bottom caption */}
-            <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.22em] font-bold" style={{ color: "#F5C443" }}>Match footage</div>
-                <div className="font-barlow font-black uppercase text-white text-xl md:text-2xl leading-tight" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
-                  Instant analysis + 48h scout
-                </div>
-              </div>
-            </div>
-
-            {/* Decorative scan line */}
-            <motion.div
-              aria-hidden
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.6, 0], top: ["22%", "72%", "22%"] }}
-              transition={{ duration: 6, repeat: Infinity, delay: 1, ease: "easeInOut" }}
-              className="absolute inset-x-0 h-px"
-              style={{ background: "#F5C443", boxShadow: "0 0 12px rgba(245,196,67,0.8)" }}
-            />
           </div>
-
-          {/* FLOATING SCOUT REPORT CARD — overlapper bottom-left of image */}
-          <motion.div
-            initial={{ opacity: 0, y: 20, rotate: -8 }}
-            animate={{ opacity: 1, y: 0, rotate: 0 }}
-            transition={{ duration: 0.75, delay: 0.4, ease: "easeOut" }}
-            className="absolute -bottom-6 md:-bottom-8 -left-3 md:-left-10 w-[50%] md:w-[44%] z-10"
-            data-testid="hero-floating-report"
-          >
-            <div
-              className="relative bg-cream-card border-2 border-ink overflow-hidden"
-              style={{
-                boxShadow:
-                  "0 32px 60px -16px rgba(10,26,18,0.4), 0 12px 22px -10px rgba(10,26,18,0.3)",
-                animation: "lm-float 5.5s ease-in-out 1.4s infinite",
-              }}
-            >
-              <img
-                src={heroReport}
-                alt="Scout report preview"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-                className="block w-full h-auto"
-              />
-              {/* Bottom strip with score */}
-              <div className="bg-forest text-white px-2 md:px-3 py-1.5 md:py-2 flex items-center justify-between border-t border-ink">
-                <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold">Scout report</span>
-                <span className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold" style={{ color: "#F5C443" }}>
-                  4-pillar · Instant analysis
-                </span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* STATS CHIP — top right */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.55 }}
-            className="absolute -top-3 md:-top-4 -right-2 md:-right-3 z-10 text-cream-base px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3"
-            style={{
-              background: "linear-gradient(150deg, #1F4F2F 0%, #12402A 100%)",
-              border: "1px solid rgba(245,196,67,0.4)",
-              boxShadow:
-                "0 18px 36px -10px rgba(10,26,18,0.4)",
-              animation: "lm-bob 4.5s ease-in-out 1.8s infinite",
-            }}
-          >
-            <span className="w-7 md:w-9 h-7 md:h-9 flex items-center justify-center font-barlow font-black text-sm md:text-base leading-none" style={{ background: "#F5C443", color: "#12200F" }}>
-              7.8
-            </span>
-            <div className="text-left">
-              <div className="text-[8px] md:text-[9px] uppercase tracking-[0.18em] md:tracking-[0.22em] font-bold" style={{ color: "#F5C443" }}>Overall</div>
-              <div className="text-[9px] md:text-[11px] uppercase tracking-[0.16em] md:tracking-[0.18em] font-bold text-cream-base/80">U14 · AMF</div>
-            </div>
-          </motion.div>
         </motion.div>
       </div>
 
