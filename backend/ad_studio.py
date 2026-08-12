@@ -86,12 +86,55 @@ FORBIDDEN = (
 )
 
 PHOTO_STYLE = (
-    "Documentary football photography, shot on a real pitch. Natural available light, honest colours, "
-    "visible photographic grain, slightly imperfect framing, shallow depth of field, a touch of motion blur "
-    "where movement happens. Grass-roots/academy setting: worn boots, scuffed ball, training bibs, dew on grass. "
-    "Face does not need to be visible. Palette leaning cream/off-white light, deep greens and near-black shadows. "
-    "STRICTLY FORBIDDEN: text, logos, watermarks, branded shirts, holograms, HUD graphics, glowing lines, "
-    "futuristic overlays, stadium crowds cheering, trophy lifting, studio lighting, plastic-perfect skin."
+    "OBSERVED, NOT GENERATED: a documentary football photograph that could realistically have been taken by a "
+    "football photographer at an actual training session or match.\n"
+    "FORMULA: real football moment + human imperfection + specific action + natural environment + emotion + "
+    "editorial camera language - every AI cliche.\n"
+    "MOMENT: start from a specific football situation (a scan over the shoulder before receiving, an imperfect "
+    "first touch, boots tied in an ordinary changing room, a quiet coach word after a drill, waiting by the "
+    "touchline before a trial, walking off with boots in one hand) — never 'young player in dramatic stadium'.\n"
+    "HUMAN IMPERFECTION: wrinkled shirt, socks at slightly different heights, grass stains, mud, worn boots, "
+    "sweat, untidy hair, normal skin texture, realistic proportions, uneven grass, worn training equipment.\n"
+    "COMPOSITION: imperfect and caught, not composed — subject off-centre on a third or partially out of frame, "
+    "foreground obstruction or a blurred teammate crossing the frame, slight camera tilt, low sideline or "
+    "long-lens touchline perspective, natural negative space.\n"
+    "CAMERA: 35mm documentary / 50mm natural / 85-135mm touchline sports lens; realistic depth of field, mild "
+    "motion blur where movement happens, subtle grain, slight highlight clipping, natural shadows — not every "
+    "pixel perfectly sharp.\n"
+    "LIGHT: overcast training ground, natural daylight, early morning or late afternoon, real floodlights or "
+    "changing-room fluorescents. No artificial rim light, fake volumetric beams, extreme HDR or orange/teal grading.\n"
+    "FOOTBALL CORRECTNESS: ball size, boot shape, laces, studs, shin pads, hands, fingers, limbs, goal geometry, "
+    "pitch markings and body mechanics must be physically right.\n"
+    "FACE OPTIONAL: backs, side profiles, boots, legs, hands, natural silhouettes and distance views are often "
+    "stronger than faces.\n"
+    "COLOUR: photographic and natural — real grass green, true skin tones, believable kit colours; NEVER a "
+    "green-tinted image. Brand cream/dark-green/black lives in the UI around the photo, not inside it.\n"
+    "STRICTLY FORBIDDEN: text, logos, watermarks, branded shirts or balls, fake club badges or sponsors, "
+    "holograms, HUD graphics, floating statistics, digital grids, glowing lines, neon, cyberpunk stadiums, "
+    "scanning beams, perfectly symmetrical stadiums, generic player holding a ball staring at camera, fake "
+    "dramatic smoke, heavy lens flare, plastic skin, perfect-teeth model smiles, over-muscular children, "
+    "impossible anatomy, spotless kit during match action, trophy celebrations, cheering crowds, studio lighting."
+)
+
+VARIETY_CONCEPTS = [
+    ("DETAIL", "a tight detail: boot, ball, hand, grass or kit"),
+    ("ACTION", "a live action: first touch, sprint, scan, turn or pass"),
+    ("OBSERVATION", "an observation perspective: scout view, touchline, seen from a distance"),
+    ("PREPARATION", "preparation: boots, tunnel, changing room, warm-up"),
+    ("HUMAN", "human connection: a quiet coach conversation or teammate interaction"),
+    ("AFTERMATH", "aftermath: after training, after the match, an emptying pitch"),
+    ("ENVIRONMENT", "the environment: training cones, wet pitch, changing room, sideline"),
+    ("POV", "a point of view: what the player, scout or parent sees"),
+]
+
+IMAGE_QC_RUBRIC = (
+    "GOLDEN RULE for judging photos: could this realistically have been taken by a football photographer at a "
+    "real training session or match — and does it communicate meaning without text? Flag as failing: "
+    "model-looking players, wrong football anatomy (hands, fingers, limbs, ball, boots, goal geometry), "
+    "physically impossible ball/body mechanics, lighting without a real source, too-perfect centred composition, "
+    "green-tinted or neon grading, artificial glow, fake branding or club badges, plastic skin, spotless kit "
+    "during action, generic player-with-ball-staring-at-camera poses, and compositions or poses repeated within "
+    "the same set."
 )
 
 QC_KEYS = [
@@ -231,7 +274,8 @@ async def _gen_image(brief: str, shape: str, fname: str, corrective: str = "") -
 # ── QC — mandatory anti-generic check ─────────────────────────────────────
 QC_SYSTEM = (
     "You are a ruthless creative director QC'ing performance ads for a premium football scouting platform. "
-    "You reject anything generic, hypey, factually wrong or unreadable on mobile. Answer only in JSON."
+    "You reject anything generic, hypey, factually wrong or unreadable on mobile. Answer only in JSON. "
+    + IMAGE_QC_RUBRIC
 )
 
 

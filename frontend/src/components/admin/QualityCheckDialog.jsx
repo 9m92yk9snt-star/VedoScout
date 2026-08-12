@@ -196,10 +196,12 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
   const fixRedMarks = async () => {
     setChecking(true);
     try {
-      await api.post(`/admin/quality/carousel/${targetId}/fix`);
-      toast.info("Fixing the red marks — rewriting and re-rendering the flagged slides…");
+      await api.post(`/admin/quality/${kind}/${targetId}/fix`);
+      toast.info(kind === "carousel"
+        ? "Fixing the red marks — rewriting and re-rendering the flagged slides…"
+        : "Fixing the red marks — correcting the article text itself…");
       startPoll((data) => {
-        if (data.passed) toast.success("Fixed ✓ — slides re-rendered and QC now passes");
+        if (data.passed) toast.success("Fixed ✓ — content corrected and QC now passes");
         else toast.info("Fixed and re-checked — see remaining marks below");
         onApplied?.();
       });
@@ -285,15 +287,27 @@ export default function QualityCheckDialog({ kind, targetId, title, onClose, onA
                 </button>
               </div>
 
-              {kind === "carousel" && !result.passed && (
+              {((kind === "carousel" && !result.passed) ||
+                (kind === "blog" && (result.checks || []).some((c) => !c.pass && c.group !== "image"))) && (
                 <button
                   data-testid="qc-fix-red-marks"
                   onClick={fixRedMarks}
                   className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-black uppercase tracking-wider transition-colors"
                   style={{ background: "#CCFF00", color: "#0D1512" }}
                 >
-                  <Sparkles className="w-4 h-4" /> Fix red marks — rewrite &amp; re-render slides
+                  <Sparkles className="w-4 h-4" />
+                  {kind === "carousel" ? "Fix red marks — rewrite & re-render slides" : "Fix red marks — correct the article text"}
                 </button>
+              )}
+
+              {result.image_scores && (
+                <div className="flex flex-wrap gap-1.5" data-testid="qc-image-scores">
+                  {[["authenticity", "Authenticity"], ["football_realism", "Football realism"], ["emotional_relevance", "Emotion"], ["originality", "Originality"], ["brand_fit", "Brand fit"]].map(([k, label]) => {
+                    const v = result.image_scores[k];
+                    const tone = v >= 85 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : v >= 65 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-rose-50 text-rose-700 border-rose-200";
+                    return <span key={k} className={`px-2 py-0.5 border text-[10px] font-bold uppercase tracking-wider ${tone}`}>{label} {v}</span>;
+                  })}
+                </div>
               )}
 
               <ChecksList checks={result.checks} />

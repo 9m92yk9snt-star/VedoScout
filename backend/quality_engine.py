@@ -14,6 +14,7 @@ import io
 import json
 import logging
 import os
+import random
 import re
 import uuid
 from datetime import datetime, timezone
@@ -23,7 +24,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ad_studio import PRODUCTS, FORBIDDEN, PHOTO_STYLE
+from ad_studio import PRODUCTS, FORBIDDEN, PHOTO_STYLE, IMAGE_QC_RUBRIC, VARIETY_CONCEPTS
 
 logger = logging.getLogger("elite-scout")
 
@@ -50,7 +51,7 @@ QC_SYSTEM = (
     "You are a ruthless creative director and editor QC'ing content for ScoutMePlay, a premium football "
     "scouting platform for youth players and parents. You reject anything generic, AI-sounding, hypey, "
     "factually wrong or unreadable on mobile. You answer ONLY in JSON. "
-    f"The ONLY claims allowed about ScoutMePlay products:\n{FACTS}\n{BRAND_STANDARD}"
+    f"The ONLY claims allowed about ScoutMePlay products:\n{FACTS}\n{BRAND_STANDARD}\n{IMAGE_QC_RUBRIC}"
 )
 
 BLOG_CHECKS = [
@@ -161,8 +162,13 @@ def _blog_hash(post: dict) -> str:
 async def _check_blog(post: dict) -> dict:
     from emergentintegrations.llm.chat import UserMessage
     cover = _local_image(post.get("cover_image_url") or "")
-    body = (post.get("content_md") or "")[:5000]
-    prompt = f"""QC this ScoutMePlay blog article. Blog tone: human, informative, knowledgeable — not an advertisement.
+    body = (post.get("content_md") or "")
+    truncated = len(body) > 5000
+    if truncated:
+        cut = body[:5000]
+        body = cut[:max(cut.rfind(". "), cut.rfind(".\n"), 3000) + 1]
+    trunc_note = " (Body below is the OPENING of a longer article — do NOT flag the abrupt ending as incomplete.)" if truncated else ""
+    prompt = f"""QC this ScoutMePlay blog article. Blog tone: human, informative, knowledgeable — not an advertisement.{trunc_note}
 TITLE: {post.get('title')}
 SUBTITLE: {post.get('subtitle') or '—'}
 CATEGORY: {post.get('category') or '—'}
@@ -171,14 +177,16 @@ META TITLE: {post.get('meta_title') or '(missing)'}
 META DESCRIPTION: {post.get('meta_description') or '(missing)'}
 META KEYWORDS: {', '.join(post.get('meta_keywords') or []) or '(missing)'}
 COVER ALT TEXT: {post.get('cover_image_alt') or '(missing)'}
-BODY (first 5000 chars):
+BODY{' (opening of a longer article)' if truncated else ''}:
 {body}
 
-The attached photo (if any) is the cover image. If no photo attached, mark the 4 image checks pass=true with issue "no local cover to analyse".
+The attached photo (if any) is the cover image. If no photo attached, mark the 4 image checks pass=true with issue "no local cover to analyse" and set image_scores to null.
+Judge the photo with the golden rule: could a football photographer realistically have taken it at a real session/match, and does it communicate the article's emotion without text?
 Evaluate every check strictly. Banned SaaS filler ("unlock your potential" etc.) fails generic_wording.
 Return ONLY JSON:
 {{"checks": [{{"key":"generic_wording","pass":true,"issue":""}}, ... all of: {[k for k, _, _ in BLOG_CHECKS]}],
  "scores": {{"text":0-100,"seo":0-100,"image":0-100,"overall":0-100}},
+ "image_scores": {{"authenticity":0-100,"football_realism":0-100,"emotional_relevance":0-100,"originality":0-100,"brand_fit":0-100}} or null,
  "image_classification": "AUTHENTIC|REVIEW|TOO_GENERIC|NONE",
  "image_recommendation": "KEEP|IMPROVE|REPLACE|GENERATE|NONE",
  "proposed": {{"title":null_or_better,"excerpt":null_or_better,"meta_title":null_or_better,"meta_description":null_or_better,"meta_keywords":null_or_comma_separated,"cover_image_alt":null_or_better}}}}
@@ -192,10 +200,16 @@ Only fill a "proposed" field when the current one fails a check — keep proposa
     if not (cover and cover.exists()):
         scores["image"] = None
         scores["overall"] = round((scores["text"] + scores["seo"]) / 2)
+    raw_is = data.get("image_scores")
+    image_scores = None
+    if cover and cover.exists() and isinstance(raw_is, dict):
+        image_scores = {k: max(0, min(100, int(raw_is.get(k, 0) or 0)))
+                        for k in ("authenticity", "football_realism", "emotional_relevance", "originality", "brand_fit")}
     proposed = {k: (str(v).strip() if v else None) for k, v in (data.get("proposed") or {}).items()
                 if k in ("title", "excerpt", "meta_title", "meta_description", "meta_keywords", "cover_image_alt")}
     return {
         "checks": checks, "scores": scores,
+        "image_scores": image_scores,
         "passed": all(c["pass"] for c in checks),
         "image_classification": data.get("image_classification") or ("NONE" if not cover else "REVIEW"),
         "image_recommendation": data.get("image_recommendation") or "NONE",
@@ -462,9 +476,11 @@ async def _generate_cover(post: dict) -> dict:
         session_id=f"quality-coverbrief-{uuid.uuid4().hex[:6]}",
         system_message=COVER_BRIEF_SYSTEM,
     ).with_model("openai", "gpt-5.4")
+    concept_name, concept_desc = random.choice(VARIETY_CONCEPTS)
     p = f"""Blog article: "{post.get('title')}" (category: {post.get('category') or 'football'}).
 Excerpt: {post.get('excerpt') or ''}
 Write ONE photography brief for the cover: a specific grass-roots football micro-moment that expresses this article's EMOTION and meaning — not a literal illustration of the title. One sentence. No text/logos/graphics in the image.
+Use the visual concept category "{concept_name}" ({concept_desc}) so the site's covers stay varied.
 Also write a short factual alt text (max 14 words) describing that photo.
 Return ONLY JSON: {{"brief": "...", "alt": "..."}}"""
     resp = await asyncio.wait_for(brief_chat.send_message(UserMessage(text=p)), timeout=90)
@@ -522,6 +538,65 @@ def schedule_auto_qc(db: Any, kind: str, target_id: str):
         asyncio.create_task(_go())
     except RuntimeError:
         logger.warning("auto-qc skipped — no running event loop")
+
+
+# ── One-click blog fix (rewrite flagged article text + apply proposals) ────
+BLOG_VOICE = (
+    "You are ScoutMePlay's blog editor — human, informative, knowledgeable football voice for parents and "
+    "youth players. Specific football language, never generic SaaS marketing. " + FORBIDDEN
+)
+
+
+async def _fix_blog(db: Any, post: dict):
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    post_id = post["id"]
+    try:
+        qc = await db.quality_checks.find_one({"kind": "blog", "target_id": post_id}) or {}
+        checks = qc.get("checks") or []
+        text_fails = [c for c in checks if not c.get("pass") and c.get("group") == "text"]
+        proposed = qc.get("proposed") or {}
+        update = {}
+
+        if text_fails:
+            chat = LlmChat(
+                api_key=os.environ["EMERGENT_LLM_KEY"],
+                session_id=f"quality-blogfix-{uuid.uuid4().hex[:6]}",
+                system_message=BLOG_VOICE,
+            ).with_model("openai", "gpt-5.4")
+            prompt = f"""Fix ONLY the flagged issues in this ScoutMePlay blog article. Keep the structure, headings, length, language and everything that already works.
+TITLE: {post.get('title')}
+FLAGGED ISSUES:
+{chr(10).join(f"- {c['label']}: {c.get('issue') or ''}" for c in text_fails)}
+
+ARTICLE (markdown):
+{post.get('content_md') or ''}
+
+Return ONLY JSON: {{"content_md": "<the FULL corrected markdown — change only what the issues describe>"}}"""
+            resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=180)
+            data = _parse_json(resp if isinstance(resp, str) else getattr(resp, "text", str(resp)))
+            fixed = str(data.get("content_md") or "").strip()
+            if fixed and len(fixed) > len(post.get("content_md") or "") * 0.5:
+                update["content_md"] = fixed
+
+        for k, v in proposed.items():
+            if k in BLOG_APPLY_WHITELIST and k != "cover_image_url" and isinstance(v, str) and v.strip():
+                update[k] = [s.strip() for s in v.split(",") if s.strip()] if k == "meta_keywords" else v.strip()
+
+        if update:
+            update["updated_at"] = now_iso()
+            await db.blog_posts.update_one({"id": post_id}, {"$set": update})
+
+        fresh = await db.blog_posts.find_one({"id": post_id}, {"_id": 0})
+        await db.quality_checks.update_one(
+            {"kind": "blog", "target_id": post_id},
+            {"$set": {"status": "checking", "started_at": now_iso(),
+                      "fixed_fields": [k for k in update if k != "updated_at"]}})
+        await _run_check(db, "blog", post_id, lambda: _check_blog(fresh), _blog_hash(fresh))
+    except Exception as e:
+        logger.exception("blog fix failed (%s)", post_id)
+        await db.quality_checks.update_one(
+            {"kind": "blog", "target_id": post_id},
+            {"$set": {"status": "error", "error": f"Fix failed: {str(e)[:250]}"}}, upsert=True)
 
 
 # ── One-click carousel fix (rewrite failing slide texts + re-render) ───────
@@ -653,6 +728,17 @@ def build_quality_router(*, db: Any, admin_dep: Any):
             {"kind": "blog", "target_id": post_id},
             {"$addToSet": {"applied": {"$each": list(update.keys())}}})
         return {"ok": True, "applied": [k for k in update if k != "updated_at"]}
+
+    @router.post("/blog/{post_id}/fix")
+    async def blog_fix(post_id: str, _=Depends(admin_dep)):
+        post = await db.blog_posts.find_one({"id": post_id}, {"_id": 0})
+        if not post:
+            raise HTTPException(404, "Post not found")
+        await db.quality_checks.update_one(
+            {"kind": "blog", "target_id": post_id},
+            {"$set": {"status": "fixing", "error": None, "started_at": now_iso()}}, upsert=True)
+        asyncio.create_task(_fix_blog(db, post))
+        return {"status": "fixing"}
 
     @router.post("/carousel/{job_id}/check")
     async def carousel_check(job_id: str, _=Depends(admin_dep)):
