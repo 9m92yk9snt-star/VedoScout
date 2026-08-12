@@ -8,6 +8,7 @@ import Navigation from "@/components/Navigation";
 import SEO, { articleJsonLd, breadcrumbJsonLd } from "@/components/SEO";
 import BlogShareBar from "@/components/BlogShareBar";
 import NewsletterSignup from "@/components/NewsletterSignup";
+import BlogCtaBanner from "@/components/BlogCtaBanner";
 import api from "@/lib/api";
 
 const LIME = "#ccff00";
@@ -242,11 +243,26 @@ export default function BlogArticlePage() {
 
       {/* ===== Related posts ===== */}
       {related.length > 0 && (
-        <section className="border-t border-gray-border bg-cream-soft py-14 md:py-20">
+        <section className="border-t border-gray-border bg-cream-soft py-14 md:py-20" data-testid="blog-related-section">
           <div className="max-w-6xl mx-auto px-6 md:px-10">
-            <h2 className="font-barlow font-black uppercase text-3xl md:text-4xl text-ink tracking-tight mb-10">
-              Keep reading
-            </h2>
+            <div className="flex items-end justify-between gap-4 mb-10">
+              <div>
+                <div className="inline-flex items-center gap-2 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: LIME }} />
+                  <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-forest">Read next</span>
+                </div>
+                <h2 className="font-barlow font-black uppercase text-3xl md:text-4xl text-ink tracking-tight">
+                  Keep reading
+                </h2>
+              </div>
+              <Link
+                to="/blog"
+                data-testid="blog-related-all-link"
+                className="hidden sm:inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] font-bold text-ink/60 hover:text-forest transition-colors whitespace-nowrap"
+              >
+                All articles <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
             <div className="grid md:grid-cols-3 gap-5 md:gap-6">
               {related.map((r) => (
                 <Link
@@ -275,21 +291,9 @@ export default function BlogArticlePage() {
       )}
 
       {/* ===== CTA ===== */}
-      <section className="border-t border-gray-border bg-forest text-cream-card py-16 md:py-20">
-        <div className="max-w-3xl mx-auto px-6 md:px-10 text-center">
-          <h2 className="font-barlow font-black uppercase text-3xl md:text-5xl tracking-tight leading-[0.95]">
-            Ready to see your game
-            <span className="block mt-2" style={{ color: LIME }}>like never before?</span>
-          </h2>
-          <Link
-            to="/signup"
-            className="inline-flex items-center gap-2 mt-7 font-barlow font-black uppercase tracking-widest text-sm px-7 py-3.5 rounded-full"
-            style={{ background: LIME, color: "#0A1F0F" }}
-          >
-            Try it free <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
+      <div className="pt-14 md:pt-20">
+        <BlogCtaBanner source="article" />
+      </div>
     </div>
   );
 }

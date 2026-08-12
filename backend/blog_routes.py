@@ -236,7 +236,14 @@ def build_blog_router(
         await ensure_categories()
         query: dict = {"status": "published"}
         if category:
-            query["category"] = category
+            # Posts store the category NAME while the UI filters by slug — accept both.
+            names = {category}
+            cat_doc = await db[BLOG_CATEGORIES].find_one(
+                {"$or": [{"slug": category}, {"name": category}]}
+            )
+            if cat_doc:
+                names.update({cat_doc.get("name"), cat_doc.get("slug")})
+            query["category"] = {"$in": [n for n in names if n]}
         if tag:
             query["tags"] = tag
         if q:

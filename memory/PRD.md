@@ -3466,3 +3466,9 @@ User approved: (1) verification AFTER the 10-frame flow, (2) the 3 taps ride alo
 ### Tested (Playwright E2E, webm test clip via /upload as admin)
 - 10-frame flow unchanged → verify intro appears after frame 10 → scrub + 3 taps → counter 1/3→2/3→3/3 → "✓ PLAYER CONFIRMED" → overlay closes → toast "13 anchors locked". Pulsing NOT VISIBLE · NEXT button visible during marking. COMPILE_OK backend+frontend.
 - Note: headless Chromium cannot decode H.264 — use .webm clips for any future ScoutMode automation (e.g. /app/backend/uploads/2ab51964-*.webm).
+
+## 2026-08-12 — Blog: category filter bug + new CTA banners (verified in Preview)
+1. **Category filter bug (production-reported, same code)**: posts store category NAME ("Parent's Guide") but the UI filters by slug ("parents-guide") → "No articles yet". Fixed in `blog_routes.py` list endpoint: category param now matches slug OR name via blog_categories lookup ($in on both). Verified: ?category=parents-guide → 4 posts, by name → 4, all → 7. Breadcrumb links (category name) also work now.
+2. **New ScoutMePlay-style bottom CTA banner** (`/app/frontend/src/components/BlogCtaBanner.jsx`): dark ink rounded card with lime radial glow, START SCOUTING eyebrow, "SEE YOUR GAME LIKE A REAL SCOUT.", TRY IT FREE pill → /signup, honest social proof ("Hundreds of players scouted already" + initials avatars), trust line, CSS phone mockup with real demo match frame (/api/uploads/demo-frame-dribble.jpg) + LIVE ANALYSIS badge + Overall 8.0 bar. Replaces the flat green CTA on BOTH BlogIndexPage and BlogArticlePage.
+3. **Related articles polish** (BlogArticlePage): "READ NEXT" eyebrow + "All articles →" link on the Keep Reading section (related posts endpoint already existed).
+Verified via screenshots (mobile 390px): filter shows cards, banners render on index + article, related section present. USER MUST DEPLOY for scoutmeplay.com.

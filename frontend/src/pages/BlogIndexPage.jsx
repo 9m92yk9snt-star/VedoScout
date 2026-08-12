@@ -5,6 +5,7 @@ import { Search, Clock, ArrowRight, Tag as TagIcon } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import SEO, { organizationJsonLd } from "@/components/SEO";
 import NewsletterSignup from "@/components/NewsletterSignup";
+import BlogCtaBanner from "@/components/BlogCtaBanner";
 import api from "@/lib/api";
 
 const LIME = "#ccff00";
@@ -273,25 +274,7 @@ export default function BlogIndexPage() {
       </section>
 
       {/* ===== CTA ===== */}
-      <section className="border-t border-gray-border bg-forest text-cream-card py-16 md:py-24">
-        <div className="max-w-4xl mx-auto px-6 md:px-10 text-center">
-          <h2 className="font-barlow font-black uppercase text-4xl md:text-5xl tracking-tight leading-[0.95]">
-            See your game
-            <span className="block mt-2" style={{ color: LIME }}>like a real scout.</span>
-          </h2>
-          <p className="mt-6 text-cream-card/75 max-w-xl mx-auto">
-            Upload one video and get a free instant scout preview. No card required to start.
-          </p>
-          <Link
-            to="/signup"
-            data-testid="blog-cta-signup"
-            className="inline-flex items-center gap-2 mt-8 font-barlow font-black uppercase tracking-widest text-sm px-7 py-3.5 rounded-full transition-all"
-            style={{ background: LIME, color: "#0A1F0F" }}
-          >
-            Try it free <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </section>
+      <BlogCtaBanner source="index" />
     </div>
   );
 }
