@@ -3496,3 +3496,6 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 
 ## 2026-08-12 (6) — Hero round 3 (verified)
 - Final hero image: lone player from behind with football CLEARLY under arm + football boots/socks fully visible, misty grass fills the whole background (empty goal far top), top 24% cropped → virtually NO sky, head at top edge. Same path /api/static/landing/hero-player.jpg. Verified desktop + mobile screenshots.
+
+## 2026-08-12 (7) — Hero final image (user hated the field version)
+- Replaced with premium campaign-grade shot: lone player from behind in a vast EMPTY golden stadium (dreaming of the big stage), ball under arm, boots visible, warm cinematic grade, top 22% cropped → head at top, stands (not sky) fill the background. Path unchanged. Verified desktop + mobile.
