@@ -3483,3 +3483,8 @@ Verified via screenshots (mobile 390px): filter shows cards, banners render on i
 - Generated hero image (Gemini image): teenage player from behind in black SCOUT ME PLAY shirt (ME in lime box) holding ball in hazy stadium → `/app/backend/static/landing/hero-player.jpg` (served /api/static/landing/hero-player.jpg). Image bleeds right with 4-side cream (#F4EFE6) gradient blend; text max-widths keep copy clear of the player on all breakpoints.
 - Old right-side composition (hero-action image, floating report card, stats chip) removed from hero only. data-testids preserved: hero-headline, hero-upload-cta, hero-secondary-cta, hero-sample-report-cta, hero-signin-link; new hero-player-photo, hero-feature-row.
 - Verified: mobile 390px (no horizontal overflow, layout matches reference) + desktop 1440px screenshots. File spliced via python (function lines 145-437), COMPILE_OK. USER MUST DEPLOY.
+
+## 2026-08-12 (4) — Hero polish (verified in Preview)
+- Hero image re-edited (Gemini image edit): SCOUT ME PLAY print ERASED from shirt (plain black), more cinematic grade (golden-hour rim light, film contrast, haze). Same file path /api/static/landing/hero-player.jpg.
+- Alignment: removed pt-4/pt-6 on the copy column so headline top == image top on all breakpoints.
+- Motion: slow cinematic drift on the image (smp-hero-drift 18s alternate, scale 1.04→1.12 + translate), container overflow-hidden so fades stay intact, prefers-reduced-motion disables it. Verified animationName applied + mobile no overflow.

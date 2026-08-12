@@ -171,14 +171,19 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.9 }}
             aria-hidden
-            className="absolute inset-y-0 -right-5 md:right-0 w-[60%] sm:w-[52%] lg:w-[46%] pointer-events-none select-none"
+            className="absolute inset-y-0 -right-5 md:right-0 w-[60%] sm:w-[52%] lg:w-[46%] pointer-events-none select-none overflow-hidden"
             data-testid="hero-player-photo"
           >
+            <style>{`
+              @keyframes smp-hero-drift { from { transform: scale(1.04) translate(0px, 0px); } to { transform: scale(1.12) translate(-12px, -8px); } }
+              @media (prefers-reduced-motion: reduce) { .smp-hero-img { animation: none !important; } }
+            `}</style>
             <img
               src={heroPlayer}
               alt=""
               onError={(e) => { e.currentTarget.style.display = "none"; }}
-              className="w-full h-full object-cover object-top"
+              className="smp-hero-img w-full h-full object-cover object-top"
+              style={{ animation: "smp-hero-drift 18s ease-in-out infinite alternate" }}
             />
             <div
               className="absolute inset-0"
@@ -188,8 +193,8 @@ function HeroSection({ onPrimaryCta, isLoggedIn }) {
             />
           </motion.div>
 
-          {/* Copy column */}
-          <div className="relative z-10 pt-4 md:pt-6">
+          {/* Copy column — top-aligned with the player photo */}
+          <div className="relative z-10">
             <motion.h1
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
