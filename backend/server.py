@@ -7346,6 +7346,36 @@ async def _telestrate_verified_frames(
             c["telestrated"] = True
             c["tele_ring"] = ring
             done += 1
+    # SECOND PASS — identity-verified frames WITHOUT a tap anchor. Double-gated:
+    # Gemini locates the tapped player (refs attached, strict sanity checks), then
+    # GPT-4o — a DIFFERENT model family — must CONFIRM the located crop is the
+    # tapped player. Any doubt at either gate → no graphics, never a wrong ring.
+    jersey = fp.get("jersey_name", "unclear")
+    shorts = fp.get("shorts_name", "unclear")
+    jnum = (doc.get("player_details") or {}).get("jersey_number")
+    for i, c in enumerate(enriched):
+        if not isinstance(c, dict) or c.get("anchor_locked") or c.get("telestrated"):
+            continue
+        if c.get("identity_verified") is not True or not ref_crops:
+            continue
+        fu = str(c.get("frame_url") or "")
+        if not fu.startswith("/api/uploads/frames/"):
+            continue
+        frame_path = frames_dir / Path(fu).name
+        if not frame_path.exists():
+            continue
+        box = await find_player_double_gated(
+            EMERGENT_LLM_KEY, f"tele-ai-{report_id}-{i}", ref_crops, str(frame_path),
+            jersey, shorts, jnum, fp.get("jersey_hex", "#888888"), fp.get("shorts_hex", "#888888"),
+        )
+        if not box:
+            logger.info(f"[tele] {report_id}: frame {i} not double-confirmed — no graphics")
+            continue
+        if await asyncio.to_thread(render_telestration, str(frame_path), box, label, True, box["y0"]):
+            c["telestrated"] = True
+            c["tele_ring"] = True
+            c["tele_ai_gated"] = True
+            done += 1
     if done:
         logger.info(f"[tele] {report_id}: {done} anchor-locked frames telestrated")
     return done
@@ -14344,7 +14374,7 @@ from identity_verify import (
     identity_memory_block,
     verify_preview_summary,
 )
-from telestration import render_telestration
+from telestration import render_telestration, detect_player_bbox, crop_box_region, find_player_double_gated
 from player_tracking import track_player, track_at
 from movement_metrics import compute_movement_map, fmt_mmss
 from speed_metrics import compute_speed_metrics

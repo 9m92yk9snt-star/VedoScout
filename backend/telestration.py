@@ -83,17 +83,90 @@ async def detect_player_bbox(
         box = data.get("box_2d")
         if not (isinstance(box, list) and len(box) == 4):
             return None
-        y0, x0, y1, x1 = [max(0.0, min(1000.0, float(v))) / 1000.0 for v in box]
-        if y1 <= y0 or x1 <= x0:
-            return None
-        w, h = x1 - x0, y1 - y0
-        # Sanity: a single player is a small-ish upright box, never most of the frame.
-        if w > 0.6 or h > 0.9 or w * h < 0.0004 or w * h > 0.35:
-            return None
-        return {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
+        vals = [max(0.0, min(1000.0, float(v))) / 1000.0 for v in box]
+
+        def _sane(x0, y0, x1, y1):
+            if y1 <= y0 or x1 <= x0:
+                return None
+            w, h = x1 - x0, y1 - y0
+            # Sanity: a single player is a small-ish upright box, never most of the frame.
+            if w > 0.6 or h > 0.9 or w * h < 0.0004 or w * h > 0.35:
+                return None
+            return {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
+
+        # Models do not reliably honour [ymin,xmin,ymax,xmax] — return BOTH
+        # interpretations; the caller MUST cross-verify each crop before drawing.
+        cands = []
+        a = _sane(vals[1], vals[0], vals[3], vals[2])  # [y,x,y,x] as asked
+        b = _sane(vals[0], vals[1], vals[2], vals[3])  # [x,y,x,y] fallback
+        if a:
+            cands.append(a)
+        if b and b != a:
+            cands.append(b)
+        return cands or None
     except Exception as e:
         logger.warning(f"[tele] detect failed ({session_id}): {e}")
         return None
+
+
+async def find_player_double_gated(api_key: str, session_base: str, ref_crops: list[str],
+                                   frame_path: str, jersey: str, shorts: str, jersey_number,
+                                   jersey_hex: str, shorts_hex: str) -> dict | None:
+    """Full safe localization chain for frames WITHOUT a tap anchor.
+    detect (full frame) → GPT-4o gate 1 on padded region → zoomed re-detect inside
+    the confirmed region → GPT-4o gate 2 on the tight box → blob-refine for feet.
+    Any doubt at any gate → None (no graphics, never a wrong ring)."""
+    from identity_verify import verify_frame_identity
+    from precision_engine import locate_player_in_box
+    fp = Path(frame_path)
+    cands = await detect_player_bbox(api_key, f"{session_base}-d", ref_crops, frame_path) or []
+    try:
+        img = Image.open(frame_path).convert("RGB")
+    except Exception:
+        return None
+    W, H = img.size
+    for ci, cand in enumerate(cands):
+        pw, ph = (cand["x1"] - cand["x0"]) * 0.8, (cand["y1"] - cand["y0"]) * 0.8
+        rx0, ry0 = max(0.0, cand["x0"] - pw), max(0.0, cand["y0"] - ph)
+        rx1, ry1 = min(1.0, cand["x1"] + pw), min(1.0, cand["y1"] + ph)
+        region_path = fp.parent / f".tele_region_{fp.stem}_{ci}.jpg"
+        try:
+            rc = img.crop((int(rx0 * W), int(ry0 * H), int(rx1 * W), int(ry1 * H)))
+            if rc.width < 12 or rc.height < 12:
+                continue
+            if rc.width < 480:
+                s = 480 / rc.width
+                rc = rc.resize((480, int(rc.height * s)), Image.LANCZOS)
+            rc.save(region_path, "JPEG", quality=92)
+            v1 = await verify_frame_identity(api_key, f"{session_base}-g1{ci}", ref_crops,
+                                             str(region_path), jersey, shorts, jersey_number)
+            if v1 != "confirmed":
+                continue
+            local = await detect_player_bbox(api_key, f"{session_base}-z{ci}", ref_crops, str(region_path)) or []
+        finally:
+            region_path.unlink(missing_ok=True)
+        for li, lb in enumerate(local):
+            gb = {"x0": rx0 + lb["x0"] * (rx1 - rx0), "y0": ry0 + lb["y0"] * (ry1 - ry0),
+                  "x1": rx0 + lb["x1"] * (rx1 - rx0), "y1": ry0 + lb["y1"] * (ry1 - ry0)}
+            tight_path = fp.parent / f".tele_tight_{fp.stem}_{ci}{li}.jpg"
+            try:
+                if not crop_box_region(frame_path, gb, str(tight_path), 0.3):
+                    continue
+                v2 = await verify_frame_identity(api_key, f"{session_base}-g2{ci}{li}", ref_crops,
+                                                 str(tight_path), jersey, shorts, jersey_number)
+            finally:
+                tight_path.unlink(missing_ok=True)
+            if v2 != "confirmed":
+                continue
+            bxywh = {"x": gb["x0"], "y": gb["y0"], "w": gb["x1"] - gb["x0"], "h": gb["y1"] - gb["y0"]}
+            refined = locate_player_in_box(frame_path, bxywh, jersey_hex, shorts_hex)
+            if refined:
+                cx = (refined["x0"] + refined["x1"]) / 2
+                cy = (refined["y0"] + refined["y1"]) / 2
+                if gb["x0"] <= cx <= gb["x1"] and gb["y0"] <= cy <= gb["y1"]:
+                    return {k: float(refined[k]) for k in ("x0", "y0", "x1", "y1")}
+            return gb
+    return None
 
 
 def crop_box_region(frame_path: str, box: dict, out_path: str, pad: float = 0.18) -> bool:
