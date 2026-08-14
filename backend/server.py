@@ -1863,11 +1863,18 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
         if existing_url.startswith("http") or existing_url.startswith("/api/media/"):
             enriched.append(c)
             continue
+        # STRICT policy holds at read time too: identity-dropped moments stay
+        # text-only — never resurrect a rejected image or invent a placeholder.
+        if c.get("identity_verified") is False and not existing_url:
+            enriched.append(c)
+            continue
         ts = c.get("timestamp", "")
         out_path = frames_dir / f"frame_{idx:02d}.jpg"
+        ph_marker = out_path.with_suffix(".ph")
         frame_meta = None
         if not out_path.exists():
             ok = False
+            ph_marker.unlink(missing_ok=True)
             if have_video:
                 seconds = _ts_to_seconds(ts)
                 if seconds is not None:
@@ -1899,8 +1906,11 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                         ok = _extract_video_frame(video_path, seconds, out_path)
             if not ok:
                 _make_placeholder_frame(ts, c.get("comment", ""), out_path)
+                ph_marker.touch()
         out = dict(c)
         out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
+        if ph_marker.exists():
+            out["frame_placeholder"] = True
         if frame_meta:
             out["frame_verified"] = bool(frame_meta.get("ok"))
             out["frame_picked_ts"] = frame_meta.get("picked_ts")
@@ -7554,7 +7564,7 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
             fu = c.get("frame_url") or ""
             if fu.startswith("/api/uploads/frames/"):
                 p = frames_dir / Path(fu).name
-                if p.exists() and p.stat().st_size > 0:
+                if p.exists() and p.stat().st_size > 0 and not p.with_suffix(".ph").exists():
                     try:
                         key = f"reports/{report_id}/frames/{p.name}"
                         c["frame_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "image/jpeg")
@@ -14488,6 +14498,32 @@ async def admin_unlock(report_id: str, _=Depends(get_current_admin)):
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Report not found")
     return {"status": "unlocked"}
+
+
+@api_router.post("/admin/reports/{report_id}/regenerate-evidence")
+async def admin_regenerate_evidence(report_id: str, _=Depends(get_current_admin)):
+    """Repair tool: re-extract evidence frames + tracked proof clips for an
+    existing premium report (restores the video from R2 when the local disk
+    was wiped). Placeholder/unverified frame URLs are cleared first so real
+    frames are re-extracted and re-verified by the identity gate."""
+    doc = await db.reports.find_one({"id": report_id})
+    if not doc or not (doc.get("full_report") or {}).get("video_comments"):
+        raise HTTPException(status_code=404, detail="Report with a full analysis not found")
+    video_path = await _ensure_report_video_local(report_id)
+    if not video_path:
+        raise HTTPException(status_code=409, detail="The report video is no longer available (neither local nor on R2)")
+    vcs = (doc.get("full_report") or {}).get("video_comments") or []
+    cleared = 0
+    for c in vcs:
+        if isinstance(c, dict) and c.get("frame_url") and not c.get("anchor_locked") and c.get("identity_verified") is not True:
+            c["frame_url"] = None
+            c.pop("frame_placeholder", None)
+            cleared += 1
+    if cleared:
+        await db.reports.update_one({"id": report_id}, {"$set": {"full_report.video_comments": vcs}})
+    asyncio.create_task(_persist_video_frames(report_id, video_path))
+    logger.info(f"[regen-evidence] {report_id}: started (cleared {cleared} weak frames)")
+    return {"started": True, "cleared_frames": cleared}
 
 
 @api_router.delete("/admin/reports/{report_id}")

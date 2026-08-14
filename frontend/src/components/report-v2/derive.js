@@ -158,7 +158,7 @@ export function deriveV2(report) {
     .filter((a) => a && a.timestamp && (a.title || a.description)
       && String(a.identity_confidence || "").toLowerCase() !== "low");
   const snapFrameEntries = (full.video_comments || [])
-    .filter((c) => c && c.frame_url && c.identity_verified !== false && c.timestamp)
+    .filter((c) => c && c.frame_url && !c.frame_placeholder && c.identity_verified !== false && c.timestamp)
     .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url, comment: c.comment || "" }));
   const snapUsedFrames = new Set();
   const snapCloseFrame = (ts) => {

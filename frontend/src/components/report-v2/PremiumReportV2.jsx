@@ -266,7 +266,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
       .filter((m) => m && m.frame_url)
       .map((m) => ({ sec: tsToSeconds(m.timestamp), url: resolveUrl(m.frame_url, assetBase) })),
     ...(report.full_report?.video_comments || [])
-      .filter((c) => c && c.frame_url && c.identity_verified !== false)
+      .filter((c) => c && c.frame_url && !c.frame_placeholder && c.identity_verified !== false)
       .map((c) => ({ sec: tsToSeconds(c.timestamp), url: resolveUrl(c.frame_url, assetBase) })),
   ];
 

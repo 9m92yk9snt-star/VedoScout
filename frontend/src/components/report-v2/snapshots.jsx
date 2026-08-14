@@ -16,49 +16,11 @@ export const SNAP_CARD_META = {
   develop: { label: "Biggest Development Area", Icon: Target, header: "linear-gradient(90deg,#5E1D1B,#98322B)" },
 };
 
-/* Tactical overlay drawn on top of the frame. Generic presentation marks
-   (movement arrow, scan direction, run + target, space circle) — they never
-   assert facts beyond the moment's own verified text. */
-export function SnapshotAnnot({ type }) {
-  if (!type) return null;
-  const t = type === "space" ? "circle" : type;
-  return (
-    <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-      {(t === "path" || t === "arrow") && (
-        <g stroke="#7ED321" fill="none" strokeWidth="2" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }}>
-          <line x1="38" y1="64" x2="58" y2="46" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-          <polyline points="51,44 59,45 57,53" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-          {t === "path" && (
-            <ellipse cx="30" cy="78" rx="16" ry="6" strokeDasharray="2.2 1.8" vectorEffect="non-scaling-stroke" />
-          )}
-        </g>
-      )}
-      {t === "scan" && (
-        <g stroke="#FFFFFF" fill="none" strokeWidth="2" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.6))" }}>
-          <line x1="72" y1="21" x2="46" y2="21" strokeDasharray="1.8 1.8" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-          <polyline points="51,16 44,21 51,26" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="75" cy="21" r="1.8" fill="#FFFFFF" stroke="none" />
-        </g>
-      )}
-      {t === "run" && (
-        <g stroke="#F5A623" fill="none" strokeWidth="2" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }}>
-          <path d="M 20,82 Q 42,64 58,38" strokeDasharray="2.2 1.8" vectorEffect="non-scaling-stroke" strokeLinecap="round" />
-          <polyline points="51,40 59,36 59,45" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="64" cy="28" r="7" strokeDasharray="2 1.6" vectorEffect="non-scaling-stroke" />
-        </g>
-      )}
-      {t === "circle" && (
-        <g stroke="#E8442E" fill="none" strokeWidth="2" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }}>
-          <ellipse cx="60" cy="78" rx="17" ry="6.5" strokeDasharray="2.2 1.8" vectorEffect="non-scaling-stroke" />
-        </g>
-      )}
-    </svg>
-  );
-}
-
 /* Frame image with graceful stylized-pitch fallback (real reports without a
-   verified frame never show an invented photo). */
-export function SnapFrame({ thumb, annot, Icon }) {
+   verified frame never show an invented photo). No decorative overlays — the
+   only markers a reader sees are the gated telestrations baked into the frame
+   itself, so a circle always means the verified player. */
+export function SnapFrame({ thumb, Icon }) {
   const [err, setErr] = useState(false);
   const show = !!thumb && !err;
   return (
@@ -72,7 +34,6 @@ export function SnapFrame({ thumb, annot, Icon }) {
           {Icon && <Icon className="absolute inset-0 m-auto w-12 h-12 text-white/15" />}
         </div>
       )}
-      <SnapshotAnnot type={annot} />
     </div>
   );
 }
@@ -92,7 +53,7 @@ function SnapCard({ moment, onShare, sharing }) {
         )}
       </div>
       <div className="relative h-[200px] md:h-[245px] bg-[#0B1F14] shrink-0">
-        <SnapFrame thumb={moment.thumb} annot={moment.annot} Icon={meta.Icon} />
+        <SnapFrame thumb={moment.thumb} Icon={meta.Icon} />
       </div>
       <div className="px-5 py-4 flex-1 relative">
         <div className={`text-[18px] md:text-[20px] font-extrabold text-[#12211A] leading-snug ${onShare ? "pr-10" : ""}`} data-testid={`snapshot-title-${moment.key}`}>{moment.title}</div>

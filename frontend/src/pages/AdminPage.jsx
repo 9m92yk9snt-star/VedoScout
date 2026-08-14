@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
   ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
-  Share2, Twitter, Facebook, Linkedin, Instagram, Layout,
+  Share2, Twitter, Facebook, Linkedin, Instagram, Layout, RefreshCcw,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
@@ -347,6 +347,16 @@ export default function AdminPage() {
     }
   };
 
+  const handleRegenEvidence = async (id) => {
+    if (!window.confirm("Regenerate evidence frames + tracked proof clips for this report? Runs in the background and takes a few minutes.")) return;
+    try {
+      const { data } = await api.post(`/admin/reports/${id}/regenerate-evidence`);
+      toast.success(`Evidence regeneration started${data.cleared_frames ? ` — ${data.cleared_frames} weak frame(s) cleared` : ""}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Could not start regeneration");
+    }
+  };
+
   const handleDeletePayment = async (id) => {
     if (!window.confirm("Delete this payment row from the list? (Does not affect unlocks or credits.)")) return;
     try {
@@ -597,6 +607,16 @@ export default function AdminPage() {
                                   className="text-volt hover:bg-volt hover:text-white p-2 transition-colors"
                                 >
                                   <Unlock className="w-4 h-4" />
+                                </button>
+                              )}
+                              {(r.is_paid || r.manually_unlocked) && (
+                                <button
+                                  onClick={() => handleRegenEvidence(r.id)}
+                                  data-testid={`admin-regen-evidence-${r.id}`}
+                                  title="Regenerate evidence frames + proof clips"
+                                  className="text-volt hover:bg-volt hover:text-white p-2 transition-colors"
+                                >
+                                  <RefreshCcw className="w-4 h-4" />
                                 </button>
                               )}
                               <button

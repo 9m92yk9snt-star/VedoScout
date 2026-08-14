@@ -468,6 +468,14 @@ export function PremiumMobileCategories({
     setTimeout(() => rowRefs.current[target]?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   };
 
+  // Opening a row scrolls its header to the top — collapsing the previously
+  // open section above no longer leaves the reader stranded mid-page.
+  const toggleRow = (key) => {
+    const next = openKey === key ? null : key;
+    setOpenKey(next);
+    if (next) setTimeout(() => rowRefs.current[next]?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
+
   const activeTab = TABS.find((t) => tabTarget[t.key] === openKey)?.key
     || (["iq", "tech", "phys", "tact", "impact"].includes(openKey) ? "analysis" : null);
 
@@ -522,7 +530,7 @@ export function PremiumMobileCategories({
               desc={c.desc}
               chip={c.chip}
               open={openKey === c.key}
-              onToggle={() => setOpenKey(openKey === c.key ? null : c.key)}
+              onToggle={() => toggleRow(c.key)}
               testid={`pm-cat-${c.key}`}
             >
               {openKey === c.key && c.body()}

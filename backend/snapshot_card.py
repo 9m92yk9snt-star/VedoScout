@@ -224,7 +224,7 @@ def build_snapshot_card(report_doc: dict, key: str, output_path: str, image_reso
         pdr.line([(0, PH // 2), (CW_, PH // 2)], fill=(255, 255, 255, 26), width=3)
         pdr.ellipse((CW_ / 2 - 110, PH / 2 - 110, CW_ / 2 + 110, PH / 2 + 110), outline=(70, 100, 80), width=3)
     pd = ImageDraw.Draw(photo)
-    _annot(pd, moment.get("annot"), 0, 0, CW_, PH)
+    # No decorative annotation — only gated telestration baked into the frame is honest.
     card.paste(photo, (0, HB))
 
     # title + desc
