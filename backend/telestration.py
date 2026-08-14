@@ -195,16 +195,26 @@ def crop_box_region(frame_path: str, box: dict, out_path: str, pad: float = 0.18
 
 def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER",
                         ring: bool = True, chip_top: float | None = None) -> bool:
-    """Draw spotlight dim + volt ring under the feet + name chip. Overwrites the frame.
+    """Premium grounded marker: spotlight dim + perspective ground ellipse under
+    the feet (soft fill, glow, crisp volt ring) + a small name chip with a
+    pointer sitting just above the player's head. Overwrites the frame.
     With ring=False (no refined player blob) only the spotlight + chip are drawn —
     an honest fallback that can never point at the wrong spot."""
     try:
         img = Image.open(frame_path).convert("RGB")
         W, H = img.size
         x0, y0, x1, y1 = box["x0"] * W, box["y0"] * H, box["x1"] * W, box["y1"] * H
-        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        cx = (x0 + x1) / 2
+        cy = (y0 + y1) / 2
         bw, bh = x1 - x0, y1 - y0
-        feet_y = min(H - 6, y1 - bh * 0.02)
+        # Height estimate with sanity bounds — generous tap boxes overstate the
+        # player, so the chip/ring must never trust bh blindly.
+        est_h = min(max(bh, H * 0.045), W * 0.333, H * 0.42)
+        rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
+        rh = rw * 0.34
+        # ground contact: box bottoms include shadow — pull the ellipse centre up
+        # so the feet sit INSIDE the marker, never on its top rim
+        feet_y = min(H - 6, y1 - min(bh * 0.08, rh * 0.8))
 
         # 1 — spotlight: dim everything except a soft ellipse around the player
         dark = ImageEnhance.Brightness(img).enhance(0.52)
@@ -216,44 +226,49 @@ def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER",
         mask = mask.filter(ImageFilter.GaussianBlur(int(max(W, H) * 0.055)))
         out = Image.composite(img, dark, mask).convert("RGBA")
 
-        # 2 — volt ring under the feet (2x supersampled for crisp anti-aliasing)
-        out = out.convert("RGBA")
+        # 2 — grounded ellipse: sized from PLAYER HEIGHT so the player stands
+        # inside the marker at any distance; flat perspective, soft fill + glow.
         if ring:
+            lw = max(2, int(rw * 0.085))
+            feet_y = min(feet_y, H - rh - 4)
             S = 2
-            ov = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+            bbox = [(cx - rw) * S, (feet_y - rh) * S, (cx + rw) * S, (feet_y + rh) * S]
+            glow_src = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+            gd = ImageDraw.Draw(glow_src)
+            gd.ellipse(bbox, outline=VOLT + (190,), width=lw * 3 * S)
+            ov = glow_src.filter(ImageFilter.GaussianBlur(int(lw * 2.2 * S)))
             od = ImageDraw.Draw(ov)
-            rw = min(max(bw * 0.6, W * 0.045), W * 0.22)
-            rh = rw * 0.32
-            feet_y = min(feet_y, H - rh - 4)  # keep the full ellipse inside the frame
-            lw = max(3, int(W / 230))
-            od.ellipse([(cx - rw) * S, (feet_y - rh) * S, (cx + rw) * S, (feet_y + rh) * S],
-                       outline=VOLT + (255,), width=lw * S)
-            od.ellipse([(cx - rw * 0.68) * S, (feet_y - rh * 0.68) * S,
-                        (cx + rw * 0.68) * S, (feet_y + rh * 0.68) * S],
-                       outline=VOLT + (110,), width=max(1, lw // 2) * S)
-            glow = ov.filter(ImageFilter.GaussianBlur(7 * S))
-            ov = Image.alpha_composite(glow, ov).resize((W, H), Image.LANCZOS)
+            od.ellipse(bbox, fill=VOLT + (30,))
+            od.ellipse(bbox, outline=(14, 34, 20, 150), width=(lw + 2) * S)
+            od.ellipse(bbox, outline=VOLT + (235,), width=lw * S)
+            ov = ov.resize((W, H), Image.LANCZOS)
             out = Image.alpha_composite(out, ov)
 
-        # 3 — name chip above the player (clamped inside the frame)
-        d = ImageDraw.Draw(out)
-        fs = max(15, int(W / 46))
+        # 3 — small name chip with pointer, just above the player's head
+        chip_ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(chip_ov)
+        fs = max(12, int(W / 58))
         font = _font(fs)
         label = str(label or "YOUR PLAYER")[:18]
         tw = d.textlength(label, font=font)
-        pad_x = int(fs * 0.62)
-        chip_h = int(fs * 1.9)
-        dot_r = fs * 0.22
-        chip_w = tw + 2 * pad_x + dot_r * 2 + fs * 0.5
+        pad_x = int(fs * 0.6)
+        chip_h = int(fs * 1.75)
+        dot_r = fs * 0.2
+        ptr = max(5, int(fs * 0.45))
+        chip_w = tw + 2 * pad_x + dot_r * 2 + fs * 0.4
+        head_y = max(0.0, y0, feet_y - est_h * 0.9)
         chx = min(max(6, cx - chip_w / 2), W - chip_w - 6)
-        top_ref = min(y0, chip_top * H) if chip_top is not None else y0
-        chy = max(6, top_ref - chip_h - 10)
+        chy = max(6, head_y - chip_h - ptr - fs * 0.5)
         d.rounded_rectangle([chx, chy, chx + chip_w, chy + chip_h],
-                            radius=int(chip_h / 2.4), fill=INK + (235,))
+                            radius=int(chip_h / 2), fill=INK + (218,))
+        pcx = min(max(cx, chx + chip_h * 0.7), chx + chip_w - chip_h * 0.7)
+        d.polygon([(pcx - ptr, chy + chip_h - 1), (pcx + ptr, chy + chip_h - 1),
+                   (pcx, chy + chip_h + ptr)], fill=INK + (218,))
         dcx = chx + pad_x + dot_r
-        d.ellipse([dcx - dot_r, chy + chip_h / 2 - dot_r, dcx + dot_r, chy + chip_h / 2 + dot_r], fill=VOLT)
-        d.text((dcx + dot_r + fs * 0.32, chy + (chip_h - fs) / 2 - fs * 0.08),
-               label, font=font, fill=(255, 255, 255))
+        d.ellipse([dcx - dot_r, chy + chip_h / 2 - dot_r, dcx + dot_r, chy + chip_h / 2 + dot_r], fill=VOLT + (255,))
+        d.text((dcx + dot_r + fs * 0.32, chy + (chip_h - fs) / 2 - fs * 0.05),
+               label, font=font, fill=(255, 255, 255, 245))
+        out = Image.alpha_composite(out, chip_ov)
 
         out.convert("RGB").save(frame_path, "JPEG", quality=90)
         return True

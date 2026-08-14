@@ -21,28 +21,36 @@ SEED_TOL = 0.35       # a track point must exist this close to the cited moment
 
 
 def _make_chip(label: str, frame_w: int):
+    """Small dark pill '• NAME · TRACKED' with a downward pointer baked in."""
     from PIL import Image, ImageDraw, ImageFont
-    h = max(26, int(frame_w * 0.040))
+    fs = max(12, int(frame_w / 58))
+    h = int(fs * 1.75)
+    ptr = max(5, int(fs * 0.45))
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", int(h * 0.52))
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fs)
     except Exception:
         font = ImageFont.load_default()
     tmp = Image.new("RGBA", (10, 10))
     tw = int(ImageDraw.Draw(tmp).textlength(label, font=font))
-    w = tw + int(h * 1.5)
-    img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    pad_x = int(fs * 0.6)
+    dot_r = fs * 0.2
+    w = int(tw + 2 * pad_x + dot_r * 2 + fs * 0.4)
+    img = Image.new("RGBA", (w, h + ptr), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=h // 2, fill=(10, 15, 13, 200))
-    r = int(h * 0.16)
-    d.ellipse([int(h * 0.42) - r, h // 2 - r, int(h * 0.42) + r, h // 2 + r], fill=(204, 255, 0, 255))
-    d.text((int(h * 0.78), (h - int(h * 0.52)) // 2 - 1), label, font=font, fill=(244, 239, 230, 235))
+    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=h // 2, fill=(10, 15, 13, 218))
+    d.polygon([(w / 2 - ptr, h - 1), (w / 2 + ptr, h - 1), (w / 2, h + ptr - 1)], fill=(10, 15, 13, 218))
+    dcx = pad_x + dot_r
+    d.ellipse([dcx - dot_r, h / 2 - dot_r, dcx + dot_r, h / 2 + dot_r], fill=(204, 255, 0, 255))
+    d.text((dcx + dot_r + fs * 0.32, (h - fs) / 2 - fs * 0.05), label, font=font, fill=(255, 255, 255, 245))
     return np.array(img)
 
 
 def _blend_chip(frame, chip, x: int, y: int, alpha: float = 1.0):
     ch, cw = chip.shape[:2]
     fh, fw = frame.shape[:2]
-    if alpha <= 0.02 or y + ch > fh or x + cw > fw:
+    x = max(0, min(fw - cw, x))
+    y = max(0, min(fh - ch, y))
+    if alpha <= 0.02:
         return
     rgb = chip[:, :, [2, 1, 0]].astype(np.float32)
     a = (chip[:, :, 3:4].astype(np.float32)) / 255.0 * min(1.0, alpha)
@@ -50,27 +58,44 @@ def _blend_chip(frame, chip, x: int, y: int, alpha: float = 1.0):
     frame[y:y + ch, x:x + cw] = (roi * (1 - a) + rgb * a).astype(np.uint8)
 
 
-def _draw_ring(frame, cx: float, feet_y: float, w: float, alpha: float = 1.0):
-    """Subtle ground ellipse under the player's feet, alpha-blended so it never
-    pops or distracts. Dark under-stroke + thin lime accent (brand colours)."""
+VOLT_BGR = np.float32([0, 255, 204])
+
+
+def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float = 1.0):
+    """Premium grounded ellipse under the player's feet: soft transparent fill,
+    subtle glow, crisp volt ring with a dark under-stroke for depth. Sized from
+    PLAYER HEIGHT so the player stands inside the marker at any distance."""
     if alpha <= 0.02:
         return
     fh, fw = frame.shape[:2]
+    est_h = min(max(h * fh, fh * 0.045), fw * 0.333, fh * 0.42)
+    rw = int(min(max(est_h * 0.30, fw * 0.024), fw * 0.10))
+    rh = max(4, int(rw * 0.34))
+    lw = max(2, int(rw * 0.085))
     px, py = int(cx * fw), int(min(feet_y, 0.995) * fh)
-    ax = max(14, int(w * fw * 0.85))
-    ay = max(6, int(ax * 0.36))
-    th_o, th_i = max(3, ax // 9), max(2, ax // 14)
-    m = th_o + 4
-    x0, y0 = max(0, px - ax - m), max(0, py - ay - m)
-    x1, y1 = min(fw, px + ax + m), min(fh, py + ay + m)
-    if x1 - x0 < 4 or y1 - y0 < 4:
+    m = lw * 8
+    x0, y0 = max(0, px - rw - m), max(0, py - rh - m)
+    x1, y1 = min(fw, px + rw + m), min(fh, py + rh + m)
+    if x1 - x0 < 8 or y1 - y0 < 8:
         return
     roi = frame[y0:y1, x0:x1]
-    ov = roi.copy()
     c = (px - x0, py - y0)
-    cv2.ellipse(ov, c, (ax, ay), 0, 0, 360, (13, 21, 13), th_o, cv2.LINE_AA)
-    cv2.ellipse(ov, c, (ax, ay), 0, 0, 360, (0, 255, 204), th_i, cv2.LINE_AA)
-    a = 0.85 * min(1.0, alpha)
+    # glow — blurred ring blended per-pixel so only the ring glows
+    glow = np.zeros_like(roi)
+    cv2.ellipse(glow, c, (rw, rh), 0, 0, 360, (0, 255, 204), lw * 3, cv2.LINE_AA)
+    glow = cv2.GaussianBlur(glow, (0, 0), max(1.0, lw * 1.4))
+    ga = (glow.max(axis=2).astype(np.float32) / 255.0 * 0.45 * alpha)[..., None]
+    roi[:] = (roi * (1 - ga) + VOLT_BGR * ga).astype(np.uint8)
+    # soft transparent fill grounds the marker on the pitch
+    fill = np.zeros(roi.shape[:2], np.uint8)
+    cv2.ellipse(fill, c, (rw, rh), 0, 0, 360, 255, -1, cv2.LINE_AA)
+    fa = (fill.astype(np.float32) / 255.0 * 0.10 * alpha)[..., None]
+    roi[:] = (roi * (1 - fa) + VOLT_BGR * fa).astype(np.uint8)
+    # crisp ring with dark under-stroke for depth
+    ov = roi.copy()
+    cv2.ellipse(ov, c, (rw, rh), 0, 0, 360, (20, 34, 14), lw + 2, cv2.LINE_AA)
+    cv2.ellipse(ov, c, (rw, rh), 0, 0, 360, (0, 255, 204), lw, cv2.LINE_AA)
+    a = 0.92 * min(1.0, alpha)
     cv2.addWeighted(ov, a, roi, 1 - a, 0, dst=roi)
 
 
@@ -113,18 +138,20 @@ def _window_points(track_points: list, t_moment: float, pre: float, post: float)
 
 
 def _smooth(pts: list) -> list:
-    """Moving average over ±2 samples on (cx, feet_y, w)."""
+    """Moving average over ±2 samples on (cx, feet_y, w, h)."""
     raw = [(float(p["t"]),
             float(p["x"]) + float(p["w"]) / 2.0,
             float(p["y"]) + float(p["h"]),
-            float(p["w"])) for p in pts]
+            float(p["w"]),
+            float(p["h"])) for p in pts]
     out = []
     for i in range(len(raw)):
         n = raw[max(0, i - 2):i + 3]
         out.append((raw[i][0],
                     sum(v[1] for v in n) / len(n),
                     sum(v[2] for v in n) / len(n),
-                    sum(v[3] for v in n) / len(n)))
+                    sum(v[3] for v in n) / len(n),
+                    sum(v[4] for v in n) / len(n)))
     return out
 
 
@@ -136,11 +163,11 @@ def _interp(sm: list, t: float):
     for a, b in zip(sm, sm[1:]):
         if a[0] <= t <= b[0]:
             f = (t - a[0]) / max(1e-6, b[0] - a[0])
-            return tuple(a[i] + (b[i] - a[i]) * f for i in (1, 2, 3))
+            return tuple(a[i] + (b[i] - a[i]) * f for i in (1, 2, 3, 4))
     return sm[-1][1:]
 
 
-pos_at = _interp  # public: (cx, feet_y, w) at time t from a smoothed position list
+pos_at = _interp  # public: (cx, feet_y, w, h) at time t from a smoothed position list
 
 
 def plan_window(track_points: list, t_moment: float, pre: float = 1.8, post: float = 1.8):
@@ -178,6 +205,7 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
 
         import imageio
         chip = _make_chip(label, W)
+        chip_h_px, chip_w_px = chip.shape[:2]
         writer = imageio.get_writer(out_path, fps=round(fps, 2), codec="libx264",
                                     quality=7, pixelformat="yuv420p", macro_block_size=1,
                                     output_params=["-movflags", "+faststart"])
@@ -188,9 +216,15 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             if not ok:
                 break
             a = min(1.0, (idx - f0 + 1) / fade, (f1 - idx + 1) / fade)
-            cx, feet_y, bw = _interp(sm, idx / fps)
-            _draw_ring(frame, cx, feet_y, bw, a)
-            _blend_chip(frame, chip, int(W * 0.03), int(W * 0.03), a)
+            cx, feet_y, bw, bh = _interp(sm, idx / fps)
+            est_h = min(max(bh * H, H * 0.045), W * 0.333, H * 0.42)
+            rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
+            feet_px = feet_y * H - min(bh * H * 0.08, rw * 0.34 * 0.8)
+            _draw_ring(frame, cx, feet_px / H, bw, bh, a)
+            # chip follows the player, just above the head (clamped height estimate)
+            head_px = int(max((feet_y - bh) * H, feet_px - est_h * 0.9))
+            _blend_chip(frame, chip, int(cx * W - chip_w_px / 2),
+                        head_px - chip_h_px - int(W / 140), a)
             writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             idx += 1
         writer.close()

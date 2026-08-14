@@ -7417,8 +7417,8 @@ def _teleclip_edge_crop(video_path: str, sm: list, t: float, out_path: str) -> O
         if not ok:
             return None
         fh, fw = frame.shape[:2]
-        cx, feet_y, w = pos_at(sm, t)
-        _draw_ring(frame, cx, feet_y, w, 1.0)
+        cx, feet_y, w, h = pos_at(sm, t)
+        _draw_ring(frame, cx, feet_y, w, h, 1.0)
         half = max(100, int(1.35 * w * fw))
         px, py = int(cx * fw), int(feet_y * fh)
         x0, x1 = max(0, px - half), min(fw, px + half)
@@ -14515,9 +14515,13 @@ async def admin_regenerate_evidence(report_id: str, _=Depends(get_current_admin)
     vcs = (doc.get("full_report") or {}).get("video_comments") or []
     cleared = 0
     for c in vcs:
-        if isinstance(c, dict) and c.get("frame_url") and not c.get("anchor_locked") and c.get("identity_verified") is not True:
+        if isinstance(c, dict) and c.get("frame_url"):
+            # full re-render: frames are re-extracted, re-verified by the identity
+            # gate and re-telestrated with the current marker design
             c["frame_url"] = None
             c.pop("frame_placeholder", None)
+            c.pop("telestrated", None)
+            c.pop("tele_ring", None)
             cleared += 1
     if cleared:
         await db.reports.update_one({"id": report_id}, {"$set": {"full_report.video_comments": vcs}})

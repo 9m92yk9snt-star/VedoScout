@@ -3598,3 +3598,13 @@ Fixes:
 - LESSON: decorator placement — inserting a new endpoint above `async def admin_delete_report` landed between @api_router.delete and the function; always include the decorator in old_str when inserting endpoints.
 - deployment_agent cannot fetch production logs on demand (runs static analysis instead); its advice to set CORS_ORIGINS="*" was REJECTED — scoutmeplay.com + www + preview are already explicitly allowed and production works.
 - USER MUST REDEPLOY, then click the regenerate button (Admin → Reports) on the affected production report to restore real evidence frames + proof clips.
+
+## 2026-08-14 (21) — Premium marker redesign (ring + label), visually verified on real report
+User: ring must sit UNDER the feet (player inside the marker, no lines crossing legs), correct pitch perspective, subtle transparency/glow, depth; label smaller/cleaner and CLOSE to the player; reference layout supplied (close/mid/far).
+Implemented in BOTH renderers (identical design):
+- telestration.py render_telestration: ring sized from PLAYER HEIGHT with sanity bounds (est_h = min(max(bh, H*0.045), W*0.333, H*0.42); rw = clamp(est_h*0.30, W*0.024, W*0.10); rh = 0.34*rw flat perspective). Feet pull-up: feet_y = y1 - min(bh*0.08, rh*0.8) — box bottoms include shadows; feet now sit INSIDE the marker. Style: soft volt fill (alpha 30) + blurred glow + dark under-stroke + crisp volt ring, 2x supersampled. Chip: fs = W/58, dark pill (218 alpha) + volt dot + white text + downward pointer, anchored at max(y0, feet - est_h*0.9) — near the head even when tap boxes overstate height. chip_top param now ignored (it caused chips floating in the sky).
+- tele_clip.py: same geometry in cv2. Smoothing now carries h (pos_at returns cx, feet_y, w, h — server _teleclip_edge_crop updated). Per-pixel glow (blurred ring blended via max-channel alpha map), translucent fill, crisp ring w/ under-stroke; all scale with fade alpha. Chip rendered once (with pointer) and FOLLOWS the player above the head each frame, fading with the ring. Chip fs = W/58.
+- Verified visually at 100% zoom on regenerated report f5748eb6: stills 00:03/00:19/00:48 + proofclip_1 (ring under feet, feet inside, chip readable/close, fade + follow OK). Evidence UI cards confirmed via screenshot.
+- LESSON REPEATED: parallel search_replace edits on ONE file (telestration.py) corrupted it (duplicated tail + orphan refs). NEVER batch-edit a single file.
+- Note: edge-gate nondeterminism at boundaries means clip count can vary between regen runs (1-2 clips on this report) — honest behavior.
+- USER MUST REDEPLOY + press Regenerate evidence (Admin → Reports) on production reports to apply the new marker.
