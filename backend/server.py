@@ -7084,6 +7084,61 @@ async def confirm_doubt_moments(report_id: str, payload: DoubtConfirmPayload, us
     return {"ok": True, "status": "confirmed", "count": len(confirmations)}
 
 
+async def _verify_doubt_taps(report_id: str, file_path: Path, confirmations: list) -> list:
+    """Safety net: a mistaken tap on an unclear crossover frame must never seed
+    the tracker onto the wrong player. Each tap crop is checked against the
+    player's reference crops; only HIGH-CONFIDENCE wrong taps are dropped —
+    the parent's tap stays the primary ground truth."""
+    doc = await db.reports.find_one({"id": report_id})
+    ref_crops = _identity_ref_crops(doc or {})
+    if not ref_crops:
+        return confirmations
+    fp = (doc or {}).get("fingerprint") or {}
+    jnum = ((doc or {}).get("player_details") or {}).get("jersey_number")
+    import cv2
+    kept = []
+    for c in confirmations:
+        box = c.get("box") or {}
+        crop_path = UPLOAD_DIR / f"{report_id}-doubtchk-{c.get('idx')}.jpg"
+
+        def _crop():
+            cap = cv2.VideoCapture(str(file_path))
+            try:
+                fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
+                cap.set(cv2.CAP_PROP_POS_FRAMES, int(float(c["t"]) * fps))
+                ok, frame = cap.read()
+                if not ok:
+                    return False
+                fh, fw = frame.shape[:2]
+                px, py = box.get("w", 0.06) * 0.8, box.get("h", 0.16) * 0.4
+                x0 = max(0, int((box["x"] - px) * fw))
+                x1 = min(fw, int((box["x"] + box["w"] + px) * fw))
+                y0 = max(0, int((box["y"] - py) * fh))
+                y1 = min(fh, int((box["y"] + box["h"] + py) * fh))
+                if x1 - x0 < 30 or y1 - y0 < 30:
+                    return False
+                cv2.imwrite(str(crop_path), frame[y0:y1, x0:x1], [cv2.IMWRITE_JPEG_QUALITY, 85])
+                return True
+            finally:
+                cap.release()
+
+        verdict = "error"
+        try:
+            if await asyncio.to_thread(_crop):
+                verdict = await verify_frame_identity(
+                    EMERGENT_LLM_KEY, f"doubtchk-{report_id}-{c.get('idx')}", ref_crops, str(crop_path),
+                    fp.get("jersey_name", "unclear"), fp.get("shorts_name", "unclear"), jnum)
+        except Exception as e:
+            logger.warning(f"[doubt] {report_id}: tap check failed ({e}) — keeping tap")
+        finally:
+            crop_path.unlink(missing_ok=True)
+        if verdict == "rejected":
+            logger.info(f"[doubt] {report_id}: tap {c.get('idx')} rejected by identity gate — dropped")
+            continue
+        kept.append(c)
+    return kept
+
+
 async def _run_doubt_confirmation(
     report_id: str, file_path: Path, valid_anchors: list, gt_t_off: float,
     gt_track: dict, doubt_moments: list,
@@ -7131,6 +7186,11 @@ async def _run_doubt_confirmation(
     status = (fresh or {}).get("doubt_status")
     confirmations = (fresh or {}).get("doubt_confirmations") or []
     final = status if status in ("confirmed", "skipped") else "timeout"
+    if final == "confirmed" and confirmations:
+        confirmations = await _verify_doubt_taps(report_id, file_path, confirmations)
+        if not confirmations:
+            final = "skipped"
+            logger.info(f"[doubt] {report_id}: no taps survived the identity gate — honest fallback")
     if final == "confirmed" and confirmations:
         # Confirmed taps FIRST so they always survive the 10-seed cap. Their t
         # is already in video time — subtract t_off since track_player re-adds it.

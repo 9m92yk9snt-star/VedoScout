@@ -90,19 +90,30 @@ def _gap_to_next(score: float):
     return None, None
 
 
-def _pick_evidence(evidence: list, vsecs: list):
-    ev = None
+def _pick_evidence(evidence: list, vsecs: list, used: list):
+    """Pick a proof moment from THIS skill's own model-cited evidence, preferring
+    moments not already shown on another card (±3s) — proofs spread across the
+    match instead of repeating one clip. Never invents timestamps."""
+    cands = []
     for e in evidence or []:
         ts = (e or {}).get("timestamp") if isinstance(e, dict) else None
         s = _ts_sec(ts)
         if s is None:
             continue
-        verified = _is_verified(s, vsecs)
-        if ev is None or (verified and not ev["verified"]):
-            ev = {"timestamp": str(ts), "verified": verified}
-        if ev["verified"]:
-            break
-    return ev
+        cands.append({"timestamp": str(ts), "sec": s, "verified": _is_verified(s, vsecs)})
+    if not cands:
+        return None
+    def fresh(c):
+        return all(abs(c["sec"] - u) > 3.0 for u in used)
+    def exact(c):
+        return sum(1 for u in used if abs(c["sec"] - u) < 0.5)
+    def clash(c):
+        return sum(1 for u in used if abs(c["sec"] - u) <= 3.0)
+    pick = (next((c for c in cands if c["verified"] and fresh(c)), None)
+            or next((c for c in cands if fresh(c)), None)
+            or sorted(cands, key=lambda c: (exact(c), clash(c), not c["verified"]))[0])
+    used.append(pick["sec"])
+    return {"timestamp": pick["timestamp"], "verified": pick["verified"]}
 
 
 def _discovery(obs_map: dict, posdata: dict, kb_skills: dict, first: str):
@@ -173,7 +184,7 @@ def build_score_meaning(doc: dict, progression: dict | None = None) -> dict | No
             "looks_for": kb.get("looks_for"),
             "scale": kb.get("scale"),
             "next_level": kb.get("next_level"),
-            "evidence": _pick_evidence(sk.get("evidence"), vsecs),
+            "evidence": None,
             "position_why": weighs.get(key),
             "angles": {
                 "better_than": _better_than(score, tier),
@@ -185,6 +196,11 @@ def build_score_meaning(doc: dict, progression: dict | None = None) -> dict | No
     if not skills:
         return None
     skills.sort(key=lambda s: (-s["score"], s["key"]))
+    # assign proof moments in display order so top cards get first pick and
+    # each card prefers a moment the reader has not already seen
+    used: list = []
+    for s in skills:
+        s["evidence"] = _pick_evidence((obs_map[s["key"]][1] or {}).get("evidence"), vsecs, used)
     return {
         "position": pos,
         "position_line": posdata.get("line"),

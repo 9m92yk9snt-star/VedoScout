@@ -3608,3 +3608,13 @@ Implemented in BOTH renderers (identical design):
 - LESSON REPEATED: parallel search_replace edits on ONE file (telestration.py) corrupted it (duplicated tail + orphan refs). NEVER batch-edit a single file.
 - Note: edge-gate nondeterminism at boundaries means clip count can vary between regen runs (1-2 clips on this report) — honest behavior.
 - USER MUST REDEPLOY + press Regenerate evidence (Admin → Reports) on production reports to apply the new marker.
+
+## 2026-08-14 (22) — Proof diversity + doubt-tap safety (verified on real report bd972050 "Ormantestic")
+User: (1) assure the player-finding methodology is unchanged; reports of WRONG player being tapped before proof moments; (2) same clip reused across 3 categories/skills although the >1min video has many highlights.
+ASSURANCE (git-verified): player_tracking.py + precision_engine.py untouched all along; identity_verify.py only gained NEW gates (verify_ring_placement, and now doubt-tap check). Methodology unchanged — only visuals + safety additions.
+Fixes:
+- score_meaning.py _pick_evidence: diversity-aware assignment in display order with shared `used` list — prefer (verified & fresh ±3s) > fresh > fallback minimizing (exact reuse, proximity clash, unverified). Only uses the model's OWN evidence per skill — never invents timestamps. Result on real report: 17 distinct proof moments across 20 skill cards (before: one clip on 3+ cards); remaining doubles only where analysis cites a single moment. LESSON: fallback must minimize EXACT reuse before proximity clash — pure proximity-min pushed picks onto already-used exact timestamps.
+- derive.js topStrengths: same greedy dedupe across the 4 cards (verified: 00:11/00:43/00:13/00:34 distinct).
+- DoubtConfirmModal.jsx rewritten: per-moment "Can't see my player — skip this moment" toggle (undo supported); confirm enabled when every moment is tapped OR skipped; all-skipped → global skip. ROOT CAUSE of wrong-player taps: old modal REQUIRED a tap on every frame even when the player wasn't visible (user screenshot showed a crossover frame with no players) — forced wrong taps became tracking seeds.
+- server.py _verify_doubt_taps: each confirmed doubt tap is crop-checked against identity ref crops (GPT gate); only HIGH-CONFIDENCE wrong taps are dropped (parent tap stays primary ground truth; kept on confirmed/uncertain/error); zero surviving taps → honest "skipped" fallback. Wired into _run_doubt_confirmation.
+- All read-time changes (score_meaning + derive) apply to EXISTING reports immediately after redeploy — no regeneration needed for the repetition fix. Doubt-flow changes apply to new uploads.

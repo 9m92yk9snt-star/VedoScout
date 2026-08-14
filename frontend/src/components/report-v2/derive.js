@@ -109,12 +109,17 @@ export function deriveV2(report) {
   const obTier = String(ob.tier || "").toLowerCase();
 
   // ---- Top strengths (4 highest observed skills) ----
+  // Each card prefers an evidence moment not already used by another card,
+  // so the four proofs show four different moments when the footage allows.
   const confRank = { high: 2, medium: 1, low: 0 };
+  const usedTs = new Set();
   const topStrengths = [...skills]
     .sort((a, b) => b.score - a.score || (confRank[b.confidence] ?? 0) - (confRank[a.confidence] ?? 0))
     .slice(0, 4)
     .map((s) => {
-      const ev = s.evidence.find((e) => e && e.timestamp && e.timestamp !== "General");
+      const evs = (s.evidence || []).filter((e) => e && e.timestamp && e.timestamp !== "General");
+      const ev = evs.find((e) => !usedTs.has(e.timestamp)) || evs[0];
+      if (ev?.timestamp) usedTs.add(ev.timestamp);
       const fr = frames.find(ev?.timestamp);
       return {
         name: s.label, score: s.score, category: s.category,
