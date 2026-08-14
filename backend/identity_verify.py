@@ -105,6 +105,71 @@ async def verify_frame_identity(
         return "error"
 
 
+async def verify_ring_placement(
+    api_key: str,
+    session_id: str,
+    ref_crop_paths: list[str],
+    crop_path: str,
+    jersey_name: str = "unclear",
+    shorts_name: str = "unclear",
+    jersey_number: str | None = None,
+) -> str:
+    """Placement verdict for a drawn ground-ring:
+    "confirmed" — the ring sits under the referenced player's feet
+    "uncertain" — not certain either way
+    "rejected"  — high-confidence: ring on grass / wrong player / displaced
+    "error"     — verifier unavailable
+    """
+    try:
+        refs = [
+            ImageContent(image_base64=_b64(p))
+            for p in ref_crop_paths[:MAX_REF_CROPS]
+            if p and Path(p).exists()
+        ]
+        if not refs or not Path(crop_path).exists():
+            return "error"
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=session_id,
+            system_message=(
+                "You verify football telestration accuracy across images. "
+                "Respond with STRICT JSON only — no prose, no markdown."
+            ),
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        prompt = (
+            f"The first {len(refs)} image(s) are reference crops of ONE specific youth football player. "
+            "Identify the player's distinctive features yourself (kit colours, build, socks, boots). "
+            f"An automated kit-colour read said '{jersey_name} jersey, {shorts_name} shorts' but it MAY BE "
+            "INACCURATE — trust the images.\n"
+            + (
+                f"The player's own family states the target wears SHIRT NUMBER {jersey_number}.\n"
+                if jersey_number else ""
+            )
+            + "The LAST image is a cropped match-video frame on which a bright lime ELLIPSE has been drawn "
+            "on the pitch. The ellipse is supposed to sit DIRECTLY UNDER that same player's feet.\n"
+            "Question: is the ellipse correctly placed under that player's feet? Answer false when the "
+            "ellipse lies on empty grass, under a DIFFERENT player, or is clearly displaced from the "
+            "player's feet (more than roughly one body-width away).\n"
+            'Respond ONLY with JSON: {"correct": true|false, "confidence": "high"|"medium"|"low", '
+            '"why": "<one short sentence>"}'
+        )
+        msg = UserMessage(text=prompt, file_contents=[*refs, ImageContent(image_base64=_b64(crop_path))])
+        resp = await asyncio.wait_for(chat.send_message(msg), timeout=60)
+        text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
+        data = _extract_json(text)
+        if not data:
+            return "error"
+        correct = bool(data.get("correct"))
+        conf = str(data.get("confidence", "")).lower()
+        logger.info(f"[ring] {session_id}: correct={correct} conf={conf} why={str(data.get('why'))[:120]}")
+        if correct:
+            return "confirmed" if conf in ("high", "medium") else "uncertain"
+        return "rejected" if conf == "high" else "uncertain"
+    except Exception as e:
+        logger.warning(f"ring placement verify inconclusive ({session_id}): {e}")
+        return "error"
+
+
 def _extract_json(text: str) -> dict | None:
     start, end = text.find("{"), text.rfind("}")
     if start < 0 or end <= start:

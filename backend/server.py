@@ -6906,6 +6906,11 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         # rewrite the comments list with a `frame_url` per moment.
         enriched_comments = ensure_video_frames(doc)
         if enriched_comments and isinstance(out.get("full_report"), dict):
+            enriched_comments = [
+                ({**c, "tele_clip_url": _sign_media_url(c["tele_clip_url"])}
+                 if isinstance(c, dict) and c.get("tele_clip_url") else c)
+                for c in enriched_comments
+            ]
             out["full_report"] = {**out["full_report"], "video_comments": enriched_comments}
         # Generate share card lazily — use enriched archetype for the card.
         share_doc = {**doc, "archetype": out.get("archetype")}
@@ -7375,10 +7380,141 @@ async def _telestrate_verified_frames(
             c["telestrated"] = True
             c["tele_ring"] = True
             c["tele_ai_gated"] = True
+            c["tele_box"] = {k: float(box[k]) for k in ("x0", "y0", "x1", "y1")}
             done += 1
     if done:
         logger.info(f"[tele] {report_id}: {done} anchor-locked frames telestrated")
     return done
+
+
+TELE_CLIP_MAX = 3
+TELE_EDGE_TRUST = 0.7  # secs from the tapped moment where the tap itself is proof
+TELE_EDGE_STEP = 0.6
+
+
+def _teleclip_edge_crop(video_path: str, sm: list, t: float, out_path: str) -> Optional[str]:
+    """Crop around the tracked ring position at time t WITH the ring drawn in —
+    evidence for the placement gate."""
+    import cv2
+    from tele_clip import pos_at, _draw_ring
+    cap = cv2.VideoCapture(video_path)
+    try:
+        if not cap.isOpened():
+            return None
+        fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+        ok, frame = cap.read()
+        if not ok:
+            return None
+        fh, fw = frame.shape[:2]
+        cx, feet_y, w = pos_at(sm, t)
+        _draw_ring(frame, cx, feet_y, w, 1.0)
+        half = max(100, int(1.35 * w * fw))
+        px, py = int(cx * fw), int(feet_y * fh)
+        x0, x1 = max(0, px - half), min(fw, px + half)
+        y0, y1 = max(0, py - int(half * 2.0)), min(fh, py + int(half * 0.55))
+        if x1 - x0 < 40 or y1 - y0 < 40:
+            return None
+        crop = frame[y0:y1, x0:x1]
+        ch, cw = crop.shape[:2]
+        if max(ch, cw) > 720:
+            s = 720 / max(ch, cw)
+            crop = cv2.resize(crop, (int(cw * s), int(ch * s)))
+        cv2.imwrite(out_path, crop, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        return out_path
+    finally:
+        cap.release()
+
+
+async def _teleclip_verified_window(report_id: str, i: int, video_path, track_pts: list, sec: float,
+                                    ref_crops: list, fp: dict, jnum, frames_dir):
+    """Pick a clip window whose EDGES are identity-confirmed by GPT vision (a
+    different model family than the tracker). An unconfirmed edge shrinks the
+    window toward the tapped moment; too little verified footage → no clip."""
+    from tele_clip import plan_window
+    pre = post = 1.8 if ref_crops else TELE_EDGE_TRUST
+    for rnd in range(3):
+        win = plan_window(track_pts, sec, pre, post)
+        if not win:
+            return None
+        checks = []
+        if sec - win["w0"] > TELE_EDGE_TRUST:
+            checks.append(("pre", win["w0"] + 0.12))
+        if win["w1"] - sec > TELE_EDGE_TRUST:
+            checks.append(("post", win["w1"] - 0.12))
+        if not checks:
+            return win
+        ok_all = True
+        for side, t_chk in checks:
+            crop_path = frames_dir / f"clipchk_{i}_{side}.jpg"
+            crop = await asyncio.to_thread(_teleclip_edge_crop, str(video_path), win["sm"], t_chk, str(crop_path))
+            verdict = "error"
+            if crop:
+                verdict = await verify_ring_placement(
+                    EMERGENT_LLM_KEY, f"teleclip-{report_id}-{i}-{side}-{rnd}", ref_crops, crop,
+                    fp.get("jersey_name", "unclear"), fp.get("shorts_name", "unclear"), jnum,
+                )
+            crop_path.unlink(missing_ok=True)
+            if verdict != "confirmed":
+                ok_all = False
+                if side == "pre":
+                    pre = max(TELE_EDGE_TRUST, sec - win["w0"] - TELE_EDGE_STEP)
+                else:
+                    post = max(TELE_EDGE_TRUST, win["w1"] - sec - TELE_EDGE_STEP)
+                logger.info(f"[teleclip] {report_id}: clip {i} {side}-edge not confirmed ({verdict}) — shrinking")
+        if ok_all:
+            return win
+    return plan_window(track_pts, sec, min(pre, TELE_EDGE_TRUST), min(post, TELE_EDGE_TRUST))
+
+
+async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: list, video_path,
+                               ref_crops: list):
+    """Tracked proof clips for telestrated moments. Ring positions come from the
+    report's ground-truth player track (tap-seeded, colour-vetoed); clip edges
+    are identity-confirmed by GPT vision — never a wrong ring. The proof player
+    falls back to the full video if a clip is missing."""
+    from tele_clip import generate_tracked_clip
+    vp = Path(str(video_path))
+    if not vp.exists():
+        logger.info(f"[teleclip] {report_id}: video not local — skipping clips")
+        return
+    track_pts = ((doc.get("player_track") or {}).get("points")) or []
+    if not track_pts:
+        logger.info(f"[teleclip] {report_id}: no ground-truth track — skipping clips")
+        return
+    pd = doc.get("player_details") or {}
+    fp = doc.get("fingerprint") or {}
+    jnum = pd.get("jersey_number")
+    first = str(pd.get("player_name") or "").strip().split(" ")[0]
+    label = f"{first.upper()} · TRACKED" if first else "PLAYER · TRACKED"
+    for c in enriched:
+        if isinstance(c, dict):
+            c.pop("tele_clip_url", None)
+            c.pop("tele_clip_coverage", None)
+    made = 0
+    for i, c in enumerate(enriched):
+        if made >= TELE_CLIP_MAX:
+            break
+        if not isinstance(c, dict) or not c.get("telestrated"):
+            continue
+        picked = c.get("frame_picked_ts")
+        sec = float(picked) if isinstance(picked, (int, float)) else _ts_to_seconds(str(c.get("timestamp") or ""))
+        if sec is None:
+            continue
+        win = await _teleclip_verified_window(report_id, i, vp, track_pts, sec, ref_crops, fp, jnum, frames_dir)
+        if not win:
+            logger.info(f"[teleclip] {report_id}: moment {i} has no verified window — no clip")
+            continue
+        out = frames_dir / f"proofclip_{i}.mp4"
+        res = await asyncio.to_thread(
+            generate_tracked_clip, str(vp), float(sec), track_pts, str(out), label,
+            float(sec - win["w0"]), float(win["w1"] - sec),
+        )
+        if res and res.get("ok"):
+            c["tele_clip_url"] = f"/api/uploads/frames/{report_id}/{out.name}"
+            c["tele_clip_coverage"] = res.get("coverage")
+            made += 1
+            logger.info(f"[teleclip] {report_id}: clip {out.name} coverage={res.get('coverage')}")
 
 
 async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
@@ -7406,6 +7542,11 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
         await _telestrate_verified_frames(report_id, doc, frames_dir, enriched, ref_crops)
     except Exception:
         logger.exception(f"telestration layer failed for {report_id}")
+    # Level 2 — tracked proof clips: the ring follows the player through a short clip.
+    try:
+        await _generate_tele_clips(report_id, doc, frames_dir, enriched, video_path, ref_crops)
+    except Exception:
+        logger.exception(f"tele clip layer failed for {report_id}")
     if r2_storage.is_configured():
         for c in enriched:
             if not isinstance(c, dict):
@@ -7419,6 +7560,15 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
                         c["frame_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "image/jpeg")
                     except Exception as e:
                         logger.warning(f"R2 flush frame failed {report_id}/{p.name}: {e}")
+            cu = c.get("tele_clip_url") or ""
+            if cu.startswith("/api/uploads/frames/"):
+                p = frames_dir / Path(cu).name
+                if p.exists() and p.stat().st_size > 0:
+                    try:
+                        key = f"reports/{report_id}/frames/{p.name}"
+                        c["tele_clip_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "video/mp4")
+                    except Exception as e:
+                        logger.warning(f"R2 flush clip failed {report_id}/{p.name}: {e}")
     await db.reports.update_one(
         {"id": report_id},
         {"$set": {
@@ -14369,6 +14519,7 @@ from url_video_fetch import build_url_fetch_router, resolve_temp_token_path
 from chunked_upload import build_chunked_upload_router
 from identity_verify import (
     verify_frame_identity,
+    verify_ring_placement,
     build_identity_profile,
     identity_profile_block,
     identity_memory_block,

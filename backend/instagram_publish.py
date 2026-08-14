@@ -128,14 +128,19 @@ def build_instagram_router(*, db: Any, admin_dep: Any):
         token = payload.access_token.strip()
         ig_id = payload.ig_user_id.strip()
         try:
-            info = await _graph_get(f"/{ig_id}", {"fields": "id,username,account_type"}, token)
+            info = await _graph_get(f"/{ig_id}", {"fields": "id,username,name"}, token)
         except RuntimeError as e:
             raise HTTPException(400, f"Meta rejected the connection: {e}")
-        if (info.get("account_type") or "").upper() not in ("BUSINESS", "MEDIA_CREATOR", "CREATOR", ""):
-            raise HTTPException(400, f"Account type is {info.get('account_type')} — a Business account is required")
+        if not info.get("username"):
+            raise HTTPException(400, "Meta did not return a username for this account ID — check the Instagram Business Account ID")
         await db.settings.update_one(
             {"key": "instagram_publish"},
-            {"$set": {"access_token": token, "ig_user_id": ig_id, "username": info.get("username")}},
+            {"$set": {
+                "access_token": token,
+                "ig_user_id": ig_id,
+                "username": info.get("username"),
+                "account_name": info.get("name"),
+            }},
             upsert=True,
         )
         return {"connected": True, "username": info.get("username"), "ig_user_id": ig_id}

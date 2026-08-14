@@ -12,9 +12,13 @@ const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math
 export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onClose, onUnlock }) {
   const vidRef = useRef(null);
   const [atMoment, setAtMoment] = useState(false);
+  const [clipFailed, setClipFailed] = useState(false);
   const sec = tsToSeconds(proof?.ts);
   const startAt = sec != null ? Math.max(0, sec - 4) : 0;
   const locked = !!proof?.locked;
+  const useClip = !!proof?.clip && !clipFailed && !demo && !locked;
+
+  useEffect(() => { setClipFailed(false); }, [proof?.key]);
 
   useEffect(() => {
     if (!proof) return undefined;
@@ -25,7 +29,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
 
   useEffect(() => {
     setAtMoment(false);
-    if (!proof || demo || locked || !videoUrl || sec == null) return undefined;
+    if (!proof || demo || locked || useClip || !videoUrl || sec == null) return undefined;
     const v = vidRef.current;
     if (!v) return undefined;
     const onTime = () => setAtMoment(v.currentTime >= sec - 0.3 && v.currentTime <= sec + 2.5);
@@ -34,7 +38,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
   }, [proof, demo, locked, videoUrl, sec]);
 
   useEffect(() => {
-    if (!proof || demo || locked || !videoUrl) return;
+    if (!proof || demo || locked || useClip || !videoUrl) return;
     const v = vidRef.current;
     if (!v) return;
     const seekPlay = () => {
@@ -103,6 +107,36 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
                 {proof.ts && (
                   <span className="absolute bottom-2 left-2 bg-black/70 text-white font-barlow font-extrabold text-[12px] px-2 py-0.5 rounded tabular-nums">{proof.ts}</span>
                 )}
+              </>
+            ) : useClip ? (
+              <>
+                <video
+                  key={proof.clip}
+                  src={proof.clip}
+                  poster={posterUrl || undefined}
+                  autoPlay
+                  loop
+                  muted
+                  controls
+                  playsInline
+                  preload="auto"
+                  onError={() => setClipFailed(true)}
+                  data-testid="proof-clip-video"
+                  className="absolute inset-0 w-full h-full object-contain bg-black"
+                />
+                <span
+                  data-testid="proof-clip-badge"
+                  className="absolute top-2 right-2 z-10 px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-[0.08em] uppercase pointer-events-none bg-[#CCFF00] text-[#12211A]"
+                >
+                  Player tracked · {proof.ts}
+                </span>
+                <button
+                  data-testid="proof-clip-fullvideo-btn"
+                  onClick={() => setClipFailed(true)}
+                  className="absolute bottom-2 right-2 z-10 px-2 py-1 rounded bg-black/70 text-white/85 text-[10px] font-bold uppercase tracking-[0.08em] hover:bg-black/90"
+                >
+                  Full video
+                </button>
               </>
             ) : (
               <>

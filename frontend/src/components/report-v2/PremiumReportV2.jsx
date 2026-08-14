@@ -255,8 +255,11 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
   const [proof, setProof] = useState(null);
   const playAt = useCallback((ts) => {
     try { videoRef.current?.pause(); } catch { /* noop */ }
-    setProof({ ts: ts || null, key: Date.now() });
-  }, []);
+    const vc = (report.full_report?.video_comments || []).find(
+      (c) => c && c.timestamp === ts && c.tele_clip_url,
+    );
+    setProof({ ts: ts || null, clip: vc ? resolveUrl(vc.tele_clip_url, assetBase) : null, key: Date.now() });
+  }, [report, assetBase]);
 
   const proofFrames = [
     ...(report.full_report?.snapshot_moments || [])
