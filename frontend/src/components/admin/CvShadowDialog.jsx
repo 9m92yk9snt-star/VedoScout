@@ -92,6 +92,14 @@ export default function CvShadowDialog({ reportId, onClose }) {
                 Taps: {data.taps?.length} · outliers {data.tap_outliers} · verified coverage {Math.round((data.verified_coverage || 0) * 100)}% ·
                 crossovers {data.crossover_samples} · engine v{data.engine_version} · {data.compute_s}s
               </div>
+              {data.scene && (
+                <div className="text-[11px] text-ink/50 leading-relaxed border-t border-gray-border pt-2" data-testid="cv-shadow-scene">
+                  Scene: detector {data.scene.detector ? "on" : "off"} · {data.scene.avg_persons} persons/frame ·
+                  MOT tracks {data.scene.mot_tracks_created} · crossover events {data.scene.mot_crossover_events} ·
+                  team {data.scene.team_ready ? `${data.scene.team_counts?.target_team}/${data.scene.team_counts?.opponent}/${data.scene.team_counts?.other} (own/opp/other)` : "not ready"} ·
+                  negatives {data.scene.det_negatives}
+                </div>
+              )}
             </>
           )}
           <button

@@ -29,6 +29,8 @@ from typing import Optional
 import cv2
 import numpy as np
 
+import cv_detect
+
 logger = logging.getLogger("elite-scout")
 
 SHADOW_ENABLED = os.environ.get("CV_SHADOW_ENABLED", "1") == "1"
@@ -220,7 +222,8 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale):
             )
             refs.append({"t": round(t, 2), "emb": emb, "quality": quality,
                          "box": rb, "refined": bool(cand), "overlaps": overlaps,
-                         "merged": bool(emb.get("merged"))})
+                         "merged": bool(emb.get("merged")),
+                         "chroma": cv_detect.torso_chroma(small, rb)})
             # P10 negative gallery: OTHER blobs at the tap moment (same scene)
             for c in cand:
                 if c == rb or _iou(c, rb) > 0.3:
@@ -297,6 +300,17 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         # the current production track box still look like the tapped player?"
         prod_sims, prod_suspect, prod_crowded, switch_risk = [], 0, 0, 0
         suspect_ts, switch_ts, crowded_ts = [], [], []
+
+        # ── P3 scene awareness (detector + MOT + team classification) ──
+        detector = cv_detect.PersonDetector()
+        mot = cv_detect.MiniMOT()
+        _tap_chromas = [r["chroma"] for r in refs if r.get("chroma")]
+        _anchor = (float(np.median([c[0] for c in _tap_chromas])),
+                   float(np.median([c[1] for c in _tap_chromas]))) if _tap_chromas else None
+        team = cv_detect.TeamModel(_anchor)
+        det_frames = det_persons = 0
+        team_counts = {"target_team": 0, "opponent": 0, "other": 0}
+        det_negatives = 0
         prev_tiny = None
         cam_dx = cam_dy = 0.0
 
@@ -324,6 +338,24 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 cam_dx, cam_dy = dx * sw / 160, dy * sw / 160
             prev_tiny = tiny
 
+            # ── P3: person detection + MOT + team classification (shadow) ──
+            dets = []
+            if detector.ok:
+                for (nx, ny, nw_, nh_, dc) in detector.detect(frame):
+                    b = (int(nx * sw), int(ny * sh),
+                         max(3, int(nw_ * sw)), max(6, int(nh_ * sh)))
+                    if med_h * 0.35 <= b[3] <= med_h * 2.5:
+                        dets.append(b)
+                det_frames += 1
+                det_persons += len(dets)
+                mot.update(dets, cam_dx, cam_dy)
+                for b in dets:
+                    ch = cv_detect.torso_chroma(small, b)
+                    team.add(ch)
+                    cl = team.classify(ch)
+                    if cl:
+                        team_counts[cl] += 1
+
             # expected position: production track first, else own continuity
             pr = prod_at(t)
             if pr is not None:
@@ -346,13 +378,19 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                         prod_suspect += 1
                         if len(suspect_ts) < 60:
                             suspect_ts.append({"t": round(t, 1), "sim": round(ps, 2)})
-                    # nearby blobs overlapping the prod box → crossover pressure
-                    nb_roi = np.zeros((sh, sw), np.uint8)
-                    rr = int(pb[3] * 1.5)
-                    nb_roi[max(0, pb[1] - rr):min(sh, pb[1] + pb[3] + rr),
-                           max(0, pb[0] - rr):min(sw, pb[0] + pb[2] + rr)] = 255
-                    near_blobs = _blobs(small, nb_roi, min_h=max(8, int(pb[3] * 0.45)),
-                                        max_h=int(pb[3] * 2.0))
+                    # nearby people around the prod box → crossover pressure.
+                    # Real detections when available; blob fallback otherwise.
+                    if dets:
+                        near_blobs = [c for c in dets
+                                      if abs(c[0] + c[2] / 2 - (pb[0] + pb[2] / 2)) < pb[3] * 2.5
+                                      and abs(c[1] + c[3] / 2 - (pb[1] + pb[3] / 2)) < pb[3] * 2.5]
+                    else:
+                        nb_roi = np.zeros((sh, sw), np.uint8)
+                        rr = int(pb[3] * 1.5)
+                        nb_roi[max(0, pb[1] - rr):min(sh, pb[1] + pb[3] + rr),
+                               max(0, pb[0] - rr):min(sw, pb[0] + pb[2] + rr)] = 255
+                        near_blobs = _blobs(small, nb_roi, min_h=max(8, int(pb[3] * 0.45)),
+                                            max_h=int(pb[3] * 2.0))
                     others = [c for c in near_blobs if _iou(c, pb) < 0.35]
                     if any(_iou(c, pb) > 0.10 for c in others):
                         prod_crowded += 1
@@ -367,6 +405,22 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                             if len(switch_ts) < 60:
                                 switch_ts.append(round(t, 1))
                             break
+                    # P10: negative teammate gallery from REAL detections —
+                    # same-kit players clearly away from the production target.
+                    # Never contaminates the positive profile (separate list).
+                    if dets and len(negatives) < 30:
+                        for c in dets:
+                            if _iou(c, pb) > 0.05:
+                                continue
+                            d_c = np.hypot(c[0] + c[2] / 2 - (pb[0] + pb[2] / 2),
+                                           c[1] + c[3] / 2 - (pb[1] + pb[3] / 2))
+                            if d_c < med_h * 2.0:
+                                continue  # too close — ambiguous, skip
+                            if team.classify(cv_detect.torso_chroma(small, c)) == "target_team":
+                                ne = _zone_embedding(small, c, pitch_l)
+                                if ne:
+                                    negatives.append(ne)
+                                    det_negatives += 1
 
             # ROI: local when we have an expectation, wide when re-acquiring
             roi_mask = np.zeros((sh, sw), np.uint8)
@@ -376,8 +430,14 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 roi_mask[y0:min(sh, int(exp[1] + r)), x0:min(sw, int(exp[0] + r))] = 255
             else:
                 roi_mask[:] = 255
-            cand = _blobs(small, roi_mask, min_h=max(8, int(med_h * 0.45)),
-                          max_h=int(med_h * 2.2))
+            # candidates: REAL detections inside the ROI (P3); blob fallback
+            if dets:
+                cand = [c for c in dets
+                        if roi_mask[min(sh - 1, max(0, c[1] + c[3] // 2)),
+                                    min(sw - 1, max(0, c[0] + c[2] // 2))] > 0]
+            else:
+                cand = _blobs(small, roi_mask, min_h=max(8, int(med_h * 0.45)),
+                              max_h=int(med_h * 2.2))
 
             scored = []
             for c in cand:
@@ -393,8 +453,12 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                     prior = float(np.exp(-dist / max(1.0, med_h * 2.0)))
                 else:
                     prior = 0.5
+                # P9: team classification as candidate FILTER (rank penalty
+                # only — never a hard identity decision)
+                cl = team.classify(cv_detect.torso_chroma(small, c)) if dets else None
+                team_pen = 0.6 if cl in ("opponent", "other") else 1.0
                 scored.append({"box": c, "sim": s, "neg": sn,
-                               "rank": s * (0.6 + 0.4 * prior)})
+                               "rank": s * (0.6 + 0.4 * prior) * team_pen})
             scored.sort(key=lambda d: -d["rank"])
 
             # crossover detection (P13): candidates overlapping the best one
@@ -464,7 +528,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
 
         out = {
             "status": "ok",
-            "engine_version": 3,
+            "engine_version": 4,
             "duration_s": round(dur, 1),
             "samples": samples,
             "taps": [{"t": r["t"], "quality": r["quality"], "consistency": r["consistency"],
@@ -494,6 +558,17 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 "suspect_ts": suspect_ts,
                 "switch_ts": switch_ts,
                 "crowded_ts": crowded_ts,
+            },
+            # P3 scene awareness (detector + MOT + team classification)
+            "scene": {
+                "detector": bool(detector.ok),
+                "det_frames": det_frames,
+                "avg_persons": round(det_persons / max(1, det_frames), 2) if det_frames else None,
+                "mot_tracks_created": mot.created,
+                "mot_crossover_events": mot.crossover_events,
+                "team_ready": bool(team.centers is not None and team.target_ci is not None),
+                "team_counts": team_counts,
+                "det_negatives": det_negatives,
             },
             "compute_s": round(time.time() - t_start, 1),
             "config": {"hz": HZ, "width": SMALL_W, "sim_t": SIM_T, "margin_t": MARGIN_T},
