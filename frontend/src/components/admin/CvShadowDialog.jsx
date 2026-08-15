@@ -40,7 +40,7 @@ const ShadowThumb = ({ reportId, entry, kind }) => {
           <Loader2 className="w-4 h-4 animate-spin text-ink/30" />
         </div>
       )}
-      <div className={`px-1.5 py-1 text-[9px] font-bold uppercase tracking-wider ${kind === "SWITCH" ? "text-red-500" : kind === "EMPTY" ? "text-purple-600" : "text-amber-600"}`}>
+      <div className={`px-1.5 py-1 text-[9px] font-bold uppercase tracking-wider ${kind === "SWITCH" ? "text-red-500" : kind === "EMPTY" ? "text-purple-600" : kind === "NEG" ? "text-rose-600" : kind === "TELEPORT" ? "text-blue-600" : "text-amber-600"}`}>
         {kind} · {fmtT(entry.t)}{entry.sim != null ? ` · ${entry.sim}` : ""}
       </div>
     </div>
@@ -103,6 +103,8 @@ export default function CvShadowDialog({ reportId, onClose }) {
                 <Stat label="Switch-risk frames" value={pv?.switch_risk_frames} warn={(pv?.switch_risk_frames || 0) > 0} />
                 <Stat label="Empty-box frames" value={pv?.empty_box_frames ?? "—"} warn={(pv?.empty_box_frames || 0) > 2} />
                 <Stat label="Crowded frames" value={pv?.crowded_frames} />
+                <Stat label="Teammate-match frames" value={pv?.neg_match_frames ?? "—"} warn={(pv?.neg_match_frames || 0) > 0} />
+                <Stat label="Teleport frames" value={pv?.teleport_frames ?? "—"} warn={(pv?.teleport_frames || 0) > 0} />
                 <Stat label="Tap self-verify" value={data.tap_self_verify} />
               </div>
               {(pv?.suspect_ts?.length > 0 || pv?.switch_ts?.length > 0) && (
@@ -124,6 +126,8 @@ export default function CvShadowDialog({ reportId, onClose }) {
               {(() => {
                 const thumbs = [
                   ...(pv?.switch_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "SWITCH" })),
+                  ...(pv?.neg_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "NEG" })),
+                  ...(pv?.teleport_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "TELEPORT" })),
                   ...(pv?.empty_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "EMPTY" })),
                   ...(pv?.suspect_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "SUSPECT" })),
                 ];
@@ -146,6 +150,15 @@ export default function CvShadowDialog({ reportId, onClose }) {
                 crossovers {data.crossover_samples} · engine v{data.engine_version} · {data.compute_s}s
                 {data.gap_bridging && (
                   <> · track gaps {data.gap_bridging.gaps} (safe to bridge: {data.gap_bridging.bridgeable})</>
+                )}
+                {data.camera && (
+                  <> · camera affine {data.camera.affine_frames}/{(data.camera.affine_frames || 0) + (data.camera.fallback_frames || 0)}</>
+                )}
+                {data.feature_ownership && (
+                  <> · owned evals {data.feature_ownership.owned_evals} (contaminated {data.feature_ownership.contaminated_evals})</>
+                )}
+                {data.reacq && (
+                  <> · re-acq {data.reacq.verified}/{data.reacq.attempts} (team-rejected {data.reacq.team_rejected})</>
                 )}
                 {pv?.empty_windows?.length > 0 && (
                   <> · unsafe track windows: {pv.empty_windows.map((w) => `${fmtT(w[0])}–${fmtT(w[1])}`).join(", ")}</>

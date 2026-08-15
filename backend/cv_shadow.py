@@ -90,22 +90,41 @@ def _comp_mask_crop(small, box):
         if d < bd:
             bd, best = d, i
     if best == 0:
-        return roi, np.full(roi.shape[:2], 255, np.uint8), True
+        return roi, np.full(roi.shape[:2], 255, np.uint8), True, (x0, y0)
     m = (lbl == best).astype(np.uint8) * 255
     xs = np.where(m.any(0))[0]
     ys = np.where(m.any(1))[0]
     return (roi[ys[0]:ys[-1] + 1, xs[0]:xs[-1] + 1],
-            m[ys[0]:ys[-1] + 1, xs[0]:xs[-1] + 1], False)
+            m[ys[0]:ys[-1] + 1, xs[0]:xs[-1] + 1], False,
+            (x0 + int(xs[0]), y0 + int(ys[0])))
 
 
-def _zone_embedding(small, box, pitch_l):
+def _zone_embedding(small, box, pitch_l, occluders=None):
     """Multi-scale zone embedding over the ISOLATED person component only.
     Per zone: illumination-normalized Lab mean+std. Zones adapt to pixel size —
-    a far player is never compared on details the camera cannot resolve."""
-    crop, mask, merged = _comp_mask_crop(small, box)
+    a far player is never compared on details the camera cannot resolve.
+    Phase 4 feature ownership: pixels covered by OCCLUDING people are removed
+    from the mask so the target is never matched on someone else's body; if
+    too little of the target stays visible the sample is tagged owned=False
+    instead of silently comparing contaminated features."""
+    crop, mask, merged, (gx, gy) = _comp_mask_crop(small, box)
     h, w = crop.shape[:2]
     if h < 12 or w < 4:
         return None
+    owned = None
+    if occluders:
+        om = mask.copy()
+        for oc in occluders:
+            lx0, ly0 = max(0, int(oc[0]) - gx), max(0, int(oc[1]) - gy)
+            lx1 = min(w, int(oc[0] + oc[2]) - gx)
+            ly1 = min(h, int(oc[1] + oc[3]) - gy)
+            if lx1 > lx0 and ly1 > ly0:
+                om[ly0:ly1, lx0:lx1] = 0
+        kept = int((om > 0).sum())
+        if kept >= 0.30 * max(1, int((mask > 0).sum())) and kept >= 30:
+            mask, owned = om, True
+        else:
+            owned = False  # too occluded to own its features — tagged, never guessed
     lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB).astype(np.float32)
     lab[:, :, 0] *= 140.0 / max(30.0, pitch_l)
     if h >= 90:
@@ -122,7 +141,7 @@ def _zone_embedding(small, box, pitch_l):
         zs = z[mm] if mm.sum() >= 10 else z
         zones.append(np.concatenate([zs.mean(0), zs.std(0)]))
     return {"scale": scale, "zones": zones, "aspect": h / max(1, w),
-            "merged": merged, "px_h": h}
+            "merged": merged, "px_h": h, "owned": owned}
 
 
 def _sim(a, b) -> float:
@@ -276,12 +295,14 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
             else:
                 rb = (bx, by, bw, bh)  # fallback: trust the raw tap box
                 refined_by = "raw"
-            emb = _zone_embedding(small, rb, pl)
+            # visible-body awareness first: other people near the refined box —
+            # they both drive the visibility score and are removed from the
+            # embedding mask (Phase 4 feature ownership at tap references)
+            others_near = [c for c in (det_in or cand) if c != rb]
+            emb = _zone_embedding(small, rb, pl,
+                                  occluders=[c for c in others_near if _iou(c, rb) > 0.05])
             if not emb:
                 continue
-            # visible-body awareness: fraction of the refined box NOT covered
-            # by other people (detections preferred, blobs otherwise)
-            others_near = [c for c in (det_in or cand) if c != rb]
             occ_frac = 0.0
             for c in others_near:
                 ix = max(0, min(rb[0] + rb[2], c[0] + c[2]) - max(rb[0], c[0]))
@@ -309,7 +330,7 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
                     continue
                 oe = _zone_embedding(small, c, pl)
                 if oe:
-                    negatives.append(oe)
+                    _add_negative(negatives, oe)
         except Exception:
             continue
     # P4 consistency: pairwise similarity → outliers downweighted; a clearly
@@ -333,16 +354,23 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
             (0.3 if r["outlier"] else 1.0)
             * (0.5 if r["merged"] else 1.0)
             * max(0.2, r["quality"]), 3)
-    return refs, negatives[:30]
+    return refs, negatives
 
 
 def _profile_sim(emb, refs) -> float:
-    """Weighted mean of the 3 best tap matches — one identity, many views."""
+    """Weighted mean of the 3 best tap matches — one identity, many views.
+    Phase 3 multi-view: same-scale references are PREFERRED during selection
+    (a far player is matched against far-view taps when available) without
+    ever penalising the similarity value itself."""
     if not refs:
         return 0.0
-    scored = sorted(((_sim(emb, r["emb"]), r["weight"]) for r in refs), reverse=True)[:3]
-    tw = sum(w for _, w in scored)
-    return sum(s * w for s, w in scored) / max(1e-6, tw)
+    scale = emb.get("scale") if emb else None
+    ranked = sorted(
+        ((_sim(emb, r["emb"]), r) for r in refs),
+        key=lambda sr: -(sr[0] + (0.05 if sr[1]["emb"].get("scale") == scale else 0.0)),
+    )[:3]
+    tw = sum(r["weight"] for _, r in ranked)
+    return sum(s * r["weight"] for s, r in ranked) / max(1e-6, tw)
 
 
 def _sim_relaxed(emb, refs) -> float:
@@ -359,6 +387,18 @@ def _sim_relaxed(emb, refs) -> float:
         d = np.abs(pooled - rp) / _TOL
         best = max(best, float(np.clip(1.0 - d.mean(), 0.0, 1.0)))
     return best
+
+
+def _add_negative(negatives, emb, cap=30):
+    """Phase 7 persistent negative gallery: keep DISTINCT teammates only —
+    near-duplicates are skipped so the cap covers different players."""
+    if not emb or len(negatives) >= cap:
+        return False
+    for n in negatives:
+        if _sim(emb, n) > 0.92:
+            return False
+    negatives.append(emb)
+    return True
 
 
 # ---------------------------------------------------------------- main scan
@@ -401,6 +441,9 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         step = max(1, int(round(fps / HZ)))
         state, last_pos, last_t, lost_since = "LOST", None, None, 0.0
         reacq_streak = 0
+        reacq_pending, lost_in_crowd = False, False
+        reacq_attempts = reacq_verified = reacq_team_rejected = 0
+        reacq_need_max = 2
         states_count = {"VERIFIED": 0, "PROVISIONAL": 0, "UNCERTAIN": 0, "LOST": 0}
         crossovers = potential_switches = samples = 0
         margins, agreements = [], []
@@ -413,6 +456,11 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         prev_prod_empty = False
         empty_ts = []
         sample_log = []  # per-sample prod context for gap-bridging analysis
+        own_evals = contaminated_evals = 0
+        neg_match = teleport = 0
+        neg_ts, teleport_ts = [], []
+        prev_neg_hit = False
+        prev_prod_c, prev_prod_t = None, None
 
         # flagged-moment gallery: small annotated frames so an admin can judge
         # every finding (true risk vs false alarm) with their own eyes
@@ -460,7 +508,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         det_frames = det_persons = 0
         team_counts = {"target_team": 0, "opponent": 0, "other": 0}
         det_negatives = 0
-        prev_tiny = None
+        cam = cv_detect.CameraMotion(out_scale=sw / 160.0)  # Phase 8 full global motion
         cam_dx = cam_dy = 0.0
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
@@ -482,10 +530,8 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
             pitch_l = _pitch_l(small)
             tiny = cv2.cvtColor(cv2.resize(small, (160, max(2, int(sh * 160 / sw)))),
                                 cv2.COLOR_BGR2GRAY).astype(np.float32)
-            if prev_tiny is not None:
-                (dx, dy), _ = cv2.phaseCorrelate(prev_tiny, tiny)  # P11 camera comp
-                cam_dx, cam_dy = dx * sw / 160, dy * sw / 160
-            prev_tiny = tiny
+            cam.update(tiny)  # Phase 8: affine pan/zoom/rotation, translation fallback
+            cam_dx, cam_dy = cam.dx, cam.dy
 
             # ── P3: person detection + MOT + team classification (shadow) ──
             dets = []
@@ -511,7 +557,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 exp = ((float(pr["x"]) + float(pr["w"]) / 2) * sw,
                        (float(pr["y"]) + float(pr["h"]) / 2) * sh)
             elif last_pos is not None:
-                exp = (last_pos[0] + cam_dx, last_pos[1] + cam_dy)
+                exp = cam.point(last_pos[0], last_pos[1])
             else:
                 exp = None
 
@@ -527,10 +573,51 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                     _ov = [c for c in dets if _iou(c, pb) > 0.2]
                     if _ov:
                         pb_eval = max(_ov, key=lambda c: _iou(c, pb))
-                pe = _zone_embedding(small, pb_eval, pitch_l)
+                pe = _zone_embedding(small, pb_eval, pitch_l,
+                                     occluders=[c for c in dets
+                                                if c != pb_eval and _iou(c, pb_eval) > 0.05])
+                # Phase 9: trajectory gate on the PRODUCTION track — a camera-
+                # compensated jump faster than physically possible means the
+                # box teleported (switch/drift). Scene cuts are excluded: the
+                # affine estimation fails there → fallback mode skips the check.
+                cur_c = (pb[0] + pb[2] / 2.0, pb[1] + pb[3] / 2.0)
+                if (prev_prod_c is not None and prev_prod_t is not None
+                        and cam.mode == "affine"):
+                    dtp = t - prev_prod_t
+                    if 0.0 < dtp <= 0.6:
+                        exq = cam.point(prev_prod_c[0], prev_prod_c[1])
+                        jump = float(np.hypot(cur_c[0] - exq[0], cur_c[1] - exq[1]))
+                        if ((jump / max(0.05, dtp)) / sw > MAX_SPEED * 1.6
+                                and jump > med_h * 0.8):
+                            teleport += 1
+                            if len(teleport_ts) < 40:
+                                entry = {"t": round(t, 1)}
+                                img = _save_flag_frame(small, t, pb, None, 0.0, "TELEPORT")
+                                if img:
+                                    entry["img"] = img
+                                teleport_ts.append(entry)
+                prev_prod_c, prev_prod_t = cur_c, t
                 if pe:
+                    if pe.get("owned") is True:
+                        own_evals += 1
+                    elif pe.get("owned") is False:
+                        contaminated_evals += 1
                     ps = _profile_sim(pe, refs)
                     prod_sims.append(round(ps, 3))
+                    # Phase 7: a KNOWN teammate matching the prod-box content
+                    # clearly better than the tapped player = switch indicator
+                    # (persistence required — 2 consecutive samples)
+                    pn = max((_sim(pe, n) for n in negatives), default=0.0)
+                    neg_hit = pn > ps + 0.15 and ps < SIM_T
+                    if neg_hit and prev_neg_hit:
+                        neg_match += 1
+                        if len(neg_ts) < 40:
+                            entry = {"t": round(t, 1), "sim": round(ps, 2)}
+                            img = _save_flag_frame(small, t, pb, None, ps, "NEG-MATCH")
+                            if img:
+                                entry["img"] = img
+                            neg_ts.append(entry)
+                    prev_neg_hit = neg_hit
                     # pose-robust flagging: a bent/fallen target scrambles the
                     # zone layout → the pose-tolerant pooled similarity may
                     # rescue the sample, but ONLY when a detected person is
@@ -599,7 +686,8 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                     # SAME-KIT (opponents/spectators can't be the target).
                     if low and prev_prod_low:
                         for c in others:
-                            oe = _zone_embedding(small, c, pitch_l)
+                            oe = _zone_embedding(small, c, pitch_l,
+                                                 occluders=[pb_eval] if _iou(c, pb_eval) > 0.05 else None)
                             if not oe:
                                 continue
                             if _profile_sim(oe, refs) > ps + 0.15 and ps < SIM_T:
@@ -628,8 +716,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                                 continue  # too close — ambiguous, skip
                             if team.classify(cv_detect.torso_chroma(small, c)) == "target_team":
                                 ne = _zone_embedding(small, c, pitch_l)
-                                if ne:
-                                    negatives.append(ne)
+                                if ne and _add_negative(negatives, ne):
                                     det_negatives += 1
 
             # ROI: local when we have an expectation, wide when re-acquiring
@@ -651,7 +738,9 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
 
             scored = []
             for c in cand:
-                emb = _zone_embedding(small, c, pitch_l)
+                emb = _zone_embedding(small, c, pitch_l,
+                                      occluders=[o for o in cand
+                                                 if o is not c and _iou(o, c) > 0.05])
                 if not emb:
                     continue
                 s = _profile_sim(emb, refs)
@@ -667,7 +756,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 # only — never a hard identity decision)
                 cl = team.classify(cv_detect.torso_chroma(small, c)) if dets else None
                 team_pen = 0.6 if cl in ("opponent", "other") else 1.0
-                scored.append({"box": c, "sim": s, "neg": sn,
+                scored.append({"box": c, "sim": s, "neg": sn, "emb": emb,
                                "rank": s * (0.6 + 0.4 * prior) * team_pen})
             scored.sort(key=lambda d: -d["rank"])
 
@@ -684,37 +773,67 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 runner = scored[1]["sim"] if len(scored) > 1 else 0.0
                 margin = best["sim"] - max(runner, best["neg"])
                 margins.append(round(margin, 3))
-                # P12 physics gate (camera-compensated)
+                # P12 physics gate (camera-compensated, full affine — Phase 8)
                 phys_ok = True
                 if last_pos is not None and last_t is not None and state != "LOST":
                     dt = max(0.05, t - last_t)
-                    dist = np.hypot(best["box"][0] + best["box"][2] / 2 - (last_pos[0] + cam_dx),
-                                    best["box"][1] + best["box"][3] / 2 - (last_pos[1] + cam_dy))
+                    exp_p = cam.point(last_pos[0], last_pos[1])
+                    dist = np.hypot(best["box"][0] + best["box"][2] / 2 - exp_p[0],
+                                    best["box"][1] + best["box"][3] / 2 - exp_p[1])
                     phys_ok = dist <= MAX_SPEED * sw * dt + med_h * 0.6
-                sim_gate = SIM_T + (REACQ_BONUS if state == "LOST" else 0.0)
-                mar_gate = MARGIN_T + (REACQ_BONUS if state == "LOST" else 0.0)
+                reacq_mode = state == "LOST" or reacq_pending
+                sim_gate = SIM_T + (REACQ_BONUS if reacq_mode else 0.0)
+                mar_gate = MARGIN_T + (REACQ_BONUS if reacq_mode else 0.0)
+                accepted_clean = False
                 if best["sim"] >= sim_gate and margin >= mar_gate and phys_ok and not crowd:
-                    if state == "LOST":  # P16 safe re-acquisition: 2 clean samples
-                        reacq_streak += 1
-                        new_state = "PROVISIONAL" if reacq_streak < 2 else "VERIFIED"
+                    if reacq_mode:
+                        # Phase 13 safe re-acquisition — multi-signal: a streak
+                        # of CONSECUTIVE clean samples (3 when lost in a crowd),
+                        # team must not contradict, pose-relaxed sim must agree.
+                        if state == "LOST":
+                            reacq_attempts += 1
+                        need = 3 if lost_in_crowd else 2
+                        reacq_need_max = max(reacq_need_max, need)
+                        cl_best = (team.classify(cv_detect.torso_chroma(small, best["box"]))
+                                   if dets else None)
+                        if cl_best in ("opponent", "other"):
+                            reacq_team_rejected += 1
+                            new_state = "UNCERTAIN"
+                        else:
+                            accepted_clean = True
+                            reacq_pending = True
+                            reacq_streak += 1
+                            if (reacq_streak >= need
+                                    and _sim_relaxed(best.get("emb"), refs) >= SIM_T):
+                                new_state = "VERIFIED"
+                                reacq_pending, lost_in_crowd = False, False
+                                reacq_verified += 1
+                            else:
+                                new_state = "PROVISIONAL"
                     else:
+                        accepted_clean = True
                         new_state = "VERIFIED"
                 elif best["sim"] >= SIM_T and phys_ok:
                     new_state = "PROVISIONAL" if not crowd else "UNCERTAIN"
                 elif best["sim"] >= SIM_T * 0.75:
                     new_state = "UNCERTAIN"
+                if reacq_pending and not accepted_clean:
+                    reacq_streak = 0  # streak must be consecutive clean samples
                 if new_state in ("VERIFIED", "PROVISIONAL"):
                     last_pos = (best["box"][0] + best["box"][2] / 2,
                                 best["box"][1] + best["box"][3] / 2)
                     last_t = t
                     lost_since = 0.0
-                if new_state != "LOST" and state != "LOST":
+                if new_state != "LOST" and state != "LOST" and not reacq_pending:
                     reacq_streak = 0
             if new_state == "LOST":
                 reacq_streak = 0
+                reacq_pending = False
                 lost_since += step / fps
                 if lost_since < LOST_GRACE and state in ("VERIFIED", "PROVISIONAL", "UNCERTAIN"):
                     new_state = "UNCERTAIN"
+            if new_state == "LOST" and state != "LOST":
+                lost_in_crowd = bool(crowd)  # Phase 13: remember the loss context
             state = new_state
             states_count[state] += 1
 
@@ -771,7 +890,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
 
         out = {
             "status": "ok",
-            "engine_version": 5,
+            "engine_version": 6,
             "duration_s": round(dur, 1),
             "samples": samples,
             "taps": [{"t": r["t"], "quality": r["quality"], "consistency": r["consistency"],
@@ -801,12 +920,31 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 "crowded_frames": prod_crowded,
                 "switch_risk_frames": switch_risk,
                 "empty_box_frames": prod_empty,
+                "neg_match_frames": neg_match,
+                "teleport_frames": teleport,
                 "suspect_ts": suspect_ts,
                 "switch_ts": switch_ts,
                 "crowded_ts": crowded_ts,
                 "empty_ts": empty_ts,
+                "neg_ts": neg_ts,
+                "teleport_ts": teleport_ts,
                 "empty_windows": empty_windows,
                 "flag_frames": saved_imgs,
+            },
+            # Phase 8/4/13 — camera model, feature ownership, re-acquisition
+            "camera": {
+                "affine_frames": cam.affine_frames,
+                "fallback_frames": cam.fallback_frames,
+            },
+            "feature_ownership": {
+                "owned_evals": own_evals,
+                "contaminated_evals": contaminated_evals,
+            },
+            "reacq": {
+                "attempts": reacq_attempts,
+                "verified": reacq_verified,
+                "team_rejected": reacq_team_rejected,
+                "max_streak_required": reacq_need_max,
             },
             # Phase 15 (shadow): production-track gaps and which are SAFELY
             # bridgeable given identity/crowd/physics context on both sides
@@ -833,6 +971,8 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
             f"[cv-shadow] {report_id}: coverage={out['verified_coverage']} "
             f"prod_sim={out['prod_verify']['sim_mean']} "
             f"suspect={prod_suspect}/{len(prod_sims)} switch_risk={switch_risk} "
+            f"neg_match={neg_match} teleport={teleport} "
+            f"cam_affine={cam.affine_frames}/{cam.affine_frames + cam.fallback_frames} "
             f"crossovers={crossovers} outliers={out['tap_outliers']} "
             f"({out['compute_s']}s for {samples} samples)"
         )

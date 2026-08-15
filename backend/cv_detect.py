@@ -126,6 +126,72 @@ class MiniMOT:
         return live
 
 
+class CameraMotion:
+    """Phase 8 — full global camera motion (pan/zoom/rotation) via sparse
+    optical flow + RANSAC similarity transform on a tiny gray frame.
+    Falls back to phase-correlation translation; fails safe to no motion.
+    Supporting layer only — never decides identity."""
+
+    def __init__(self, out_scale=1.0):
+        self.prev = None
+        self.M = None
+        self.mode = "none"
+        self.affine_frames = 0
+        self.fallback_frames = 0
+        self.out_scale = float(out_scale)
+        self.dx = 0.0
+        self.dy = 0.0
+
+    def update(self, tiny_gray_f32):
+        prev, self.prev = self.prev, tiny_gray_f32
+        self.M, self.mode = None, "none"
+        self.dx = self.dy = 0.0
+        if prev is None:
+            return
+        p8 = prev.astype(np.uint8)
+        c8 = tiny_gray_f32.astype(np.uint8)
+        try:
+            pts = cv2.goodFeaturesToTrack(p8, maxCorners=120, qualityLevel=0.01,
+                                          minDistance=6)
+            if pts is not None and len(pts) >= 20:
+                nxt, st, _ = cv2.calcOpticalFlowPyrLK(p8, c8, pts, None,
+                                                      winSize=(15, 15), maxLevel=2)
+                good = st.reshape(-1) == 1
+                if good.sum() >= 12:
+                    M, inl = cv2.estimateAffinePartial2D(
+                        pts[good], nxt[good], method=cv2.RANSAC,
+                        ransacReprojThreshold=2.0)
+                    if M is not None and inl is not None and int(inl.sum()) >= 10:
+                        self.M = M
+                        self.mode = "affine"
+                        self.affine_frames += 1
+                        h, w = p8.shape[:2]
+                        cx, cy = w / 2.0, h / 2.0
+                        nx = M[0, 0] * cx + M[0, 1] * cy + M[0, 2]
+                        ny = M[1, 0] * cx + M[1, 1] * cy + M[1, 2]
+                        self.dx = (nx - cx) * self.out_scale
+                        self.dy = (ny - cy) * self.out_scale
+                        return
+        except Exception:
+            pass
+        try:
+            (dx, dy), _ = cv2.phaseCorrelate(prev, tiny_gray_f32)
+            self.dx, self.dy = dx * self.out_scale, dy * self.out_scale
+            self.mode = "translation"
+            self.fallback_frames += 1
+        except Exception:
+            self.mode = "none"
+
+    def point(self, x, y):
+        """Transform a point (in output/small coords) through the last motion."""
+        if self.M is None:
+            return (x + self.dx, y + self.dy)
+        tx, ty = x / self.out_scale, y / self.out_scale
+        nx = self.M[0, 0] * tx + self.M[0, 1] * ty + self.M[0, 2]
+        ny = self.M[1, 0] * tx + self.M[1, 1] * ty + self.M[1, 2]
+        return (nx * self.out_scale, ny * self.out_scale)
+
+
 def torso_chroma(small, box):
     """Median Lab (a, b) chroma of the non-pitch torso zone → kit signature.
     Chroma is far more lighting-stable than hue/brightness."""
