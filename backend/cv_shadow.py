@@ -188,6 +188,47 @@ def _cluster_windows(ts_list, join=1.0, pad=0.3):
     return [[round(max(0.0, a - pad), 1), round(b + pad, 1)] for a, b in out]
 
 
+def bridge_track_points(points, windows, hz=5.0):
+    """Phase 15 ACTIVATION: return a COPY of the production track where small,
+    pre-validated safe gaps are linearly interpolated (identity verified on
+    both sides, no crowding, physics-realistic — validated in shadow). The
+    stored production track is NEVER mutated; this only feeds rendering."""
+    if not points or not windows:
+        return points
+    pts = sorted((dict(p) for p in points), key=lambda p: float(p["t"]))
+    added = []
+    for w in windows:
+        try:
+            w0, w1 = float(w[0]), float(w[1])
+        except Exception:
+            continue
+        p0 = max((p for p in pts if float(p["t"]) <= w0 + 0.05),
+                 key=lambda p: float(p["t"]), default=None)
+        p1 = min((p for p in pts if float(p["t"]) >= w1 - 0.05),
+                 key=lambda p: float(p["t"]), default=None)
+        if not p0 or not p1:
+            continue
+        t0, t1 = float(p0["t"]), float(p1["t"])
+        if t1 - t0 <= 0:
+            continue
+        n = int((t1 - t0) * hz)
+        for k in range(1, n):
+            f = k / n
+            added.append({
+                "t": round(t0 + f * (t1 - t0), 3),
+                "x": float(p0["x"]) + f * (float(p1["x"]) - float(p0["x"])),
+                "y": float(p0["y"]) + f * (float(p1["y"]) - float(p0["y"])),
+                "w": float(p0["w"]) + f * (float(p1["w"]) - float(p0["w"])),
+                "h": float(p0["h"]) + f * (float(p1["h"]) - float(p0["h"])),
+                "conf": round(min(float(p0.get("conf") or 0.8),
+                                  float(p1.get("conf") or 0.8)) * 0.9, 3),
+                "bridged": True,
+            })
+    if not added:
+        return points
+    return sorted(list(pts) + added, key=lambda p: float(p["t"]))
+
+
 # ---------------------------------------------------------------- reference
 def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None):
     """P1-P4: refine each user tap to the actual person, score its quality,

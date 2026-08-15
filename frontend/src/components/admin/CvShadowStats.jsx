@@ -52,6 +52,9 @@ export default function CvShadowStats() {
                 <span>identity match <b>{agg.sim_mean ?? "—"}</b></span>
                 <span className={agg.suspect_rate > 0.15 ? "text-amber-600" : ""}>suspect rate <b>{Math.round((agg.suspect_rate || 0) * 100)}%</b></span>
                 <span className={agg.switch_risk_frames > 0 ? "text-red-500" : ""}>switch-risk frames <b>{agg.switch_risk_frames}</b> ({Math.round((agg.switch_rate || 0) * 100)}%)</span>
+                <span className={agg.gap_bridge_active ? "text-green-600" : "text-ink/50"} data-testid="cv-gap-bridge-status">
+                  gap bridging <b>{agg.gap_bridge_active ? "ACTIVE" : `dormant (needs ≥${agg.gap_bridge_min_reports} clean reports)`}</b>
+                </span>
               </div>
               <div className="space-y-1 max-h-56 overflow-y-auto">
                 {data.reports.map((r) => (

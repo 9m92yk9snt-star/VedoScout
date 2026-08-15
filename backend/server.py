@@ -7599,6 +7599,26 @@ async def _teleclip_verified_window(report_id: str, i: int, video_path, track_pt
     return plan_window(track_pts, sec, min(pre, TELE_EDGE_TRUST), min(post, TELE_EDGE_TRUST))
 
 
+async def _cv_gap_bridge_allowed() -> bool:
+    """Gap bridging goes live ONLY when the cross-report shadow base is clean
+    (user rule): ≥ N reports analysed and aggregate suspect/switch rates low."""
+    try:
+        min_reports = int(os.environ.get("CV_GAP_BRIDGE_MIN_REPORTS", "2"))
+        max_suspect = float(os.environ.get("CV_GAP_BRIDGE_MAX_SUSPECT", "0.15"))
+        max_switch = float(os.environ.get("CV_GAP_BRIDGE_MAX_SWITCH_RATE", "0.02"))
+        docs = await db.reports.find(
+            {"cv_shadow.status": "ok"}, {"_id": 0, "cv_shadow.prod_verify": 1}).to_list(100)
+        pvs = [((d.get("cv_shadow") or {}).get("prod_verify") or {}) for d in docs]
+        checked = sum(int(p.get("checked") or 0) for p in pvs)
+        if len(pvs) < min_reports or checked <= 0:
+            return False
+        suspect = sum(int(p.get("suspect_frames") or 0) for p in pvs)
+        switch = sum(int(p.get("switch_risk_frames") or 0) for p in pvs)
+        return suspect / checked <= max_suspect and switch / checked <= max_switch
+    except Exception:
+        return False
+
+
 async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: list, video_path,
                                ref_crops: list):
     """Tracked proof clips for telestrated moments. Ring positions come from the
@@ -7635,7 +7655,8 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                 {"_id": 0, "cv_shadow.prod_verify.switch_ts": 1,
                  "cv_shadow.prod_verify.empty_windows": 1,
                  "cv_shadow.prod_verify.suspect_rate": 1,
-                 "cv_shadow.prod_verify.switch_risk_frames": 1})
+                 "cv_shadow.prod_verify.switch_risk_frames": 1,
+                 "cv_shadow.gap_bridging.windows": 1})
             _pv = ((_fresh or {}).get("cv_shadow") or {}).get("prod_verify") or {}
             for x in _pv.get("switch_ts") or []:
                 _t = x.get("t") if isinstance(x, dict) else x
@@ -7653,6 +7674,16 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                     and int(_pv.get("switch_risk_frames") or 0) <= CV_PROOF_EXPAND_MAX_SWITCH):
                 clip_cap = TELE_CLIP_MAX_STABLE
                 logger.info(f"[teleclip] {report_id}: shadow stability documented — clip cap {clip_cap}")
+            # Phase 15 ACTIVATION: interpolate pre-validated safe gaps into the
+            # RENDERING copy of the track — only when the cross-report shadow
+            # base is clean. Stored production track is never mutated.
+            if os.environ.get("CV_GAP_BRIDGE_ENABLED", "1") == "1":
+                _bw = (((_fresh or {}).get("cv_shadow") or {}).get("gap_bridging") or {}).get("windows") or []
+                if _bw and await _cv_gap_bridge_allowed():
+                    _n0 = len(track_pts)
+                    track_pts = cv_shadow.bridge_track_points(track_pts, _bw)
+                    logger.info(f"[teleclip] {report_id}: gap bridging ACTIVE — "
+                                f"+{len(track_pts) - _n0} interpolated points in {len(_bw)} safe windows")
     except Exception:
         risky_windows = []
         clip_cap = TELE_CLIP_MAX
@@ -13835,6 +13866,8 @@ async def admin_cv_shadow_summary(_=Depends(get_current_admin)):
             "switch_risk_frames": tot_switch,
             "switch_rate": round(tot_switch / max(1, tot_checked), 3),
             "sim_mean": round(sum(sims) / max(1, len(sims)), 3) if sims else None,
+            "gap_bridge_active": await _cv_gap_bridge_allowed(),
+            "gap_bridge_min_reports": int(os.environ.get("CV_GAP_BRIDGE_MIN_REPORTS", "2")),
         },
         "reports": rows,
     }
