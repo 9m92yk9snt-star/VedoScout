@@ -7972,6 +7972,24 @@ async def generate_full_report_task(report_id: str) -> None:
                 f"{len(gt_track.get('segments') or [])} segments (Δ={gt_t_off:+.2f}s)"
             )
 
+        # ── CV SHADOW MODE (additive, feature-flagged, observe-only) ──
+        # Runs the new identity engine in the background AFTER production tracking.
+        # It never touches gt_track, analysis, markers or proofs — diagnostics only.
+        if cv_shadow.SHADOW_ENABLED and gt_track and valid_anchors:
+            async def _cv_shadow_bg():
+                try:
+                    shadow = await asyncio.to_thread(
+                        cv_shadow.run_shadow, report_id, str(file_path),
+                        {"anchors": valid_anchors, "player_track": gt_track,
+                         "anchor_time_offset": gt_t_off},
+                    )
+                    if shadow:
+                        await db.reports.update_one(
+                            {"id": report_id}, {"$set": {"cv_shadow": shadow}})
+                except Exception:
+                    logger.exception(f"[cv-shadow] background run failed for {report_id}")
+            asyncio.create_task(_cv_shadow_bg())
+
         async def _movement_pace_core():
             """Movement map + trusted fastest moment + pace metrics. Runs in
             parallel with the Gemini call — nothing here feeds the prompt."""
@@ -13670,6 +13688,27 @@ async def admin_reports(_=Depends(get_current_admin)):
     return docs
 
 
+@api_router.get("/admin/reports/{report_id}/cv-shadow")
+async def admin_cv_shadow(report_id: str, run: bool = False, _=Depends(get_current_admin)):
+    """Admin-only diagnostics from the shadow-mode CV identity engine.
+    ?run=1 (re)computes on demand for an existing report. Observe-only."""
+    doc = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Report not found")
+    if run:
+        vf = doc.get("video_filename")
+        vp = (UPLOAD_DIR / vf) if vf else None
+        if vp and not vp.exists():
+            _try_restore_from_r2(doc.get("video_url_override"), vp)
+        if not vp or not vp.exists():
+            raise HTTPException(status_code=400, detail="Video file not available locally")
+        shadow = await asyncio.to_thread(cv_shadow.run_shadow, report_id, str(vp), doc)
+        if shadow:
+            await db.reports.update_one({"id": report_id}, {"$set": {"cv_shadow": shadow}})
+        return {"report_id": report_id, "cv_shadow": shadow}
+    return {"report_id": report_id, "cv_shadow": doc.get("cv_shadow")}
+
+
 @api_router.post("/admin/seed-test-accounts")
 async def admin_seed_test_accounts(_=Depends(get_current_admin)):
     """Idempotent: creates (or updates) two demo accounts used for QA:
@@ -14627,6 +14666,7 @@ from identity_verify import (
 )
 from telestration import render_telestration, detect_player_bbox, crop_box_region, find_player_double_gated
 from player_tracking import track_player, track_at
+import cv_shadow
 from movement_metrics import compute_movement_map, fmt_mmss
 from speed_metrics import compute_speed_metrics
 from progression import build_progression

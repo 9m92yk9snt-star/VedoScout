@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
   ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
-  Share2, Twitter, Facebook, Linkedin, Instagram, Layout, RefreshCcw,
+  Share2, Twitter, Facebook, Linkedin, Instagram, Layout, RefreshCcw, Radar,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
@@ -34,6 +34,7 @@ import DashboardHubAdmin from "@/components/admin/DashboardHubAdmin";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import AdStudioAdmin from "@/components/admin/AdStudioAdmin";
 import QualityAdmin from "@/components/admin/QualityAdmin";
+import CvShadowDialog from "@/components/admin/CvShadowDialog";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
@@ -147,6 +148,7 @@ export default function AdminPage() {
   const [deletingUserId, setDeletingUserId] = useState(null);
   // Reports tab — failed/empty uploads are hidden by default (list hygiene)
   const [showFailedReports, setShowFailedReports] = useState(false);
+  const [cvShadowReportId, setCvShadowReportId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -611,6 +613,16 @@ export default function AdminPage() {
                               )}
                               {(r.is_paid || r.manually_unlocked) && (
                                 <button
+                                  onClick={() => setCvShadowReportId(r.id)}
+                                  data-testid={`admin-cv-shadow-${r.id}`}
+                                  title="CV shadow diagnostics (identity safety)"
+                                  className="text-volt hover:bg-volt hover:text-white p-2 transition-colors"
+                                >
+                                  <Radar className="w-4 h-4" />
+                                </button>
+                              )}
+                              {(r.is_paid || r.manually_unlocked) && (
+                                <button
                                   onClick={() => handleRegenEvidence(r.id)}
                                   data-testid={`admin-regen-evidence-${r.id}`}
                                   title="Regenerate evidence frames + proof clips"
@@ -637,6 +649,9 @@ export default function AdminPage() {
                     </tbody>
                   </table>
                 </div>
+                {cvShadowReportId && (
+                  <CvShadowDialog reportId={cvShadowReportId} onClose={() => setCvShadowReportId(null)} />
+                )}
                 </div>
                 );
               })()}
