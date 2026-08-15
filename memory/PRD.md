@@ -1,5 +1,11 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 22) — DEPLOY-KLAR + FULD VERIFIKATION MED TESTING AGENT ✅ (iteration_95: backend 100%, frontend ~95%)
+- **Deployment-readiness: PASS** efter 2 fixes: (1) `backend/.env` CORS_ORIGINS="*" (app bruger Bearer-tokens, ikke cookies — sikkert), (2) `AuthShell.jsx` googleRedirect uden path-parameter (funktionen havde INGEN callers = risikofrit; session_id-hash processeres globalt i App.js). Selve deployet skal brugeren udføre via Deploy-knappen.
+- **Testing agent iteration_95 bekræftede HELE listen**: Phase 0–14/17–23 uændret (samme tracks/analyse/evidens/rapporter), køber-API dybde-scannet UDEN cv_shadow-læk, evidens-frames 200 image/jpeg, clips 200 video/mp4 (signed URLs uafhængige af bearer), admin-endpoints 403 uden auth, summary-aggregat {3 rapporter, 295 tjek, suspect ≤5%, switch 0, gap_bridge_active}, shadow-dialog + galleri virker. **VISUELT BESTÅET: grounded ellipse ved fod/jordkontakt, renderet BAG støvler/ben (okklusion), INGEN navn/'TRACKED'/chip/pointer.** Genbrugelig regressionstest: `/app/backend/tests/test_iter95_cv_shadow.py` (10 tests).
+- Minor fixes efter test: React duplicate-key i CvShadowStats (composite key), 404-konsolfejl kunne ikke reproduceres (0 fundet ved eget tjek), thumbnails tidligere bekræftet loadende.
+- **PHASE 15/16 ER LUKKET.** Ingen nye produktfaser påbegyndt (brugerens instruks: stop og rapportér).
+
 ## Session (Jun 2026 — part 21) — PHASE 15 MARKER-KORREKTION (ren downstream-renderer) ✅ (visuelt verificeret + alle 3 rapporter re-renderet)
 - **Label/chip/pointer FJERNET HELT** i både `telestration.py` (statiske frames) og `tele_clip.py` (clips) — den groundede ellipse alene er markøren. `label`-parametre bevaret ubrugte (API-kompatibilitet); `_make_chip`/`_blend_chip` ubrugte men ikke slettet (minimal ændring).
 - **Spilleren-foran-ringen okklusion**: efter ring-tegning restaureres spillerens silhuet (non-green maske i bånd cx±0.6·rw, feet_y−3·rh..feet_y+rh, feathered GaussianBlur) — den grønne linje krydser ALDRIG forrest på fødder/ben; ringen læses som malet på banen bag spilleren. Implementeret ens i begge renderere.

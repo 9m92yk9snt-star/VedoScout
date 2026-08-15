@@ -57,8 +57,8 @@ export default function CvShadowStats() {
                 </span>
               </div>
               <div className="space-y-1 max-h-56 overflow-y-auto">
-                {data.reports.map((r) => (
-                  <div key={r.report_id} className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-ink/65" data-testid={`cv-shadow-row-${r.report_id}`}>
+                {data.reports.map((r, i) => (
+                  <div key={`${r.report_id}-${i}`} className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-[11px] text-ink/65" data-testid={`cv-shadow-row-${r.report_id}`}>
                     <span className="font-bold text-ink w-28 truncate">{r.player}</span>
                     <span>v{r.engine_version}</span>
                     <span>{r.checked} checks</span>

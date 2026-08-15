@@ -16,8 +16,8 @@ export const AUTH_HERO_IMG = `${ASSET_BASE}/api/static/landing/auth-hero-player.
 export const AUTH_AVATARS = [1, 2, 3, 4].map((i) => `${ASSET_BASE}/api/static/landing/auth-avatar-${i}.jpg`);
 
 /* REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH */
-export const googleRedirect = (path = "/dashboard") => {
-  const redirectUrl = window.location.origin + path;
+export const googleRedirect = () => {
+  const redirectUrl = window.location.origin;
   window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
 };
 
