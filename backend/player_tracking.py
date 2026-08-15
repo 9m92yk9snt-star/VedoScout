@@ -31,6 +31,26 @@ DRIFT_MIN = 0.30
 MAX_MISSES = 3
 COLOR_MIN = 0.22      # HSV-correlation below this = colour mismatch
 COLOR_MAX_MISSES = 3  # consecutive colour mismatches → stop (identity risk)
+# ── track-end drift protection (validated on 3 real matches) ──
+# Real players never sustain near-perfect NCC at 12.5 Hz (pose changes keep
+# it ≤ ~0.89); a template latched onto STATIC BACKGROUND does (0.94-0.998).
+LOCK_CONF = 0.93      # sustained match ≥ this = background latch
+LOCK_STEPS = 6        # ≈ 0.5 s of near-perfect matches → stop + un-record
+CUT_DIFF = 45.0       # global frame diff (160w gray) above this = scene cut
+                      # (measured: pans p99 = 33, real montage cuts 47-67)
+
+
+def _cut_flags(frames):
+    """flags[i] = True when a scene cut lies between frames[i-1] and frames[i]."""
+    flags = [False] * len(frames)
+    prev = None
+    for i, (_t, g, _hsv) in enumerate(frames):
+        small = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1]))))
+        sf = small.astype("float32")
+        if prev is not None and prev.shape == sf.shape:
+            flags[i] = float(cv2.absdiff(prev, sf).mean()) > CUT_DIFF
+        prev = sf
+    return flags
 
 
 def _read_window(cap, w0: float, w1: float, step: float):
@@ -113,7 +133,8 @@ def _doubt(doubts, t: float, cur, W: int, H: int, reason: str):
     })
 
 
-def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None):
+def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None,
+                   cuts: list | None = None):
     _t0, g0, hsv0 = frames[i0]
     tmpl0 = _crop(g0, box_px)
     if tmpl0 is None:
@@ -126,9 +147,16 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
     misses = 0
     color_misses = 0
     steps = 0
+    lock_ts: list = []  # timestamps of the current near-perfect-match streak
     cur = list(box_px)
     end = len(frames) if direction > 0 else -1
     for i in range(i0 + direction, end, direction):
+        # ── scene-cut stop: a montage cut invalidates template tracking ──
+        if cuts is not None:
+            boundary = cuts[i] if direction > 0 else (cuts[i + 1] if i + 1 < len(cuts) else False)
+            if boundary:
+                _doubt(doubts, frames[i][0], cur, W, H, "scene cut — tracking cannot continue")
+                break
         t, g, hsv = frames[i]
         gx, gy = bw * 0.45, bh * 0.45
         sx0, sy0 = max(0, int(cur[0] - gx)), max(0, int(cur[1] - gy))
@@ -156,6 +184,18 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
         color_misses = 0
         cur = cand_box
         steps += 1
+        # ── static-background latch: real players never sustain near-perfect
+        # NCC (pose keeps changing); static background does. Stop and remove
+        # the latched points — no data is better than a ring on bushes. ──
+        if mx >= LOCK_CONF:
+            lock_ts.append(round(t, 2))
+            if len(lock_ts) >= LOCK_STEPS:
+                for tt in lock_ts:
+                    out.pop(tt, None)
+                _doubt(doubts, t, cur, W, H, "static background lock — player left the box")
+                break
+        else:
+            lock_ts = []
         cand = _crop(g, cur)
         if cand is None:
             break
@@ -199,8 +239,9 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
                 (float(b["x"]) + float(b["w"])) * W, (float(b["y"]) + float(b["h"])) * H,
             ]
             _record(points, frames[i0][0], box_px, W, H, 1.0)  # the tap itself
-            _run_direction(frames, i0, box_px, points, +1, doubts)
-            _run_direction(frames, i0, box_px, points, -1, doubts)
+            cuts = _cut_flags(frames)
+            _run_direction(frames, i0, box_px, points, +1, doubts, cuts)
+            _run_direction(frames, i0, box_px, points, -1, doubts, cuts)
             del frames
     finally:
         cap.release()

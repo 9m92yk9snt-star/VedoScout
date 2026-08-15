@@ -536,7 +536,22 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                     # rescue the sample, but ONLY when a detected person is
                     # actually inside the prod box (an empty box must keep
                     # flagging). All flags need 2 consecutive low samples.
+                    # empty-box check: no detection overlapping AND the box
+                    # content is not person-like (a far/small player can be
+                    # missed by the detector — white kit against pitch gives a
+                    # high non-green fraction, bushes/grass do not)
                     person_in_box = any(_iou(c, pb) > 0.2 for c in dets) if dets else True
+                    if dets and not person_in_box:
+                        _bx0, _by0 = max(0, pb[0]), max(0, pb[1])
+                        _bx1 = min(sw, pb[0] + pb[2])
+                        _by1 = min(sh, pb[1] + pb[3])
+                        _roi = small[_by0:_by1, _bx0:_bx1]
+                        if _roi.size >= 60:
+                            _ng = cv2.bitwise_not(_green_mask(_roi))
+                            # measured on real footage: bushes/goal background
+                            # 0.35-0.52, real player boxes 0.65-0.86
+                            if float(_ng.mean()) / 255.0 >= 0.55:
+                                person_in_box = True  # person-like content present
                     ps_rel = _sim_relaxed(pe, refs)
                     low = ps < SIM_T * 0.75 and (not person_in_box or ps_rel < SIM_T)
                     if detector.ok and not person_in_box:
