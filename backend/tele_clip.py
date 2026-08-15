@@ -16,7 +16,8 @@ logger = logging.getLogger("elite-scout")
 MIN_COVERAGE = 0.90   # user rule: only near-complete tracking ships, else fallback video
 MAX_GAP_SEC = 0.5     # track samples further apart than this end the usable window
 FADE_SEC = 0.35       # ring fades in/out — never pops
-MIN_CLIP_SEC = 1.4
+MIN_CLIP_SEC = 3.0    # shorter verified windows fall back to the full video
+                      # with the moment chip — no meaningless 2-3 s loops
 SEED_TOL = 0.35       # a track point must exist this close to the cited moment
 
 
@@ -61,7 +62,43 @@ def _blend_chip(frame, chip, x: int, y: int, alpha: float = 1.0):
 VOLT_BGR = np.float32([0, 255, 204])
 
 
-def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float = 1.0):
+def _ground_anchor(frame, px, py, bw, bh):
+    """Visual Ground-Anchor Resolver: locate the target's ACTUAL ground
+    contact (feet/hands footprint) near the accepted box instead of blindly
+    trusting bbox bottom-center. Handles running, wide stance, distant
+    players, duels (ownership stays within the accepted box's columns) and
+    falls (contact may sit BELOW a torso-hugging box). Fail-safe fallback:
+    the incoming bbox bottom-center. Never touches tracking data."""
+    fh, fw = frame.shape[:2]
+    x0, x1 = int(max(0, px - bw * 0.62)), int(min(fw, px + bw * 0.62))
+    y0, y1 = int(max(0, py - bh * 0.85)), int(min(fh, py + bh * 0.45))
+    if x1 - x0 < 8 or y1 - y0 < 10:
+        return px, py, None
+    hsv = cv2.cvtColor(frame[y0:y1, x0:x1], cv2.COLOR_BGR2HSV)
+    pm = (cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0).astype(np.uint8)
+    pm = cv2.morphologyEx(pm, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    ys, xs = np.nonzero(pm)
+    if len(ys) < 30:
+        return px, py, None
+    keep = np.abs(xs + x0 - px) <= bw * 0.5  # ownership: target's own columns
+    ys, xs = ys[keep], xs[keep]
+    if len(ys) < 25:
+        return px, py, None
+    y_low = float(np.percentile(ys, 96))
+    band = ys >= y_low - max(3.0, bh * 0.12)
+    if int(band.sum()) < 10:
+        return px, py, None
+    bx, by = xs[band], ys[band]
+    ax = x0 + float(np.median(bx))
+    ay = y0 + float(np.percentile(by, 85))
+    foot_w = float(np.percentile(bx, 95) - np.percentile(bx, 5))
+    if abs(ax - px) > bw * 0.45 or ay < py - bh * 0.55:
+        return px, py, None  # implausible → honest fallback
+    return ax, min(ay, fh - 2.0), foot_w
+
+
+def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float = 1.0,
+               state: dict | None = None):
     """Ground-integrated marker: the ellipse reads as PAINTED ON the pitch under
     the player, not as a graphic overlay. Volt paint is modulated by the grass
     luminance (inherits pitch texture), a soft contact shadow grounds the player,
@@ -71,15 +108,31 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
     if alpha <= 0.02:
         return
     fh, fw = frame.shape[:2]
+    bx_w, bx_h = max(8.0, w * fw), max(12.0, h * fh)
+    ax, ay, foot_w = _ground_anchor(frame, cx * fw, min(feet_y, 0.995) * fh, bx_w, bx_h)
+    if state is not None:  # temporal stability across clip frames
+        prev = state.get("anchor")
+        if prev is not None:
+            jump = float(np.hypot(ax - prev[0], ay - prev[1]))
+            k = 0.15 if jump > bx_h * 0.6 else 0.45  # implausible jump → glide
+            ax = prev[0] + k * (ax - prev[0])
+            ay = prev[1] + k * (ay - prev[1])
+            if foot_w and state.get("foot_w"):
+                foot_w = state["foot_w"] + 0.3 * (foot_w - state["foot_w"])
+        state["anchor"] = (ax, ay)
+        if foot_w:
+            state["foot_w"] = foot_w
     est_h = min(max(h * fh, fh * 0.045), fw * 0.333, fh * 0.42)
     rw = est_h * 0.30
-    rw = max(rw, min(w * fw * 0.55, est_h * 0.45))  # both feet inside on a wide stance
+    if foot_w:  # stance-adaptive: the real footprint decides the width
+        rw = max(rw, min(foot_w * 0.85, est_h * 0.50))
+    else:
+        rw = max(rw, min(w * fw * 0.55, est_h * 0.45))
     rw = int(min(max(rw, fw * 0.024), fw * 0.10))
-    py = int(min(feet_y, 0.995) * fh)
+    px, py = int(ax), int(min(ay, fh * 0.995))
     ratio = 0.26 + 0.14 * min(1.0, max(0.0, py / max(1, fh)))  # flatter when far away
     rh = max(4, int(rw * ratio))
     lw = max(2, int(rw * 0.085))
-    px = int(cx * fw)
     m = lw * 10
     x0, y0 = max(0, px - rw - m), max(0, py - rh - m)
     x1, y1 = min(fw, px + rw + m), min(fh, py + rh + m)
@@ -267,6 +320,7 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         cap.set(cv2.CAP_PROP_POS_FRAMES, f0)
         idx = f0
         ema_wh = None
+        ring_state = {}  # ground-anchor temporal smoothing across frames
         while idx <= f1:
             ok, frame = cap.read()
             if not ok:
@@ -284,7 +338,7 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             est_h = min(max(bh * H, H * 0.045), W * 0.333, H * 0.42)
             rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
             feet_px = feet_y * H - min(bh * H * 0.08, rw * 0.34 * 0.8)
-            _draw_ring(frame, cx, feet_px / H, bw, bh, a)
+            _draw_ring(frame, cx, feet_px / H, bw, bh, a, state=ring_state)
             # no label/chip: the grounded ellipse alone is the visual marker
             writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             idx += 1

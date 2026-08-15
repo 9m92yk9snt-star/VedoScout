@@ -258,7 +258,12 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
     const vc = (report.full_report?.video_comments || []).find(
       (c) => c && c.timestamp === ts && c.tele_clip_url,
     );
-    setProof({ ts: ts || null, clip: vc ? resolveUrl(vc.tele_clip_url, assetBase) : null, key: Date.now() });
+    setProof({
+      ts: ts || null,
+      clip: vc ? resolveUrl(vc.tele_clip_url, assetBase) : null,
+      clipStart: vc && typeof vc.tele_clip_start === "number" ? vc.tele_clip_start : null,
+      key: Date.now(),
+    });
   }, [report, assetBase]);
 
   const proofFrames = [

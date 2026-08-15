@@ -7564,7 +7564,7 @@ async def _teleclip_verified_window(report_id: str, i: int, video_path, track_pt
     different model family than the tracker). An unconfirmed edge shrinks the
     window toward the tapped moment; too little verified footage → no clip."""
     from tele_clip import plan_window
-    pre = post = 1.8 if ref_crops else TELE_EDGE_TRUST
+    pre, post = (2.5, 3.5) if ref_crops else (TELE_EDGE_TRUST, TELE_EDGE_TRUST)
     for rnd in range(3):
         win = plan_window(track_pts, sec, pre, post)
         if not win:
@@ -7643,6 +7643,8 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
         if isinstance(c, dict):
             c.pop("tele_clip_url", None)
             c.pop("tele_clip_coverage", None)
+            c.pop("tele_clip_start", None)
+            c.pop("tele_clip_end", None)
     # P19 marker state-fade: ring fades out inside shadow switch-risk windows
     # (never rides along on a possibly wrong player). Fail-open: no shadow
     # data or flag off → exactly the previous behaviour.
@@ -7718,6 +7720,9 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
         if res and res.get("ok"):
             c["tele_clip_url"] = f"/api/uploads/frames/{report_id}/{out.name}"
             c["tele_clip_coverage"] = res.get("coverage")
+            # THE MOMENT activation in the proof player = event_start - clip_start
+            c["tele_clip_start"] = res.get("start")
+            c["tele_clip_end"] = res.get("end")
             made += 1
             clipped_secs.append(sec)
             logger.info(f"[teleclip] {report_id}: clip {out.name} coverage={res.get('coverage')}")

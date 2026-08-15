@@ -49,9 +49,22 @@ def test_report_no_cv_shadow_leak(admin_headers):
     assert isinstance(vc, list) and len(vc) > 0, "no video_comments"
     frame_urls = [c.get("frame_url") for c in vc if c.get("frame_url")]
     assert len(frame_urls) > 0, "no frame_url in video_comments"
-    # tele_clip_url >=2
-    tele_clips = [c.get("tele_clip_url") for c in vc if c.get("tele_clip_url")]
-    assert len(tele_clips) >= 2, f"expected >=2 tele_clip_url entries, got {len(tele_clips)}"
+    # Proof clips are OPTIONAL per report since MIN_CLIP_SEC=3.0: only ≥3s
+    # identity-verified windows ship (no meaningless 2-3s loops). Collect
+    # clips across ALL seeded reports; at least one must exist WITH the
+    # tele_clip_start metadata that drives THE MOMENT activation.
+    tele_clips = []
+    for rid in [REPORT_ID, "fe7bc3e5-8181-465f-a41a-99c54d691710",
+                "3467a622-c287-4b81-add4-f5411b3fef4b"]:
+        rr = requests.get(f"{BASE_URL}/api/reports/{rid}", headers=admin_headers, timeout=30)
+        if rr.status_code != 200:
+            continue
+        for c in (rr.json().get("full_report") or {}).get("video_comments") or []:
+            if isinstance(c, dict) and c.get("tele_clip_url"):
+                assert isinstance(c.get("tele_clip_start"), (int, float)), "tele_clip_start missing on clip"
+                assert isinstance(c.get("tele_clip_end"), (int, float)), "tele_clip_end missing on clip"
+                tele_clips.append(c["tele_clip_url"])
+    assert len(tele_clips) >= 1, f"expected >=1 tele_clip_url across seeded reports, got {len(tele_clips)}"
     # stash on module for reuse
     pytest.frame_url = frame_urls[0]
     pytest.tele_clip_url = tele_clips[0]

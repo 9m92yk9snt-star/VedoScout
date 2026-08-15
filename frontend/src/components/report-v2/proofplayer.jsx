@@ -11,14 +11,29 @@ const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math
 
 export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onClose, onUnlock }) {
   const vidRef = useRef(null);
+  const clipRef = useRef(null);
   const [atMoment, setAtMoment] = useState(false);
+  const [atClipMoment, setAtClipMoment] = useState(false);
   const [clipFailed, setClipFailed] = useState(false);
   const sec = tsToSeconds(proof?.ts);
   const startAt = sec != null ? Math.max(0, sec - 4) : 0;
   const locked = !!proof?.locked;
   const useClip = !!proof?.clip && !clipFailed && !demo && !locked;
+  const clipStart = typeof proof?.clipStart === "number" ? proof.clipStart : null;
+  // THE MOMENT activation inside a proof clip = event_start - clip_start
+  const clipMomentAt = useClip && clipStart != null && sec != null ? Math.max(0, sec - clipStart) : null;
 
   useEffect(() => { setClipFailed(false); }, [proof?.key]);
+
+  useEffect(() => {
+    setAtClipMoment(false);
+    if (!useClip || clipMomentAt == null) return undefined;
+    const v = clipRef.current;
+    if (!v) return undefined;
+    const onTime = () => setAtClipMoment(v.currentTime >= clipMomentAt - 0.15 && v.currentTime <= clipMomentAt + 2.0);
+    v.addEventListener("timeupdate", onTime);
+    return () => v.removeEventListener("timeupdate", onTime);
+  }, [proof, useClip, clipMomentAt]);
 
   useEffect(() => {
     if (!proof) return undefined;
@@ -112,6 +127,7 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
               <>
                 <video
                   key={proof.clip}
+                  ref={clipRef}
                   src={proof.clip}
                   poster={posterUrl || undefined}
                   autoPlay
@@ -126,9 +142,11 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
                 />
                 <span
                   data-testid="proof-clip-badge"
-                  className="absolute top-2 right-2 z-10 px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-[0.08em] uppercase pointer-events-none bg-[#CCFF00] text-[#12211A]"
+                  className={`absolute top-2 right-2 z-10 px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-[0.08em] uppercase pointer-events-none transition-colors duration-300 ${
+                    atClipMoment ? "bg-[#CCFF00] text-[#12211A] animate-pulse" : "bg-black/70 text-white/85"
+                  }`}
                 >
-                  Player tracked · {proof.ts}
+                  {atClipMoment ? "The moment" : "Moment at"} · {proof.ts}
                 </span>
                 <button
                   data-testid="proof-clip-fullvideo-btn"
@@ -184,8 +202,12 @@ export function ProofPlayerSheet({ proof, videoUrl, posterUrl, frames, demo, onC
           ) : (
             <p className="text-white/45 text-[10.5px] leading-[1.4] px-1.5 pt-2 pb-1 flex items-center gap-1.5">
               <ShieldCheck className="w-3 h-3 text-[#CCFF00] shrink-0" />
-              {sec != null && proof.ts
-                ? <>Playing from {fmt(startAt)} so you see the build-up — the moment hits at <span className="text-[#CCFF00] font-bold">{proof.ts}</span>.</>
+            {sec != null && proof.ts
+                ? (useClip
+                    ? (clipStart != null
+                        ? <>Playing from {fmt(clipStart)} so you see the build-up — the moment hits at <span className="text-[#CCFF00] font-bold">{proof.ts}</span>.</>
+                        : <>Verified tracked clip of the moment at <span className="text-[#CCFF00] font-bold">{proof.ts}</span>.</>)
+                    : <>Playing from {fmt(startAt)} so you see the build-up — the moment hits at <span className="text-[#CCFF00] font-bold">{proof.ts}</span>.</>)
                 : <>Playing the uploaded match video.</>}
             </p>
           )}

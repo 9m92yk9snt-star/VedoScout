@@ -28,7 +28,7 @@ box = {"x0": float(near["x"]), "y0": float(near["y"]),
        "x1": float(near["x"]) + float(near["w"]), "y1": float(near["y"]) + float(near["h"])}
 print("static:", telestration.render_telestration("/tmp/marker_static.jpg", box, ring=True))
 
-res = tele_clip.generate_tracked_clip(str(vp), T, pts, "/tmp/marker_clip.mp4")
+res = tele_clip.generate_tracked_clip(str(vp), T, pts, "/tmp/marker_clip.mp4", "X", 2.5, 3.5)
 print("clip:", res)
 if res:
     cap = cv2.VideoCapture("/tmp/marker_clip.mp4")
