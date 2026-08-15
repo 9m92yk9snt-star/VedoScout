@@ -142,8 +142,14 @@ export default function CvShadowDialog({ reportId, onClose }) {
                 );
               })()}
               <div className="text-[11px] text-ink/50 leading-relaxed">
-                Taps: {data.taps?.length} · outliers {data.tap_outliers} · verified coverage {Math.round((data.verified_coverage || 0) * 100)}% ·
+                Taps: {data.taps?.length} · outliers {data.tap_outliers} · rejected {data.tap_rejected ?? 0} · verified coverage {Math.round((data.verified_coverage || 0) * 100)}% ·
                 crossovers {data.crossover_samples} · engine v{data.engine_version} · {data.compute_s}s
+                {data.gap_bridging && (
+                  <> · track gaps {data.gap_bridging.gaps} (safe to bridge: {data.gap_bridging.bridgeable})</>
+                )}
+                {pv?.empty_windows?.length > 0 && (
+                  <> · unsafe track windows: {pv.empty_windows.map((w) => `${fmtT(w[0])}–${fmtT(w[1])}`).join(", ")}</>
+                )}
               </div>
               {data.scene && (
                 <div className="text-[11px] text-ink/50 leading-relaxed border-t border-gray-border pt-2" data-testid="cv-shadow-scene">

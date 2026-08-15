@@ -26,6 +26,15 @@ def _risky_seconds(doc: dict) -> list:
         t = x.get("t") if isinstance(x, dict) else x
         if isinstance(t, (int, float)):
             out.append(float(t))
+    # track-end protection: empty-box windows (track box on nobody) count too
+    for w in pv.get("empty_windows") or []:
+        try:
+            s = float(w[0])
+            while s <= float(w[1]) + 0.01:
+                out.append(s)
+                s += 1.0
+        except Exception:
+            pass
     return out
 
 _NEXT_BANDS = [(5.5, "Club"), (7.0, "Top Club"), (8.0, "Academy"), (9.0, "Elite")]

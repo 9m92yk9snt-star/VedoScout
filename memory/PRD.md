@@ -1,5 +1,11 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 16) — TRACK-ENDE BESKYTTELSE + PHASE 15 GAP BRIDGING (skygge) ✅
+- **Track-ende beskyttelse**: cv_shadow klynger persistente empty-box-fund til `prod_verify.empty_windows` (`_cluster_windows`, join 1.0s/pad 0.3s). På d8c04d5d: [[0.1,2.7],[58.9,59.5],[66.5,69.9],[71.7,72.5]] — dækker præcist de visuelt bekræftede fejl-segmenter (buske-fejlen 68.4s + start/slut). ANVENDES: (a) server `_generate_proof_clips` risky_windows inkluderer nu empty_windows → ring/chip fader dér (flag CV_MARKER_STATE_FADE), (b) `score_meaning._risky_seconds` dækker empty-vinduer (1s-steps) → evidens nedprioriteres (soft, dropper aldrig). Unit-testet.
+- **Phase 15 gap bridging (KUN skygge/log)**: `sample_log` (t, ps, crowded, empty) pr. prod-tjek; efter scanning analyseres produktions-trackets huller (>0.7s): bridgeable KUN hvis identity shadow-verificeret på BEGGE sider (ps≥SIM_T), ingen crowd/empty ved kanterne, og fysisk realistisk (dist/dt ≤ MAX_SPEED). Ingen blind 0.5s-regel. Output `gap_bridging {gaps, bridgeable, windows}`. På d8c04d5d: 8 gaps, 0 bridgeable (korrekt konservativt — kanterne har crowd/empty kontekst). INGEN produktions-udfyldning sker — kun måling til senere aktivering.
+- Admin-dialog viser nu rejected-taps, track gaps (safe to bridge) og unsafe track windows.
+- Ændrede filer: cv_shadow.py, server.py (risky_windows-læsning), score_meaning.py (_risky_seconds), CvShadowDialog.jsx.
+
 ## Session (Jun 2026 — part 15) — PHASE 1: Smart Tap References ✅ (essential test på rigtig rapport)
 - **Detektor-baseret tap-refinement**: `_build_tap_references(..., detector=)` prioriterer YOLO-persondetektioner i det paddede tap-område (blob=fallback, raw=sidste udvej); `refined_by` felt (detector/blob/raw). Alle 11 taps på d8c04d5d nu detector-refinede.
 - **Visible-body awareness**: `visibility` = 1 − maks. overlap-fraktion fra andre personer i boksen; indgår 30% i quality (erstatter grov overlaps-trappe).

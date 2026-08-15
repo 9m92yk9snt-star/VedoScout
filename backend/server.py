@@ -7625,12 +7625,20 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
     try:
         if os.environ.get("CV_MARKER_STATE_FADE", "1") == "1":
             _fresh = await db.reports.find_one(
-                {"id": report_id}, {"_id": 0, "cv_shadow.prod_verify.switch_ts": 1})
-            _sts = (((_fresh or {}).get("cv_shadow") or {}).get("prod_verify") or {}).get("switch_ts") or []
-            for x in _sts:
+                {"id": report_id},
+                {"_id": 0, "cv_shadow.prod_verify.switch_ts": 1,
+                 "cv_shadow.prod_verify.empty_windows": 1})
+            _pv = ((_fresh or {}).get("cv_shadow") or {}).get("prod_verify") or {}
+            for x in _pv.get("switch_ts") or []:
                 _t = x.get("t") if isinstance(x, dict) else x
                 if isinstance(_t, (int, float)):
                     risky_windows.append((float(_t) - 0.6, float(_t) + 0.6))
+            # track-end protection: empty-box windows (ring on nobody) fade too
+            for w in _pv.get("empty_windows") or []:
+                try:
+                    risky_windows.append((float(w[0]), float(w[1])))
+                except Exception:
+                    pass
     except Exception:
         risky_windows = []
     made = 0

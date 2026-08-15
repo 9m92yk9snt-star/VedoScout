@@ -176,6 +176,18 @@ def _iou(a, b) -> float:
     return inter / max(1.0, a[2] * a[3] + b[2] * b[3] - inter)
 
 
+def _cluster_windows(ts_list, join=1.0, pad=0.3):
+    """Merge nearby timestamps into [t0, t1] windows."""
+    ts = sorted(float(t) for t in ts_list)
+    out = []
+    for t in ts:
+        if out and t - out[-1][1] <= join:
+            out[-1][1] = t
+        else:
+            out.append([t, t])
+    return [[round(max(0.0, a - pad), 1), round(b + pad, 1)] for a, b in out]
+
+
 # ---------------------------------------------------------------- reference
 def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None):
     """P1-P4: refine each user tap to the actual person, score its quality,
@@ -359,6 +371,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         prod_empty = 0
         prev_prod_empty = False
         empty_ts = []
+        sample_log = []  # per-sample prod context for gap-bridging analysis
 
         # flagged-moment gallery: small annotated frames so an admin can judge
         # every finding (true risk vs false alarm) with their own eyes
@@ -516,10 +529,13 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                         near_blobs = _blobs(small, nb_roi, min_h=max(8, int(pb[3] * 0.45)),
                                             max_h=int(pb[3] * 2.0))
                     others = [c for c in near_blobs if _iou(c, pb) < 0.35]
-                    if any(_iou(c, pb) > 0.10 for c in others):
+                    _crowd_flag = any(_iou(c, pb) > 0.10 for c in others)
+                    if _crowd_flag:
                         prod_crowded += 1
                         if len(crowded_ts) < 60:
                             crowded_ts.append(round(t, 1))
+                    sample_log.append({"t": t, "ps": ps, "crowded": _crowd_flag,
+                                       "empty": detector.ok and not person_in_box})
                     # switch risk: a DIFFERENT nearby person matches the tapped
                     # player CLEARLY better than the prod box content does.
                     # Pose-robust: requires persistence (prev sample also low),
@@ -658,6 +674,39 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 if not agree:
                     potential_switches += 1
 
+        # ── track-end protection: cluster persistent empty-box moments into
+        # unsafe windows (marker/clips fade there; evidence deprioritizes) ──
+        empty_windows = _cluster_windows([e["t"] for e in empty_ts]) if empty_ts else []
+
+        # ── PHASE 15 (SHADOW): context-aware gap bridging — observe/log only.
+        # A production-track gap is "bridgeable" ONLY when identity is shadow-
+        # verified on BOTH sides, nobody is crowding, and the implied movement
+        # is physically realistic. No blind fixed-duration rule.
+        gaps_found = bridgeable = 0
+        bridge_windows = []
+        spts = sorted(track_pts, key=lambda p: float(p["t"]))
+        def _near_log(tq, w=0.55):
+            return [s for s in sample_log if abs(s["t"] - tq) <= w]
+        for i in range(1, len(spts)):
+            g0, g1 = float(spts[i - 1]["t"]), float(spts[i]["t"])
+            gap = g1 - g0
+            if gap <= 0.7:
+                continue
+            gaps_found += 1
+            if gap > 1.5:
+                continue
+            l0, l1 = _near_log(g0), _near_log(g1)
+            id_ok = (bool(l0) and max(s["ps"] for s in l0) >= SIM_T
+                     and bool(l1) and max(s["ps"] for s in l1) >= SIM_T)
+            crowd = any(s["crowded"] or s["empty"] for s in l0 + l1)
+            dxn = float(spts[i]["x"]) - float(spts[i - 1]["x"])
+            dyn = float(spts[i]["y"]) - float(spts[i - 1]["y"])
+            phys_ok = (float(np.hypot(dxn, dyn)) / gap) <= MAX_SPEED
+            if id_ok and not crowd and phys_ok:
+                bridgeable += 1
+                if len(bridge_windows) < 40:
+                    bridge_windows.append([round(g0, 1), round(g1, 1)])
+
         # false-rejection proxy: does the shadow engine re-verify the taps themselves?
         tap_self = []
         for r in refs:
@@ -700,7 +749,15 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 "switch_ts": switch_ts,
                 "crowded_ts": crowded_ts,
                 "empty_ts": empty_ts,
+                "empty_windows": empty_windows,
                 "flag_frames": saved_imgs,
+            },
+            # Phase 15 (shadow): production-track gaps and which are SAFELY
+            # bridgeable given identity/crowd/physics context on both sides
+            "gap_bridging": {
+                "gaps": gaps_found,
+                "bridgeable": bridgeable,
+                "windows": bridge_windows,
             },
             # P3 scene awareness (detector + MOT + team classification)
             "scene": {
