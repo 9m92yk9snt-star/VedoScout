@@ -177,10 +177,12 @@ def _iou(a, b) -> float:
 
 
 # ---------------------------------------------------------------- reference
-def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale):
+def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None):
     """P1-P4: refine each user tap to the actual person, score its quality,
     embed it, then cross-check all taps into ONE identity with outliers
-    downweighted — a single bad tap can never contaminate the profile."""
+    downweighted — a single bad tap can never contaminate the profile.
+    Refinement prefers REAL person detections (fixes merged/contaminated
+    taps); connected-component blobs remain the fallback."""
     refs, negatives = [], []
     for a in anchors:
         try:
@@ -202,48 +204,82 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale):
             roi_mask = np.zeros((sh, sw), np.uint8)
             roi_mask[ry0:ry1, rx0:rx1] = 255
             cand = _blobs(small, roi_mask, min_h=max(8, int(bh * 0.4)), max_h=int(bh * 1.6))
-            # refined person box = blob closest to the tap-box centre
             cx0, cy0 = bx + bw / 2, by + bh / 2
-            if cand:
+            # person detections inside the padded region (preferred refinement)
+            det_in = []
+            if detector is not None and detector.ok:
+                for (nx, ny, nw_, nh_, dc) in detector.detect(frame):
+                    c = (int(nx * sw), int(ny * sh),
+                         max(3, int(nw_ * sw)), max(6, int(nh_ * sh)))
+                    ccx, ccy = c[0] + c[2] / 2, c[1] + c[3] / 2
+                    if rx0 <= ccx <= rx1 and ry0 <= ccy <= ry1 and bh * 0.4 <= c[3] <= bh * 1.7:
+                        det_in.append(c)
+            if det_in:
+                rb = min(det_in, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0))
+                refined_by = "detector"
+            elif cand:
                 rb = min(cand, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0))
+                refined_by = "blob"
             else:
                 rb = (bx, by, bw, bh)  # fallback: trust the raw tap box
+                refined_by = "raw"
             emb = _zone_embedding(small, rb, pl)
             if not emb:
                 continue
-            overlaps = sum(1 for c in cand if c != rb and _iou(c, rb) > 0.10)
+            # visible-body awareness: fraction of the refined box NOT covered
+            # by other people (detections preferred, blobs otherwise)
+            others_near = [c for c in (det_in or cand) if c != rb]
+            occ_frac = 0.0
+            for c in others_near:
+                ix = max(0, min(rb[0] + rb[2], c[0] + c[2]) - max(rb[0], c[0]))
+                iy = max(0, min(rb[1] + rb[3], c[1] + c[3]) - max(rb[1], c[1]))
+                occ_frac = max(occ_frac, (ix * iy) / max(1.0, rb[2] * rb[3]))
+            visibility = round(1.0 - min(1.0, occ_frac), 3)
+            overlaps = sum(1 for c in others_near if _iou(c, rb) > 0.10)
             crop = small[rb[1]:rb[1] + rb[3], rb[0]:rb[0] + rb[2]]
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
             quality = round(
-                0.35 * min(1.0, rb[3] / 60.0)              # pixel size
+                0.30 * min(1.0, rb[3] / 60.0)              # pixel size
                 + 0.25 * _sharpness(gray)                   # blur
-                + 0.25 * (1.0 if overlaps == 0 else (0.5 if overlaps == 1 else 0.2))  # occlusion
+                + 0.30 * visibility                          # occlusion / visible body
                 + 0.15 * (0.0 if emb.get("merged") else 1.0),  # isolation
                 3,
             )
             refs.append({"t": round(t, 2), "emb": emb, "quality": quality,
-                         "box": rb, "refined": bool(cand), "overlaps": overlaps,
-                         "merged": bool(emb.get("merged")),
+                         "box": rb, "refined": refined_by != "raw",
+                         "refined_by": refined_by, "visibility": visibility,
+                         "overlaps": overlaps, "merged": bool(emb.get("merged")),
                          "chroma": cv_detect.torso_chroma(small, rb)})
-            # P10 negative gallery: OTHER blobs at the tap moment (same scene)
-            for c in cand:
-                if c == rb or _iou(c, rb) > 0.3:
+            # P10 negative gallery: OTHER people at the tap moment (same scene)
+            for c in others_near:
+                if _iou(c, rb) > 0.3:
                     continue
                 oe = _zone_embedding(small, c, pl)
                 if oe:
                     negatives.append(oe)
         except Exception:
             continue
-    # P4 consistency: pairwise similarity → outliers downweighted, never deleted
+    # P4 consistency: pairwise similarity → outliers downweighted; a clearly
+    # wrong tap (far below the group AND low quality) is fully REJECTED —
+    # one bad tap must never contaminate the identity. Max 2 rejections,
+    # never with fewer than 5 usable taps.
     for r in refs:
         sims = [_sim(r["emb"], o["emb"]) for o in refs if o is not r]
         r["consistency"] = round(float(np.mean(sims)), 3) if sims else 1.0
     med = float(np.median([r["consistency"] for r in refs])) if refs else 0.0
-    for r in refs:
+    rejected = 0
+    for r in sorted(refs, key=lambda x: x["consistency"]):
         r["outlier"] = bool(r["consistency"] < med - 0.15)
-        r["weight"] = round((0.3 if r["outlier"] else 1.0)
-                            * (0.5 if r["merged"] else 1.0)
-                            * max(0.2, r["quality"]), 3)
+        r["rejected"] = False
+        if (len(refs) >= 5 and rejected < 2
+                and r["consistency"] < med - 0.30 and r["quality"] < 0.5):
+            r["rejected"] = True
+            rejected += 1
+    for r in refs:
+        r["weight"] = 0.0 if r["rejected"] else round(
+            (0.3 if r["outlier"] else 1.0)
+            * (0.5 if r["merged"] else 1.0)
+            * max(0.2, r["quality"]), 3)
     return refs, negatives[:30]
 
 
@@ -297,7 +333,9 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         scale = SMALL_W / W
         sw, sh = SMALL_W, max(2, int(H * scale))
 
-        refs, negatives = _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale)
+        detector = cv_detect.PersonDetector()
+        refs, negatives = _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale,
+                                                detector=detector)
         if len(refs) < 3:
             return {"status": "skipped", "reason": "too_few_references"}
 
@@ -330,6 +368,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         except Exception:
             frames_dir = None
         saved_imgs = 0
+        _last_save = {}
 
         def _save_flag_frame(small_img, t, pb, other_box, ps, kind):
             nonlocal saved_imgs
@@ -337,6 +376,8 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 return None
             if kind == "SUSPECT" and saved_imgs >= 8:
                 return None  # reserve slots for the rarer switch-risk frames
+            if t - _last_save.get(kind, -9.0) < 1.5:
+                return None  # one image per incident, not per sample
             try:
                 vis = small_img.copy()
                 cv2.rectangle(vis, (pb[0], pb[1]), (pb[0] + pb[2], pb[1] + pb[3]),
@@ -351,12 +392,12 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 cv2.imwrite(str(frames_dir / name), vis,
                             [cv2.IMWRITE_JPEG_QUALITY, 70])
                 saved_imgs += 1
+                _last_save[kind] = t
                 return name
             except Exception:
                 return None
 
         # ── P3 scene awareness (detector + MOT + team classification) ──
-        detector = cv_detect.PersonDetector()
         mot = cv_detect.MiniMOT()
         _tap_chromas = [r["chroma"] for r in refs if r.get("chroma")]
         _anchor = (float(np.median([c[0] for c in _tap_chromas])),
@@ -424,7 +465,15 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
             if pr is not None:
                 pb = (int(float(pr["x"]) * sw), int(float(pr["y"]) * sh),
                       max(4, int(float(pr["w"]) * sw)), max(8, int(float(pr["h"]) * sh)))
-                pe = _zone_embedding(small, pb, pitch_l)
+                # apples-to-apples: tap references are tight detector boxes, so
+                # evaluate the person DETECTION inside the prod box (when one
+                # exists) rather than the looser prod rectangle itself
+                pb_eval = pb
+                if dets:
+                    _ov = [c for c in dets if _iou(c, pb) > 0.2]
+                    if _ov:
+                        pb_eval = max(_ov, key=lambda c: _iou(c, pb))
+                pe = _zone_embedding(small, pb_eval, pitch_l)
                 if pe:
                     ps = _profile_sim(pe, refs)
                     prod_sims.append(round(ps, 3))
@@ -621,10 +670,12 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
             "duration_s": round(dur, 1),
             "samples": samples,
             "taps": [{"t": r["t"], "quality": r["quality"], "consistency": r["consistency"],
-                      "outlier": r["outlier"], "weight": r["weight"], "refined": r["refined"],
+                      "outlier": r["outlier"], "rejected": r["rejected"], "weight": r["weight"],
+                      "refined_by": r["refined_by"], "visibility": r["visibility"],
                       "merged": r["merged"]}
                      for r in refs],
             "tap_outliers": sum(1 for r in refs if r["outlier"]),
+            "tap_rejected": sum(1 for r in refs if r["rejected"]),
             "negative_gallery": len(negatives),
             "states": states_count,
             "verified_coverage": round(states_count["VERIFIED"] / max(1, samples), 3),
