@@ -16,8 +16,12 @@ logger = logging.getLogger("elite-scout")
 MIN_COVERAGE = 0.90   # user rule: only near-complete tracking ships, else fallback video
 MAX_GAP_SEC = 0.5     # track samples further apart than this end the usable window
 FADE_SEC = 0.35       # ring fades in/out — never pops
-MIN_CLIP_SEC = 3.0    # shorter verified windows fall back to the full video
-                      # with the moment chip — no meaningless 2-3 s loops
+MIN_CLIP_SEC = 3.0    # minimum SHIPPED clip length — short verified windows are
+                      # PADDED with raw context (marker hidden there), never
+                      # replaced by the whole uploaded video
+MIN_TRACKED_SEC = 1.2  # smallest verified core worth marking at all
+PAD_PRE = 2.5         # raw context before the event (build-up)
+PAD_POST = 3.5        # raw context after the event (completed action)
 SEED_TOL = 0.35       # a track point must exist this close to the cited moment
 
 
@@ -62,15 +66,20 @@ def _blend_chip(frame, chip, x: int, y: int, alpha: float = 1.0):
 VOLT_BGR = np.float32([0, 255, 204])
 
 
-def _ground_anchor(frame, px, py, bw, bh):
+def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
     """Visual Ground-Anchor Resolver: locate the target's ACTUAL ground
     contact (feet/hands footprint) near the accepted box instead of blindly
     trusting bbox bottom-center. Handles running, wide stance, distant
     players, duels (ownership stays within the accepted box's columns) and
-    falls (contact may sit BELOW a torso-hugging box). Fail-safe fallback:
+    falls (contact may sit BELOW a torso-hugging box). `vx` (px/s, from the
+    track itself) LEADS the search in the motion direction so a box that
+    trails a sprinting player still finds his real feet — never a fixed
+    offset, the anchor always comes from actual pixels. Fail-safe fallback:
     the incoming bbox bottom-center. Never touches tracking data."""
     fh, fw = frame.shape[:2]
-    x0, x1 = int(max(0, px - bw * 0.62)), int(min(fw, px + bw * 0.62))
+    lead = float(np.clip(vx * 0.25, -bw * 0.55, bw * 0.55))
+    x0 = int(max(0, px - bw * 0.62 + min(0.0, lead)))
+    x1 = int(min(fw, px + bw * 0.62 + max(0.0, lead)))
     y0, y1 = int(max(0, py - bh * 0.85)), int(min(fh, py + bh * 0.45))
     if x1 - x0 < 8 or y1 - y0 < 10:
         return px, py, None
@@ -80,7 +89,8 @@ def _ground_anchor(frame, px, py, bw, bh):
     ys, xs = np.nonzero(pm)
     if len(ys) < 30:
         return px, py, None
-    keep = np.abs(xs + x0 - px) <= bw * 0.5  # ownership: target's own columns
+    # ownership: target's own columns, shifted along the motion direction
+    keep = np.abs(xs + x0 - (px + lead * 0.6)) <= bw * 0.5 + abs(lead) * 0.5
     ys, xs = ys[keep], xs[keep]
     if len(ys) < 25:
         return px, py, None
@@ -92,13 +102,13 @@ def _ground_anchor(frame, px, py, bw, bh):
     ax = x0 + float(np.median(bx))
     ay = y0 + float(np.percentile(by, 85))
     foot_w = float(np.percentile(bx, 95) - np.percentile(bx, 5))
-    if abs(ax - px) > bw * 0.45 or ay < py - bh * 0.55:
+    if abs(ax - px) > bw * 0.45 + abs(lead) or ay < py - bh * 0.55:
         return px, py, None  # implausible → honest fallback
     return ax, min(ay, fh - 2.0), foot_w
 
 
 def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float = 1.0,
-               state: dict | None = None):
+               state: dict | None = None, vx: float = 0.0):
     """Ground-integrated marker: the ellipse reads as PAINTED ON the pitch under
     the player, not as a graphic overlay. Volt paint is modulated by the grass
     luminance (inherits pitch texture), a soft contact shadow grounds the player,
@@ -109,12 +119,17 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
         return
     fh, fw = frame.shape[:2]
     bx_w, bx_h = max(8.0, w * fw), max(12.0, h * fh)
-    ax, ay, foot_w = _ground_anchor(frame, cx * fw, min(feet_y, 0.995) * fh, bx_w, bx_h)
+    ax, ay, foot_w = _ground_anchor(frame, cx * fw, min(feet_y, 0.995) * fh, bx_w, bx_h, vx=vx)
     if state is not None:  # temporal stability across clip frames
         prev = state.get("anchor")
         if prev is not None:
             jump = float(np.hypot(ax - prev[0], ay - prev[1]))
-            k = 0.15 if jump > bx_h * 0.6 else 0.45  # implausible jump → glide
+            if jump > bx_h * 0.9:
+                k = 0.12  # implausible teleport → glide, never snap
+            else:
+                # sprint-responsive smoothing: fast steady motion is followed
+                # closely (no trailing); only small jitter is damped
+                k = min(0.85, 0.35 + 0.9 * (jump / max(1.0, bx_h * 0.5)))
             ax = prev[0] + k * (ax - prev[0])
             ay = prev[1] + k * (ay - prev[1])
             if foot_w and state.get("foot_w"):
@@ -215,7 +230,7 @@ def _window_points(track_points: list, t_moment: float, pre: float, post: float)
     seg = pts[lo:hi + 1]
     w0 = max(float(seg[0]["t"]), t_moment - pre)
     w1 = min(float(seg[-1]["t"]), t_moment + post)
-    if w1 - w0 < MIN_CLIP_SEC:
+    if w1 - w0 < MIN_TRACKED_SEC:
         logger.info(f"[teleclip] tracked window too short ({w1 - w0:.1f}s) — no clip")
         return None
     inside = [p for p in seg if w0 <= float(p["t"]) <= w1]
@@ -310,7 +325,23 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
         if W < 100 or H < 100:
             return None
-        f0, f1 = int(w0 * fps), max(int(w1 * fps) - 1, int(w0 * fps) + 1)
+        n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        duration = n_frames / fps if n_frames > 0 else None
+        if duration is not None and duration < MIN_CLIP_SEC + 1.0:
+            return None  # source itself is short → full video is the better proof
+        # C: pad the CLIP with raw context around the verified window so short
+        # verified windows still make a useful proof. The marker only shows
+        # inside the verified window — the padding never claims identity.
+        c0 = min(w0, t_moment - PAD_PRE)
+        c1 = max(w1, t_moment + PAD_POST)
+        if c1 - c0 < MIN_CLIP_SEC:
+            half = (MIN_CLIP_SEC - (c1 - c0)) / 2.0
+            c0, c1 = c0 - half, c1 + half
+        c0 = max(0.0, c0)
+        if duration is not None:
+            c1 = min(duration - 0.05, c1)
+        f0, f1 = int(c0 * fps), max(int(c1 * fps) - 1, int(c0 * fps) + 1)
+        v0, v1 = int(w0 * fps), int(w1 * fps)  # verified marker window (frames)
         fade = max(2, int(fps * FADE_SEC))
 
         import imageio
@@ -325,8 +356,9 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             ok, frame = cap.read()
             if not ok:
                 break
-            a = min(1.0, (idx - f0 + 1) / fade, (f1 - idx + 1) / fade)
-            a *= _risk_alpha(idx / fps, risky_windows)
+            # marker alpha: visible only inside the VERIFIED window
+            a = min(1.0, (idx - v0 + 1) / fade, (v1 - idx + 1) / fade)
+            a = max(0.0, a) * _risk_alpha(idx / fps, risky_windows)
             cx, feet_y, bw, bh = _interp(sm, idx / fps)
             # size stability: EMA on box size only (position stays responsive)
             if ema_wh is None:
@@ -338,7 +370,10 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             est_h = min(max(bh * H, H * 0.045), W * 0.333, H * 0.42)
             rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
             feet_px = feet_y * H - min(bh * H * 0.08, rw * 0.34 * 0.8)
-            _draw_ring(frame, cx, feet_px / H, bw, bh, a, state=ring_state)
+            # horizontal track velocity (px/s) leads the anchor search during sprints
+            ta, tb = min(w1, idx / fps + 0.15), max(w0, idx / fps - 0.15)
+            vx_px = (_interp(sm, ta)[0] - _interp(sm, tb)[0]) / max(0.05, ta - tb) * W
+            _draw_ring(frame, cx, feet_px / H, bw, bh, a, state=ring_state, vx=vx_px)
             # no label/chip: the grounded ellipse alone is the visual marker
             writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             idx += 1
@@ -346,7 +381,8 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         writer = None
         if not Path(out_path).exists() or Path(out_path).stat().st_size < 20_000:
             return None
-        return {"ok": True, "coverage": round(coverage, 2), "start": round(w0, 2), "end": round(w1, 2)}
+        return {"ok": True, "coverage": round(coverage, 2), "start": round(c0, 2),
+                "end": round(c1, 2), "tracked_start": round(w0, 2), "tracked_end": round(w1, 2)}
     except Exception as e:
         logger.warning(f"[teleclip] failed for {video_path}@{t_moment}: {e}")
         try:
