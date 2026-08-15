@@ -244,31 +244,25 @@ def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER",
             ov = ov.resize((W, H), Image.LANCZOS)
             out = Image.alpha_composite(out, ov)
 
-        # 3 — small name chip with pointer, just above the player's head
-        chip_ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-        d = ImageDraw.Draw(chip_ov)
-        fs = max(12, int(W / 58))
-        font = _font(fs)
-        label = str(label or "YOUR PLAYER")[:18]
-        tw = d.textlength(label, font=font)
-        pad_x = int(fs * 0.6)
-        chip_h = int(fs * 1.75)
-        dot_r = fs * 0.2
-        ptr = max(5, int(fs * 0.45))
-        chip_w = tw + 2 * pad_x + dot_r * 2 + fs * 0.4
-        head_y = max(0.0, y0, feet_y - est_h * 0.9)
-        chx = min(max(6, cx - chip_w / 2), W - chip_w - 6)
-        chy = max(6, head_y - chip_h - ptr - fs * 0.5)
-        d.rounded_rectangle([chx, chy, chx + chip_w, chy + chip_h],
-                            radius=int(chip_h / 2), fill=INK + (218,))
-        pcx = min(max(cx, chx + chip_h * 0.7), chx + chip_w - chip_h * 0.7)
-        d.polygon([(pcx - ptr, chy + chip_h - 1), (pcx + ptr, chy + chip_h - 1),
-                   (pcx, chy + chip_h + ptr)], fill=INK + (218,))
-        dcx = chx + pad_x + dot_r
-        d.ellipse([dcx - dot_r, chy + chip_h / 2 - dot_r, dcx + dot_r, chy + chip_h / 2 + dot_r], fill=VOLT + (255,))
-        d.text((dcx + dot_r + fs * 0.32, chy + (chip_h - fs) / 2 - fs * 0.05),
-               label, font=font, fill=(255, 255, 255, 245))
-        out = Image.alpha_composite(out, chip_ov)
+            # 3 — player in front: restore the player's silhouette over the
+            # ring so the marker reads as painted on the pitch BEHIND boots
+            # and legs — the line never crosses the front of the feet.
+            try:
+                import numpy as _np
+                import cv2 as _cv2
+                arr = _np.array(out.convert("RGB"))
+                base = _np.array(Image.composite(img, dark, mask).convert("RGB"))
+                hsv = _cv2.cvtColor(base, _cv2.COLOR_RGB2HSV)
+                ng = _cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0
+                sel = _np.zeros(ng.shape, bool)
+                x_lo, x_hi = int(max(0, cx - rw * 0.6)), int(min(W, cx + rw * 0.6))
+                y_lo, y_hi = int(max(0, feet_y - rh * 3)), int(min(H, feet_y + rh))
+                sel[y_lo:y_hi, x_lo:x_hi] = True
+                m2 = (ng & sel).astype(_np.uint8) * 255
+                m2 = _cv2.GaussianBlur(m2, (5, 5), 0).astype(_np.float32)[..., None] / 255.0
+                out = Image.fromarray((base * m2 + arr * (1 - m2)).astype(_np.uint8)).convert("RGBA")
+            except Exception:
+                pass
 
         out.convert("RGB").save(frame_path, "JPEG", quality=90)
         return True

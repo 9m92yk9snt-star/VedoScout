@@ -79,6 +79,7 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
     if x1 - x0 < 8 or y1 - y0 < 8:
         return
     roi = frame[y0:y1, x0:x1]
+    orig = roi.copy()
     c = (px - x0, py - y0)
     # glow — blurred ring blended per-pixel so only the ring glows
     glow = np.zeros_like(roi)
@@ -97,6 +98,17 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
     cv2.ellipse(ov, c, (rw, rh), 0, 0, 360, (0, 255, 204), lw, cv2.LINE_AA)
     a = 0.92 * min(1.0, alpha)
     cv2.addWeighted(ov, a, roi, 1 - a, 0, dst=roi)
+    # player in front: restore the player's silhouette over the ring so the
+    # line never crosses the front of boots/legs (marker painted on the pitch)
+    hsv = cv2.cvtColor(orig, cv2.COLOR_BGR2HSV)
+    ng = cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0
+    sel = np.zeros(ng.shape, bool)
+    xl, xh = max(0, c[0] - int(rw * 0.6)), min(roi.shape[1], c[0] + int(rw * 0.6))
+    yl, yh = max(0, c[1] - rh * 3), min(roi.shape[0], c[1] + rh)
+    sel[yl:yh, xl:xh] = True
+    m2 = (ng & sel).astype(np.uint8) * 255
+    m2 = (cv2.GaussianBlur(m2, (5, 5), 0).astype(np.float32) / 255.0)[..., None]
+    roi[:] = (orig * m2 + roi * (1 - m2)).astype(np.uint8)
 
 
 def _window_points(track_points: list, t_moment: float, pre: float, post: float):
@@ -220,8 +232,6 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         fade = max(2, int(fps * FADE_SEC))
 
         import imageio
-        chip = _make_chip(label, W)
-        chip_h_px, chip_w_px = chip.shape[:2]
         writer = imageio.get_writer(out_path, fps=round(fps, 2), codec="libx264",
                                     quality=7, pixelformat="yuv420p", macro_block_size=1,
                                     output_params=["-movflags", "+faststart"])
@@ -238,10 +248,7 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
             feet_px = feet_y * H - min(bh * H * 0.08, rw * 0.34 * 0.8)
             _draw_ring(frame, cx, feet_px / H, bw, bh, a)
-            # chip follows the player, just above the head (clamped height estimate)
-            head_px = int(max((feet_y - bh) * H, feet_px - est_h * 0.9))
-            _blend_chip(frame, chip, int(cx * W - chip_w_px / 2),
-                        head_px - chip_h_px - int(W / 140), a)
+            # no label/chip: the grounded ellipse alone is the visual marker
             writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             idx += 1
         writer.close()

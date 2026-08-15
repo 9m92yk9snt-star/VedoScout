@@ -1,5 +1,12 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 21) — PHASE 15 MARKER-KORREKTION (ren downstream-renderer) ✅ (visuelt verificeret + alle 3 rapporter re-renderet)
+- **Label/chip/pointer FJERNET HELT** i både `telestration.py` (statiske frames) og `tele_clip.py` (clips) — den groundede ellipse alene er markøren. `label`-parametre bevaret ubrugte (API-kompatibilitet); `_make_chip`/`_blend_chip` ubrugte men ikke slettet (minimal ændring).
+- **Spilleren-foran-ringen okklusion**: efter ring-tegning restaureres spillerens silhuet (non-green maske i bånd cx±0.6·rw, feet_y−3·rh..feet_y+rh, feathered GaussianBlur) — den grønne linje krydser ALDRIG forrest på fødder/ben; ringen læses som malet på banen bag spilleren. Implementeret ens i begge renderere.
+- **1:1-justering verificeret**: ring = track-boksens fod-center præcist (align-test med boks+ring på samme frame).
+- **Ring-guard-afklaring**: `verify_ring_placement`/kant-tjek dømmer RÅ video-crops ved track-positionen (identitetssystem) — IKKE den renderede ellipse. Ingen omvendt afhængighed fandtes; intet safeguard svækket.
+- **Re-render af visuelle assets**: regenerate-evidence kørt på alle 3 rapporter (frames 6/3/5 + clips 2/1/2, R2-persisteret). Fodboldanalyse/identitet/tracks urørte. Visuel kontrol af regenereret frame: korrekt spiller, ellipse under fødder, okklusion virker, ingen chip.
+
 ## Session (Jun 2026 — part 20) — EVIDENS REGENERERET PÅ ALLE 3 RAPPORTER MED KORRIGEREDE TRACKS ✅
 - Kørte `POST /api/admin/reports/{id}/regenerate-evidence` sekventielt på d8c04d5d, fe7bc3e5, 3467a622 (efter part-19 tracker-fix + persisterede tracks).
 - **Resultat**: frames 6/3/5 re-ekstraheret + re-verificeret af identitets-gaten + re-telestreret; proof clips 2/1/1 med coverage 1.0 på de korrigerede tracks; alle clips R2-persisteret (`/api/media/...`). Færre clips end cap = identitets-gates droppede usikre momenter korrekt (fail-safe).
