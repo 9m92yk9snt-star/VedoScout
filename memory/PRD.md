@@ -1,5 +1,12 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 20) — EVIDENS REGENERERET PÅ ALLE 3 RAPPORTER MED KORRIGEREDE TRACKS ✅
+- Kørte `POST /api/admin/reports/{id}/regenerate-evidence` sekventielt på d8c04d5d, fe7bc3e5, 3467a622 (efter part-19 tracker-fix + persisterede tracks).
+- **Resultat**: frames 6/3/5 re-ekstraheret + re-verificeret af identitets-gaten + re-telestreret; proof clips 2/1/1 med coverage 1.0 på de korrigerede tracks; alle clips R2-persisteret (`/api/media/...`). Færre clips end cap = identitets-gates droppede usikre momenter korrekt (fail-safe).
+- **Sikkerhedskæden observeret live i logs**: GPT ring-vagten afviste kanter hvor ringen sad på blå spiller/tom græs → klip blev krympet til trusted window; "moment 4 has no verified window — no clip".
+- **Visuel verifikation**: regenereret frame (Ormani3) viser korrekt spiller med grounded ellipse under fødderne, spotlight + lille chip — professionelt.
+- Hele kæden er nu konsistent: fixet tracker → rene skygge-vinduer → hård evidens-gate → state-fade → verificerede clips.
+
 ## Session (Jun 2026 — part 19) — TRACK-ENDE RODÅRSAG FIXET I SELVE TRACKEREN ✅ (empirisk reproduceret + valideret på alle 3 rigtige kampe)
 - **Rodårsag 1 — scene-klip (montage)**: tracking ±4s pr. tap krydsede montage-cuts (globale frame-diffs: pans p99=33, cuts 47–67 på 160w gray). FIX: `_cut_flags()` i `player_tracking.py` — segment STOPPER ved cut (CUT_DIFF=45), doubt "scene cut".
 - **Rodårsag 2 — statisk-baggrunds-lås**: når spilleren forlader boksen, låser NCC-templaten på statisk baggrund med nær-perfekt score (empirisk: empty-zoner conf p50 0.94–0.98 vs normal tracking p50 0.64–0.81, p90≤0.89). FIX: LOCK_CONF=0.93 / LOCK_STEPS=6 — vedvarende ≥0.93 i ~0.5s ⇒ stop OG de låste punkter UN-recordes, doubt "static background lock". Begge regler KUN stop-betingelser (forkorter ærligt, skifter/forlænger aldrig).
