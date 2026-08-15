@@ -3288,6 +3288,7 @@ async def call_gemini_with_video(
         file_contents.append(
             FileContentWithMimeType(file_path=marker_path, mime_type="image/jpeg")
         )
+    video_path = await asyncio.to_thread(_ensure_analysis_video, video_path)
     video_file = FileContentWithMimeType(
         file_path=video_path,
         mime_type="video/mp4",
@@ -3900,6 +3901,55 @@ def _probe_video_codec(src_path: Path) -> tuple:
     return probe_codec_pixfmt(src_path)
 
 
+ANALYSIS_MAX_INLINE_MB = int(os.environ.get("ANALYSIS_MAX_INLINE_MB", "45"))
+
+
+def _ensure_analysis_video(video_path: str) -> str:
+    """The LLM proxy hard-caps request bodies at 64 MB; base64 inflates the
+    video ~1.37×, so anything above ~45 MB fails with a 413 (seen on a 207 MB
+    upload — report froze at 'Final Check'). For large files, build/reuse a
+    compact analysis rendition NEXT TO the original. The full-quality web.mp4
+    is untouched and remains the source for tracking/evidence/proof clips."""
+    import subprocess
+    try:
+        p = Path(video_path)
+        if not p.exists() or p.stat().st_size <= ANALYSIS_MAX_INLINE_MB * 1024 * 1024:
+            return str(video_path)
+        out = p.with_suffix(".analysis.mp4")
+        if out.exists() and 0 < out.stat().st_size <= ANALYSIS_MAX_INLINE_MB * 1024 * 1024:
+            return str(out)
+        passes = [
+            ["-vf", "scale='min(960,iw)':-2", "-r", "24", "-crf", "30"],
+            ["-vf", "scale='min(640,iw)':-2", "-r", "15", "-crf", "34"],
+        ]
+        for extra in passes:
+            result = subprocess.run(
+                [FFMPEG_BIN, "-y", "-i", str(p),
+                 "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                 *extra,
+                 "-c:a", "aac", "-b:a", "48k", "-ac", "1",
+                 "-movflags", "+faststart", "-loglevel", "error", str(out)],
+                capture_output=True, timeout=900,
+            )
+            if result.returncode == 0 and out.exists() and out.stat().st_size > 0:
+                if out.stat().st_size <= ANALYSIS_MAX_INLINE_MB * 1024 * 1024:
+                    logger.info(
+                        f"[analysis-video] {p.name}: "
+                        f"{p.stat().st_size // 1048576}MB → {out.stat().st_size // 1048576}MB "
+                        f"(inline Gemini rendition)")
+                    return str(out)
+            else:
+                logger.warning(f"[analysis-video] ffmpeg rc={result.returncode}: "
+                               f"{(result.stderr or b'')[:200]}")
+        if out.exists() and out.stat().st_size > 0:
+            logger.warning(f"[analysis-video] {p.name}: rendition still "
+                           f"{out.stat().st_size // 1048576}MB — sending anyway")
+            return str(out)
+    except Exception as e:
+        logger.warning(f"[analysis-video] failed for {video_path}: {e}")
+    return str(video_path)
+
+
 def transcode_to_web_mp4(src_path: Path) -> Path:
     """
     Convert the uploaded video to a browser-friendly MP4 (H.264 8-bit yuv420p + AAC, faststart).
@@ -3917,8 +3967,15 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
     import subprocess
 
     # ── FAST PATH: already-safe source needs no re-encoding ──
+    # Size guard (Aug 2026): a 207 MB H.264 iPhone upload sailed through the
+    # fast path unshrunk and later broke the inline Gemini call + mobile
+    # streaming. Large files always get the full downscaling re-encode.
     codec, pix_fmt = _probe_video_codec(src_path)
-    if codec == "h264" and pix_fmt in ("yuv420p", "yuvj420p"):
+    try:
+        _src_mb = src_path.stat().st_size / 1048576
+    except Exception:
+        _src_mb = 0
+    if codec == "h264" and pix_fmt in ("yuv420p", "yuvj420p") and _src_mb <= 80:
         # Ensure .web.mp4 naming convention downstream code expects.
         out_path = src_path.with_suffix(".web.mp4")
         if out_path.resolve() == src_path.resolve():
@@ -3944,7 +4001,7 @@ def transcode_to_web_mp4(src_path: Path) -> Path:
                 "-loglevel", "error",
                 str(out_path),
             ],
-            capture_output=True, timeout=420,
+            capture_output=True, timeout=900,
         )
         if result.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0:
             return out_path

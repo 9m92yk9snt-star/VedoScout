@@ -1,5 +1,11 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 12) — BUGFIX: 200MB+ videoer frøs på "Final Check" ✅ (E2E-verificeret på den faktiske fejlede rapport)
+- **Rodårsag**: LLM-proxyen hard-capper request bodies på 64MB. En 207MB H.264 iPhone-video tog transcode-FAST-PATH (kopieret 1:1 som .web.mp4), blev base64-inlinet (~285MB) til Gemini → 413 `request_too_large` → `full_report_status=failed` (frontend HAR retry-UI; skærmbillede var taget før fejlen slog igennem).
+- **Fix 1 — `_ensure_analysis_video()` (server.py, før transcode_to_web_mp4)**: filer >45MB (`ANALYSIS_MAX_INLINE_MB`) får en kompakt `.analysis.mp4`-rendition (960px/24fps/CRF30, fallback 640px/15fps/CRF34) KUN til Gemini-kald. Kaldes ét centralt sted i `call_gemini_with_video` (dækker Analysis A, B og retry). Fuld-kvalitets web.mp4 urørt til tracking/evidens/proofs.
+- **Fix 2 — transcode fast-path størrelsesvagt**: H.264-filer >80MB tager nu fuld re-encode (1280p CRF26) i stedet for 1:1-kopi; ffmpeg-timeout 420→900s.
+- **E2E-verificeret på rapport d8c04d5d (207MB)**: regenerate → R2-restore → `[analysis-video] 207MB → 13MB` → fuld analyse OK → cross-verify: 10 claims, 4 droppet, status=verified → `full_report_status=ready`. Dual analysis-arkitektur urørt.
+
 ## Session (Jun 2026 — part 11) — P3 SCENE AWARENESS (detektor + MOT + holdklassifikation) ✅ (self-tested på rigtig rapport + visuel verifikation; stadig 100% skygge)
 - **GYLDIG YOLOv8n-detektor sikret**: `models/yolov8n.onnx` (12.85MB fra HF `kshitijj…/yolov8n-coco-onnx`, verificeret load + output (1,84,8400) i cv2.dnn; gamle 29-byte fil erstattet). 80ms/frame CPU. VIGTIGT: HF `Ultralytics/YOLOv8`-repoet giver 15-byte "Entry not found" — brug HF API `?blobs=true` til at size-tjekke før download.
 - **NY `/app/backend/cv_detect.py`** (modulær, flag `CV_SHADOW_DETECTOR`, fail-safe load): `PersonDetector` (letterbox 640, NMS, kun person-klasse), `MiniMOT` (greedy IoU + kamera-komp, track-IDs, crossover-events — støttelag, afgør ALDRIG identitet), `torso_chroma` (Lab a/b median, belysningsstabil), `TeamModel` (k-means k=2, target-anker fra tap-chromas, refit ved 30/150/400 samples, 'other'=dommer/GK ved afstand >18).
