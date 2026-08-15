@@ -226,41 +226,18 @@ def render_telestration(frame_path: str, box: dict, label: str = "YOUR PLAYER",
         mask = mask.filter(ImageFilter.GaussianBlur(int(max(W, H) * 0.055)))
         out = Image.composite(img, dark, mask).convert("RGBA")
 
-        # 2 — grounded ellipse: sized from PLAYER HEIGHT so the player stands
-        # inside the marker at any distance; flat perspective, soft fill + glow.
+        # 2 — grounded ellipse: SAME ground-integrated renderer as proof clips
+        # (tele_clip._draw_ring): painted-on-grass look, contact shadow,
+        # perspective flatness, silhouette occlusion. One implementation —
+        # frames and clips can never diverge visually.
         if ring:
-            lw = max(2, int(rw * 0.085))
-            feet_y = min(feet_y, H - rh - 4)
-            S = 2
-            bbox = [(cx - rw) * S, (feet_y - rh) * S, (cx + rw) * S, (feet_y + rh) * S]
-            glow_src = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
-            gd = ImageDraw.Draw(glow_src)
-            gd.ellipse(bbox, outline=VOLT + (190,), width=lw * 3 * S)
-            ov = glow_src.filter(ImageFilter.GaussianBlur(int(lw * 2.2 * S)))
-            od = ImageDraw.Draw(ov)
-            od.ellipse(bbox, fill=VOLT + (30,))
-            od.ellipse(bbox, outline=(14, 34, 20, 150), width=(lw + 2) * S)
-            od.ellipse(bbox, outline=VOLT + (235,), width=lw * S)
-            ov = ov.resize((W, H), Image.LANCZOS)
-            out = Image.alpha_composite(out, ov)
-
-            # 3 — player in front: restore the player's silhouette over the
-            # ring so the marker reads as painted on the pitch BEHIND boots
-            # and legs — the line never crosses the front of the feet.
             try:
                 import numpy as _np
-                import cv2 as _cv2
-                arr = _np.array(out.convert("RGB"))
-                base = _np.array(Image.composite(img, dark, mask).convert("RGB"))
-                hsv = _cv2.cvtColor(base, _cv2.COLOR_RGB2HSV)
-                ng = _cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0
-                sel = _np.zeros(ng.shape, bool)
-                x_lo, x_hi = int(max(0, cx - rw * 0.6)), int(min(W, cx + rw * 0.6))
-                y_lo, y_hi = int(max(0, feet_y - rh * 3)), int(min(H, feet_y + rh))
-                sel[y_lo:y_hi, x_lo:x_hi] = True
-                m2 = (ng & sel).astype(_np.uint8) * 255
-                m2 = _cv2.GaussianBlur(m2, (5, 5), 0).astype(_np.float32)[..., None] / 255.0
-                out = Image.fromarray((base * m2 + arr * (1 - m2)).astype(_np.uint8)).convert("RGBA")
+                import tele_clip as _tc
+                feet_y = min(feet_y, H - rh - 4)
+                arr = _np.array(out.convert("RGB"))[:, :, ::-1].copy()
+                _tc._draw_ring(arr, cx / W, feet_y / H, bw / W, bh / H, 1.0)
+                out = Image.fromarray(arr[:, :, ::-1]).convert("RGBA")
             except Exception:
                 pass
 

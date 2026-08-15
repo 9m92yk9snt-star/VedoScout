@@ -62,18 +62,25 @@ VOLT_BGR = np.float32([0, 255, 204])
 
 
 def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float = 1.0):
-    """Premium grounded ellipse under the player's feet: soft transparent fill,
-    subtle glow, crisp volt ring with a dark under-stroke for depth. Sized from
-    PLAYER HEIGHT so the player stands inside the marker at any distance."""
+    """Ground-integrated marker: the ellipse reads as PAINTED ON the pitch under
+    the player, not as a graphic overlay. Volt paint is modulated by the grass
+    luminance (inherits pitch texture), a soft contact shadow grounds the player,
+    the rim has gentle falloff + controlled glow, flatness follows perspective,
+    and the player's silhouette is restored in front so no line ever crosses
+    boots/ankles/legs. Pure downstream visualization of the verified track."""
     if alpha <= 0.02:
         return
     fh, fw = frame.shape[:2]
     est_h = min(max(h * fh, fh * 0.045), fw * 0.333, fh * 0.42)
-    rw = int(min(max(est_h * 0.30, fw * 0.024), fw * 0.10))
-    rh = max(4, int(rw * 0.34))
+    rw = est_h * 0.30
+    rw = max(rw, min(w * fw * 0.55, est_h * 0.45))  # both feet inside on a wide stance
+    rw = int(min(max(rw, fw * 0.024), fw * 0.10))
+    py = int(min(feet_y, 0.995) * fh)
+    ratio = 0.26 + 0.14 * min(1.0, max(0.0, py / max(1, fh)))  # flatter when far away
+    rh = max(4, int(rw * ratio))
     lw = max(2, int(rw * 0.085))
-    px, py = int(cx * fw), int(min(feet_y, 0.995) * fh)
-    m = lw * 8
+    px = int(cx * fw)
+    m = lw * 10
     x0, y0 = max(0, px - rw - m), max(0, py - rh - m)
     x1, y1 = min(fw, px + rw + m), min(fh, py + rh + m)
     if x1 - x0 < 8 or y1 - y0 < 8:
@@ -81,33 +88,55 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
     roi = frame[y0:y1, x0:x1]
     orig = roi.copy()
     c = (px - x0, py - y0)
-    # glow — blurred ring blended per-pixel so only the ring glows
-    glow = np.zeros_like(roi)
-    cv2.ellipse(glow, c, (rw, rh), 0, 0, 360, (0, 255, 204), lw * 3, cv2.LINE_AA)
-    glow = cv2.GaussianBlur(glow, (0, 0), max(1.0, lw * 1.4))
-    ga = (glow.max(axis=2).astype(np.float32) / 255.0 * 0.45 * alpha)[..., None]
-    roi[:] = (roi * (1 - ga) + VOLT_BGR * ga).astype(np.uint8)
-    # soft transparent fill grounds the marker on the pitch
+
+    # paint tint: volt carried by the local grass luminance → chalk-like paint
+    gray = cv2.cvtColor(orig, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+    tint = VOLT_BGR[None, None, :] * (0.42 + 0.58 * gray[..., None])
+
+    # 1 — soft contact shadow under the player (grounds him on the grass)
+    sh = np.zeros(roi.shape[:2], np.uint8)
+    cv2.ellipse(sh, c, (max(3, int(rw * 0.58)), max(3, int(rh * 0.66))),
+                0, 0, 360, 255, -1, cv2.LINE_AA)
+    sh = cv2.GaussianBlur(sh, (0, 0), max(2.0, rw * 0.16)).astype(np.float32) / 255.0
+    roi[:] = (roi * (1 - (sh * 0.28 * alpha)[..., None])).astype(np.uint8)
+
+    # 2 — very subtle transparent ground fill with a soft edge
     fill = np.zeros(roi.shape[:2], np.uint8)
     cv2.ellipse(fill, c, (rw, rh), 0, 0, 360, 255, -1, cv2.LINE_AA)
-    fa = (fill.astype(np.float32) / 255.0 * 0.10 * alpha)[..., None]
-    roi[:] = (roi * (1 - fa) + VOLT_BGR * fa).astype(np.uint8)
-    # crisp ring with dark under-stroke for depth
-    ov = roi.copy()
-    cv2.ellipse(ov, c, (rw, rh), 0, 0, 360, (20, 34, 14), lw + 2, cv2.LINE_AA)
-    cv2.ellipse(ov, c, (rw, rh), 0, 0, 360, (0, 255, 204), lw, cv2.LINE_AA)
-    a = 0.92 * min(1.0, alpha)
-    cv2.addWeighted(ov, a, roi, 1 - a, 0, dst=roi)
-    # player in front: restore the player's silhouette over the ring so the
-    # line never crosses the front of boots/legs (marker painted on the pitch)
+    fillf = cv2.GaussianBlur(fill, (0, 0), max(1.5, lw * 0.9)).astype(np.float32) / 255.0
+    fa = (fillf * 0.07 * alpha)[..., None]
+    roi[:] = (roi * (1 - fa) + tint * fa).astype(np.uint8)
+
+    # 3 — controlled glow hugging the rim (no neon bloom)
+    ring_l = np.zeros(roi.shape[:2], np.uint8)
+    cv2.ellipse(ring_l, c, (rw, rh), 0, 0, 360, 255, lw, cv2.LINE_AA)
+    glowf = cv2.GaussianBlur(ring_l, (0, 0), max(1.5, lw * 1.6)).astype(np.float32) / 255.0
+    ga = (glowf * 0.20 * alpha)[..., None]
+    roi[:] = (roi * (1 - ga) + tint * ga).astype(np.uint8)
+
+    # 4 — the painted line: soft-edged + a faint offset under-stroke for depth
+    depth = np.zeros(roi.shape[:2], np.uint8)
+    cv2.ellipse(depth, (c[0], c[1] + max(1, lw // 2)), (rw, rh), 0, 0, 360, 255,
+                lw + 2, cv2.LINE_AA)
+    da = (cv2.GaussianBlur(depth, (0, 0), max(1.0, lw * 0.5)).astype(np.float32)
+          / 255.0 * 0.26 * alpha)[..., None]
+    roi[:] = (roi * (1 - da)).astype(np.uint8)
+    linef = cv2.GaussianBlur(ring_l, (0, 0), max(0.8, lw * 0.35)).astype(np.float32) / 255.0
+    la = (linef * 0.80 * alpha)[..., None]
+    roi[:] = (roi * (1 - la) + tint * la).astype(np.uint8)
+
+    # 5 — player in front: restore the silhouette over the marker (full ellipse
+    # width so a wide stance/second foot is always covered); slight dilation
+    # kills anti-alias halos along boots/legs
     hsv = cv2.cvtColor(orig, cv2.COLOR_BGR2HSV)
-    ng = cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0
-    sel = np.zeros(ng.shape, bool)
-    xl, xh = max(0, c[0] - int(rw * 0.6)), min(roi.shape[1], c[0] + int(rw * 0.6))
-    yl, yh = max(0, c[1] - rh * 3), min(roi.shape[0], c[1] + rh)
-    sel[yl:yh, xl:xh] = True
-    m2 = (ng & sel).astype(np.uint8) * 255
-    m2 = (cv2.GaussianBlur(m2, (5, 5), 0).astype(np.float32) / 255.0)[..., None]
+    ng = (cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0).astype(np.uint8) * 255
+    sel = np.zeros(ng.shape, np.uint8)
+    xl, xh = max(0, c[0] - int(rw * 0.95)), min(roi.shape[1], c[0] + int(rw * 0.95))
+    yl, yh = max(0, c[1] - rh * 4), min(roi.shape[0], c[1] + rh + 1)
+    sel[yl:yh, xl:xh] = 255
+    m2 = cv2.bitwise_and(ng, sel)
+    m2 = cv2.dilate(m2, np.ones((3, 3), np.uint8))
+    m2 = (cv2.GaussianBlur(m2, (7, 7), 0).astype(np.float32) / 255.0)[..., None]
     roi[:] = (orig * m2 + roi * (1 - m2)).astype(np.uint8)
 
 
@@ -237,6 +266,7 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
                                     output_params=["-movflags", "+faststart"])
         cap.set(cv2.CAP_PROP_POS_FRAMES, f0)
         idx = f0
+        ema_wh = None
         while idx <= f1:
             ok, frame = cap.read()
             if not ok:
@@ -244,6 +274,13 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             a = min(1.0, (idx - f0 + 1) / fade, (f1 - idx + 1) / fade)
             a *= _risk_alpha(idx / fps, risky_windows)
             cx, feet_y, bw, bh = _interp(sm, idx / fps)
+            # size stability: EMA on box size only (position stays responsive)
+            if ema_wh is None:
+                ema_wh = [bw, bh]
+            else:
+                ema_wh[0] += 0.25 * (bw - ema_wh[0])
+                ema_wh[1] += 0.25 * (bh - ema_wh[1])
+            bw, bh = ema_wh[0], ema_wh[1]
             est_h = min(max(bh * H, H * 0.045), W * 0.333, H * 0.42)
             rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
             feet_px = feet_y * H - min(bh * H * 0.08, rw * 0.34 * 0.8)
