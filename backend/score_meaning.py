@@ -6,9 +6,27 @@ anchor or an independent identity-checked frame). No estimates, no invention."""
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 _KB = json.loads((Path(__file__).resolve().parent / "content" / "skill_knowledge.json").read_text())
+
+_EVIDENCE_SOFT_GATE = os.environ.get("CV_EVIDENCE_SOFT_GATE", "1") == "1"
+
+
+def _risky_seconds(doc: dict) -> list:
+    """Switch-risk moments from the CV shadow engine (P7 soft gate): evidence
+    picking PREFERS other verified moments near these timestamps. It never
+    drops evidence and never changes Analysis A/B — ordering preference only."""
+    if not _EVIDENCE_SOFT_GATE:
+        return []
+    pv = ((doc.get("cv_shadow") or {}).get("prod_verify")) or {}
+    out = []
+    for x in pv.get("switch_ts") or []:
+        t = x.get("t") if isinstance(x, dict) else x
+        if isinstance(t, (int, float)):
+            out.append(float(t))
+    return out
 
 _NEXT_BANDS = [(5.5, "Club"), (7.0, "Top Club"), (8.0, "Academy"), (9.0, "Elite")]
 _TIER_OUT_OF_10 = {"elite_academy": 9, "pro_academy": 8, "strong_club": 7, "standard_club": 5}
@@ -90,10 +108,12 @@ def _gap_to_next(score: float):
     return None, None
 
 
-def _pick_evidence(evidence: list, vsecs: list, used: list):
+def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None = None):
     """Pick a proof moment from THIS skill's own model-cited evidence, preferring
     moments not already shown on another card (±3s) — proofs spread across the
-    match instead of repeating one clip. Never invents timestamps."""
+    match instead of repeating one clip. Never invents timestamps.
+    P7 soft gate: moments within ±1.5s of a shadow switch-risk flag are only
+    deprioritized — picked last, never dropped."""
     cands = []
     for e in evidence or []:
         ts = (e or {}).get("timestamp") if isinstance(e, dict) else None
@@ -109,9 +129,13 @@ def _pick_evidence(evidence: list, vsecs: list, used: list):
         return sum(1 for u in used if abs(c["sec"] - u) < 0.5)
     def clash(c):
         return sum(1 for u in used if abs(c["sec"] - u) <= 3.0)
-    pick = (next((c for c in cands if c["verified"] and fresh(c)), None)
+    def risk(c):
+        return any(abs(c["sec"] - r) <= 1.5 for r in (risky or []))
+    pick = (next((c for c in cands if c["verified"] and fresh(c) and not risk(c)), None)
+            or next((c for c in cands if c["verified"] and fresh(c)), None)
+            or next((c for c in cands if fresh(c) and not risk(c)), None)
             or next((c for c in cands if fresh(c)), None)
-            or sorted(cands, key=lambda c: (exact(c), clash(c), not c["verified"]))[0])
+            or sorted(cands, key=lambda c: (exact(c), clash(c), risk(c), not c["verified"]))[0])
     used.append(pick["sec"])
     return {"timestamp": pick["timestamp"], "verified": pick["verified"]}
 
@@ -199,8 +223,9 @@ def build_score_meaning(doc: dict, progression: dict | None = None) -> dict | No
     # assign proof moments in display order so top cards get first pick and
     # each card prefers a moment the reader has not already seen
     used: list = []
+    risky = _risky_seconds(doc)
     for s in skills:
-        s["evidence"] = _pick_evidence((obs_map[s["key"]][1] or {}).get("evidence"), vsecs, used)
+        s["evidence"] = _pick_evidence((obs_map[s["key"]][1] or {}).get("evidence"), vsecs, used, risky)
     return {
         "position": pos,
         "position_line": posdata.get("line"),

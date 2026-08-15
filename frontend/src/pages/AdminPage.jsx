@@ -35,6 +35,7 @@ import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import AdStudioAdmin from "@/components/admin/AdStudioAdmin";
 import QualityAdmin from "@/components/admin/QualityAdmin";
 import CvShadowDialog from "@/components/admin/CvShadowDialog";
+import CvShadowStats from "@/components/admin/CvShadowStats";
 
 const ALL_TABS = [
   { id: "stats", label: "Overview", role: "admin" },
@@ -548,6 +549,7 @@ export default function AdminPage() {
                 const visible = showFailedReports ? failedReports : okReports;
                 return (
                 <div className="space-y-3">
+                  <CvShadowStats />
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs uppercase tracking-widest font-bold text-white/60">
                       {showFailedReports ? `Failed / empty uploads (${failedReports.length})` : `Analyses (${okReports.length})`}

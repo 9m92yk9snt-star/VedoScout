@@ -180,8 +180,24 @@ def plan_window(track_points: list, t_moment: float, pre: float = 1.8, post: flo
     return {"w0": w0, "w1": w1, "coverage": coverage, "sm": _smooth(pts)}
 
 
+def _risk_alpha(t: float, windows, fade: float = FADE_SEC) -> float:
+    """P19 marker state logic: inside a switch-risk window the ring fades
+    OUT smoothly (never jumps to another player); it fades back in after."""
+    m = 1.0
+    for r0, r1 in windows or []:
+        if r0 - fade < t < r1 + fade:
+            if t < r0:
+                m = min(m, (r0 - t) / fade)
+            elif t > r1:
+                m = min(m, (t - r1) / fade)
+            else:
+                return 0.0
+    return m
+
+
 def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, out_path: str,
-                          label: str = "PLAYER · TRACKED", pre: float = 1.8, post: float = 1.8):
+                          label: str = "PLAYER · TRACKED", pre: float = 1.8, post: float = 1.8,
+                          risky_windows: list | None = None):
     """Returns {"ok": True, "coverage": float, "start": s, "end": s} or None. Never raises."""
     cap = None
     writer = None
@@ -216,6 +232,7 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             if not ok:
                 break
             a = min(1.0, (idx - f0 + 1) / fade, (f1 - idx + 1) / fade)
+            a *= _risk_alpha(idx / fps, risky_windows)
             cx, feet_y, bw, bh = _interp(sm, idx / fps)
             est_h = min(max(bh * H, H * 0.045), W * 0.333, H * 0.42)
             rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)

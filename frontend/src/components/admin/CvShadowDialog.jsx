@@ -40,8 +40,8 @@ const ShadowThumb = ({ reportId, entry, kind }) => {
           <Loader2 className="w-4 h-4 animate-spin text-ink/30" />
         </div>
       )}
-      <div className={`px-1.5 py-1 text-[9px] font-bold uppercase tracking-wider ${kind === "SWITCH" ? "text-red-500" : "text-amber-600"}`}>
-        {kind} · {fmtT(entry.t)} · {entry.sim}
+      <div className={`px-1.5 py-1 text-[9px] font-bold uppercase tracking-wider ${kind === "SWITCH" ? "text-red-500" : kind === "EMPTY" ? "text-purple-600" : "text-amber-600"}`}>
+        {kind} · {fmtT(entry.t)}{entry.sim != null ? ` · ${entry.sim}` : ""}
       </div>
     </div>
   );
@@ -101,6 +101,7 @@ export default function CvShadowDialog({ reportId, onClose }) {
                 <Stat label="Identity match (mean)" value={pv?.sim_mean} />
                 <Stat label="Suspect frames" value={`${pv?.suspect_frames ?? 0} (${Math.round((pv?.suspect_rate || 0) * 100)}%)`} warn={(pv?.suspect_rate || 0) > 0.2} />
                 <Stat label="Switch-risk frames" value={pv?.switch_risk_frames} warn={(pv?.switch_risk_frames || 0) > 0} />
+                <Stat label="Empty-box frames" value={pv?.empty_box_frames ?? "—"} warn={(pv?.empty_box_frames || 0) > 2} />
                 <Stat label="Crowded frames" value={pv?.crowded_frames} />
                 <Stat label="Tap self-verify" value={data.tap_self_verify} />
               </div>
@@ -123,6 +124,7 @@ export default function CvShadowDialog({ reportId, onClose }) {
               {(() => {
                 const thumbs = [
                   ...(pv?.switch_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "SWITCH" })),
+                  ...(pv?.empty_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "EMPTY" })),
                   ...(pv?.suspect_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "SUSPECT" })),
                 ];
                 if (!thumbs.length) return null;

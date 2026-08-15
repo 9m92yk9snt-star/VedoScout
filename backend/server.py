@@ -7618,6 +7618,21 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
         if isinstance(c, dict):
             c.pop("tele_clip_url", None)
             c.pop("tele_clip_coverage", None)
+    # P19 marker state-fade: ring fades out inside shadow switch-risk windows
+    # (never rides along on a possibly wrong player). Fail-open: no shadow
+    # data or flag off → exactly the previous behaviour.
+    risky_windows = []
+    try:
+        if os.environ.get("CV_MARKER_STATE_FADE", "1") == "1":
+            _fresh = await db.reports.find_one(
+                {"id": report_id}, {"_id": 0, "cv_shadow.prod_verify.switch_ts": 1})
+            _sts = (((_fresh or {}).get("cv_shadow") or {}).get("prod_verify") or {}).get("switch_ts") or []
+            for x in _sts:
+                _t = x.get("t") if isinstance(x, dict) else x
+                if isinstance(_t, (int, float)):
+                    risky_windows.append((float(_t) - 0.6, float(_t) + 0.6))
+    except Exception:
+        risky_windows = []
     made = 0
     for i, c in enumerate(enriched):
         if made >= TELE_CLIP_MAX:
@@ -7635,7 +7650,7 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
         out = frames_dir / f"proofclip_{i}.mp4"
         res = await asyncio.to_thread(
             generate_tracked_clip, str(vp), float(sec), track_pts, str(out), label,
-            float(sec - win["w0"]), float(win["w1"] - sec),
+            float(sec - win["w0"]), float(win["w1"] - sec), risky_windows,
         )
         if res and res.get("ok"):
             c["tele_clip_url"] = f"/api/uploads/frames/{report_id}/{out.name}"
@@ -13743,6 +13758,53 @@ async def admin_reports(_=Depends(get_current_admin)):
         d["video_url"] = _resolve_video_url(d)
         d["poster_url"] = _resolve_poster_url(d)
     return docs
+
+
+@api_router.get("/admin/cv-shadow/summary")
+async def admin_cv_shadow_summary(_=Depends(get_current_admin)):
+    """Cross-report shadow validation stats — false-alarm rate builds up here
+    as new real uploads run through the shadow engine automatically."""
+    docs = await db.reports.find(
+        {"cv_shadow.status": "ok"},
+        {"_id": 0, "id": 1, "created_at": 1, "player_details.player_name": 1, "cv_shadow": 1},
+    ).sort("created_at", -1).to_list(100)
+    rows = []
+    tot_checked = tot_suspect = tot_switch = 0
+    sims = []
+    for d in docs:
+        cv = d["cv_shadow"]
+        pv = cv.get("prod_verify") or {}
+        checked = int(pv.get("checked") or 0)
+        tot_checked += checked
+        tot_suspect += int(pv.get("suspect_frames") or 0)
+        tot_switch += int(pv.get("switch_risk_frames") or 0)
+        if pv.get("sim_mean") is not None:
+            sims.append(float(pv["sim_mean"]))
+        rows.append({
+            "report_id": d["id"],
+            "player": ((d.get("player_details") or {}).get("player_name")) or "—",
+            "created_at": d.get("created_at"),
+            "engine_version": cv.get("engine_version"),
+            "checked": checked,
+            "sim_mean": pv.get("sim_mean"),
+            "suspect_frames": pv.get("suspect_frames"),
+            "suspect_rate": pv.get("suspect_rate"),
+            "switch_risk_frames": pv.get("switch_risk_frames"),
+            "empty_box_frames": pv.get("empty_box_frames"),
+            "flag_frames": pv.get("flag_frames", 0),
+        })
+    return {
+        "aggregate": {
+            "reports": len(rows),
+            "checked": tot_checked,
+            "suspect_frames": tot_suspect,
+            "suspect_rate": round(tot_suspect / max(1, tot_checked), 3),
+            "switch_risk_frames": tot_switch,
+            "switch_rate": round(tot_switch / max(1, tot_checked), 3),
+            "sim_mean": round(sum(sims) / max(1, len(sims)), 3) if sims else None,
+        },
+        "reports": rows,
+    }
 
 
 @api_router.get("/admin/reports/{report_id}/cv-shadow")

@@ -256,6 +256,22 @@ def _profile_sim(emb, refs) -> float:
     return sum(s * w for s, w in scored) / max(1e-6, tw)
 
 
+def _sim_relaxed(emb, refs) -> float:
+    """Pose-tolerant similarity: whole-body pooled stats, no zone order, no
+    aspect penalty. A bent/fallen target keeps its colours even when the
+    vertical zone layout scrambles — used ONLY to avoid false alarms, never
+    to raise confidence."""
+    if not emb or not refs:
+        return 0.0
+    pooled = np.mean(emb["zones"], axis=0)
+    best = 0.0
+    for r in refs:
+        rp = np.mean(r["emb"]["zones"], axis=0)
+        d = np.abs(pooled - rp) / _TOL
+        best = max(best, float(np.clip(1.0 - d.mean(), 0.0, 1.0)))
+    return best
+
+
 # ---------------------------------------------------------------- main scan
 def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
     """Full shadow pass. Returns the metrics dict (also logged). Never raises."""
@@ -301,6 +317,10 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         # the current production track box still look like the tapped player?"
         prod_sims, prod_suspect, prod_crowded, switch_risk = [], 0, 0, 0
         suspect_ts, switch_ts, crowded_ts = [], [], []
+        prev_prod_low = False  # pose-robustness: flags need 2 consecutive low samples
+        prod_empty = 0
+        prev_prod_empty = False
+        empty_ts = []
 
         # flagged-moment gallery: small annotated frames so an admin can judge
         # every finding (true risk vs false alarm) with their own eyes
@@ -408,7 +428,24 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 if pe:
                     ps = _profile_sim(pe, refs)
                     prod_sims.append(round(ps, 3))
-                    if ps < SIM_T * 0.75:
+                    # pose-robust flagging: a bent/fallen target scrambles the
+                    # zone layout → the pose-tolerant pooled similarity may
+                    # rescue the sample, but ONLY when a detected person is
+                    # actually inside the prod box (an empty box must keep
+                    # flagging). All flags need 2 consecutive low samples.
+                    person_in_box = any(_iou(c, pb) > 0.2 for c in dets) if dets else True
+                    ps_rel = _sim_relaxed(pe, refs)
+                    low = ps < SIM_T * 0.75 and (not person_in_box or ps_rel < SIM_T)
+                    if detector.ok and not person_in_box:
+                        prod_empty += 1
+                        if prev_prod_empty and len(empty_ts) < 60:
+                            entry = {"t": round(t, 1)}
+                            img = _save_flag_frame(small, t, pb, None, ps, "EMPTY-BOX")
+                            if img:
+                                entry["img"] = img
+                            empty_ts.append(entry)
+                    prev_prod_empty = detector.ok and not person_in_box
+                    if low and prev_prod_low:
                         prod_suspect += 1
                         if len(suspect_ts) < 60:
                             entry = {"t": round(t, 1), "sim": round(ps, 2)}
@@ -435,18 +472,28 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                         if len(crowded_ts) < 60:
                             crowded_ts.append(round(t, 1))
                     # switch risk: a DIFFERENT nearby person matches the tapped
-                    # player CLEARLY better than the prod box content does
-                    for c in others:
-                        oe = _zone_embedding(small, c, pitch_l)
-                        if oe and _profile_sim(oe, refs) > ps + 0.15 and ps < SIM_T:
-                            switch_risk += 1
-                            if len(switch_ts) < 60:
-                                entry = {"t": round(t, 1), "sim": round(ps, 2)}
-                                img = _save_flag_frame(small, t, pb, c, ps, "SWITCH-RISK")
-                                if img:
-                                    entry["img"] = img
-                                switch_ts.append(entry)
-                            break
+                    # player CLEARLY better than the prod box content does.
+                    # Pose-robust: requires persistence (prev sample also low),
+                    # the relaxed check to fail too, and the competitor to be
+                    # SAME-KIT (opponents/spectators can't be the target).
+                    if low and prev_prod_low:
+                        for c in others:
+                            oe = _zone_embedding(small, c, pitch_l)
+                            if not oe:
+                                continue
+                            if _profile_sim(oe, refs) > ps + 0.15 and ps < SIM_T:
+                                cl = team.classify(cv_detect.torso_chroma(small, c))
+                                if cl in ("opponent", "other"):
+                                    continue
+                                switch_risk += 1
+                                if len(switch_ts) < 60:
+                                    entry = {"t": round(t, 1), "sim": round(ps, 2)}
+                                    img = _save_flag_frame(small, t, pb, c, ps, "SWITCH-RISK")
+                                    if img:
+                                        entry["img"] = img
+                                    switch_ts.append(entry)
+                                break
+                    prev_prod_low = low
                     # P10: negative teammate gallery from REAL detections —
                     # same-kit players clearly away from the production target.
                     # Never contaminates the positive profile (separate list).
@@ -570,7 +617,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
 
         out = {
             "status": "ok",
-            "engine_version": 4,
+            "engine_version": 5,
             "duration_s": round(dur, 1),
             "samples": samples,
             "taps": [{"t": r["t"], "quality": r["quality"], "consistency": r["consistency"],
@@ -597,9 +644,11 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 "suspect_rate": round(prod_suspect / max(1, len(prod_sims)), 3),
                 "crowded_frames": prod_crowded,
                 "switch_risk_frames": switch_risk,
+                "empty_box_frames": prod_empty,
                 "suspect_ts": suspect_ts,
                 "switch_ts": switch_ts,
                 "crowded_ts": crowded_ts,
+                "empty_ts": empty_ts,
                 "flag_frames": saved_imgs,
             },
             # P3 scene awareness (detector + MOT + team classification)
