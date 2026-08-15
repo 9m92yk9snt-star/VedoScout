@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Optional
 
 import cv2
@@ -301,6 +302,39 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         prod_sims, prod_suspect, prod_crowded, switch_risk = [], 0, 0, 0
         suspect_ts, switch_ts, crowded_ts = [], [], []
 
+        # flagged-moment gallery: small annotated frames so an admin can judge
+        # every finding (true risk vs false alarm) with their own eyes
+        try:
+            frames_dir = Path(video_path).parent / "frames" / str(report_id)
+            frames_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            frames_dir = None
+        saved_imgs = 0
+
+        def _save_flag_frame(small_img, t, pb, other_box, ps, kind):
+            nonlocal saved_imgs
+            if frames_dir is None or saved_imgs >= 12:
+                return None
+            if kind == "SUSPECT" and saved_imgs >= 8:
+                return None  # reserve slots for the rarer switch-risk frames
+            try:
+                vis = small_img.copy()
+                cv2.rectangle(vis, (pb[0], pb[1]), (pb[0] + pb[2], pb[1] + pb[3]),
+                              (0, 255, 255), 2)
+                if other_box is not None:
+                    cv2.rectangle(vis, (other_box[0], other_box[1]),
+                                  (other_box[0] + other_box[2], other_box[1] + other_box[3]),
+                                  (0, 0, 255), 2)
+                cv2.putText(vis, f"{kind} t={t:.1f}s sim={ps:.2f}", (8, 22),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+                name = f"cvshadow_{int(round(t * 10))}.jpg"
+                cv2.imwrite(str(frames_dir / name), vis,
+                            [cv2.IMWRITE_JPEG_QUALITY, 70])
+                saved_imgs += 1
+                return name
+            except Exception:
+                return None
+
         # ── P3 scene awareness (detector + MOT + team classification) ──
         detector = cv_detect.PersonDetector()
         mot = cv_detect.MiniMOT()
@@ -377,7 +411,11 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                     if ps < SIM_T * 0.75:
                         prod_suspect += 1
                         if len(suspect_ts) < 60:
-                            suspect_ts.append({"t": round(t, 1), "sim": round(ps, 2)})
+                            entry = {"t": round(t, 1), "sim": round(ps, 2)}
+                            img = _save_flag_frame(small, t, pb, None, ps, "SUSPECT")
+                            if img:
+                                entry["img"] = img
+                            suspect_ts.append(entry)
                     # nearby people around the prod box → crossover pressure.
                     # Real detections when available; blob fallback otherwise.
                     if dets:
@@ -403,7 +441,11 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                         if oe and _profile_sim(oe, refs) > ps + 0.15 and ps < SIM_T:
                             switch_risk += 1
                             if len(switch_ts) < 60:
-                                switch_ts.append(round(t, 1))
+                                entry = {"t": round(t, 1), "sim": round(ps, 2)}
+                                img = _save_flag_frame(small, t, pb, c, ps, "SWITCH-RISK")
+                                if img:
+                                    entry["img"] = img
+                                switch_ts.append(entry)
                             break
                     # P10: negative teammate gallery from REAL detections —
                     # same-kit players clearly away from the production target.
@@ -558,6 +600,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
                 "suspect_ts": suspect_ts,
                 "switch_ts": switch_ts,
                 "crowded_ts": crowded_ts,
+                "flag_frames": saved_imgs,
             },
             # P3 scene awareness (detector + MOT + team classification)
             "scene": {

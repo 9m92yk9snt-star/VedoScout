@@ -1,5 +1,12 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 13) — SUSPEKT-FRAME GALLERI ✅ (E2E-verificeret med screenshot: 12 thumbs loaded)
+- **cv_shadow.py**: `_save_flag_frame()` gemmer op til 12 annoterede JPEGs (gul=prod-boks, rød=konkurrerende spiller, label kind/t/sim) i `uploads/frames/{report_id}/cvshadow_{t*10}.jpg` (kvalitet 70; max 8 SUSPECT — resten reserveret SWITCH-RISK). `suspect_ts`/`switch_ts` entries har nu `img`-felt; **switch_ts er nu dicts {t,sim,img}** (UI håndterer gamle float-format bagudkompatibelt). Nyt felt `prod_verify.flag_frames`.
+- **server.py**: `GET /api/admin/reports/{id}/cv-shadow/frame/{fname}` (admin-auth, regex-valideret filnavn, FileResponse). Frames er lokale (ikke R2) — efter pod-restart: kør blot "Run shadow analysis now" igen.
+- **CvShadowDialog.jsx**: `ShadowThumb` henter billeder som auth'et blob (axios responseType blob → objectURL), galleri-grid med testids cv-shadow-gallery/cv-shadow-thumb.
+- **Valideret på rapport d8c04d5d**: 12 frames gemt+vist. Eksempel-bedømmelse: switch-risk ved 12.2s = FALSK ALARM (prod-boks korrekt på bøjet målspiller #15, "konkurrenten" var en tilskuer bag målet) — præcis den falsk-alarm-synlighed briefen kræver før nogen gate aktiveres.
+- **Næste**: valider på flere rigtige uploads (falsk-alarm-rate), derefter P7 evidens-gate-kobling → P8/P19 marker state-fade → P9/P10.
+
 ## Session (Jun 2026 — part 12) — BUGFIX: 200MB+ videoer frøs på "Final Check" ✅ (E2E-verificeret på den faktiske fejlede rapport)
 - **Rodårsag**: LLM-proxyen hard-capper request bodies på 64MB. En 207MB H.264 iPhone-video tog transcode-FAST-PATH (kopieret 1:1 som .web.mp4), blev base64-inlinet (~285MB) til Gemini → 413 `request_too_large` → `full_report_status=failed` (frontend HAR retry-UI; skærmbillede var taget før fejlen slog igennem).
 - **Fix 1 — `_ensure_analysis_video()` (server.py, før transcode_to_web_mp4)**: filer >45MB (`ANALYSIS_MAX_INLINE_MB`) får en kompakt `.analysis.mp4`-rendition (960px/24fps/CRF30, fallback 640px/15fps/CRF34) KUN til Gemini-kald. Kaldes ét centralt sted i `call_gemini_with_video` (dækker Analysis A, B og retry). Fuld-kvalitets web.mp4 urørt til tracking/evidens/proofs.

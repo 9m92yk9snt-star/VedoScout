@@ -15,6 +15,38 @@ const Stat = ({ label, value, warn }) => (
   </div>
 );
 
+const ShadowThumb = ({ reportId, entry, kind }) => {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let url;
+    let alive = true;
+    api.get(`/admin/reports/${reportId}/cv-shadow/frame/${entry.img}`, { responseType: "blob" })
+      .then(({ data }) => {
+        url = URL.createObjectURL(data);
+        if (alive) setSrc(url);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [reportId, entry.img]);
+  return (
+    <div className="border border-gray-border bg-black/5" data-testid="cv-shadow-thumb">
+      {src ? (
+        <img src={src} alt={`${kind} at ${fmtT(entry.t)}`} className="w-full h-auto block" />
+      ) : (
+        <div className="aspect-[9/16] flex items-center justify-center">
+          <Loader2 className="w-4 h-4 animate-spin text-ink/30" />
+        </div>
+      )}
+      <div className={`px-1.5 py-1 text-[9px] font-bold uppercase tracking-wider ${kind === "SWITCH" ? "text-red-500" : "text-amber-600"}`}>
+        {kind} · {fmtT(entry.t)} · {entry.sim}
+      </div>
+    </div>
+  );
+};
+
 export default function CvShadowDialog({ reportId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,7 +109,7 @@ export default function CvShadowDialog({ reportId, onClose }) {
                   {pv.switch_ts?.length > 0 && (
                     <div className="text-xs text-ink/70">
                       <span className="font-bold text-red-500 uppercase tracking-widest text-[10px]">Switch risk at:</span>{" "}
-                      {pv.switch_ts.map((t) => fmtT(t)).join(", ")}
+                      {pv.switch_ts.map((x) => fmtT(typeof x === "number" ? x : x.t)).join(", ")}
                     </div>
                   )}
                   {pv.suspect_ts?.length > 0 && (
@@ -88,6 +120,25 @@ export default function CvShadowDialog({ reportId, onClose }) {
                   )}
                 </div>
               )}
+              {(() => {
+                const thumbs = [
+                  ...(pv?.switch_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "SWITCH" })),
+                  ...(pv?.suspect_ts || []).filter((x) => x && x.img).map((x) => ({ ...x, kind: "SUSPECT" })),
+                ];
+                if (!thumbs.length) return null;
+                return (
+                  <div data-testid="cv-shadow-gallery">
+                    <div className="text-[10px] uppercase tracking-widest text-ink/50 font-bold mb-2">
+                      Flagged moments — judge with your own eyes (yellow = production box, red = competing player)
+                    </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {thumbs.map((x) => (
+                        <ShadowThumb key={x.img} reportId={reportId} entry={x} kind={x.kind} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="text-[11px] text-ink/50 leading-relaxed">
                 Taps: {data.taps?.length} · outliers {data.tap_outliers} · verified coverage {Math.round((data.verified_coverage || 0) * 100)}% ·
                 crossovers {data.crossover_samples} · engine v{data.engine_version} · {data.compute_s}s

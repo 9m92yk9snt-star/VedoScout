@@ -13766,6 +13766,18 @@ async def admin_cv_shadow(report_id: str, run: bool = False, _=Depends(get_curre
     return {"report_id": report_id, "cv_shadow": doc.get("cv_shadow")}
 
 
+@api_router.get("/admin/reports/{report_id}/cv-shadow/frame/{fname}")
+async def admin_cv_shadow_frame(report_id: str, fname: str, _=Depends(get_current_admin)):
+    """Admin-only: serve a flagged-moment frame saved by the shadow engine."""
+    import re as _re
+    if not _re.fullmatch(r"cvshadow_[0-9]{1,7}\.jpg", fname):
+        raise HTTPException(status_code=404, detail="Not found")
+    p = UPLOAD_DIR / "frames" / report_id / fname
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="Frame not found — re-run shadow analysis")
+    return FileResponse(str(p), media_type="image/jpeg")
+
+
 @api_router.post("/admin/seed-test-accounts")
 async def admin_seed_test_accounts(_=Depends(get_current_admin)):
     """Idempotent: creates (or updates) two demo accounts used for QA:
