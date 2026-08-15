@@ -7515,6 +7515,11 @@ async def _telestrate_verified_frames(
 
 
 TELE_CLIP_MAX = 3
+# Phase 18: when shadow stability is documented for the report, allow more
+# UNIQUE proofs (still individually identity-verified, never near-duplicates)
+TELE_CLIP_MAX_STABLE = int(os.environ.get("TELE_CLIP_MAX_STABLE", "6"))
+CV_PROOF_EXPAND_MAX_SUSPECT = float(os.environ.get("CV_PROOF_EXPAND_MAX_SUSPECT", "0.10"))
+CV_PROOF_EXPAND_MAX_SWITCH = int(os.environ.get("CV_PROOF_EXPAND_MAX_SWITCH", "2"))
 TELE_EDGE_TRUST = 0.7  # secs from the tapped moment where the tap itself is proof
 TELE_EDGE_STEP = 0.6
 
@@ -7622,12 +7627,15 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
     # (never rides along on a possibly wrong player). Fail-open: no shadow
     # data or flag off → exactly the previous behaviour.
     risky_windows = []
+    clip_cap = TELE_CLIP_MAX
     try:
         if os.environ.get("CV_MARKER_STATE_FADE", "1") == "1":
             _fresh = await db.reports.find_one(
                 {"id": report_id},
                 {"_id": 0, "cv_shadow.prod_verify.switch_ts": 1,
-                 "cv_shadow.prod_verify.empty_windows": 1})
+                 "cv_shadow.prod_verify.empty_windows": 1,
+                 "cv_shadow.prod_verify.suspect_rate": 1,
+                 "cv_shadow.prod_verify.switch_risk_frames": 1})
             _pv = ((_fresh or {}).get("cv_shadow") or {}).get("prod_verify") or {}
             for x in _pv.get("switch_ts") or []:
                 _t = x.get("t") if isinstance(x, dict) else x
@@ -7639,17 +7647,33 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                     risky_windows.append((float(w[0]), float(w[1])))
                 except Exception:
                     pass
+            # Phase 18: documented stability → allow more unique proofs
+            if (_pv.get("suspect_rate") is not None
+                    and float(_pv["suspect_rate"]) <= CV_PROOF_EXPAND_MAX_SUSPECT
+                    and int(_pv.get("switch_risk_frames") or 0) <= CV_PROOF_EXPAND_MAX_SWITCH):
+                clip_cap = TELE_CLIP_MAX_STABLE
+                logger.info(f"[teleclip] {report_id}: shadow stability documented — clip cap {clip_cap}")
     except Exception:
         risky_windows = []
+        clip_cap = TELE_CLIP_MAX
     made = 0
+    clipped_secs = []
     for i, c in enumerate(enriched):
-        if made >= TELE_CLIP_MAX:
+        if made >= clip_cap:
             break
         if not isinstance(c, dict) or not c.get("telestrated"):
             continue
         picked = c.get("frame_picked_ts")
         sec = float(picked) if isinstance(picked, (int, float)) else _ts_to_seconds(str(c.get("timestamp") or ""))
         if sec is None:
+            continue
+        # PHASE 17 hard gate: never build a proof where identity is uncertain
+        # mid-action (switch-risk or empty-box window at the key moment)
+        if any(w0 <= sec <= w1 for w0, w1 in risky_windows):
+            logger.info(f"[teleclip] {report_id}: moment {i} ({sec:.1f}s) inside identity-unsafe window — no clip")
+            continue
+        # uniqueness: proofs must show DIFFERENT moments, not the same ±3s
+        if any(abs(sec - u) <= 3.0 for u in clipped_secs):
             continue
         win = await _teleclip_verified_window(report_id, i, vp, track_pts, sec, ref_crops, fp, jnum, frames_dir)
         if not win:
@@ -7664,6 +7688,7 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
             c["tele_clip_url"] = f"/api/uploads/frames/{report_id}/{out.name}"
             c["tele_clip_coverage"] = res.get("coverage")
             made += 1
+            clipped_secs.append(sec)
             logger.info(f"[teleclip] {report_id}: clip {out.name} coverage={res.get('coverage')}")
 
 

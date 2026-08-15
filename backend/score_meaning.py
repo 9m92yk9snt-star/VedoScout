@@ -12,6 +12,7 @@ from pathlib import Path
 _KB = json.loads((Path(__file__).resolve().parent / "content" / "skill_knowledge.json").read_text())
 
 _EVIDENCE_SOFT_GATE = os.environ.get("CV_EVIDENCE_SOFT_GATE", "1") == "1"
+_EVIDENCE_HARD_GATE = os.environ.get("CV_EVIDENCE_HARD_GATE", "1") == "1"
 
 
 def _risky_seconds(doc: dict) -> list:
@@ -140,6 +141,15 @@ def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None =
         return sum(1 for u in used if abs(c["sec"] - u) <= 3.0)
     def risk(c):
         return any(abs(c["sec"] - r) <= 1.5 for r in (risky or []))
+    # PHASE 17 HARD GATE: identity-uncertain moments may NOT become report
+    # evidence at all — "uncertain player + obvious action → reject". A card
+    # with no safe cited moment shows no proof (temporarily missing proof is
+    # acceptable; a confidently wrong proof is not).
+    if _EVIDENCE_HARD_GATE and risky:
+        safe = [c for c in cands if not risk(c)]
+        if not safe:
+            return None
+        cands = safe
     pick = (next((c for c in cands if c["verified"] and fresh(c) and not risk(c)), None)
             or next((c for c in cands if c["verified"] and fresh(c)), None)
             or next((c for c in cands if fresh(c) and not risk(c)), None)
