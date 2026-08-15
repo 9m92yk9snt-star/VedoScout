@@ -398,16 +398,35 @@ export default function UploadPage() {
   };
 
   // ── Chunked upload — bypasses the Cloudflare/ingress ~100 MB body cap ──
-  // Slices the file into ≤24 MB chunks, then assembles server-side into a
+  // Slices the file into ≤8 MB chunks, then assembles server-side into a
   // temp video consumed via the existing `temp_video_token` upload path.
-  const CHUNK_SIZE = 24 * 1024 * 1024;
-  const DIRECT_LIMIT = 80 * 1024 * 1024; // ≤80 MB still goes as one request
+  // Small chunks + per-request RETRY make mobile (5G/4G) uploads survive
+  // transient drops and strict production proxy timeouts.
+  const CHUNK_SIZE = 8 * 1024 * 1024;
+  const DIRECT_LIMIT = 12 * 1024 * 1024; // ≤12 MB still goes as one request
+
+  // Retry transient failures: network drops (no response), gateway timeouts
+  // and 5xx. Never retries real 4xx rejections (413 too large, 403, ...).
+  const postRetry = async (url, fd, cfg = {}, attempts = 4) => {
+    let wait = 1500;
+    for (let a = 1; ; a++) {
+      try {
+        return await api.post(url, fd, cfg);
+      } catch (err) {
+        const st = err?.response?.status;
+        const retriable = !err?.response || st === 408 || st === 425 || st === 429 || st >= 500;
+        if (!retriable || a >= attempts) throw err;
+        await new Promise((r) => setTimeout(r, wait));
+        wait *= 2;
+      }
+    }
+  };
 
   const chunkedUpload = async (f, onPct = (p) => setUploadPct(p)) => {
     const initFd = new FormData();
     initFd.append("filename", f.name || "video.mp4");
     initFd.append("total_size", String(f.size));
-    const { data: init } = await api.post("/me/chunked-upload/init", initFd);
+    const { data: init } = await postRetry("/me/chunked-upload/init", initFd, { timeout: 60000 });
     const total = Math.ceil(f.size / CHUNK_SIZE);
     let sent = 0;
     for (let i = 0; i < total; i++) {
@@ -416,8 +435,8 @@ export default function UploadPage() {
       cfd.append("upload_id", init.upload_id);
       cfd.append("index", String(i));
       cfd.append("chunk", blob, `part_${i}`);
-      await api.post("/me/chunked-upload/chunk", cfd, {
-        timeout: 300000,
+      await postRetry("/me/chunked-upload/chunk", cfd, {
+        timeout: 180000,
         onUploadProgress: (ev) => {
           const done = sent + (ev.loaded || 0);
           onPct(Math.min(99, Math.round((done * 100) / f.size)));
@@ -428,7 +447,7 @@ export default function UploadPage() {
     const doneFd = new FormData();
     doneFd.append("upload_id", init.upload_id);
     doneFd.append("total_chunks", String(total));
-    const { data: fin } = await api.post("/me/chunked-upload/complete", doneFd, { timeout: 300000 });
+    const { data: fin } = await postRetry("/me/chunked-upload/complete", doneFd, { timeout: 300000 });
     return fin.token;
   };
 

@@ -1,5 +1,14 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 28) — PRODUKTIONS-UPLOADFEJL: ROBUST CHUNKED UPLOAD ✅ (E2E-testet i preview — KRÆVER REDEPLOY)
+- **Produktionsrapport (scoutmeplay.com, mobil 5G)**: "Upload failed while sending the video" + en analyse der stod på 1%. Deployment-scan: PASS (ingen config-fejl); live produktionslogs kunne ikke hentes.
+- **Rodårsager i upload-koden**: (1) filer ≤80MB blev sendt som ÉN multipart-POST — tager minutter på svagt 5G og rammer produktions-proxyens request-timeout; (2) chunk-upload havde INGEN retry — ét transient netværksudfald væltede hele uploaden.
+- **Fix (kun `UploadPage.jsx`)**: CHUNK_SIZE 24MB→8MB, DIRECT_LIMIT 80MB→12MB (reelle videoer går altid chunked), ny `postRetry()` med 4 forsøg + eksponentiel backoff (1.5s→3s→6s) på init/chunk/complete — retrier KUN transiente fejl (netværksdrop, 408/425/429/5xx), aldrig ægte 4xx (413 osv.). Chunk-timeout 180s (8MB når igennem selv på langsomt net).
+- **Backend uændret**: `chunked_upload.py` er chunk-størrelse-agnostisk (cap 32MB/chunk, 64 chunks, 500MB total; 8MB×63=504MB dækker 500MB-cappen), R2+Mongo multi-pod-safe, idempotent pr. chunk-index.
+- **E2E-verifikation i preview**: init → chunk0 → chunk1 → chunk1 GENSENDT (idempotent retry bekræftet) → complete samlede 9MB → token. Frontend webpack compiled.
+- **Analyse-hængt-på-1% (produktion)**: IKKE diagnosticeret — kræver produktionslogs (Emergent Support) hvis den genopstår efter redeploy. Preview-pipelinen har transcode-fastpath for store videoer og er testet OK.
+- ⚠️ KRÆVER REDEPLOY for at virke på scoutmeplay.com.
+
 ## Session (Jun 2026 — part 27) — FINAL 0.5s SPRINT-CHECK (29.0–29.5s): FEJLET FØRST, DEREFTER LUKKET ✅ (frame-for-frame verificeret + regression 10/10 + endelig regenerering)
 - **Fund 1 (linje-hijack)**: Hvid banelinje er non-green → kontakt-båndet (laveste rækker) kaprede ankeret ned ad linjen (29.0/29.3/29.5). **Fund 2 (mudder-hijack)**: mørke slidpletter er også non-green og brede nok til at bestå bredde-tjek. **Fund 3 (boks HELT under spilleren)**: ved 29.0 lå track-boksen en hel kropshøjde under spilleren (bokstop under fødderne) — søgefeltet nåede aldrig kroppen.
 - **Endelig `_ground_anchor` (tele_clip.py)**: (1) KUN komponenten forbundet med spillerens torso-vindue må levere fodaftryk — løsrevne linjer/mudpletter kan aldrig kapre; (2) linje-tynde bånd (<0.14·bw) forkastes iterativt med fine trin (0.07·bh, 6 iter) — klatrer til ægte fodaftryk; (3) identitets-SIKKER opad-redning når boksen ingen krop indeholder: accepteres KUN hvis præcis ÉN plausibel person-masse (højde ≥0.25·bh, ≥40px) står i boksens egne kolonner (±0.5·bw) op til 1.9·bh over — ellers `None`; (4) `None` ⇒ markøren SKJULES den frame (ingen markør er bedre end forkert markør — aldrig gætte). Godartede små-maske-tilfælde falder stadig tilbage til bbox-bund.
