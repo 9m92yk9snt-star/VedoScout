@@ -72,37 +72,98 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
     trusting bbox bottom-center. Handles running, wide stance, distant
     players, duels (ownership stays within the accepted box's columns) and
     falls (contact may sit BELOW a torso-hugging box). `vx` (px/s, from the
-    track itself) LEADS the search in the motion direction so a box that
-    trails a sprinting player still finds his real feet — never a fixed
-    offset, the anchor always comes from actual pixels. Fail-safe fallback:
-    the incoming bbox bottom-center. Never touches tracking data."""
+    track itself) LEADS the search in the motion direction. Only the
+    component CONNECTED to the player's body may provide the footprint —
+    pitch lines / mud patches can never hijack the anchor. If the box holds
+    no body mass, ONE unambiguous person-mass directly above in the box's
+    own columns may rescue the anchor; otherwise returns None and the
+    marker is HIDDEN (no marker is better than a wrong marker).
+    Benign small-mask cases fall back to bbox bottom-center."""
     fh, fw = frame.shape[:2]
     lead = float(np.clip(vx * 0.25, -bw * 0.55, bw * 0.55))
+    tcx = px + lead * 0.6
     x0 = int(max(0, px - bw * 0.62 + min(0.0, lead)))
     x1 = int(min(fw, px + bw * 0.62 + max(0.0, lead)))
-    y0, y1 = int(max(0, py - bh * 0.85)), int(min(fh, py + bh * 0.45))
-    if x1 - x0 < 8 or y1 - y0 < 10:
+    y1 = int(min(fh, py + bh * 0.45))
+
+    def _mask(y_top):
+        y0 = int(max(0, y_top))
+        if x1 - x0 < 8 or y1 - y0 < 10:
+            return None
+        hsv = cv2.cvtColor(frame[y0:y1, x0:x1], cv2.COLOR_BGR2HSV)
+        m = (cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0).astype(np.uint8)
+        return cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)), y0
+
+    got = _mask(py - bh * 0.85)
+    if got is None:
         return px, py, None
-    hsv = cv2.cvtColor(frame[y0:y1, x0:x1], cv2.COLOR_BGR2HSV)
-    pm = (cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0).astype(np.uint8)
-    pm = cv2.morphologyEx(pm, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+    pm, y0 = got
+    _, lbl = cv2.connectedComponents(pm)
+    tx0 = int(max(0, tcx - bw * 0.30 - x0))
+    tx1 = int(min(x1 - x0, tcx + bw * 0.30 - x0))
+    ty0 = int(max(0, py - bh * 0.80 - y0))
+    ty1 = int(min(y1 - y0, py - bh * 0.25 - y0))
+    rescue = False
+    ids = []
+    if tx1 > tx0 and ty1 > ty0:
+        sub = lbl[ty0:ty1, tx0:tx1]
+        ids, cnts = np.unique(sub[sub > 0], return_counts=True)
+    if len(ids):
+        pm = (lbl == int(ids[np.argmax(cnts)])).astype(np.uint8)
+    else:
+        # box holds no body mass (track box may sit below the player during
+        # fast motion). Identity-safe rescue: accept ONLY if exactly one
+        # plausible person-mass stands in the box's own columns above.
+        got = _mask(py - bh * 1.9)
+        if got is None:
+            return None
+        pm2, y0 = got
+        num, lbl2 = cv2.connectedComponents(pm2)
+        cands = []
+        for cid in range(1, num):
+            comp = lbl2 == cid
+            if int(comp.sum()) < 40:
+                continue
+            ys_c, xs_c = np.nonzero(comp)
+            if (ys_c.max() - ys_c.min()) >= bh * 0.25 and abs(x0 + float(xs_c.mean()) - tcx) <= bw * 0.5:
+                cands.append(cid)
+        if len(cands) != 1:
+            return None  # ambiguous or empty → hide, never guess
+        pm = (lbl2 == cands[0]).astype(np.uint8)
+        rescue = True
     ys, xs = np.nonzero(pm)
     if len(ys) < 30:
-        return px, py, None
+        return None if rescue else (px, py, None)
     # ownership: target's own columns, shifted along the motion direction
-    keep = np.abs(xs + x0 - (px + lead * 0.6)) <= bw * 0.5 + abs(lead) * 0.5
+    keep = np.abs(xs + x0 - tcx) <= bw * 0.5 + abs(lead) * 0.5
     ys, xs = ys[keep], xs[keep]
     if len(ys) < 25:
-        return px, py, None
-    y_low = float(np.percentile(ys, 96))
-    band = ys >= y_low - max(3.0, bh * 0.12)
-    if int(band.sum()) < 10:
-        return px, py, None
-    bx, by = xs[band], ys[band]
+        return None if rescue else (px, py, None)
+    y_low = 0.0
+    bx = by = None
+    foot_w = 0.0
+    for _ in range(6):
+        y_low = float(np.percentile(ys, 96))
+        band = ys >= y_low - max(3.0, bh * 0.07)
+        if int(band.sum()) < 8:
+            return None if rescue else (px, py, None)
+        bx, by = xs[band], ys[band]
+        foot_w = float(np.percentile(bx, 95) - np.percentile(bx, 5))
+        if foot_w >= bw * 0.14:
+            break  # plausible foot/contact footprint
+        # line-like sliver (white pitch line running below the player) —
+        # discard those rows and climb to the real footprint above
+        keepy = ys < y_low - max(3.0, bh * 0.07)
+        ys, xs = ys[keepy], xs[keepy]
+        if len(ys) < 25:
+            return None if rescue else (px, py, None)
+    else:
+        return None if rescue else (px, py, None)
     ax = x0 + float(np.median(bx))
     ay = y0 + float(np.percentile(by, 85))
-    foot_w = float(np.percentile(bx, 95) - np.percentile(bx, 5))
-    if abs(ax - px) > bw * 0.45 + abs(lead) or ay < py - bh * 0.55:
+    if abs(ax - px) > bw * (0.45 if not rescue else 0.55) + abs(lead):
+        return None if rescue else (px, py, None)
+    if not rescue and ay < py - bh * 0.55:
         return px, py, None  # implausible → honest fallback
     return ax, min(ay, fh - 2.0), foot_w
 
@@ -119,7 +180,10 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
         return
     fh, fw = frame.shape[:2]
     bx_w, bx_h = max(8.0, w * fw), max(12.0, h * fh)
-    ax, ay, foot_w = _ground_anchor(frame, cx * fw, min(feet_y, 0.995) * fh, bx_w, bx_h, vx=vx)
+    res = _ground_anchor(frame, cx * fw, min(feet_y, 0.995) * fh, bx_w, bx_h, vx=vx)
+    if res is None:
+        return  # no body at the box and no unambiguous rescue → no marker
+    ax, ay, foot_w = res
     if state is not None:  # temporal stability across clip frames
         prev = state.get("anchor")
         if prev is not None:
