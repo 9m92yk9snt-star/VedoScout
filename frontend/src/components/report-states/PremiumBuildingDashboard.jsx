@@ -91,9 +91,40 @@ function Gauge({ label, value }) {
   );
 }
 
+function useServerLiveness(reportId) {
+  // Polls the status endpoint for the pipeline heartbeat so the building
+  // screen can show honest "server working / waiting" state instead of
+  // looking frozen during long CPU stages on production.
+  const [live, setLive] = useState(null);
+  useEffect(() => {
+    let on = true;
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/reports/${reportId}/status`);
+        if (!on) return;
+        const at = data?.last_progress_at ? new Date(data.last_progress_at).getTime() : null;
+        const ageSec = at ? Math.max(0, Math.round((Date.now() - at) / 1000)) : null;
+        setLive({
+          ageSec,
+          fresh: ageSec != null && ageSec < 120,
+          stage: data?.pipeline_stage || null,
+          retries: data?.full_report_retries || 0,
+        });
+      } catch {
+        /* polling is best-effort */
+      }
+    };
+    poll();
+    const t = setInterval(poll, 6000);
+    return () => { on = false; clearInterval(t); };
+  }, [reportId]);
+  return live;
+}
+
 export default function PremiumBuildingDashboard({ report, user, error, onRetry }) {
   const navigate = useNavigate();
   const { pct, remaining, elapsed } = useBuildProgress(report.id);
+  const live = useServerLiveness(report.id);
   const [showVideo, setShowVideo] = useState(false);
   const [review, setReview] = useState(null);
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -172,6 +203,28 @@ export default function PremiumBuildingDashboard({ report, user, error, onRetry 
           Welcome back, {firstName} <span aria-hidden>👋</span>
         </h1>
         <p className="text-[14px] text-[#5C6657] mt-0.5">Here&rsquo;s your latest report</p>
+
+        {/* ── Live server activity — slow is not frozen ── */}
+        {!(error || report.full_report_status === "failed") && live && live.ageSec != null && (
+          <div
+            data-testid="pbd-liveness"
+            className="mt-3 flex items-center gap-2 text-[12px] font-semibold rounded-full px-3.5 py-1.5 w-fit"
+            style={{
+              background: live.fresh ? "rgba(18,33,26,0.06)" : "rgba(180,60,20,0.08)",
+              color: live.fresh ? "#3E6B4F" : "#8A4B22",
+            }}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${live.fresh ? "animate-pulse" : ""}`}
+              style={{ background: live.fresh ? "#2FBF71" : "#D97B29" }}
+            />
+            {live.fresh ? (
+              <>Server working — last activity {live.ageSec}s ago{live.retries > 0 ? ` · attempt ${live.retries + 1}` : ""}</>
+            ) : (
+              <>Reconnecting to the analysis worker — it resumes automatically, nothing is lost</>
+            )}
+          </div>
+        )}
 
         {/* ── Interrupted state — honest retry instead of an endless spinner ── */}
         {(error || report.full_report_status === "failed") ? (

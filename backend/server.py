@@ -5613,6 +5613,14 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         # flagged crossovers while the full report task waits (bounded).
         "doubt_status": doc.get("doubt_status"),
         "doubt_moments": doc.get("doubt_moments") if doc.get("doubt_status") == "awaiting" else None,
+        # Liveness — lets the building screen show honest "server working /
+        # reconnecting" state instead of looking frozen on slow production CPUs.
+        "last_progress_at": doc.get("last_progress_at"),
+        "full_report_retries": int(doc.get("full_report_retries") or 0),
+        "pipeline_stage": (
+            (doc.get("pipeline_trace") or [{}])[-1].get("stage")
+            if isinstance((doc.get("pipeline_trace") or [{}])[-1], dict) else None
+        ),
     }
     if analysis_status == "ready":
         out.update({
@@ -5670,6 +5678,24 @@ async def _await_with_heartbeat(report_id: str, awaitable, interval: int = 45):
             pass
         if done:
             return task.result()
+
+
+async def _full_report_with_heartbeat(report_id: str) -> None:
+    """Liveness stamper around the FULL report generation so the frontend can
+    tell SLOW (pod alive, still working) from DEAD (pod restarted): stamps
+    `last_progress_at` every 45s for the entire duration of the pipeline."""
+    async def _stamp():
+        while True:
+            await asyncio.sleep(45)
+            try:
+                await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat()})
+            except Exception:
+                pass
+    stamper = asyncio.create_task(_stamp())
+    try:
+        await generate_full_report_task(report_id)
+    finally:
+        stamper.cancel()
 
 
 async def _trace(report_id: str, stage: str) -> None:
@@ -6345,7 +6371,7 @@ async def analyze_preview_task(report_id: str):
         # Stage 5 — refresh the per-player identity memory profile.
         await _upsert_player_profile(report_id)
         if doc and doc.get("is_paid"):
-            asyncio.create_task(generate_full_report_task(report_id))
+            asyncio.create_task(_full_report_with_heartbeat(report_id))
     except Exception as e:
         logger.exception(f"analyze_preview_task failed for {report_id}")
         # Session 132 — surface the *clean* detail message when the failure was
@@ -15045,7 +15071,7 @@ async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
                 "full_report_started_at": now.isoformat(),
             }},
         )
-        asyncio.create_task(generate_full_report_task(rid))
+        asyncio.create_task(_full_report_with_heartbeat(rid))
         requeued += 1
         logger.warning(f"[full-report-watchdog] requeued generation for {rid} (attempt {retries + 1})")
     return requeued

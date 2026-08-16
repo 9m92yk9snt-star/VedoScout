@@ -1,5 +1,15 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 29) — "ANALYSE FROSSEN/LANGSOM" PÅ PRODUKTION: LIVENESS-KÆDE ✅ (self-tested — KRÆVER REDEPLOY)
+- **Diagnose**: Recovery-systemet FANDTES allerede (preview-watchdog: fail+refund efter 5 min stall; fuld-rapport-watchdog: auto-requeue ved boot + 20 min-tærskel, max 2 forsøg). Men fuld-rapport-fasens tunge stadier (tracking/evidence/clips) stempler INGEN heartbeat — så UI kunne ikke skelne LANGSOM (produktions-CPU) fra DØD (pod-genstart), og brugeren så "frossen".
+- **Fix 1 (server.py)**: `_full_report_with_heartbeat()` — stempler `last_progress_at` hvert 45s under HELE fuld-genereringen; begge enqueue-steder (generate-full endpoint + fuld-watchdog requeue) bruger nu wrapperen.
+- **Fix 2 (server.py)**: `/reports/{id}/status` returnerer nu `last_progress_at`, `full_report_retries`, `pipeline_stage` (sidste pipeline_trace-stage).
+- **Fix 3 (PremiumBuildingDashboard.jsx)**: `useServerLiveness`-hook (poller status hvert 6s) + synlig aktivitetslinje: grøn puls "Server working — last activity Xs ago (attempt N)" når heartbeat <120s; ellers amber "Reconnecting to the analysis worker — it resumes automatically". Testid `pbd-liveness`.
+- **Verifikation**: py_compile OK, status-endpoint returnerer nye felter på reel rapport, webpack compiled.
+- **Bemærk**: Selve hastigheden på produktion (CPU-bundne stadier) er ikke ændret — men bruger kan nu SE at serveren arbejder, watchdog genoptager døde jobs, og gentagne afbrydelser ender i ærlig fail+retry-kort i stedet for evig spinner.
+- Filer: server.py (wrapper + 2 call sites + status-felter), PremiumBuildingDashboard.jsx.
+- ⚠️ KRÆVER REDEPLOY for at virke på scoutmeplay.com.
+
 ## Session (Jun 2026 — part 28) — PRODUKTIONS-UPLOADFEJL: ROBUST CHUNKED UPLOAD ✅ (E2E-testet i preview — KRÆVER REDEPLOY)
 - **Produktionsrapport (scoutmeplay.com, mobil 5G)**: "Upload failed while sending the video" + en analyse der stod på 1%. Deployment-scan: PASS (ingen config-fejl); live produktionslogs kunne ikke hentes.
 - **Rodårsager i upload-koden**: (1) filer ≤80MB blev sendt som ÉN multipart-POST — tager minutter på svagt 5G og rammer produktions-proxyens request-timeout; (2) chunk-upload havde INGEN retry — ét transient netværksudfald væltede hele uploaden.
