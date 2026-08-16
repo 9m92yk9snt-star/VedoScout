@@ -5294,6 +5294,15 @@ async def upload_video_and_create_preview(
     marker_path = UPLOAD_DIR / marker_filename
     with marker_path.open("wb") as buffer:
         shutil.copyfileobj(marker_image.file, buffer)
+    # Mirror marker + raw video to R2 (24h) so a production pod restart can
+    # restore them when the analysis watchdog requeues the pipeline.
+    try:
+        asyncio.create_task(asyncio.to_thread(
+            r2_storage.upload_file, f"tmp/{marker_filename}", marker_path, "image/jpeg", 24 * 3600))
+        asyncio.create_task(asyncio.to_thread(
+            r2_storage.upload_file, f"tmp/{file_path.name}", file_path, "video/mp4", 24 * 3600))
+    except Exception:
+        pass
 
     # ============== REQUIRED PLAYER PHOTO + COUNTRY (Step 3) ==============
     country_clean = (country or "").strip()[:80]
@@ -5755,6 +5764,15 @@ async def analyze_preview_task(report_id: str):
 
         marker_path = UPLOAD_DIR / marker_filename if marker_filename else None
         raw_path = UPLOAD_DIR / raw_filename if raw_filename else None
+        # Pod restarts wipe the production pod's local disk — restore the
+        # source files from their 24h R2 tmp mirrors before giving up.
+        try:
+            if raw_path and not raw_path.exists():
+                await asyncio.to_thread(r2_storage.download_to_file, f"tmp/{raw_path.name}", raw_path)
+            if marker_path and not marker_path.exists():
+                await asyncio.to_thread(r2_storage.download_to_file, f"tmp/{marker_path.name}", marker_path)
+        except Exception as e:
+            logger.warning(f"[pipeline] R2 tmp restore failed for {report_id}: {e}")
         if not (marker_path and marker_path.exists() and raw_path and raw_path.exists()):
             await db.reports.update_one(
                 {"id": report_id},
@@ -15124,6 +15142,13 @@ def _ensure_payment_method_domains_sync() -> None:
         logger.warning(f"[stripe] payment method domain sweep failed: {e}")
 
 
+async def _wd_requeue_preview(report_id: str) -> None:
+    """Watchdog requeue: restart the preview analysis pipeline once for a
+    report whose background task died (production pod restart). Source files
+    are restored from their R2 tmp mirrors inside the task itself."""
+    asyncio.create_task(_analyze_preview_task_with_timeout(report_id))
+
+
 @app.on_event("startup")
 async def on_startup():
     # ── Security indexes (idempotent, safe to call every boot) ──
@@ -15215,10 +15240,11 @@ async def on_startup():
     # they are, by definition, orphaned. Then start the periodic loop that
     # catches future stalls within ~5 min instead of 15 min.
     try:
-        rescued = await _wd_sweep(db, refund_cb=_refund_upload_eligibility)
+        rescued = await _wd_sweep(db, refund_cb=_refund_upload_eligibility,
+                                  requeue_cb=_wd_requeue_preview)
         if rescued:
             logger.warning(f"[startup-sweep] rescued {rescued} orphaned analyzing report(s)")
-        _wd_start(db, refund_cb=_refund_upload_eligibility)
+        _wd_start(db, refund_cb=_refund_upload_eligibility, requeue_cb=_wd_requeue_preview)
         logger.info("[watchdog] periodic sweep loop started")
     except Exception:
         logger.exception("Analysis watchdog failed to start (non-fatal)")

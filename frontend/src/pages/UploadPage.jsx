@@ -74,6 +74,7 @@ export default function UploadPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
   const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
+  const [lastBeat, setLastBeat] = useState(null);            // server heartbeat (liveness)
   const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
   const [premiumReadyReport, setPremiumReadyReport] = useState(null); // Session 130 — premium-tier celebration screen
   const [howOpen, setHowOpen] = useState(false); // Step 2 "How it works" inline explainer
@@ -676,6 +677,7 @@ export default function UploadPage() {
               setBackendStep(statusResp.progress_step);
               setUploadPct(Math.min(100, Math.round((statusResp.progress_step / 5) * 100)));
             }
+            setLastBeat(statusResp.last_progress_at || null);
             if (statusResp.status === "failed") {
               const errMsg = statusResp.error || "Analysis failed. Please try again or upload a clearer clip.";
               toast.error(errMsg);
@@ -878,6 +880,7 @@ export default function UploadPage() {
         playerPosition={form.position}
         tapsCount={markerAnchors?.length || 0}
         heroImage={markerPreviewUrl}
+        lastProgressAt={lastBeat}
         onContinueInBackground={() => {
           // Immediate handoff — never depend on the poll loop's next tick.
           backgroundedRef.current = true;

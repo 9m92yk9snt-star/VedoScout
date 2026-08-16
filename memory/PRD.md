@@ -1,5 +1,15 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 30) — "ANALYSE KOMMER IKKE" (produktion, preview-fasen): SELVHELENDE PIPELINE ✅ (unit-testet mod reel Mongo — KRÆVER REDEPLOY)
+- **Diagnose**: Preview-fasen (step 3/3-skærmen, 4% "Detecting") kræver LOKALE filer (rå video + markør); en produktions-pod-genstart wiper disken → task død → watchdog markerede FAILED+refund (bruger skulle uploade forfra). Ingen requeue, ingen liveness på skærmen.
+- **Fix 1 — R2-spejling ved upload** (server.py upload-endpoint): markør-billede + råfil spejles best-effort til R2 `tmp/{navn}` (24h TTL) i baggrundstråde (chunked uploads var allerede spejlet af chunked_upload.py).
+- **Fix 2 — R2-gendannelse i pipeline** (analyze_preview_task): før "Source files missing"-fail forsøges `r2_storage.download_to_file("tmp/{navn}")` for rå+markør — en requeue på en frisk pod kan nu fuldføre.
+- **Fix 3 — Watchdog REQUEUE** (analysis_watchdog.py + server-wiring): `_mark_stalled` requeuer nu ÉN gang (atomisk claim på `analysis_requeues<1`, opfrisker heartbeat) via `_wd_requeue_preview` → `_analyze_preview_task_with_timeout`; anden stall → ærlig FAIL + refund som før. Unit-testet mod reel Mongo: sweep1 → requeue+analyzing, sweep2 → failed+refund. ✅
+- **Fix 4 — Liveness på analyzing-skærmen** (PrecisionScanOverlay + UploadPage): poll-loop gemmer `last_progress_at` → `LivenessLine` under ETA: grøn "Live — server activity Xs ago" (<120s) / amber "Server reconnecting — resumes automatically". Testid `wait-liveness`.
+- **Verifikation**: py_compile OK, watchdog-unittest PASS, backend genstartet rent (watchdog-loops kører), webpack compiled, API 200. Ingen LLM-kredit brugt, ingen testing agent.
+- Filer: server.py (mirror + restore + requeue-wiring + `_wd_requeue_preview`), analysis_watchdog.py (requeue_cb gennem hele kæden), UploadPage.jsx (lastBeat), PrecisionScanOverlay.jsx (LivenessLine + prop).
+- ⚠️ KRÆVER REDEPLOY. Hvis analysen STADIG dør gentagne gange efter redeploy = podden genstarter konstant (ressourcer/hukommelse) → Emergent Support skal se produktionslogs.
+
 ## Session (Jun 2026 — part 29) — "ANALYSE FROSSEN/LANGSOM" PÅ PRODUKTION: LIVENESS-KÆDE ✅ (self-tested — KRÆVER REDEPLOY)
 - **Diagnose**: Recovery-systemet FANDTES allerede (preview-watchdog: fail+refund efter 5 min stall; fuld-rapport-watchdog: auto-requeue ved boot + 20 min-tærskel, max 2 forsøg). Men fuld-rapport-fasens tunge stadier (tracking/evidence/clips) stempler INGEN heartbeat — så UI kunne ikke skelne LANGSOM (produktions-CPU) fra DØD (pod-genstart), og brugeren så "frossen".
 - **Fix 1 (server.py)**: `_full_report_with_heartbeat()` — stempler `last_progress_at` hvert 45s under HELE fuld-genereringen; begge enqueue-steder (generate-full endpoint + fuld-watchdog requeue) bruger nu wrapperen.

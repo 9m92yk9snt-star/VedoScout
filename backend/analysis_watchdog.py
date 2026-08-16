@@ -76,11 +76,31 @@ async def stamp_progress(db, report_id: str, step: Optional[int] = None, **extra
         logger.warning(f"[watchdog] heartbeat write failed for {report_id}: {e}")
 
 
-async def _mark_stalled(db, report_id: str, refund_cb: Optional[Callable[[str], Awaitable[None]]]) -> None:
-    """Idempotently mark a stalled report as failed and refund eligibility.
-    We only touch reports still `status=analyzing` (compareAndSwap style) so
-    a race with a legitimately-completing task can't clobber a `ready` state.
-    """
+async def _mark_stalled(
+    db,
+    report_id: str,
+    refund_cb: Optional[Callable[[str], Awaitable[None]]],
+    requeue_cb: Optional[Callable[[str], Awaitable[None]]] = None,
+) -> None:
+    """Idempotently handle a stalled report: REQUEUE it once (pod restarts on
+    production kill the background task — the video survives in R2, so a
+    second attempt usually succeeds), then mark failed + refund if it stalls
+    again. compareAndSwap-style guards keep every step race-free."""
+    if requeue_cb is not None:
+        claimed = await db.reports.find_one_and_update(
+            {"id": report_id, "analysis_status": "analyzing",
+             "$or": [{"analysis_requeues": {"$exists": False}},
+                     {"analysis_requeues": {"$lt": 1}}]},
+            {"$inc": {"analysis_requeues": 1},
+             "$set": {"last_progress_at": _utcnow_iso(), "requeued_at": _utcnow_iso()}},
+        )
+        if claimed is not None:
+            logger.warning(f"[watchdog] STALLED — requeuing analysis for {report_id} (attempt 2)")
+            try:
+                await requeue_cb(report_id)
+                return
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"[watchdog] requeue_cb failed for {report_id}: {e}")
     result = await db.reports.update_one(
         {"id": report_id, "analysis_status": "analyzing"},
         {"$set": {
@@ -108,6 +128,7 @@ async def _mark_stalled(db, report_id: str, refund_cb: Optional[Callable[[str], 
 async def sweep_stalled_reports(
     db,
     refund_cb: Optional[Callable[[str], Awaitable[None]]] = None,
+    requeue_cb: Optional[Callable[[str], Awaitable[None]]] = None,
 ) -> int:
     """Scan the `reports` collection for stalled entries and mark them failed.
     Returns the number of reports rescued. Safe to call any time — every step
@@ -140,7 +161,7 @@ async def sweep_stalled_reports(
         rid = doc.get("id")
         if not rid:
             continue
-        await _mark_stalled(db, rid, refund_cb)
+        await _mark_stalled(db, rid, refund_cb, requeue_cb)
         rescued += 1
     if rescued:
         logger.warning(f"[watchdog] sweep completed — {rescued} stalled report(s) rescued")
@@ -151,6 +172,7 @@ async def _watchdog_loop(
     db,
     refund_cb: Optional[Callable[[str], Awaitable[None]]],
     interval: int,
+    requeue_cb: Optional[Callable[[str], Awaitable[None]]] = None,
 ) -> None:
     """Never-ending sweep loop. Cancellation-safe — a `CancelledError`
     propagates out cleanly on shutdown."""
@@ -158,7 +180,7 @@ async def _watchdog_loop(
     while True:
         try:
             await asyncio.sleep(interval)
-            await sweep_stalled_reports(db, refund_cb)
+            await sweep_stalled_reports(db, refund_cb, requeue_cb)
         except asyncio.CancelledError:
             logger.info("[watchdog] loop cancelled — shutting down cleanly")
             raise
@@ -171,11 +193,12 @@ def start_watchdog(
     db,
     refund_cb: Optional[Callable[[str], Awaitable[None]]] = None,
     interval: int = WATCHDOG_INTERVAL_SECONDS,
+    requeue_cb: Optional[Callable[[str], Awaitable[None]]] = None,
 ) -> asyncio.Task:
     """Kick off the periodic watchdog and return its Task. The FastAPI startup
     hook should await one initial `sweep_stalled_reports(...)` first, THEN
     call this to keep the loop running."""
     return asyncio.create_task(
-        _watchdog_loop(db, refund_cb, interval),
+        _watchdog_loop(db, refund_cb, interval, requeue_cb),
         name="analysis_watchdog_loop",
     )

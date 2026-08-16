@@ -51,6 +51,26 @@ const MINI_STAGES = [
   { label: "Building Report", from: 5 },
 ];
 
+function LivenessLine({ lastProgressAt }) {
+  // Honest server-activity indicator: green while the analysis worker stamps
+  // heartbeats, amber if the heartbeat goes stale (worker restarting).
+  const [, force] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => force((n) => n + 1), 5000);
+    return () => clearInterval(id);
+  }, []);
+  if (!lastProgressAt) return null;
+  const age = Math.max(0, Math.round((Date.now() - new Date(lastProgressAt).getTime()) / 1000));
+  const fresh = age < 120;
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] font-semibold" data-testid="wait-liveness"
+         style={{ color: fresh ? "#9BE7B4" : "#F2B06B" }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: fresh ? "#2FBF71" : "#D97B29", animation: fresh ? "wait-blink 1.6s infinite" : "none" }} />
+      {fresh ? `Live — server activity ${age}s ago` : "Server reconnecting — resumes automatically"}
+    </div>
+  );
+}
+
 export default function PrecisionScanOverlay({
   open,
   phase = "analyzing",
@@ -61,6 +81,7 @@ export default function PrecisionScanOverlay({
   playerPosition = "",
   tapsCount = 0,
   heroImage = null,
+  lastProgressAt = null,
   onViewReport,
   onContinueInBackground,
 }) {
@@ -208,6 +229,7 @@ export default function PrecisionScanOverlay({
                     {displayPct}%
                   </div>
                   <div className="mt-2 text-white font-bold text-[16px]" data-testid="wait-eta">{etaLabel}</div>
+                  <LivenessLine lastProgressAt={lastProgressAt} />
                   <div className="mt-0.5 text-[13px]" style={{ color: "rgba(255,255,255,0.72)" }}>
                     Typically ready in ~90 sec
                   </div>
