@@ -1,5 +1,12 @@
 # ScoutMePlay — PRD & Status
 
+## Session (Jun 2026 — part 31) — VIDEOER >1 MIN FEJLER PÅ UPLOAD (preview): RESUME-UPLOAD ✅ (log-diagnosticeret, 0 LLM-kredit)
+- **Diagnose fra preview-logs**: alle chunks der nåede serveren fik 200 — strømmen stoppede bare midt i (ingen complete, ingen serverfejl). Klient-siden: >1 min videoer tager mange minutter på svagt 5G; ét længere udfald (eller telefon-skærmlås, som suspenderer browserens JS) udtømte de 4 hurtige retries → toast.
+- **Fix (UploadPage.jsx)**: (1) `postRetry` nu 5 forsøg, backoff 2s→30s (cap); (2) OUTER RESUME pr. chunk: efter udtømte retries ventes 20s og samme chunk genoptages (op til 3 passes) — allerede sendte chunks ligger på serveren (idempotent pr. index), så intet arbejde tabes. Samlet overleves udfald på flere minutter.
+- **Fil-korruption fixet**: en tidligere edit efterlod et duplikeret JSX-fragment i slutningen af UploadPage.jsx (webpack syntax error) — repareret.
+- **Verifikation**: webpack compiled, upload-side renderer OK i preview-screenshot.
+- **Preview har fixet med det samme (hot reload); produktion kræver REDEPLOY.** Praktisk råd til bruger: hold skærmen tændt under upload — telefonlås suspenderer browseren, og ingen kode kan helt overleve lange suspensioner.
+
 ## Session (Jun 2026 — part 30) — "ANALYSE KOMMER IKKE" (produktion, preview-fasen): SELVHELENDE PIPELINE ✅ (unit-testet mod reel Mongo — KRÆVER REDEPLOY)
 - **Diagnose**: Preview-fasen (step 3/3-skærmen, 4% "Detecting") kræver LOKALE filer (rå video + markør); en produktions-pod-genstart wiper disken → task død → watchdog markerede FAILED+refund (bruger skulle uploade forfra). Ingen requeue, ingen liveness på skærmen.
 - **Fix 1 — R2-spejling ved upload** (server.py upload-endpoint): markør-billede + råfil spejles best-effort til R2 `tmp/{navn}` (24h TTL) i baggrundstråde (chunked uploads var allerede spejlet af chunked_upload.py).

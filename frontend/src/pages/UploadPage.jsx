@@ -408,8 +408,8 @@ export default function UploadPage() {
 
   // Retry transient failures: network drops (no response), gateway timeouts
   // and 5xx. Never retries real 4xx rejections (413 too large, 403, ...).
-  const postRetry = async (url, fd, cfg = {}, attempts = 4) => {
-    let wait = 1500;
+  const postRetry = async (url, fd, cfg = {}, attempts = 5) => {
+    let wait = 2000;
     for (let a = 1; ; a++) {
       try {
         return await api.post(url, fd, cfg);
@@ -418,7 +418,7 @@ export default function UploadPage() {
         const retriable = !err?.response || st === 408 || st === 425 || st === 429 || st >= 500;
         if (!retriable || a >= attempts) throw err;
         await new Promise((r) => setTimeout(r, wait));
-        wait *= 2;
+        wait = Math.min(wait * 2, 30000);
       }
     }
   };
