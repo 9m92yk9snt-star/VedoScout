@@ -12,6 +12,7 @@ import AccountGateModal from "@/components/auth/AccountGateModal";
 import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
 import { isPremiumUser } from "@/lib/premium";
+import { serializeMarkerAnchors } from "@/lib/anchorSerialization.mjs";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
@@ -593,21 +594,7 @@ export default function UploadPage() {
       );
     }
     if (_markerAnchors && _markerAnchors.length) {
-      fd.append(
-        "marker_anchors",
-        JSON.stringify(
-          _markerAnchors.map((a) => ({
-            t: Number((a.t || 0).toFixed(2)),
-            box: {
-              x: Number(a.box.x.toFixed(4)),
-              y: Number(a.box.y.toFixed(4)),
-              w: Number(a.box.w.toFixed(4)),
-              h: Number(a.box.h.toFixed(4)),
-            },
-            thumb: a.thumb || undefined,
-          })),
-        ),
-      );
+      fd.append("marker_anchors", JSON.stringify(serializeMarkerAnchors(_markerAnchors)));
     }
     Object.entries(_form).forEach(([k, v]) => {
       if (v !== "" && v !== null && v !== undefined) fd.append(k, String(v));

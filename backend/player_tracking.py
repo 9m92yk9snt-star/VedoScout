@@ -29,6 +29,10 @@ COLOR_W = 240  # half-res colour frames for HSV signature checks
 MATCH_MIN = 0.45
 DRIFT_MIN = 0.30
 MAX_MISSES = 3
+# FIX 00A — explicit user-confirmed seeds: 10 Scout Mode taps + 3 manual
+# verification taps + 3 doubt-confirmation taps. Seeds only — the tracking
+# algorithm itself is unchanged.
+MAX_TRACKER_SEEDS = 16
 COLOR_MIN = 0.22      # HSV-correlation below this = colour mismatch
 COLOR_MAX_MISSES = 3  # consecutive colour mismatches → stop (identity risk)
 # ── track-end drift protection (validated on 3 real matches) ──
@@ -214,14 +218,15 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
     {points: [{t,x,y,w,h,conf}...], segments: [[t0,t1]...], t_off, hz}."""
     seeds = [
         (float(a["t"]) + float(t_off or 0.0), a["box"])
-        for a in (anchors or [])[:10]
+        for a in (anchors or [])[:MAX_TRACKER_SEEDS]
         if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
     ]
+    logger.info(f"[track] tracker_seed_count={len(seeds)} (anchors_received={len(anchors or [])})")
     if not seeds:
-        return {"points": [], "segments": [], "doubt_moments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ}
+        return {"points": [], "segments": [], "doubt_moments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ, "seed_count": 0}
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        return {"points": [], "segments": [], "doubt_moments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ}
+        return {"points": [], "segments": [], "doubt_moments": [], "t_off": round(t_off, 3), "hz": SAMPLE_HZ, "seed_count": len(seeds)}
     points: dict = {}
     doubts: list = []
     step = 1.0 / SAMPLE_HZ
@@ -265,6 +270,7 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
     return {
         "points": pts, "segments": segs, "doubt_moments": doubt_out[:3],
         "t_off": round(float(t_off or 0.0), 3), "hz": SAMPLE_HZ,
+        "seed_count": len(seeds),
     }
 
 
