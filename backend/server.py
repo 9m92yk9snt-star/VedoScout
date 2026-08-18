@@ -26,6 +26,7 @@ import httpx
 
 # Local modules
 import r2_storage
+import video_timebase
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -3031,13 +3032,10 @@ def _gyg_ts_seconds(ts) -> Optional[float]:
 
 
 def _video_duration_seconds(path) -> float:
+    # FIX 03 — media duration (ffprobe → ffmpeg banner chain) is authoritative;
+    # OpenCV frame_count/fps survives only as the helper's internal last resort.
     try:
-        import cv2
-        cap = cv2.VideoCapture(str(path))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 0
-        n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
-        cap.release()
-        return float(n / fps) if fps > 0 else 0.0
+        return float(get_duration_seconds(str(path)) or 0.0)
     except Exception:
         return 0.0
 
@@ -7326,8 +7324,8 @@ async def _verify_doubt_taps(report_id: str, file_path: Path, confirmations: lis
         def _crop():
             cap = cv2.VideoCapture(str(file_path))
             try:
-                fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
-                cap.set(cv2.CAP_PROP_POS_FRAMES, int(float(c["t"]) * fps))
+                # FIX 03 — canonical media-time seek (VFR-safe), never t*fps
+                video_timebase.seek_seconds(cap, float(c["t"]))
                 ok, frame = cap.read()
                 if not ok:
                     return False
@@ -7757,8 +7755,9 @@ def _teleclip_edge_crop(video_path: str, sm: list, t: float, out_path: str) -> O
     try:
         if not cap.isOpened():
             return None
-        fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
+        # FIX 03 — the frame verifying an edge at time T must actually
+        # represent media time T (canonical seek, never t*fps)
+        video_timebase.seek_seconds(cap, t)
         ok, frame = cap.read()
         if not ok:
             return None

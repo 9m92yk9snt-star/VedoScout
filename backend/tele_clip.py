@@ -11,6 +11,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+import video_timebase
+
 logger = logging.getLogger("elite-scout")
 
 MIN_COVERAGE = 0.90   # user rule: only near-complete tracking ships, else fallback video
@@ -390,7 +392,11 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         if W < 100 or H < 100:
             return None
         n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        duration = n_frames / fps if n_frames > 0 else None
+        # FIX 03 — media duration is authoritative; frame_count/fps is an
+        # explicit last-resort fallback only
+        duration = video_timebase.media_duration_seconds(video_path)
+        if not duration:
+            duration = n_frames / fps if n_frames > 0 else None
         if duration is not None and duration < MIN_CLIP_SEC + 1.0:
             return None  # source itself is short → full video is the better proof
         # C: pad the CLIP with raw context around the verified window so short
@@ -404,26 +410,32 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         c0 = max(0.0, c0)
         if duration is not None:
             c1 = min(duration - 0.05, c1)
-        f0, f1 = int(c0 * fps), max(int(c1 * fps) - 1, int(c0 * fps) + 1)
-        v0, v1 = int(w0 * fps), int(w1 * fps)  # verified marker window (frames)
-        fade = max(2, int(fps * FADE_SEC))
+        # FIX 03 — SOURCE FRAME ↔ TRACK TIME is matched via each decoded
+        # frame's ACTUAL media timestamp (VFR-safe). The output stays CFR for
+        # browser compatibility; fade duration stays in SECONDS.
+        eps = 1.0 / max(1.0, fps)
+        fade_s = max(2.0 * eps, FADE_SEC)
 
         import imageio
         writer = imageio.get_writer(out_path, fps=round(fps, 2), codec="libx264",
                                     quality=7, pixelformat="yuv420p", macro_block_size=1,
                                     output_params=["-movflags", "+faststart"])
-        cap.set(cv2.CAP_PROP_POS_FRAMES, f0)
-        idx = f0
+        video_timebase.seek_seconds(cap, c0)
         ema_wh = None
         ring_state = {}  # ground-anchor temporal smoothing across frames
-        while idx <= f1:
+        while True:
+            t, _tb_fb = video_timebase.next_frame_time_seconds(cap, fps)
             ok, frame = cap.read()
             if not ok:
                 break
+            if t < c0 - 1e-3:
+                continue  # keyframe seek landed early — skip up to clip start
+            if t > c1:
+                break     # stop on actual media time, never a computed frame count
             # marker alpha: visible only inside the VERIFIED window
-            a = min(1.0, (idx - v0 + 1) / fade, (v1 - idx + 1) / fade)
-            a = max(0.0, a) * _risk_alpha(idx / fps, risky_windows)
-            cx, feet_y, bw, bh = _interp(sm, idx / fps)
+            a = min(1.0, (t - w0 + eps) / fade_s, (w1 - t + eps) / fade_s)
+            a = max(0.0, a) * _risk_alpha(t, risky_windows)
+            cx, feet_y, bw, bh = _interp(sm, t)
             # size stability: EMA on box size only (position stays responsive)
             if ema_wh is None:
                 ema_wh = [bw, bh]
@@ -435,12 +447,11 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             rw = min(max(est_h * 0.30, W * 0.024), W * 0.10)
             feet_px = feet_y * H - min(bh * H * 0.08, rw * 0.34 * 0.8)
             # horizontal track velocity (px/s) leads the anchor search during sprints
-            ta, tb = min(w1, idx / fps + 0.15), max(w0, idx / fps - 0.15)
+            ta, tb = min(w1, t + 0.15), max(w0, t - 0.15)
             vx_px = (_interp(sm, ta)[0] - _interp(sm, tb)[0]) / max(0.05, ta - tb) * W
             _draw_ring(frame, cx, feet_px / H, bw, bh, a, state=ring_state, vx=vx_px)
             # no label/chip: the grounded ellipse alone is the visual marker
             writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            idx += 1
         writer.close()
         writer = None
         if not Path(out_path).exists() or Path(out_path).stat().st_size < 20_000:
