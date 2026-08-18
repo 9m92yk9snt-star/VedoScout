@@ -4,7 +4,7 @@
 // pure read-only mapping with graceful fallbacks for missing fields.
 
 // FIX 01 — authority-aware frame lookup lives in a pure, testable module.
-import { buildFrameLookup, isAuthorityReport, canUseAuthorityProof, resolveAuthorityFrame } from "../../lib/authorityJoin.mjs";
+import { buildFrameLookup, isAuthorityReport, canUseAuthorityProof, resolveAuthorityFrame, selectEvidenceHighlight } from "../../lib/authorityJoin.mjs";
 
 export const SKILL_LABELS = {
   first_touch: "First Touch", ball_control: "Ball Control", dribbling: "Dribbling",
@@ -325,11 +325,8 @@ export function deriveV2(report) {
     { label: "Minutes Analysed", value: `${ms.minutes_analysed ?? "—"}'`, pct: Math.min(100, ((ms.minutes_analysed || 0) / 90) * 100) },
   ].filter((r) => r.value !== undefined && r.value !== null) : null;
 
-  // ---- Video highlight (prefer an identity-verified frame) ----
-  const vc = (full.video_comments || []).filter((c) => c && c.timestamp);
-  const vcBest = vc.find((c) => c.frame_url && c.identity_verified === true)
-    || vc.find((c) => c.frame_url && c.identity_verified !== false)
-    || vc[0];
+  // ---- Video highlight (authority: fail-closed proof_verified only) ----
+  const vcBest = selectEvidenceHighlight(full.video_comments, authority);
   const videoHighlight = vcBest
     ? {
         timestamp: vcBest.timestamp, caption: vcBest.comment,

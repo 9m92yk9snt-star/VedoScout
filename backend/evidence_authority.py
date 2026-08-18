@@ -209,15 +209,15 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
 def compute_proof_frame_verified(comment: dict) -> bool:
     """FIX 02 — a frame is exact proof only when the evidence passed the
     fail-closed proof gate, identity is positively verified (or user-tap
-    ground truth), and the ACTUAL frame moment IS the cited moment. A nearby
-    replacement frame may stay as internal identity info — never exact proof."""
+    ground truth), and the ACTUAL frame moment IS the cited moment.
+    C01: anchor_locked is trusted IDENTITY ground truth ONLY — it never
+    waives the exact-time requirement. A nearby replacement frame may stay
+    as internal identity info — never exact proof."""
     if not isinstance(comment, dict) or comment.get("proof_verified") is not True:
         return False
-    if not comment.get("frame_url"):
+    if not comment.get("frame_url") or comment.get("frame_placeholder"):
         return False
-    if comment.get("anchor_locked") is True:
-        return True
-    if comment.get("identity_verified") is not True:
+    if comment.get("identity_verified") is not True and comment.get("anchor_locked") is not True:
         return False
     et, ft = comment.get("evidence_time_ms"), comment.get("frame_time_ms")
     return isinstance(et, int) and isinstance(ft, int) and et == ft

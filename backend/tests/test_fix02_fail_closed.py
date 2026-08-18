@@ -352,10 +352,17 @@ def test_T17b_gate_conditions():
     assert compute_proof_frame_verified({**base, "proof_verified": True,
                                          "identity_verified": True,
                                          "frame_url": None}) is False
-    # user tap ground truth is trusted
+    # C01 — anchor_locked is identity ground truth ONLY: it substitutes for
+    # identity_verified but NEVER waives the exact-time requirement.
     assert compute_proof_frame_verified({**base, "proof_verified": True,
                                          "anchor_locked": True,
-                                         "frame_time_ms": 36800}) is True
+                                         "frame_time_ms": 36800}) is False
+    assert compute_proof_frame_verified({**base, "proof_verified": True,
+                                         "anchor_locked": True}) is True  # 36000 == 36000
+    # placeholder frames are never proof
+    assert compute_proof_frame_verified({**base, "proof_verified": True,
+                                         "identity_verified": True,
+                                         "frame_placeholder": True}) is False
 
 
 # ---------- T18 / T19 / T20 — frontend fail closed ----------
@@ -479,3 +486,54 @@ def test_T22_no_new_model_call_sites():
     sm = (BACKEND / "score_meaning.py").read_text().lower()
     for banned in ("gemini", "openai", "httpx", "llmchat"):
         assert banned not in sm
+
+
+# ==================================================================
+# FIX 02 — CORRECTION 01
+# ==================================================================
+
+def test_C01_anchor_locked_requires_exact_time():
+    base = {"evidence_id": "e", "proof_verified": True, "frame_url": "/f/x.jpg",
+            "anchor_locked": True, "evidence_time_ms": 36000}
+    # shifted anchor frame: identity trusted, time NOT exact -> never proof
+    assert compute_proof_frame_verified({**base, "frame_time_ms": 36800}) is False
+    # exact anchor frame -> proof allowed
+    assert compute_proof_frame_verified({**base, "frame_time_ms": 36000}) is True
+    # anchor substitutes only for identity; all other gates still apply
+    assert compute_proof_frame_verified({**base, "frame_time_ms": 36000,
+                                         "proof_verified": False}) is False
+    assert compute_proof_frame_verified({**base, "frame_time_ms": None}) is False
+
+
+def test_C01_video_highlight_fail_closed():
+    script = f"""
+import {{ selectEvidenceHighlight }} from "file://{AUTHORITY_MJS}";
+const unverified = [
+  {{ timestamp: "00:36", comment: "a", evidence_id: "e1", frame_url: "/f/1.jpg", identity_verified: true, proof_verified: false }},
+  {{ timestamp: "00:40", comment: "b", evidence_id: "e2", proof_verified: false }},
+];
+const mixed = [
+  {{ timestamp: "00:36", comment: "a", evidence_id: "e1", frame_url: "/f/1.jpg", identity_verified: true, proof_verified: false }},
+  {{ timestamp: "00:40", comment: "b", evidence_id: "e2", proof_verified: true }},
+  {{ timestamp: "00:44", comment: "c", evidence_id: "e3", frame_url: "/f/3.jpg", proof_verified: true, proof_frame_verified: true }},
+];
+const legacy = [
+  {{ timestamp: "00:10", comment: "x" }},
+  {{ timestamp: "00:20", comment: "y", frame_url: "/f/y.jpg" }},
+  {{ timestamp: "00:30", comment: "z", frame_url: "/f/z.jpg", identity_verified: true }},
+];
+const A = selectEvidenceHighlight(unverified, true);
+const B = selectEvidenceHighlight(mixed, true);
+const C = selectEvidenceHighlight(legacy, false);
+const C2 = selectEvidenceHighlight([legacy[0], legacy[1]], false);
+console.log(JSON.stringify({{
+  A: A === null,
+  B: B && B.evidence_id,
+  C: C && C.comment,
+  C2: C2 && C2.comment,
+}}));
+"""
+    r = _run_node(script)
+    assert r["A"] is True                 # unverified never becomes the highlight
+    assert r["B"] == "e3"                 # proof_verified (frame-proof preferred)
+    assert r["C"] == "z" and r["C2"] == "y"  # legacy chain unchanged

@@ -106,3 +106,18 @@ export function resolveAuthorityFrame(comments, ref) {
   if (!c && evtId) c = list.find((x) => usable(x) && x.event_id === evtId) || null;
   return c;
 }
+
+// FIX 02 C01 — Video Evidence Highlight selection. FAIL CLOSED: authority
+// reports may only present a proof_verified comment as the specific evidence
+// highlight; none means no highlight (the generic match video stays available).
+// Legacy: existing preference chain unchanged.
+export function selectEvidenceHighlight(comments, authority) {
+  const vc = (Array.isArray(comments) ? comments : []).filter((c) => c && c.timestamp);
+  if (authority) {
+    const ok = vc.filter((c) => c.proof_verified === true);
+    return ok.find((c) => c.proof_frame_verified === true && c.frame_url) || ok[0] || null;
+  }
+  return vc.find((c) => c.frame_url && c.identity_verified === true)
+    || vc.find((c) => c.frame_url && c.identity_verified !== false)
+    || vc[0] || null;
+}
