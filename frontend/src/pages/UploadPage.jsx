@@ -604,6 +604,11 @@ export default function UploadPage() {
               w: Number(a.box.w.toFixed(4)),
               h: Number(a.box.h.toFixed(4)),
             },
+            // FIX 00A — the manual verification role and scene segment must
+            // survive serialization; verify is an explicit flag, never
+            // inferred from array position. Legacy anchors omit both keys.
+            ...(Number.isFinite(a.segment) ? { segment: a.segment } : {}),
+            ...(a.verify === true ? { verify: true } : {}),
             thumb: a.thumb || undefined,
           })),
         ),

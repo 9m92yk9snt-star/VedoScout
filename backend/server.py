@@ -5174,6 +5174,36 @@ async def get_pass_price() -> float:
     return DEFAULT_PASS_PRICE
 
 
+# FIX 00A — original Scout Mode user anchors: 10 normal taps + 3 manual verification taps.
+ORIGINAL_ANCHOR_LIMIT = 13
+
+
+def _detach_anchor_thumbs(raw_json: Optional[str], report_id: str) -> Optional[str]:
+    """Detach per-anchor base64 thumbnails into files for ALL original user
+    anchors (up to ORIGINAL_ANCHOR_LIMIT), preserving every other anchor field
+    (t, box, segment, verify) verbatim. verify is NEVER inferred from index."""
+    if not raw_json:
+        return raw_json
+    try:
+        _al = json.loads(raw_json)
+        if isinstance(_al, list):
+            for _i, _a in enumerate(_al[:ORIGINAL_ANCHOR_LIMIT]):
+                if not isinstance(_a, dict):
+                    continue
+                _td = _a.pop("thumb", None)
+                if isinstance(_td, str) and _td.startswith("data:image"):
+                    try:
+                        _tf = f"{report_id}-anchor-{_i + 1}-thumb.jpg"
+                        (UPLOAD_DIR / _tf).write_bytes(base64.b64decode(_td.split(",", 1)[1]))
+                        _a["thumb_filename"] = _tf
+                    except Exception:
+                        pass
+            return json.dumps(_al)
+    except Exception:
+        pass
+    return raw_json
+
+
 @api_router.post("/reports/upload")
 async def upload_video_and_create_preview(
     background: BackgroundTasks,
@@ -5331,23 +5361,7 @@ async def upload_video_and_create_preview(
     # Detach per-anchor thumbnails (pixel-true captures of what the user framed)
     # into files — used later for template-based player re-location.
     if raw_marker_anchors:
-        try:
-            _al = json.loads(raw_marker_anchors)
-            if isinstance(_al, list):
-                for _i, _a in enumerate(_al[:10]):
-                    if not isinstance(_a, dict):
-                        continue
-                    _td = _a.pop("thumb", None)
-                    if isinstance(_td, str) and _td.startswith("data:image"):
-                        try:
-                            _tf = f"{report_id}-anchor-{_i + 1}-thumb.jpg"
-                            (UPLOAD_DIR / _tf).write_bytes(base64.b64decode(_td.split(",", 1)[1]))
-                            _a["thumb_filename"] = _tf
-                        except Exception:
-                            pass
-                raw_marker_anchors = json.dumps(_al)
-        except Exception:
-            pass
+        raw_marker_anchors = _detach_anchor_thumbs(raw_marker_anchors, report_id)
 
     # Build player details summary
     details = {
@@ -5925,6 +5939,8 @@ async def analyze_preview_task(report_id: str):
         extra_anchors_payload: list[dict] = []
         anchor_crop_paths: list[str] = []
         wide_crop_paths: list[str] = []
+        verify_crop_paths: list[str] = []  # crops of the 3 manual verify:true taps
+        all_anchors: list = []
         if fp is not None and crop_path and Path(crop_path).exists():
             anchor_crop_paths.append(str(crop_path))
             extra_anchors_payload.append({
@@ -5951,7 +5967,7 @@ async def analyze_preview_task(report_id: str):
             # the keyframe flow + up to 3 manual verification taps (verify:true)
             # appended by the "tap your player 3 times" step. More sightings =
             # stronger lock.
-            for idx, a in enumerate(all_anchors[1:13], start=2):
+            for idx, a in enumerate(all_anchors[1:ORIGINAL_ANCHOR_LIMIT], start=2):
                 try:
                     t_anchor = float(a.get("t", 0.0))
                     box_anchor = a.get("box") or {}
@@ -5980,6 +5996,8 @@ async def analyze_preview_task(report_id: str):
                         pass
                     if fp_a.crop_path and Path(fp_a.crop_path).exists():
                         anchor_crop_paths.append(str(crop_path_a))
+                        if a.get("verify"):
+                            verify_crop_paths.append(str(crop_path_a))
                         if has_wide:
                             wide_crop_paths.append(str(wide_path_a))
                         extra_anchors_payload.append({
@@ -5993,6 +6011,7 @@ async def analyze_preview_task(report_id: str):
                             "wide_filename": wide_filename_a if has_wide else None,
                             "thumb_filename": a.get("thumb_filename"),
                             **({"verify": True} if a.get("verify") else {}),
+                            **({"segment": int(a["segment"])} if isinstance(a.get("segment"), (int, float)) else {}),
                         })
                 except Exception as e:
                     logger.warning(f"Anchor {idx} extraction failed for {report_id}: {e}")
@@ -6049,7 +6068,13 @@ async def analyze_preview_task(report_id: str):
                 **_wd_heartbeat(),
             }},
         )
-        await _trace(report_id, f"anchors_persisted:{len(extra_anchors_payload)}")
+        _n_verify = sum(1 for a in extra_anchors_payload if a.get("verify"))
+        logger.info(
+            f"[anchors] {report_id}: anchors_received={len(all_anchors)} "
+            f"persisted={len(extra_anchors_payload)} "
+            f"normal_taps={len(extra_anchors_payload) - _n_verify} manual_verify_taps={_n_verify}"
+        )
+        await _trace(report_id, f"anchors_persisted:{len(extra_anchors_payload)}:verify:{_n_verify}")
 
         # ============== IDENTITY PROFILE (GPT-vision, PARALLEL with clip/gate) ==============
         # Preview-level identity guarantee (user-mandated: preview must verify
@@ -6060,7 +6085,8 @@ async def analyze_preview_task(report_id: str):
         identity_profile_task = None
         if anchor_crop_paths:
             identity_profile_task = asyncio.ensure_future(build_identity_profile(
-                EMERGENT_LLM_KEY, f"idp-{report_id}", anchor_crop_paths, wide_crop_paths,
+                EMERGENT_LLM_KEY, f"idp-{report_id}",
+                _prioritized_profile_crops(anchor_crop_paths, verify_crop_paths), wide_crop_paths,
                 jersey_number=(details or {}).get("jersey_number"),
             ))
 
@@ -6244,7 +6270,7 @@ async def analyze_preview_task(report_id: str):
                 ]))
                 verdict = await verify_preview_summary(
                     EMERGENT_LLM_KEY, f"pidv-{report_id}",
-                    anchor_crop_paths, wide_crop_paths, summary_txt,
+                    _prioritized_profile_crops(anchor_crop_paths, verify_crop_paths), wide_crop_paths, summary_txt,
                 )
                 if verdict is False:
                     await _trace(report_id, "preview_identity_retry")
@@ -6276,7 +6302,7 @@ async def analyze_preview_task(report_id: str):
                         ]))
                         v2 = await verify_preview_summary(
                             EMERGENT_LLM_KEY, f"pidv-retry-{report_id}",
-                            anchor_crop_paths, wide_crop_paths, retry_txt,
+                            _prioritized_profile_crops(anchor_crop_paths, verify_crop_paths), wide_crop_paths, retry_txt,
                         )
                         if v2 is False:
                             retry_preview["identity_flagged"] = True
@@ -7293,7 +7319,7 @@ async def _run_doubt_confirmation(
             final = "skipped"
             logger.info(f"[doubt] {report_id}: no taps survived the identity gate — honest fallback")
     if final == "confirmed" and confirmations:
-        # Confirmed taps FIRST so they always survive the 10-seed cap. Their t
+        # Confirmed taps FIRST so they always survive the 16-seed cap. Their t
         # is already in video time — subtract t_off since track_player re-adds it.
         seeds = [
             {"t": float(c["t"]) - float(gt_t_off or 0.0), "box": c["box"]}
@@ -7336,26 +7362,58 @@ def _try_restore_from_r2(url: Optional[str], dest: Path) -> bool:
 
 
 def _identity_ref_crops(doc: dict) -> list[str]:
-    """Reference crops of the tapped player for identity verification —
-    subject crop + up to two extra anchors (anchor 1 IS the subject crop)."""
-    out: list[str] = []
-    cf = doc.get("subject_crop_filename")
-    if cf:
-        p = UPLOAD_DIR / cf
-        if not p.exists():
-            _try_restore_from_r2(doc.get("subject_crop_url_override"), p)
-        if p.exists():
-            out.append(str(p))
-    for a in (doc.get("anchors") or [])[1:3]:
+    """Reference crops of the tapped player for identity verification.
+    FIX 00A: anchors flagged verify:true (the manual verification taps —
+    dedicated ground truth) preferentially fill the EXISTING 3 slots; the
+    legacy order (subject crop + anchors 2-3) fills any remaining slots.
+    Reports without verify:true anchors behave exactly as before."""
+    def _resolve(a) -> Optional[str]:
         cf = a.get("crop_filename") if isinstance(a, dict) else None
         if not cf:
-            continue
+            return None
         p = UPLOAD_DIR / cf
-        if not p.exists() and isinstance(a, dict):
+        if not p.exists():
             _try_restore_from_r2(a.get("crop_r2_url"), p)
-        if p.exists():
-            out.append(str(p))
+        return str(p) if p.exists() else None
+
+    out: list[str] = []
+    anchors = doc.get("anchors") or []
+    for a in anchors:
+        if len(out) >= 3:
+            break
+        if isinstance(a, dict) and a.get("verify") is True:
+            p = _resolve(a)
+            if p and p not in out:
+                out.append(p)
+    if len(out) < 3:
+        cf = doc.get("subject_crop_filename")
+        if cf:
+            p = UPLOAD_DIR / cf
+            if not p.exists():
+                _try_restore_from_r2(doc.get("subject_crop_url_override"), p)
+            if p.exists() and str(p) not in out:
+                out.append(str(p))
+    for a in anchors[1:3]:
+        if len(out) >= 3:
+            break
+        if isinstance(a, dict) and a.get("verify") is True:
+            continue  # already considered above
+        p = _resolve(a)
+        if p and p not in out:
+            out.append(p)
     return out[:3]
+
+
+def _prioritized_profile_crops(crop_paths: list[str], verify_crop_paths: list[str]) -> list[str]:
+    """FIX 00A — selection priority only (budgets unchanged): order identity
+    reference crops so the manual verify:true tap crops always fall inside
+    identity_verify's EXISTING MAX_PROFILE_CROPS budget. Same images, same
+    payload size. No verify crops → original order (legacy behaviour)."""
+    vs = [p for p in verify_crop_paths if p in crop_paths]
+    if not vs:
+        return list(crop_paths)
+    vset = set(vs)
+    return vs + [p for p in crop_paths if p not in vset]
 
 
 def _mmss_to_secs(ts) -> Optional[float]:
@@ -7866,7 +7924,7 @@ def _ground_truth_positions_block(anchors: list, track: dict | None, t_off: floa
     """Feed the user's tap positions (+ tracking coverage) into the analysis
     prompt so the model anchors its identification to ground truth."""
     rows = []
-    for a in (anchors or [])[:10]:
+    for a in (anchors or [])[:ORIGINAL_ANCHOR_LIMIT]:
         if not (isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)):
             continue
         b = a["box"]
@@ -8154,7 +8212,8 @@ async def generate_full_report_task(report_id: str) -> None:
         if gt_track:
             logger.info(
                 f"[track] {report_id}: {len(gt_track.get('points') or [])} points, "
-                f"{len(gt_track.get('segments') or [])} segments (Δ={gt_t_off:+.2f}s)"
+                f"{len(gt_track.get('segments') or [])} segments, "
+                f"seeds={gt_track.get('seed_count')} (Δ={gt_t_off:+.2f}s)"
             )
 
         # ── CV SHADOW MODE (additive, feature-flagged, observe-only) ──
