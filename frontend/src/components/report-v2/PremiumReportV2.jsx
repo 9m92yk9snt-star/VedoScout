@@ -9,6 +9,7 @@ import { Star, Users, ShieldCheck, Play, Clapperboard, Loader2 } from "lucide-re
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { deriveV2, tsToSeconds } from "./derive";
+import { isAuthorityReport, resolveProofClip } from "@/lib/authorityJoin.mjs";
 import {
   V2Card, V2Title, MatchStatsCard, AgeComparisonCard,
   TopStrengthsCard, DevPrioritiesCard, RoadmapCard, TrainingPlanCard,
@@ -253,10 +254,15 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
   // Proof mini-player: "see the proof" opens a bottom sheet — the reader's
   // scroll position never moves. Replaces the old scroll-to-video behaviour.
   const [proof, setProof] = useState(null);
-  const playAt = useCallback((ts) => {
+  // FIX 01 — authority reports resolve the proof clip by exact IDs only;
+  // legacy reports keep the timestamp-string match.
+  const playAt = useCallback((ts, ref) => {
     try { videoRef.current?.pause(); } catch { /* noop */ }
-    const vc = (report.full_report?.video_comments || []).find(
-      (c) => c && c.timestamp === ts && c.tele_clip_url,
+    const authority = isAuthorityReport(report.full_report);
+    const vc = resolveProofClip(
+      report.full_report?.video_comments,
+      { ...(ref || {}), timestamp: ts },
+      authority,
     );
     setProof({
       ts: ts || null,

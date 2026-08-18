@@ -91,7 +91,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
               {s.timestamp && (
                 <button
                   type="button"
-                  onClick={() => onPlayAt?.(s.timestamp)}
+                  onClick={() => onPlayAt?.(s.timestamp, { evidenceId: s.evidenceId, eventId: s.eventId })}
                   data-testid={`v2-strength-proof-${i}`}
                   className="md:hidden mt-2 inline-flex items-center gap-1.5 bg-[#12402A] text-[#CCFF00] text-[10px] font-extrabold tracking-[0.07em] uppercase px-2.5 py-1 rounded-full active:scale-95 transition-transform"
                 >
@@ -106,7 +106,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
             {thumb ? (
               <button
                 type="button"
-                onClick={() => onPlayAt?.(s.timestamp)}
+                onClick={() => onPlayAt?.(s.timestamp, { evidenceId: s.evidenceId, eventId: s.eventId })}
                 data-testid={`v2-strength-play-${i}`}
                 className="relative w-[140px] h-[80px] rounded-[9px] overflow-hidden border border-[#E5DFCE] shrink-0 hidden md:block group"
               >
@@ -149,7 +149,7 @@ export function ActionTimelineCard({ actions, onPlayAt }) {
             key={i}
             type="button"
             data-testid={`v2-action-row-${i}`}
-            onClick={() => onPlayAt?.(a.timestamp)}
+            onClick={() => onPlayAt?.(a.timestamp, { eventId: a.eventId })}
             className={`relative w-full text-left flex items-center gap-3 py-2.5 group ${i < actions.length - 1 ? "border-b border-[#F2EDDE]" : ""}`}
           >
             <span
