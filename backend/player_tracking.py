@@ -3,8 +3,13 @@ player_tracking.py — deterministic optical tracking seeded by the user's taps.
 
 Every tap gives a ground-truth (time, box). From each seed we track the player
 forward AND backward (±SPAN seconds) with local NCC template matching:
-- search window = last box grown 45%
-- template updated every frame, drift-guarded against the ORIGINAL tap content
+- FIX 03/04: every frame carries its own ACTUAL post-grab media PTS (VFR-safe)
+- search window = last box grown 45%, centred by bounded motion prediction
+  (camera-compensated player velocity over ACTUAL media dt) — FIX 04
+- conservative multi-scale matching (±6%/step, bounded vs the tap) — FIX 04
+- geometry gates: same-kit ambiguity skip + implausible-jump rejection — FIX 04
+- template updated from ACCEPTED frames only, drift-guarded against the
+  ORIGINAL tap content
 - COLOUR VETO: every accepted match is compared against the seed's HSV
   colour signature (jersey area). Consistent colour mismatch = likely an
   identity switch onto another player → stop honestly.
@@ -19,6 +24,9 @@ import logging
 
 import cv2
 import numpy as np  # noqa: F401
+
+import tracking_geometry
+import video_timebase
 
 logger = logging.getLogger(__name__)
 
@@ -48,35 +56,41 @@ def _cut_flags(frames):
     """flags[i] = True when a scene cut lies between frames[i-1] and frames[i]."""
     flags = [False] * len(frames)
     prev = None
-    for i, (_t, g, _hsv) in enumerate(frames):
-        small = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1]))))
-        sf = small.astype("float32")
+    for i, (_t, _g, _hsv, tiny) in enumerate(frames):
+        sf = tiny
         if prev is not None and prev.shape == sf.shape:
             flags[i] = float(cv2.absdiff(prev, sf).mean()) > CUT_DIFF
         prev = sf
     return flags
 
 
-def _read_window(cap, w0: float, w1: float, step: float):
-    """Returns [(t, gray_480w, hsv_240w), ...]"""
+def _read_window(cap, w0: float, w1: float, step: float, fps=None):
+    """Returns [(t, gray_480w, hsv_240w, tiny_160w_f32), ...].
+
+    FIX 03/04 canonical contract: adaptive-preroll seek at/before w0, then
+    grab → read the ACTUAL post-grab PTS → retrieve that SAME frame. Only
+    frames whose actual media time lies within [w0, w1] are included, and
+    sampling is by elapsed ACTUAL media time — never frame_index/fps."""
     frames = []
-    cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, w0) * 1000.0)
-    last_t = -1e9
-    while True:
-        pos = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-        ok, fr = cap.read()
-        if not ok or pos > w1:
+    lo = max(0.0, w0)
+    ok, t, _fb = video_timebase.seek_with_preroll(cap, lo, fps)
+    last_t = None
+    while ok:
+        if t > w1 + 1e-3:
             break
-        if pos - last_t < step * 0.8:
-            continue
-        last_t = pos
-        h, w = fr.shape[:2]
-        small = cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w))))
-        g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-        hsv = cv2.cvtColor(
-            cv2.resize(small, (COLOR_W, max(2, small.shape[0] // 2))), cv2.COLOR_BGR2HSV,
-        )
-        frames.append((pos, g, hsv))
+        if t >= lo - 1e-3 and video_timebase.should_sample(t, last_t, step * 0.8):
+            ok2, fr = cap.retrieve()
+            if ok2:
+                last_t = t
+                h, w = fr.shape[:2]
+                small = cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w))))
+                g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+                hsv = cv2.cvtColor(
+                    cv2.resize(small, (COLOR_W, max(2, small.shape[0] // 2))), cv2.COLOR_BGR2HSV,
+                )
+                tiny = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1])))).astype("float32")
+                frames.append((t, g, hsv, tiny))
+        ok, t, _fb = video_timebase.grab_frame_time_seconds(cap, fps)
     return frames
 
 
@@ -139,20 +153,28 @@ def _doubt(doubts, t: float, cur, W: int, H: int, reason: str):
 
 def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None,
                    cuts: list | None = None):
-    _t0, g0, hsv0 = frames[i0]
+    _t0, g0, hsv0, tiny0 = frames[i0]
     tmpl0 = _crop(g0, box_px)
     if tmpl0 is None:
         return
     tmpl = tmpl0
-    bw, bh = box_px[2] - box_px[0], box_px[3] - box_px[1]
+    bw0, bh0 = box_px[2] - box_px[0], box_px[3] - box_px[1]  # seed size = scale bounds
+    bw, bh = float(bw0), float(bh0)
     H, W = g0.shape[:2]
     scale = hsv0.shape[1] / float(W)  # gray-px → colour-px
     ref_hist = _color_hist(hsv0, box_px, scale)  # FIXED colour signature from the tap
     misses = 0
     color_misses = 0
+    ambig_misses = 0
+    jump_misses = 0
     steps = 0
     lock_ts: list = []  # timestamps of the current near-perfect-match streak
     cur = list(box_px)
+    vel = (0.0, 0.0)          # camera-compensated player velocity (gray px/s)
+    t_last = frames[i0][0]    # media time of the last ACCEPTED geometry
+    cam_acc = [0.0, 0.0]      # camera shift accumulated since last accept (gray px)
+    prev_tiny = tiny0
+    tiny_scale = W / float(tiny0.shape[1])
     end = len(frames) if direction > 0 else -1
     for i in range(i0 + direction, end, direction):
         # ── scene-cut stop: a montage cut invalidates template tracking ──
@@ -161,22 +183,66 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             if boundary:
                 _doubt(doubts, frames[i][0], cur, W, H, "scene cut — tracking cannot continue")
                 break
-        t, g, hsv = frames[i]
-        gx, gy = bw * 0.45, bh * 0.45
-        sx0, sy0 = max(0, int(cur[0] - gx)), max(0, int(cur[1] - gy))
-        sx1, sy1 = min(W, int(cur[2] + gx)), min(H, int(cur[3] + gy))
+        t, g, hsv, tiny = frames[i]
+        # ── global camera motion between the previously PROCESSED frame and
+        # this one — a pan must not be read as player motion (fail-safe 0) ──
+        cdx, cdy = tracking_geometry.estimate_camera_shift(prev_tiny, tiny)
+        prev_tiny = tiny
+        cam_acc[0] += cdx * tiny_scale
+        cam_acc[1] += cdy * tiny_scale
+        dt = abs(t - t_last)  # ACTUAL elapsed media time since last accept
+        # ── bounded motion prediction: search follows camera + player motion ──
+        pdx, pdy = tracking_geometry.predict_displacement(vel, dt, bw, bh)
+        pcx = (cur[0] + cur[2]) / 2.0 + cam_acc[0] + pdx
+        pcy = (cur[1] + cur[3]) / 2.0 + cam_acc[1] + pdy
+        ex = min(abs(pdx) * 0.5 + abs(cam_acc[0]) * 0.25, bw * 0.6)
+        ey = min(abs(pdy) * 0.5 + abs(cam_acc[1]) * 0.25, bh * 0.6)
+        gx, gy = bw * 0.45 + ex, bh * 0.45 + ey
+        sx0, sy0 = max(0, int(pcx - bw / 2.0 - gx)), max(0, int(pcy - bh / 2.0 - gy))
+        sx1, sy1 = min(W, int(pcx + bw / 2.0 + gx)), min(H, int(pcy + bh / 2.0 + gy))
         region = g[sy0:sy1, sx0:sx1]
-        if region.shape[0] <= tmpl.shape[0] or region.shape[1] <= tmpl.shape[1]:
-            break
-        res = cv2.matchTemplate(region, tmpl, cv2.TM_CCOEFF_NORMED)
-        _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+        # ── conservative multi-scale match (±6%/step, bounded vs the tap) ──
+        best = None
+        for s in tracking_geometry.scale_candidates(bw, bh, bw0, bh0):
+            tw = max(6, int(round(tmpl.shape[1] * s)))
+            th = max(6, int(round(tmpl.shape[0] * s)))
+            if region.shape[0] <= th or region.shape[1] <= tw:
+                continue
+            tm = tmpl if (tw, th) == (tmpl.shape[1], tmpl.shape[0]) else cv2.resize(tmpl, (tw, th))
+            res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED)
+            _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+            if best is None or mx > best[0]:
+                best = (mx, ml, tw, th, res)
+        if best is None:
+            break  # search region cannot even hold the template
+        mx, ml, tw, th, res = best
         if mx < MATCH_MIN:
             misses += 1
             if misses >= MAX_MISSES:
                 break
             continue
         misses = 0
-        cand_box = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + int(bw), sy0 + ml[1] + int(bh)]
+        # ── same-kit crossover safety: two spatially distinct near-equal
+        # candidates → this frame is NOT authoritative geometry. No record,
+        # no template update, no jumping to the nearest teammate. ──
+        mx2, _ml2 = tracking_geometry.second_peak(res, ml, tw, th)
+        if tracking_geometry.is_ambiguous(mx, mx2, MATCH_MIN):
+            ambig_misses += 1
+            if ambig_misses >= MAX_MISSES:
+                _doubt(doubts, t, cur, W, H, "two similar players — identity ambiguous")
+                break
+            continue
+        cand_box = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + tw, sy0 + ml[1] + th]
+        # ── geometry teleport gate: camera-compensated residual displacement
+        # must stay plausible for the elapsed media time, however high NCC is ──
+        rdx = (cand_box[0] + cand_box[2]) / 2.0 - pcx
+        rdy = (cand_box[1] + cand_box[3]) / 2.0 - pcy
+        if not tracking_geometry.plausible_motion(rdx, rdy, bw, bh, dt):
+            jump_misses += 1
+            if jump_misses >= MAX_MISSES:
+                _doubt(doubts, t, cur, W, H, "implausible jump — geometry rejected")
+                break
+            continue
         # ── colour veto: does the matched box still wear the tapped colours? ──
         csim = _color_sim(ref_hist, hsv, cand_box, scale)
         if csim is not None and csim < COLOR_MIN:
@@ -186,7 +252,18 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
                 break  # colours no longer match the tapped player — stop honestly
             continue  # do NOT accept the suspicious box
         color_misses = 0
+        ambig_misses = 0
+        jump_misses = 0
+        # ── ACCEPT: velocity from the camera-compensated residual, ACTUAL dt ──
+        vel = tracking_geometry.update_velocity(
+            vel,
+            ((cur[0] + cur[2]) / 2.0, (cur[1] + cur[3]) / 2.0),
+            ((cand_box[0] + cand_box[2]) / 2.0, (cand_box[1] + cand_box[3]) / 2.0),
+            cam_acc, dt)
         cur = cand_box
+        bw, bh = float(tw), float(th)
+        cam_acc = [0.0, 0.0]
+        t_last = t
         steps += 1
         # ── static-background latch: real players never sustain near-perfect
         # NCC (pose keeps changing); static background does. Stop and remove
@@ -230,9 +307,11 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
     points: dict = {}
     doubts: list = []
     step = 1.0 / SAMPLE_HZ
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    fps = fps if fps > 0 else None  # explicit last-resort fallback only
     try:
         for t_seed, b in seeds:
-            frames = _read_window(cap, t_seed - span, t_seed + span, step)
+            frames = _read_window(cap, t_seed - span, t_seed + span, step, fps)
             if len(frames) < 3:
                 continue
             H, W = frames[0][1].shape[:2]
