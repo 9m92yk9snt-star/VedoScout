@@ -31,6 +31,7 @@ import cv2
 import numpy as np
 
 import cv_detect
+import video_timebase
 
 logger = logging.getLogger("elite-scout")
 
@@ -260,8 +261,9 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
         try:
             t = float(a["t"]) + (t_off or 0.0)
             box = a["box"]
-            cap.set(cv2.CAP_PROP_POS_FRAMES, int(max(0.0, t) * fps))
-            ok, frame = cap.read()
+            # FIX 03 C02 — canonical random access: adaptive preroll + decode
+            # forward on ACTUAL PTS (one POS_MSEC seek may overshoot on VFR)
+            ok, frame, _actual_t = video_timebase.read_frame_at(cap, max(0.0, t), fps)
             if not ok:
                 continue
             small = cv2.resize(frame, (sw, sh))
@@ -422,7 +424,9 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         if W < 100 or H < 100 or total < 10:
             return {"status": "skipped", "reason": "bad_video"}
-        dur = total / fps
+        # FIX 03 — media duration is authoritative; frame_count/fps is an
+        # explicit last-resort fallback only
+        dur = video_timebase.media_duration_seconds(video_path) or (total / fps)
         scale = SMALL_W / W
         sw, sh = SMALL_W, max(2, int(H * scale))
 
@@ -438,7 +442,6 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
             return min(near, key=lambda p: abs(float(p["t"]) - t)) if near else None
 
         med_h = float(np.median([r["box"][3] for r in refs]))
-        step = max(1, int(round(fps / HZ)))
         state, last_pos, last_t, lost_since = "LOST", None, None, 0.0
         reacq_streak = 0
         reacq_pending, lost_in_crowd = False, False
@@ -511,20 +514,23 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         cam = cv_detect.CameraMotion(out_scale=sw / 160.0)  # Phase 8 full global motion
         cam_dx = cam_dy = 0.0
 
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        fidx = 0
+        cap.set(cv2.CAP_PROP_POS_MSEC, 0.0)
+        # FIX 03 — sample at HZ by ELAPSED MEDIA TIME (VFR-safe). C01 contract:
+        # grab → read THAT frame's PTS → decide → retrieve the SAME frame.
+        sample_interval = 1.0 / HZ if HZ > 0 else 0.0
+        prev_sample_t = None
+        dt_sample = sample_interval
         while True:
-            ok = cap.grab()
+            ok, t, _tb_fb = video_timebase.grab_frame_time_seconds(cap, fps)
             if not ok:
                 break
-            if fidx % step != 0:
-                fidx += 1
+            if not video_timebase.should_sample(t, prev_sample_t, sample_interval):
                 continue
             ok, frame = cap.retrieve()
             if not ok:
                 break
-            t = fidx / fps
-            fidx += 1
+            dt_sample = video_timebase.sample_dt(t, prev_sample_t, sample_interval)
+            prev_sample_t = t
             samples += 1
             small = cv2.resize(frame, (sw, sh))
             pitch_l = _pitch_l(small)
@@ -829,7 +835,7 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
             if new_state == "LOST":
                 reacq_streak = 0
                 reacq_pending = False
-                lost_since += step / fps
+                lost_since += dt_sample
                 if lost_since < LOST_GRACE and state in ("VERIFIED", "PROVISIONAL", "UNCERTAIN"):
                     new_state = "UNCERTAIN"
             if new_state == "LOST" and state != "LOST":

@@ -26,6 +26,7 @@ import httpx
 
 # Local modules
 import r2_storage
+import video_timebase
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -3031,13 +3032,10 @@ def _gyg_ts_seconds(ts) -> Optional[float]:
 
 
 def _video_duration_seconds(path) -> float:
+    # FIX 03 — media duration (ffprobe → ffmpeg banner chain) is authoritative;
+    # OpenCV frame_count/fps survives only as the helper's internal last resort.
     try:
-        import cv2
-        cap = cv2.VideoCapture(str(path))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 0
-        n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
-        cap.release()
-        return float(n / fps) if fps > 0 else 0.0
+        return float(get_duration_seconds(str(path)) or 0.0)
     except Exception:
         return 0.0
 
@@ -7326,9 +7324,9 @@ async def _verify_doubt_taps(report_id: str, file_path: Path, confirmations: lis
         def _crop():
             cap = cv2.VideoCapture(str(file_path))
             try:
-                fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
-                cap.set(cv2.CAP_PROP_POS_FRAMES, int(float(c["t"]) * fps))
-                ok, frame = cap.read()
+                # FIX 03 C01 — canonical random access: decode forward to the
+                # ACTUAL frame at/after T; never a stale keyframe
+                ok, frame, _t = video_timebase.read_frame_at(cap, float(c["t"]))
                 if not ok:
                     return False
                 fh, fw = frame.shape[:2]
@@ -7757,13 +7755,14 @@ def _teleclip_edge_crop(video_path: str, sm: list, t: float, out_path: str) -> O
     try:
         if not cap.isOpened():
             return None
-        fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(t * fps))
-        ok, frame = cap.read()
+        # FIX 03 C01/C02 — the frame verifying an edge at time T must ACTUALLY
+        # represent media time T: adaptive-preroll seek, decode forward on
+        # actual PTS, and place ring/crop from the SAME decoded frame's PTS
+        ok, frame, actual_t = video_timebase.read_frame_at(cap, t)
         if not ok:
             return None
         fh, fw = frame.shape[:2]
-        cx, feet_y, w, h = pos_at(sm, t)
+        cx, feet_y, w, h = pos_at(sm, actual_t)
         _draw_ring(frame, cx, feet_y, w, h, 1.0)
         half = max(100, int(1.35 * w * fw))
         px, py = int(cx * fw), int(feet_y * fh)
