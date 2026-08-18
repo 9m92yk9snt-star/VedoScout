@@ -8164,14 +8164,15 @@ async def _finalize_full_report(report_id: str, file_path, persist_frames: bool 
     finalization work and then writes the SINGLE authoritative
     `full_report_status = "ready"` transition. READY must never lie: it is
     written here and nowhere else in the analysis run, after finalization.
-    Individual proof assets keep their existing fail-open behaviour (safe
-    omission + read-time self-heal); notifications are optional and are sent
-    after READY so they can never block or falsify it."""
+    Individual asset failures keep their existing fail-open handling INSIDE
+    _persist_video_frames (safe omission + read-time self-heal), but a
+    TOP-LEVEL _persist_video_frames failure means finalization did NOT
+    complete and MUST propagate into the caller's failure contract.
+    Notifications are optional and are sent after READY so they can never
+    block or falsify it."""
     if persist_frames:
-        try:
-            await _persist_video_frames(report_id, file_path)
-        except Exception:
-            logger.exception(f"evidence frame persist failed for {report_id}")
+        # FIX 00B correction — do NOT swallow: top-level failure → no READY.
+        await _persist_video_frames(report_id, file_path)
     try:
         fresh = await db.reports.find_one({"id": report_id})
         if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
@@ -8210,12 +8211,27 @@ async def generate_full_report_task(report_id: str) -> None:
             return
         if doc.get("full_report"):
             st = doc.get("full_report_status")
-            if st in ("verifying", "finalizing"):
-                # FIX 00B — resumed after an interruption mid-finalization: the
-                # report body already exists, so redo only the finalization tail
-                # (frames/clips regenerate idempotently) and let IT write READY.
+            if st == "ready":
+                return
+            if not st:
+                # TRUE legacy doc (predates the lifecycle states) — instant-ready
+                # fallback for backward compatibility ONLY.
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"full_report_status": "ready"}},
+                )
+                return
+            if st in ("verifying", "finalizing", "failed", "generating"):
+                # FIX 00B — the report body already exists, so recover by re-running
+                # ONLY the finalization tail (frames/clips regenerate idempotently)
+                # and let IT write READY. Never a new Gemini spend, and an explicit
+                # failed/non-ready state is NEVER promoted directly to ready.
                 file_path = await _ensure_report_video_local(report_id)
                 if file_path and file_path.exists():
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"full_report_status": "finalizing", "full_report_error": None}},
+                    )
                     await _finalize_full_report(report_id, file_path, persist_frames=True)
                 else:
                     await db.reports.update_one(
@@ -8224,12 +8240,8 @@ async def generate_full_report_task(report_id: str) -> None:
                                   "full_report_error": "Source video file missing on server."}},
                     )
                 return
-            # Legacy/complete docs — make sure status reflects that for any concurrent poller.
-            if st != "ready":
-                await db.reports.update_one(
-                    {"id": report_id},
-                    {"$set": {"full_report_status": "ready"}},
-                )
+            # Any other EXPLICIT state (e.g. awaiting_confirmation) — never
+            # promote to ready just because the report body exists.
             return
         await db.reports.update_one(
             {"id": report_id},
@@ -8529,13 +8541,13 @@ async def generate_full_report_task(report_id: str) -> None:
             }},
         )
         # Ensure scout review is queued for every paid/unlocked report
-        try:
-            identity_stats = await _persist_video_frames(report_id, file_path)
-        except Exception:
-            identity_stats = None
-            logger.exception(f"evidence frame persist failed for {report_id}")
+        # FIX 00B correction — a TOP-LEVEL persist failure means finalization
+        # did NOT complete: propagate into the failure contract (no ready).
+        # Individual asset failures stay fail-open INSIDE _persist_video_frames.
+        identity_stats = await _persist_video_frames(report_id, file_path)
         # ── IDENTITY GATE — one corrective re-analysis when GPT-vision rejects
         # most evidence frames (Gemini most likely switched player mid-video).
+        _retry_persisted = False
         try:
             checked = (identity_stats or {}).get("checked", 0)
             dropped = (identity_stats or {}).get("hard_rejected", 0)
@@ -8581,6 +8593,7 @@ async def generate_full_report_task(report_id: str) -> None:
                         {"id": report_id},
                         {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
                     )
+                    _retry_persisted = True
                     stats2 = await _persist_video_frames(report_id, file_path)
                     checked2 = (stats2 or {}).get("checked", 0)
                     dropped2 = (stats2 or {}).get("hard_rejected", 0)
@@ -8590,6 +8603,10 @@ async def generate_full_report_task(report_id: str) -> None:
                     else:
                         logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
         except Exception:
+            if _retry_persisted:
+                # FIX 00B correction — the replacement report is already live;
+                # its final evidence persistence is REQUIRED before READY.
+                raise
             logger.exception(f"identity gate failed for {report_id}")
         # FIX 00B — single authoritative finalization: agent review queue,
         # READY transition, then optional notifications.

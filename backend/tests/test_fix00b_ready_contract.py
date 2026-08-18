@@ -177,18 +177,122 @@ def test_3_4_9_ready_written_once_after_finalization(monkeypatch):
         vid.unlink(missing_ok=True)
 
 
-# ── optional asset failure: existing safe-omission behaviour preserved ────
-def test_optional_frame_failure_does_not_block_ready(monkeypatch):
+# ── A + B: TOP-LEVEL persist failure → ready NEVER written, failed wins ──
+def test_A_B_toplevel_persist_failure_never_ready(monkeypatch):
+    """Resume path with the REAL _finalize_full_report: a top-level
+    _persist_video_frames exception must propagate into the existing failure
+    contract — the report ends failed, ready is never written."""
     doc = {"id": "r5", "full_report": {"scores": {}}, "full_report_status": "finalizing"}
     fake = FakeReports(doc)
     _wire(monkeypatch, fake, persist_raises=True)
     vid = _tmp_video()
+
+    async def fake_local(report_id):
+        return vid
+
+    monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
     try:
-        asyncio.run(server._finalize_full_report("r5", vid, persist_frames=True))
-        assert len(_ready_writes(fake)) == 1, \
-            "frame persist keeps its existing fail-open/self-heal contract"
+        asyncio.run(server.generate_full_report_task("r5"))
+        assert not _ready_writes(fake), "top-level persist failure must never become ready"
+        assert fake.doc["full_report_status"] == "failed"
+        assert not any(c[0] == "email" for c in fake.calls)
     finally:
         vid.unlink(missing_ok=True)
+
+
+def test_A_supplement_normal_path_persist_not_swallowed():
+    src = (BACKEND / "server.py").read_text()
+    task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
+    assert "identity_stats = None" not in task, \
+        "normal path must not swallow a top-level persist failure"
+    assert "identity_stats = await _persist_video_frames(" in task
+    finalize = src.split("async def _finalize_full_report(")[1].split("\nasync def ")[0]
+    assert "except Exception" not in finalize.split("agent_review")[0], \
+        "resume-path persist must not be wrapped in a swallow"
+
+
+# ── C: corrective retry — replacement report requires final persistence ──
+def test_C_retry_persist_failure_propagates():
+    src = (BACKEND / "server.py").read_text()
+    task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
+    gate = task.split("IDENTITY GATE")[1]
+    before_persist, after_persist = gate.split("_retry_persisted = True")
+    assert '"full_report": retry' in before_persist, \
+        "flag must be set immediately after the replacement report is persisted"
+    assert "stats2 = await _persist_video_frames(" in after_persist.split("except Exception")[0]
+    handler = after_persist.split("except Exception:")[1]
+    assert "if _retry_persisted:" in handler and "raise" in handler.split("logger.exception")[0], \
+        "a live replacement report must not be declared ready when its evidence persistence fails"
+
+
+# ── D: failed + full_report → never instant-ready, resume tail instead ───
+def test_D_failed_plus_full_report_not_instant_ready(monkeypatch):
+    doc = {"id": "r7", "full_report": {"scores": {}}, "full_report_status": "failed"}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake)
+    vid = _tmp_video()
+    finalized = []
+
+    async def fake_finalize(report_id, file_path, persist_frames=True):
+        finalized.append((report_id, persist_frames))
+
+    async def fake_local(report_id):
+        return vid
+
+    monkeypatch.setattr(server, "_finalize_full_report", fake_finalize)
+    monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
+    try:
+        asyncio.run(server.generate_full_report_task("r7"))
+        assert finalized == [("r7", True)], "failed+body must resume the finalization tail"
+        assert not _ready_writes(fake), "failed must NEVER be promoted directly to ready"
+        assert fake.doc["full_report_status"] == "finalizing", \
+            "recovery must be visible as an in-flight state"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+# ── E: failed retry recovers WITHOUT a new full Gemini generation ─────────
+def test_E_failed_retry_spends_no_new_llm(monkeypatch):
+    doc = {"id": "r8", "is_paid": True, "paid_at": None,
+           "full_report": {"scores": {}}, "full_report_status": "failed"}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake)
+    vid = _tmp_video()
+    llm_calls = []
+
+    async def forbidden_gemini(*a, **k):
+        llm_calls.append(1)
+        raise AssertionError("full Gemini generation must NOT run for a finalization retry")
+
+    async def fake_local(report_id):
+        return vid
+
+    monkeypatch.setattr(server, "call_gemini_with_video", forbidden_gemini)
+    monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
+    try:
+        asyncio.run(server.generate_full_report_task("r8"))
+        assert llm_calls == [], "credit control: no new production LLM call"
+        assert len(_ready_writes(fake)) == 1, "finalization-only recovery reaches ready"
+        assert fake.doc["full_report_status"] == "ready"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+# ── F: explicit awaiting_confirmation + full_report → never promoted ─────
+def test_F_awaiting_confirmation_never_promoted(monkeypatch):
+    doc = {"id": "r9", "full_report": {"scores": {}},
+           "full_report_status": "awaiting_confirmation"}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake)
+    called = []
+
+    async def fake_finalize(*a, **k):
+        called.append(1)
+
+    monkeypatch.setattr(server, "_finalize_full_report", fake_finalize)
+    asyncio.run(server.generate_full_report_task("r9"))
+    assert not _ready_writes(fake) and not called
+    assert fake.doc["full_report_status"] == "awaiting_confirmation"
 
 
 # ── TEST 8: required finalization failure → ready is NEVER written ────────
@@ -223,10 +327,13 @@ def test_watchdog_query_covers_new_states(monkeypatch):
 def test_9_supplement_single_ready_write_site():
     src = (BACKEND / "server.py").read_text()
     task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
-    assert '"full_report_status": "ready"' not in task.split('if st != "ready":')[1].split("return")[1], \
-        "pipeline body must not write ready directly"
+    # exactly ONE direct ready write in the task body — the TRUE-legacy fallback
+    assert task.count('"full_report_status": "ready"') == 1
+    legacy_branch = task.split("if not st:")[1].split("return")[0]
+    assert '"full_report_status": "ready"' in legacy_branch, \
+        "the only direct ready write must be the no-status legacy fallback"
     # the full_report persistence point stores finalizing, not ready
-    persist_block = task.split('"full_report": full,')[1][:400]
+    persist_block = task.split('"full_report": full,')[1][:500]
     assert '"full_report_status": "finalizing"' in persist_block
     finalize = src.split("async def _finalize_full_report(")[1].split("\nasync def ")[0]
     assert finalize.count('"full_report_status": "ready"') == 1
