@@ -8159,6 +8159,271 @@ async def _trusted_fastest_moment(
     return None
 
 
+def _report_media_paths(doc: dict) -> tuple:
+    """EXISTING marker/subject-crop restore logic, extracted verbatim so the
+    normal pipeline and corrective-only recovery share it."""
+    marker_path = None
+    if doc.get("marker_filename"):
+        mp = UPLOAD_DIR / doc["marker_filename"]
+        if not mp.exists():
+            _try_restore_from_r2(doc.get("marker_url_override"), mp)
+        if mp.exists():
+            marker_path = str(mp)
+    crop_path_str = None
+    if doc.get("subject_crop_filename"):
+        cp = UPLOAD_DIR / doc["subject_crop_filename"]
+        if not cp.exists():
+            _try_restore_from_r2(doc.get("subject_crop_url_override"), cp)
+        if cp.exists():
+            crop_path_str = str(cp)
+    return marker_path, crop_path_str
+
+
+def _collect_anchor_crop_paths(anchor_payload_list: list) -> tuple[list[str], list[str]]:
+    """EXISTING anchor tight/wide crop collection (with R2 restore), extracted
+    verbatim. Wide crops keep the existing [:3] budget."""
+    anchor_crops_full: list[str] = []
+    for a in anchor_payload_list:
+        cf = a.get("crop_filename") if isinstance(a, dict) else None
+        if not cf:
+            continue
+        p = UPLOAD_DIR / cf
+        if not p.exists() and isinstance(a, dict):
+            _try_restore_from_r2(a.get("crop_r2_url"), p)
+        if p.exists():
+            anchor_crops_full.append(str(p))
+    wide_crops_full: list[str] = []
+    for a in anchor_payload_list:
+        wf = a.get("wide_filename") if isinstance(a, dict) else None
+        if not wf:
+            continue
+        p = UPLOAD_DIR / wf
+        if not p.exists() and isinstance(a, dict):
+            _try_restore_from_r2(a.get("wide_r2_url"), p)
+        if p.exists():
+            wide_crops_full.append(str(p))
+    return anchor_crops_full, wide_crops_full[:3]
+
+
+async def _compose_full_prompt(doc: dict, audio_events_full, anchor_payload_list: list,
+                               crop_path_str, gt_track, gt_t_off) -> str:
+    """EXISTING full-report prompt composition (precision priors + identity
+    profile + identity memory + ground-truth positions), extracted verbatim so
+    the normal pipeline and corrective-only recovery build the SAME prompt."""
+    details_str = json.dumps(doc["player_details"], ensure_ascii=False)
+    gate = doc.get("content_gate") or {}
+    fp_obj = None
+    fp_payload = doc.get("fingerprint")
+    if fp_payload:
+        try:
+            fp_obj = PlayerFingerprint(
+                jersey_hex=fp_payload.get("jersey_hex", "#888888"),
+                jersey_name=fp_payload.get("jersey_name", "unclear"),
+                shorts_hex=fp_payload.get("shorts_hex", "#888888"),
+                shorts_name=fp_payload.get("shorts_name", "unclear"),
+                body_ratio=float(fp_payload.get("body_ratio", 2.0)),
+                crop_path=crop_path_str,
+                box=fp_payload.get("box", {}),
+                confidence="ok",
+            )
+        except Exception:
+            fp_obj = None
+    if fp_obj is not None:
+        full_prompt = precision_build_full_prompt(
+            base_prompt=FULL_REPORT_PROMPT,
+            fingerprint=fp_obj,
+            audio_events=audio_events_full,
+            player_details=doc["player_details"],
+            content_type=str(gate.get("content_type", "other")),
+            quality=str(gate.get("quality", "good")),
+            player_visible=str(gate.get("player_visible", "clear")),
+            camera_distance=str(gate.get("camera_distance", "medium")),
+            games_detected=int(gate.get("games_detected", 1) or 1),
+            anchors=anchor_payload_list,
+        )
+    else:
+        full_prompt = (
+            FULL_REPORT_PROMPT
+            .replace("{player_details}", details_str)
+            .replace("{content_type}", str(gate.get("content_type", "other")))
+            .replace("{quality}", str(gate.get("quality", "good")))
+            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+            .replace("{games_detected}", str(gate.get("games_detected", 1)))
+        )
+    # Inject the pre-analysis identity profile (same block as the preview).
+    try:
+        _idp = doc.get("identity_profile")
+        if _idp:
+            full_prompt += identity_profile_block(_idp)
+    except Exception:
+        pass
+    # Stage 5 — identity memory from this player's previous reports.
+    try:
+        _mem = await db.player_profiles.find_one(
+            {"user_id": doc.get("user_id"),
+             "normalized_name": _norm_player_name((doc.get("player_details") or {}).get("player_name"))})
+        _mem_block = identity_memory_block(_mem)
+        if _mem_block:
+            full_prompt += _mem_block
+    except Exception:
+        pass
+    # Inject the ground-truth tap positions + tracking coverage.
+    try:
+        gt_block = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
+        if gt_block:
+            full_prompt += gt_block
+    except Exception:
+        pass
+    return full_prompt
+
+
+async def _run_identity_corrective_pass(
+    report_id: str, *, full_prompt: str, file_path, marker_path, crop_path_str,
+    anchor_crops_full: list, wide_crops_full: list, anchor_payload_list: list,
+    gt_track, gt_t_off, doc: dict, identity_stats=None,
+) -> str:
+    """EXISTING corrective identity re-analysis (session `full-retry-{id}`),
+    extracted UNCHANGED so the normal pipeline and corrective-only recovery
+    share ONE corrective algorithm. Preserved semantics:
+    - at most once per report (`identity_retry_done`, set eagerly)
+    - failures BEFORE the replacement report is persisted are fail-open in the
+      normal pipeline (original report stands) → returns "failed"
+    - failures AFTER it is persisted propagate (its final evidence persistence
+      is REQUIRED before READY)
+    - a still-failing re-verification sets `identity_flagged`.
+    Returns "completed" | "already_done" | "failed"."""
+    persisted = False
+    try:
+        checked = (identity_stats or {}).get("checked", 0)
+        dropped = (identity_stats or {}).get("hard_rejected", 0)
+        fresh = await db.reports.find_one({"id": report_id})
+        if not fresh or fresh.get("identity_retry_done"):
+            return "already_done"
+        await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
+        bad_ts = [
+            str(c.get("timestamp"))
+            for c in (fresh.get("full_report") or {}).get("video_comments", [])
+            if isinstance(c, dict) and c.get("identity_hard_reject") and c.get("timestamp")
+        ]
+        correction = (
+            "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact video FAILED an "
+            "independent vision verification. The tapped player was confirmed NOT to be the subject "
+            f"at these timestamps: {', '.join(bad_ts) if bad_ts else 'several cited moments'}. "
+            "You most likely switched to a DIFFERENT player at some point. Re-analyse from scratch "
+            "with strict focus on the attached reference crops (the tapped player may be partially "
+            "hidden in them). Re-identify the tapped player at EVERY timestamp you cite; if you are "
+            "not certain at a moment, do NOT cite it."
+        )
+        logger.warning(f"[identity-gate] {report_id}: {dropped}/{checked} frames rejected — running ONE corrective re-analysis")
+        retry = await call_gemini_with_video(
+            session_id=f"full-retry-{report_id}",
+            prompt=full_prompt + correction,
+            video_path=str(file_path),
+            marker_path=marker_path,
+            crop_path=crop_path_str,
+            anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+            timeout_s=420.0,
+        )
+        retry = scrub_hedging(retry)
+        retry = _filter_low_identity_evidence(retry, report_id)
+        _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
+        await _cross_verify_full_report(
+            report_id, retry,
+            file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
+            anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+            anchor_payload_list=anchor_payload_list,
+            gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+        )
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
+        )
+        persisted = True
+        stats2 = await _persist_video_frames(report_id, file_path)
+        checked2 = (stats2 or {}).get("checked", 0)
+        dropped2 = (stats2 or {}).get("hard_rejected", 0)
+        if _identity_gate_required(stats2):
+            await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
+            logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
+        else:
+            logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
+        return "completed"
+    except Exception:
+        if persisted:
+            # FIX 00B correction — the replacement report is already live;
+            # its final evidence persistence is REQUIRED before READY.
+            raise
+        logger.exception(f"identity gate failed for {report_id}")
+        return "failed"
+
+
+async def _corrective_only_recovery(report_id: str, doc: dict) -> None:
+    """FIX 00B — `identity_regen_required` recovery. The persisted report body
+    specifically requires the corrective identity re-analysis, so run ONLY the
+    existing corrective pass (session `full-retry-{id}`) — NEVER the standard
+    `full-{id}` generation, and never rerun tracking/movement/pace. Reuses the
+    persisted full_report, player_track, anchor_time_offset, anchors and audio
+    metadata. `identity_regen_required` stays True until recovery actually
+    succeeds, so a transient failure never loses the requirement."""
+    file_path = await _ensure_report_video_local(report_id)
+    if not file_path or not file_path.exists():
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "failed",
+                      "full_report_error": "Source video file missing on server."}},
+        )
+        return
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"full_report_status": "verifying", "full_report_error": None}},
+    )
+    marker_path, crop_path_str = _report_media_paths(doc)
+    anchor_payload_list = doc.get("anchors") or []
+    anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
+    gt_track = doc.get("player_track")
+    try:
+        gt_t_off = float(doc.get("anchor_time_offset") or (gt_track or {}).get("t_off") or 0.0)
+    except Exception:
+        gt_t_off = 0.0
+    audio_events_full = [
+        SimpleNamespace(t=float(e.get("t", 0)), peak_db=float(e.get("peak_db", 0)), kind=str(e.get("kind", "")))
+        for e in (doc.get("audio_events_full") or []) if isinstance(e, dict)
+    ]
+    full_prompt = await _compose_full_prompt(
+        doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off)
+    outcome = await _run_identity_corrective_pass(
+        report_id, full_prompt=full_prompt, file_path=file_path, marker_path=marker_path,
+        crop_path_str=crop_path_str, anchor_crops_full=anchor_crops_full,
+        wide_crops_full=wide_crops_full, anchor_payload_list=anchor_payload_list,
+        gt_track=gt_track, gt_t_off=gt_t_off, doc=doc, identity_stats=None,
+    )
+    if outcome == "failed":
+        # Keep identity_regen_required=True — the requirement must survive
+        # transient failures. The outer failure contract marks the run failed.
+        raise RuntimeError("corrective identity re-analysis failed — recovery requirement kept")
+    if outcome == "completed":
+        # Corrective pass already persisted the replacement report AND
+        # re-verified its evidence frames (incl. identity_flagged semantics).
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "finalizing",
+                      "identity_gate_done": True,
+                      "identity_regen_required": False}},
+        )
+        await _finalize_full_report(report_id, file_path, persist_frames=False)
+    else:
+        # "already_done" — the one corrective attempt ran in an earlier run:
+        # existing semantics = re-evaluate evidence via the finalization gate
+        # (identity_retry_done=True → still-failing becomes identity_flagged).
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "finalizing",
+                      "identity_regen_required": False}},
+        )
+        await _finalize_full_report(report_id, file_path, persist_frames=True)
+
+
 def _identity_gate_required(stats) -> bool:
     """EXISTING corrective-identity threshold (UNCHANGED: checked >= 2 and
     hard_rejected/checked >= 0.5). Single definition shared by the normal
@@ -8261,7 +8526,13 @@ async def generate_full_report_task(report_id: str) -> None:
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
             return
-        if doc.get("full_report") and not doc.get("identity_regen_required"):
+        if doc.get("full_report") and doc.get("identity_regen_required"):
+            # FIX 00B — corrective-only recovery: the body exists and requires
+            # identity correction. NEVER re-run the standard full-{id} Gemini
+            # generation; run exactly the existing corrective pass instead.
+            await _corrective_only_recovery(report_id, doc)
+            return
+        if doc.get("full_report"):
             st = doc.get("full_report_status")
             if st == "ready":
                 return
@@ -8315,48 +8586,9 @@ async def generate_full_report_task(report_id: str) -> None:
             )
             return
 
-        marker_path = None
-        if doc.get("marker_filename"):
-            mp = UPLOAD_DIR / doc["marker_filename"]
-            if not mp.exists():
-                _try_restore_from_r2(doc.get("marker_url_override"), mp)
-            if mp.exists():
-                marker_path = str(mp)
-
-        crop_path_str = None
-        if doc.get("subject_crop_filename"):
-            cp = UPLOAD_DIR / doc["subject_crop_filename"]
-            if not cp.exists():
-                _try_restore_from_r2(doc.get("subject_crop_url_override"), cp)
-            if cp.exists():
-                crop_path_str = str(cp)
-
+        marker_path, crop_path_str = _report_media_paths(doc)
         anchor_payload_list = doc.get("anchors") or []
-        anchor_crops_full: list[str] = []
-        for a in anchor_payload_list:
-            cf = a.get("crop_filename") if isinstance(a, dict) else None
-            if not cf:
-                continue
-            p = UPLOAD_DIR / cf
-            if not p.exists() and isinstance(a, dict):
-                _try_restore_from_r2(a.get("crop_r2_url"), p)
-            if p.exists():
-                anchor_crops_full.append(str(p))
-
-        wide_crops_full: list[str] = []
-        for a in anchor_payload_list:
-            wf = a.get("wide_filename") if isinstance(a, dict) else None
-            if not wf:
-                continue
-            p = UPLOAD_DIR / wf
-            if not p.exists() and isinstance(a, dict):
-                _try_restore_from_r2(a.get("wide_r2_url"), p)
-            if p.exists():
-                wide_crops_full.append(str(p))
-        wide_crops_full = wide_crops_full[:3]
-
-        details_str = json.dumps(doc["player_details"], ensure_ascii=False)
-        gate = doc.get("content_gate") or {}
+        anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
 
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
         # Session 143 — PARALLEL PIPELINE:
@@ -8471,70 +8703,9 @@ async def generate_full_report_task(report_id: str) -> None:
             except Exception:
                 logger.exception(f"movement/pace metrics failed for {report_id}")
 
-        # ── Precision priors ──
-        fp_obj = None
-        fp_payload = doc.get("fingerprint")
-        if fp_payload:
-            try:
-                fp_obj = PlayerFingerprint(
-                    jersey_hex=fp_payload.get("jersey_hex", "#888888"),
-                    jersey_name=fp_payload.get("jersey_name", "unclear"),
-                    shorts_hex=fp_payload.get("shorts_hex", "#888888"),
-                    shorts_name=fp_payload.get("shorts_name", "unclear"),
-                    body_ratio=float(fp_payload.get("body_ratio", 2.0)),
-                    crop_path=crop_path_str,
-                    box=fp_payload.get("box", {}),
-                    confidence="ok",
-                )
-            except Exception:
-                fp_obj = None
-        if fp_obj is not None:
-            full_prompt = precision_build_full_prompt(
-                base_prompt=FULL_REPORT_PROMPT,
-                fingerprint=fp_obj,
-                audio_events=audio_events_full,
-                player_details=doc["player_details"],
-                content_type=str(gate.get("content_type", "other")),
-                quality=str(gate.get("quality", "good")),
-                player_visible=str(gate.get("player_visible", "clear")),
-                camera_distance=str(gate.get("camera_distance", "medium")),
-                games_detected=int(gate.get("games_detected", 1) or 1),
-                anchors=anchor_payload_list,
-            )
-        else:
-            full_prompt = (
-                FULL_REPORT_PROMPT
-                .replace("{player_details}", details_str)
-                .replace("{content_type}", str(gate.get("content_type", "other")))
-                .replace("{quality}", str(gate.get("quality", "good")))
-                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-                .replace("{games_detected}", str(gate.get("games_detected", 1)))
-            )
-        # Inject the pre-analysis identity profile (same block as the preview).
-        try:
-            _idp = doc.get("identity_profile")
-            if _idp:
-                full_prompt += identity_profile_block(_idp)
-        except Exception:
-            pass
-        # Stage 5 — identity memory from this player's previous reports.
-        try:
-            _mem = await db.player_profiles.find_one(
-                {"user_id": doc.get("user_id"),
-                 "normalized_name": _norm_player_name((doc.get("player_details") or {}).get("player_name"))})
-            _mem_block = identity_memory_block(_mem)
-            if _mem_block:
-                full_prompt += _mem_block
-        except Exception:
-            pass
-        # Inject the ground-truth tap positions + tracking coverage.
-        try:
-            gt_block = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
-            if gt_block:
-                full_prompt += gt_block
-        except Exception:
-            pass
+        # ── Full-report prompt (shared verbatim with corrective-only recovery) ──
+        full_prompt = await _compose_full_prompt(
+            doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off)
         # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
         full, _mm_done = await asyncio.gather(
             call_gemini_with_video(
@@ -8602,67 +8773,15 @@ async def generate_full_report_task(report_id: str) -> None:
         identity_stats = await _persist_video_frames(report_id, file_path)
         # ── IDENTITY GATE — one corrective re-analysis when GPT-vision rejects
         # most evidence frames (Gemini most likely switched player mid-video).
-        _retry_persisted = False
-        try:
-            checked = (identity_stats or {}).get("checked", 0)
-            dropped = (identity_stats or {}).get("hard_rejected", 0)
-            if _identity_gate_required(identity_stats):
-                fresh = await db.reports.find_one({"id": report_id})
-                if fresh and not fresh.get("identity_retry_done"):
-                    await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
-                    bad_ts = [
-                        str(c.get("timestamp"))
-                        for c in (fresh.get("full_report") or {}).get("video_comments", [])
-                        if isinstance(c, dict) and c.get("identity_hard_reject") and c.get("timestamp")
-                    ]
-                    correction = (
-                        "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact video FAILED an "
-                        "independent vision verification. The tapped player was confirmed NOT to be the subject "
-                        f"at these timestamps: {', '.join(bad_ts) if bad_ts else 'several cited moments'}. "
-                        "You most likely switched to a DIFFERENT player at some point. Re-analyse from scratch "
-                        "with strict focus on the attached reference crops (the tapped player may be partially "
-                        "hidden in them). Re-identify the tapped player at EVERY timestamp you cite; if you are "
-                        "not certain at a moment, do NOT cite it."
-                    )
-                    logger.warning(f"[identity-gate] {report_id}: {dropped}/{checked} frames rejected — running ONE corrective re-analysis")
-                    retry = await call_gemini_with_video(
-                        session_id=f"full-retry-{report_id}",
-                        prompt=full_prompt + correction,
-                        video_path=str(file_path),
-                        marker_path=marker_path,
-                        crop_path=crop_path_str,
-                        anchor_crops=(anchor_crops_full + wide_crops_full) or None,
-                        timeout_s=420.0,
-                    )
-                    retry = scrub_hedging(retry)
-                    retry = _filter_low_identity_evidence(retry, report_id)
-                    _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
-                    await _cross_verify_full_report(
-                        report_id, retry,
-                        file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
-                        anchor_crops=(anchor_crops_full + wide_crops_full) or None,
-                        anchor_payload_list=anchor_payload_list,
-                        gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
-                    )
-                    await db.reports.update_one(
-                        {"id": report_id},
-                        {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
-                    )
-                    _retry_persisted = True
-                    stats2 = await _persist_video_frames(report_id, file_path)
-                    checked2 = (stats2 or {}).get("checked", 0)
-                    dropped2 = (stats2 or {}).get("hard_rejected", 0)
-                    if _identity_gate_required(stats2):
-                        await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
-                        logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
-                    else:
-                        logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
-        except Exception:
-            if _retry_persisted:
-                # FIX 00B correction — the replacement report is already live;
-                # its final evidence persistence is REQUIRED before READY.
-                raise
-            logger.exception(f"identity gate failed for {report_id}")
+        # Shared helper: the SAME corrective algorithm as corrective-only recovery.
+        if _identity_gate_required(identity_stats):
+            await _run_identity_corrective_pass(
+                report_id, full_prompt=full_prompt, file_path=file_path,
+                marker_path=marker_path, crop_path_str=crop_path_str,
+                anchor_crops_full=anchor_crops_full, wide_crops_full=wide_crops_full,
+                anchor_payload_list=anchor_payload_list, gt_track=gt_track,
+                gt_t_off=gt_t_off, doc=doc, identity_stats=identity_stats,
+            )
         # FIX 00B — internal checkpoint: the identity gate has completed for
         # this run (recovery must not repeat it, and READY may follow).
         await db.reports.update_one(

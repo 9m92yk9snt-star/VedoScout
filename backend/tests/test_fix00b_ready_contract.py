@@ -24,6 +24,8 @@ sys.path.insert(0, str(BACKEND))
 
 import server
 
+BOX = {"x": 0.4, "y": 0.4, "w": 0.05, "h": 0.12}
+
 
 # ── fakes ─────────────────────────────────────────────────────────────────
 class FakeReports:
@@ -211,17 +213,17 @@ def test_A_supplement_normal_path_persist_not_swallowed():
         "resume-path persist must not be wrapped in a swallow"
 
 
-# ── C: corrective retry — replacement report requires final persistence ──
+# ── C: corrective pass — replacement report requires final persistence ──
 def test_C_retry_persist_failure_propagates():
     src = (BACKEND / "server.py").read_text()
-    task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
-    gate = task.split("IDENTITY GATE")[1]
-    before_persist, after_persist = gate.split("_retry_persisted = True")
+    helper = src.split("async def _run_identity_corrective_pass(")[1].split("\nasync def ")[0]
+    before_persist, after_persist = helper.split("persisted = True")[1:3] if False else (
+        helper.split("persisted = True")[0], helper.split("persisted = True")[1])
     assert '"full_report": retry' in before_persist, \
         "flag must be set immediately after the replacement report is persisted"
     assert "stats2 = await _persist_video_frames(" in after_persist.split("except Exception")[0]
     handler = after_persist.split("except Exception:")[1]
-    assert "if _retry_persisted:" in handler and "raise" in handler.split("logger.exception")[0], \
+    assert "if persisted:" in handler and "raise" in handler.split("logger.exception")[0], \
         "a live replacement report must not be declared ready when its evidence persistence fails"
 
 
@@ -397,11 +399,12 @@ def test_parity_threshold_helper_unchanged():
     assert f({"checked": 1, "hard_rejected": 1}) is False  # checked >= 2 guard
     assert f({"checked": 0, "hard_rejected": 0}) is False
     assert f(None) is False
-    # BOTH the normal pipeline and recovery use this single definition
+    # BOTH the normal pipeline and the shared corrective pass use this definition
     src = (BACKEND / "server.py").read_text()
     task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
     assert "if _identity_gate_required(identity_stats):" in task
-    assert "if _identity_gate_required(stats2):" in task
+    helper = src.split("async def _run_identity_corrective_pass(")[1].split("\nasync def ")[0]
+    assert "if _identity_gate_required(stats2):" in helper
     finalize = src.split("async def _finalize_full_report(")[1].split("\nasync def ")[0]
     assert "if _identity_gate_required(stats):" in finalize
 
@@ -440,31 +443,169 @@ def test_R2_recovery_bad_stats_without_correction_blocks_ready(monkeypatch):
         vid.unlink(missing_ok=True)
 
 
-def test_R2b_regen_required_routes_to_full_pipeline_not_resume(monkeypatch):
-    """After case D the next run must perform a FULL regeneration (existing
-    corrective contract), never resume-to-ready with the suspect body."""
-    doc = {"id": "p3", "full_report": {"scores": {}}, "full_report_status": "generating",
-           "identity_regen_required": True}
+def _regen_doc(rid, retry_done=False):
+    d = {"id": rid, "full_report_status": "generating", "identity_regen_required": True,
+         "full_report": {"scores": {}, "video_comments": [
+             {"timestamp": "00:36", "identity_hard_reject": True}]},
+         "player_details": {"player_name": "Test Player", "age": 12},
+         "content_gate": {"content_type": "match"},
+         "anchors": [{"i": 1, "t": 1.0, "box": dict(BOX)}],
+         "player_track": {"points": [], "t_off": 0.0},
+         "anchor_time_offset": 0.0,
+         "audio_events_full": [{"t": 3.0, "peak_db": -8.0, "kind": "cheer"}]}
+    if retry_done:
+        d["identity_retry_done"] = True
+    return d
+
+
+def _wire_corrective(monkeypatch, fake, vid, gemini_raises=False):
+    """Mocks the corrective seams; records every Gemini session_id."""
+    sessions = []
+
+    async def fake_gemini(session_id=None, **k):
+        sessions.append(session_id)
+        if gemini_raises:
+            raise RuntimeError("simulated corrective Gemini failure")
+        return {"scores": {}, "video_comments": [], "_replacement": True}
+
+    async def fake_cross_verify(*a, **k):
+        fake.calls.append(("cross_verify",))
+
+    async def fake_local(report_id):
+        return vid
+
+    monkeypatch.setattr(server, "call_gemini_with_video", fake_gemini)
+    monkeypatch.setattr(server, "scrub_hedging", lambda r: r)
+    monkeypatch.setattr(server, "_filter_low_identity_evidence", lambda r, rid: r)
+    monkeypatch.setattr(server, "_apply_tracking_verification", lambda *a, **k: None)
+    monkeypatch.setattr(server, "_cross_verify_full_report", fake_cross_verify)
+    monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
+    return sessions
+
+
+# ── CORRECTIVE-ONLY RECOVERY (final credit correction) ────────────────────
+
+def test_CR1_CR2_regen_recovery_uses_only_the_corrective_call(monkeypatch):
+    """TEST 1: zero standard full-{id} calls. TEST 2: exactly one
+    full-retry-{id} call."""
+    doc = _regen_doc("q1")
     fake = FakeReports(doc)
-    _wire(monkeypatch, fake)
-    finalized = []
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 0})
+    vid = _tmp_video()
+    sessions = _wire_corrective(monkeypatch, fake, vid)
+    try:
+        asyncio.run(server.generate_full_report_task("q1"))
+        assert "full-q1" not in sessions, "standard full-report generation must NOT run"
+        assert sessions.count("full-retry-q1") == 1, "exactly one corrective call"
+        assert sessions == ["full-retry-q1"]
+    finally:
+        vid.unlink(missing_ok=True)
 
-    async def fake_finalize(*a, **k):
-        finalized.append(1)
 
-    async def no_video(report_id):
-        return None  # stop the full pipeline deterministically at video fetch
+def test_CR3_corrective_pass_success_reaches_ready_once(monkeypatch):
+    doc = _regen_doc("q2")
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 0})
+    vid = _tmp_video()
+    _wire_corrective(monkeypatch, fake, vid)
+    try:
+        asyncio.run(server.generate_full_report_task("q2"))
+        assert fake.doc["full_report"].get("_replacement") is True, \
+            "replacement full_report persisted"
+        assert fake.doc.get("identity_gate_done") is True
+        assert fake.doc.get("identity_regen_required") is False
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
+        assert fake.doc.get("identity_retry_done") is True
+    finally:
+        vid.unlink(missing_ok=True)
 
-    monkeypatch.setattr(server, "_finalize_full_report", fake_finalize)
-    monkeypatch.setattr(server, "_ensure_report_video_local", no_video)
-    asyncio.run(server.generate_full_report_task("p3"))
-    assert not finalized, "must NOT take the resume path"
-    assert not _ready_writes(fake)
-    # proof it entered the full pipeline: the run reset the internal checkpoints
-    gen_sets = [u["$set"] for _, u in fake.updates
-                if (u.get("$set") or {}).get("full_report_status") == "generating"]
-    assert gen_sets and gen_sets[0].get("identity_regen_required") is False
-    assert gen_sets[0].get("identity_gate_done") is False
+
+def test_CR4_corrective_still_failing_flags_before_ready(monkeypatch):
+    doc = _regen_doc("q3")
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 3})
+    vid = _tmp_video()
+    _wire_corrective(monkeypatch, fake, vid)
+    try:
+        asyncio.run(server.generate_full_report_task("q3"))
+        assert fake.doc.get("identity_flagged") is True
+        flag_idx = next(i for i, (_, u) in enumerate(fake.updates)
+                        if (u.get("$set") or {}).get("identity_flagged") is True)
+        ready_idx = next(i for i, (_, u) in enumerate(fake.updates)
+                         if (u.get("$set") or {}).get("full_report_status") == "ready")
+        assert flag_idx < ready_idx, "identity_flagged must be set BEFORE ready"
+        assert len(_ready_writes(fake)) == 1
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_CR5_corrective_gemini_failure_keeps_requirement(monkeypatch):
+    doc = _regen_doc("q4")
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 0})
+    vid = _tmp_video()
+    _wire_corrective(monkeypatch, fake, vid, gemini_raises=True)
+    try:
+        asyncio.run(server.generate_full_report_task("q4"))
+        assert not _ready_writes(fake)
+        assert fake.doc["full_report_status"] == "failed"
+        assert fake.doc.get("identity_regen_required") is True, \
+            "transient corrective failure must not lose the recovery requirement"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_CR5b_corrective_persistence_failure_keeps_requirement(monkeypatch):
+    doc = _regen_doc("q5")
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_raises=True)  # post-replacement persist fails
+    vid = _tmp_video()
+    _wire_corrective(monkeypatch, fake, vid)
+    try:
+        asyncio.run(server.generate_full_report_task("q5"))
+        assert not _ready_writes(fake)
+        assert fake.doc["full_report_status"] == "failed"
+        assert fake.doc.get("identity_regen_required") is True
+        assert fake.doc["full_report"].get("_replacement") is True, \
+            "replacement was persisted — its evidence persistence failure must block ready"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_CR6_regen_with_retry_done_reverifies_without_gemini(monkeypatch):
+    """After a post-persist failure, the next recovery must not repeat the
+    one-shot corrective Gemini call: it re-evaluates evidence via the
+    finalization gate (identity_retry_done=True → flag semantics)."""
+    doc = _regen_doc("q6", retry_done=True)
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 3})
+    vid = _tmp_video()
+    sessions = _wire_corrective(monkeypatch, fake, vid)
+    try:
+        asyncio.run(server.generate_full_report_task("q6"))
+        assert sessions == [], "no Gemini call of any kind"
+        assert fake.doc.get("identity_flagged") is True
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc.get("identity_regen_required") is False
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_CR7_normal_pipeline_uses_same_corrective_helper():
+    src = (BACKEND / "server.py").read_text()
+    # ONE corrective algorithm: the full-retry session string exists only in the helper
+    assert src.count('session_id=f"full-retry-{report_id}"') == 1
+    helper = src.split("async def _run_identity_corrective_pass(")[1].split("\nasync def ")[0]
+    assert 'session_id=f"full-retry-{report_id}"' in helper
+    # exactly two call sites: normal pipeline identity gate + corrective-only recovery
+    assert src.count("await _run_identity_corrective_pass(") == 2
+    task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
+    assert "await _run_identity_corrective_pass(" in task
+    recovery = src.split("async def _corrective_only_recovery(")[1].split("\nasync def ")[0]
+    assert "await _run_identity_corrective_pass(" in recovery
+    # identity_retry_done semantics preserved inside the shared helper
+    assert '"identity_retry_done": True' in helper and "identity_retry_done" in helper
 
 
 def test_R3_recovery_after_correction_flags_and_reaches_ready(monkeypatch):
