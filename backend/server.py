@@ -7324,9 +7324,9 @@ async def _verify_doubt_taps(report_id: str, file_path: Path, confirmations: lis
         def _crop():
             cap = cv2.VideoCapture(str(file_path))
             try:
-                # FIX 03 — canonical media-time seek (VFR-safe), never t*fps
-                video_timebase.seek_seconds(cap, float(c["t"]))
-                ok, frame = cap.read()
+                # FIX 03 C01 — canonical random access: decode forward to the
+                # ACTUAL frame at/after T; never a stale keyframe
+                ok, frame, _t = video_timebase.read_frame_at(cap, float(c["t"]))
                 if not ok:
                     return False
                 fh, fw = frame.shape[:2]
@@ -7755,10 +7755,9 @@ def _teleclip_edge_crop(video_path: str, sm: list, t: float, out_path: str) -> O
     try:
         if not cap.isOpened():
             return None
-        # FIX 03 — the frame verifying an edge at time T must actually
-        # represent media time T (canonical seek, never t*fps)
-        video_timebase.seek_seconds(cap, t)
-        ok, frame = cap.read()
+        # FIX 03 C01 — the frame verifying an edge at time T must ACTUALLY
+        # represent media time T: seek, then decode forward to the real frame
+        ok, frame, _t = video_timebase.read_frame_at(cap, t)
         if not ok:
             return None
         fh, fw = frame.shape[:2]

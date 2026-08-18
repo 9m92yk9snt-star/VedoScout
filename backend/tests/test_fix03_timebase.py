@@ -1,6 +1,7 @@
-# FIX 03 — CANONICAL TIMEBASE / VFR behavioural tests.
-# Deterministic only: a pure-Python VFR VideoCapture stand-in drives every
-# media-time assertion. ZERO live LLM calls, zero real video decoding.
+# FIX 03 — CANONICAL TIMEBASE / VFR behavioural tests (incl. CORRECTION 01).
+# Deterministic only: a pure-Python VFR VideoCapture stand-in mimics real
+# OpenCV/FFmpeg semantics (POS_MSEC = picture_pts established AFTER grab).
+# ZERO live LLM calls, zero real video decoding.
 import sys
 from pathlib import Path
 
@@ -18,22 +19,26 @@ REGULAR_20FPS = [i * 0.05 for i in range(10)]
 
 
 class FakeCap:
-    """Deterministic VFR VideoCapture stand-in: a PTS list drives POS_MSEC."""
+    """Mimics OpenCV/FFmpeg semantics: CAP_PROP_POS_MSEC is picture_pts —
+    established only AFTER grab()/decode. Pre-grab reads return the PREVIOUS
+    grab's (stale) PTS, exactly like the real backend. Every frame carries its
+    source index in all pixels so frame↔timestamp pairing is provable."""
 
-    def __init__(self, times_s, fps=20.0, w=160, h=120):
+    def __init__(self, times_s, fps=20.0, w=160, h=120, keyframes=None):
         self.times = list(times_s)
-        self.i = 0
         self.fps = fps
         self.w, self.h = w, h
-        self.seeks = []  # every cap.set() call, recorded
+        self.next_i = 0
+        self.last_pts_ms = 0.0
+        self.last_grabbed = None
+        self.keyframes = sorted(keyframes) if keyframes else None
+        self.seeks = []
 
     def get(self, prop):
         if prop == cv2.CAP_PROP_POS_MSEC:
-            if self.i < len(self.times):
-                return self.times[self.i] * 1000.0
-            return (self.times[-1] + 0.04) * 1000.0 if self.times else 0.0
+            return self.last_pts_ms  # PTS of the LAST grabbed frame only
         if prop == cv2.CAP_PROP_POS_FRAMES:
-            return float(self.i)
+            return float(self.next_i)
         if prop == cv2.CAP_PROP_FPS:
             return self.fps
         if prop == cv2.CAP_PROP_FRAME_COUNT:
@@ -47,25 +52,38 @@ class FakeCap:
     def set(self, prop, value):
         self.seeks.append((prop, float(value)))
         if prop == cv2.CAP_PROP_POS_MSEC:
-            self.i = next((k for k, t in enumerate(self.times)
-                           if t * 1000.0 >= value - 1e-6), len(self.times))
+            target = value / 1000.0
+            idx = 0
+            for k, t in enumerate(self.times):
+                if t <= target + 1e-9:
+                    idx = k
+                else:
+                    break
+            if self.keyframes is not None:  # ffmpeg lands on keyframe <= target
+                idx = max([k for k in self.keyframes if k <= idx] or [0])
+            self.next_i = idx
+            self.last_pts_ms = 0.0 if idx == 0 else self.times[idx - 1] * 1000.0
         elif prop == cv2.CAP_PROP_POS_FRAMES:
-            self.i = int(value)
+            self.next_i = int(value)
         return True
 
     def grab(self):
-        if self.i >= len(self.times):
+        if self.next_i >= len(self.times):
             return False
-        self.i += 1
+        self.last_grabbed = self.next_i
+        self.last_pts_ms = self.times[self.next_i] * 1000.0
+        self.next_i += 1
         return True
 
     def retrieve(self):
-        return True, np.zeros((self.h, self.w, 3), dtype=np.uint8)
+        if self.last_grabbed is None:
+            return False, None
+        return True, np.full((self.h, self.w, 3), self.last_grabbed % 250, dtype=np.uint8)
 
     def read(self):
         if not self.grab():
             return False, None
-        return True, np.zeros((self.h, self.w, 3), dtype=np.uint8)
+        return self.retrieve()
 
     def isOpened(self):
         return True
@@ -74,22 +92,25 @@ class FakeCap:
         pass
 
 
-def _decode_all_times(cap, fps):
+def _decode_all(cap, fps):
+    """(t, frame_id) pairs via the C01 contract: grab → PTS → retrieve."""
     out = []
     while True:
-        t, fb = video_timebase.next_frame_time_seconds(cap, fps)
-        ok, _ = cap.read()
+        ok, t, _fb = video_timebase.grab_frame_time_seconds(cap, fps)
         if not ok:
             break
-        out.append(round(t, 4))
+        ok, frame = cap.retrieve()
+        if not ok:
+            break
+        out.append((round(t, 4), int(frame[0, 0, 0])))
     return out
 
 
 # ---------- T1 / T9 — VFR is never reinterpreted as frame_index/fps ----------
 
 def test_T1_T9_vfr_sequence_not_flattened_to_fps_grid():
-    cap = FakeCap(VFR_TIMES, fps=20.0)
-    ts = _decode_all_times(cap, 20.0)
+    pairs = _decode_all(FakeCap(VFR_TIMES, fps=20.0), 20.0)
+    ts = [t for t, _ in pairs]
     assert ts == [round(t, 4) for t in VFR_TIMES]           # actual media times
     assert ts != [round(t, 4) for t in REGULAR_20FPS]       # NOT 0.00,0.05,0.10...
 
@@ -101,16 +122,13 @@ def test_T1b_explicit_fallback_only_without_media_time():
                 return -1.0  # backend reports no usable media time
             return super().get(prop)
     cap = DeadCap(VFR_TIMES, fps=20.0)
-    t, fb = video_timebase.next_frame_time_seconds(cap, 20.0)
-    assert fb is True                     # explicitly flagged as fallback
-    assert t == 0.0
+    ok, t, fb = video_timebase.grab_frame_time_seconds(cap, 20.0)
+    assert ok and fb is True and t == 0.0     # explicit last resort, flagged
+    ok, t2, fb2 = video_timebase.grab_frame_time_seconds(cap, 20.0)
+    assert fb2 is True and abs(t2 - 0.05) < 1e-9
     # authoritative path is flagged False
-    t2, fb2 = video_timebase.next_frame_time_seconds(FakeCap(VFR_TIMES), 20.0)
-    assert fb2 is False and t2 == 0.0
-    cap2 = FakeCap(VFR_TIMES)
-    cap2.read()
-    t3, fb3 = video_timebase.next_frame_time_seconds(cap2, 20.0)
-    assert fb3 is False and abs(t3 - 0.04) < 1e-9
+    ok, t3, fb3 = video_timebase.grab_frame_time_seconds(FakeCap(VFR_TIMES), 20.0)
+    assert ok and fb3 is False and t3 == 0.0
 
 
 # ---------- T2 — canonical seek uses milliseconds, never POS_FRAMES ----------
@@ -121,15 +139,41 @@ def test_T2_seek_requests_pos_msec():
     video_timebase.seek_ms(cap, 240.0)
     assert cap.seeks == [(cv2.CAP_PROP_POS_MSEC, 150.0), (cv2.CAP_PROP_POS_MSEC, 240.0)]
     assert all(p != cv2.CAP_PROP_POS_FRAMES for p, _ in cap.seeks)
-    ok, frame, t = video_timebase.read_frame_at(FakeCap(VFR_TIMES), 0.12)
-    assert ok and abs(t - 0.15) < 1e-9   # actual media time of the frame used
+
+
+# ---------- C1 — grab → timestamp → retrieve pairs the SAME frame ----------
+
+def test_C1_grab_then_timestamp_then_retrieve_same_frame():
+    pairs = _decode_all(FakeCap(VFR_TIMES, fps=20.0), 20.0)
+    assert len(pairs) == len(VFR_TIMES)
+    for t, fid in pairs:
+        assert abs(VFR_TIMES[fid] - t) < 1e-9  # timestamp belongs to THAT frame
+
+
+# ---------- C2 — the old pre-grab reading is provably wrong ----------
+
+def test_C2_pre_grab_timestamp_fails_on_realistic_cap():
+    cap = FakeCap(VFR_TIMES, fps=20.0)
+    old_style = []
+    while True:
+        stale_ms = cap.get(cv2.CAP_PROP_POS_MSEC)   # read BEFORE grab (old bug)
+        ok, frame = cap.read()
+        if not ok:
+            break
+        old_style.append((round(stale_ms / 1000.0, 4), int(frame[0, 0, 0])))
+    # every frame after the first gets the PREVIOUS frame's PTS -> mismatch
+    mismatches = [1 for t, fid in old_style if abs(VFR_TIMES[fid] - t) > 1e-9]
+    assert len(mismatches) == len(VFR_TIMES) - 1
+    # the corrected helper has zero mismatches (C1)
+    good = _decode_all(FakeCap(VFR_TIMES, fps=20.0), 20.0)
+    assert all(abs(VFR_TIMES[fid] - t) < 1e-9 for t, fid in good)
 
 
 # ---------- T3 — CV-shadow tap reference seeks by media time ----------
 
 def test_T3_cv_shadow_tap_reference_media_seek():
     import cv_shadow
-    cap = FakeCap([i * 0.1 for i in range(400)], fps=10.0, w=160, h=120)
+    cap = FakeCap([i * 0.1 for i in range(400)], fps=10.0)
     anchors = [{"t": 36.0, "box": {"x": 0.4, "y": 0.4, "w": 0.1, "h": 0.2}}]
     cv_shadow._build_tap_references(cap, 10.0, anchors, 0.5, 160, 120, 1.0, detector=None)
     msec_seeks = [v for p, v in cap.seeks if p == cv2.CAP_PROP_POS_MSEC]
@@ -137,27 +181,28 @@ def test_T3_cv_shadow_tap_reference_media_seek():
     assert all(p == cv2.CAP_PROP_POS_MSEC for p, _ in cap.seeks)
 
 
-# ---------- T4 — shadow sampling by elapsed media time ----------
+# ---------- T4 / C3 — shadow sampling: same decoded frame + media time ----------
 
-def test_T4_sampling_uses_media_time_not_fidx_fps():
+def test_T4_C3_sampling_uses_media_time_of_the_decoded_frame():
     cap = FakeCap(VFR_TIMES, fps=20.0)
     interval = 0.2  # 5 Hz
     sampled, prev = [], None
     while True:
-        t, _fb = video_timebase.next_frame_time_seconds(cap, 20.0)
-        if not cap.grab():
+        ok, t, _fb = video_timebase.grab_frame_time_seconds(cap, 20.0)
+        if not ok:
             break
         if not video_timebase.should_sample(t, prev, interval):
             continue
+        ok, frame = cap.retrieve()
+        assert ok
         prev = t
-        sampled.append(round(t, 4))
-    assert sampled == [0.00, 0.24, 0.44]      # actual VFR media instants
-    for s in sampled:
-        assert s in [round(t, 4) for t in VFR_TIMES]
-    assert sampled != [0.0, 0.2, 0.4]         # never an fps-derived grid
-    # wiring: the shadow scan consumes exactly these helpers, fidx/fps is gone
+        sampled.append((round(t, 4), int(frame[0, 0, 0])))
+    assert [t for t, _ in sampled] == [0.00, 0.24, 0.44]  # actual VFR instants
+    for t, fid in sampled:
+        assert abs(VFR_TIMES[fid] - t) < 1e-9   # C3: SAME frame as timestamp
+    assert [t for t, _ in sampled] != [0.0, 0.2, 0.4]     # never an fps grid
     src = (BACKEND / "cv_shadow.py").read_text()
-    assert "video_timebase.next_frame_time_seconds(cap, fps)" in src
+    assert "video_timebase.grab_frame_time_seconds(cap, fps)" in src
     assert "video_timebase.should_sample(" in src
     assert "t = fidx / fps" not in src
     assert "CAP_PROP_POS_FRAMES" not in src
@@ -173,24 +218,34 @@ def test_T5_physics_dt_uses_real_media_delta():
     assert "dt_sample = video_timebase.sample_dt(t, prev_sample_t, sample_interval)" in src
     assert "lost_since += dt_sample" in src
     assert "step / fps" not in src
-    assert "dt = max(0.05, t - last_t)" in src  # physics dt now spans media ts
+    assert "dt = max(0.05, t - last_t)" in src  # physics dt spans media ts
 
 
-# ---------- T6 / T7 / T8 — tele clip renders by media time ----------
+# ---------- tele clip: shared harness ----------
+
+def _teleclip_times():
+    # irregular VFR cadence, dense (0.04s) around the 5.0s moment
+    times, t, k = [], 0.0, 0
+    while t < 14.0:
+        times.append(round(t, 3))
+        t += 0.04 if (4.0 <= t <= 6.0 or k % 3) else 0.11
+        k += 1
+    return times
+
 
 def _run_teleclip(monkeypatch, times, fps=20.0):
     import tele_clip
 
-    fake = FakeCap(times, fps=fps, w=160, h=120)
+    fake = FakeCap(times, fps=fps)
     monkeypatch.setattr(tele_clip.cv2, "VideoCapture", lambda p: fake)
     monkeypatch.setattr(video_timebase, "media_duration_seconds",
                         lambda p: times[-1] + 0.05)
 
     class FakeWriter:
         def __init__(self):
-            self.frames = 0
+            self.ids = []
         def append_data(self, arr):
-            self.frames += 1
+            self.ids.append(int(arr[0, 0, 0]))
         def close(self):
             pass
 
@@ -203,78 +258,139 @@ def _run_teleclip(monkeypatch, times, fps=20.0):
 
     monkeypatch.setitem(sys.modules, "imageio", FakeImageio)
 
-    interp_ts, risk_ts = [], []
-    orig_interp = tele_clip._interp
+    risk_ts, draw_ids = [], []
     orig_risk = tele_clip._risk_alpha
-
-    def rec_interp(sm, t):
-        interp_ts.append(round(t, 4))
-        return orig_interp(sm, t)
+    orig_draw = tele_clip._draw_ring
 
     def rec_risk(t, windows, fade=tele_clip.FADE_SEC):
         risk_ts.append(round(t, 4))
         return orig_risk(t, windows, fade)
 
-    monkeypatch.setattr(tele_clip, "_interp", rec_interp)
+    def rec_draw(frame, *a, **kw):
+        draw_ids.append(int(frame[0, 0, 0]))
+        return orig_draw(frame, *a, **kw)
+
     monkeypatch.setattr(tele_clip, "_risk_alpha", rec_risk)
+    monkeypatch.setattr(tele_clip, "_draw_ring", rec_draw)
 
     track = [{"t": 0.2 * i, "x": 0.4, "y": 0.4, "w": 0.05, "h": 0.12}
              for i in range(0, 60)]  # dense 0..11.8s track
-    res = tele_clip.generate_tracked_clip("fake.mp4", 5.0, track, "/tmp/fix03_clip.mp4")
-    return fake, writer, interp_ts, risk_ts, res
+    tele_clip.generate_tracked_clip("fake.mp4", 5.0, track, "/tmp/fix03_clip.mp4")
+    c0 = next(v for p, v in fake.seeks if p == cv2.CAP_PROP_POS_MSEC) / 1000.0
+    return fake, writer, risk_ts, draw_ids, c0
 
 
-def test_T6_T7_T8_teleclip_media_time(monkeypatch):
-    # VFR source around the 5.0s moment: irregular gaps, extends beyond c1
-    times = []
-    t = 0.0
-    k = 0
-    while t < 14.0:
-        times.append(round(t, 3))
-        t += 0.04 if (k % 3) else 0.11   # irregular VFR cadence
-        k += 1
-    fake, writer, interp_ts, risk_ts, _res = _run_teleclip(monkeypatch, times)
-    assert writer.frames > 0
-    pts = {round(x, 4) for x in times}
-    # T6 — interpolation main calls receive the frame's ACTUAL media timestamp
-    mains = interp_ts[0::3]  # per frame: main, then velocity ta/tb
-    assert len(mains) == writer.frames
-    assert all(m in pts for m in mains)
-    # T7 — risk-alpha windows evaluated at the actual media timestamp
-    assert len(risk_ts) == writer.frames
-    assert risk_ts == mains
-    # T8 — render stopped by media time: nothing at/after 14s was rendered,
-    # and the clip covers only the c0..c1 media window
-    c1_max = max(mains)
-    assert c1_max < 11.0                     # 5.0 moment + post/padding window
-    assert all(m <= c1_max + 1e-6 for m in mains)
-    assert mains == sorted(mains)
+# ---------- C4 / T7 — ring/risk time belongs to the SAME decoded frame ----------
+
+def test_C4_T7_teleclip_overlays_use_same_decoded_frame_time(monkeypatch):
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    assert len(draw_ids) == len(risk_ts) > 0
+    for t, fid in zip(risk_ts, draw_ids):
+        assert abs(times[fid] - t) < 1e-6   # timestamp of THAT decoded frame
+    assert risk_ts == sorted(risk_ts)
     # never a regular fps grid
-    grid = [round(mains[0] + i * (1.0 / 20.0), 4) for i in range(len(mains))]
-    assert mains != grid
+    grid = [round(risk_ts[0] + i * 0.05, 4) for i in range(len(risk_ts))]
+    assert risk_ts != grid
     src = (BACKEND / "tele_clip.py").read_text()
+    assert "video_timebase.grab_frame_time_seconds(cap, fps)" in src
     assert "idx / fps" not in src and "CAP_PROP_POS_FRAMES" not in src
 
 
-# ---------- T10 / T11 — doubt tap + teleclip edge use canonical seeks ----------
+# ---------- T8 — render window bounded by media time ----------
 
-def test_T10_doubt_tap_canonical_seek_wiring():
+def test_T8_render_stops_on_media_time(monkeypatch):
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    c1_max = max(risk_ts)
+    assert c1_max < 11.0                     # moment 5.0 + padded window only
+    # consumption stopped right after media time passed c1 (one look-ahead grab)
+    assert times[fake.last_grabbed] <= c1_max + 0.2
+    assert all(t <= c1_max + 1e-6 for t in risk_ts)
+
+
+# ---------- C8 — CFR output is PTS-resampled, preserving elapsed time ----------
+
+def test_C8_cfr_output_preserves_canonical_elapsed_time(monkeypatch):
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    out_dt = 1.0 / 20.0
+    assert writer.ids, "no output frames"
+    rendered_locals = {fid: round(times[fid] - c0, 6) for fid in draw_ids}
+    rendered_sorted = sorted(rendered_locals.items(), key=lambda kv: kv[1])
+    assert writer.ids == sorted(writer.ids)  # time-monotonic output
+    first_fid = draw_ids[0]
+    first_local = rendered_locals[first_fid]
+    for k, fid in enumerate(writer.ids):
+        slot = k * out_dt
+        local = rendered_locals[fid]
+        if fid == first_fid and slot < first_local - 1e-9:
+            continue  # head padding duplicates the first available frame
+        assert local <= slot + 1e-6          # never a frame from the future
+        # sample-and-hold: no LATER rendered frame existed at/before this slot
+        nxt = next((lv for f, lv in rendered_sorted if lv > local), None)
+        assert nxt is None or nxt > slot - 1e-9
+    # VFR proves drop/duplicate happened: dense 0.04s region -> drops,
+    # sparse 0.11s region -> duplicates
+    assert len(set(writer.ids)) < len(writer.ids)          # duplicates exist
+    assert len(set(draw_ids) - set(writer.ids)) > 0        # drops exist
+    # naive sequential append would emit every decoded frame exactly once
+    assert writer.ids != draw_ids
+
+
+# ---------- C9 — moment_local_ms points at the right output frame ----------
+
+def test_C9_moment_maps_to_intended_source_frame(monkeypatch):
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    out_dt = 1.0 / 20.0
+    moment_local = 5.0 - c0                  # == moment_local_ms / 1000
+    k = round(moment_local / out_dt)
+    assert 0 <= k < len(writer.ids)
+    fid = writer.ids[k]
+    # the frame shown at the moment slot IS the source moment (dense region:
+    # within one output frame interval)
+    assert abs((times[fid] - c0) - moment_local) <= out_dt + 1e-6
+
+
+# ---------- C5 — early keyframe landing decodes forward to actual T ----------
+
+def test_C5_seek_lands_early_then_decodes_forward():
+    times = [round(i * 0.1, 4) for i in range(200)]
+    cap = FakeCap(times, fps=10.0, keyframes=[0, 30, 60, 90, 120])
+    ok, frame, t = video_timebase.read_frame_at(cap, 7.3, fps=10.0)
+    assert ok
+    assert abs(t - 7.3) < 1e-9               # ACTUAL frame media time returned
+    assert int(frame[0, 0, 0]) == 73          # the frame AT 7.3s, not the keyframe
+    assert cap.last_grabbed == 73             # decoded forward from keyframe 60
+    assert (cv2.CAP_PROP_POS_MSEC, 7300.0) in cap.seeks
+
+
+# ---------- C6 / T10 — doubt tap uses canonical random access ----------
+
+def test_C6_T10_doubt_tap_canonical_wiring():
     src = (BACKEND / "server.py").read_text()
-    assert "CAP_PROP_POS_FRAMES" not in src   # no frame-index seeking anywhere
+    assert "CAP_PROP_POS_FRAMES" not in src
     i = src.find("async def _verify_doubt_taps")
     assert i > 0
     seg = src[i:i + 4000]
-    assert 'video_timebase.seek_seconds(cap, float(c["t"]))' in seg
+    assert 'video_timebase.read_frame_at(cap, float(c["t"]))' in seg
+    # behaviour of read_frame_at itself is proven in C5
 
 
-def test_T11_teleclip_edge_crop_canonical_seek(monkeypatch):
+# ---------- C7 / T11 — teleclip edge crop uses actual decoded frame ----------
+
+def test_C7_T11_teleclip_edge_crop_actual_frame(monkeypatch):
     import server
-    fake = FakeCap([i * 0.1 for i in range(200)], fps=10.0, w=160, h=120)
+    times = [round(i * 0.1, 4) for i in range(200)]
+    fake = FakeCap(times, fps=10.0, keyframes=[0, 30, 60, 90, 120])
     monkeypatch.setattr(cv2, "VideoCapture", lambda p: fake)
     sm = [(0.2 * i, 0.4, 0.4, 0.05, 0.12) for i in range(60)]
     server._teleclip_edge_crop("fake.mp4", sm, 7.3, "/tmp/fix03_edge.jpg")
     assert (cv2.CAP_PROP_POS_MSEC, 7300.0) in fake.seeks
     assert all(p == cv2.CAP_PROP_POS_MSEC for p, _ in fake.seeks)
+    assert fake.last_grabbed == 73            # decoded forward to the REAL 7.3s frame
+    assert abs(times[fake.last_grabbed] - 7.3) < 1e-9
 
 
 # ---------- T12 — duration does not depend on frame_count/fps ----------

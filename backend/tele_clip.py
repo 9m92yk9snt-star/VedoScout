@@ -411,27 +411,43 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         if duration is not None:
             c1 = min(duration - 0.05, c1)
         # FIX 03 — SOURCE FRAME ↔ TRACK TIME is matched via each decoded
-        # frame's ACTUAL media timestamp (VFR-safe). The output stays CFR for
-        # browser compatibility; fade duration stays in SECONDS.
+        # frame's ACTUAL media timestamp (VFR-safe). C01 contract: grab →
+        # read THAT frame's PTS → retrieve the SAME frame. The CFR output is
+        # TIME-RESAMPLED from source PTS (drop/duplicate) so
+        # output_local_time ≈ source_media_time − clip_start within one
+        # output frame — VFR spacing is never flattened sequentially.
         eps = 1.0 / max(1.0, fps)
         fade_s = max(2.0 * eps, FADE_SEC)
+        out_fps = max(1.0, round(fps, 2))
+        out_dt = 1.0 / out_fps
 
         import imageio
-        writer = imageio.get_writer(out_path, fps=round(fps, 2), codec="libx264",
+        writer = imageio.get_writer(out_path, fps=out_fps, codec="libx264",
                                     quality=7, pixelformat="yuv420p", macro_block_size=1,
                                     output_params=["-movflags", "+faststart"])
         video_timebase.seek_seconds(cap, c0)
         ema_wh = None
         ring_state = {}  # ground-anchor temporal smoothing across frames
+        next_out = 0.0        # local CFR output timeline (relative to c0)
+        pending = None        # last rendered frame awaiting its output slots
+        pending_local = None
         while True:
-            t, _tb_fb = video_timebase.next_frame_time_seconds(cap, fps)
-            ok, frame = cap.read()
+            ok, t, _tb_fb = video_timebase.grab_frame_time_seconds(cap, fps)
             if not ok:
                 break
             if t < c0 - 1e-3:
                 continue  # keyframe seek landed early — skip up to clip start
             if t > c1:
                 break     # stop on actual media time, never a computed frame count
+            ok, frame = cap.retrieve()
+            if not ok:
+                break
+            local = t - c0
+            # sample-and-hold resample: the previous frame fills every output
+            # slot that lies before this frame's canonical local time
+            while pending is not None and next_out < local - 1e-9:
+                writer.append_data(pending)
+                next_out += out_dt
             # marker alpha: visible only inside the VERIFIED window
             a = min(1.0, (t - w0 + eps) / fade_s, (w1 - t + eps) / fade_s)
             a = max(0.0, a) * _risk_alpha(t, risky_windows)
@@ -451,7 +467,18 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             vx_px = (_interp(sm, ta)[0] - _interp(sm, tb)[0]) / max(0.05, ta - tb) * W
             _draw_ring(frame, cx, feet_px / H, bw, bh, a, state=ring_state, vx=vx_px)
             # no label/chip: the grounded ellipse alone is the visual marker
-            writer.append_data(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            rendered = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if pending is None:
+                # head-pad: slots before the first real frame duplicate that
+                # frame so every later frame keeps its exact canonical offset
+                while next_out < local - 1e-9:
+                    writer.append_data(rendered)
+                    next_out += out_dt
+            pending = rendered
+            pending_local = local
+        # tail: the final frame occupies its own canonical slot
+        if pending is not None and next_out <= pending_local + 1e-9:
+            writer.append_data(pending)
         writer.close()
         writer = None
         if not Path(out_path).exists() or Path(out_path).stat().st_size < 20_000:

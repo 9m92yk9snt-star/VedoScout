@@ -515,14 +515,13 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
         cam_dx = cam_dy = 0.0
 
         cap.set(cv2.CAP_PROP_POS_MSEC, 0.0)
-        # FIX 03 — sample at HZ by ELAPSED MEDIA TIME (VFR-safe); every
-        # timestamp is the frame's ACTUAL media time, never fidx/fps
+        # FIX 03 — sample at HZ by ELAPSED MEDIA TIME (VFR-safe). C01 contract:
+        # grab → read THAT frame's PTS → decide → retrieve the SAME frame.
         sample_interval = 1.0 / HZ if HZ > 0 else 0.0
         prev_sample_t = None
         dt_sample = sample_interval
         while True:
-            t, _tb_fb = video_timebase.next_frame_time_seconds(cap, fps)
-            ok = cap.grab()
+            ok, t, _tb_fb = video_timebase.grab_frame_time_seconds(cap, fps)
             if not ok:
                 break
             if not video_timebase.should_sample(t, prev_sample_t, sample_interval):
