@@ -8290,8 +8290,9 @@ async def _run_identity_corrective_pass(
       (`identity_corrective_persisted`); a transient PRE-persist failure
       re-arms `identity_retry_done` so a later explicit recovery may retry
       the REQUIRED full-retry call (never the standard full-{id} call)
-    - failures BEFORE the replacement report is persisted are fail-open in the
-      normal pipeline (original report stands) → returns "failed"
+    - failures BEFORE the replacement report is persisted re-arm the marker
+      and return "failed" — BOTH callers then fail the run and keep the
+      corrective requirement (READY is never written for an unverified report)
     - failures AFTER it is persisted propagate (its final evidence persistence
       is REQUIRED before READY)
     - a still-failing re-verification sets `identity_flagged`.
@@ -8798,13 +8799,29 @@ async def generate_full_report_task(report_id: str) -> None:
         # most evidence frames (Gemini most likely switched player mid-video).
         # Shared helper: the SAME corrective algorithm as corrective-only recovery.
         if _identity_gate_required(identity_stats):
-            await _run_identity_corrective_pass(
+            outcome = await _run_identity_corrective_pass(
                 report_id, full_prompt=full_prompt, file_path=file_path,
                 marker_path=marker_path, crop_path_str=crop_path_str,
                 anchor_crops_full=anchor_crops_full, wide_crops_full=wide_crops_full,
                 anchor_payload_list=anchor_payload_list, gt_track=gt_track,
                 gt_t_off=gt_t_off, doc=doc, identity_stats=identity_stats,
             )
+            if outcome == "already_done":
+                _chk = await db.reports.find_one({"id": report_id})
+                if not (_chk or {}).get("identity_corrective_persisted"):
+                    # stale/in-flight marker without an actual replacement —
+                    # the corrective requirement was NOT fulfilled.
+                    outcome = "failed"
+            if outcome == "failed":
+                # The REQUIRED corrective pass never produced a replacement:
+                # route the next run to corrective-only recovery and fail this
+                # run — READY must never be written for an unverified report.
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"identity_regen_required": True}},
+                )
+                raise RuntimeError(
+                    "required corrective identity re-analysis failed — report not finalized")
         # FIX 00B — internal checkpoint: the identity gate has completed for
         # this run (recovery must not repeat it, and READY may follow).
         await db.reports.update_one(

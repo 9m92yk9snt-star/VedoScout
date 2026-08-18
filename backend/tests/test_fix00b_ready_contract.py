@@ -766,3 +766,86 @@ def test_TB_post_persist_failure_then_reverify_without_new_gemini(monkeypatch):
         assert fake.doc["full_report_status"] == "ready"
     finally:
         vid.unlink(missing_ok=True)
+
+
+# ══ NORMAL-PATH READY BLOCKER — full normal run, corrective fails ═════════
+
+def test_TC_normal_run_corrective_failure_then_corrective_only_recovery(monkeypatch):
+    """NORMAL FIRST RUN: initial full analysis succeeds, evidence stats hit the
+    corrective threshold, corrective full-retry raises pre-persist → the run
+    must FAIL (never ready). SECOND invocation: corrective-only recovery
+    succeeds WITHOUT calling standard full-{id} again."""
+    doc = {"id": "n1", "is_paid": True, "paid_at": None,
+           "player_details": {"player_name": "Test Player", "age": 12},
+           "content_gate": {"content_type": "match"},
+           "anchors": [{"i": 1, "t": 1.0, "box": dict(BOX)}]}
+    fake = FakeReports(doc)
+    vid = _tmp_video()
+    sessions = []
+    behavior = {"retry_raise": True}
+
+    monkeypatch.setattr(server, "db", SimpleNamespace(reports=fake))
+
+    async def fake_gemini(session_id=None, **k):
+        sessions.append(session_id)
+        if session_id.startswith("full-retry-") and behavior["retry_raise"]:
+            raise RuntimeError("transient corrective Gemini failure")
+        return {"scores": {}, "video_comments": [],
+                "_replacement": session_id.startswith("full-retry-")}
+
+    async def fake_persist(report_id, video_path):
+        fake.calls.append(("persist_frames", report_id))
+        if fake.doc["full_report"].get("_replacement"):
+            return {"checked": 4, "hard_rejected": 0}  # corrected report verifies
+        return {"checked": 4, "hard_rejected": 3}      # first report fails the gate
+
+    async def _noop(*a, **k):
+        return None
+
+    async def fake_local(report_id):
+        return vid
+
+    def fake_track(*a, **k):
+        return {"points": [], "segments": [], "doubt_moments": [], "t_off": 0.0,
+                "hz": 12.5, "seed_count": 1}
+
+    monkeypatch.setattr(server, "call_gemini_with_video", fake_gemini)
+    monkeypatch.setattr(server, "scrub_hedging", lambda r: r)
+    monkeypatch.setattr(server, "_filter_low_identity_evidence", lambda r, rid: r)
+    monkeypatch.setattr(server, "_apply_tracking_verification", lambda *a, **k: None)
+    monkeypatch.setattr(server, "_cross_verify_full_report", _noop)
+    monkeypatch.setattr(server, "_persist_video_frames", fake_persist)
+    monkeypatch.setattr(server, "_send_report_ready_email", _noop)
+    monkeypatch.setattr(server, "_notify_dashboard_report", _noop)
+    monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
+    monkeypatch.setattr(server, "track_player", fake_track)
+    monkeypatch.setattr(server, "extract_audio_events", lambda *a, **k: [])
+    monkeypatch.setattr(server, "compute_movement_map", lambda *a, **k: None)
+    monkeypatch.setattr(server, "compute_speed_metrics", lambda *a, **k: {})
+    monkeypatch.setattr(server, "_video_duration_seconds", lambda p: 60.0)
+    monkeypatch.setattr(server, "_validate_grow_your_game", lambda *a, **k: 0)
+    monkeypatch.setattr(server, "_validate_parent_corner", lambda *a, **k: None)
+    monkeypatch.setattr(server.cv_shadow, "SHADOW_ENABLED", False)
+    try:
+        # FIRST invocation — the FULL normal pipeline
+        asyncio.run(server.generate_full_report_task("n1"))
+        assert sessions[0] == "full-n1" and sessions[1] == "full-retry-n1"
+        assert fake.doc["full_report_status"] == "failed"
+        assert not _ready_writes(fake), "READY must never be written"
+        assert fake.doc.get("identity_gate_done") is False
+        assert fake.doc.get("identity_regen_required") is True
+        assert not fake.doc.get("identity_corrective_persisted")
+
+        # SECOND invocation — corrective-only recovery
+        behavior["retry_raise"] = False
+        asyncio.run(server.generate_full_report_task("n1"))
+        assert sessions.count("full-n1") == 1, "standard full-{id} must NOT run again"
+        assert sessions.count("full-retry-n1") == 2
+        assert fake.doc["full_report"].get("_replacement") is True
+        assert fake.doc.get("identity_corrective_persisted") is True
+        assert fake.doc.get("identity_gate_done") is True
+        assert fake.doc.get("identity_regen_required") is False
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
+    finally:
+        vid.unlink(missing_ok=True)
