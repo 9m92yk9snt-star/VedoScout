@@ -130,7 +130,8 @@ def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None =
         s = _ts_sec(ts)
         if s is None:
             continue
-        cands.append({"timestamp": str(ts), "sec": s, "verified": _is_verified(s, vsecs)})
+        cands.append({"timestamp": str(ts), "sec": s, "verified": _is_verified(s, vsecs),
+                      "evidence_id": e.get("evidence_id"), "event_id": e.get("event_id")})
     if not cands:
         return None
     def fresh(c):
@@ -156,7 +157,14 @@ def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None =
             or next((c for c in cands if fresh(c)), None)
             or sorted(cands, key=lambda c: (exact(c), clash(c), risk(c), not c["verified"]))[0])
     used.append(pick["sec"])
-    return {"timestamp": pick["timestamp"], "verified": pick["verified"]}
+    out = {"timestamp": pick["timestamp"], "verified": pick["verified"]}
+    # FIX 01 — preserve the authority IDs of the selected source evidence row
+    # so frontend proof navigation joins by exact ID (selection policy unchanged).
+    if pick.get("evidence_id"):
+        out["evidence_id"] = pick["evidence_id"]
+    if pick.get("event_id"):
+        out["event_id"] = pick["event_id"]
+    return out
 
 
 def _discovery(obs_map: dict, posdata: dict, kb_skills: dict, first: str):

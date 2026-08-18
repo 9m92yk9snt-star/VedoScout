@@ -352,3 +352,156 @@ console.log(JSON.stringify({{
     assert r["isAuthNew"] is True
     assert r["isAuthLegacy"] is False
     assert r["isAuthNull"] is False
+
+
+# ==================================================================
+# FIX 01 — CORRECTION 01: authority proof presentation / ID propagation
+# ==================================================================
+
+def test_C01_D_snapshot_moments_bound():
+    full = _body(
+        [_evt("00:36")],
+        [_com("00:36"), _com("00:40"), _com("00:40")],
+        snapshot_moments=[
+            {"key": "strength", "title": "t", "timestamp": "00:36"},   # exact unique
+            {"key": "noticed", "title": "t", "timestamp": "00:38"},    # no candidate
+            {"key": "hidden", "title": "t", "timestamp": "00:40"},     # ambiguous
+            {"key": "develop", "title": "t", "timestamp": "General"},  # unparseable
+        ],
+    )
+    attach_event_evidence_authority(full)
+    sm = full["snapshot_moments"]
+    assert sm[0]["evidence_id"] == full["video_comments"][0]["evidence_id"]
+    assert sm[0]["event_id"] == full["action_timeline"][0]["event_id"]
+    assert "evidence_id" not in sm[1] and "event_id" not in sm[1]
+    assert "evidence_id" not in sm[2]  # two exact candidates — never guess
+    assert "evidence_id" not in sm[3] and "event_id" not in sm[3]
+    assert sm[0]["timestamp"] == "00:36"  # presentation untouched
+
+
+def test_C01_F_watch_together_and_gyg_bound():
+    full = _body(
+        [_evt("00:36")],
+        [_com("00:36"), _com("01:10")],
+        parents_package={"watch_together": {"moments": [
+            {"timestamp": "00:36", "say_this": "great run"},
+            {"timestamp": "00:38", "say_this": "no match"},
+        ]}},
+        grow_your_game={"lessons": [
+            {"topic_id": "scanning", "moments": [
+                {"timestamp": "01:10", "what": "exact"},
+                {"timestamp": "01:11", "what": "no match"},
+            ]},
+        ]},
+    )
+    attach_event_evidence_authority(full)
+    wt = full["parents_package"]["watch_together"]["moments"]
+    assert wt[0]["evidence_id"] == full["video_comments"][0]["evidence_id"]
+    assert wt[0]["event_id"] == full["action_timeline"][0]["event_id"]
+    assert "evidence_id" not in wt[1] and "event_id" not in wt[1]
+    gm = full["grow_your_game"]["lessons"][0]["moments"]
+    assert gm[0]["evidence_id"] == full["video_comments"][1]["evidence_id"]
+    assert "event_id" not in gm[0]  # no event at 01:10
+    assert "evidence_id" not in gm[1]
+
+
+def test_C01_idempotent_with_structured_moments():
+    full = _body(
+        [_evt("00:36")],
+        [_com("00:36")],
+        snapshot_moments=[{"key": "strength", "timestamp": "00:36"}],
+        parents_package={"watch_together": {"moments": [{"timestamp": "00:36"}]}},
+        grow_your_game={"lessons": [{"moments": [{"timestamp": "00:36"}]}]},
+    )
+    attach_event_evidence_authority(full)
+    snap = json.loads(json.dumps(full))
+    attach_event_evidence_authority(full)
+    assert full == snap
+
+
+def test_C01_E_score_meaning_preserves_ids():
+    from score_meaning import _pick_evidence
+    vsecs = [("anchor", 36.0)]
+    out = _pick_evidence(
+        [{"timestamp": "00:36", "evidence_id": "E1", "event_id": "EV1"}],
+        vsecs, [], None,
+    )
+    assert out == {"timestamp": "00:36", "verified": True,
+                   "evidence_id": "E1", "event_id": "EV1"}
+    legacy = _pick_evidence([{"timestamp": "00:36"}], vsecs, [], None)
+    assert legacy == {"timestamp": "00:36", "verified": True}
+    assert "evidence_id" not in legacy and "event_id" not in legacy
+
+
+def test_C01_frontend_wiring_passes_ids():
+    # supporting wiring check (behaviour proven via the pure-helper node tests)
+    rv2 = BACKEND.parent / "frontend" / "src" / "components" / "report-v2"
+    sections = (rv2 / "sections.jsx").read_text()
+    assert "strengthThumb(authority, s.thumb, fallbackThumb)" in sections
+    assert sections.count("{ evidenceId: s.evidenceId, eventId: s.eventId }") == 2
+    sm = (rv2 / "scoremeaning.jsx").read_text()
+    assert "onPlayAt(ev.timestamp, { evidenceId: ev.evidence_id, eventId: ev.event_id })" in sm
+    assert "canUseAuthorityProof(authority, ev)" in sm
+    gyg = (rv2 / "growyourgame.jsx").read_text()
+    assert "canUseAuthorityProof(authority, m)" in gyg
+    assert "{ evidenceId: m.evidence_id, eventId: m.event_id }" in gyg
+    parents = (rv2 / "parents.jsx").read_text()
+    assert "canUseAuthorityProof(authority, m)" in parents
+    assert "{ evidenceId: m.evidence_id, eventId: m.event_id }" in parents
+    derive = (rv2 / "derive.js").read_text()
+    assert "resolveAuthorityFrame(full.video_comments, x)" in derive
+
+
+def test_C01_A_B_C_strength_thumb_and_affordance():
+    script = f"""
+import {{ canUseAuthorityProof, strengthThumb }} from "file://{AUTHORITY_MJS}";
+console.log(JSON.stringify({{
+  A_afford: canUseAuthorityProof(true, {{ timestamp: "00:36" }}),
+  A_thumb: strengthThumb(true, null, "/marker.jpg"),
+  B_afford: canUseAuthorityProof(true, {{ evidenceId: "evd_A" }}),
+  B_afford_evt: canUseAuthorityProof(true, {{ eventId: "evt_A" }}),
+  B_afford_snake: canUseAuthorityProof(true, {{ evidence_id: "evd_A" }}),
+  B_thumb: strengthThumb(true, "/f/36.jpg", "/marker.jpg"),
+  C_afford: canUseAuthorityProof(false, {{ timestamp: "00:36" }}),
+  C_thumb: strengthThumb(false, null, "/marker.jpg"),
+  C_null: canUseAuthorityProof(true, null),
+}}));
+"""
+    r = _run_node(script)
+    assert r["A_afford"] is False          # no proof affordance
+    assert r["A_thumb"] is None            # never fallbackThumb as evidence
+    assert r["B_afford"] is True and r["B_afford_evt"] is True and r["B_afford_snake"] is True
+    assert r["B_thumb"] == "/f/36.jpg"     # exact authority frame shown
+    assert r["C_afford"] is True           # legacy keeps timestamp behaviour
+    assert r["C_thumb"] == "/marker.jpg"   # legacy fallback retained
+    assert r["C_null"] is False
+
+
+def test_C01_D_frontend_snapshot_frame_resolution():
+    script = f"""
+import {{ resolveAuthorityFrame }} from "file://{AUTHORITY_MJS}";
+const comments = [
+  {{ timestamp: "00:36", evidence_id: "evd_36", event_id: "evt_36", frame_url: "/f/36.jpg", identity_verified: true }},
+  {{ timestamp: "00:38", evidence_id: "evd_38", frame_url: "/f/38.jpg", identity_verified: true }},
+  {{ timestamp: "00:50", evidence_id: "evd_50", frame_url: "/f/50.jpg", identity_verified: false }},
+  {{ timestamp: "00:55", evidence_id: "evd_55", frame_url: "/f/55.jpg", frame_placeholder: true }},
+];
+const byEvd = resolveAuthorityFrame(comments, {{ evidence_id: "evd_36" }});
+const byEvt = resolveAuthorityFrame(comments, {{ eventId: "evt_36" }});
+const noIds = resolveAuthorityFrame(comments, {{ timestamp: "00:36" }});
+const rejected = resolveAuthorityFrame(comments, {{ evidence_id: "evd_50" }});
+const placeholder = resolveAuthorityFrame(comments, {{ evidence_id: "evd_55" }});
+console.log(JSON.stringify({{
+  byEvd: byEvd && byEvd.frame_url,
+  byEvt: byEvt && byEvt.frame_url,
+  noIds: noIds === null,
+  rejected: rejected === null,
+  placeholder: placeholder === null,
+}}));
+"""
+    r = _run_node(script)
+    assert r["byEvd"] == "/f/36.jpg"
+    assert r["byEvt"] == "/f/36.jpg"
+    assert r["noIds"] is True        # 00:38 frame never substituted
+    assert r["rejected"] is True     # identity-rejected frame unusable
+    assert r["placeholder"] is True  # placeholder unusable

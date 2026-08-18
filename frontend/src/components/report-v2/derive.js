@@ -4,7 +4,7 @@
 // pure read-only mapping with graceful fallbacks for missing fields.
 
 // FIX 01 — authority-aware frame lookup lives in a pure, testable module.
-import { buildFrameLookup, isAuthorityReport } from "../../lib/authorityJoin.mjs";
+import { buildFrameLookup, isAuthorityReport, canUseAuthorityProof, resolveAuthorityFrame } from "../../lib/authorityJoin.mjs";
 
 export const SKILL_LABELS = {
   first_touch: "First Touch", ball_control: "Ball Control", dribbling: "Dribbling",
@@ -108,6 +108,7 @@ export function deriveV2(report) {
         thumbVerified: !!fr?.verified,
         evidenceId: ev?.evidence_id || null,
         eventId: ev?.event_id || null,
+        proofable: canUseAuthorityProof(authority, ev),
       };
     });
 
@@ -232,15 +233,22 @@ export function deriveV2(report) {
     };
   };
   const explicitMoments = Array.isArray(full.snapshot_moments) && full.snapshot_moments.length >= 4
-    ? full.snapshot_moments.slice(0, 4).map((x) => ({
-        key: x.key,
-        title: x.title || "—",
-        desc: x.desc || "—",
-        timestamp: x.timestamp || null,
-        thumb: x.frame_url || null,
-        annot: x.annot || "circle",
-        glance: x.glance || null,
-      }))
+    ? full.snapshot_moments.slice(0, 4).map((x) => {
+        // FIX 01 C01 — authority: the photo must come from the exactly bound
+        // evidence object; x.frame_url is never trusted as authority evidence.
+        const bound = authority ? resolveAuthorityFrame(full.video_comments, x) : null;
+        return {
+          key: x.key,
+          title: x.title || "—",
+          desc: x.desc || "—",
+          timestamp: x.timestamp || null,
+          thumb: authority ? (bound?.frame_url || null) : (x.frame_url || null),
+          annot: x.annot || "circle",
+          glance: x.glance || null,
+          evidenceId: x.evidence_id || null,
+          eventId: x.event_id || null,
+        };
+      })
     : null;
   const snapshotMoments = explicitMoments || [
     buildSnapMoment("strength", snapshot.biggestStrength, "positive", null),
@@ -360,7 +368,7 @@ export function deriveV2(report) {
     ? pp.watch_together : null;
   const playerMessage = pp?.message_to_player?.body ? pp.message_to_player : null;
   const parentsPackage = (homeDrills.length || watchTogether || playerMessage)
-    ? { homeDrills, watchTogether, playerMessage }
+    ? { homeDrills, watchTogether, playerMessage, authority }
     : null;
 
   // ---- Next match missions (printable card) ----
@@ -386,7 +394,7 @@ export function deriveV2(report) {
   // ---- Grow Your Game (evidence-gated football education) ----
   const gygRaw = full.grow_your_game;
   const growYourGame = gygRaw && Array.isArray(gygRaw.lessons) && gygRaw.lessons.length
-    ? { lessons: gygRaw.lessons, homework: Array.isArray(gygRaw.homework_plan) ? gygRaw.homework_plan : [] }
+    ? { lessons: gygRaw.lessons, homework: Array.isArray(gygRaw.homework_plan) ? gygRaw.homework_plan : [], authority }
     : null;
 
   // ---- Parent corner (Layer 1: AI-personalized; Layer 2 lives client-side) ----
@@ -406,6 +414,7 @@ export function deriveV2(report) {
 
   return {
     playerType: full.player_type || "",
+    authority,
     overall, ageBracket,
     stars: overall != null ? Math.round(overall / 2) : 0,
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",

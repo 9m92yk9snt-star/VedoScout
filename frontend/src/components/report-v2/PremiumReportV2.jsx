@@ -419,7 +419,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
 
           {/* Row 3 — top strengths / development priorities */}
           <div className="grid lg:grid-cols-[1.16fr_1fr] gap-4 mb-4">
-            <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl} />
+            <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={resolveUrl(report.marker_url, assetBase) || posterUrl} authority={d.authority} />
             <DevPrioritiesCard devPriorities={d.devPriorities} />
           </div>
 
@@ -465,7 +465,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
 
           {report.score_meaning?.skills?.length ? (
             <div className="mb-4">
-              <ScoreMeaningSection sm={report.score_meaning} playerName={pd.player_name} position={pd.position} onPlayAt={playAt} />
+              <ScoreMeaningSection sm={report.score_meaning} playerName={pd.player_name} position={pd.position} onPlayAt={playAt} authority={d.authority} />
             </div>
           ) : report.score_context?.overall ? (
             <div className="mb-4">

@@ -8,6 +8,7 @@ import {
   Bell, Brain, Wand2, Dumbbell, Timer, MonitorPlay, Route, ClipboardList,
   Check, Sprout, BedDouble, Heart, ShieldCheck, Clipboard, Binoculars, ArrowRight,
 } from "lucide-react";
+import { canUseAuthorityProof, strengthThumb } from "@/lib/authorityJoin.mjs";
 
 export const V2Card = ({ children, className = "", testid }) => (
   <div data-testid={testid} className={`bg-white border border-[#E5DFCE] rounded-[14px] shadow-[0_2px_10px_rgba(30,50,35,0.06)] p-5 md:p-6 ${className}`}>
@@ -70,7 +71,7 @@ export function AgeComparisonCard({ ageComparison, ageBracket }) {
 
 const STRENGTH_ICONS = { technical: CircleDot, tactical: Lightbulb, physical: PersonStanding, mentality: HeartPulse };
 
-export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
+export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb, authority = false }) {
   if (!topStrengths?.length) return null;
   return (
     <V2Card testid="v2-top-strengths-card">
@@ -79,7 +80,10 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
       </V2Title>
       {topStrengths.map((s, i) => {
         const Icon = STRENGTH_ICONS[s.category] || Star;
-        const thumb = s.thumb || fallbackThumb;
+        // FIX 01 C01 — authority: never present generic imagery as evidence,
+        // and no proof affordance without an authoritative reference.
+        const proofable = s.proofable != null ? s.proofable : canUseAuthorityProof(authority, s);
+        const thumb = strengthThumb(authority, s.thumb, fallbackThumb);
         return (
           <div key={i} data-testid={`v2-strength-${i}`} className={`flex items-center gap-3.5 py-3.5 ${i < topStrengths.length - 1 ? "border-b border-[#EFEADB]" : ""}`}>
             <div className="w-11 h-11 rounded-full bg-[#12402A] text-white flex items-center justify-center shrink-0">
@@ -88,7 +92,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
             <div className="flex-1 min-w-0">
               <div className="text-[13.5px] font-extrabold tracking-[0.05em] uppercase">{s.name}</div>
               <p className="text-[12px] text-[#68766B] leading-[1.5] mt-0.5 max-w-[280px]">{s.note}</p>
-              {s.timestamp && (
+              {s.timestamp && proofable && (
                 <button
                   type="button"
                   onClick={() => onPlayAt?.(s.timestamp, { evidenceId: s.evidenceId, eventId: s.eventId })}
@@ -103,7 +107,7 @@ export function TopStrengthsCard({ topStrengths, onPlayAt, fallbackThumb }) {
               {Number(s.score).toFixed(1)}<span className="text-[13px] text-[#A5AF9E] font-bold">/10</span>
             </div>
             <div className="font-barlow font-extrabold text-[15px] text-[#5B695E] w-[46px] shrink-0 hidden sm:block tabular-nums">{s.timestamp || ""}</div>
-            {thumb ? (
+            {thumb && proofable ? (
               <button
                 type="button"
                 onClick={() => onPlayAt?.(s.timestamp, { evidenceId: s.evidenceId, eventId: s.eventId })}

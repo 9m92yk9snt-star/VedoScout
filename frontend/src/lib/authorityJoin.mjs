@@ -70,3 +70,30 @@ export function buildFrameLookup(comments, authority) {
   };
   return { entries, find };
 }
+
+// FIX 01 CORRECTION 01 — proof affordance gate. Authority reports may only
+// offer proof navigation for items carrying an authoritative reference.
+export function canUseAuthorityProof(authority, ref) {
+  if (!authority) return true;
+  return !!(ref && (ref.evidenceId || ref.evidence_id || ref.eventId || ref.event_id));
+}
+
+// Evidence thumb for a Top Strength: generic marker/poster imagery may NEVER
+// stand in as the evidence image on an authority card.
+export function strengthThumb(authority, itemThumb, fallbackThumb) {
+  return itemThumb || (authority ? null : fallbackThumb || null);
+}
+
+// Resolve the exactly bound video_comment whose frame may serve as the proof
+// photo for a structured moment (snapshot_moments etc). EXACT ID joins only —
+// never nearest, never an unrelated frame.
+export function resolveAuthorityFrame(comments, ref) {
+  const list = Array.isArray(comments) ? comments : [];
+  const evId = ref && (ref.evidenceId || ref.evidence_id);
+  const evtId = ref && (ref.eventId || ref.event_id);
+  const usable = (c) => c && c.frame_url && !c.frame_placeholder && c.identity_verified !== false;
+  let c = null;
+  if (evId) c = list.find((x) => usable(x) && x.evidence_id === evId) || null;
+  if (!c && evtId) c = list.find((x) => usable(x) && x.event_id === evtId) || null;
+  return c;
+}

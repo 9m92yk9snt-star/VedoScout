@@ -8,6 +8,7 @@ import {
   ArrowUpRight, ShieldCheck, ChevronRight,
 } from "lucide-react";
 import { V2Card } from "./sections";
+import { canUseAuthorityProof } from "@/lib/authorityJoin.mjs";
 
 const FOREST = "#12402A";
 const LIME = "#CCFF00";
@@ -16,16 +17,18 @@ const CAT_LABEL = { technical: "Technical", tactical: "Tactical", physical: "Phy
 
 const activeStep = (score) => (score < 7 ? "6" : score < 8.6 ? "8" : "9");
 
-function AngleChips({ s, onPlayAt, seekable = true }) {
+function AngleChips({ s, onPlayAt, seekable = true, authority = false }) {
   const a = s.angles || {};
   const ev = s.evidence;
+  // FIX 01 C01 — authority: no proof navigation without an authoritative ID.
+  const proofable = canUseAuthorityProof(authority, ev);
   return (
     <div className="flex flex-wrap gap-1.5 mt-3">
       {ev?.verified && (
-        seekable && onPlayAt ? (
+        seekable && onPlayAt && proofable ? (
           <button
             type="button"
-            onClick={() => onPlayAt(ev.timestamp)}
+            onClick={() => onPlayAt(ev.timestamp, { evidenceId: ev.evidence_id, eventId: ev.event_id })}
             data-testid={`sm-evidence-${s.key}`}
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10.5px] font-extrabold tracking-[0.04em] uppercase transition-transform hover:scale-[1.03] active:scale-[0.97]"
             style={{ background: FOREST, color: LIME }}
@@ -131,7 +134,7 @@ function ExpandPanel({ s, position }) {
   );
 }
 
-export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defaultOpen = false }) {
+export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defaultOpen = false, authority = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div
@@ -153,7 +156,7 @@ export function SkillMeaningCard({ s, position, onPlayAt, seekable = true, defau
       {(s.lines || []).map((l, i) => (
         <p key={i} className={`text-[13px] leading-[1.58] mt-2 ${i === 0 ? "text-[#174A30] font-semibold" : "text-[#3C4A40]"}`}>{l}</p>
       ))}
-      <AngleChips s={s} onPlayAt={onPlayAt} seekable={seekable} />
+      <AngleChips s={s} onPlayAt={onPlayAt} seekable={seekable} authority={authority} />
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -204,7 +207,7 @@ export function PositionDiscoveryCard({ discovery, playerName, currentPosition }
   );
 }
 
-export function ScoreMeaningSection({ sm, playerName, position, onPlayAt }) {
+export function ScoreMeaningSection({ sm, playerName, position, onPlayAt, authority = false }) {
   const [showAll, setShowAll] = useState(false);
   if (!sm?.skills?.length) return null;
   const first = (playerName || "your player").split(" ")[0];
@@ -233,7 +236,7 @@ export function ScoreMeaningSection({ sm, playerName, position, onPlayAt }) {
       <div className="bg-[#F5F1E3] border border-t-0 border-[#E5DFCE] rounded-b-[16px] p-4 md:p-5">
         <div className="grid md:grid-cols-2 gap-4">
           {visible.map((s) => (
-            <SkillMeaningCard key={s.key} s={s} position={position} onPlayAt={onPlayAt} />
+            <SkillMeaningCard key={s.key} s={s} position={position} onPlayAt={onPlayAt} authority={authority} />
           ))}
         </div>
         {hidden > 0 && (

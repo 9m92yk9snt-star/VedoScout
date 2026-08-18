@@ -309,7 +309,7 @@ export function PremiumMobileCategories({
     const rich = smFor(bucket);
     if (rich.length) {
       return rich.map((s) => (
-        <SkillMeaningCard key={s.key} s={s} position={pd.position} onPlayAt={playAt} />
+        <SkillMeaningCard key={s.key} s={s} position={pd.position} onPlayAt={playAt} authority={d.authority} />
       ));
     }
     return (
@@ -396,7 +396,7 @@ export function PremiumMobileCategories({
             playerName={pd.player_name}
             reportId={report.id}
           />
-          <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={fallbackThumb} />
+          <TopStrengthsCard topStrengths={topStrengths} onPlayAt={playAt} fallbackThumb={fallbackThumb} authority={d.authority} />
           {d.actionTimeline?.length > 0 && <ActionTimelineCard actions={d.actionTimeline} onPlayAt={playAt} />}
           <VideoHighlightCard videoHighlight={videoHighlight} videoUrl={videoUrl} posterUrl={posterUrl} videoRef={videoRef} />
         </>

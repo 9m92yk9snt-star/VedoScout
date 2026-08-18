@@ -111,13 +111,30 @@ def attach_event_evidence_authority(full: dict) -> dict:
         elif cands and len(cands) > 1:
             c["event_binding_ambiguous"] = True
 
-    # Sub-skill evidence references — EXACT unique mapping only; text and
-    # timestamps stay untouched; nothing is deleted here.
+    # Sub-skill evidence + structured point-moment references (snapshot
+    # moments, watch-together, grow-your-game lessons) — EXACT unique mapping
+    # only; text and timestamps stay untouched; nothing is deleted here.
     evidence_by_ms: dict = {}
     for c in comments:
         ms = c.get("evidence_time_ms")
         if isinstance(ms, int):
             evidence_by_ms.setdefault(ms, []).append(c)
+
+    def _bind_row(row) -> None:
+        if not isinstance(row, dict):
+            return
+        ms = ts_to_ms(row.get("timestamp"))
+        if ms is None:
+            return
+        if not row.get("evidence_id"):
+            ec = evidence_by_ms.get(ms)
+            if ec and len(ec) == 1:
+                row["evidence_id"] = ec[0]["evidence_id"]
+        if not row.get("event_id"):
+            ev = events_by_ms.get(ms)
+            if ev and len(ev) == 1:
+                row["event_id"] = ev[0]["event_id"]
+
     for cat in ("technical", "tactical", "physical", "mentality"):
         sec = full.get(cat)
         if not isinstance(sec, dict):
@@ -126,19 +143,20 @@ def attach_event_evidence_authority(full: dict) -> dict:
             if not isinstance(sk, dict):
                 continue
             for row in (sk.get("evidence") or []):
-                if not isinstance(row, dict):
-                    continue
-                ms = ts_to_ms(row.get("timestamp"))
-                if ms is None:
-                    continue
-                if not row.get("evidence_id"):
-                    ec = evidence_by_ms.get(ms)
-                    if ec and len(ec) == 1:
-                        row["evidence_id"] = ec[0]["evidence_id"]
-                if not row.get("event_id"):
-                    ev = events_by_ms.get(ms)
-                    if ev and len(ev) == 1:
-                        row["event_id"] = ev[0]["event_id"]
+                _bind_row(row)
+    for row in (full.get("snapshot_moments") or []):
+        _bind_row(row)
+    pp = full.get("parents_package")
+    wt = pp.get("watch_together") if isinstance(pp, dict) else None
+    if isinstance(wt, dict):
+        for row in (wt.get("moments") or []):
+            _bind_row(row)
+    gyg = full.get("grow_your_game")
+    if isinstance(gyg, dict):
+        for lesson in (gyg.get("lessons") or []):
+            if isinstance(lesson, dict):
+                for row in (lesson.get("moments") or []):
+                    _bind_row(row)
     return full
 
 
