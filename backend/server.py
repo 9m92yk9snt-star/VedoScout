@@ -8286,7 +8286,10 @@ async def _run_identity_corrective_pass(
     """EXISTING corrective identity re-analysis (session `full-retry-{id}`),
     extracted UNCHANGED so the normal pipeline and corrective-only recovery
     share ONE corrective algorithm. Preserved semantics:
-    - at most once per report (`identity_retry_done`, set eagerly)
+    - at most once AFTER a corrective replacement was actually produced
+      (`identity_corrective_persisted`); a transient PRE-persist failure
+      re-arms `identity_retry_done` so a later explicit recovery may retry
+      the REQUIRED full-retry call (never the standard full-{id} call)
     - failures BEFORE the replacement report is persisted are fail-open in the
       normal pipeline (original report stands) → returns "failed"
     - failures AFTER it is persisted propagate (its final evidence persistence
@@ -8298,7 +8301,14 @@ async def _run_identity_corrective_pass(
         checked = (identity_stats or {}).get("checked", 0)
         dropped = (identity_stats or {}).get("hard_rejected", 0)
         fresh = await db.reports.find_one({"id": report_id})
-        if not fresh or fresh.get("identity_retry_done"):
+        if not fresh:
+            return "already_done"
+        if fresh.get("identity_corrective_persisted"):
+            # The corrective replacement exists — at-most-once holds forever.
+            return "already_done"
+        if fresh.get("identity_retry_done"):
+            # Legacy at-most-once marker (or an attempt in flight) — never run
+            # a duplicate corrective call in this pass.
             return "already_done"
         await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
         bad_ts = [
@@ -8337,7 +8347,10 @@ async def _run_identity_corrective_pass(
         )
         await db.reports.update_one(
             {"id": report_id},
-            {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
+            {"$set": {"full_report": retry, "full_generated_at": now_iso(),
+                      # internal checkpoint: the corrective replacement now EXISTS —
+                      # only from here on may the at-most-once rule skip Gemini.
+                      "identity_corrective_persisted": True}},
         )
         persisted = True
         stats2 = await _persist_video_frames(report_id, file_path)
@@ -8354,6 +8367,16 @@ async def _run_identity_corrective_pass(
             # FIX 00B correction — the replacement report is already live;
             # its final evidence persistence is REQUIRED before READY.
             raise
+        # PRE-persist transient failure: the required corrective output does
+        # NOT exist — re-arm the marker so a later explicit recovery may retry
+        # the corrective call (never an automatic loop, never a standard call).
+        try:
+            await db.reports.update_one(
+                {"id": report_id, "identity_corrective_persisted": {"$ne": True}},
+                {"$set": {"identity_retry_done": False}},
+            )
+        except Exception:
+            pass
         logger.exception(f"identity gate failed for {report_id}")
         return "failed"
 

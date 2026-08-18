@@ -552,6 +552,9 @@ def test_CR5_corrective_gemini_failure_keeps_requirement(monkeypatch):
         assert fake.doc["full_report_status"] == "failed"
         assert fake.doc.get("identity_regen_required") is True, \
             "transient corrective failure must not lose the recovery requirement"
+        assert not fake.doc.get("identity_corrective_persisted")
+        assert fake.doc.get("identity_retry_done") is False, \
+            "pre-persist failure must re-arm the corrective marker"
     finally:
         vid.unlink(missing_ok=True)
 
@@ -578,6 +581,7 @@ def test_CR6_regen_with_retry_done_reverifies_without_gemini(monkeypatch):
     one-shot corrective Gemini call: it re-evaluates evidence via the
     finalization gate (identity_retry_done=True → flag semantics)."""
     doc = _regen_doc("q6", retry_done=True)
+    doc["identity_corrective_persisted"] = True  # post-persist failure state
     fake = FakeReports(doc)
     _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 3})
     vid = _tmp_video()
@@ -654,5 +658,111 @@ def test_R5_helper_toplevel_persist_failure_propagates(monkeypatch):
         with pytest.raises(RuntimeError):
             asyncio.run(server._finalize_full_report("p6", vid, persist_frames=True))
         assert not _ready_writes(fake)
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+# ══ TRANSIENT CORRECTIVE RECOVERY — two-invocation proofs ═════════════════
+
+def _wire_two_phase(monkeypatch, fake, vid, behavior, sessions):
+    """Corrective seams whose behaviour can change between task invocations."""
+    monkeypatch.setattr(server, "db", SimpleNamespace(reports=fake))
+
+    async def fake_gemini(session_id=None, **k):
+        sessions.append(session_id)
+        if behavior.get("gemini_raise"):
+            raise RuntimeError("transient Gemini failure")
+        return {"scores": {}, "video_comments": [], "_replacement": True}
+
+    async def fake_persist(report_id, video_path):
+        fake.calls.append(("persist_frames", report_id))
+        if behavior.get("persist_raise"):
+            raise RuntimeError("evidence persistence failure")
+        return {"checked": 4, "hard_rejected": 0}
+
+    async def _noop(*a, **k):
+        return None
+
+    async def fake_local(report_id):
+        return vid
+
+    monkeypatch.setattr(server, "call_gemini_with_video", fake_gemini)
+    monkeypatch.setattr(server, "scrub_hedging", lambda r: r)
+    monkeypatch.setattr(server, "_filter_low_identity_evidence", lambda r, rid: r)
+    monkeypatch.setattr(server, "_apply_tracking_verification", lambda *a, **k: None)
+    monkeypatch.setattr(server, "_cross_verify_full_report", _noop)
+    monkeypatch.setattr(server, "_persist_video_frames", fake_persist)
+    monkeypatch.setattr(server, "_send_report_ready_email", _noop)
+    monkeypatch.setattr(server, "_notify_dashboard_report", _noop)
+    monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
+
+
+def test_TA_pre_persist_failure_then_retry_succeeds(monkeypatch):
+    """TEST A — same report, two sequential invocations: a pre-persist Gemini
+    failure must allow the REQUIRED corrective call to run again later."""
+    doc = _regen_doc("t1")
+    fake = FakeReports(doc)
+    vid = _tmp_video()
+    sessions = []
+    behavior = {"gemini_raise": True}
+    _wire_two_phase(monkeypatch, fake, vid, behavior, sessions)
+    try:
+        # FIRST invocation — corrective fails BEFORE replacement persistence
+        asyncio.run(server.generate_full_report_task("t1"))
+        assert fake.doc["full_report_status"] == "failed"
+        assert not _ready_writes(fake)
+        assert fake.doc.get("identity_regen_required") is True
+        assert not fake.doc.get("identity_corrective_persisted"), \
+            "corrective replacement must NOT be marked persisted"
+        assert fake.doc.get("identity_retry_done") is False, "marker re-armed"
+        assert sessions == ["full-retry-t1"]
+
+        # SECOND invocation — corrective succeeds
+        behavior["gemini_raise"] = False
+        asyncio.run(server.generate_full_report_task("t1"))
+        assert sessions == ["full-retry-t1", "full-retry-t1"], \
+            "the required corrective call must actually run again"
+        assert "full-t1" not in sessions, "standard full-{id} stays at ZERO"
+        assert fake.doc["full_report"].get("_replacement") is True
+        assert fake.doc.get("identity_corrective_persisted") is True
+        assert fake.doc.get("identity_gate_done") is True
+        assert fake.doc.get("identity_regen_required") is False
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_TB_post_persist_failure_then_reverify_without_new_gemini(monkeypatch):
+    """TEST B — replacement persisted, later evidence persistence fails: the
+    next recovery must reverify/finalize the EXISTING replacement, never
+    repeat the corrective Gemini call."""
+    doc = _regen_doc("t2")
+    fake = FakeReports(doc)
+    vid = _tmp_video()
+    sessions = []
+    behavior = {"persist_raise": True}
+    _wire_two_phase(monkeypatch, fake, vid, behavior, sessions)
+    try:
+        # FIRST invocation — corrective succeeds, evidence persistence raises
+        asyncio.run(server.generate_full_report_task("t2"))
+        assert fake.doc["full_report_status"] == "failed"
+        assert not _ready_writes(fake)
+        assert fake.doc.get("identity_corrective_persisted") is True, \
+            "the replacement WAS produced — that fact must be remembered"
+        assert fake.doc.get("identity_regen_required") is True
+        assert fake.doc["full_report"].get("_replacement") is True
+        assert sessions == ["full-retry-t2"]
+
+        # SECOND invocation — no new Gemini; reverify + finalize the replacement
+        behavior["persist_raise"] = False
+        asyncio.run(server.generate_full_report_task("t2"))
+        assert sessions == ["full-retry-t2"], "corrective Gemini count must NOT increase"
+        assert any(c[0] == "persist_frames" for c in fake.calls), \
+            "existing replacement reverified via evidence persistence"
+        assert fake.doc.get("identity_regen_required") is False
+        assert fake.doc.get("identity_gate_done") is True
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
     finally:
         vid.unlink(missing_ok=True)
