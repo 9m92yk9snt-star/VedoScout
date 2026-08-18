@@ -6983,6 +6983,9 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "created_at": doc.get("created_at"),
         "paid_at": doc.get("paid_at"),
         "gyg_lesson_count": doc.get("gyg_lesson_count", 0),
+        # FIX 00B — the authoritative finalization state. Legacy docs that
+        # predate the lifecycle states fall back to ready when complete.
+        "full_report_status": doc.get("full_report_status") or ("ready" if doc.get("full_report") else None),
     }
     if not include_full:
         # Honest teaser for the free landing — a real overall number ONLY when a
@@ -7156,13 +7159,15 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     if not unlocked:
         raise HTTPException(status_code=402, detail="Payment required")
 
-    if doc.get("full_report"):
+    if doc.get("full_report") and (doc.get("full_report_status") or "ready") == "ready":
         return {"status": "exists", "report_id": report_id, "full_report_status": "ready"}
 
     # Idempotency — if a task is already running for this report, no-op.
+    # FIX 00B — verifying/finalizing are still in-flight states: never restart
+    # the task and never claim ready while they run.
     current = doc.get("full_report_status")
-    if current in ("generating", "awaiting_confirmation"):
-        return {"status": "already_generating", "report_id": report_id, "full_report_status": "generating"}
+    if current in ("generating", "verifying", "finalizing", "awaiting_confirmation"):
+        return {"status": "already_generating", "report_id": report_id, "full_report_status": current}
 
     # Verify the source video is REACHABLE (local disk OR Cloudflare R2).
     # After the R2 flush, `video_filename` still exists in the doc but the file
@@ -8154,18 +8159,73 @@ async def _trusted_fastest_moment(
     return None
 
 
+async def _finalize_full_report(report_id: str, file_path, persist_frames: bool = True) -> None:
+    """FIX 00B — FINALIZING → READY. Completes the required user-facing
+    finalization work and then writes the SINGLE authoritative
+    `full_report_status = "ready"` transition. READY must never lie: it is
+    written here and nowhere else in the analysis run, after finalization.
+    Individual proof assets keep their existing fail-open behaviour (safe
+    omission + read-time self-heal); notifications are optional and are sent
+    after READY so they can never block or falsify it."""
+    if persist_frames:
+        try:
+            await _persist_video_frames(report_id, file_path)
+        except Exception:
+            logger.exception(f"evidence frame persist failed for {report_id}")
+    try:
+        fresh = await db.reports.find_one({"id": report_id})
+        if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
+            review = _default_agent_review(fresh.get("paid_at"))
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"agent_review": review}},
+            )
+    except Exception:
+        logger.exception(f"Failed to queue agent_review for {report_id}")
+    # THE authoritative READY transition — the only write of "ready" in the run.
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"full_report_status": "ready", "full_report_error": None}},
+    )
+    try:
+        await _send_report_ready_email(report_id)
+    except Exception:
+        logger.exception(f"report-ready email failed for {report_id}")
+    try:
+        await _notify_dashboard_report(report_id, "full")
+    except Exception:
+        logger.exception(f"dashboard notify failed for {report_id}")
+
+
 async def generate_full_report_task(report_id: str) -> None:
     """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads).
 
     Sets `full_report_status` on the report doc so the frontend can poll
     `/reports/{id}/status` to know when generation is done. Status values:
-    `generating` | `ready` | `failed`.
+    `generating` | `verifying` | `finalizing` | `ready` | `failed`.
     """
     try:
         doc = await db.reports.find_one({"id": report_id})
-        if not doc or doc.get("full_report"):
-            # Already done — make sure status reflects that for any concurrent poller.
-            if doc and doc.get("full_report") and doc.get("full_report_status") != "ready":
+        if not doc:
+            return
+        if doc.get("full_report"):
+            st = doc.get("full_report_status")
+            if st in ("verifying", "finalizing"):
+                # FIX 00B — resumed after an interruption mid-finalization: the
+                # report body already exists, so redo only the finalization tail
+                # (frames/clips regenerate idempotently) and let IT write READY.
+                file_path = await _ensure_report_video_local(report_id)
+                if file_path and file_path.exists():
+                    await _finalize_full_report(report_id, file_path, persist_frames=True)
+                else:
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"full_report_status": "failed",
+                                  "full_report_error": "Source video file missing on server."}},
+                    )
+                return
+            # Legacy/complete docs — make sure status reflects that for any concurrent poller.
+            if st != "ready":
                 await db.reports.update_one(
                     {"id": report_id},
                     {"$set": {"full_report_status": "ready"}},
@@ -8441,6 +8501,11 @@ async def generate_full_report_task(report_id: str) -> None:
             full.pop("parent_corner", None)
         # INTELLIGENT DUAL-PASS — independent verification of every claim
         # (identity + event) before the report is stored. Fail-open.
+        # FIX 00B — lifecycle: generation done, verification pass starting.
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "verifying"}},
+        )
         await _cross_verify_full_report(
             report_id, full,
             file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
@@ -8452,7 +8517,10 @@ async def generate_full_report_task(report_id: str) -> None:
             {"$set": {
                 "full_report": full,
                 "full_generated_at": now_iso(),
-                "full_report_status": "ready",
+                # FIX 00B — NOT ready yet: user-facing evidence frames, proof
+                # clips and identity gating still run below. READY is written
+                # only by _finalize_full_report at the true end of the pipeline.
+                "full_report_status": "finalizing",
                 "full_report_error": None,
                 "gyg_lesson_count": gyg_count,
                 "audio_events_full": [
@@ -8523,18 +8591,9 @@ async def generate_full_report_task(report_id: str) -> None:
                         logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
         except Exception:
             logger.exception(f"identity gate failed for {report_id}")
-        try:
-            fresh = await db.reports.find_one({"id": report_id})
-            if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
-                review = _default_agent_review(fresh.get("paid_at"))
-                await db.reports.update_one(
-                    {"id": report_id},
-                    {"$set": {"agent_review": review}},
-                )
-        except Exception:
-            logger.exception(f"Failed to queue agent_review for {report_id}")
-        await _send_report_ready_email(report_id)
-        await _notify_dashboard_report(report_id, "full")
+        # FIX 00B — single authoritative finalization: agent review queue,
+        # READY transition, then optional notifications.
+        await _finalize_full_report(report_id, file_path, persist_frames=False)
     except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
         # Persist a friendly failure marker so the frontend can surface "Try again".
@@ -15173,12 +15232,14 @@ FULL_REPORT_MAX_RETRIES = 2
 
 async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
     """Requeue orphaned/stalled full-report generations. At startup ANY doc
-    still 'generating' is orphaned by definition (include_fresh=True); the
-    periodic sweep only touches docs whose `full_report_started_at` is older
+    still in an in-flight state (generating/verifying/finalizing) is orphaned
+    by definition (include_fresh=True); the periodic sweep only touches docs
+    whose `full_report_started_at` is older
     than FULL_REPORT_STALL_SECONDS. Bounded by FULL_REPORT_MAX_RETRIES, after
     which the doc flips to 'failed' so the UI can offer a retry."""
     now = datetime.now(timezone.utc)
-    query: dict = {"full_report_status": "generating"}
+    _inflight = ["generating", "verifying", "finalizing"]
+    query: dict = {"full_report_status": {"$in": _inflight}}
     if not include_fresh:
         cutoff = (now - timedelta(seconds=FULL_REPORT_STALL_SECONDS)).isoformat()
         query["$or"] = [
@@ -15194,7 +15255,7 @@ async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
         retries = int(d.get("full_report_retries") or 0)
         if retries >= FULL_REPORT_MAX_RETRIES:
             await db.reports.update_one(
-                {"id": rid, "full_report_status": "generating"},
+                {"id": rid, "full_report_status": {"$in": _inflight}},
                 {"$set": {
                     "full_report_status": "failed",
                     "full_report_error": "Generation was interrupted repeatedly — tap retry, nothing is lost.",
