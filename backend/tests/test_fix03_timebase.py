@@ -24,7 +24,7 @@ class FakeCap:
     grab's (stale) PTS, exactly like the real backend. Every frame carries its
     source index in all pixels so frame↔timestamp pairing is provable."""
 
-    def __init__(self, times_s, fps=20.0, w=160, h=120, keyframes=None):
+    def __init__(self, times_s, fps=20.0, w=160, h=120, keyframes=None, opencv_seek=False):
         self.times = list(times_s)
         self.fps = fps
         self.w, self.h = w, h
@@ -32,6 +32,7 @@ class FakeCap:
         self.last_pts_ms = 0.0
         self.last_grabbed = None
         self.keyframes = sorted(keyframes) if keyframes else None
+        self.opencv_seek = opencv_seek  # OpenCV 4.13-style setter simulation
         self.seeks = []
 
     def get(self, prop):
@@ -52,17 +53,23 @@ class FakeCap:
     def set(self, prop, value):
         self.seeks.append((prop, float(value)))
         if prop == cv2.CAP_PROP_POS_MSEC:
-            target = value / 1000.0
-            idx = 0
-            for k, t in enumerate(self.times):
-                if t <= target + 1e-9:
-                    idx = k
-                else:
-                    break
-            if self.keyframes is not None:  # ffmpeg lands on keyframe <= target
+            if self.opencv_seek:
+                # OpenCV 4.13 FFmpeg: POS_MSEC SET = seek(round(sec*get_fps()))
+                # — an average-fps FRAME INDEX; overshoots real VFR content
+                idx = int(round((value / 1000.0) * self.fps))
+                idx = max(0, min(idx, len(self.times)))
+            else:
+                target = value / 1000.0
+                idx = 0
+                for k, t in enumerate(self.times):
+                    if t <= target + 1e-9:
+                        idx = k
+                    else:
+                        break
+            if self.keyframes is not None:  # ffmpeg lands on keyframe <= index
                 idx = max([k for k in self.keyframes if k <= idx] or [0])
             self.next_i = idx
-            self.last_pts_ms = 0.0 if idx == 0 else self.times[idx - 1] * 1000.0
+            self.last_pts_ms = 0.0 if idx == 0 else self.times[min(idx, len(self.times)) - 1] * 1000.0
         elif prop == cv2.CAP_PROP_POS_FRAMES:
             self.next_i = int(value)
         return True
@@ -177,8 +184,11 @@ def test_T3_cv_shadow_tap_reference_media_seek():
     anchors = [{"t": 36.0, "box": {"x": 0.4, "y": 0.4, "w": 0.1, "h": 0.2}}]
     cv_shadow._build_tap_references(cap, 10.0, anchors, 0.5, 160, 120, 1.0, detector=None)
     msec_seeks = [v for p, v in cap.seeks if p == cv2.CAP_PROP_POS_MSEC]
-    assert 36500.0 in msec_seeks          # (36.0 + t_off 0.5) * 1000 — media time
+    assert 36000.0 in msec_seeks  # (36.0 + t_off 0.5 − 0.5 preroll) * 1000
     assert all(p == cv2.CAP_PROP_POS_MSEC for p, _ in cap.seeks)
+    # the frame actually used is the canonical 36.5s frame
+    assert cap.last_grabbed is not None
+    assert abs(cap.times[cap.last_grabbed] - 36.5) < 1e-9
 
 
 # ---------- T4 / C3 — shadow sampling: same decoded frame + media time ----------
@@ -233,13 +243,22 @@ def _teleclip_times():
     return times
 
 
-def _run_teleclip(monkeypatch, times, fps=20.0):
+def _run_teleclip(monkeypatch, times, fps=20.0, opencv_seek=False):
     import tele_clip
 
-    fake = FakeCap(times, fps=fps)
+    fake = FakeCap(times, fps=fps, opencv_seek=opencv_seek)
     monkeypatch.setattr(tele_clip.cv2, "VideoCapture", lambda p: fake)
     monkeypatch.setattr(video_timebase, "media_duration_seconds",
                         lambda p: times[-1] + 0.05)
+
+    targets = []
+    orig_swp = video_timebase.seek_with_preroll
+
+    def rec_swp(cap_, seconds, fps_=None, attempts=6):
+        targets.append(round(float(seconds), 6))
+        return orig_swp(cap_, seconds, fps_, attempts)
+
+    monkeypatch.setattr(video_timebase, "seek_with_preroll", rec_swp)
 
     class FakeWriter:
         def __init__(self):
@@ -276,7 +295,7 @@ def _run_teleclip(monkeypatch, times, fps=20.0):
     track = [{"t": 0.2 * i, "x": 0.4, "y": 0.4, "w": 0.05, "h": 0.12}
              for i in range(0, 60)]  # dense 0..11.8s track
     tele_clip.generate_tracked_clip("fake.mp4", 5.0, track, "/tmp/fix03_clip.mp4")
-    c0 = next(v for p, v in fake.seeks if p == cv2.CAP_PROP_POS_MSEC) / 1000.0
+    c0 = targets[0]  # canonical clip start requested by the render loop
     return fake, writer, risk_ts, draw_ids, c0
 
 
@@ -309,48 +328,23 @@ def test_T8_render_stops_on_media_time(monkeypatch):
     assert all(t <= c1_max + 1e-6 for t in risk_ts)
 
 
-# ---------- C8 — CFR output is PTS-resampled, preserving elapsed time ----------
+# ---------- C8 — CFR output is PTS-resampled (drop/duplicate) ----------
 
 def test_C8_cfr_output_preserves_canonical_elapsed_time(monkeypatch):
     times = _teleclip_times()
     fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
-    out_dt = 1.0 / 20.0
     assert writer.ids, "no output frames"
-    rendered_locals = {fid: round(times[fid] - c0, 6) for fid in draw_ids}
-    rendered_sorted = sorted(rendered_locals.items(), key=lambda kv: kv[1])
     assert writer.ids == sorted(writer.ids)  # time-monotonic output
-    first_fid = draw_ids[0]
-    first_local = rendered_locals[first_fid]
-    for k, fid in enumerate(writer.ids):
-        slot = k * out_dt
-        local = rendered_locals[fid]
-        if fid == first_fid and slot < first_local - 1e-9:
-            continue  # head padding duplicates the first available frame
-        assert local <= slot + 1e-6          # never a frame from the future
-        # sample-and-hold: no LATER rendered frame existed at/before this slot
-        nxt = next((lv for f, lv in rendered_sorted if lv > local), None)
-        assert nxt is None or nxt > slot - 1e-9
     # VFR proves drop/duplicate happened: dense 0.04s region -> drops,
-    # sparse 0.11s region -> duplicates
+    # sparse 0.11s region / tail padding -> duplicates
     assert len(set(writer.ids)) < len(writer.ids)          # duplicates exist
     assert len(set(draw_ids) - set(writer.ids)) > 0        # drops exist
     # naive sequential append would emit every decoded frame exactly once
     assert writer.ids != draw_ids
 
 
-# ---------- C9 — moment_local_ms points at the right output frame ----------
+# ---------- C9 — moved to test_C9_C17 (Correction 02 section) ----------
 
-def test_C9_moment_maps_to_intended_source_frame(monkeypatch):
-    times = _teleclip_times()
-    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
-    out_dt = 1.0 / 20.0
-    moment_local = 5.0 - c0                  # == moment_local_ms / 1000
-    k = round(moment_local / out_dt)
-    assert 0 <= k < len(writer.ids)
-    fid = writer.ids[k]
-    # the frame shown at the moment slot IS the source moment (dense region:
-    # within one output frame interval)
-    assert abs((times[fid] - c0) - moment_local) <= out_dt + 1e-6
 
 
 # ---------- C5 — early keyframe landing decodes forward to actual T ----------
@@ -362,8 +356,10 @@ def test_C5_seek_lands_early_then_decodes_forward():
     assert ok
     assert abs(t - 7.3) < 1e-9               # ACTUAL frame media time returned
     assert int(frame[0, 0, 0]) == 73          # the frame AT 7.3s, not the keyframe
-    assert cap.last_grabbed == 73             # decoded forward from keyframe 60
-    assert (cv2.CAP_PROP_POS_MSEC, 7300.0) in cap.seeks
+    assert cap.last_grabbed == 73             # decoded forward from the keyframe
+    # C02: first positioning attempt targets T − preroll (6.8s), POS_MSEC only
+    assert cap.seeks[0] == (cv2.CAP_PROP_POS_MSEC, 6800.0)
+    assert all(p == cv2.CAP_PROP_POS_MSEC for p, _ in cap.seeks)
 
 
 # ---------- C6 / T10 — doubt tap uses canonical random access ----------
@@ -387,7 +383,7 @@ def test_C7_T11_teleclip_edge_crop_actual_frame(monkeypatch):
     monkeypatch.setattr(cv2, "VideoCapture", lambda p: fake)
     sm = [(0.2 * i, 0.4, 0.4, 0.05, 0.12) for i in range(60)]
     server._teleclip_edge_crop("fake.mp4", sm, 7.3, "/tmp/fix03_edge.jpg")
-    assert (cv2.CAP_PROP_POS_MSEC, 7300.0) in fake.seeks
+    assert (cv2.CAP_PROP_POS_MSEC, 6800.0) in fake.seeks  # T − preroll
     assert all(p == cv2.CAP_PROP_POS_MSEC for p, _ in fake.seeks)
     assert fake.last_grabbed == 73            # decoded forward to the REAL 7.3s frame
     assert abs(times[fake.last_grabbed] - 7.3) < 1e-9
@@ -457,3 +453,136 @@ def test_T15_no_new_model_call_sites():
         low = (BACKEND / name).read_text().lower()
         for banned in ("gemini", "openai", "llmchat", "httpx"):
             assert banned not in low
+
+
+# ==================================================================
+# FIX 03 — CORRECTION 02
+# ==================================================================
+
+def test_C10_opencv_setter_overshoot_recovered():
+    # real content at 20 fps but backend reports 30 fps: POS_MSEC SET
+    # (sec * get_fps()) overshoots the target on this VFR-style mismatch
+    times = [round(i * 0.05, 4) for i in range(400)]
+    cap = FakeCap(times, fps=30.0, opencv_seek=True)
+    ok, frame, t = video_timebase.read_frame_at(cap, 5.0, fps=30.0)
+    assert ok
+    assert abs(t - 5.0) < 1e-9                # ACTUAL PTS of the frame used
+    assert int(frame[0, 0, 0]) == 100          # the real 5.0s frame
+    msec = [v for p, v in cap.seeks if p == cv2.CAP_PROP_POS_MSEC]
+    assert msec[0] == 4500.0                   # first attempt: T − 0.5 preroll
+    assert len(msec) >= 3                      # adaptive backoff actually retried
+    assert msec == sorted(msec, reverse=True)  # each retry seeks farther back
+    assert all(p == cv2.CAP_PROP_POS_MSEC for p, _ in cap.seeks)
+
+
+def test_C11_tap_reference_correct_frame_under_overshoot():
+    import cv_shadow
+    times = [round(i * 0.05, 4) for i in range(900)]  # 45s of real 20 fps
+    cap = FakeCap(times, fps=30.0, opencv_seek=True)  # backend claims 30 fps
+    anchors = [{"t": 36.0, "box": {"x": 0.4, "y": 0.4, "w": 0.1, "h": 0.2}}]
+    cv_shadow._build_tap_references(cap, 30.0, anchors, 0.5, 160, 120, 1.0, detector=None)
+    assert cap.last_grabbed is not None
+    # the reference patch came from the ACTUAL 36.5s frame despite overshoot
+    assert abs(times[cap.last_grabbed] - 36.5) < 1e-9
+
+
+def test_C12_clip_start_not_late_under_overshoot(monkeypatch):
+    times = [round(i * 0.05, 4) for i in range(300)]  # real 20 fps, 15s
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(
+        monkeypatch, times, fps=30.0, opencv_seek=True)
+    assert risk_ts, "no frames rendered"
+    assert risk_ts[0] >= c0 - 1e-3
+    assert risk_ts[0] <= c0 + 0.05 + 1e-6  # starts AT c0, not after overshoot
+
+
+def test_C13_edge_overlay_uses_actual_pts(monkeypatch):
+    import server
+    import tele_clip
+    times = [round(i * 0.1, 4) for i in range(200)]
+    fake = FakeCap(times, fps=10.0)
+    monkeypatch.setattr(cv2, "VideoCapture", lambda p: fake)
+    pos_ts = []
+    orig_pos = tele_clip.pos_at
+
+    def rec_pos(sm, t):
+        pos_ts.append(round(t, 4))
+        return orig_pos(sm, t)
+
+    monkeypatch.setattr(tele_clip, "pos_at", rec_pos)
+    sm = [(0.2 * i, 0.4, 0.4, 0.05, 0.12) for i in range(60)]
+    server._teleclip_edge_crop("fake.mp4", sm, 7.31, "/tmp/fix03_edge2.jpg")
+    assert fake.last_grabbed == 74            # the actual 7.40s frame decoded
+    assert 7.4 in pos_ts                       # ring position from ACTUAL PTS
+    assert 7.31 not in pos_ts                  # never the requested time
+
+
+def test_C14_nearest_slot_selection_fixture():
+    src = [0.00, 0.04, 0.11, 0.15, 0.24]
+    out_dt = 1.0 / 20.0
+    slots = {}
+    next_out, pending = 0.0, None
+    for local in src:  # same previous/current lookahead as the render loop
+        while pending is not None and next_out < local - 1e-9:
+            if video_timebase.nearest_slot_choice(next_out, pending, local):
+                break
+            slots[round(next_out, 2)] = pending
+            next_out += out_dt
+        pending = local
+    while next_out <= src[-1] + 1e-9:
+        slots[round(next_out, 2)] = pending
+        next_out += out_dt
+    assert slots[0.10] == 0.11    # nearest (0.01 away) — NOT 0.04 sample-and-hold
+    assert slots[0.00] == 0.00
+    assert slots[0.05] == 0.04
+    assert slots[0.15] == 0.15
+    assert slots[0.20] == 0.24    # 0.04 away beats 0.15 (0.05 away)
+
+
+def test_C15_every_slot_selects_nearest_rendered_pts(monkeypatch):
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    out_dt = 1.0 / 20.0
+    locals_by_id = {fid: times[fid] - c0 for fid in draw_ids}
+    all_locals = sorted(locals_by_id.values())
+    for k, fid in enumerate(writer.ids):
+        slot = k * out_dt
+        chosen = locals_by_id[fid]
+        best = min(all_locals, key=lambda lv: abs(slot - lv))
+        assert abs(slot - chosen) <= abs(slot - best) + 1e-9   # globally nearest
+        # invariant: within one output frame whenever the cadence allows it
+        if abs(slot - best) <= out_dt:
+            assert abs(slot - chosen) <= out_dt + 1e-9
+
+
+def test_C16_output_duration_matches_clip_window(monkeypatch):
+    import tele_clip
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    out_dt = 1.0 / 20.0
+    # replicate the render's own window maths for the expected c1
+    track = [{"t": 0.2 * i, "x": 0.4, "y": 0.4, "w": 0.05, "h": 0.12}
+             for i in range(0, 60)]
+    plan = tele_clip.plan_window(track, 5.0, 1.8, 1.8)
+    c0_exp = min(plan["w0"], 5.0 - tele_clip.PAD_PRE)
+    c1_exp = max(plan["w1"], 5.0 + tele_clip.PAD_POST)
+    if c1_exp - c0_exp < tele_clip.MIN_CLIP_SEC:
+        half = (tele_clip.MIN_CLIP_SEC - (c1_exp - c0_exp)) / 2.0
+        c0_exp, c1_exp = c0_exp - half, c1_exp + half
+    c0_exp = max(0.0, c0_exp)
+    c1_exp = min((times[-1] + 0.05) - 0.05, c1_exp)
+    assert abs(c0 - c0_exp) < 1e-6
+    duration_out = len(writer.ids) * out_dt
+    assert abs(duration_out - (c1_exp - c0_exp)) <= out_dt + 1e-6
+
+
+def test_C9_C17_moment_maps_to_intended_source_frame(monkeypatch):
+    times = _teleclip_times()
+    fake, writer, risk_ts, draw_ids, c0 = _run_teleclip(monkeypatch, times)
+    out_dt = 1.0 / 20.0
+    moment_local = 5.0 - c0                  # == moment_local_ms / 1000
+    k = round(moment_local / out_dt)
+    assert 0 <= k < len(writer.ids)
+    fid = writer.ids[k]
+    # the frame shown at the moment slot IS the source moment (dense region:
+    # within one output frame interval)
+    assert abs((times[fid] - c0) - moment_local) <= out_dt + 1e-6

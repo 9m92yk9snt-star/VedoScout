@@ -261,9 +261,9 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
         try:
             t = float(a["t"]) + (t_off or 0.0)
             box = a["box"]
-            # FIX 03 — canonical media-time seek (VFR-safe), never t*fps
-            video_timebase.seek_seconds(cap, max(0.0, t))
-            ok, frame = cap.read()
+            # FIX 03 C02 — canonical random access: adaptive preroll + decode
+            # forward on ACTUAL PTS (one POS_MSEC seek may overshoot on VFR)
+            ok, frame, _actual_t = video_timebase.read_frame_at(cap, max(0.0, t), fps)
             if not ok:
                 continue
             small = cv2.resize(frame, (sw, sh))

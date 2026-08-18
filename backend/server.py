@@ -7755,13 +7755,14 @@ def _teleclip_edge_crop(video_path: str, sm: list, t: float, out_path: str) -> O
     try:
         if not cap.isOpened():
             return None
-        # FIX 03 C01 — the frame verifying an edge at time T must ACTUALLY
-        # represent media time T: seek, then decode forward to the real frame
-        ok, frame, _t = video_timebase.read_frame_at(cap, t)
+        # FIX 03 C01/C02 — the frame verifying an edge at time T must ACTUALLY
+        # represent media time T: adaptive-preroll seek, decode forward on
+        # actual PTS, and place ring/crop from the SAME decoded frame's PTS
+        ok, frame, actual_t = video_timebase.read_frame_at(cap, t)
         if not ok:
             return None
         fh, fw = frame.shape[:2]
-        cx, feet_y, w, h = pos_at(sm, t)
+        cx, feet_y, w, h = pos_at(sm, actual_t)
         _draw_ring(frame, cx, feet_y, w, h, 1.0)
         half = max(100, int(1.35 * w * fw))
         px, py = int(cx * fw), int(feet_y * fh)

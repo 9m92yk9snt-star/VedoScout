@@ -425,14 +425,20 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
         writer = imageio.get_writer(out_path, fps=out_fps, codec="libx264",
                                     quality=7, pixelformat="yuv420p", macro_block_size=1,
                                     output_params=["-movflags", "+faststart"])
-        video_timebase.seek_seconds(cap, c0)
+        pre_ok, pre_t, _pre_fb = video_timebase.seek_with_preroll(cap, c0, fps)
+        # the preroll helper already grabbed the first frame — consume it below
         ema_wh = None
         ring_state = {}  # ground-anchor temporal smoothing across frames
         next_out = 0.0        # local CFR output timeline (relative to c0)
         pending = None        # last rendered frame awaiting its output slots
         pending_local = None
+        first_grab = (pre_ok, pre_t)
         while True:
-            ok, t, _tb_fb = video_timebase.grab_frame_time_seconds(cap, fps)
+            if first_grab is not None:
+                ok, t = first_grab
+                first_grab = None
+            else:
+                ok, t, _tb_fb = video_timebase.grab_frame_time_seconds(cap, fps)
             if not ok:
                 break
             if t < c0 - 1e-3:
@@ -443,9 +449,12 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
             if not ok:
                 break
             local = t - c0
-            # sample-and-hold resample: the previous frame fills every output
-            # slot that lies before this frame's canonical local time
+            # nearest-frame CFR resample (previous/current lookahead): each
+            # output slot takes the source frame whose canonical local PTS is
+            # closest — never blindly the latest at/before the slot
             while pending is not None and next_out < local - 1e-9:
+                if video_timebase.nearest_slot_choice(next_out, pending_local, local):
+                    break  # the CURRENT frame is nearer to this CFR slot
                 writer.append_data(pending)
                 next_out += out_dt
             # marker alpha: visible only inside the VERIFIED window
@@ -476,8 +485,14 @@ def generate_tracked_clip(video_path: str, t_moment: float, track_points: list, 
                     next_out += out_dt
             pending = rendered
             pending_local = local
-        # tail: the final frame occupies its own canonical slot
-        if pending is not None and next_out <= pending_local + 1e-9:
+        # tail: pad with the final frame so the playable duration matches the
+        # canonical clip window (c1 - c0) within one output frame —
+        # clip_start_ms/clip_end_ms/moment_local_ms describe this timeline
+        if pending is not None:
+            end_local = c1 - c0
+            while next_out < end_local - out_dt / 2 - 1e-9:
+                writer.append_data(pending)
+                next_out += out_dt
             writer.append_data(pending)
         writer.close()
         writer = None

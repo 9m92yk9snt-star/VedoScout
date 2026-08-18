@@ -53,23 +53,53 @@ def grab_frame_time_seconds(cap, fps=None):
     return True, t, fb
 
 
-def read_frame_at(cap, seconds: float, fps=None, max_forward: int = 240):
-    """Canonical random access: seek by media time, then decode FORWARD until
-    the first frame whose ACTUAL PTS reaches T (a container seek may land on
-    an earlier keyframe). Returns (ok, frame_or_None, actual_media_seconds)
-    — the timestamp of the frame actually used, never the requested T."""
+def seek_with_preroll(cap, seconds: float, fps=None, attempts: int = 6):
+    """Position decoding at/before `seconds` despite OpenCV's approximate
+    POS_MSEC setter (FFmpeg implements it as seek(round(sec * get_fps())) —
+    on VFR it may land AFTER the target). Only the post-grab POS_MSEC READ is
+    canonical. Adaptive bounded backoff: seek earlier, grab, read ACTUAL PTS;
+    if still past target, back off farther.
+
+    Returns (ok, first_t, used_fallback) where first_t is the ACTUAL PTS of
+    the already-grabbed first frame — callers must process that grabbed frame
+    (retrieve) before grabbing again."""
     target = max(0.0, float(seconds))
-    seek_seconds(cap, target)
-    last_t = None
+    preroll = 0.5
+    ok, t, fb = False, 0.0, False
+    for _ in range(attempts):
+        seek_seconds(cap, max(0.0, target - preroll))
+        ok, t, fb = grab_frame_time_seconds(cap, fps)
+        # a failed grab means the approximate seek landed at/past EOF —
+        # treat it like an overshoot and back off farther
+        if ok and (t <= target + 1e-3 or (target - preroll) <= 0.0):
+            return True, t, fb
+        preroll *= 2.0
+    return ok, t, fb
+
+
+def read_frame_at(cap, seconds: float, fps=None, max_forward: int = 240):
+    """Canonical random access: adaptive-preroll positioning at/before T,
+    then decode FORWARD using ACTUAL post-grab PTS to the first frame
+    at/after T. Returns (ok, frame_or_None, actual_media_seconds) — the PTS
+    of the frame actually used, never the requested T."""
+    target = max(0.0, float(seconds))
+    ok, t, _fb = seek_with_preroll(cap, target, fps)
+    if not ok:
+        return False, None, target
     for _ in range(max_forward):
-        ok, t, _fb = grab_frame_time_seconds(cap, fps)
-        if not ok:
-            break
-        last_t = t
         if t >= target - 1e-3:
             ok2, frame = cap.retrieve()
             return ok2, (frame if ok2 else None), t
-    return False, None, (last_t if last_t is not None else target)
+        ok, t, _fb = grab_frame_time_seconds(cap, fps)
+        if not ok:
+            return False, None, t
+    return False, None, t
+
+
+def nearest_slot_choice(slot, prev_local, cur_local) -> bool:
+    """CFR resampling lookahead: True when the CURRENT source frame is
+    strictly nearer to the output slot than the previous one."""
+    return abs(slot - cur_local) < abs(slot - prev_local) - 1e-12
 
 
 def should_sample(t, prev_sample_t, interval) -> bool:
