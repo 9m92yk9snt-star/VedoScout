@@ -2,6 +2,7 @@
 import React from "react";
 import { HeartHandshake, Activity, Swords, RefreshCcw, Footprints, Play } from "lucide-react";
 import { V2Card, V2Title } from "./sections";
+import { canUseAuthorityProof } from "@/lib/authorityJoin.mjs";
 
 const REACTION_META = {
   strong: { label: "Strong response", cls: "bg-[#12402A] text-[#CCFF00]" },
@@ -24,6 +25,9 @@ function MetricTile({ icon: Icon, label, value, note, testid }) {
 
 export function ParentValueMetricsCard({ metrics, onPlayAt }) {
   const m = metrics || {};
+  // FIX 02 — authority: LLM point moments open proof only when ID + fail-closed
+  // proof state exist; broad "top minute" ranges stay informational text.
+  const authority = !!m.authority;
   if (!m.involvement && !m.bravery && !m.reaction && !m.offBall && !m.topMinutes?.length) return null;
   const inv = m.involvement;
   const reaction = m.reaction;
@@ -65,14 +69,20 @@ export function ParentValueMetricsCard({ metrics, onPlayAt }) {
               <div className="mt-2 flex items-center gap-2 flex-wrap">
                 <span className={`text-[10px] font-extrabold tracking-[0.08em] uppercase px-2 py-1 rounded-[5px] ${rMeta.cls}`}>{rMeta.label}</span>
                 {reaction.timestamp && (
-                  <button
-                    type="button"
-                    onClick={() => onPlayAt?.(reaction.timestamp)}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-[#1E5B3C] hover:text-[#12402A]"
-                    data-testid="v2-pm-reaction-ts"
-                  >
-                    <Play className="w-2.5 h-2.5 fill-current" /> {reaction.timestamp}
-                  </button>
+                  canUseAuthorityProof(authority, reaction) ? (
+                    <button
+                      type="button"
+                      onClick={() => onPlayAt?.(reaction.timestamp, { evidenceId: reaction.evidence_id, eventId: reaction.event_id })}
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-[#1E5B3C] hover:text-[#12402A]"
+                      data-testid="v2-pm-reaction-ts"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-current" /> {reaction.timestamp}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#75816F]" data-testid="v2-pm-reaction-ts">
+                      {reaction.timestamp}
+                    </span>
+                  )
                 )}
               </div>
             ) : (
@@ -98,18 +108,31 @@ export function ParentValueMetricsCard({ metrics, onPlayAt }) {
           </span>
           <div className="mt-2.5 space-y-2">
             {m.topMinutes.map((t, i) => (
-              <button
-                key={i}
-                type="button"
-                data-testid={`v2-pm-topmin-${i}`}
-                onClick={() => onPlayAt?.(t.from)}
-                className="w-full text-left flex items-start gap-2.5 group"
-              >
-                <span className="shrink-0 inline-flex items-center gap-1 bg-[#CCFF00] text-[#0D2818] text-[10px] font-black px-2 py-0.5 rounded-[4px]">
-                  <Play className="w-2.5 h-2.5 fill-current" /> {t.from}{t.to ? `–${t.to}` : ""}
-                </span>
-                <span className="text-[11.5px] text-white/80 leading-[1.45] group-hover:text-white transition-colors">{t.why}</span>
-              </button>
+              authority ? (
+                <div
+                  key={i}
+                  data-testid={`v2-pm-topmin-${i}`}
+                  className="w-full text-left flex items-start gap-2.5"
+                >
+                  <span className="shrink-0 inline-flex items-center gap-1 bg-[#CCFF00] text-[#0D2818] text-[10px] font-black px-2 py-0.5 rounded-[4px]">
+                    {t.from}{t.to ? `–${t.to}` : ""}
+                  </span>
+                  <span className="text-[11.5px] text-white/80 leading-[1.45]">{t.why}</span>
+                </div>
+              ) : (
+                <button
+                  key={i}
+                  type="button"
+                  data-testid={`v2-pm-topmin-${i}`}
+                  onClick={() => onPlayAt?.(t.from)}
+                  className="w-full text-left flex items-start gap-2.5 group"
+                >
+                  <span className="shrink-0 inline-flex items-center gap-1 bg-[#CCFF00] text-[#0D2818] text-[10px] font-black px-2 py-0.5 rounded-[4px]">
+                    <Play className="w-2.5 h-2.5 fill-current" /> {t.from}{t.to ? `–${t.to}` : ""}
+                  </span>
+                  <span className="text-[11.5px] text-white/80 leading-[1.45] group-hover:text-white transition-colors">{t.why}</span>
+                </button>
+              )
             ))}
           </div>
         </div>

@@ -20,11 +20,12 @@ const activeStep = (score) => (score < 7 ? "6" : score < 8.6 ? "8" : "9");
 function AngleChips({ s, onPlayAt, seekable = true, authority = false }) {
   const a = s.angles || {};
   const ev = s.evidence;
-  // FIX 01 C01 — authority: no proof navigation without an authoritative ID.
+  // FIX 01 C01 / FIX 02 — authority: no proof navigation and no "proven"
+  // claim without an authoritative ID + fail-closed proof state.
   const proofable = canUseAuthorityProof(authority, ev);
   return (
     <div className="flex flex-wrap gap-1.5 mt-3">
-      {ev?.verified && (
+      {ev?.verified && (!authority || proofable) && (
         seekable && onPlayAt && proofable ? (
           <button
             type="button"

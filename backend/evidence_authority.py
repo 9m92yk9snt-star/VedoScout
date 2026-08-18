@@ -111,9 +111,8 @@ def attach_event_evidence_authority(full: dict) -> dict:
         elif cands and len(cands) > 1:
             c["event_binding_ambiguous"] = True
 
-    # Sub-skill evidence + structured point-moment references (snapshot
-    # moments, watch-together, grow-your-game lessons) — EXACT unique mapping
-    # only; text and timestamps stay untouched; nothing is deleted here.
+    # Sub-skill evidence + structured point-moment references — EXACT unique
+    # mapping only; text and timestamps stay untouched; nothing is deleted here.
     evidence_by_ms: dict = {}
     for c in comments:
         ms = c.get("evidence_time_ms")
@@ -135,6 +134,15 @@ def attach_event_evidence_authority(full: dict) -> dict:
             if ev and len(ev) == 1:
                 row["event_id"] = ev[0]["event_id"]
 
+    for row in _iter_structured_rows(full):
+        _bind_row(row)
+    return full
+
+
+def _iter_structured_rows(full: dict):
+    """Every structured point-moment row that references report evidence:
+    sub-skill evidence, snapshot moments, watch-together moments, grow-your-game
+    lesson moments and the parent 'reaction after mistake' moment."""
     for cat in ("technical", "tactical", "physical", "mentality"):
         sec = full.get(cat)
         if not isinstance(sec, dict):
@@ -143,21 +151,76 @@ def attach_event_evidence_authority(full: dict) -> dict:
             if not isinstance(sk, dict):
                 continue
             for row in (sk.get("evidence") or []):
-                _bind_row(row)
+                yield row
     for row in (full.get("snapshot_moments") or []):
-        _bind_row(row)
+        yield row
     pp = full.get("parents_package")
     wt = pp.get("watch_together") if isinstance(pp, dict) else None
     if isinstance(wt, dict):
         for row in (wt.get("moments") or []):
-            _bind_row(row)
+            yield row
     gyg = full.get("grow_your_game")
     if isinstance(gyg, dict):
         for lesson in (gyg.get("lessons") or []):
             if isinstance(lesson, dict):
                 for row in (lesson.get("moments") or []):
-                    _bind_row(row)
+                    yield row
+    pvm = full.get("parent_value_metrics")
+    ram = pvm.get("reaction_after_mistake") if isinstance(pvm, dict) else None
+    if isinstance(ram, dict):
+        yield ram
+
+
+def apply_fail_closed_proof_authority(full: dict) -> dict:
+    """FIX 02 — deterministic fail-closed proof eligibility (zero LLM).
+
+    Events: proof-verified only when the cross verifier fully confirmed them.
+    Evidence: proof-verified only through an exact event_id bind to such an
+    event. Structured rows inherit ONLY through exact FIX 01 authority IDs —
+    never nearest, never semantic, never first-available."""
+    if not isinstance(full, dict):
+        return full
+    verified_event_ids = set()
+    for e in (full.get("action_timeline") or []):
+        if not isinstance(e, dict):
+            continue
+        ok = e.get("cross_verified") is True
+        e["proof_verified"] = ok
+        if ok and e.get("event_id"):
+            verified_event_ids.add(e["event_id"])
+    verified_evidence_ids = set()
+    for c in (full.get("video_comments") or []):
+        if not isinstance(c, dict):
+            continue
+        ok = bool(c.get("event_id")) and c["event_id"] in verified_event_ids
+        c["proof_verified"] = ok
+        if ok and c.get("evidence_id"):
+            verified_evidence_ids.add(c["evidence_id"])
+    for row in _iter_structured_rows(full):
+        if not isinstance(row, dict):
+            continue
+        row["proof_verified"] = (
+            (bool(row.get("evidence_id")) and row["evidence_id"] in verified_evidence_ids)
+            or (bool(row.get("event_id")) and row["event_id"] in verified_event_ids)
+        )
     return full
+
+
+def compute_proof_frame_verified(comment: dict) -> bool:
+    """FIX 02 — a frame is exact proof only when the evidence passed the
+    fail-closed proof gate, identity is positively verified (or user-tap
+    ground truth), and the ACTUAL frame moment IS the cited moment.
+    C01: anchor_locked is trusted IDENTITY ground truth ONLY — it never
+    waives the exact-time requirement. A nearby replacement frame may stay
+    as internal identity info — never exact proof."""
+    if not isinstance(comment, dict) or comment.get("proof_verified") is not True:
+        return False
+    if not comment.get("frame_url") or comment.get("frame_placeholder"):
+        return False
+    if comment.get("identity_verified") is not True and comment.get("anchor_locked") is not True:
+        return False
+    et, ft = comment.get("evidence_time_ms"), comment.get("frame_time_ms")
+    return isinstance(et, int) and isinstance(ft, int) and et == ft
 
 
 def attach_clip_authority(comment: dict, clip_start_s, clip_end_s,

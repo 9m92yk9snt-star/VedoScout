@@ -4,7 +4,7 @@
 // pure read-only mapping with graceful fallbacks for missing fields.
 
 // FIX 01 — authority-aware frame lookup lives in a pure, testable module.
-import { buildFrameLookup, isAuthorityReport, canUseAuthorityProof, resolveAuthorityFrame } from "../../lib/authorityJoin.mjs";
+import { buildFrameLookup, isAuthorityReport, canUseAuthorityProof, resolveAuthorityFrame, selectEvidenceHighlight } from "../../lib/authorityJoin.mjs";
 
 export const SKILL_LABELS = {
   first_touch: "First Touch", ball_control: "Ball Control", dribbling: "Dribbling",
@@ -145,7 +145,8 @@ export function deriveV2(report) {
     .filter((a) => a && a.timestamp && (a.title || a.description)
       && String(a.identity_confidence || "").toLowerCase() !== "low");
   const snapFrameEntries = (full.video_comments || [])
-    .filter((c) => c && c.frame_url && !c.frame_placeholder && c.identity_verified !== false && c.timestamp)
+    .filter((c) => c && c.frame_url && !c.frame_placeholder && c.timestamp
+      && (authority ? c.proof_frame_verified === true : c.identity_verified !== false))
     .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url, comment: c.comment || "",
       evidenceId: c.evidence_id || null, eventId: c.event_id || null }));
   const snapUsedFrames = new Set();
@@ -324,16 +325,17 @@ export function deriveV2(report) {
     { label: "Minutes Analysed", value: `${ms.minutes_analysed ?? "—"}'`, pct: Math.min(100, ((ms.minutes_analysed || 0) / 90) * 100) },
   ].filter((r) => r.value !== undefined && r.value !== null) : null;
 
-  // ---- Video highlight (prefer an identity-verified frame) ----
-  const vc = (full.video_comments || []).filter((c) => c && c.timestamp);
-  const vcBest = vc.find((c) => c.frame_url && c.identity_verified === true)
-    || vc.find((c) => c.frame_url && c.identity_verified !== false)
-    || vc[0];
+  // ---- Video highlight (authority: fail-closed proof_verified only) ----
+  const vcBest = selectEvidenceHighlight(full.video_comments, authority);
   const videoHighlight = vcBest
     ? {
         timestamp: vcBest.timestamp, caption: vcBest.comment,
-        thumb: vcBest.identity_verified === false ? null : vcBest.frame_url || null,
-        thumbVerified: vcBest.identity_verified === true,
+        // FIX 02 — authority: the highlight photo/badge must satisfy the
+        // fail-closed proof-frame state; never "verified" by implication.
+        thumb: authority
+          ? (vcBest.proof_frame_verified === true ? vcBest.frame_url || null : null)
+          : (vcBest.identity_verified === false ? null : vcBest.frame_url || null),
+        thumbVerified: authority ? vcBest.proof_frame_verified === true : vcBest.identity_verified === true,
         evidenceId: vcBest.evidence_id || null,
       }
     : null;
@@ -357,6 +359,10 @@ export function deriveV2(report) {
         outcome: ["positive", "neutral", "negative"].includes(oc) ? oc : "neutral",
         tracked: !!a.tracking_verified,
         eventId: a.event_id || null,
+        // FIX 02 — fail-closed proof state; authority rows without it are
+        // rendered non-clickable (defense-in-depth, backend already drops them).
+        proofVerified: a.proof_verified === true,
+        proofable: canUseAuthorityProof(authority, a),
       };
     });
 
@@ -387,6 +393,7 @@ export function deriveV2(report) {
       reaction: pvmRaw.reaction_after_mistake || null,
       offBall: pvmRaw.off_ball_work || null,
       topMinutes,
+      authority,
     };
     if (pm.involvement || pm.bravery || pm.reaction || pm.offBall || topMinutes.length) parentMetrics = pm;
   }

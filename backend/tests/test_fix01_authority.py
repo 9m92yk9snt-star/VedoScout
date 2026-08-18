@@ -284,8 +284,8 @@ def test_T10_duplicate_timestamp_proof_uses_evidence_id():
     script = f"""
 import {{ resolveProofClip }} from "file://{AUTHORITY_MJS}";
 const comments = [
-  {{ timestamp: "00:36", evidence_id: "evd_A", tele_clip_url: "/clips/A.mp4" }},
-  {{ timestamp: "00:36", evidence_id: "evd_B", tele_clip_url: "/clips/B.mp4" }},
+  {{ timestamp: "00:36", evidence_id: "evd_A", proof_verified: true, tele_clip_url: "/clips/A.mp4" }},
+  {{ timestamp: "00:36", evidence_id: "evd_B", proof_verified: true, tele_clip_url: "/clips/B.mp4" }},
 ];
 const auth = resolveProofClip(comments, {{ evidenceId: "evd_B", timestamp: "00:36" }}, true);
 const legacy = resolveProofClip(comments, {{ timestamp: "00:36" }}, false);
@@ -300,8 +300,8 @@ def test_T11_event_proof_join():
     script = f"""
 import {{ resolveProofClip }} from "file://{AUTHORITY_MJS}";
 const comments = [
-  {{ timestamp: "00:20", evidence_id: "evd_A", event_id: "EVT-X", tele_clip_url: "/clips/X.mp4" }},
-  {{ timestamp: "00:36", evidence_id: "evd_B", tele_clip_url: "/clips/B.mp4" }},
+  {{ timestamp: "00:20", evidence_id: "evd_A", event_id: "EVT-X", proof_verified: true, tele_clip_url: "/clips/X.mp4" }},
+  {{ timestamp: "00:36", evidence_id: "evd_B", proof_verified: true, tele_clip_url: "/clips/B.mp4" }},
 ];
 const hit = resolveProofClip(comments, {{ eventId: "EVT-X", timestamp: "00:20" }}, true);
 const miss = resolveProofClip(comments, {{ eventId: "EVT-NONE", timestamp: "00:36" }}, true);
@@ -316,7 +316,7 @@ def test_T12_authority_no_nearest_frame():
     script = f"""
 import {{ buildFrameLookup }} from "file://{AUTHORITY_MJS}";
 const comments = [
-  {{ timestamp: "00:38", evidence_id: "evd_38", frame_url: "/f/38.jpg", identity_verified: true }},
+  {{ timestamp: "00:38", evidence_id: "evd_38", frame_url: "/f/38.jpg", identity_verified: true, proof_frame_verified: true }},
 ];
 const auth = buildFrameLookup(comments, true);
 const a = auth.find("00:36", {{ evidenceId: "evd_36_missing" }});
@@ -458,9 +458,9 @@ import {{ canUseAuthorityProof, strengthThumb }} from "file://{AUTHORITY_MJS}";
 console.log(JSON.stringify({{
   A_afford: canUseAuthorityProof(true, {{ timestamp: "00:36" }}),
   A_thumb: strengthThumb(true, null, "/marker.jpg"),
-  B_afford: canUseAuthorityProof(true, {{ evidenceId: "evd_A" }}),
-  B_afford_evt: canUseAuthorityProof(true, {{ eventId: "evt_A" }}),
-  B_afford_snake: canUseAuthorityProof(true, {{ evidence_id: "evd_A" }}),
+  B_afford: canUseAuthorityProof(true, {{ evidenceId: "evd_A", proof_verified: true }}),
+  B_afford_evt: canUseAuthorityProof(true, {{ eventId: "evt_A", proofVerified: true }}),
+  B_afford_snake: canUseAuthorityProof(true, {{ evidence_id: "evd_A", proof_verified: true }}),
   B_thumb: strengthThumb(true, "/f/36.jpg", "/marker.jpg"),
   C_afford: canUseAuthorityProof(false, {{ timestamp: "00:36" }}),
   C_thumb: strengthThumb(false, null, "/marker.jpg"),
@@ -481,10 +481,10 @@ def test_C01_D_frontend_snapshot_frame_resolution():
     script = f"""
 import {{ resolveAuthorityFrame }} from "file://{AUTHORITY_MJS}";
 const comments = [
-  {{ timestamp: "00:36", evidence_id: "evd_36", event_id: "evt_36", frame_url: "/f/36.jpg", identity_verified: true }},
-  {{ timestamp: "00:38", evidence_id: "evd_38", frame_url: "/f/38.jpg", identity_verified: true }},
+  {{ timestamp: "00:36", evidence_id: "evd_36", event_id: "evt_36", frame_url: "/f/36.jpg", identity_verified: true, proof_frame_verified: true }},
+  {{ timestamp: "00:38", evidence_id: "evd_38", frame_url: "/f/38.jpg", identity_verified: true, proof_frame_verified: true }},
   {{ timestamp: "00:50", evidence_id: "evd_50", frame_url: "/f/50.jpg", identity_verified: false }},
-  {{ timestamp: "00:55", evidence_id: "evd_55", frame_url: "/f/55.jpg", frame_placeholder: true }},
+  {{ timestamp: "00:55", evidence_id: "evd_55", frame_url: "/f/55.jpg", frame_placeholder: true, proof_frame_verified: true }},
 ];
 const byEvd = resolveAuthorityFrame(comments, {{ evidence_id: "evd_36" }});
 const byEvt = resolveAuthorityFrame(comments, {{ eventId: "evt_36" }});
