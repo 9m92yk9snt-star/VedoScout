@@ -556,6 +556,133 @@ def test_G23_zero_model_calls_in_geometry_code():
             assert pat not in src, f"{name} contains {pat}"
 
 
+# --------------- G24–G26 — cold start, hard stop, sharp reversal (C01)
+
+def test_G24_tap_during_full_sprint_no_ramp():
+    # 28 px/sample from frame 1 — no acceleration ramp, no prior velocity
+    frames = [frame_at(i, [(60 + 28 * i, 135, 36, 48, KIT_RED, 1300 + i)]) for i in range(13)]
+    pts, doubts = run_forward(frames, box_of(60, 135))
+    assert not doubts
+    recorded = {round(p["t"] / DT): p for p in pts}
+    assert all(i in recorded for i in range(2, 13)), f"sprint lost: {sorted(recorded)}"
+    for i, p in recorded.items():
+        assert abs(cx_of(p) - (60 + 28 * i)) <= 9        # follows CURRENT position
+        assert abs(cx_of(p) - (60 + 28 * (i - 1))) >= 19  # no fake lag to previous
+
+
+def test_G25_hard_stop_reacquired_not_teleport_rejected():
+    cxs = list(SPRINT_CX[:9]) + [SPRINT_CX[8]] * 6  # sprint → dead stop at 258
+    frames = [frame_at(i, [(cxs[i], 135, 36, 48, KIT_RED, 1350 + i)]) for i in range(15)]
+    pts, doubts = run_forward(frames, box_of(60, 135))
+    assert not doubts, f"hard stop misread as loss: {doubts}"
+    recorded = {round(p["t"] / DT): p for p in pts}
+    assert all(i in recorded for i in range(10, 15)), f"target lost after stop: {sorted(recorded)}"
+    for i in range(10, 15):
+        assert abs(cx_of(recorded[i]) - SPRINT_CX[8]) <= 9
+
+
+def test_G26_sharp_reversal_reacquired_on_new_trajectory():
+    cxs = list(SPRINT_CX[:9]) + [SPRINT_CX[8] - 12 * k for k in range(1, 7)]
+    frames = [frame_at(i, [(cxs[i], 135, 36, 48, KIT_RED, 1400 + i)]) for i in range(15)]
+    pts, doubts = run_forward(frames, box_of(60, 135))
+    assert not doubts
+    recorded = {round(p["t"] / DT): p for p in pts}
+    assert all(i in recorded for i in range(10, 15)), f"reversal lost: {sorted(recorded)}"
+    for i in range(10, 15):
+        p = recorded[i]
+        assert abs(cx_of(p) - cxs[i]) <= 9, "not following the NEW trajectory"
+        assert p["conf"] >= 0.6  # template never learned an unconfirmed turn
+
+
+# --------------- G27–G29 — close/merged same-kit crossover (C01)
+
+def test_G27_close_duel_geometry_withheld():
+    frames = []
+    for i in range(12):
+        cx = 150 + 6 * i
+        players = []
+        if i in (5, 6):  # teammate within < 0.6 bbox-width, partially visible
+            players.append((cx + 14, 135 + 20, 36, 48, KIT_RED, 1460 + i))
+        players.append((cx, 135, 36, 48, KIT_RED, 1450 + i))
+        frames.append(frame_at(i, players))
+    pts, doubts = run_forward(frames, box_of(150, 135))
+    recorded = {round(p["t"] / DT): p for p in pts}
+    assert 5 not in recorded and 6 not in recorded, "contaminated duel frames recorded"
+    for i, p in recorded.items():  # never pulled toward the neighbour
+        assert abs(cx_of(p) - (150 + 6 * i)) <= 9
+    assert all(i in recorded for i in range(7, 12)), "did not resume after the duel"
+    assert not doubts
+
+
+def test_G28_partial_occlusion_crossover_resumes_clean():
+    frames = []
+    for i in range(16):
+        tcx = 120 + 10 * i          # tapped target, steady
+        pcx = 460 - 20 * i          # teammate crossing IN FRONT (drawn last)
+        players = [(tcx, 135, 36, 48, KIT_RED, 1500 + i),
+                   (pcx, 135 + 30, 36, 48, KIT_RED, 1550 + i)]
+        frames.append(frame_at(i, players))
+    pts, doubts = run_forward(frames, box_of(120, 135))
+    assert not doubts
+    recorded = {round(p["t"] / DT): p for p in pts}
+    overlap = [i for i in range(16) if abs((460 - 20 * i) - (120 + 10 * i)) < 30]
+    assert any(i not in recorded for i in overlap), "no occlusion frame was withheld"
+    for i, p in recorded.items():
+        tcx, pcx = 120 + 10 * i, 460 - 20 * i
+        assert abs(cx_of(p) - tcx) <= 12, f"target lost at {i}"
+        if abs(tcx - pcx) > 40:
+            assert abs(cx_of(p) - pcx) > 20, f"switched to the crossing teammate at {i}"
+        assert p["conf"] >= 0.6  # template not contaminated
+    assert max(recorded) >= 14, "did not resume after separation"
+
+
+def test_G29_merged_body_region_never_a_clean_bbox():
+    frames = []
+    for i in range(12):
+        players = [(240, 135, 36, 48, KIT_RED, 1600 + i)]
+        if i >= 5:  # partner merges into one wider foreground region
+            players.insert(0, (240 + 16, 135 + 16, 36, 48, KIT_RED, 1650))
+        frames.append(frame_at(i, players))
+    pts, doubts = run_forward(frames, box_of(240, 135))
+    recorded = {round(p["t"] / DT): p for p in pts}
+    merged = [i for i in recorded if i >= 5]
+    assert len(merged) <= 1, f"merged frames became authoritative geometry: {merged}"
+    for i in merged:  # any surviving frame is the single tapped body, never the blob
+        p = recorded[i]
+        assert p["w"] * W <= 36 * 1.1 and p["h"] * H <= 48 * 1.1
+        assert abs(cx_of(p) - 240) <= 8 and abs(cy_of(p) - 135) <= 8
+        assert abs(cx_of(p) - 256) >= 12, "geometry pulled to the partner"
+    for p in pts:
+        assert p["w"] * W <= 36 * 1.2  # never a widened 'clean' single bbox
+    assert any(("overlap" in d["reason"]) or ("ambiguous" in d["reason"]) for d in doubts), \
+        f"no crowding doubt: {doubts}"
+    assert not any(i >= 8 for i in recorded), "persistent merge did not stop the direction"
+
+
+# --------------- G30 — unified conservative miss budget (C01)
+
+def test_G30_mixed_rejection_streak_stops_direction():
+    frames = []
+    for i in range(10):
+        if i <= 4:
+            players = [(240, 135, 36, 48, KIT_RED, 1700 + i)]   # established target
+        elif i == 5:
+            players = []                                        # vanished → low NCC
+        elif i == 6:                                            # two rivals → ambiguity
+            players = [(240 - 8, 135 - 15, 36, 48, KIT_RED, 1750),
+                       (240 + 12, 135 + 15, 36, 48, KIT_RED, 1751)]
+        elif i == 7:                                            # far decoy → spatial hold
+            players = [(240 + 40, 135, 36, 48, KIT_RED, 1752)]
+        else:
+            players = [(240, 135, 36, 48, KIT_RED, 1700 + i)]   # target returns too late
+        frames.append(frame_at(i, players))
+    pts, doubts = run_forward(frames, box_of(240, 135))
+    recorded = {round(p["t"] / DT): p for p in pts}
+    assert not any(i >= 5 for i in recorded), "wrong geometry recorded during the streak"
+    assert doubts, "mixed rejection streak did not stop the direction"
+    assert not any(i in recorded for i in (8, 9)), "stale re-lock after the stop"
+
+
 # ------------------------------------------------- pure geometry helpers
 
 def test_pure_teleport_gate_bounds():
@@ -594,6 +721,20 @@ def test_pure_ambiguity_and_second_peak():
     res2[8, 10] = 0.88  # same-object shoulder → suppressed, NOT a distinct peak
     mx2b, _ = tracking_geometry.second_peak(res2, (5, 5), 12, 12)
     assert mx2b < 0.5
+
+
+def test_pure_near_rival_contamination():
+    res = np.zeros((40, 40), dtype="float32")
+    res[20, 20] = 0.9
+    res[20, 22] = 0.85  # inside the single-body mainlobe → not a rival
+    assert tracking_geometry.is_contaminated(res, (20, 20), 36, 48, 0.9) is False
+    res[24, 34] = 0.8   # dx=14 (band), dy=4 → strong near-field rival
+    assert tracking_geometry.is_contaminated(res, (20, 20), 36, 48, 0.9) is True
+    res[24, 34] = 0.5   # weak support in the band → clean
+    assert tracking_geometry.is_contaminated(res, (20, 20), 36, 48, 0.9) is False
+    res[24, 34] = 0.42
+    assert tracking_geometry.is_contaminated(res, (20, 20), 36, 48, 0.5) is False  # weak match = lost, not crowded
+    assert tracking_geometry.near_rival(np.zeros((1, 1), dtype="float32"), (0, 0), 36, 48) <= 0.0
 
 
 def test_pure_camera_shift_recovers_translation_and_fails_safe():

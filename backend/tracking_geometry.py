@@ -21,6 +21,11 @@ AMBIG_RATIO = 0.8         # distinct second peak this close to best = ambiguous
 AMBIG_DIST_FRAC = 0.6     # peaks farther apart than this × template dim = distinct
 JUMP_BASE_FRAC = 0.5      # teleport allowance = bbox × (base + rate × dt)
 JUMP_RATE_FRAC = 2.0
+BOOT_FRAC = 0.75          # bounded bootstrap widening (extra margin, in bbox dims)
+CONTAM_INNER = 0.25       # single-body mainlobe halfwidth (× template dim)
+CONTAM_OUTER = 0.6        # near-field band outer edge (× template dim)
+CONTAM_RATIO = 0.75       # rival support this close to best = contaminated
+CONTAM_MIN = 0.55         # below this match quality the band is noise, not crowding
 
 
 def estimate_camera_shift(prev_tiny, cur_tiny):
@@ -96,3 +101,28 @@ def is_ambiguous(best, second, floor):
     """Two spatially distinct candidates too close in score → the frame must
     not become authoritative geometry (same-kit crossover safety)."""
     return second >= floor and second >= best * AMBIG_RATIO
+
+
+def near_rival(res, best_loc, tw, th):
+    """Strongest match support in the near-field band around the best peak —
+    outside a single body's autocorrelation mainlobe but closer than the
+    'spatially distinct' radius. One isolated player leaves this band weak;
+    a partially visible overlapping body raises it."""
+    ix, iy = max(2, int(tw * CONTAM_INNER)), max(2, int(th * CONTAM_INNER))
+    ox, oy = max(ix + 1, int(tw * CONTAM_OUTER)), max(iy + 1, int(th * CONTAM_OUTER))
+    x0, y0 = max(0, best_loc[0] - ox), max(0, best_loc[1] - oy)
+    x1, y1 = min(res.shape[1], best_loc[0] + ox + 1), min(res.shape[0], best_loc[1] + oy + 1)
+    win = res[y0:y1, x0:x1].copy()
+    if win.size == 0:
+        return 0.0
+    mx0, my0 = max(0, best_loc[0] - ix - x0), max(0, best_loc[1] - iy - y0)
+    mx1, my1 = min(win.shape[1], best_loc[0] + ix + 1 - x0), min(win.shape[0], best_loc[1] + iy + 1 - y0)
+    win[my0:my1, mx0:mx1] = -1.0
+    return float(win.max())
+
+
+def is_contaminated(res, best_loc, tw, th, mx):
+    """Deterministic close-crowding gate: SOLID geometry whose near-field
+    carries a second strong body support must not be learned or recorded.
+    Weak matches are 'lost', not crowded — their band is just noise."""
+    return mx >= CONTAM_MIN and near_rival(res, best_loc, tw, th) >= mx * CONTAM_RATIO
