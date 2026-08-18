@@ -6983,6 +6983,9 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         "created_at": doc.get("created_at"),
         "paid_at": doc.get("paid_at"),
         "gyg_lesson_count": doc.get("gyg_lesson_count", 0),
+        # FIX 00B — the authoritative finalization state. Legacy docs that
+        # predate the lifecycle states fall back to ready when complete.
+        "full_report_status": doc.get("full_report_status") or ("ready" if doc.get("full_report") else None),
     }
     if not include_full:
         # Honest teaser for the free landing — a real overall number ONLY when a
@@ -7156,13 +7159,15 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     if not unlocked:
         raise HTTPException(status_code=402, detail="Payment required")
 
-    if doc.get("full_report"):
+    if doc.get("full_report") and (doc.get("full_report_status") or "ready") == "ready":
         return {"status": "exists", "report_id": report_id, "full_report_status": "ready"}
 
     # Idempotency — if a task is already running for this report, no-op.
+    # FIX 00B — verifying/finalizing are still in-flight states: never restart
+    # the task and never claim ready while they run.
     current = doc.get("full_report_status")
-    if current in ("generating", "awaiting_confirmation"):
-        return {"status": "already_generating", "report_id": report_id, "full_report_status": "generating"}
+    if current in ("generating", "verifying", "finalizing", "awaiting_confirmation"):
+        return {"status": "already_generating", "report_id": report_id, "full_report_status": current}
 
     # Verify the source video is REACHABLE (local disk OR Cloudflare R2).
     # After the R2 flush, `video_filename` still exists in the doc but the file
@@ -8154,22 +8159,436 @@ async def _trusted_fastest_moment(
     return None
 
 
+def _report_media_paths(doc: dict) -> tuple:
+    """EXISTING marker/subject-crop restore logic, extracted verbatim so the
+    normal pipeline and corrective-only recovery share it."""
+    marker_path = None
+    if doc.get("marker_filename"):
+        mp = UPLOAD_DIR / doc["marker_filename"]
+        if not mp.exists():
+            _try_restore_from_r2(doc.get("marker_url_override"), mp)
+        if mp.exists():
+            marker_path = str(mp)
+    crop_path_str = None
+    if doc.get("subject_crop_filename"):
+        cp = UPLOAD_DIR / doc["subject_crop_filename"]
+        if not cp.exists():
+            _try_restore_from_r2(doc.get("subject_crop_url_override"), cp)
+        if cp.exists():
+            crop_path_str = str(cp)
+    return marker_path, crop_path_str
+
+
+def _collect_anchor_crop_paths(anchor_payload_list: list) -> tuple[list[str], list[str]]:
+    """EXISTING anchor tight/wide crop collection (with R2 restore), extracted
+    verbatim. Wide crops keep the existing [:3] budget."""
+    anchor_crops_full: list[str] = []
+    for a in anchor_payload_list:
+        cf = a.get("crop_filename") if isinstance(a, dict) else None
+        if not cf:
+            continue
+        p = UPLOAD_DIR / cf
+        if not p.exists() and isinstance(a, dict):
+            _try_restore_from_r2(a.get("crop_r2_url"), p)
+        if p.exists():
+            anchor_crops_full.append(str(p))
+    wide_crops_full: list[str] = []
+    for a in anchor_payload_list:
+        wf = a.get("wide_filename") if isinstance(a, dict) else None
+        if not wf:
+            continue
+        p = UPLOAD_DIR / wf
+        if not p.exists() and isinstance(a, dict):
+            _try_restore_from_r2(a.get("wide_r2_url"), p)
+        if p.exists():
+            wide_crops_full.append(str(p))
+    return anchor_crops_full, wide_crops_full[:3]
+
+
+async def _compose_full_prompt(doc: dict, audio_events_full, anchor_payload_list: list,
+                               crop_path_str, gt_track, gt_t_off) -> str:
+    """EXISTING full-report prompt composition (precision priors + identity
+    profile + identity memory + ground-truth positions), extracted verbatim so
+    the normal pipeline and corrective-only recovery build the SAME prompt."""
+    details_str = json.dumps(doc["player_details"], ensure_ascii=False)
+    gate = doc.get("content_gate") or {}
+    fp_obj = None
+    fp_payload = doc.get("fingerprint")
+    if fp_payload:
+        try:
+            fp_obj = PlayerFingerprint(
+                jersey_hex=fp_payload.get("jersey_hex", "#888888"),
+                jersey_name=fp_payload.get("jersey_name", "unclear"),
+                shorts_hex=fp_payload.get("shorts_hex", "#888888"),
+                shorts_name=fp_payload.get("shorts_name", "unclear"),
+                body_ratio=float(fp_payload.get("body_ratio", 2.0)),
+                crop_path=crop_path_str,
+                box=fp_payload.get("box", {}),
+                confidence="ok",
+            )
+        except Exception:
+            fp_obj = None
+    if fp_obj is not None:
+        full_prompt = precision_build_full_prompt(
+            base_prompt=FULL_REPORT_PROMPT,
+            fingerprint=fp_obj,
+            audio_events=audio_events_full,
+            player_details=doc["player_details"],
+            content_type=str(gate.get("content_type", "other")),
+            quality=str(gate.get("quality", "good")),
+            player_visible=str(gate.get("player_visible", "clear")),
+            camera_distance=str(gate.get("camera_distance", "medium")),
+            games_detected=int(gate.get("games_detected", 1) or 1),
+            anchors=anchor_payload_list,
+        )
+    else:
+        full_prompt = (
+            FULL_REPORT_PROMPT
+            .replace("{player_details}", details_str)
+            .replace("{content_type}", str(gate.get("content_type", "other")))
+            .replace("{quality}", str(gate.get("quality", "good")))
+            .replace("{player_visible}", str(gate.get("player_visible", "clear")))
+            .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
+            .replace("{games_detected}", str(gate.get("games_detected", 1)))
+        )
+    # Inject the pre-analysis identity profile (same block as the preview).
+    try:
+        _idp = doc.get("identity_profile")
+        if _idp:
+            full_prompt += identity_profile_block(_idp)
+    except Exception:
+        pass
+    # Stage 5 — identity memory from this player's previous reports.
+    try:
+        _mem = await db.player_profiles.find_one(
+            {"user_id": doc.get("user_id"),
+             "normalized_name": _norm_player_name((doc.get("player_details") or {}).get("player_name"))})
+        _mem_block = identity_memory_block(_mem)
+        if _mem_block:
+            full_prompt += _mem_block
+    except Exception:
+        pass
+    # Inject the ground-truth tap positions + tracking coverage.
+    try:
+        gt_block = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
+        if gt_block:
+            full_prompt += gt_block
+    except Exception:
+        pass
+    return full_prompt
+
+
+async def _run_identity_corrective_pass(
+    report_id: str, *, full_prompt: str, file_path, marker_path, crop_path_str,
+    anchor_crops_full: list, wide_crops_full: list, anchor_payload_list: list,
+    gt_track, gt_t_off, doc: dict, identity_stats=None,
+) -> str:
+    """EXISTING corrective identity re-analysis (session `full-retry-{id}`),
+    extracted UNCHANGED so the normal pipeline and corrective-only recovery
+    share ONE corrective algorithm. Preserved semantics:
+    - at most once AFTER a corrective replacement was actually produced
+      (`identity_corrective_persisted`); a transient PRE-persist failure
+      re-arms `identity_retry_done` so a later explicit recovery may retry
+      the REQUIRED full-retry call (never the standard full-{id} call)
+    - failures BEFORE the replacement report is persisted re-arm the marker
+      and return "failed" — BOTH callers then fail the run and keep the
+      corrective requirement (READY is never written for an unverified report)
+    - failures AFTER it is persisted propagate (its final evidence persistence
+      is REQUIRED before READY)
+    - a still-failing re-verification sets `identity_flagged`.
+    Returns "completed" | "already_done" | "failed"."""
+    persisted = False
+    try:
+        checked = (identity_stats or {}).get("checked", 0)
+        dropped = (identity_stats or {}).get("hard_rejected", 0)
+        fresh = await db.reports.find_one({"id": report_id})
+        if not fresh:
+            return "already_done"
+        if fresh.get("identity_corrective_persisted"):
+            # The corrective replacement exists — at-most-once holds forever.
+            return "already_done"
+        if fresh.get("identity_retry_done"):
+            # Legacy at-most-once marker (or an attempt in flight) — never run
+            # a duplicate corrective call in this pass.
+            return "already_done"
+        await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
+        bad_ts = [
+            str(c.get("timestamp"))
+            for c in (fresh.get("full_report") or {}).get("video_comments", [])
+            if isinstance(c, dict) and c.get("identity_hard_reject") and c.get("timestamp")
+        ]
+        correction = (
+            "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact video FAILED an "
+            "independent vision verification. The tapped player was confirmed NOT to be the subject "
+            f"at these timestamps: {', '.join(bad_ts) if bad_ts else 'several cited moments'}. "
+            "You most likely switched to a DIFFERENT player at some point. Re-analyse from scratch "
+            "with strict focus on the attached reference crops (the tapped player may be partially "
+            "hidden in them). Re-identify the tapped player at EVERY timestamp you cite; if you are "
+            "not certain at a moment, do NOT cite it."
+        )
+        logger.warning(f"[identity-gate] {report_id}: {dropped}/{checked} frames rejected — running ONE corrective re-analysis")
+        retry = await call_gemini_with_video(
+            session_id=f"full-retry-{report_id}",
+            prompt=full_prompt + correction,
+            video_path=str(file_path),
+            marker_path=marker_path,
+            crop_path=crop_path_str,
+            anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+            timeout_s=420.0,
+        )
+        retry = scrub_hedging(retry)
+        retry = _filter_low_identity_evidence(retry, report_id)
+        _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
+        await _cross_verify_full_report(
+            report_id, retry,
+            file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
+            anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+            anchor_payload_list=anchor_payload_list,
+            gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+        )
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report": retry, "full_generated_at": now_iso(),
+                      # internal checkpoint: the corrective replacement now EXISTS —
+                      # only from here on may the at-most-once rule skip Gemini.
+                      "identity_corrective_persisted": True}},
+        )
+        persisted = True
+        stats2 = await _persist_video_frames(report_id, file_path)
+        checked2 = (stats2 or {}).get("checked", 0)
+        dropped2 = (stats2 or {}).get("hard_rejected", 0)
+        if _identity_gate_required(stats2):
+            await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
+            logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
+        else:
+            logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
+        return "completed"
+    except Exception:
+        if persisted:
+            # FIX 00B correction — the replacement report is already live;
+            # its final evidence persistence is REQUIRED before READY.
+            raise
+        # PRE-persist transient failure: the required corrective output does
+        # NOT exist — re-arm the marker so a later explicit recovery may retry
+        # the corrective call (never an automatic loop, never a standard call).
+        try:
+            await db.reports.update_one(
+                {"id": report_id, "identity_corrective_persisted": {"$ne": True}},
+                {"$set": {"identity_retry_done": False}},
+            )
+        except Exception:
+            pass
+        logger.exception(f"identity gate failed for {report_id}")
+        return "failed"
+
+
+async def _corrective_only_recovery(report_id: str, doc: dict) -> None:
+    """FIX 00B — `identity_regen_required` recovery. The persisted report body
+    specifically requires the corrective identity re-analysis, so run ONLY the
+    existing corrective pass (session `full-retry-{id}`) — NEVER the standard
+    `full-{id}` generation, and never rerun tracking/movement/pace. Reuses the
+    persisted full_report, player_track, anchor_time_offset, anchors and audio
+    metadata. `identity_regen_required` stays True until recovery actually
+    succeeds, so a transient failure never loses the requirement."""
+    file_path = await _ensure_report_video_local(report_id)
+    if not file_path or not file_path.exists():
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "failed",
+                      "full_report_error": "Source video file missing on server."}},
+        )
+        return
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"full_report_status": "verifying", "full_report_error": None}},
+    )
+    marker_path, crop_path_str = _report_media_paths(doc)
+    anchor_payload_list = doc.get("anchors") or []
+    anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
+    gt_track = doc.get("player_track")
+    try:
+        gt_t_off = float(doc.get("anchor_time_offset") or (gt_track or {}).get("t_off") or 0.0)
+    except Exception:
+        gt_t_off = 0.0
+    audio_events_full = [
+        SimpleNamespace(t=float(e.get("t", 0)), peak_db=float(e.get("peak_db", 0)), kind=str(e.get("kind", "")))
+        for e in (doc.get("audio_events_full") or []) if isinstance(e, dict)
+    ]
+    full_prompt = await _compose_full_prompt(
+        doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off)
+    outcome = await _run_identity_corrective_pass(
+        report_id, full_prompt=full_prompt, file_path=file_path, marker_path=marker_path,
+        crop_path_str=crop_path_str, anchor_crops_full=anchor_crops_full,
+        wide_crops_full=wide_crops_full, anchor_payload_list=anchor_payload_list,
+        gt_track=gt_track, gt_t_off=gt_t_off, doc=doc, identity_stats=None,
+    )
+    if outcome == "failed":
+        # Keep identity_regen_required=True — the requirement must survive
+        # transient failures. The outer failure contract marks the run failed.
+        raise RuntimeError("corrective identity re-analysis failed — recovery requirement kept")
+    if outcome == "completed":
+        # Corrective pass already persisted the replacement report AND
+        # re-verified its evidence frames (incl. identity_flagged semantics).
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "finalizing",
+                      "identity_gate_done": True,
+                      "identity_regen_required": False}},
+        )
+        await _finalize_full_report(report_id, file_path, persist_frames=False)
+    else:
+        # "already_done" — the one corrective attempt ran in an earlier run:
+        # existing semantics = re-evaluate evidence via the finalization gate
+        # (identity_retry_done=True → still-failing becomes identity_flagged).
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "finalizing",
+                      "identity_regen_required": False}},
+        )
+        await _finalize_full_report(report_id, file_path, persist_frames=True)
+
+
+def _identity_gate_required(stats) -> bool:
+    """EXISTING corrective-identity threshold (UNCHANGED: checked >= 2 and
+    hard_rejected/checked >= 0.5). Single definition shared by the normal
+    pipeline and finalization recovery so READY has identical identity-gate
+    semantics on both paths."""
+    checked = (stats or {}).get("checked", 0)
+    dropped = (stats or {}).get("hard_rejected", 0)
+    return checked >= 2 and dropped / checked >= 0.5
+
+
+async def _finalize_full_report(report_id: str, file_path, persist_frames: bool = True) -> None:
+    """FIX 00B — FINALIZING → READY. Completes the required user-facing
+    finalization work and then writes the SINGLE authoritative
+    `full_report_status = "ready"` transition. READY must never lie: it is
+    written here and nowhere else in the analysis run, after finalization.
+    Individual asset failures keep their existing fail-open handling INSIDE
+    _persist_video_frames (safe omission + read-time self-heal), but a
+    TOP-LEVEL _persist_video_frames failure means finalization did NOT
+    complete and MUST propagate into the caller's failure contract.
+
+    RECOVERY (persist_frames=True) has identity-gate PARITY with the normal
+    pipeline via the internal `identity_gate_done` checkpoint:
+      A. checkpoint done → skip the expensive re-verification, finish → READY
+      B/C. re-persist evidence, stats below threshold → checkpoint → READY
+      D. threshold met + correction never ran → NEVER ready; flag
+         `identity_regen_required` so the next run performs the existing full
+         corrective re-analysis (correctness wins over saving an LLM call)
+      E. threshold met + `identity_retry_done` already true → existing
+         `identity_flagged` semantics, then READY (same as normal pipeline).
+    Notifications are optional and are sent after READY so they can never
+    block or falsify it."""
+    if persist_frames:
+        doc = await db.reports.find_one({"id": report_id})
+        if not doc:
+            return
+        if doc.get("identity_gate_done"):
+            logger.info(f"[finalize-recovery] {report_id}: identity gate checkpoint complete — skipping re-verification")
+        else:
+            # FIX 00B correction — do NOT swallow: top-level failure → no READY.
+            stats = await _persist_video_frames(report_id, file_path)
+            if _identity_gate_required(stats):
+                fresh = await db.reports.find_one({"id": report_id})
+                if fresh and fresh.get("identity_retry_done"):
+                    # Case E — the one corrective re-analysis already ran:
+                    # existing normal-pipeline semantics = flag for review.
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"identity_flagged": True}},
+                    )
+                    logger.warning(f"[finalize-recovery] {report_id}: still failing identity after prior correction — flagged for review")
+                else:
+                    # Case D — the existing corrective re-analysis is REQUIRED
+                    # and needs the full pipeline context: route the next run
+                    # to a full regeneration instead of declaring a suspect
+                    # report ready.
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"identity_regen_required": True}},
+                    )
+                    raise RuntimeError(
+                        "identity verification rejected most evidence frames — corrective re-analysis required"
+                    )
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"identity_gate_done": True}},
+            )
+    try:
+        fresh = await db.reports.find_one({"id": report_id})
+        if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
+            review = _default_agent_review(fresh.get("paid_at"))
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"agent_review": review}},
+            )
+    except Exception:
+        logger.exception(f"Failed to queue agent_review for {report_id}")
+    # THE authoritative READY transition — the only write of "ready" in the run.
+    await db.reports.update_one(
+        {"id": report_id},
+        {"$set": {"full_report_status": "ready", "full_report_error": None}},
+    )
+    try:
+        await _send_report_ready_email(report_id)
+    except Exception:
+        logger.exception(f"report-ready email failed for {report_id}")
+    try:
+        await _notify_dashboard_report(report_id, "full")
+    except Exception:
+        logger.exception(f"dashboard notify failed for {report_id}")
+
+
 async def generate_full_report_task(report_id: str) -> None:
     """Fire-and-forget full report generation (used after Stripe payment OR auto-paid uploads).
 
     Sets `full_report_status` on the report doc so the frontend can poll
     `/reports/{id}/status` to know when generation is done. Status values:
-    `generating` | `ready` | `failed`.
+    `generating` | `verifying` | `finalizing` | `ready` | `failed`.
     """
     try:
         doc = await db.reports.find_one({"id": report_id})
-        if not doc or doc.get("full_report"):
-            # Already done — make sure status reflects that for any concurrent poller.
-            if doc and doc.get("full_report") and doc.get("full_report_status") != "ready":
+        if not doc:
+            return
+        if doc.get("full_report") and doc.get("identity_regen_required"):
+            # FIX 00B — corrective-only recovery: the body exists and requires
+            # identity correction. NEVER re-run the standard full-{id} Gemini
+            # generation; run exactly the existing corrective pass instead.
+            await _corrective_only_recovery(report_id, doc)
+            return
+        if doc.get("full_report"):
+            st = doc.get("full_report_status")
+            if st == "ready":
+                return
+            if not st:
+                # TRUE legacy doc (predates the lifecycle states) — instant-ready
+                # fallback for backward compatibility ONLY.
                 await db.reports.update_one(
                     {"id": report_id},
                     {"$set": {"full_report_status": "ready"}},
                 )
+                return
+            if st in ("verifying", "finalizing", "failed", "generating"):
+                # FIX 00B — the report body already exists, so recover by re-running
+                # ONLY the finalization tail (frames/clips regenerate idempotently)
+                # and let IT write READY. Never a new Gemini spend, and an explicit
+                # failed/non-ready state is NEVER promoted directly to ready.
+                file_path = await _ensure_report_video_local(report_id)
+                if file_path and file_path.exists():
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"full_report_status": "finalizing", "full_report_error": None}},
+                    )
+                    await _finalize_full_report(report_id, file_path, persist_frames=True)
+                else:
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"full_report_status": "failed",
+                                  "full_report_error": "Source video file missing on server."}},
+                    )
+                return
+            # Any other EXPLICIT state (e.g. awaiting_confirmation) — never
+            # promote to ready just because the report body exists.
             return
         await db.reports.update_one(
             {"id": report_id},
@@ -8177,6 +8596,9 @@ async def generate_full_report_task(report_id: str) -> None:
                 "full_report_status": "generating",
                 "full_report_error": None,
                 "full_report_started_at": datetime.now(timezone.utc).isoformat(),
+                # FIX 00B — internal checkpoints reset for the new analysis run.
+                "identity_gate_done": False,
+                "identity_regen_required": False,
             }},
         )
         file_path = await _ensure_report_video_local(report_id)
@@ -8188,48 +8610,9 @@ async def generate_full_report_task(report_id: str) -> None:
             )
             return
 
-        marker_path = None
-        if doc.get("marker_filename"):
-            mp = UPLOAD_DIR / doc["marker_filename"]
-            if not mp.exists():
-                _try_restore_from_r2(doc.get("marker_url_override"), mp)
-            if mp.exists():
-                marker_path = str(mp)
-
-        crop_path_str = None
-        if doc.get("subject_crop_filename"):
-            cp = UPLOAD_DIR / doc["subject_crop_filename"]
-            if not cp.exists():
-                _try_restore_from_r2(doc.get("subject_crop_url_override"), cp)
-            if cp.exists():
-                crop_path_str = str(cp)
-
+        marker_path, crop_path_str = _report_media_paths(doc)
         anchor_payload_list = doc.get("anchors") or []
-        anchor_crops_full: list[str] = []
-        for a in anchor_payload_list:
-            cf = a.get("crop_filename") if isinstance(a, dict) else None
-            if not cf:
-                continue
-            p = UPLOAD_DIR / cf
-            if not p.exists() and isinstance(a, dict):
-                _try_restore_from_r2(a.get("crop_r2_url"), p)
-            if p.exists():
-                anchor_crops_full.append(str(p))
-
-        wide_crops_full: list[str] = []
-        for a in anchor_payload_list:
-            wf = a.get("wide_filename") if isinstance(a, dict) else None
-            if not wf:
-                continue
-            p = UPLOAD_DIR / wf
-            if not p.exists() and isinstance(a, dict):
-                _try_restore_from_r2(a.get("wide_r2_url"), p)
-            if p.exists():
-                wide_crops_full.append(str(p))
-        wide_crops_full = wide_crops_full[:3]
-
-        details_str = json.dumps(doc["player_details"], ensure_ascii=False)
-        gate = doc.get("content_gate") or {}
+        anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
 
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
         # Session 143 — PARALLEL PIPELINE:
@@ -8344,70 +8727,9 @@ async def generate_full_report_task(report_id: str) -> None:
             except Exception:
                 logger.exception(f"movement/pace metrics failed for {report_id}")
 
-        # ── Precision priors ──
-        fp_obj = None
-        fp_payload = doc.get("fingerprint")
-        if fp_payload:
-            try:
-                fp_obj = PlayerFingerprint(
-                    jersey_hex=fp_payload.get("jersey_hex", "#888888"),
-                    jersey_name=fp_payload.get("jersey_name", "unclear"),
-                    shorts_hex=fp_payload.get("shorts_hex", "#888888"),
-                    shorts_name=fp_payload.get("shorts_name", "unclear"),
-                    body_ratio=float(fp_payload.get("body_ratio", 2.0)),
-                    crop_path=crop_path_str,
-                    box=fp_payload.get("box", {}),
-                    confidence="ok",
-                )
-            except Exception:
-                fp_obj = None
-        if fp_obj is not None:
-            full_prompt = precision_build_full_prompt(
-                base_prompt=FULL_REPORT_PROMPT,
-                fingerprint=fp_obj,
-                audio_events=audio_events_full,
-                player_details=doc["player_details"],
-                content_type=str(gate.get("content_type", "other")),
-                quality=str(gate.get("quality", "good")),
-                player_visible=str(gate.get("player_visible", "clear")),
-                camera_distance=str(gate.get("camera_distance", "medium")),
-                games_detected=int(gate.get("games_detected", 1) or 1),
-                anchors=anchor_payload_list,
-            )
-        else:
-            full_prompt = (
-                FULL_REPORT_PROMPT
-                .replace("{player_details}", details_str)
-                .replace("{content_type}", str(gate.get("content_type", "other")))
-                .replace("{quality}", str(gate.get("quality", "good")))
-                .replace("{player_visible}", str(gate.get("player_visible", "clear")))
-                .replace("{camera_distance}", str(gate.get("camera_distance", "medium")))
-                .replace("{games_detected}", str(gate.get("games_detected", 1)))
-            )
-        # Inject the pre-analysis identity profile (same block as the preview).
-        try:
-            _idp = doc.get("identity_profile")
-            if _idp:
-                full_prompt += identity_profile_block(_idp)
-        except Exception:
-            pass
-        # Stage 5 — identity memory from this player's previous reports.
-        try:
-            _mem = await db.player_profiles.find_one(
-                {"user_id": doc.get("user_id"),
-                 "normalized_name": _norm_player_name((doc.get("player_details") or {}).get("player_name"))})
-            _mem_block = identity_memory_block(_mem)
-            if _mem_block:
-                full_prompt += _mem_block
-        except Exception:
-            pass
-        # Inject the ground-truth tap positions + tracking coverage.
-        try:
-            gt_block = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
-            if gt_block:
-                full_prompt += gt_block
-        except Exception:
-            pass
+        # ── Full-report prompt (shared verbatim with corrective-only recovery) ──
+        full_prompt = await _compose_full_prompt(
+            doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off)
         # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
         full, _mm_done = await asyncio.gather(
             call_gemini_with_video(
@@ -8441,6 +8763,11 @@ async def generate_full_report_task(report_id: str) -> None:
             full.pop("parent_corner", None)
         # INTELLIGENT DUAL-PASS — independent verification of every claim
         # (identity + event) before the report is stored. Fail-open.
+        # FIX 00B — lifecycle: generation done, verification pass starting.
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"full_report_status": "verifying"}},
+        )
         await _cross_verify_full_report(
             report_id, full,
             file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
@@ -8452,7 +8779,10 @@ async def generate_full_report_task(report_id: str) -> None:
             {"$set": {
                 "full_report": full,
                 "full_generated_at": now_iso(),
-                "full_report_status": "ready",
+                # FIX 00B — NOT ready yet: user-facing evidence frames, proof
+                # clips and identity gating still run below. READY is written
+                # only by _finalize_full_report at the true end of the pipeline.
+                "full_report_status": "finalizing",
                 "full_report_error": None,
                 "gyg_lesson_count": gyg_count,
                 "audio_events_full": [
@@ -8461,80 +8791,46 @@ async def generate_full_report_task(report_id: str) -> None:
             }},
         )
         # Ensure scout review is queued for every paid/unlocked report
-        try:
-            identity_stats = await _persist_video_frames(report_id, file_path)
-        except Exception:
-            identity_stats = None
-            logger.exception(f"evidence frame persist failed for {report_id}")
+        # FIX 00B correction — a TOP-LEVEL persist failure means finalization
+        # did NOT complete: propagate into the failure contract (no ready).
+        # Individual asset failures stay fail-open INSIDE _persist_video_frames.
+        identity_stats = await _persist_video_frames(report_id, file_path)
         # ── IDENTITY GATE — one corrective re-analysis when GPT-vision rejects
         # most evidence frames (Gemini most likely switched player mid-video).
-        try:
-            checked = (identity_stats or {}).get("checked", 0)
-            dropped = (identity_stats or {}).get("hard_rejected", 0)
-            if checked >= 2 and dropped / checked >= 0.5:
-                fresh = await db.reports.find_one({"id": report_id})
-                if fresh and not fresh.get("identity_retry_done"):
-                    await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
-                    bad_ts = [
-                        str(c.get("timestamp"))
-                        for c in (fresh.get("full_report") or {}).get("video_comments", [])
-                        if isinstance(c, dict) and c.get("identity_hard_reject") and c.get("timestamp")
-                    ]
-                    correction = (
-                        "\n\n🚨 IDENTITY CORRECTION — a previous analysis of THIS exact video FAILED an "
-                        "independent vision verification. The tapped player was confirmed NOT to be the subject "
-                        f"at these timestamps: {', '.join(bad_ts) if bad_ts else 'several cited moments'}. "
-                        "You most likely switched to a DIFFERENT player at some point. Re-analyse from scratch "
-                        "with strict focus on the attached reference crops (the tapped player may be partially "
-                        "hidden in them). Re-identify the tapped player at EVERY timestamp you cite; if you are "
-                        "not certain at a moment, do NOT cite it."
-                    )
-                    logger.warning(f"[identity-gate] {report_id}: {dropped}/{checked} frames rejected — running ONE corrective re-analysis")
-                    retry = await call_gemini_with_video(
-                        session_id=f"full-retry-{report_id}",
-                        prompt=full_prompt + correction,
-                        video_path=str(file_path),
-                        marker_path=marker_path,
-                        crop_path=crop_path_str,
-                        anchor_crops=(anchor_crops_full + wide_crops_full) or None,
-                        timeout_s=420.0,
-                    )
-                    retry = scrub_hedging(retry)
-                    retry = _filter_low_identity_evidence(retry, report_id)
-                    _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
-                    await _cross_verify_full_report(
-                        report_id, retry,
-                        file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
-                        anchor_crops=(anchor_crops_full + wide_crops_full) or None,
-                        anchor_payload_list=anchor_payload_list,
-                        gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
-                    )
-                    await db.reports.update_one(
-                        {"id": report_id},
-                        {"$set": {"full_report": retry, "full_generated_at": now_iso()}},
-                    )
-                    stats2 = await _persist_video_frames(report_id, file_path)
-                    checked2 = (stats2 or {}).get("checked", 0)
-                    dropped2 = (stats2 or {}).get("hard_rejected", 0)
-                    if checked2 >= 2 and dropped2 / checked2 >= 0.5:
-                        await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
-                        logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
-                    else:
-                        logger.info(f"[identity-gate] {report_id}: corrective re-analysis passed ({dropped2}/{checked2} rejected)")
-        except Exception:
-            logger.exception(f"identity gate failed for {report_id}")
-        try:
-            fresh = await db.reports.find_one({"id": report_id})
-            if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
-                review = _default_agent_review(fresh.get("paid_at"))
+        # Shared helper: the SAME corrective algorithm as corrective-only recovery.
+        if _identity_gate_required(identity_stats):
+            outcome = await _run_identity_corrective_pass(
+                report_id, full_prompt=full_prompt, file_path=file_path,
+                marker_path=marker_path, crop_path_str=crop_path_str,
+                anchor_crops_full=anchor_crops_full, wide_crops_full=wide_crops_full,
+                anchor_payload_list=anchor_payload_list, gt_track=gt_track,
+                gt_t_off=gt_t_off, doc=doc, identity_stats=identity_stats,
+            )
+            if outcome == "already_done":
+                _chk = await db.reports.find_one({"id": report_id})
+                if not (_chk or {}).get("identity_corrective_persisted"):
+                    # stale/in-flight marker without an actual replacement —
+                    # the corrective requirement was NOT fulfilled.
+                    outcome = "failed"
+            if outcome == "failed":
+                # The REQUIRED corrective pass never produced a replacement:
+                # route the next run to corrective-only recovery and fail this
+                # run — READY must never be written for an unverified report.
                 await db.reports.update_one(
                     {"id": report_id},
-                    {"$set": {"agent_review": review}},
+                    {"$set": {"identity_regen_required": True}},
                 )
-        except Exception:
-            logger.exception(f"Failed to queue agent_review for {report_id}")
-        await _send_report_ready_email(report_id)
-        await _notify_dashboard_report(report_id, "full")
+                raise RuntimeError(
+                    "required corrective identity re-analysis failed — report not finalized")
+        # FIX 00B — internal checkpoint: the identity gate has completed for
+        # this run (recovery must not repeat it, and READY may follow).
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"identity_gate_done": True}},
+        )
+        # FIX 00B — single authoritative finalization: agent review queue,
+        # READY transition, then optional notifications.
+        await _finalize_full_report(report_id, file_path, persist_frames=False)
     except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
         # Persist a friendly failure marker so the frontend can surface "Try again".
@@ -15173,12 +15469,14 @@ FULL_REPORT_MAX_RETRIES = 2
 
 async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
     """Requeue orphaned/stalled full-report generations. At startup ANY doc
-    still 'generating' is orphaned by definition (include_fresh=True); the
-    periodic sweep only touches docs whose `full_report_started_at` is older
+    still in an in-flight state (generating/verifying/finalizing) is orphaned
+    by definition (include_fresh=True); the periodic sweep only touches docs
+    whose `full_report_started_at` is older
     than FULL_REPORT_STALL_SECONDS. Bounded by FULL_REPORT_MAX_RETRIES, after
     which the doc flips to 'failed' so the UI can offer a retry."""
     now = datetime.now(timezone.utc)
-    query: dict = {"full_report_status": "generating"}
+    _inflight = ["generating", "verifying", "finalizing"]
+    query: dict = {"full_report_status": {"$in": _inflight}}
     if not include_fresh:
         cutoff = (now - timedelta(seconds=FULL_REPORT_STALL_SECONDS)).isoformat()
         query["$or"] = [
@@ -15194,7 +15492,7 @@ async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
         retries = int(d.get("full_report_retries") or 0)
         if retries >= FULL_REPORT_MAX_RETRIES:
             await db.reports.update_one(
-                {"id": rid, "full_report_status": "generating"},
+                {"id": rid, "full_report_status": {"$in": _inflight}},
                 {"$set": {
                     "full_report_status": "failed",
                     "full_report_error": "Generation was interrupted repeatedly — tap retry, nothing is lost.",

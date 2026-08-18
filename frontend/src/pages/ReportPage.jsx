@@ -29,6 +29,7 @@ import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 import DoubtConfirmModal from "@/components/DoubtConfirmModal";
 import PremiumBuildingDashboard from "@/components/report-states/PremiumBuildingDashboard";
+import { isFullReportReady } from "@/lib/reportReady.mjs";
 import FreePreviewLanding from "@/components/report-states/FreePreviewLanding";
 import StatsTicker from "@/components/StatsTicker";
 
@@ -1740,7 +1741,9 @@ export default function ReportPage() {
     // ONLY reports that are actually paid/unlocked may auto-generate — never
     // trigger a (costly) full Gemini run just because the VIEWER is admin/premium.
     const alreadyUnlocked = report.is_paid || report.manually_unlocked;
-    const needsFullReport = alreadyUnlocked && !report.full_report;
+    // FIX 00B — the report body existing is NOT completion: keep the flow
+    // (and polling) alive until full_report_status === "ready".
+    const needsFullReport = alreadyUnlocked && !isFullReportReady(report);
     // Don't auto-fire if the backend is already generating (e.g. right after
     // a successful checkout). The Stripe success path sets generatingFull.
     if (needsFullReport) {
@@ -1750,7 +1753,7 @@ export default function ReportPage() {
         try {
           // Don't re-fire if the backend is already generating (e.g. right after
           // a successful checkout or a doubt-confirmation wait) — just poll.
-          if (report.full_report_status !== "generating" && report.full_report_status !== "awaiting_confirmation") {
+          if (!["generating", "awaiting_confirmation", "verifying", "finalizing"].includes(report.full_report_status)) {
             await api.post(`/reports/${id}/generate-full`);
           }
           await pollFullReportReady();
@@ -1918,7 +1921,7 @@ export default function ReportPage() {
         } else if (data?.doubt_status && data.doubt_status !== "awaiting") {
           setDoubtInfo(null);
         }
-        if (data?.full_report_status === "ready" || data?.has_full_report) return data;
+        if (isFullReportReady(data)) return data;
         if (data?.full_report_status === "failed") {
           throw new Error(data?.full_report_error || "Full report generation failed");
         }
@@ -2088,7 +2091,7 @@ export default function ReportPage() {
   // ===== Premium Report V2 — the pixel-perfect report design fully REPLACES
   // the old premium layout once the full dossier exists. Locked/free-preview
   // and "generating" states keep the original flow below. =====
-  if (unlocked && full_report) {
+  if (unlocked && full_report && isFullReportReady(report)) {
     return (
       <div className="min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
