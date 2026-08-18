@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import {
   Sprout, Play, ShieldCheck, ChevronDown, ListVideo, Heart, Star, CalendarDays,
 } from "lucide-react";
+import { canUseAuthorityProof } from "@/lib/authorityJoin.mjs";
 
 /* GROW YOUR GAME — evidence-gated football education.
    Every lesson shown here survived the backend's 100%-evidence gate:
@@ -23,20 +24,23 @@ function LessonBlock({ label, children }) {
   );
 }
 
-function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen }) {
+function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen, authority = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const [explainOpen, setExplainOpen] = useState(false);
   const reelTimer = useRef(null);
   const cat = CAT_META[lesson.category] || CAT_META.on_ball;
   const moments = lesson.moments || [];
+  // FIX 01 C01 — authority: only moments with an authoritative reference are
+  // navigable proof; the rest stay visible as plain text.
+  const playable = moments.filter((m) => canUseAuthorityProof(authority, m));
 
   const playAll = () => {
-    if (!onPlayAt || !moments.length) return;
+    if (!onPlayAt || !playable.length) return;
     clearTimeout(reelTimer.current);
     let i = 0;
     const step = () => {
-      if (i >= moments.length) return;
-      onPlayAt(moments[i].timestamp);
+      if (i >= playable.length) return;
+      onPlayAt(playable[i].timestamp, { evidenceId: playable[i].evidence_id, eventId: playable[i].event_id });
       i += 1;
       reelTimer.current = setTimeout(step, 9000);
     };
@@ -88,7 +92,7 @@ function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen }) {
           <div>
             <div className="flex items-center justify-between gap-2">
               <div className="text-[9.5px] font-extrabold tracking-[0.16em] uppercase text-[#8B957F]">Verified moments from the match</div>
-              {onPlayAt && moments.length > 1 && (
+              {onPlayAt && playable.length > 1 && (
                 <button
                   type="button"
                   onClick={playAll}
@@ -102,14 +106,23 @@ function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen }) {
             <div className="mt-2 space-y-1.5">
               {moments.map((m, i) => (
                 <div key={i} className="flex items-start gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => onPlayAt && onPlayAt(m.timestamp)}
-                    data-testid={`gyg-play-moment-${lesson.topic_id}-${i}`}
-                    className="shrink-0 inline-flex items-center gap-1 bg-[#12402A] text-[#CCFF00] text-[10.5px] font-extrabold px-2 py-1 rounded-md hover:bg-[#1E5B3C] transition-colors"
-                  >
-                    <Play className="w-3 h-3 fill-current" /> {m.timestamp}
-                  </button>
+                  {canUseAuthorityProof(authority, m) ? (
+                    <button
+                      type="button"
+                      onClick={() => onPlayAt && onPlayAt(m.timestamp, { evidenceId: m.evidence_id, eventId: m.event_id })}
+                      data-testid={`gyg-play-moment-${lesson.topic_id}-${i}`}
+                      className="shrink-0 inline-flex items-center gap-1 bg-[#12402A] text-[#CCFF00] text-[10.5px] font-extrabold px-2 py-1 rounded-md hover:bg-[#1E5B3C] transition-colors"
+                    >
+                      <Play className="w-3 h-3 fill-current" /> {m.timestamp}
+                    </button>
+                  ) : (
+                    <span
+                      data-testid={`gyg-moment-ts-${lesson.topic_id}-${i}`}
+                      className="shrink-0 inline-flex items-center gap-1 bg-[#EDF0EA] text-[#5B695E] text-[10.5px] font-extrabold px-2 py-1 rounded-md"
+                    >
+                      {m.timestamp}
+                    </span>
+                  )}
                   <span className="text-[12.5px] leading-snug text-[#3C4A40]">{m.what}</span>
                 </div>
               ))}
@@ -154,6 +167,7 @@ function LessonCard({ lesson, index, playerFirst, onPlayAt, defaultOpen }) {
 }
 
 export function GrowYourGameSection({ gyg, playerName, onPlayAt }) {
+  const authority = !!gyg?.authority;
   if (!gyg?.lessons?.length) return null;
   const first = (playerName || "your player").split(" ")[0];
   const homework = gyg.homework || [];
@@ -193,6 +207,7 @@ export function GrowYourGameSection({ gyg, playerName, onPlayAt }) {
             playerFirst={first}
             onPlayAt={onPlayAt}
             defaultOpen={i === 0}
+            authority={authority}
           />
         ))}
       </div>

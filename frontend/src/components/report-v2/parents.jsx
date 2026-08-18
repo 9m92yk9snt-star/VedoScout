@@ -3,6 +3,7 @@
 import React from "react";
 import { Home, Clapperboard, Mail, Play, XCircle, CheckCircle2 } from "lucide-react";
 import { V2Card, V2Title } from "./sections";
+import { canUseAuthorityProof } from "@/lib/authorityJoin.mjs";
 
 function HomeDrillsCard({ drills }) {
   if (!drills?.length) return null;
@@ -41,28 +42,45 @@ function HomeDrillsCard({ drills }) {
   );
 }
 
-function WatchTogetherCard({ watch, onPlayAt }) {
+function WatchTogetherCard({ watch, onPlayAt, authority = false }) {
   if (!watch) return null;
   return (
     <V2Card testid="v2-watch-together-card">
       <V2Title icon={Clapperboard}>Watch the Video Together</V2Title>
       {watch.intro && <p className="text-[12px] text-[#68766B] leading-[1.55] mb-3">{watch.intro}</p>}
-      {(watch.moments || []).slice(0, 3).map((m, i) => (
-        <button
-          key={i}
-          type="button"
-          data-testid={`v2-wt-moment-${i}`}
-          onClick={() => onPlayAt?.(m.timestamp)}
-          className="w-full text-left flex gap-3 items-start bg-[#FBF9F3] border border-[#E5DFCE] rounded-[11px] px-3.5 py-3 mb-2.5 group"
-        >
-          <span className="bg-[#12402A] text-[#CCFF00] font-barlow font-extrabold text-[12px] px-2 py-0.5 rounded-[6px] tabular-nums shrink-0 flex items-center gap-1">
-            <Play className="w-2.5 h-2.5 fill-[#CCFF00]" /> {m.timestamp}
-          </span>
-          <span className="text-[12px] leading-[1.55] text-[#3C4A40]">
-            <b className="text-[#12402A]">Pause and say:</b> “{m.say_this}”
-          </span>
-        </button>
-      ))}
+      {(watch.moments || []).slice(0, 3).map((m, i) => {
+        // FIX 01 C01 — authority: no clickable proof without an authoritative ID.
+        const proofable = canUseAuthorityProof(authority, m);
+        const inner = (
+          <>
+            <span className="bg-[#12402A] text-[#CCFF00] font-barlow font-extrabold text-[12px] px-2 py-0.5 rounded-[6px] tabular-nums shrink-0 flex items-center gap-1">
+              {proofable && <Play className="w-2.5 h-2.5 fill-[#CCFF00]" />} {m.timestamp}
+            </span>
+            <span className="text-[12px] leading-[1.55] text-[#3C4A40]">
+              <b className="text-[#12402A]">Pause and say:</b> “{m.say_this}”
+            </span>
+          </>
+        );
+        return proofable ? (
+          <button
+            key={i}
+            type="button"
+            data-testid={`v2-wt-moment-${i}`}
+            onClick={() => onPlayAt?.(m.timestamp, { evidenceId: m.evidence_id, eventId: m.event_id })}
+            className="w-full text-left flex gap-3 items-start bg-[#FBF9F3] border border-[#E5DFCE] rounded-[11px] px-3.5 py-3 mb-2.5 group"
+          >
+            {inner}
+          </button>
+        ) : (
+          <div
+            key={i}
+            data-testid={`v2-wt-moment-${i}`}
+            className="w-full text-left flex gap-3 items-start bg-[#FBF9F3] border border-[#E5DFCE] rounded-[11px] px-3.5 py-3 mb-2.5"
+          >
+            {inner}
+          </div>
+        );
+      })}
       {(watch.avoid || []).length > 0 && (
         <div className="mt-1 bg-[#FFF8E9] border border-[#F0E3C4] rounded-[11px] px-3.5 py-3">
           <div className="text-[10px] font-extrabold tracking-[0.12em] text-[#8A6D3B] mb-1.5">GOOD TO AVOID</div>
@@ -99,7 +117,7 @@ export function ParentsPackageSection({ pack, playerName, onPlayAt }) {
     <div data-testid="v2-parents-package" className="space-y-4">
       <HomeDrillsCard drills={pack.homeDrills} />
       <div className={`grid gap-4 ${two ? "lg:grid-cols-[1.08fr_1fr]" : ""}`}>
-        <WatchTogetherCard watch={pack.watchTogether} onPlayAt={onPlayAt} />
+        <WatchTogetherCard watch={pack.watchTogether} onPlayAt={onPlayAt} authority={!!pack.authority} />
         <LetterCard message={pack.playerMessage} playerName={playerName} />
       </div>
     </div>

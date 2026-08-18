@@ -3,6 +3,9 @@
 // exact data shapes the V2 sections render. NEVER touches scores or logic —
 // pure read-only mapping with graceful fallbacks for missing fields.
 
+// FIX 01 — authority-aware frame lookup lives in a pure, testable module.
+import { buildFrameLookup, isAuthorityReport, canUseAuthorityProof, resolveAuthorityFrame } from "../../lib/authorityJoin.mjs";
+
 export const SKILL_LABELS = {
   first_touch: "First Touch", ball_control: "Ball Control", dribbling: "Dribbling",
   passing: "Passing", shooting: "Shooting", weak_foot: "Weak Foot", one_v_one: "1v1 Attacking",
@@ -72,37 +75,12 @@ function collectSkills(full) {
   return out;
 }
 
-function buildFrameLookup(full) {
-  const comments = Array.isArray(full?.video_comments) ? full.video_comments : [];
-  const entries = comments
-    .filter((c) => c && c.frame_url && c.identity_verified !== false)
-    .map((c) => ({ ts: c.timestamp, sec: tsToSeconds(c.timestamp), url: c.frame_url, verified: c.identity_verified === true }));
-  const used = new Set();
-  const find = (ts) => {
-    const sec = tsToSeconds(ts);
-    let best = null;
-    for (const e of entries) {
-      if (used.has(e.url)) continue;
-      if (ts && e.ts === ts) { best = e; break; }
-      if (sec != null && e.sec != null) {
-        const d = Math.abs(e.sec - sec);
-        if (d <= 8 && (!best || d < Math.abs((best.sec ?? 999) - sec))) best = e;
-      }
-    }
-    if (!best) best = entries.find((e) => !used.has(e.url)) || null;
-    if (best) used.add(best.url);
-    // ts included so callers can display the FRAME's exact second — the photo,
-    // the shown timestamp and the proof video must always be the same moment.
-    return best ? { url: best.url, verified: !!best.verified, ts: best.ts || null } : null;
-  };
-  return { entries, find };
-}
-
 export function deriveV2(report) {
   const full = report?.full_report || {};
   const pd = report?.player_details || {};
+  const authority = isAuthorityReport(full);
   const skills = collectSkills(full);
-  const frames = buildFrameLookup(full);
+  const frames = buildFrameLookup(full?.video_comments, authority);
   const scoutView = full.scout_view || {};
   const pa = full.potential_assessment || {};
   const ob = full.overall_benchmark || {};
@@ -120,13 +98,17 @@ export function deriveV2(report) {
       const evs = (s.evidence || []).filter((e) => e && e.timestamp && e.timestamp !== "General");
       const ev = evs.find((e) => !usedTs.has(e.timestamp)) || evs[0];
       if (ev?.timestamp) usedTs.add(ev.timestamp);
-      const fr = frames.find(ev?.timestamp);
+      // FIX 01 — authority reports join by IDs (exact only); legacy keeps ts.
+      const fr = frames.find(ev?.timestamp, { evidenceId: ev?.evidence_id, eventId: ev?.event_id });
       return {
         name: s.label, score: s.score, category: s.category,
         note: s.notes,
         timestamp: fr?.ts || ev?.timestamp || null,
         thumb: fr?.url || null,
         thumbVerified: !!fr?.verified,
+        evidenceId: ev?.evidence_id || null,
+        eventId: ev?.event_id || null,
+        proofable: canUseAuthorityProof(authority, ev),
       };
     });
 
@@ -164,9 +146,18 @@ export function deriveV2(report) {
       && String(a.identity_confidence || "").toLowerCase() !== "low");
   const snapFrameEntries = (full.video_comments || [])
     .filter((c) => c && c.frame_url && !c.frame_placeholder && c.identity_verified !== false && c.timestamp)
-    .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url, comment: c.comment || "" }));
+    .map((c) => ({ sec: tsToSeconds(c.timestamp), ts: c.timestamp, url: c.frame_url, comment: c.comment || "",
+      evidenceId: c.evidence_id || null, eventId: c.event_id || null }));
   const snapUsedFrames = new Set();
-  const snapCloseFrame = (ts) => {
+  const snapCloseFrame = (ev) => {
+    // FIX 01 — authority reports: EXACT event_id join only (no nearest <=8s).
+    if (authority) {
+      const best = snapFrameEntries.find(
+        (e) => !snapUsedFrames.has(e.url) && ev?.event_id && e.eventId === ev.event_id) || null;
+      if (best) snapUsedFrames.add(best.url);
+      return best;
+    }
+    const ts = ev?.timestamp;
     const sec = tsToSeconds(ts);
     let best = null;
     for (const e of snapFrameEntries) {
@@ -181,10 +172,10 @@ export function deriveV2(report) {
     return best || null;
   };
   // Frame-first fallback: every snapshot card must show a REAL verified frame.
-  // When no timeline event matches the card's theme, use the next unused
-  // verified frame — displayed timestamp AND caption come from that exact
-  // moment (same-moment rule: photo, timestamp, text always align).
+  // LEGACY ONLY — authority reports never display an unrelated moment: no
+  // exact bound proof means no photo for that card.
   const takeAnyFrame = () => {
+    if (authority) return null;
     const e = snapFrameEntries.find((x) => !snapUsedFrames.has(x.url)) || null;
     if (e) snapUsedFrames.add(e.url);
     return e;
@@ -217,7 +208,7 @@ export function deriveV2(report) {
   };
   const buildSnapMoment = (key, text, pref, forcedAnnot, preferEventTitle = false) => {
     const ev = snapMatchEvent(text, pref);
-    let fr = ev ? snapCloseFrame(ev.timestamp) : null;
+    let fr = ev ? snapCloseFrame(ev) : null;
     let frComment = null;
     if (!fr) {
       fr = takeAnyFrame();
@@ -242,15 +233,22 @@ export function deriveV2(report) {
     };
   };
   const explicitMoments = Array.isArray(full.snapshot_moments) && full.snapshot_moments.length >= 4
-    ? full.snapshot_moments.slice(0, 4).map((x) => ({
-        key: x.key,
-        title: x.title || "—",
-        desc: x.desc || "—",
-        timestamp: x.timestamp || null,
-        thumb: x.frame_url || null,
-        annot: x.annot || "circle",
-        glance: x.glance || null,
-      }))
+    ? full.snapshot_moments.slice(0, 4).map((x) => {
+        // FIX 01 C01 — authority: the photo must come from the exactly bound
+        // evidence object; x.frame_url is never trusted as authority evidence.
+        const bound = authority ? resolveAuthorityFrame(full.video_comments, x) : null;
+        return {
+          key: x.key,
+          title: x.title || "—",
+          desc: x.desc || "—",
+          timestamp: x.timestamp || null,
+          thumb: authority ? (bound?.frame_url || null) : (x.frame_url || null),
+          annot: x.annot || "circle",
+          glance: x.glance || null,
+          evidenceId: x.evidence_id || null,
+          eventId: x.event_id || null,
+        };
+      })
     : null;
   const snapshotMoments = explicitMoments || [
     buildSnapMoment("strength", snapshot.biggestStrength, "positive", null),
@@ -336,6 +334,7 @@ export function deriveV2(report) {
         timestamp: vcBest.timestamp, caption: vcBest.comment,
         thumb: vcBest.identity_verified === false ? null : vcBest.frame_url || null,
         thumbVerified: vcBest.identity_verified === true,
+        evidenceId: vcBest.evidence_id || null,
       }
     : null;
 
@@ -357,6 +356,7 @@ export function deriveV2(report) {
         rating: typeof a.rating === "number" ? a.rating : null,
         outcome: ["positive", "neutral", "negative"].includes(oc) ? oc : "neutral",
         tracked: !!a.tracking_verified,
+        eventId: a.event_id || null,
       };
     });
 
@@ -368,7 +368,7 @@ export function deriveV2(report) {
     ? pp.watch_together : null;
   const playerMessage = pp?.message_to_player?.body ? pp.message_to_player : null;
   const parentsPackage = (homeDrills.length || watchTogether || playerMessage)
-    ? { homeDrills, watchTogether, playerMessage }
+    ? { homeDrills, watchTogether, playerMessage, authority }
     : null;
 
   // ---- Next match missions (printable card) ----
@@ -394,7 +394,7 @@ export function deriveV2(report) {
   // ---- Grow Your Game (evidence-gated football education) ----
   const gygRaw = full.grow_your_game;
   const growYourGame = gygRaw && Array.isArray(gygRaw.lessons) && gygRaw.lessons.length
-    ? { lessons: gygRaw.lessons, homework: Array.isArray(gygRaw.homework_plan) ? gygRaw.homework_plan : [] }
+    ? { lessons: gygRaw.lessons, homework: Array.isArray(gygRaw.homework_plan) ? gygRaw.homework_plan : [], authority }
     : null;
 
   // ---- Parent corner (Layer 1: AI-personalized; Layer 2 lives client-side) ----
@@ -414,6 +414,7 @@ export function deriveV2(report) {
 
   return {
     playerType: full.player_type || "",
+    authority,
     overall, ageBracket,
     stars: overall != null ? Math.round(overall / 2) : 0,
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",

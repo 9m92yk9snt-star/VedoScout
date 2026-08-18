@@ -26,6 +26,7 @@ import httpx
 
 # Local modules
 import r2_storage
+from evidence_authority import attach_event_evidence_authority, attach_clip_authority, frame_time_ms as _authority_frame_time_ms
 from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds, probe_codec_pixfmt
 from analysis_watchdog import (
     heartbeat as _wd_heartbeat,
@@ -1923,6 +1924,13 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                 out["anchor_thumb_filename"] = frame_meta.get("anchor_thumb_filename")
                 out["anchor_crop_filename"] = frame_meta.get("anchor_crop_filename")
                 out["identity_verified"] = True
+        # FIX 01 — frame authority: the ACTUAL frame moment. Never overwrites
+        # evidence_time_ms/event_start_ms — a 36.0s cited moment with a 38.0s
+        # replacement frame must stay detectable as 36000 vs 38000.
+        if out.get("evidence_id") and not out.get("frame_placeholder"):
+            _v = _authority_frame_time_ms(out.get("frame_picked_ts"), _ts_to_seconds(ts))
+            if _v is not None:
+                out["frame_time_ms"] = _v
         enriched.append(out)
     return enriched
 
@@ -7541,6 +7549,9 @@ async def _verify_enriched_frames(
                         shutil.move(str(cand), str(frame_path))
                         c["identity_verified"] = True
                         c["frame_ts_adjusted"] = off
+                        # FIX 01 — the ACTUAL frame is now the re-window pick.
+                        if c.get("evidence_id"):
+                            c["frame_time_ms"] = int(round(ts2 * 1000))
                         return
                     cand.unlink(missing_ok=True)
             # STRICT POLICY: no confirmed match anywhere near — drop the image.
@@ -7813,6 +7824,20 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
             c.pop("tele_clip_coverage", None)
             c.pop("tele_clip_start", None)
             c.pop("tele_clip_end", None)
+            # FIX 01 — clip authority metadata belongs to the physical clip:
+            # cleared with it, re-attached when a new clip is generated.
+            c.pop("clip_id", None)
+            c.pop("clip_start_ms", None)
+            c.pop("clip_end_ms", None)
+            c.pop("moment_local_ms", None)
+    # FIX 01 — event_start_ms lookup for event-bound moment_local_ms.
+    evt_ms_by_id: dict = {}
+    try:
+        for _e in ((doc.get("full_report") or {}).get("action_timeline") or []):
+            if isinstance(_e, dict) and _e.get("event_id") and isinstance(_e.get("event_start_ms"), int):
+                evt_ms_by_id[_e["event_id"]] = _e["event_start_ms"]
+    except Exception:
+        evt_ms_by_id = {}
     # P19 marker state-fade: ring fades out inside shadow switch-risk windows
     # (never rides along on a possibly wrong player). Fail-open: no shadow
     # data or flag off → exactly the previous behaviour.
@@ -7891,6 +7916,10 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
             # THE MOMENT activation in the proof player = event_start - clip_start
             c["tele_clip_start"] = res.get("start")
             c["tele_clip_end"] = res.get("end")
+            # FIX 01 — clip authority: clip_id + ms metadata on the exact
+            # evidence row that generated this clip (records reality only;
+            # clip timing/generation unchanged).
+            attach_clip_authority(c, res.get("start"), res.get("end"), evt_ms_by_id)
             made += 1
             clipped_secs.append(sec)
             logger.info(f"[teleclip] {report_id}: clip {out.name} coverage={res.get('coverage')}")
@@ -8346,6 +8375,10 @@ async def _run_identity_corrective_pass(
             anchor_payload_list=anchor_payload_list,
             gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
         )
+        # FIX 01 — the corrective replacement is a NEW analysis body: it gets
+        # its own authority namespace/IDs via the SAME normalisation helper
+        # (stale IDs from the replaced body are never copied).
+        retry = attach_event_evidence_authority(retry)
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {"full_report": retry, "full_generated_at": now_iso(),
@@ -8774,6 +8807,10 @@ async def generate_full_report_task(report_id: str) -> None:
             anchor_crops=anchor_crops_full, anchor_payload_list=anchor_payload_list,
             gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
         )
+        # FIX 01 — attach the event/evidence authority layer (stable IDs, ms
+        # metadata, exact joins) AFTER all verification/filtering, right before
+        # the body is persisted. Deterministic — zero LLM.
+        full = attach_event_evidence_authority(full)
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {
