@@ -61,14 +61,14 @@ def _ready_writes(fake):
             if (u.get("$set") or {}).get("full_report_status") == "ready"]
 
 
-def _wire(monkeypatch, fake, persist_raises=False):
+def _wire(monkeypatch, fake, persist_raises=False, persist_stats=None):
     monkeypatch.setattr(server, "db", SimpleNamespace(reports=fake))
 
     async def fake_persist(report_id, video_path):
         fake.calls.append(("persist_frames", report_id))
         if persist_raises:
             raise RuntimeError("simulated frame persist failure")
-        return {"checked": 3, "hard_rejected": 0}
+        return dict(persist_stats) if persist_stats else {"checked": 3, "hard_rejected": 0}
 
     async def fake_email(report_id):
         fake.calls.append(("email", report_id))
@@ -251,8 +251,12 @@ def test_D_failed_plus_full_report_not_instant_ready(monkeypatch):
         vid.unlink(missing_ok=True)
 
 
-# ── E: failed retry recovers WITHOUT a new full Gemini generation ─────────
-def test_E_failed_retry_spends_no_new_llm(monkeypatch):
+# ── E: failed retry — no unnecessary full-report Gemini REGENERATION ─────
+def test_E_failed_retry_no_full_gemini_regeneration(monkeypatch):
+    """Proves the recovery path never re-runs the full-report Gemini
+    generation. NOTE: this does not claim zero model work overall —
+    _persist_video_frames contains its own identity/proof verification seams
+    (mocked here)."""
     doc = {"id": "r8", "is_paid": True, "paid_at": None,
            "full_report": {"scores": {}}, "full_report_status": "failed"}
     fake = FakeReports(doc)
@@ -271,7 +275,7 @@ def test_E_failed_retry_spends_no_new_llm(monkeypatch):
     monkeypatch.setattr(server, "_ensure_report_video_local", fake_local)
     try:
         asyncio.run(server.generate_full_report_task("r8"))
-        assert llm_calls == [], "credit control: no new production LLM call"
+        assert llm_calls == [], "credit control: no full-report Gemini regeneration"
         assert len(_ready_writes(fake)) == 1, "finalization-only recovery reaches ready"
         assert fake.doc["full_report_status"] == "ready"
     finally:
@@ -375,3 +379,139 @@ def test_frontend_wiring_uses_the_helper():
     assert "!isFullReportReady(report)" in rp, "auto-generate/poll trigger gate"
     assert "data?.has_full_report) return data" not in rp, \
         "has_full_report alone must no longer stop polling"
+
+
+# ══ RECOVERY IDENTITY-GATE PARITY (final review correction) ═══════════════
+
+def _fake_local(vid):
+    async def f(report_id):
+        return vid
+    return f
+
+
+def test_parity_threshold_helper_unchanged():
+    f = server._identity_gate_required
+    assert f({"checked": 4, "hard_rejected": 3}) is True
+    assert f({"checked": 4, "hard_rejected": 2}) is True   # exactly 0.5 boundary
+    assert f({"checked": 4, "hard_rejected": 1}) is False
+    assert f({"checked": 1, "hard_rejected": 1}) is False  # checked >= 2 guard
+    assert f({"checked": 0, "hard_rejected": 0}) is False
+    assert f(None) is False
+    # BOTH the normal pipeline and recovery use this single definition
+    src = (BACKEND / "server.py").read_text()
+    task = src.split("async def generate_full_report_task(")[1].split("\nasync def ")[0]
+    assert "if _identity_gate_required(identity_stats):" in task
+    assert "if _identity_gate_required(stats2):" in task
+    finalize = src.split("async def _finalize_full_report(")[1].split("\nasync def ")[0]
+    assert "if _identity_gate_required(stats):" in finalize
+
+
+def test_R1_recovery_clean_stats_reaches_ready(monkeypatch):
+    doc = {"id": "p1", "full_report": {"scores": {}}, "full_report_status": "failed"}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 0})
+    vid = _tmp_video()
+    monkeypatch.setattr(server, "_ensure_report_video_local", _fake_local(vid))
+    try:
+        asyncio.run(server.generate_full_report_task("p1"))
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
+        assert fake.doc.get("identity_gate_done") is True, "checkpoint persisted"
+        assert not fake.doc.get("identity_flagged") and not fake.doc.get("identity_regen_required")
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_R2_recovery_bad_stats_without_correction_blocks_ready(monkeypatch):
+    doc = {"id": "p2", "full_report": {"scores": {}}, "full_report_status": "failed"}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 3})
+    vid = _tmp_video()
+    monkeypatch.setattr(server, "_ensure_report_video_local", _fake_local(vid))
+    try:
+        asyncio.run(server.generate_full_report_task("p2"))
+        assert not _ready_writes(fake), \
+            "recovery must NOT bypass the corrective identity requirement"
+        assert fake.doc["full_report_status"] == "failed"
+        assert fake.doc.get("identity_regen_required") is True
+        assert not fake.doc.get("identity_gate_done")
+        assert not any(c[0] == "email" for c in fake.calls)
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_R2b_regen_required_routes_to_full_pipeline_not_resume(monkeypatch):
+    """After case D the next run must perform a FULL regeneration (existing
+    corrective contract), never resume-to-ready with the suspect body."""
+    doc = {"id": "p3", "full_report": {"scores": {}}, "full_report_status": "generating",
+           "identity_regen_required": True}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake)
+    finalized = []
+
+    async def fake_finalize(*a, **k):
+        finalized.append(1)
+
+    async def no_video(report_id):
+        return None  # stop the full pipeline deterministically at video fetch
+
+    monkeypatch.setattr(server, "_finalize_full_report", fake_finalize)
+    monkeypatch.setattr(server, "_ensure_report_video_local", no_video)
+    asyncio.run(server.generate_full_report_task("p3"))
+    assert not finalized, "must NOT take the resume path"
+    assert not _ready_writes(fake)
+    # proof it entered the full pipeline: the run reset the internal checkpoints
+    gen_sets = [u["$set"] for _, u in fake.updates
+                if (u.get("$set") or {}).get("full_report_status") == "generating"]
+    assert gen_sets and gen_sets[0].get("identity_regen_required") is False
+    assert gen_sets[0].get("identity_gate_done") is False
+
+
+def test_R3_recovery_after_correction_flags_and_reaches_ready(monkeypatch):
+    doc = {"id": "p4", "full_report": {"scores": {}}, "full_report_status": "failed",
+           "identity_retry_done": True}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_stats={"checked": 4, "hard_rejected": 3})
+    vid = _tmp_video()
+    monkeypatch.setattr(server, "_ensure_report_video_local", _fake_local(vid))
+    try:
+        asyncio.run(server.generate_full_report_task("p4"))
+        assert fake.doc.get("identity_flagged") is True, \
+            "existing identity_flagged semantics preserved before ready"
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_R4_checkpoint_skips_expensive_reverification(monkeypatch):
+    doc = {"id": "p5", "full_report": {"scores": {}}, "full_report_status": "finalizing",
+           "identity_gate_done": True}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake)
+    vid = _tmp_video()
+    monkeypatch.setattr(server, "_ensure_report_video_local", _fake_local(vid))
+    try:
+        asyncio.run(server.generate_full_report_task("p5"))
+        assert not any(c[0] == "persist_frames" for c in fake.calls), \
+            "completed identity gate must not be repeated"
+        assert len(_ready_writes(fake)) == 1
+        assert fake.doc["full_report_status"] == "ready"
+    finally:
+        vid.unlink(missing_ok=True)
+
+
+def test_R5_helper_toplevel_persist_failure_propagates(monkeypatch):
+    """Direct behavioural proof on the shared finalization seam (used by both
+    the normal tail and recovery): a top-level persist failure raises out of
+    _finalize_full_report — never swallowed into READY."""
+    doc = {"id": "p6", "full_report": {"scores": {}}, "full_report_status": "finalizing"}
+    fake = FakeReports(doc)
+    _wire(monkeypatch, fake, persist_raises=True)
+    vid = _tmp_video()
+    try:
+        with pytest.raises(RuntimeError):
+            asyncio.run(server._finalize_full_report("p6", vid, persist_frames=True))
+        assert not _ready_writes(fake)
+    finally:
+        vid.unlink(missing_ok=True)

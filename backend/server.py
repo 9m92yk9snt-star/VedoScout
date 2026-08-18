@@ -8159,6 +8159,16 @@ async def _trusted_fastest_moment(
     return None
 
 
+def _identity_gate_required(stats) -> bool:
+    """EXISTING corrective-identity threshold (UNCHANGED: checked >= 2 and
+    hard_rejected/checked >= 0.5). Single definition shared by the normal
+    pipeline and finalization recovery so READY has identical identity-gate
+    semantics on both paths."""
+    checked = (stats or {}).get("checked", 0)
+    dropped = (stats or {}).get("hard_rejected", 0)
+    return checked >= 2 and dropped / checked >= 0.5
+
+
 async def _finalize_full_report(report_id: str, file_path, persist_frames: bool = True) -> None:
     """FIX 00B — FINALIZING → READY. Completes the required user-facing
     finalization work and then writes the SINGLE authoritative
@@ -8168,11 +8178,53 @@ async def _finalize_full_report(report_id: str, file_path, persist_frames: bool 
     _persist_video_frames (safe omission + read-time self-heal), but a
     TOP-LEVEL _persist_video_frames failure means finalization did NOT
     complete and MUST propagate into the caller's failure contract.
+
+    RECOVERY (persist_frames=True) has identity-gate PARITY with the normal
+    pipeline via the internal `identity_gate_done` checkpoint:
+      A. checkpoint done → skip the expensive re-verification, finish → READY
+      B/C. re-persist evidence, stats below threshold → checkpoint → READY
+      D. threshold met + correction never ran → NEVER ready; flag
+         `identity_regen_required` so the next run performs the existing full
+         corrective re-analysis (correctness wins over saving an LLM call)
+      E. threshold met + `identity_retry_done` already true → existing
+         `identity_flagged` semantics, then READY (same as normal pipeline).
     Notifications are optional and are sent after READY so they can never
     block or falsify it."""
     if persist_frames:
-        # FIX 00B correction — do NOT swallow: top-level failure → no READY.
-        await _persist_video_frames(report_id, file_path)
+        doc = await db.reports.find_one({"id": report_id})
+        if not doc:
+            return
+        if doc.get("identity_gate_done"):
+            logger.info(f"[finalize-recovery] {report_id}: identity gate checkpoint complete — skipping re-verification")
+        else:
+            # FIX 00B correction — do NOT swallow: top-level failure → no READY.
+            stats = await _persist_video_frames(report_id, file_path)
+            if _identity_gate_required(stats):
+                fresh = await db.reports.find_one({"id": report_id})
+                if fresh and fresh.get("identity_retry_done"):
+                    # Case E — the one corrective re-analysis already ran:
+                    # existing normal-pipeline semantics = flag for review.
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"identity_flagged": True}},
+                    )
+                    logger.warning(f"[finalize-recovery] {report_id}: still failing identity after prior correction — flagged for review")
+                else:
+                    # Case D — the existing corrective re-analysis is REQUIRED
+                    # and needs the full pipeline context: route the next run
+                    # to a full regeneration instead of declaring a suspect
+                    # report ready.
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": {"identity_regen_required": True}},
+                    )
+                    raise RuntimeError(
+                        "identity verification rejected most evidence frames — corrective re-analysis required"
+                    )
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"identity_gate_done": True}},
+            )
     try:
         fresh = await db.reports.find_one({"id": report_id})
         if fresh and not fresh.get("agent_review") and (fresh.get("is_paid") or fresh.get("manually_unlocked")):
@@ -8209,7 +8261,7 @@ async def generate_full_report_task(report_id: str) -> None:
         doc = await db.reports.find_one({"id": report_id})
         if not doc:
             return
-        if doc.get("full_report"):
+        if doc.get("full_report") and not doc.get("identity_regen_required"):
             st = doc.get("full_report_status")
             if st == "ready":
                 return
@@ -8249,6 +8301,9 @@ async def generate_full_report_task(report_id: str) -> None:
                 "full_report_status": "generating",
                 "full_report_error": None,
                 "full_report_started_at": datetime.now(timezone.utc).isoformat(),
+                # FIX 00B — internal checkpoints reset for the new analysis run.
+                "identity_gate_done": False,
+                "identity_regen_required": False,
             }},
         )
         file_path = await _ensure_report_video_local(report_id)
@@ -8551,7 +8606,7 @@ async def generate_full_report_task(report_id: str) -> None:
         try:
             checked = (identity_stats or {}).get("checked", 0)
             dropped = (identity_stats or {}).get("hard_rejected", 0)
-            if checked >= 2 and dropped / checked >= 0.5:
+            if _identity_gate_required(identity_stats):
                 fresh = await db.reports.find_one({"id": report_id})
                 if fresh and not fresh.get("identity_retry_done"):
                     await db.reports.update_one({"id": report_id}, {"$set": {"identity_retry_done": True}})
@@ -8597,7 +8652,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     stats2 = await _persist_video_frames(report_id, file_path)
                     checked2 = (stats2 or {}).get("checked", 0)
                     dropped2 = (stats2 or {}).get("hard_rejected", 0)
-                    if checked2 >= 2 and dropped2 / checked2 >= 0.5:
+                    if _identity_gate_required(stats2):
                         await db.reports.update_one({"id": report_id}, {"$set": {"identity_flagged": True}})
                         logger.warning(f"[identity-gate] {report_id}: STILL failing after retry ({dropped2}/{checked2}) — flagged for review")
                     else:
@@ -8608,6 +8663,12 @@ async def generate_full_report_task(report_id: str) -> None:
                 # its final evidence persistence is REQUIRED before READY.
                 raise
             logger.exception(f"identity gate failed for {report_id}")
+        # FIX 00B — internal checkpoint: the identity gate has completed for
+        # this run (recovery must not repeat it, and READY may follow).
+        await db.reports.update_one(
+            {"id": report_id},
+            {"$set": {"identity_gate_done": True}},
+        )
         # FIX 00B — single authoritative finalization: agent review queue,
         # READY transition, then optional notifications.
         await _finalize_full_report(report_id, file_path, persist_frames=False)
