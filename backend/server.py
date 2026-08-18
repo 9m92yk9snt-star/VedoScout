@@ -26,7 +26,13 @@ import httpx
 
 # Local modules
 import r2_storage
-from evidence_authority import attach_event_evidence_authority, attach_clip_authority, frame_time_ms as _authority_frame_time_ms
+from evidence_authority import (
+    attach_event_evidence_authority,
+    attach_clip_authority,
+    apply_fail_closed_proof_authority,
+    compute_proof_frame_verified,
+    frame_time_ms as _authority_frame_time_ms,
+)
 from media_binaries import FFMPEG_BIN, FFPROBE_BIN, get_duration_seconds, probe_codec_pixfmt
 from analysis_watchdog import (
     heartbeat as _wd_heartbeat,
@@ -1931,6 +1937,9 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             _v = _authority_frame_time_ms(out.get("frame_picked_ts"), _ts_to_seconds(ts))
             if _v is not None:
                 out["frame_time_ms"] = _v
+            # FIX 02 — initial fail-closed proof-frame state (recomputed after
+            # the GPT identity layer in _persist_video_frames).
+            out["proof_frame_verified"] = compute_proof_frame_verified(out)
         enriched.append(out)
     return enriched
 
@@ -2902,7 +2911,10 @@ Return ONLY valid JSON, no markdown:
 
 def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> dict:
     """Deterministic merge of the verification pass (NO AI here):
-    - drops timeline events the verifier rejected (wrong player / not re-found)
+    - FIX 02 FAIL CLOSED: an event survives ONLY when the verifier fully
+      confirmed it (identity CONFIRMED + event CONFIRMED); anything else —
+      WRONG_PLAYER, NOT_VISIBLE, NOT_SEEN, missing/unknown/malformed verdict —
+      is dropped. If nothing is confirmed the timeline stays EMPTY.
     - drops events at times where optical tracking never saw the player
     - snaps timestamps to the nearest tracked position (≤2s)
     - final scores = rounded mean of the two independent passes
@@ -2921,11 +2933,22 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
         v = verdicts.get(i)
         identity = str((v or {}).get("identity") or "").upper()
         event = str((v or {}).get("event") or "").upper()
-        if v and (identity == "WRONG_PLAYER" or event == "NOT_SEEN"):
+        if not v or identity != "CONFIRMED" or event != "CONFIRMED":
+            if identity == "WRONG_PLAYER":
+                reason = "WRONG_PLAYER"
+            elif event == "NOT_SEEN":
+                reason = "NOT_SEEN"
+            elif identity == "NOT_VISIBLE":
+                reason = "NOT_VISIBLE"
+            elif not v:
+                reason = "NO_VERDICT"
+            else:
+                reason = "INVALID_VERDICT"
             dropped.append({"timestamp": ev.get("timestamp"), "title": ev.get("title"),
-                            "reason": "WRONG_PLAYER" if identity == "WRONG_PLAYER" else "NOT_SEEN"})
+                            "reason": reason})
             continue
-        cts = (v or {}).get("corrected_timestamp")
+        # corrected_timestamp may ONLY be applied to a fully CONFIRMED event
+        cts = v.get("corrected_timestamp")
         if cts and _mmss_to_secs(cts) is not None:
             ev["timestamp"] = str(cts).strip()
         sec = _mmss_to_secs(ev.get("timestamp"))
@@ -2939,16 +2962,14 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
             if abs(float(best["t"]) - sec) <= 2:
                 mm, ss = divmod(int(round(float(best["t"]))), 60)
                 ev["timestamp"] = f"{mm:02d}:{ss:02d}"
-        ev["cross_verified"] = bool(v) and identity == "CONFIRMED" and event == "CONFIRMED"
+        ev["cross_verified"] = True
         kept.append(ev)
 
     status = "verified"
     if timeline and not kept:
-        # Verifier rejected EVERYTHING — that signals a systemic problem, not
-        # 15 individual hallucinations. Keep the original timeline, flag it.
-        status = "inconclusive"
-        kept = timeline
-        dropped = []
+        # FIX 02 — FAIL CLOSED: the verifier confirmed NOTHING. The original
+        # timeline is NEVER restored — no proof is better than wrong proof.
+        status = "rejected_all"
     if timeline:
         full["action_timeline"] = kept
 
@@ -7506,7 +7527,9 @@ async def _verify_enriched_frames(
     by GPT vision; only a CONFIRMED identity match keeps its image. Uncertain
     or rejected frames get a nearby-seconds re-window search for a confirmed
     frame — otherwise the image is dropped entirely (text-only evidence).
-    Verifier outages (API errors) keep the image but leave it unverified."""
+    FIX 02 FAIL CLOSED: missing frames, persistent verifier errors and task
+    exceptions also make the image unusable as proof (infra errors are NOT
+    hard identity rejections)."""
     fp = doc.get("fingerprint") or {}
     jersey = fp.get("jersey_name", "unclear")
     shorts = fp.get("shorts_name", "unclear")
@@ -7516,7 +7539,10 @@ async def _verify_enriched_frames(
     async def _check_one(i: int, c: dict) -> None:
         frame_path = frames_dir / Path(str(c.get("frame_url"))).name
         if not frame_path.exists():
-            c["identity_verified"] = None
+            # FIX 02 — FAIL CLOSED: a missing frame can never become proof.
+            c["identity_verified"] = False
+            c["identity_verification_status"] = "missing"
+            c["frame_url"] = None
             return
         async with sem:
             verdict = await verify_frame_identity(
@@ -7529,10 +7555,15 @@ async def _verify_enriched_frames(
                 )
             if verdict == "confirmed":
                 c["identity_verified"] = True
+                c["identity_verification_status"] = "confirmed"
                 return
             if verdict == "error":
-                # Verifier down — an infra failure is not evidence of a wrong player.
-                c["identity_verified"] = None
+                # FIX 02 — FAIL CLOSED: verifier down. An infra failure is not
+                # evidence of a wrong player (no hard reject), but an
+                # unconfirmed image may not be presented as proof either.
+                c["identity_verified"] = False
+                c["identity_verification_status"] = "error"
+                c["frame_url"] = None
                 return
             # Uncertain OR rejected — search nearby seconds for a CONFIRMED frame.
             sec = _mmss_to_secs(c.get("timestamp"))
@@ -7548,6 +7579,7 @@ async def _verify_enriched_frames(
                     if v2 == "confirmed":
                         shutil.move(str(cand), str(frame_path))
                         c["identity_verified"] = True
+                        c["identity_verification_status"] = "confirmed"
                         c["frame_ts_adjusted"] = off
                         # FIX 01 — the ACTUAL frame is now the re-window pick.
                         if c.get("evidence_id"):
@@ -7556,12 +7588,25 @@ async def _verify_enriched_frames(
                     cand.unlink(missing_ok=True)
             # STRICT POLICY: no confirmed match anywhere near — drop the image.
             c["identity_verified"] = False
+            c["identity_verification_status"] = "rejected" if verdict == "rejected" else "uncertain"
             c["identity_hard_reject"] = verdict == "rejected"
             c["frame_url"] = None
             frame_path.unlink(missing_ok=True)
 
+    async def _check_one_safe(i: int, c: dict) -> None:
+        try:
+            await _check_one(i, c)
+        except Exception:
+            # FIX 02 — FAIL CLOSED: an exception is an infra error, not a
+            # wrong player. The frame is unusable as proof; never hard-reject.
+            logger.exception(f"[identity] {report_id}: frame check {i} raised")
+            c["identity_verified"] = False
+            c["identity_verification_status"] = "error"
+            c["identity_hard_reject"] = False
+            c["frame_url"] = None
+
     tasks = [
-        _check_one(i, c) for i, c in enumerate(enriched)
+        _check_one_safe(i, c) for i, c in enumerate(enriched)
         if isinstance(c, dict) and not c.get("anchor_locked")
         and str(c.get("frame_url") or "").startswith("/api/uploads/frames/")
     ]
@@ -7889,6 +7934,12 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
             break
         if not isinstance(c, dict) or not c.get("telestrated"):
             continue
+        # FIX 02 — FAIL CLOSED: an authority proof clip may only exist for
+        # evidence that passed the deterministic proof gate (verified event,
+        # exact binding, exact frame moment or user-tap ground truth).
+        if c.get("evidence_id") and not compute_proof_frame_verified(c):
+            logger.info(f"[teleclip] {report_id}: moment {i} not proof-verified — no clip")
+            continue
         picked = c.get("frame_picked_ts")
         sec = float(picked) if isinstance(picked, (int, float)) else _ts_to_seconds(str(c.get("timestamp") or ""))
         if sec is None:
@@ -7945,6 +7996,19 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
             stats = await _verify_enriched_frames(report_id, doc, Path(str(video_path)), frames_dir, enriched, ref_crops)
     except Exception:
         logger.exception(f"identity verification layer failed for {report_id}")
+        # FIX 02 — FAIL CLOSED: the identity layer itself failed (infra).
+        # Unconfirmed non-anchor images may not be presented as proof.
+        for c in enriched:
+            if (isinstance(c, dict) and not c.get("anchor_locked")
+                    and c.get("identity_verified") is not True and c.get("frame_url")):
+                c["identity_verified"] = False
+                c["identity_verification_status"] = "error"
+                c["frame_url"] = None
+    # FIX 02 — final fail-closed proof-frame state (after identity verification,
+    # before any proof clip may be generated from it).
+    for c in enriched:
+        if isinstance(c, dict) and c.get("evidence_id"):
+            c["proof_frame_verified"] = compute_proof_frame_verified(c)
     # Telestration — ring drawn ONLY from the user's own tap anchors (ground truth).
     try:
         await _telestrate_verified_frames(report_id, doc, frames_dir, enriched, ref_crops)
@@ -8091,8 +8155,9 @@ async def _cross_verify_full_report(
     """INTELLIGENT DUAL-PASS: a second, independent Gemini pass re-watches the
     video and must CONFIRM every timeline claim (identity + event) against the
     tap crops and ground-truth positions, then scores independently. The merge
-    itself is deterministic code (`_apply_cross_verification`). Fail-open: any
-    error leaves pass-1 untouched."""
+    itself is deterministic code (`_apply_cross_verification`). FIX 02 FAIL
+    CLOSED: if this pass errors, NOTHING is confirmed — the pass-1 timeline is
+    not exposed as verified evidence."""
     try:
         timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
         if not timeline:
@@ -8139,7 +8204,13 @@ async def _cross_verify_full_report(
         )
     except Exception:
         logger.exception(f"cross-verification failed for {report_id}")
-        full["cross_verification"] = {"status": "skipped", "reason": "error"}
+        # FIX 02 — FAIL CLOSED: a failed verification pass confirms nothing.
+        had = len([e for e in (full.get("action_timeline") or []) if isinstance(e, dict)])
+        full["action_timeline"] = []
+        full["cross_verification"] = {
+            "status": "fail_closed_error", "reason": "verifier_error",
+            "events_checked": had, "events_dropped": had, "verified_at": now_iso(),
+        }
 
 
 async def _trusted_fastest_moment(
@@ -8379,6 +8450,8 @@ async def _run_identity_corrective_pass(
         # its own authority namespace/IDs via the SAME normalisation helper
         # (stale IDs from the replaced body are never copied).
         retry = attach_event_evidence_authority(retry)
+        # FIX 02 — same fail-closed proof gate as the normal pipeline.
+        retry = apply_fail_closed_proof_authority(retry)
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {"full_report": retry, "full_generated_at": now_iso(),
@@ -8811,6 +8884,8 @@ async def generate_full_report_task(report_id: str) -> None:
         # metadata, exact joins) AFTER all verification/filtering, right before
         # the body is persisted. Deterministic — zero LLM.
         full = attach_event_evidence_authority(full)
+        # FIX 02 — fail-closed proof eligibility over the authority IDs.
+        full = apply_fail_closed_proof_authority(full)
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {

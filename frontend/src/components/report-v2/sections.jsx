@@ -148,12 +148,18 @@ export function ActionTimelineCard({ actions, onPlayAt }) {
       </V2Title>
       <div className="relative pl-7">
         <div className="absolute left-[7px] top-2 bottom-2 w-[2px] bg-[#EFEADB]" />
-        {actions.map((a, i) => (
-          <button
+        {actions.map((a, i) => {
+          // FIX 02 — defense-in-depth: unverified authority events render
+          // non-clickable (no proof affordance, no timestamp-only navigation).
+          const clickable = a.proofable !== false;
+          const Row = clickable ? "button" : "div";
+          return (
+          <Row
             key={i}
-            type="button"
+            {...(clickable
+              ? { type: "button", onClick: () => onPlayAt?.(a.timestamp, { eventId: a.eventId }) }
+              : {})}
             data-testid={`v2-action-row-${i}`}
-            onClick={() => onPlayAt?.(a.timestamp, { eventId: a.eventId })}
             className={`relative w-full text-left flex items-center gap-3 py-2.5 group ${i < actions.length - 1 ? "border-b border-[#F2EDDE]" : ""}`}
           >
             <span
@@ -177,9 +183,10 @@ export function ActionTimelineCard({ actions, onPlayAt }) {
                 {Number(a.rating).toFixed(1)}
               </span>
             )}
-            <Play className="w-3.5 h-3.5 text-[#12402A] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block" />
-          </button>
-        ))}
+            {clickable && <Play className="w-3.5 h-3.5 text-[#12402A] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block" />}
+          </Row>
+          );
+        })}
       </div>
     </V2Card>
   );

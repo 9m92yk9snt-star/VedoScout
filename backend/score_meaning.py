@@ -118,12 +118,15 @@ def _gap_to_next(score: float):
     return None, None
 
 
-def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None = None):
+def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None = None,
+                   authority: bool = False):
     """Pick a proof moment from THIS skill's own model-cited evidence, preferring
     moments not already shown on another card (±3s) — proofs spread across the
     match instead of repeating one clip. Never invents timestamps.
     P7 soft gate: moments within ±1.5s of a shadow switch-risk flag are only
-    deprioritized — picked last, never dropped."""
+    deprioritized — picked last, never dropped.
+    FIX 02: authority reports may ONLY select fail-closed proof_verified rows —
+    no unverified fallback; no verified row means no proof for that card."""
     cands = []
     for e in evidence or []:
         ts = (e or {}).get("timestamp") if isinstance(e, dict) else None
@@ -131,7 +134,10 @@ def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None =
         if s is None:
             continue
         cands.append({"timestamp": str(ts), "sec": s, "verified": _is_verified(s, vsecs),
-                      "evidence_id": e.get("evidence_id"), "event_id": e.get("event_id")})
+                      "evidence_id": e.get("evidence_id"), "event_id": e.get("event_id"),
+                      "proof_verified": e.get("proof_verified")})
+    if authority:
+        cands = [c for c in cands if c.get("proof_verified") is True]
     if not cands:
         return None
     def fresh(c):
@@ -164,6 +170,9 @@ def _pick_evidence(evidence: list, vsecs: list, used: list, risky: list | None =
         out["evidence_id"] = pick["evidence_id"]
     if pick.get("event_id"):
         out["event_id"] = pick["event_id"]
+    # FIX 02 — preserve the fail-closed proof state for frontend gating.
+    if pick.get("proof_verified") is not None:
+        out["proof_verified"] = pick["proof_verified"]
     return out
 
 
@@ -251,8 +260,11 @@ def build_score_meaning(doc: dict, progression: dict | None = None) -> dict | No
     # each card prefers a moment the reader has not already seen
     used: list = []
     risky = _risky_seconds(doc)
+    # FIX 02 — authority reports: proof selection is fail-closed.
+    authority = bool(full.get("evidence_authority_version"))
     for s in skills:
-        s["evidence"] = _pick_evidence((obs_map[s["key"]][1] or {}).get("evidence"), vsecs, used, risky)
+        s["evidence"] = _pick_evidence((obs_map[s["key"]][1] or {}).get("evidence"), vsecs, used, risky,
+                                       authority=authority)
     return {
         "position": pos,
         "position_line": posdata.get("line"),

@@ -16,25 +16,29 @@ export function isAuthorityReport(full) {
 
 // Resolve the tele proof clip for a card. Priority (authority reports):
 // 1. evidence_id exact  2. event_id exact  3. nothing (never an unrelated clip).
+// FIX 02 FAIL CLOSED: authority clips only for proof_verified evidence.
 // Legacy reports: existing timestamp-string match.
 export function resolveProofClip(comments, ref, authority) {
   const list = Array.isArray(comments) ? comments : [];
   const evId = ref && ref.evidenceId;
   const evtId = ref && ref.eventId;
   const ts = ref && ref.timestamp;
+  const ok = (c) => c && c.tele_clip_url && (!authority || c.proof_verified === true);
   let vc = null;
-  if (evId) vc = list.find((c) => c && c.evidence_id === evId && c.tele_clip_url) || null;
-  if (!vc && evtId) vc = list.find((c) => c && c.event_id === evtId && c.tele_clip_url) || null;
-  if (!vc && !authority && ts) vc = list.find((c) => c && c.timestamp === ts && c.tele_clip_url) || null;
+  if (evId) vc = list.find((c) => ok(c) && c.evidence_id === evId) || null;
+  if (!vc && evtId) vc = list.find((c) => ok(c) && c.event_id === evtId) || null;
+  if (!vc && !authority && ts) vc = list.find((c) => ok(c) && c.timestamp === ts) || null;
   return vc;
 }
 
 // Frame lookup used by the derive layer. Authority mode: ID-exact only —
 // no nearest <=8s, no any-unused-frame fallback. A card without an exact
-// bound proof gets none.
+// bound proof gets none. FIX 02 FAIL CLOSED: authority frames must carry
+// proof_frame_verified (identity_verified null/false is never accepted).
 export function buildFrameLookup(comments, authority) {
   const entries = (Array.isArray(comments) ? comments : [])
-    .filter((c) => c && c.frame_url && c.identity_verified !== false)
+    .filter((c) => c && c.frame_url
+      && (authority ? c.proof_frame_verified === true : c.identity_verified !== false))
     .map((c) => ({
       ts: c.timestamp, sec: tsToSeconds(c.timestamp), url: c.frame_url,
       verified: c.identity_verified === true,
@@ -71,11 +75,15 @@ export function buildFrameLookup(comments, authority) {
   return { entries, find };
 }
 
-// FIX 01 CORRECTION 01 — proof affordance gate. Authority reports may only
-// offer proof navigation for items carrying an authoritative reference.
+// FIX 01 CORRECTION 01 — proof affordance gate.
+// FIX 02 — FAIL CLOSED: for authority reports an ID alone is NOT enough;
+// the item must also carry the deterministic fail-closed proof state.
 export function canUseAuthorityProof(authority, ref) {
   if (!authority) return true;
-  return !!(ref && (ref.evidenceId || ref.evidence_id || ref.eventId || ref.event_id));
+  if (!ref) return false;
+  const hasId = !!(ref.evidenceId || ref.evidence_id || ref.eventId || ref.event_id);
+  const proofOk = ref.proofVerified === true || ref.proof_verified === true;
+  return hasId && proofOk;
 }
 
 // Evidence thumb for a Top Strength: generic marker/poster imagery may NEVER
@@ -86,12 +94,13 @@ export function strengthThumb(authority, itemThumb, fallbackThumb) {
 
 // Resolve the exactly bound video_comment whose frame may serve as the proof
 // photo for a structured moment (snapshot_moments etc). EXACT ID joins only —
-// never nearest, never an unrelated frame.
+// never nearest, never an unrelated frame. FIX 02 FAIL CLOSED: the frame must
+// carry the deterministic proof_frame_verified state.
 export function resolveAuthorityFrame(comments, ref) {
   const list = Array.isArray(comments) ? comments : [];
   const evId = ref && (ref.evidenceId || ref.evidence_id);
   const evtId = ref && (ref.eventId || ref.event_id);
-  const usable = (c) => c && c.frame_url && !c.frame_placeholder && c.identity_verified !== false;
+  const usable = (c) => c && c.frame_url && !c.frame_placeholder && c.proof_frame_verified === true;
   let c = null;
   if (evId) c = list.find((x) => usable(x) && x.evidence_id === evId) || null;
   if (!c && evtId) c = list.find((x) => usable(x) && x.event_id === evtId) || null;
