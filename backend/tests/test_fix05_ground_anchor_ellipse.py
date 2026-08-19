@@ -180,13 +180,11 @@ def test_E9_fall_slide_bounded_ground_contact():
 def test_E10_airborne_never_rings_the_body():
     f = pitch()
     # airborne stride: the visible mass ends WELL above the accepted bbox
-    # bottom (legs tucked / lost) — ringing that band would mark a knee/shin
+    # bottom (legs tucked / lost) — ringing that band would mark a knee/shin,
+    # and bbox bottom is NOT ground truth without support → hide (C03)
     cv2.rectangle(f, (190, 145), (210, 172), KIT, -1)
-    res = _ground_anchor(f, 200, 200, 40, 60)
-    assert res is not None
-    ax, ay, foot_w = res
-    assert ay >= 200 - 60 * 0.35, "ring attached to the airborne body"
-    assert foot_w is None, "an elevated band was reported as a real footprint"
+    assert _ground_anchor(f, 200, 200, 40, 60) is None, \
+        "elevated contact without ground support must HIDE the ring"
 
 
 # -------------------------------------------------------------- E11 pitch line
@@ -295,6 +293,76 @@ def test_E15b_single_clean_rescue_still_allowed():
 
 def test_E15c_empty_scene_no_ring():
     assert _ground_anchor(pitch(), 200, 200, 40, 60) is None
+
+
+# --------------------------- E19/E20 — motion lead never changes ownership
+
+def test_E19_fast_sprint_same_kit_decoy_ahead():
+    f = pitch()
+    draw_player(f, 200, 200)
+    draw_player(f, 232, 200)  # same-kit teammate just ahead in motion direction
+    res = _ground_anchor(f, 200, 200, 40, 60, vx=400.0)
+    assert res is not None, "clean target lost under strong positive velocity"
+    ax, ay, foot_w = res
+    assert abs(ax - 200) <= 5, "motion lead moved ownership off the target"
+    assert abs(ax - 232) > 20, "anchor became the forward teammate"
+    assert foot_w is None or foot_w <= 40 * 0.9, "teammate widened the footprint"
+
+
+def test_E20_fast_sprint_same_kit_decoy_behind():
+    f = pitch()
+    draw_player(f, 200, 200)
+    draw_player(f, 168, 200)  # same-kit teammate just behind
+    res = _ground_anchor(f, 200, 200, 40, 60, vx=-400.0)
+    assert res is not None, "clean target lost under strong negative velocity"
+    ax, ay, foot_w = res
+    assert abs(ax - 200) <= 5, "motion lead moved ownership off the target"
+    assert abs(ax - 168) > 20, "anchor became the trailing teammate"
+    assert foot_w is None or foot_w <= 40 * 0.9, "teammate widened the footprint"
+
+
+# --------------------------------- E21/E22 — merged / touching duel crowding
+
+def test_E21_touching_same_kit_duel_hides():
+    f = pitch()
+    draw_player(f, 200, 200, body_w=20, stance=10)
+    draw_player(f, 220, 200, body_w=20, stance=10)  # touching → ONE component
+    assert _ground_anchor(f, 200, 200, 40, 60) is None, \
+        "touching duel bypassed ambiguity protection"
+    assert _ground_anchor(f, 210, 200, 40, 60) is None, \
+        "midpoint anchor produced for a merged duel"
+
+
+def test_E22_merged_legs_feet_hide():
+    f = pitch()
+    draw_player(f, 196, 200, body_w=14, stance=6)
+    draw_player(f, 216, 200, body_w=14, stance=6)
+    cv2.rectangle(f, (190, 192), (222, 199), KIT, -1)  # lower bodies merged
+    assert _ground_anchor(f, 200, 200, 40, 60) is None, \
+        "merged feet became a single-player footprint"
+
+
+# ------------------------------------- E23/E24/E25 — no fail-open fallbacks
+
+def test_E23_elevated_contact_without_ground_support():
+    f = pitch()
+    cv2.rectangle(f, (190, 130), (210, 168), KIT, -1)  # mass well above py
+    assert _ground_anchor(f, 200, 200, 40, 60) is None
+
+
+def test_E24_weak_target_mask_without_credible_footprint():
+    f = pitch()
+    cv2.rectangle(f, (198, 168), (203, 173), KIT, -1)  # tiny mask remnant
+    assert _ground_anchor(f, 200, 200, 40, 60) is None, \
+        "weak mask silently became bbox-bottom ground"
+
+
+def test_E25_pitch_line_removed_no_valid_footprint():
+    f = pitch()
+    cv2.rectangle(f, (190, 148), (210, 172), KIT, -1)               # upper body only
+    cv2.rectangle(f, (175, 173), (224, 176), (255, 255, 255), -1)   # line at its base
+    assert _ground_anchor(f, 200, 200, 40, 60) is None, \
+        "line-only contact became a ring anchor"
 
 
 # ------------------------------------------------------ E16 shared renderer

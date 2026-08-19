@@ -79,11 +79,11 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
     pitch lines / mud patches can never hijack the anchor. If the box holds
     no body mass, ONE unambiguous person-mass directly above in the box's
     own columns may rescue the anchor; otherwise returns None and the
-    marker is HIDDEN (no marker is better than a wrong marker).
-    Benign small-mask cases fall back to bbox bottom-center."""
+    marker is HIDDEN (no marker is better than a wrong marker). Any path
+    that cannot confirm a target-owned plausible ground contact returns
+    None — bbox bottom is never assumed to be physical ground (C03)."""
     fh, fw = frame.shape[:2]
     lead = float(np.clip(vx * 0.25, -bw * 0.55, bw * 0.55))
-    tcx = px + lead * 0.6
     x0 = int(max(0, px - bw * 0.62 + min(0.0, lead)))
     x1 = int(min(fw, px + bw * 0.62 + max(0.0, lead)))
     y1 = int(min(fh, py + bh * 0.45))
@@ -98,11 +98,13 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
 
     got = _mask(py - bh * 0.85)
     if got is None:
-        return px, py, None
+        return None
     pm, y0 = got
     _, lbl = cv2.connectedComponents(pm)
-    tx0 = int(max(0, tcx - bw * 0.30 - x0))
-    tx1 = int(min(x1 - x0, tcx + bw * 0.30 - x0))
+    # C01: ownership is resolved from an UNSHIFTED core centred on the
+    # CURRENT accepted bbox — motion lead never chooses the component
+    tx0 = int(max(0, px - bw * 0.30 - x0))
+    tx1 = int(min(x1 - x0, px + bw * 0.30 - x0))
     ty0 = int(max(0, py - bh * 0.80 - y0))
     ty1 = int(min(y1 - y0, py - bh * 0.25 - y0))
     rescue = False
@@ -138,20 +140,53 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
             if int(comp.sum()) < 40:
                 continue
             ys_c, xs_c = np.nonzero(comp)
-            if (ys_c.max() - ys_c.min()) >= bh * 0.25 and abs(x0 + float(xs_c.mean()) - tcx) <= bw * 0.5:
+            if (ys_c.max() - ys_c.min()) >= bh * 0.25 and abs(x0 + float(xs_c.mean()) - px) <= bw * 0.5:
                 cands.append(cid)
         if len(cands) != 1:
             return None  # ambiguous or empty → hide, never guess
         pm = (lbl2 == cands[0]).astype(np.uint8)
         rescue = True
+    # C02: merged/touching duel — the OWNED component itself may hold two
+    # bodies as ONE connected component. Upper-body evidence decides:
+    # implausibly wide for the current target, or two distinct column
+    # lobes → hide, never guess which half is the player.
+    if rescue:
+        rys, rxs = np.nonzero(pm)
+        if rys.size:
+            ucols = rxs[rys <= float(rys.min()) + 0.45 * float(rys.max() - rys.min())]
+        else:
+            ucols = rxs
+    else:
+        u0 = int(max(0, py - bh * 0.80 - y0))
+        u1 = int(max(0, py - bh * 0.35 - y0))
+        ucols = np.nonzero(pm[u0:u1, :])[1]
+    if ucols.size >= 12:
+        w_t = float(ucols.max() - ucols.min())
+        if w_t > bw * 0.90:
+            return None  # wider than one plausible target body
+        if w_t > bw * 0.62:
+            if int(ucols.min()) <= 1 or int(ucols.max()) >= (x1 - x0 - 2):
+                return None  # wide mass truncated by the crop — may hide a duel
+            occ = np.bincount(ucols - int(ucols.min()), minlength=int(w_t) + 1).astype(float)
+            q = max(1, occ.size // 4)
+            vi = q + int(np.argmin(occ[q:occ.size - q]))
+            lm, rm = float(occ[:vi].sum()), float(occ[vi + 1:].sum())
+            lpk = float(occ[:vi].max()) if vi else 0.0
+            rpk = float(occ[vi + 1:].max()) if vi + 1 < occ.size else 0.0
+            if (lm + rm > 0 and lm >= 0.30 * (lm + rm) and rm >= 0.30 * (lm + rm)
+                    and min(lpk, rpk) > 0 and float(occ[vi]) <= 0.55 * min(lpk, rpk)):
+                return None  # two body lobes share one component
     ys, xs = np.nonzero(pm)
     if len(ys) < 30:
-        return None if rescue else (px, py, None)
-    # ownership: target's own columns, shifted along the motion direction
-    keep = np.abs(xs + x0 - tcx) <= bw * 0.5 + abs(lead) * 0.5
+        return None
+    # ownership: the target's OWN columns (centred on the CURRENT accepted
+    # bbox); motion lead only EXTENDS the footprint search toward the motion
+    # direction for the already-owned component — never re-centres ownership
+    rel = xs + x0 - px
+    keep = (rel >= -bw * 0.5 + min(0.0, lead) * 0.5) & (rel <= bw * 0.5 + max(0.0, lead) * 0.5)
     ys, xs = ys[keep], xs[keep]
     if len(ys) < 25:
-        return None if rescue else (px, py, None)
+        return None
     y_low = 0.0
     bx = by = None
     foot_w = 0.0
@@ -159,7 +194,7 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
         y_low = float(np.percentile(ys, 96))
         band = ys >= y_low - max(3.0, bh * 0.07)
         if int(band.sum()) < 8:
-            return None if rescue else (px, py, None)
+            return None
         bx, by = xs[band], ys[band]
         foot_w = float(np.percentile(bx, 95) - np.percentile(bx, 5))
         band_h = float(by.max() - by.min())
@@ -172,18 +207,19 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
         keepy = ys < y_low - max(3.0, bh * 0.07)
         ys, xs = ys[keepy], xs[keepy]
         if len(ys) < 25:
-            return None if rescue else (px, py, None)
+            return None  # pitch line removed, no valid footprint remains
     else:
-        return None if rescue else (px, py, None)
+        return None
     ax = x0 + float(np.median(bx))
     ay = y0 + float(np.percentile(by, 85))
-    if abs(ax - px) > bw * (0.45 if not rescue else 0.55) + abs(lead):
-        return None if rescue else (px, py, None)
+    # C01: high velocity never increases the allowed anchor distance
+    if abs(ax - px) > bw * (0.45 if not rescue else 0.55):
+        return None
     if not rescue and ay < py - bh * 0.35:
         # contact band floats too high (airborne stride / legs lost in the
-        # mask) — NEVER ring a knee/shin/torso; the accepted bbox bottom is
-        # the only safe plausible ground proxy
-        return px, py, None
+        # mask) — NEVER ring a knee/shin/torso, and bbox bottom is not
+        # ground truth without support: hide (C03)
+        return None
     return ax, min(ay, fh - 2.0), foot_w
 
 
