@@ -3,8 +3,13 @@ player_tracking.py — deterministic optical tracking seeded by the user's taps.
 
 Every tap gives a ground-truth (time, box). From each seed we track the player
 forward AND backward (±SPAN seconds) with local NCC template matching:
-- search window = last box grown 45%
-- template updated every frame, drift-guarded against the ORIGINAL tap content
+- FIX 03/04: every frame carries its own ACTUAL post-grab media PTS (VFR-safe)
+- search window = last box grown 45%, centred by bounded motion prediction
+  (camera-compensated player velocity over ACTUAL media dt) — FIX 04
+- conservative multi-scale matching (±6%/step, bounded vs the tap) — FIX 04
+- geometry gates: same-kit ambiguity skip + implausible-jump rejection — FIX 04
+- template updated from ACCEPTED frames only, drift-guarded against the
+  ORIGINAL tap content
 - COLOUR VETO: every accepted match is compared against the seed's HSV
   colour signature (jersey area). Consistent colour mismatch = likely an
   identity switch onto another player → stop honestly.
@@ -19,6 +24,9 @@ import logging
 
 import cv2
 import numpy as np  # noqa: F401
+
+import tracking_geometry
+import video_timebase
 
 logger = logging.getLogger(__name__)
 
@@ -48,35 +56,41 @@ def _cut_flags(frames):
     """flags[i] = True when a scene cut lies between frames[i-1] and frames[i]."""
     flags = [False] * len(frames)
     prev = None
-    for i, (_t, g, _hsv) in enumerate(frames):
-        small = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1]))))
-        sf = small.astype("float32")
+    for i, (_t, _g, _hsv, tiny) in enumerate(frames):
+        sf = tiny
         if prev is not None and prev.shape == sf.shape:
             flags[i] = float(cv2.absdiff(prev, sf).mean()) > CUT_DIFF
         prev = sf
     return flags
 
 
-def _read_window(cap, w0: float, w1: float, step: float):
-    """Returns [(t, gray_480w, hsv_240w), ...]"""
+def _read_window(cap, w0: float, w1: float, step: float, fps=None):
+    """Returns [(t, gray_480w, hsv_240w, tiny_160w_f32), ...].
+
+    FIX 03/04 canonical contract: adaptive-preroll seek at/before w0, then
+    grab → read the ACTUAL post-grab PTS → retrieve that SAME frame. Only
+    frames whose actual media time lies within [w0, w1] are included, and
+    sampling is by elapsed ACTUAL media time — never frame_index/fps."""
     frames = []
-    cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, w0) * 1000.0)
-    last_t = -1e9
-    while True:
-        pos = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-        ok, fr = cap.read()
-        if not ok or pos > w1:
+    lo = max(0.0, w0)
+    ok, t, _fb = video_timebase.seek_with_preroll(cap, lo, fps)
+    last_t = None
+    while ok:
+        if t > w1 + 1e-3:
             break
-        if pos - last_t < step * 0.8:
-            continue
-        last_t = pos
-        h, w = fr.shape[:2]
-        small = cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w))))
-        g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
-        hsv = cv2.cvtColor(
-            cv2.resize(small, (COLOR_W, max(2, small.shape[0] // 2))), cv2.COLOR_BGR2HSV,
-        )
-        frames.append((pos, g, hsv))
+        if t >= lo - 1e-3 and video_timebase.should_sample(t, last_t, step * 0.8):
+            ok2, fr = cap.retrieve()
+            if ok2:
+                last_t = t
+                h, w = fr.shape[:2]
+                small = cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w))))
+                g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+                hsv = cv2.cvtColor(
+                    cv2.resize(small, (COLOR_W, max(2, small.shape[0] // 2))), cv2.COLOR_BGR2HSV,
+                )
+                tiny = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1])))).astype("float32")
+                frames.append((t, g, hsv, tiny))
+        ok, t, _fb = video_timebase.grab_frame_time_seconds(cap, fps)
     return frames
 
 
@@ -137,23 +151,152 @@ def _doubt(doubts, t: float, cur, W: int, H: int, reason: str):
     })
 
 
+_DOUBT_REASONS = {
+    "lost": "player lost — no confident match",
+    "ambiguous": "two similar players — identity ambiguous",
+    "contaminated": "player overlap — geometry ambiguous",
+    "jump": "implausible jump — geometry rejected",
+    "colour": "kit-colour change — possible player crossover",
+}
+
+
+def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy):
+    """Bounded multi-scale NCC search around (pcx, pcy)."""
+    H, W = g.shape[:2]
+    sx0, sy0 = max(0, int(pcx - bw / 2.0 - gx)), max(0, int(pcy - bh / 2.0 - gy))
+    sx1, sy1 = min(W, int(pcx + bw / 2.0 + gx)), min(H, int(pcy + bh / 2.0 + gy))
+    region = g[sy0:sy1, sx0:sx1]
+    best = None
+    unit = None
+    for s in tracking_geometry.scale_candidates(bw, bh, bw0, bh0):
+        tw = max(6, int(round(tmpl.shape[1] * s)))
+        th = max(6, int(round(tmpl.shape[0] * s)))
+        if region.shape[0] <= th or region.shape[1] <= tw:
+            continue
+        tm = tmpl if (tw, th) == (tmpl.shape[1], tmpl.shape[0]) else cv2.resize(tmpl, (tw, th))
+        res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED)
+        _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+        cand = (mx, ml, tw, th, res, sx0, sy0)
+        if s == 1.0:
+            unit = cand
+        if best is None or mx > best[0]:
+            best = cand
+    # a non-unit scale must win by a real margin — noise must not ratchet
+    # the bbox smaller/larger frame after frame (scale drift)
+    if best is not None and unit is not None and best is not unit \
+            and best[0] < unit[0] + tracking_geometry.SCALE_HYST:
+        best = unit
+    return best
+
+
+def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, cam_acc, bw, bh, dt):
+    """Run every safety gate on a matched candidate.
+
+    Returns (verdict, cand_box, payload):
+      accept / confirm — authoritative geometry
+      hold             — bounded direction-change candidate (provisional)
+      ambiguous / contaminated / colour / jump — rejection reasons
+    """
+    mx, ml, tw, th, res, sx0, sy0 = best
+    # same-kit crossover safety: a spatially distinct near-equal rival means
+    # this frame is NOT authoritative geometry
+    mx2, _ml2 = tracking_geometry.second_peak(res, ml, tw, th)
+    if tracking_geometry.is_ambiguous(mx, mx2, MATCH_MIN):
+        return "ambiguous", None, None
+    # close-crowding gate: merged/overlapping bodies contaminate the match
+    # support — do not learn or record it
+    if tracking_geometry.is_contaminated(res, ml, tw, th, mx):
+        return "contaminated", None, None
+    cand_box = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + tw, sy0 + ml[1] + th]
+    ccx, ccy = (cand_box[0] + cand_box[2]) / 2.0, (cand_box[1] + cand_box[3]) / 2.0
+    # colour veto (every candidate, provisional ones included)
+    csim = _color_sim(ref_hist, hsv, cand_box, scale)
+    if csim is not None and csim < COLOR_MIN:
+        return "colour", None, None
+    payload = {"mx": mx, "tw": tw, "th": th}
+    # spatial ownership: prediction is assistance, not a hard identity prior
+    if tracking_geometry.plausible_motion(ccx - pcx, ccy - pcy, bw, bh, dt):
+        return "accept", cand_box, payload
+    if exp is not None and tracking_geometry.plausible_motion(
+            ccx - exp[0], ccy - exp[1], bw, bh, dtp):
+        return "confirm", cand_box, payload  # this frame confirmed the held trajectory
+    if (abs(ccx - lcx - cam_acc[0]) <= bw * (0.45 + tracking_geometry.BOOT_FRAC)
+            and abs(ccy - lcy - cam_acc[1]) <= bh * (0.45 + tracking_geometry.BOOT_FRAC)):
+        pv = max(dt, 1e-6)
+        return "hold", cand_box, {"cx": ccx, "cy": ccy, "t": None,
+                                  "vx": (ccx - lcx - cam_acc[0]) / pv,
+                                  "vy": (ccy - lcy - cam_acc[1]) / pv,
+                                  "cam": (cam_acc[0], cam_acc[1])}
+    return "jump", None, None
+
+
+def _distinct(b1, b2, bw, bh):
+    """True when two candidate boxes are spatially distinct bodies."""
+    if b1 is None or b2 is None:
+        return False
+    dx = abs((b1[0] + b1[2]) - (b2[0] + b2[2])) / 2.0
+    dy = abs((b1[1] + b1[3]) - (b2[1] + b2[3])) / 2.0
+    return dx > bw * 0.5 or dy > bh * 0.5
+
+
+def _provisional_from(v2, box2, pay2, prov_old, cam_acc, dtp, lcx, lcy, dt, t):
+    """Build/extend the held provisional trajectory from a safe recovery
+    candidate — kept for prediction only, never recorded or learned."""
+    if v2 == "hold":
+        pay2["t"] = t
+        return pay2
+    ccx, ccy = (box2[0] + box2[2]) / 2.0, (box2[1] + box2[3]) / 2.0
+    if v2 == "confirm" and prov_old is not None:
+        pv = max(dtp, 1e-6)
+        return {"cx": ccx, "cy": ccy, "t": t,
+                "vx": (ccx - prov_old["cx"] - cam_acc[0] + prov_old["cam"][0]) / pv,
+                "vy": (ccy - prov_old["cy"] - cam_acc[1] + prov_old["cam"][1]) / pv,
+                "cam": (cam_acc[0], cam_acc[1])}
+    pv = max(dt, 1e-6)
+    return {"cx": ccx, "cy": ccy, "t": t,
+            "vx": (ccx - lcx - cam_acc[0]) / pv,
+            "vy": (ccy - lcy - cam_acc[1]) / pv,
+            "cam": (cam_acc[0], cam_acc[1])}
+
+
 def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None,
                    cuts: list | None = None):
-    _t0, g0, hsv0 = frames[i0]
+    _t0, g0, hsv0, tiny0 = frames[i0]
     tmpl0 = _crop(g0, box_px)
     if tmpl0 is None:
         return
     tmpl = tmpl0
-    bw, bh = box_px[2] - box_px[0], box_px[3] - box_px[1]
+    bw0, bh0 = box_px[2] - box_px[0], box_px[3] - box_px[1]  # seed size = scale bounds
+    bw, bh = float(bw0), float(bh0)
     H, W = g0.shape[:2]
     scale = hsv0.shape[1] / float(W)  # gray-px → colour-px
     ref_hist = _color_hist(hsv0, box_px, scale)  # FIXED colour signature from the tap
-    misses = 0
-    color_misses = 0
     steps = 0
+    streak = 0        # unified budget: consecutive frames with NO accepted geometry
+    tally: dict = {}  # rejection reasons inside the current streak (diagnostics)
+    last_reason = "lost"
     lock_ts: list = []  # timestamps of the current near-perfect-match streak
     cur = list(box_px)
+    vel = (0.0, 0.0)          # camera-compensated player velocity (gray px/s)
+    t_last = frames[i0][0]    # media time of the last ACCEPTED geometry
+    cam_acc = [0.0, 0.0]      # camera shift accumulated since last accept (gray px)
+    prov = None               # provisional candidate — held, never recorded/learned
+    prev_tiny = tiny0
+    tiny_scale = W / float(tiny0.shape[1])
     end = len(frames) if direction > 0 else -1
+
+    def _reject(reason: str, t: float) -> bool:
+        """Unified conservative miss budget: reset ONLY by a full accept."""
+        nonlocal streak, last_reason
+        streak += 1
+        last_reason = reason
+        tally[reason] = tally.get(reason, 0) + 1
+        if streak >= MAX_MISSES:
+            top = max(tally, key=lambda k: (tally[k], 1 if k == last_reason else 0))
+            _doubt(doubts, t, cur, W, H, _DOUBT_REASONS[top])
+            return True
+        return False
+
     for i in range(i0 + direction, end, direction):
         # ── scene-cut stop: a montage cut invalidates template tracking ──
         if cuts is not None:
@@ -161,32 +304,145 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             if boundary:
                 _doubt(doubts, frames[i][0], cur, W, H, "scene cut — tracking cannot continue")
                 break
-        t, g, hsv = frames[i]
-        gx, gy = bw * 0.45, bh * 0.45
-        sx0, sy0 = max(0, int(cur[0] - gx)), max(0, int(cur[1] - gy))
-        sx1, sy1 = min(W, int(cur[2] + gx)), min(H, int(cur[3] + gy))
-        region = g[sy0:sy1, sx0:sx1]
-        if region.shape[0] <= tmpl.shape[0] or region.shape[1] <= tmpl.shape[1]:
-            break
-        res = cv2.matchTemplate(region, tmpl, cv2.TM_CCOEFF_NORMED)
-        _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
-        if mx < MATCH_MIN:
-            misses += 1
-            if misses >= MAX_MISSES:
+        t, g, hsv, tiny = frames[i]
+        # ── global camera motion between the previously PROCESSED frame and
+        # this one — a pan must not be read as player motion (fail-safe 0) ──
+        cdx, cdy = tracking_geometry.estimate_camera_shift(prev_tiny, tiny)
+        prev_tiny = tiny
+        cam_acc[0] += cdx * tiny_scale
+        cam_acc[1] += cdy * tiny_scale
+        dt = abs(t - t_last)  # ACTUAL elapsed media time since last accept
+        lcx, lcy = (cur[0] + cur[2]) / 2.0, (cur[1] + cur[3]) / 2.0
+        # ── bounded motion prediction: search follows camera + player motion ──
+        pdx, pdy = tracking_geometry.predict_displacement(vel, dt, bw, bh)
+        pcx, pcy = lcx + cam_acc[0] + pdx, lcy + cam_acc[1] + pdy
+        # camera-compensated continuation of a held provisional trajectory
+        exp = None
+        dtp = 0.0
+        if prov is not None:
+            dtp = abs(t - prov["t"])
+            exp = (prov["cx"] + prov["vx"] * dtp + cam_acc[0] - prov["cam"][0],
+                   prov["cy"] + prov["vy"] * dtp + cam_acc[1] - prov["cam"][1])
+        # ── pass 1: narrow prediction-centred search (normal path) ──
+        ex = min(abs(pdx) * 0.5 + abs(cam_acc[0]) * 0.25, bw * 0.6)
+        ey = min(abs(pdy) * 0.5 + abs(cam_acc[1]) * 0.25, bh * 0.6)
+        best = _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, bw * 0.45 + ex, bh * 0.45 + ey)
+        # ── candidate evaluation with dual-hypothesis arbitration (C02):
+        # prediction is geometry assistance — it must NEVER become identity
+        # authority. An unsafe primary verdict (lost/colour/jump) allows ONE
+        # bounded recovery pass; a primary accept that leans on stale velocity
+        # (provisional trajectory alive, or large displacement) must also be
+        # arbitrated against the recovery hypothesis before it may become
+        # authoritative. Ambiguity/contamination never triggers recovery —
+        # withholding IS the correct response to crowded geometry. ──
+        v1, box1, pay1 = "lost", None, None
+        if best is not None and best[0] >= MATCH_MIN:
+            v1, box1, pay1 = _judge_candidate(
+                best, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
+                lcx, lcy, cam_acc, bw, bh, dt)
+        need_recovery = v1 in ("lost", "colour", "jump")
+        if v1 == "accept":
+            c1x, c1y = (box1[0] + box1[2]) / 2.0, (box1[1] + box1[3]) / 2.0
+            far = not tracking_geometry.plausible_motion(
+                c1x - lcx - cam_acc[0], c1y - lcy - cam_acc[1], bw, bh, dt)
+            need_recovery = prov is not None or far
+        v2, box2, pay2 = "lost", None, None
+        solid2 = False
+        if need_recovery:
+            # bounded recovery — NOT a global search; all gates re-apply
+            bcx, bcy = exp if exp is not None else (lcx + cam_acc[0], lcy + cam_acc[1])
+            reach = 0.45 + tracking_geometry.BOOT_FRAC
+            best2 = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach)
+            if best2 is not None and best2[0] >= MATCH_MIN:
+                v2, box2, pay2 = _judge_candidate(
+                    best2, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
+                    lcx, lcy, cam_acc, bw, bh, dt)
+                # only a SOLID recovery match is a credible second hypothesis;
+                # junk-level background peaks must not veto a safe primary
+                solid2 = best2[0] >= tracking_geometry.CONTAM_MIN
+        verdict, cand_box, payload = v1, box1, pay1
+        if v1 == "accept" and need_recovery:
+            if v2 in ("accept", "confirm", "hold") and solid2 and _distinct(box1, box2, bw, bh):
+                # C: two spatially distinct safe hypotheses → identity is NOT
+                # selectable this frame. Record neither, learn neither; the
+                # recovery trajectory stays alive — a stale-velocity candidate
+                # must not erase it.
+                prov = _provisional_from(v2, box2, pay2, prov, cam_acc, dtp, lcx, lcy, dt, t)
+                if _reject("ambiguous", t):
+                    break
+                continue
+            if v2 in ("ambiguous", "contaminated") and solid2:
+                # the recovery region is genuinely crowded — fail closed
+                prov = None
+                if _reject(v2, t):
+                    break
+                continue
+            # A: only the primary hypothesis is safe (or the same body twice)
+        elif v1 == "jump":
+            if v2 == "confirm":
+                verdict, cand_box, payload = v2, box2, pay2
+            elif v2 in ("accept", "hold"):
+                # a safe recovery hypothesis next to a distinct unsafe primary
+                # candidate is HELD, never instantly authoritative
+                prov = _provisional_from(v2, box2, pay2, prov, cam_acc, dtp, lcx, lcy, dt, t)
+                if _reject("jump", t):
+                    break
+                continue
+            else:
+                prov = None
+                reason = v2 if v2 in ("ambiguous", "contaminated", "colour") else "jump"
+                if _reject(reason, t):
+                    break
+                continue
+        elif v1 in ("lost", "colour"):
+            if v2 in ("accept", "confirm"):
+                verdict, cand_box, payload = v2, box2, pay2
+            elif v2 == "hold":
+                prov = _provisional_from(v2, box2, pay2, prov, cam_acc, dtp, lcx, lcy, dt, t)
+                if _reject("jump", t):
+                    break
+                continue
+            else:
+                prov = None
+                reason = v2 if v2 in ("ambiguous", "contaminated", "colour") else v1
+                if _reject(reason, t):
+                    break
+                continue
+        if verdict in ("lost", "ambiguous", "contaminated", "colour"):
+            prov = None
+            if _reject(verdict, t):
                 break
             continue
-        misses = 0
-        cand_box = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + int(bw), sy0 + ml[1] + int(bh)]
-        # ── colour veto: does the matched box still wear the tapped colours? ──
-        csim = _color_sim(ref_hist, hsv, cand_box, scale)
-        if csim is not None and csim < COLOR_MIN:
-            color_misses += 1
-            if color_misses >= COLOR_MAX_MISSES:
-                _doubt(doubts, t, cur, W, H, "kit-colour change — possible player crossover")
-                break  # colours no longer match the tapped player — stop honestly
-            continue  # do NOT accept the suspicious box
-        color_misses = 0
+        if verdict == "hold":
+            # bounded direction-change / bootstrap candidate: HOLD as
+            # provisional — not recorded, not learned, no identity switch
+            payload["t"] = t
+            prov = payload
+            if _reject("jump", t):
+                break
+            continue
+        if verdict == "jump":
+            prov = None
+            if _reject("jump", t):
+                break
+            continue
+        mx, tw, th = payload["mx"], payload["tw"], payload["th"]
+        ccx, ccy = (cand_box[0] + cand_box[2]) / 2.0, (cand_box[1] + cand_box[3]) / 2.0
+        # ── ACCEPT (or CONFIRM a held direction change: velocity resets to the
+        # newly confirmed trajectory instead of the stale prediction) ──
+        if verdict == "confirm":
+            pv = max(dtp, 1e-6)
+            vel = ((ccx - prov["cx"] - cam_acc[0] + prov["cam"][0]) / pv,
+                   (ccy - prov["cy"] - cam_acc[1] + prov["cam"][1]) / pv)
+        else:
+            vel = tracking_geometry.update_velocity(vel, (lcx, lcy), (ccx, ccy), cam_acc, dt)
+        prov = None
+        streak = 0
+        tally = {}
         cur = cand_box
+        bw, bh = float(tw), float(th)
+        cam_acc = [0.0, 0.0]
+        t_last = t
         steps += 1
         # ── static-background latch: real players never sustain near-perfect
         # NCC (pose keeps changing); static background does. Stop and remove
@@ -209,7 +465,10 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             if drift < DRIFT_MIN:
                 _doubt(doubts, t, cur, W, H, "visual drift — tracker no longer certain")
                 break  # drifted away from the original tap content — stop honestly
-        tmpl = cand
+        if mx >= tracking_geometry.CONTAM_MIN:
+            # template learning ONLY from solid accepted geometry — a weak
+            # (possibly blended) match may be recorded but never learned
+            tmpl = cand
         _record(out, t, cur, W, H, mx)
 
 
@@ -230,9 +489,11 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
     points: dict = {}
     doubts: list = []
     step = 1.0 / SAMPLE_HZ
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    fps = fps if fps > 0 else None  # explicit last-resort fallback only
     try:
         for t_seed, b in seeds:
-            frames = _read_window(cap, t_seed - span, t_seed + span, step)
+            frames = _read_window(cap, t_seed - span, t_seed + span, step, fps)
             if len(frames) < 3:
                 continue
             H, W = frames[0][1].shape[:2]
