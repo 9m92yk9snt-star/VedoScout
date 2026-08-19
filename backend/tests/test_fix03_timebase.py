@@ -412,14 +412,16 @@ def test_T12_primary_duration_is_media_probe(monkeypatch):
 def test_T13_production_tracker_untouched():
     import player_tracking
     src = (BACKEND / "player_tracking.py").read_text()
-    assert "CAP_PROP_POS_MSEC" in src            # existing media-time timing
+    assert "CAP_PROP_POS_MSEC" not in src         # FIX 04: raw pre-grab reads removed
     assert "CAP_PROP_POS_FRAMES" not in src
     # t_off calibration mechanism retained, untouched (precision_engine)
     pe = (BACKEND / "precision_engine.py").read_text()
     assert "def estimate_time_offset" in pe
     assert "CAP_PROP_POS_MSEC" in pe
     assert player_tracking.MAX_TRACKER_SEEDS == 16
-    assert "video_timebase" not in src           # tracker deliberately untouched
+    # FIX 04: the tracker now consumes the FIX 03 canonical timebase helpers
+    assert "video_timebase" in src
+    assert "grab_frame_time_seconds" in src and "seek_with_preroll" in src
 
 
 # ---------- T14 — authority/proof semantics unchanged ----------
