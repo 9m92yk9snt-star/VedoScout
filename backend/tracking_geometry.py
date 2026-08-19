@@ -15,6 +15,7 @@ CAM_MIN_RESPONSE = 0.03   # phase-correlation response below this = unreliable â
 PRED_MAX_FRAC = 1.2       # max predicted displacement per step, in bbox dims
 VEL_ALPHA = 0.5           # EMA smoothing of camera-compensated player velocity
 SCALE_STEP = 1.06         # per-acceptance relative scale change (Â±6%)
+SCALE_HYST = 0.02         # non-unit scale must win by this margin (no drift ratchet)
 SCALE_SEED_MIN = 0.55     # cumulative scale bounds vs the ORIGINAL tap bbox
 SCALE_SEED_MAX = 1.9
 AMBIG_RATIO = 0.8         # distinct second peak this close to best = ambiguous

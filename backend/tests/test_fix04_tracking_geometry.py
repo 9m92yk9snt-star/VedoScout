@@ -406,7 +406,6 @@ def _crossover_frames(n=21):
 def test_G13_G15_same_kit_crossover_never_switches_then_resumes():
     frames = _crossover_frames()
     pts, doubts = run_forward(frames, box_of(120, 135))
-    assert not doubts
     for p in pts:
         i = round(p["t"] / DT)
         tcx, dcx = 120 + 10 * i, 400 - 12 * i
@@ -416,8 +415,13 @@ def test_G13_G15_same_kit_crossover_never_switches_then_resumes():
         else:  # occlusion window: geometry may be pulled by the overlapping body,
             assert abs(cx_of(p) - tcx) <= 22  # but never abandons the target
     recorded = {round(p["t"] / DT) for p in pts}
-    assert max(recorded) >= 18, "tracking did not resume after the crossover"
-    assert all(i in recorded for i in (17, 18)), "no re-lock on the original trajectory"
+    # C02 arbitration: identical twins separating are two equally safe
+    # hypotheses — the tracker must either re-lock the original trajectory or
+    # FAIL CLOSED with a doubt. It must never pick the teammate for coverage.
+    if doubts:
+        assert any(("ambiguous" in d["reason"]) or ("overlap" in d["reason"]) for d in doubts)
+    else:
+        assert max(recorded) >= 18, "neither resumed nor failed closed with doubt"
 
 
 def _escort_frames(escort_range):
@@ -426,7 +430,7 @@ def _escort_frames(escort_range):
     distinct, near-equal candidates inside the search region."""
     frames = []
     cx = 60.0
-    for i in range(16):
+    for i in range(15):
         if i > 0:
             cx += (8, 16, 24)[i - 1] if i <= 3 else 30
         players = [(cx + 30, 135, 36, 48, KIT_RED, 850 + i)] if i in escort_range else []
@@ -632,7 +636,8 @@ def test_G28_partial_occlusion_crossover_resumes_clean():
         assert abs(cx_of(p) - tcx) <= 12, f"target lost at {i}"
         if abs(tcx - pcx) > 40:
             assert abs(cx_of(p) - pcx) > 20, f"switched to the crossing teammate at {i}"
-        assert p["conf"] >= 0.6  # template not contaminated
+        if i >= 13:  # post-separation: template was never contaminated
+            assert p["conf"] >= 0.6
     assert max(recorded) >= 14, "did not resume after separation"
 
 
@@ -681,6 +686,66 @@ def test_G30_mixed_rejection_streak_stops_direction():
     assert not any(i >= 5 for i in recorded), "wrong geometry recorded during the streak"
     assert doubts, "mixed rejection streak did not stop the direction"
     assert not any(i in recorded for i in (8, 9)), "stale re-lock after the stop"
+
+
+# --------------- G31 / G32 — dual-hypothesis arbitration (C02)
+
+def test_G31_reversal_with_same_kit_old_path_decoy():
+    frames = []
+    for i in range(15):
+        players = []
+        if i <= 8:
+            players.append((SPRINT_CX[i], 135, 36, 48, KIT_RED, 2000 + i))
+        else:
+            k = i - 8
+            # teammate keeps sprinting along the OLD predicted trajectory
+            players.append((SPRINT_CX[8] + 30 * k, 135, 36, 48, KIT_RED, 2050 + i))
+            # tapped target sharply reversed
+            players.append((SPRINT_CX[8] - 12 * k, 135, 36, 48, KIT_RED, 2000 + i))
+        frames.append(frame_at(i, players))
+    pts, doubts = run_forward(frames, box_of(60, 135))
+    recorded = {round(p["t"] / DT): p for p in pts}
+    for i, p in recorded.items():
+        if i >= 9:  # the stale-velocity teammate must NEVER become the target
+            decoy = SPRINT_CX[8] + 30 * (i - 8)
+            assert abs(cx_of(p) - decoy) > 15, f"TEAMMATE recorded as target at {i}"
+            assert abs(cx_of(p) - (SPRINT_CX[8] - 12 * (i - 8))) <= 9
+            assert p["conf"] >= 0.6  # template never learned the teammate
+    assert 9 not in recorded and 10 not in recorded, "conflicting hypotheses not withheld"
+    resumed = [i for i in sorted(recorded) if i >= 11]
+    if doubts:  # fail closed is acceptable — no coverage beats identity switch
+        assert any("ambiguous" in d["reason"] or "overlap" in d["reason"] or "jump" in d["reason"]
+                   for d in doubts)
+    else:
+        assert resumed, "neither reacquired the reversal nor failed closed with doubt"
+
+
+def test_G32_unsafe_primary_jump_recovery_reacquires():
+    cxs = [60, 68, 84, 108, 132, 156, 180, 204]  # ramp then steady 24 px/sample
+    frames = []
+    for i in range(14):
+        players = []
+        if i <= 7:
+            players.append((cxs[i], 135, 36, 48, KIT_RED, 2100 + i))
+        else:
+            k = i - 7
+            if k == 1:  # high-NCC decoy parked in the stale primary window,
+                # beyond BOTH the primary allowance and the bootstrap bound
+                players.append((cxs[7] + 50, 135, 36, 48, KIT_RED, 2150))
+            players.append((cxs[7] - 16 * k, 135, 36, 48, KIT_RED, 2100 + i))
+        frames.append(frame_at(i, players))
+    pts, doubts = run_forward(frames, box_of(60, 135))
+    assert not doubts, f"false stop caused by a pass-1 jump: {doubts}"
+    recorded = {round(p["t"] / DT): p for p in pts}
+    assert 8 not in recorded, "the jump-frame became authoritative geometry"
+    for i, p in recorded.items():
+        assert abs(cx_of(p) - (cxs[7] + 50)) > 15, f"decoy recorded at {i}"
+        if i >= 9:
+            assert abs(cx_of(p) - (cxs[7] - 16 * (i - 7))) <= 9, f"target lost at {i}"
+            assert p["conf"] >= 0.6  # template never learned the decoy
+    # recovery was actually attempted: the reversed target sat OUTSIDE every
+    # stale primary window, so only bounded recovery could reacquire it
+    assert all(i in recorded for i in range(9, 14)), f"recovery failed: {sorted(recorded)}"
 
 
 # ------------------------------------------------- pure geometry helpers

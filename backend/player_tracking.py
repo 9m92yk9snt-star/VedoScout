@@ -167,6 +167,7 @@ def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy):
     sx1, sy1 = min(W, int(pcx + bw / 2.0 + gx)), min(H, int(pcy + bh / 2.0 + gy))
     region = g[sy0:sy1, sx0:sx1]
     best = None
+    unit = None
     for s in tracking_geometry.scale_candidates(bw, bh, bw0, bh0):
         tw = max(6, int(round(tmpl.shape[1] * s)))
         th = max(6, int(round(tmpl.shape[0] * s)))
@@ -175,8 +176,16 @@ def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy):
         tm = tmpl if (tw, th) == (tmpl.shape[1], tmpl.shape[0]) else cv2.resize(tmpl, (tw, th))
         res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED)
         _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+        cand = (mx, ml, tw, th, res, sx0, sy0)
+        if s == 1.0:
+            unit = cand
         if best is None or mx > best[0]:
-            best = (mx, ml, tw, th, res, sx0, sy0)
+            best = cand
+    # a non-unit scale must win by a real margin — noise must not ratchet
+    # the bbox smaller/larger frame after frame (scale drift)
+    if best is not None and unit is not None and best is not unit \
+            and best[0] < unit[0] + tracking_geometry.SCALE_HYST:
+        best = unit
     return best
 
 
@@ -219,6 +228,35 @@ def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, c
                                   "vy": (ccy - lcy - cam_acc[1]) / pv,
                                   "cam": (cam_acc[0], cam_acc[1])}
     return "jump", None, None
+
+
+def _distinct(b1, b2, bw, bh):
+    """True when two candidate boxes are spatially distinct bodies."""
+    if b1 is None or b2 is None:
+        return False
+    dx = abs((b1[0] + b1[2]) - (b2[0] + b2[2])) / 2.0
+    dy = abs((b1[1] + b1[3]) - (b2[1] + b2[3])) / 2.0
+    return dx > bw * 0.5 or dy > bh * 0.5
+
+
+def _provisional_from(v2, box2, pay2, prov_old, cam_acc, dtp, lcx, lcy, dt, t):
+    """Build/extend the held provisional trajectory from a safe recovery
+    candidate — kept for prediction only, never recorded or learned."""
+    if v2 == "hold":
+        pay2["t"] = t
+        return pay2
+    ccx, ccy = (box2[0] + box2[2]) / 2.0, (box2[1] + box2[3]) / 2.0
+    if v2 == "confirm" and prov_old is not None:
+        pv = max(dtp, 1e-6)
+        return {"cx": ccx, "cy": ccy, "t": t,
+                "vx": (ccx - prov_old["cx"] - cam_acc[0] + prov_old["cam"][0]) / pv,
+                "vy": (ccy - prov_old["cy"] - cam_acc[1] + prov_old["cam"][1]) / pv,
+                "cam": (cam_acc[0], cam_acc[1])}
+    pv = max(dt, 1e-6)
+    return {"cx": ccx, "cy": ccy, "t": t,
+            "vx": (ccx - lcx - cam_acc[0]) / pv,
+            "vy": (ccy - lcy - cam_acc[1]) / pv,
+            "cam": (cam_acc[0], cam_acc[1])}
 
 
 def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None,
@@ -289,26 +327,87 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
         ex = min(abs(pdx) * 0.5 + abs(cam_acc[0]) * 0.25, bw * 0.6)
         ey = min(abs(pdy) * 0.5 + abs(cam_acc[1]) * 0.25, bh * 0.6)
         best = _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, bw * 0.45 + ex, bh * 0.45 + ey)
-        # ── candidate evaluation; a missing or colour-mismatched pass-1
-        # candidate triggers ONE bounded bootstrap/recovery retry around the
-        # camera-compensated last geometry (cold-start sprint, hard stop,
-        # sharp reversal). Ambiguity/contamination never retries — withholding
-        # IS the correct response to crowded geometry. ──
-        verdict, cand_box, payload = "lost", None, None
-        for attempt in (0, 1):
-            if best is not None and best[0] >= MATCH_MIN:
-                verdict, cand_box, payload = _judge_candidate(
-                    best, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
+        # ── candidate evaluation with dual-hypothesis arbitration (C02):
+        # prediction is geometry assistance — it must NEVER become identity
+        # authority. An unsafe primary verdict (lost/colour/jump) allows ONE
+        # bounded recovery pass; a primary accept that leans on stale velocity
+        # (provisional trajectory alive, or large displacement) must also be
+        # arbitrated against the recovery hypothesis before it may become
+        # authoritative. Ambiguity/contamination never triggers recovery —
+        # withholding IS the correct response to crowded geometry. ──
+        v1, box1, pay1 = "lost", None, None
+        if best is not None and best[0] >= MATCH_MIN:
+            v1, box1, pay1 = _judge_candidate(
+                best, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
+                lcx, lcy, cam_acc, bw, bh, dt)
+        need_recovery = v1 in ("lost", "colour", "jump")
+        if v1 == "accept":
+            c1x, c1y = (box1[0] + box1[2]) / 2.0, (box1[1] + box1[3]) / 2.0
+            far = not tracking_geometry.plausible_motion(
+                c1x - lcx - cam_acc[0], c1y - lcy - cam_acc[1], bw, bh, dt)
+            need_recovery = prov is not None or far
+        v2, box2, pay2 = "lost", None, None
+        solid2 = False
+        if need_recovery:
+            # bounded recovery — NOT a global search; all gates re-apply
+            bcx, bcy = exp if exp is not None else (lcx + cam_acc[0], lcy + cam_acc[1])
+            reach = 0.45 + tracking_geometry.BOOT_FRAC
+            best2 = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach)
+            if best2 is not None and best2[0] >= MATCH_MIN:
+                v2, box2, pay2 = _judge_candidate(
+                    best2, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
                     lcx, lcy, cam_acc, bw, bh, dt)
-            else:
-                verdict = "lost"
-            if attempt == 0 and verdict in ("lost", "colour"):
-                # pass 2: bounded recovery — NOT a global search
-                bcx, bcy = exp if exp is not None else (lcx + cam_acc[0], lcy + cam_acc[1])
-                reach = 0.45 + tracking_geometry.BOOT_FRAC
-                best = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach)
+                # only a SOLID recovery match is a credible second hypothesis;
+                # junk-level background peaks must not veto a safe primary
+                solid2 = best2[0] >= tracking_geometry.CONTAM_MIN
+        verdict, cand_box, payload = v1, box1, pay1
+        if v1 == "accept" and need_recovery:
+            if v2 in ("accept", "confirm", "hold") and solid2 and _distinct(box1, box2, bw, bh):
+                # C: two spatially distinct safe hypotheses → identity is NOT
+                # selectable this frame. Record neither, learn neither; the
+                # recovery trajectory stays alive — a stale-velocity candidate
+                # must not erase it.
+                prov = _provisional_from(v2, box2, pay2, prov, cam_acc, dtp, lcx, lcy, dt, t)
+                if _reject("ambiguous", t):
+                    break
                 continue
-            break
+            if v2 in ("ambiguous", "contaminated") and solid2:
+                # the recovery region is genuinely crowded — fail closed
+                prov = None
+                if _reject(v2, t):
+                    break
+                continue
+            # A: only the primary hypothesis is safe (or the same body twice)
+        elif v1 == "jump":
+            if v2 == "confirm":
+                verdict, cand_box, payload = v2, box2, pay2
+            elif v2 in ("accept", "hold"):
+                # a safe recovery hypothesis next to a distinct unsafe primary
+                # candidate is HELD, never instantly authoritative
+                prov = _provisional_from(v2, box2, pay2, prov, cam_acc, dtp, lcx, lcy, dt, t)
+                if _reject("jump", t):
+                    break
+                continue
+            else:
+                prov = None
+                reason = v2 if v2 in ("ambiguous", "contaminated", "colour") else "jump"
+                if _reject(reason, t):
+                    break
+                continue
+        elif v1 in ("lost", "colour"):
+            if v2 in ("accept", "confirm"):
+                verdict, cand_box, payload = v2, box2, pay2
+            elif v2 == "hold":
+                prov = _provisional_from(v2, box2, pay2, prov, cam_acc, dtp, lcx, lcy, dt, t)
+                if _reject("jump", t):
+                    break
+                continue
+            else:
+                prov = None
+                reason = v2 if v2 in ("ambiguous", "contaminated", "colour") else v1
+                if _reject(reason, t):
+                    break
+                continue
         if verdict in ("lost", "ambiguous", "contaminated", "colour"):
             prov = None
             if _reject(verdict, t):
@@ -366,7 +465,10 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             if drift < DRIFT_MIN:
                 _doubt(doubts, t, cur, W, H, "visual drift — tracker no longer certain")
                 break  # drifted away from the original tap content — stop honestly
-        tmpl = cand
+        if mx >= tracking_geometry.CONTAM_MIN:
+            # template learning ONLY from solid accepted geometry — a weak
+            # (possibly blended) match may be recorded but never learned
+            tmpl = cand
         _record(out, t, cur, W, H, mx)
 
 
