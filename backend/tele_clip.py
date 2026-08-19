@@ -79,11 +79,11 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
     pitch lines / mud patches can never hijack the anchor. If the box holds
     no body mass, ONE unambiguous person-mass directly above in the box's
     own columns may rescue the anchor; otherwise returns None and the
-    marker is HIDDEN (no marker is better than a wrong marker).
-    Benign small-mask cases fall back to bbox bottom-center."""
+    marker is HIDDEN (no marker is better than a wrong marker). Any path
+    that cannot confirm a target-owned plausible ground contact returns
+    None — bbox bottom is never assumed to be physical ground (C03)."""
     fh, fw = frame.shape[:2]
     lead = float(np.clip(vx * 0.25, -bw * 0.55, bw * 0.55))
-    tcx = px + lead * 0.6
     x0 = int(max(0, px - bw * 0.62 + min(0.0, lead)))
     x1 = int(min(fw, px + bw * 0.62 + max(0.0, lead)))
     y1 = int(min(fh, py + bh * 0.45))
@@ -98,11 +98,13 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
 
     got = _mask(py - bh * 0.85)
     if got is None:
-        return px, py, None
+        return None
     pm, y0 = got
     _, lbl = cv2.connectedComponents(pm)
-    tx0 = int(max(0, tcx - bw * 0.30 - x0))
-    tx1 = int(min(x1 - x0, tcx + bw * 0.30 - x0))
+    # C01: ownership is resolved from an UNSHIFTED core centred on the
+    # CURRENT accepted bbox — motion lead never chooses the component
+    tx0 = int(max(0, px - bw * 0.30 - x0))
+    tx1 = int(min(x1 - x0, px + bw * 0.30 - x0))
     ty0 = int(max(0, py - bh * 0.80 - y0))
     ty1 = int(min(y1 - y0, py - bh * 0.25 - y0))
     rescue = False
@@ -111,7 +113,18 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
         sub = lbl[ty0:ty1, tx0:tx1]
         ids, cnts = np.unique(sub[sub > 0], return_counts=True)
     if len(ids):
-        pm = (lbl == int(ids[np.argmax(cnts)])).astype(np.uint8)
+        order = np.argsort(cnts)[::-1]
+        top = int(ids[order[0]])
+        if len(ids) >= 2 and cnts[order[1]] >= 0.55 * cnts[order[0]]:
+            # duel: a second body owns comparable mass of the contact area.
+            # If it is horizontally distinct it is ANOTHER player — hide the
+            # ring rather than guess which body the anchor belongs to.
+            second = int(ids[order[1]])
+            cx_a = float(np.nonzero(lbl == top)[1].mean())
+            cx_b = float(np.nonzero(lbl == second)[1].mean())
+            if abs(cx_a - cx_b) > bw * 0.35:
+                return None
+        pm = (lbl == top).astype(np.uint8)
     else:
         # box holds no body mass (track box may sit below the player during
         # fast motion). Identity-safe rescue: accept ONLY if exactly one
@@ -127,20 +140,53 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
             if int(comp.sum()) < 40:
                 continue
             ys_c, xs_c = np.nonzero(comp)
-            if (ys_c.max() - ys_c.min()) >= bh * 0.25 and abs(x0 + float(xs_c.mean()) - tcx) <= bw * 0.5:
+            if (ys_c.max() - ys_c.min()) >= bh * 0.25 and abs(x0 + float(xs_c.mean()) - px) <= bw * 0.5:
                 cands.append(cid)
         if len(cands) != 1:
             return None  # ambiguous or empty → hide, never guess
         pm = (lbl2 == cands[0]).astype(np.uint8)
         rescue = True
+    # C02: merged/touching duel — the OWNED component itself may hold two
+    # bodies as ONE connected component. Upper-body evidence decides:
+    # implausibly wide for the current target, or two distinct column
+    # lobes → hide, never guess which half is the player.
+    if rescue:
+        rys, rxs = np.nonzero(pm)
+        if rys.size:
+            ucols = rxs[rys <= float(rys.min()) + 0.45 * float(rys.max() - rys.min())]
+        else:
+            ucols = rxs
+    else:
+        u0 = int(max(0, py - bh * 0.80 - y0))
+        u1 = int(max(0, py - bh * 0.35 - y0))
+        ucols = np.nonzero(pm[u0:u1, :])[1]
+    if ucols.size >= 12:
+        w_t = float(ucols.max() - ucols.min())
+        if w_t > bw * 0.90:
+            return None  # wider than one plausible target body
+        if w_t > bw * 0.62:
+            if int(ucols.min()) <= 1 or int(ucols.max()) >= (x1 - x0 - 2):
+                return None  # wide mass truncated by the crop — may hide a duel
+            occ = np.bincount(ucols - int(ucols.min()), minlength=int(w_t) + 1).astype(float)
+            q = max(1, occ.size // 4)
+            vi = q + int(np.argmin(occ[q:occ.size - q]))
+            lm, rm = float(occ[:vi].sum()), float(occ[vi + 1:].sum())
+            lpk = float(occ[:vi].max()) if vi else 0.0
+            rpk = float(occ[vi + 1:].max()) if vi + 1 < occ.size else 0.0
+            if (lm + rm > 0 and lm >= 0.30 * (lm + rm) and rm >= 0.30 * (lm + rm)
+                    and min(lpk, rpk) > 0 and float(occ[vi]) <= 0.55 * min(lpk, rpk)):
+                return None  # two body lobes share one component
     ys, xs = np.nonzero(pm)
     if len(ys) < 30:
-        return None if rescue else (px, py, None)
-    # ownership: target's own columns, shifted along the motion direction
-    keep = np.abs(xs + x0 - tcx) <= bw * 0.5 + abs(lead) * 0.5
+        return None
+    # ownership: the target's OWN columns (centred on the CURRENT accepted
+    # bbox); motion lead only EXTENDS the footprint search toward the motion
+    # direction for the already-owned component — never re-centres ownership
+    rel = xs + x0 - px
+    keep = (rel >= -bw * 0.5 + min(0.0, lead) * 0.5) & (rel <= bw * 0.5 + max(0.0, lead) * 0.5)
     ys, xs = ys[keep], xs[keep]
     if len(ys) < 25:
-        return None if rescue else (px, py, None)
+        return None
     y_low = 0.0
     bx = by = None
     foot_w = 0.0
@@ -148,25 +194,32 @@ def _ground_anchor(frame, px, py, bw, bh, vx=0.0):
         y_low = float(np.percentile(ys, 96))
         band = ys >= y_low - max(3.0, bh * 0.07)
         if int(band.sum()) < 8:
-            return None if rescue else (px, py, None)
+            return None
         bx, by = xs[band], ys[band]
         foot_w = float(np.percentile(bx, 95) - np.percentile(bx, 5))
-        if foot_w >= bw * 0.14:
+        band_h = float(by.max() - by.min())
+        line_like = band_h <= max(3.0, bh * 0.06) and foot_w >= bw * 0.85
+        if foot_w >= bw * 0.14 and not line_like:
             break  # plausible foot/contact footprint
-        # line-like sliver (white pitch line running below the player) —
+        # line-like sliver (white pitch line running below the player) or a
+        # razor-thin full-width stripe merged with the body — never a foot;
         # discard those rows and climb to the real footprint above
         keepy = ys < y_low - max(3.0, bh * 0.07)
         ys, xs = ys[keepy], xs[keepy]
         if len(ys) < 25:
-            return None if rescue else (px, py, None)
+            return None  # pitch line removed, no valid footprint remains
     else:
-        return None if rescue else (px, py, None)
+        return None
     ax = x0 + float(np.median(bx))
     ay = y0 + float(np.percentile(by, 85))
-    if abs(ax - px) > bw * (0.45 if not rescue else 0.55) + abs(lead):
-        return None if rescue else (px, py, None)
-    if not rescue and ay < py - bh * 0.55:
-        return px, py, None  # implausible → honest fallback
+    # C01: high velocity never increases the allowed anchor distance
+    if abs(ax - px) > bw * (0.45 if not rescue else 0.55):
+        return None
+    if not rescue and ay < py - bh * 0.35:
+        # contact band floats too high (airborne stride / legs lost in the
+        # mask) — NEVER ring a knee/shin/torso, and bbox bottom is not
+        # ground truth without support: hide (C03)
+        return None
     return ax, min(ay, fh - 2.0), foot_w
 
 
@@ -186,18 +239,21 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
     if res is None:
         return  # no body at the box and no unambiguous rescue → no marker
     ax, ay, foot_w = res
-    if state is not None:  # temporal stability across clip frames
+    if state is not None:  # FIX05: DISPLAY smoothing only — damp jitter, then
+        # CLAMP to the plausible envelope of the CURRENT accepted geometry.
+        # The ring can never trail a sprint, overshoot a hard stop or keep
+        # moving in the old direction after a reversal.
+        raw_ax, raw_ay = ax, ay
         prev = state.get("anchor")
         if prev is not None:
             jump = float(np.hypot(ax - prev[0], ay - prev[1]))
-            if jump > bx_h * 0.9:
-                k = 0.12  # implausible teleport → glide, never snap
-            else:
-                # sprint-responsive smoothing: fast steady motion is followed
-                # closely (no trailing); only small jitter is damped
-                k = min(0.85, 0.35 + 0.9 * (jump / max(1.0, bx_h * 0.5)))
+            # sprint-responsive smoothing: fast steady motion is followed
+            # closely (no trailing); only small jitter is damped
+            k = min(0.85, 0.35 + 0.9 * (jump / max(1.0, bx_h * 0.5)))
             ax = prev[0] + k * (ax - prev[0])
             ay = prev[1] + k * (ay - prev[1])
+            ax = float(np.clip(ax, raw_ax - bx_w * 0.30, raw_ax + bx_w * 0.30))
+            ay = float(np.clip(ay, raw_ay - bx_h * 0.12, raw_ay + bx_h * 0.12))
             if foot_w and state.get("foot_w"):
                 foot_w = state["foot_w"] + 0.3 * (foot_w - state["foot_w"])
         state["anchor"] = (ax, ay)
@@ -209,7 +265,13 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
         rw = max(rw, min(foot_w * 0.85, est_h * 0.50))
     else:
         rw = max(rw, min(w * fw * 0.55, est_h * 0.45))
-    rw = int(min(max(rw, fw * 0.024), fw * 0.10))
+    rw = min(max(rw, fw * 0.024), fw * 0.10)
+    if state is not None:  # width continuity: no sudden ellipse size jumps
+        prev_rw = state.get("rw")
+        if prev_rw:
+            rw = min(max(rw, prev_rw * 0.85), prev_rw * 1.15)
+        state["rw"] = rw
+    rw = int(rw)
     px, py = int(ax), int(min(ay, fh * 0.995))
     ratio = 0.26 + 0.14 * min(1.0, max(0.0, py / max(1, fh)))  # flatter when far away
     rh = max(4, int(rw * ratio))
@@ -259,16 +321,24 @@ def _draw_ring(frame, cx: float, feet_y: float, w: float, h: float, alpha: float
     la = (linef * 0.80 * alpha)[..., None]
     roi[:] = (roi * (1 - la) + tint * la).astype(np.uint8)
 
-    # 5 — player in front: restore the silhouette over the marker (full ellipse
-    # width so a wide stance/second foot is always covered); slight dilation
+    # 5 — player in front: restore ONLY body components that reach the
+    # target's own footprint columns (FIX05) — a broad band mask could
+    # resurrect a NEARBY player as part of the target; slight dilation
     # kills anti-alias halos along boots/legs
     hsv = cv2.cvtColor(orig, cv2.COLOR_BGR2HSV)
-    ng = (cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0).astype(np.uint8) * 255
+    ng = (cv2.inRange(hsv, (30, 40, 40), (90, 255, 255)) == 0).astype(np.uint8)
     sel = np.zeros(ng.shape, np.uint8)
     xl, xh = max(0, c[0] - int(rw * 0.95)), min(roi.shape[1], c[0] + int(rw * 0.95))
     yl, yh = max(0, c[1] - rh * 4), min(roi.shape[0], c[1] + rh + 1)
-    sel[yl:yh, xl:xh] = 255
-    m2 = cv2.bitwise_and(ng, sel)
+    sel[yl:yh, xl:xh] = 1
+    num_c, lbl_c = cv2.connectedComponents(ng * sel)
+    own_r = max(rw * 0.55, float(foot_w or 0.0) * 0.6)
+    m2 = np.zeros(ng.shape, np.uint8)
+    for cid in range(1, num_c):
+        comp = lbl_c == cid
+        xs_c = np.nonzero(comp)[1]
+        if xs_c.size and float(np.abs(xs_c - c[0]).min()) <= own_r:
+            m2[comp] = 255
     m2 = cv2.dilate(m2, np.ones((3, 3), np.uint8))
     m2 = (cv2.GaussianBlur(m2, (7, 7), 0).astype(np.float32) / 255.0)[..., None]
     roi[:] = (orig * m2 + roi * (1 - m2)).astype(np.uint8)
@@ -313,7 +383,11 @@ def _window_points(track_points: list, t_moment: float, pre: float, post: float)
 
 
 def _smooth(pts: list) -> list:
-    """Moving average over ±2 samples on (cx, feet_y, w, h)."""
+    """FIX05: the CURRENT accepted FIX04 geometry is the positional source of
+    truth — (cx, feet_y) pass through RAW, so a sprint never trails, a hard
+    stop never overshoots and a reversal never drifts in the old direction.
+    Only SIZE (w, h) is averaged over ±2 samples; any display smoothing
+    happens at the final anchor and is clamped to the current bbox envelope."""
     raw = [(float(p["t"]),
             float(p["x"]) + float(p["w"]) / 2.0,
             float(p["y"]) + float(p["h"]),
@@ -323,8 +397,8 @@ def _smooth(pts: list) -> list:
     for i in range(len(raw)):
         n = raw[max(0, i - 2):i + 3]
         out.append((raw[i][0],
-                    sum(v[1] for v in n) / len(n),
-                    sum(v[2] for v in n) / len(n),
+                    raw[i][1],
+                    raw[i][2],
                     sum(v[3] for v in n) / len(n),
                     sum(v[4] for v in n) / len(n)))
     return out
