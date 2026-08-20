@@ -126,7 +126,8 @@ def _valid_scan_row(d) -> bool:
     return note is None or isinstance(note, str)
 
 
-def merge_discovered_scoring_events(full: dict, discovered, track: dict | None = None) -> dict:
+def merge_discovered_scoring_events(full: dict, discovered, track: dict | None = None,
+                                    actor_gate=None) -> dict:
     """PART 4/5 — merge the verifier's full-video scoring scan with the
     surviving timeline. Only identity-CONFIRMED, outcome-visible GOAL/ASSIST
     discoveries are ADDED (before FIX01 assigns event_id) or PROMOTE the
@@ -217,6 +218,27 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
                 tgt["promoted_by_scoring_scan"] = True
             continue
         note = str(d.get("note") or "").strip()
+        # FIX 08 C03/C09 — a NOVEL scoring event from the secondary scan must
+        # pass the SAME exact contact-time spatial actor gate as ledger events.
+        # ±8 s presence alone can never create a target GOAL/ASSIST. When the
+        # gate is supplied and the track is unusable, novel scoring events are
+        # UNRESOLVED — never verifier-only accepted.
+        gate_contact = None
+        if actor_gate is not None:
+            _c = d.get("contact_ms")
+            cand = {"contact_ms": _c if isinstance(_c, int) and not isinstance(_c, bool)
+                    else ts * 1000,
+                    "start_ms": ts * 1000,
+                    "actor_box": d.get("actor_box")}
+            ok = False
+            if track_ok:
+                ok, _reason, gate_contact = actor_gate(cand, track)
+            if not ok:
+                if at == "SHOT":
+                    scan["unresolved_goal_attempts"] += 1
+                else:
+                    scan["unresolved_assist_candidates"] += 1
+                continue
         new_ev = {
             "timestamp": _mmss(ts),
             "action_type": at.lower(),
@@ -229,6 +251,11 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
             "outcome_visible": True,
             "discovered_by_scoring_scan": True,
         }
+        if actor_gate is not None and isinstance(gate_contact, int):
+            new_ev["actor_spatial_verified"] = True
+            new_ev["ledger_contact_ms"] = gate_contact
+            new_ev["event_start_ms"] = gate_contact  # C01 — exact ms authority
+            new_ev["event_end_ms"] = gate_contact
         timeline.append(new_ev)
         index[(ts, at)] = new_ev
     full["action_timeline"] = timeline
@@ -464,9 +491,48 @@ _AGG_KEY = {"shots": "shots", "key passes": "key_passes", "passes": "passes_atte
             "crosses": "crosses_attempted", "dribbles": "dribbles_attempted",
             "duels": "duels_contested", "tackles": "tackles_attempted",
             "interceptions": "interceptions", "recoveries": "recoveries"}
+_TS_TOKEN_RE = re.compile(r"\b(\d{1,2}):(\d{2})\b")
 
 
-def _sentence_supported(sent: str, vs: dict) -> bool:
+def _verified_ts_sets(full: dict) -> dict:
+    """FIX08 PART 11 — exact canonical timestamps (ms) of verified GOAL and
+    ASSIST events. A timestamped goal/assist claim in prose must resolve to
+    one of these EXACT times — no fuzzy ±seconds."""
+    goals, assists = set(), set()
+    for e in (full.get("action_timeline") or []):
+        if not isinstance(e, dict) or e.get("cross_verified") is not True:
+            continue
+        ms = ts_to_ms(e.get("timestamp"))
+        if ms is None:
+            continue
+        et = _enum(e.get("canonical_event_type"), EVENT_TYPES, "UNCLASSIFIED")
+        if et == "GOAL":
+            goals.add(ms)
+        elif et == "ASSIST":
+            assists.add(ms)
+    return {"goal_ms": goals, "assist_ms": assists}
+
+
+def _sentence_ts_supported(sent: str, ts_auth: dict) -> bool:
+    ts_list = [(int(m.group(1)) * 60 + int(m.group(2))) * 1000
+               for m in _TS_TOKEN_RE.finditer(sent)]
+    if not ts_list:
+        return True
+    if _GOAL_LANG.search(sent):
+        allowed = set(ts_auth.get("goal_ms") or set())
+        if _TEAMMATE_RE.search(sent):  # teammate scoring at an assist moment
+            allowed |= set(ts_auth.get("assist_ms") or set())
+        if not any(t in allowed for t in ts_list):
+            return False
+    if _ASSIST_LANG.search(sent):
+        if not any(t in (ts_auth.get("assist_ms") or set()) for t in ts_list):
+            return False
+    return True
+
+
+def _sentence_supported(sent: str, vs: dict, ts_auth: dict | None = None) -> bool:
+    if ts_auth is not None and not _sentence_ts_supported(sent, ts_auth):
+        return False
     g, a = vs.get("goals"), vs.get("assists")
     creator = _CREATOR_RE.search(sent)
     if creator:
@@ -507,25 +573,25 @@ def _canonical_line(vs: dict) -> str:
             f"and {a} assist{'' if a == 1 else 's'}.")
 
 
-def _reconcile_str(text, vs, fallback=None):
+def _reconcile_str(text, vs, fallback=None, ts_auth=None):
     if not isinstance(text, str) or not text.strip():
         return text
     parts = re.split(r"(?<=[.!?])\s+", text)
-    kept = [s for s in parts if _sentence_supported(s, vs)]
+    kept = [s for s in parts if _sentence_supported(s, vs, ts_auth)]
     if len(kept) == len(parts):
         return text
     out = " ".join(kept).strip()
     return out if out else (fallback if fallback is not None else out)
 
 
-def _walk(node, vs, fallback=None):
+def _walk(node, vs, fallback=None, ts_auth=None):
     if isinstance(node, str):
-        return _reconcile_str(node, vs, fallback)
+        return _reconcile_str(node, vs, fallback, ts_auth)
     if isinstance(node, list):
-        out = [_walk(x, vs, fallback) for x in node]
+        out = [_walk(x, vs, fallback, ts_auth) for x in node]
         return [x for x in out if not (isinstance(x, str) and not x.strip())]
     if isinstance(node, dict):
-        return {k: _walk(v, vs, fallback) for k, v in node.items()}
+        return {k: _walk(v, vs, fallback, ts_auth) for k, v in node.items()}
     return node
 
 
@@ -556,18 +622,19 @@ def _sentence_lang_ok(sent: str, et: str) -> bool:
     return not (_GOAL_LANG.search(sent) or _ASSIST_LANG.search(sent))
 
 
-def _event_safe_text(text: str, et: str, vs: dict, safe: str):
+def _event_safe_text(text: str, et: str, vs: dict, safe: str, ts_auth=None):
     """Returns (new_text, changed): drops sentences with forbidden outcome
     language or unsupported aggregate claims; deterministic fallback."""
     parts = re.split(r"(?<=[.!?])\s+", text)
-    kept = [s for s in parts if _sentence_lang_ok(s, et) and _sentence_supported(s, vs)]
+    kept = [s for s in parts
+            if _sentence_lang_ok(s, et) and _sentence_supported(s, vs, ts_auth)]
     if len(kept) == len(parts):
         return text, False
     out = " ".join(kept).strip()
     return (out if out else f"Verified {safe.lower()}."), True
 
 
-def _reconcile_event_texts(full: dict, vs: dict) -> None:
+def _reconcile_event_texts(full: dict, vs: dict, ts_auth=None) -> None:
     """PART 15/16 + C06 — event-bound text, exactly-bound video comments and
     exactly-bound snapshot/cinematic moments may not claim an outcome beyond
     the event's canonical classification, nor an unsupported aggregate."""
@@ -580,11 +647,11 @@ def _reconcile_event_texts(full: dict, vs: dict) -> None:
         safe = _SAFE_TITLE.get(et, "Verified match involvement")
         title = e.get("title")
         if isinstance(title, str) and (not _sentence_lang_ok(title, et)
-                                       or not _sentence_supported(title, vs)):
+                                       or not _sentence_supported(title, vs, ts_auth)):
             e["title"] = safe
         desc = e.get("description")
         if isinstance(desc, str):
-            new, changed = _event_safe_text(desc, et, vs, safe)
+            new, changed = _event_safe_text(desc, et, vs, safe, ts_auth)
             if changed:
                 e["description"] = new
     for c in (full.get("video_comments") or []):
@@ -596,7 +663,8 @@ def _reconcile_event_texts(full: dict, vs: dict) -> None:
         txt = c.get("comment")
         if isinstance(txt, str):
             new, changed = _event_safe_text(txt, et, vs,
-                                            _SAFE_TITLE.get(et, "involvement"))
+                                            _SAFE_TITLE.get(et, "involvement"),
+                                            ts_auth)
             if changed:
                 c["comment"] = new
     for m in (full.get("snapshot_moments") or []):
@@ -608,11 +676,11 @@ def _reconcile_event_texts(full: dict, vs: dict) -> None:
         safe = _SAFE_TITLE.get(et, "Verified match involvement")
         title = m.get("title")
         if isinstance(title, str) and (not _sentence_lang_ok(title, et)
-                                       or not _sentence_supported(title, vs)):
+                                       or not _sentence_supported(title, vs, ts_auth)):
             m["title"] = safe
         desc = m.get("desc")
         if isinstance(desc, str):
-            new, changed = _event_safe_text(desc, et, vs, safe)
+            new, changed = _event_safe_text(desc, et, vs, safe, ts_auth)
             if changed:
                 m["desc"] = new
 
@@ -625,19 +693,22 @@ def reconcile_verified_claims(full: dict) -> None:
     vs = full.get("verified_stats")
     if not isinstance(vs, dict) or not vs.get("available"):
         return
+    # FIX08 PART 11 — exact timestamped goal/assist claim authority.
+    ts_auth = _verified_ts_sets(full)
     line = _canonical_line(vs)
     for key in ("executive_summary", "final_summary"):
         if isinstance(full.get(key), str):
-            full[key] = _reconcile_str(full[key], vs, fallback=line)
+            full[key] = _reconcile_str(full[key], vs, fallback=line, ts_auth=ts_auth)
     for key in ("scout_view", "parent_summary", "coach_notes", "parent_tips",
                 "technical", "tactical", "physical", "mentality", "parents_package"):
         if key in full and full.get(key) is not None:
-            full[key] = _walk(full[key], vs)
+            full[key] = _walk(full[key], vs, ts_auth=ts_auth)
     snap = full.get("snapshot")
     if isinstance(snap, dict):
         for k, v in list(snap.items()):
             if isinstance(v, str):
-                snap[k] = _reconcile_str(v, vs, fallback="Verified match involvement")
+                snap[k] = _reconcile_str(v, vs, fallback="Verified match involvement",
+                                         ts_auth=ts_auth)
     sm = full.get("snapshot_moments")
     if isinstance(sm, list):  # cinematic intro source
         for m in sm:
@@ -645,8 +716,9 @@ def reconcile_verified_claims(full: dict) -> None:
                 for k in ("title", "desc"):
                     if isinstance(m.get(k), str):
                         m[k] = _reconcile_str(m[k], vs,
-                                              fallback="Verified match involvement")
-    _reconcile_event_texts(full, vs)
+                                              fallback="Verified match involvement",
+                                              ts_auth=ts_auth)
+    _reconcile_event_texts(full, vs, ts_auth)
 
 
 def apply_verified_stats_authority(full: dict) -> dict:

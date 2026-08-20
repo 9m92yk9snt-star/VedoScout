@@ -829,7 +829,8 @@ def test_TC_normal_run_corrective_failure_then_corrective_only_recovery(monkeypa
     try:
         # FIRST invocation — the FULL normal pipeline
         asyncio.run(server.generate_full_report_task("n1"))
-        assert sessions[0] == "full-n1" and sessions[1] == "full-retry-n1"
+        # FIX 08 — ONE discovery pass precedes the standard full analysis.
+        assert sessions[:3] == ["discover-n1", "full-n1", "full-retry-n1"]
         assert fake.doc["full_report_status"] == "failed"
         assert not _ready_writes(fake), "READY must never be written"
         assert fake.doc.get("identity_gate_done") is False
@@ -840,6 +841,7 @@ def test_TC_normal_run_corrective_failure_then_corrective_only_recovery(monkeypa
         behavior["retry_raise"] = False
         asyncio.run(server.generate_full_report_task("n1"))
         assert sessions.count("full-n1") == 1, "standard full-{id} must NOT run again"
+        assert sessions.count("discover-n1") == 1, "discovery is never re-run by recovery"
         assert sessions.count("full-retry-n1") == 2
         assert fake.doc["full_report"].get("_replacement") is True
         assert fake.doc.get("identity_corrective_persisted") is True

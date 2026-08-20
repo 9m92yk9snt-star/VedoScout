@@ -217,7 +217,12 @@ def compute_proof_frame_verified(comment: dict) -> bool:
         return False
     if not comment.get("frame_url") or comment.get("frame_placeholder"):
         return False
-    if comment.get("identity_verified") is not True and comment.get("anchor_locked") is not True:
+    # FIX 08 C02 — event_track_locked = deterministic FIX04 track identity at
+    # the exact contact (never user-tap anchor semantics, never model-checked).
+    # The exact-time requirement below stays mandatory for ALL identity kinds.
+    if (comment.get("identity_verified") is not True
+            and comment.get("anchor_locked") is not True
+            and comment.get("event_track_locked") is not True):
         return False
     et, ft = comment.get("evidence_time_ms"), comment.get("frame_time_ms")
     return isinstance(et, int) and isinstance(ft, int) and et == ft

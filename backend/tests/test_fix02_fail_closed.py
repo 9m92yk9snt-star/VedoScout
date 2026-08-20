@@ -472,14 +472,16 @@ console.log(JSON.stringify({{
 
 def test_T22_no_new_model_call_sites():
     src = (BACKEND / "server.py").read_text()
-    assert src.count("call_gemini_with_video(") == 7
+    # FIX 08 added EXACTLY ONE dedicated event-discovery call site (7 → 8).
+    assert src.count("call_gemini_with_video(") == 8
     assert src.count("call_gemini_text(") == 2
     assert src.count("verify_frame_identity(") == 5
     assert src.count("verify_ring_placement(") == 1
     assert src.count("verify_preview_summary(") == 2
     # deterministic layer wiring: exactly the two shared-pipeline call sites
     assert src.count("apply_fail_closed_proof_authority(") == 2
-    assert src.count("compute_proof_frame_verified(") == 3
+    # FIX 08 — +1 deterministic call site (event-native exact frames): 3 → 4
+    assert src.count("compute_proof_frame_verified(") == 4
     ea = (BACKEND / "evidence_authority.py").read_text().lower()
     for banned in ("gemini", "openai", "httpx", "emergent", "llmchat"):
         assert banned not in ea
