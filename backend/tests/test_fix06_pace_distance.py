@@ -512,6 +512,59 @@ def test_F31_backward_flow_unavailable(monkeypatch):
     assert all(s["reason"] in ("flow", "error") for s in motion["samples"])
 
 
+# ---------------------- F32/F33 — shared physical outlier classification
+
+def _outlier_scene():
+    """Camera-valid sequence; fast 4-sample sections around ONE impossible
+    residual (~140 px ≈ 142 km/h) at interval 27."""
+    xs = [0.06]
+    for k in range(1, N):
+        d = 18 if k in (23, 24, 25, 26, 28, 29, 30, 31) else (140 if k == 27 else 2)
+        xs.append(xs[-1] + d / W)
+    boxes = [(x, 0.40, 0.08, 0.25) for x in xs]
+    pts = track_pts(boxes)
+    motion = mc.samples_from_frames(pan_frames(N, dx=0), pts)
+    return pts, motion
+
+
+def test_F32_physical_outlier_shared_rejection():
+    from movement_metrics import compute_movement_map
+    pts, motion = _outlier_scene()
+    track = {"points": pts, "segments": [[0.0, pts[-1]["t"]]]}
+    met = compute_speed_metrics(track, AGE, motion=motion)
+    assert met is not None
+    assert met["metric_samples_skipped"] >= 1, "pace did not reject the outlier"
+    assert met["top_speed_kmh"] <= 34.0
+    mm = compute_movement_map(track, motion=motion, age=AGE)
+    assert mm is not None
+    t_out = round(27 * DT, 2)
+    # the same interval is rejected everywhere: never a fastest candidate
+    for c in mm.get("fast_candidates") or []:
+        assert abs(c["t"] - t_out) > 0.01, "outlier became a fastest candidate"
+        assert c["v"] < 1.0, "outlier magnitude leaked into candidates"
+    assert mm["top_video_s"] != round(t_out, 1), "outlier became the fastest moment"
+    # and it cannot bridge the two fast sections into one burst
+    assert mm["bursts"] == 2, "outlier bridged bursts / entered intensity smoothing"
+
+
+def test_F33_outlier_near_tap_never_trusted():
+    from movement_metrics import compute_movement_map
+    pts, motion = _outlier_scene()
+    track = {"points": pts, "segments": [[0.0, pts[-1]["t"]]]}
+    tap = [round(27 * DT, 2)]  # tap exactly on the outlier moment
+    met = compute_speed_metrics(track, AGE, trusted_windows=tap, motion=motion)
+    assert met is not None
+    assert met["top_trust"] == "tap"
+    assert met["top_speed_kmh"] <= 34.0, "outlier received tap trust"
+    assert met["top_speed_kmh"] <= 20.0  # a SAFE compensated sample was used
+    mm = compute_movement_map(track, tap_times=tap, motion=motion, age=AGE)
+    assert mm is not None
+    fnt = mm.get("fast_near_tap")
+    assert fnt is not None, "no safe compensated sample offered near the tap"
+    assert abs(fnt["t"] - tap[0]) > 0.01, "outlier became fast_near_tap"
+    assert fnt["v"] < 1.0
+
+
 # --------------------------------------- F23–F25 source / phase guards
 
 def test_F23_zero_model_network_calls():

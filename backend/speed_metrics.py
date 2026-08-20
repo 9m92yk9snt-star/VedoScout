@@ -52,6 +52,19 @@ def _height_for_age(age) -> float:
         return 1.60
 
 
+def sample_kmh(s: dict, age) -> float:
+    """SHARED physical classification of one camera-compensated sample:
+    residual px → metres via the local bbox height and the age-height
+    reference → km/h. Both speed_metrics and movement_metrics use THIS
+    function — one formula, one MAX_KMH ceiling."""
+    dist_m = (s["rx"] ** 2 + s["ry"] ** 2) ** 0.5 / max(1e-6, s["h_px"]) * _height_for_age(age)
+    return dist_m / float(s["dt"]) * 3.6
+
+
+def is_physical_outlier(s: dict, age) -> bool:
+    return sample_kmh(s, age) > MAX_KMH
+
+
 def compute_speed_metrics(track: dict, age, trusted_windows: list[float] | None = None,
                           motion: dict | None = None) -> dict | None:
     """Returns pace estimates or None when the track is too thin — or too
@@ -90,7 +103,7 @@ def compute_speed_metrics(track: dict, age, trusted_windows: list[float] | None 
                 cur = []
             continue
         dist_m = (s["rx"] ** 2 + s["ry"] ** 2) ** 0.5 / max(1e-6, s["h_px"]) * height_m
-        kmh = dist_m / s["dt"] * 3.6
+        kmh = sample_kmh(s, age)
         if kmh > MAX_KMH:  # final outlier protection only — also breaks continuity
             skipped += 1
             if cur:

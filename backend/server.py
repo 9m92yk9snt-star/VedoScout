@@ -8794,7 +8794,8 @@ async def generate_full_report_task(report_id: str) -> None:
                 motion = await asyncio.to_thread(
                     compute_motion_samples, str(file_path), gt_track)
                 mm_map = await asyncio.to_thread(
-                    compute_movement_map, gt_track, tap_times=tap_times, motion=motion)
+                    compute_movement_map, gt_track, tap_times=tap_times, motion=motion,
+                    age=(doc.get("player_details") or {}).get("age"))
                 if mm_map:
                     # FIX06 C03 — deterministic trust only: the compensated
                     # fastest-near-tap sample may carry tap trust. NO verifier /

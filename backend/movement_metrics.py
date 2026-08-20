@@ -3,6 +3,8 @@ player track (player_tracking.py). Pure math on ground-truth data — no AI."""
 
 from __future__ import annotations
 
+from speed_metrics import is_physical_outlier
+
 BURST_MIN_PTS = 3     # ≥3 consecutive fast samples (~0.24 s) = one burst
 MAX_TRAIL = 90
 NEAR_TAP_S = 2.0      # a moment ≤2 s from a user tap counts as identity-anchored
@@ -17,7 +19,7 @@ _fmt_mmss = fmt_mmss  # back-compat alias
 
 
 def compute_movement_map(track: dict | None, tap_times: list[float] | None = None,
-                         motion: dict | None = None) -> dict | None:
+                         motion: dict | None = None, age=None) -> dict | None:
     """Return {tracked_seconds, segments, passages, track_start_*, points, bursts,
     top_speed_*, intensity, fast_candidates, fast_near_tap, trail} or None when
     too little data. tap_times = absolute video seconds of the user's taps
@@ -41,12 +43,15 @@ def compute_movement_map(track: dict | None, tap_times: list[float] | None = Non
     if motion is not None:
         # FIX06: camera pan/tilt/zoom removed — only the player residual
         # counts as movement. Contiguous SAFE runs: every rejected interval
-        # breaks continuity (C02) — never smoothed or counted across.
+        # breaks continuity (C02) — never smoothed or counted across. A
+        # PHYSICAL outlier (shared speed_metrics classification) is rejected
+        # and breaks continuity exactly like a failed camera transform, so
+        # it can never become a candidate, burst bridge or intensity input.
         runs, cur, prev_t1 = [], [], None
         for s in (motion.get("samples") or []):
             contiguous = prev_t1 is not None and abs(float(s["t0"]) - prev_t1) <= 1e-9
             prev_t1 = float(s["t1"])
-            if not s.get("ok"):
+            if not s.get("ok") or is_physical_outlier(s, age):
                 if cur:
                     runs.append(cur)
                     cur = []
