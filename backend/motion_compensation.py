@@ -54,6 +54,8 @@ def estimate_camera(g0, g1, exclude_boxes):
     if p1 is None or st is None:
         return None, "flow"
     p0b, stb, _ = cv2.calcOpticalFlowPyrLK(g1, g0, p1, None, **_LK)  # fwd-bwd
+    if p0b is None or stb is None:
+        return None, "flow"
     ok = (st.reshape(-1) == 1) & (stb.reshape(-1) == 1) & \
         (np.linalg.norm((p0 - p0b).reshape(-1, 2), axis=1) < 1.0)
     a, b = p0.reshape(-1, 2)[ok], p1.reshape(-1, 2)[ok]
@@ -90,10 +92,15 @@ def samples_from_frames(frames, points):
                  v_norm (residual in normalized screen units / s)
       ok=False → reason (camera transform not trustworthy — fail closed).
     Intervals with dt<=0 or dt>MAX_INTERVAL_S (gaps/segments) are never
-    produced — movement is never bridged across them."""
+    produced — movement is never bridged across them. A frame that could not
+    be decoded (None placeholder) rejects BOTH intervals touching it: the
+    original interval sequence is preserved, never re-stitched."""
     if not frames or len(frames) != len(points):
         return {"w": 0, "h": 0, "samples": []}
-    hgt, wid = frames[0].shape[:2]
+    ref = next((f for f in frames if f is not None), None)
+    if ref is None:
+        return {"w": 0, "h": 0, "samples": []}
+    hgt, wid = ref.shape[:2]
     hs = [max(1e-4, float(p["h"])) for p in points]
     hmed = [_med(hs, i) for i in range(len(hs))]
     samples = []
@@ -102,12 +109,18 @@ def samples_from_frames(frames, points):
         dt = float(p1["t"]) - float(p0["t"])
         if dt <= 0 or dt > MAX_INTERVAL_S:
             continue
+        base = {"t0": float(p0["t"]), "t1": float(p1["t"]), "dt": dt}
+        if frames[i - 1] is None or frames[i] is None:
+            samples.append({**base, "ok": False, "reason": "decode"})
+            continue
         b0 = (float(p0["x"]) * wid, float(p0["y"]) * hgt,
               float(p0["w"]) * wid, float(p0["h"]) * hgt)
         b1 = (float(p1["x"]) * wid, float(p1["y"]) * hgt,
               float(p1["w"]) * wid, float(p1["h"]) * hgt)
-        m, q = estimate_camera(frames[i - 1], frames[i], (b0, b1))
-        base = {"t0": float(p0["t"]), "t1": float(p1["t"]), "dt": dt}
+        try:
+            m, q = estimate_camera(frames[i - 1], frames[i], (b0, b1))
+        except Exception:  # any local CV failure fails closed for the interval
+            m, q = None, "error"
         if m is None:
             samples.append({**base, "ok": False, "reason": q})
             continue
@@ -144,7 +157,11 @@ def compute_motion_samples(video_path, track):
         fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
         tol = max(0.012, 0.5 / fps) if fps > 1e-6 else 0.02
         vt.seek_with_preroll(cap, max(0.0, float(pts[0]["t"]) - 0.5), fps)
-        frames, kept, idx = [], [], 0
+        # frames stay ALIGNED 1:1 with the original accepted track points —
+        # an undecodable point keeps a None placeholder so both intervals
+        # touching it are rejected, never re-stitched (C01)
+        frames = [None] * len(pts)
+        idx = 0
         last_t = float(pts[-1]["t"])
         while idx < len(pts):
             if not cap.grab():
@@ -155,7 +172,7 @@ def compute_motion_samples(video_path, track):
             if t > last_t + tol:
                 break
             while idx < len(pts) and t > float(pts[idx]["t"]) + tol:
-                idx += 1  # point's frame missed — its intervals are dropped
+                idx += 1  # point's frame missed — placeholder stays None
             if idx >= len(pts):
                 break
             if abs(t - float(pts[idx]["t"])) <= tol:
@@ -166,9 +183,8 @@ def compute_motion_samples(video_path, track):
                         s = PROC_W / g.shape[1]
                         g = cv2.resize(g, (PROC_W, max(2, int(round(g.shape[0] * s)))),
                                        interpolation=cv2.INTER_AREA)
-                    frames.append(g)
-                    kept.append(pts[idx])
+                    frames[idx] = g
                 idx += 1
-        return samples_from_frames(frames, kept)
+        return samples_from_frames(frames, pts)
     finally:
         cap.release()

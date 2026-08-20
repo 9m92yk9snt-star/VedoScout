@@ -70,29 +70,56 @@ def compute_speed_metrics(track: dict, age, trusted_windows: list[float] | None 
         return None
 
     height_m = _height_for_age(age)
-    samples = []  # (t, kmh, dist_m)
+    # contiguous SAFE runs — every rejected interval (camera fail, missing
+    # decode, outlier, gap, invalid dt) BREAKS continuity; nothing is smoothed
+    # or sustained across a break (C02)
+    runs = []           # list of runs; each run = [(t1, kmh, dist_m), ...]
+    cur = []
     skipped = 0
     metric_s = 0.0
+    eligible_s = 0.0    # duration of ALL eligible original intervals
+    prev_t1 = None
     for s in motion["samples"]:
+        eligible_s += float(s["dt"])
+        contiguous = prev_t1 is not None and abs(float(s["t0"]) - prev_t1) <= 1e-9
+        prev_t1 = float(s["t1"])
         if not s.get("ok"):
             skipped += 1
+            if cur:
+                runs.append(cur)
+                cur = []
             continue
         dist_m = (s["rx"] ** 2 + s["ry"] ** 2) ** 0.5 / max(1e-6, s["h_px"]) * height_m
         kmh = dist_m / s["dt"] * 3.6
-        if kmh > MAX_KMH:  # final outlier protection only
+        if kmh > MAX_KMH:  # final outlier protection only — also breaks continuity
             skipped += 1
+            if cur:
+                runs.append(cur)
+                cur = []
             continue
-        samples.append((float(s["t1"]), kmh, dist_m))
+        if cur and not contiguous:
+            runs.append(cur)
+            cur = []
+        cur.append((float(s["t1"]), kmh, dist_m))
         metric_s += float(s["dt"])
+    if cur:
+        runs.append(cur)
 
-    used = len(samples)
-    coverage = used / max(1, used + skipped)
+    used = sum(len(r) for r in runs)
+    # honest duration-based coverage: measurable seconds over ALL eligible
+    # interval seconds (decode/camera failures included, never extrapolated)
+    coverage = metric_s / eligible_s if eligible_s > 0 else 0.0
     if used < MIN_SAMPLES or metric_s < MIN_METRIC_S or coverage < MIN_COVERAGE:
         return None  # low coverage → no physical claim
 
-    # median-smooth speeds (window 5)
-    speeds = [s[1] for s in samples]
-    smooth = [statistics.median(speeds[max(0, i - 2):i + 3]) for i in range(len(speeds))]
+    # median-smooth speeds (window 5) WITHIN each safe run only
+    smooth_runs = []
+    for r in runs:
+        sp = [x[1] for x in r]
+        smooth_runs.append([statistics.median(sp[max(0, i - 2):i + 3])
+                            for i in range(len(sp))])
+    samples = [x for r in runs for x in r]
+    smooth = [v for sr in smooth_runs for v in sr]
 
     # robust top: the 97th-percentile SAMPLE — value and time from the SAME
     # accepted compensated sample
@@ -115,24 +142,20 @@ def compute_speed_metrics(track: dict, age, trusted_windows: list[float] | None 
 
     thr = _sprint_threshold(age)
     sprints = 0
-    run_start = None
-    prev_t = None
-    for (t, _kmh, _d), sp in zip(samples, smooth):
-        if prev_t is not None and t - prev_t > MAX_INTERVAL_S and run_start is not None:
-            # a skipped camera interval breaks continuity — never bridged
-            if prev_t - run_start >= 0.8:
-                sprints += 1
-            run_start = None
-        if sp >= thr:
-            if run_start is None:
-                run_start = t
-        else:
-            if run_start is not None and t - run_start >= 0.8:
-                sprints += 1
-            run_start = None
-        prev_t = t
-    if run_start is not None and samples[-1][0] - run_start >= 0.8:
-        sprints += 1
+    for r, sr in zip(runs, smooth_runs):
+        # sustained duration is only valid WITHIN a safe run — a rejected
+        # interval breaks the sprint, it is never silently filled
+        run_start = None
+        for (t, _kmh, _d), sp in zip(r, sr):
+            if sp >= thr:
+                if run_start is None:
+                    run_start = t
+            else:
+                if run_start is not None and t - run_start >= 0.8:
+                    sprints += 1
+                run_start = None
+        if run_start is not None and r[-1][0] - run_start >= 0.8:
+            sprints += 1
 
     distance_m = sum(d for _t, _k, d in samples)
     moving = [sp for sp in smooth if sp >= MOVING_KMH]

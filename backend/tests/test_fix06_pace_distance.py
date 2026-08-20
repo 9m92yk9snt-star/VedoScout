@@ -401,6 +401,117 @@ def test_F22_determinism():
         assert a == b
 
 
+# --------------------------- F26/F27 — missing decoded frames (C01)
+
+def test_F26_missing_middle_decoded_frame_never_bridged():
+    frames = pan_frames(N, dx=0)
+    frames[27] = None  # P1 missing: P0→P1 and P1→P2 must both reject
+    pts = track_pts(run_boxes(N, 8))
+    motion = mc.samples_from_frames(frames, pts)
+    assert len(motion["samples"]) == N - 1, "an eligible interval silently disappeared"
+    assert not any(s["dt"] > DT + 1e-6 for s in motion["samples"]), "P0→P2 bridge created"
+    bad = [s for s in motion["samples"] if not s["ok"]]
+    assert len(bad) == 2 and all(s["reason"] == "decode" for s in bad)
+    assert {round(s["t1"] / DT) for s in bad} == {27, 28}
+    met = compute_speed_metrics({"points": pts, "segments": [[0.0, pts[-1]["t"]]]},
+                                AGE, motion=motion)
+    assert met is not None
+    assert met["metric_samples_skipped"] >= 2
+    full = 54 * 8 / (0.25 * H) * HEIGHT_M
+    assert met["distance_tracked_m"] < full - 0.3, "missing interval entered distance"
+
+
+def test_F27_decode_coverage_collapse():
+    frames = pan_frames(N, dx=0)
+    for k in range(10, N):
+        frames[k] = None  # most original intervals undecodable
+    pts = track_pts(run_boxes(N, 8))
+    motion = mc.samples_from_frames(frames, pts)
+    ok_s = sum(s["dt"] for s in motion["samples"] if s["ok"])
+    all_s = sum(s["dt"] for s in motion["samples"])
+    assert ok_s / all_s < 0.4, "coverage ignored undecodable intervals"
+    met = compute_speed_metrics({"points": pts, "segments": [[0.0, pts[-1]["t"]]]},
+                                AGE, motion=motion)
+    assert met is None, "physical claim published despite decode collapse"
+
+
+# --------------------------- F28/F29 — rejected interval breaks runs (C02)
+
+def _two_fast_sections(dx_fast, fast1, fast2, dx_slow=2):
+    xs = [0.06]
+    for k in range(1, N):
+        d = dx_fast if (k in fast1 or k in fast2) else dx_slow
+        xs.append(xs[-1] + d / W)
+    return [(x, 0.40, 0.08, 0.25) for x in xs]
+
+
+def test_F28_rejected_interval_splits_sprint():
+    fast = set(range(6, 23))                      # contiguous 1.36 s fast span
+    boxes = _two_fast_sections(17, fast, set())   # ≈15.4 km/h ≥ age-9 threshold
+    # control: contiguous fast span sustains ≥0.8 s → sprint counted
+    met_c, _ = metrics(pan_frames(N, dx=0), boxes, age=9)
+    assert met_c is not None and met_c["sprint_count"] >= 1, "control scene has no sprint"
+    # one rejected camera interval inside the span must split it into two
+    # sub-0.8 s runs → 0 sprints
+    frames = pan_frames(N, dx=0)
+    frames[14] = None
+    pts = track_pts(boxes)
+    motion = mc.samples_from_frames(frames, pts)
+    met = compute_speed_metrics({"points": pts, "segments": [[0.0, pts[-1]["t"]]]},
+                                9, motion=motion)
+    assert met is not None
+    assert met["sprint_count"] == 0, "sprint sustained across a rejected interval"
+
+
+def test_F29_rejected_interval_splits_burst():
+    from movement_metrics import compute_movement_map
+    fast1, fast2 = set(range(9, 13)), set(range(15, 19))
+    boxes = _two_fast_sections(18, fast1, fast2)
+    pts = track_pts(boxes)
+    track = {"points": pts, "segments": [[0.0, pts[-1]["t"]]]}
+    # control: adjacent in the ok-series → one merged burst
+    motion_c = mc.samples_from_frames(pan_frames(N, dx=0), pts)
+    mm_c = compute_movement_map(track, motion=motion_c)
+    frames = pan_frames(N, dx=0)
+    frames[13] = None  # rejected interval BETWEEN the fast sections
+    motion = mc.samples_from_frames(frames, pts)
+    mm = compute_movement_map(track, motion=motion)
+    assert mm is not None
+    assert mm["bursts"] == 2, "burst smoothed/counted across a rejected interval"
+    assert mm_c["bursts"] < 2 or mm["bursts"] >= mm_c["bursts"]
+
+
+# ------------------------------ F30 — FIX06 path zero verifier (C03)
+
+def test_F30_fix06_path_zero_verifier():
+    src = (BACKEND / "server.py").read_text()
+    body = src.split("async def _movement_pace_core", 1)[1]
+    body = body.split("full_prompt = await _compose_full_prompt", 1)[0]
+    for token in ("_trusted_fastest_moment", "verify_frame_identity",
+                  "call_gemini", "LlmChat"):
+        assert token not in body, f"FIX06 movement path can invoke {token}"
+
+
+# ------------------------------ F31 — backward LK fails closed (C04)
+
+def test_F31_backward_flow_unavailable(monkeypatch):
+    real = cv2.calcOpticalFlowPyrLK
+    calls = {"n": 0}
+
+    def fake(*a, **k):
+        calls["n"] += 1
+        if calls["n"] % 2 == 0:  # every BACKWARD pass returns nothing
+            return None, None, None
+        return real(*a, **k)
+
+    monkeypatch.setattr(mc.cv2, "calcOpticalFlowPyrLK", fake)
+    boxes = [(0.72 - k * 4 / W, 0.40, 0.08, 0.25) for k in range(12)]
+    motion = mc.samples_from_frames(pan_frames(12, dx=4), track_pts(boxes))
+    assert motion["samples"], "no intervals were even attempted"
+    assert all(not s["ok"] for s in motion["samples"]), "raw fallback happened"
+    assert all(s["reason"] in ("flow", "error") for s in motion["samples"])
+
+
 # --------------------------------------- F23–F25 source / phase guards
 
 def test_F23_zero_model_network_calls():

@@ -8795,21 +8795,20 @@ async def generate_full_report_task(report_id: str) -> None:
                     compute_motion_samples, str(file_path), gt_track)
                 mm_map = await asyncio.to_thread(
                     compute_movement_map, gt_track, tap_times=tap_times, motion=motion)
-                chosen_fast = None
                 if mm_map:
-                    try:
-                        chosen_fast = await _trusted_fastest_moment(
-                            report_id, mm_map, tap_times, file_path, anchor_crops_full)
-                    except Exception:
-                        logger.exception(f"trusted fastest-moment selection failed for {report_id}")
-                    if chosen_fast:
-                        ct, cv, trust = chosen_fast
+                    # FIX06 C03 — deterministic trust only: the compensated
+                    # fastest-near-tap sample may carry tap trust. NO verifier /
+                    # model / network call is permitted on the movement path
+                    # (accepted FIX04 geometry is already the identity authority).
+                    fnt = mm_map.get("fast_near_tap")
+                    if fnt:
+                        ct, cv_ = float(fnt["t"]), float(fnt["v"])
                         start_s = mm_map.get("track_start_s")
                         mm_map.update({
                             "top_speed_t": fmt_mmss(ct),
                             "top_video_s": round(ct, 1),
-                            "top_speed_idx": min(100, round(cv * 65)),
-                            "top_trust": trust,
+                            "top_speed_idx": min(100, round(cv_ * 65)),
+                            "top_trust": "tap",
                             "top_after_start": round(ct - start_s, 1) if start_s is not None else None,
                         })
                     else:
