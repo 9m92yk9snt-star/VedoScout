@@ -218,19 +218,21 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
                 tgt["promoted_by_scoring_scan"] = True
             continue
         note = str(d.get("note") or "").strip()
-        # FIX 08 C03 — a NOVEL scoring event from the secondary scan must pass
-        # the SAME exact contact-time spatial actor gate as ledger events when
-        # a usable track exists. ±8 s presence alone can never create a target
-        # GOAL/ASSIST. No usable track → existing verifier-only behavior
-        # (FIX07 C04) is preserved exactly.
+        # FIX 08 C03/C09 — a NOVEL scoring event from the secondary scan must
+        # pass the SAME exact contact-time spatial actor gate as ledger events.
+        # ±8 s presence alone can never create a target GOAL/ASSIST. When the
+        # gate is supplied and the track is unusable, novel scoring events are
+        # UNRESOLVED — never verifier-only accepted.
         gate_contact = None
-        if actor_gate is not None and track_ok:
+        if actor_gate is not None:
             _c = d.get("contact_ms")
             cand = {"contact_ms": _c if isinstance(_c, int) and not isinstance(_c, bool)
                     else ts * 1000,
                     "start_ms": ts * 1000,
                     "actor_box": d.get("actor_box")}
-            ok, _reason, gate_contact = actor_gate(cand, track)
+            ok = False
+            if track_ok:
+                ok, _reason, gate_contact = actor_gate(cand, track)
             if not ok:
                 if at == "SHOT":
                     scan["unresolved_goal_attempts"] += 1
@@ -249,7 +251,7 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
             "outcome_visible": True,
             "discovered_by_scoring_scan": True,
         }
-        if actor_gate is not None and track_ok and isinstance(gate_contact, int):
+        if actor_gate is not None and isinstance(gate_contact, int):
             new_ev["actor_spatial_verified"] = True
             new_ev["ledger_contact_ms"] = gate_contact
             new_ev["event_start_ms"] = gate_contact  # C01 — exact ms authority

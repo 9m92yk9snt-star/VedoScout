@@ -31,9 +31,13 @@ OUTCOMES = {"SCORED", "TEAMMATE_SCORED", "TEAMMATE_SHOT", "SAVED", "BLOCKED",
 FEET = {"LEFT", "RIGHT", "UNKNOWN"}
 
 _MIN_TRACK_POINTS = 10          # same usable-track threshold as cross-verification
-_CONTACT_MAX_GAP_S = 1.0        # exact contact-time bbox resolve window
-_IOU_MATCH = 0.15
-_CENTER_MATCH_FACTOR = 0.75
+_EXACT_POINT_TOL_S = 0.010      # a track point this close IS the contact point
+_INTERP_MAX_GAP_S = 1.5         # bounded normal tracking gap for interpolation
+# C08 — close-duel hardened same-actor geometry (ALL conditions required)
+_MATCH_IOU_MIN = 0.30
+_MATCH_CENTER_FACTOR = 0.45
+_MATCH_SIZE_RATIO_MIN = 0.55
+_MATCH_SIZE_RATIO_MAX = 1.8
 
 _SAFE_TITLE = {"SHOT": "Shot attempt", "PASS": "Pass", "CROSS": "Cross",
                "DRIBBLE": "Dribble", "DUEL": "Duel", "TACKLE": "Tackle",
@@ -138,41 +142,75 @@ def _valid_box(b) -> bool:
     return 0.0 <= x <= 1.0 and 0.0 <= y <= 1.0 and 0.0 < w <= 1.0 and 0.0 < h <= 1.0
 
 
-def resolve_target_box(track, contact_ms: int, max_gap_s: float = _CONTACT_MAX_GAP_S):
-    """FIX04 accepted target bbox at the EXACT contact time (canonical ms).
-    Returns (point | None, reason). Never widens to ±8 s."""
+def _geom_ok(p) -> bool:
+    return isinstance(p, dict) and all(
+        isinstance(p.get(k), (int, float)) for k in ("x", "y", "w", "h"))
+
+
+def resolve_target_box(track, contact_ms: int, max_gap_s: float = _INTERP_MAX_GAP_S):
+    """C07 — FIX04 accepted target bbox AT the EXACT contact time (canonical
+    ms). Exact point → used as-is; otherwise linear x/y/w/h interpolation
+    between the surrounding track points, ONLY when the surrounding interval
+    is a bounded normal tracking gap. Large gap / no surrounding pair →
+    TRACK_GAP. Never widened to ±8 s, never presentation MM:SS.
+    Returns (bbox dict | None, reason)."""
     pts = [p for p in ((track or {}).get("points") or [])
            if isinstance(p, dict) and isinstance(p.get("t"), (int, float))]
     if len(pts) < _MIN_TRACK_POINTS:
         return None, "NO_TARGET_TRACK"
+    pts.sort(key=lambda p: float(p["t"]))
     sec = contact_ms / 1000.0
-    best = None
+    before, after = None, None
     for p in pts:
-        d = abs(float(p["t"]) - sec)
-        if d <= max_gap_s and (best is None or d < abs(float(best["t"]) - sec)):
-            best = p
-    if best is None:
+        t = float(p["t"])
+        if abs(t - sec) <= _EXACT_POINT_TOL_S:
+            if not _geom_ok(p):
+                return None, "TRACK_GAP"
+            return {"x": float(p["x"]), "y": float(p["y"]),
+                    "w": float(p["w"]), "h": float(p["h"]), "t": t}, "OK"
+        if t < sec:
+            before = p
+        elif after is None:
+            after = p
+            break
+    if before is None or after is None:
+        return None, "TRACK_GAP"  # contact outside the tracked interval
+    t0, t1 = float(before["t"]), float(after["t"])
+    if (t1 - t0) > max_gap_s:
+        return None, "TRACK_GAP"  # abnormal gap — no false geometry
+    if not (_geom_ok(before) and _geom_ok(after)):
         return None, "TRACK_GAP"
-    if not all(isinstance(best.get(k), (int, float)) for k in ("x", "y", "w", "h")):
-        return None, "TRACK_GAP"
-    return best, "OK"
+    f = (sec - t0) / (t1 - t0) if t1 > t0 else 0.0
+    lerp = lambda a, b: float(a) + (float(b) - float(a)) * f  # noqa: E731
+    return {"x": lerp(before["x"], after["x"]), "y": lerp(before["y"], after["y"]),
+            "w": lerp(before["w"], after["w"]), "h": lerp(before["h"], after["h"]),
+            "t": sec}, "OK"
 
 
 def boxes_match(a: dict, b: dict) -> bool:
-    """Deterministic same-actor geometry test in the shared normalized
-    coordinate system (x/y top-left, 0..1): IoU or body-scaled center match."""
+    """C08 — hardened deterministic same-actor geometry test in the shared
+    normalized coordinate system (x/y top-left, 0..1). ALL required:
+    compatible box size, center displacement small relative to body size,
+    AND strong overlap. A nearby duel opponent whose box merely overlaps
+    must fail closed — overlap alone is never identity."""
     ax, ay, aw, ah = float(a["x"]), float(a["y"]), float(a["w"]), float(a["h"])
     bx, by, bw, bh = float(b["x"]), float(b["y"]), float(b["w"]), float(b["h"])
+    if min(aw, ah, bw, bh) <= 0:
+        return False
+    for ratio in (aw / bw, ah / bh):
+        if not (_MATCH_SIZE_RATIO_MIN <= ratio <= _MATCH_SIZE_RATIO_MAX):
+            return False
+    acx, acy = ax + aw / 2.0, ay + ah / 2.0
+    bcx, bcy = bx + bw / 2.0, by + bh / 2.0
+    if abs(acx - bcx) > _MATCH_CENTER_FACTOR * max(aw, bw):
+        return False
+    if abs(acy - bcy) > _MATCH_CENTER_FACTOR * max(ah, bh):
+        return False
     ix = max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
     iy = max(0.0, min(ay + ah, by + bh) - max(ay, by))
     inter = ix * iy
     union = aw * ah + bw * bh - inter
-    if union > 0 and inter / union >= _IOU_MATCH:
-        return True
-    acx, acy = ax + aw / 2.0, ay + ah / 2.0
-    bcx, bcy = bx + bw / 2.0, by + bh / 2.0
-    return (abs(acx - bcx) <= _CENTER_MATCH_FACTOR * max(aw, bw)
-            and abs(acy - bcy) <= _CENTER_MATCH_FACTOR * max(ah, bh))
+    return union > 0 and inter / union >= _MATCH_IOU_MIN
 
 
 def validate_actor(candidate: dict, track) -> tuple[bool, str, int | None]:

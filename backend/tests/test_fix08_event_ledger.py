@@ -679,3 +679,155 @@ def test_F16_incomplete_discovery_never_claims_exhaustive():
     assert len(ledger["events"]) == 1, "partial verified candidates remain"
     summary = el.discovery_summary(ledger)
     assert summary["event_discovery_complete"] is False
+
+
+# ============ FIX08 CORRECTION 02 — F17–F27 (close-duel + fail-closed) ============
+
+def test_F17_exact_contact_time_interpolation():
+    # moving player: x drifts 0.40→0.50 between 31.0s and 32.0s
+    track = _track([i * 0.5 for i in range(0, 62)])  # 0..30.5
+    track["points"].append({"t": 31.0, "x": 0.40, "y": 0.30, "w": 0.06, "h": 0.18})
+    track["points"].append({"t": 32.0, "x": 0.50, "y": 0.34, "w": 0.08, "h": 0.20})
+    box, why = el.resolve_target_box(track, 31500)
+    assert why == "OK"
+    assert abs(box["x"] - 0.45) < 1e-9 and abs(box["y"] - 0.32) < 1e-9
+    assert abs(box["w"] - 0.07) < 1e-9 and abs(box["h"] - 0.19) < 1e-9
+    # exact point wins without interpolation
+    box2, _ = el.resolve_target_box(track, 31000)
+    assert box2["x"] == 0.40 and box2["w"] == 0.06
+
+
+def test_F18_large_temporal_gap_fails_closed():
+    gap_track = _track([i * 0.5 for i in range(0, 40)]  # 0..19.5s
+                       + [40 + i * 0.5 for i in range(0, 40)])  # 40..59.5s
+    box, why = el.resolve_target_box(gap_track, 31500)
+    assert box is None and why == "TRACK_GAP", "abnormal gap must never interpolate"
+    ledger = el.build_ledger(_discovery([_cand(contact_ms=31500)]), gap_track, DUR)
+    assert ledger["events"] == []
+    # contact outside the tracked interval also fails closed
+    box2, why2 = el.resolve_target_box(_track([i * 0.5 for i in range(20)]), 30000)
+    assert box2 is None and why2 == "TRACK_GAP"
+
+
+def test_F19_same_player_jitter_accepted():
+    target = _box()  # x=0.40 y=0.30 w=0.06 h=0.18
+    for jitter_x in (0.405, 0.41):
+        assert el.boxes_match({**target, "x": jitter_x}, target) is True, \
+            f"small detector jitter x={jitter_x} must stay ACTOR_MATCH"
+    ok, reason, _ = el.validate_actor(_cand(box=_box(x=0.405)), TRACK)
+    assert ok is True and reason == "ACTOR_MATCH"
+
+
+def test_F20_close_duel_neighbour_rejected():
+    target = _box()  # x=0.40 w=0.06 → boxes overlap at x=0.44
+    duel = _box(x=0.44)
+    # sanity: the old permissive rule would have overlapped here
+    assert el.boxes_match(duel, target) is False, \
+        "close-duel opponent with overlapping bbox must fail closed"
+    ok, reason, _ = el.validate_actor(_cand(box=duel), TRACK)
+    assert ok is False and reason == "ACTOR_MISMATCH"
+    ledger = el.build_ledger(_discovery([_cand(box=duel)]), TRACK, DUR)
+    assert ledger["events"] == []
+
+
+def test_F21_clearly_wrong_actor_rejected():
+    assert el.boxes_match(_box(x=0.70), _box()) is False
+    ok, reason, _ = el.validate_actor(_cand(box=_box(x=0.70)), TRACK)
+    assert ok is False and reason == "ACTOR_MISMATCH"
+    # large scale mismatch also fails
+    assert el.boxes_match(_box(w=0.15, h=0.40), _box()) is False
+    assert el.boxes_match(_box(w=0.02, h=0.06), _box()) is False
+
+
+def test_F22_novel_secondary_goal_unusable_track_unresolved():
+    for bad_track in (None, {"points": []}, _track([1.0, 2.0, 3.0])):
+        full = {"action_timeline": []}
+        scan = vstats.merge_discovered_scoring_events(
+            full, [_scan_row(box=_box(), contact=20000)],
+            track=bad_track, actor_gate=el.validate_actor)
+        assert full["action_timeline"] == [], \
+            "novel scan GOAL must NEVER be verifier-only accepted"
+        assert scan["unresolved_goal_attempts"] == 1
+
+
+def test_F23_novel_secondary_assist_unusable_track_unresolved():
+    full = {"action_timeline": []}
+    scan = vstats.merge_discovered_scoring_events(
+        full, [_scan_row(et="ASSIST", at="PASS", res="TEAMMATE_SCORED",
+                         box=_box(), contact=20000)],
+        track=None, actor_gate=el.validate_actor)
+    assert full["action_timeline"] == []
+    assert scan["unresolved_assist_candidates"] == 1
+
+
+def test_F24_novel_scoring_usable_track_wrong_actor_not_added():
+    full = {"action_timeline": []}
+    scan = vstats.merge_discovered_scoring_events(
+        full, [_scan_row(box=_box(x=0.44), contact=20000)],  # close-duel neighbour
+        track=TRACK, actor_gate=el.validate_actor)
+    assert full["action_timeline"] == []
+    assert scan["unresolved_goal_attempts"] == 1
+
+
+def test_F25_novel_scoring_usable_track_exact_actor_allowed():
+    full = {"action_timeline": []}
+    vstats.merge_discovered_scoring_events(
+        full, [_scan_row(box=_box(), contact=20120)],
+        track=TRACK, actor_gate=el.validate_actor)
+    assert len(full["action_timeline"]) == 1
+    ev = full["action_timeline"][0]
+    assert ev["canonical_event_type"] == "GOAL"
+    assert ev["event_start_ms"] == 20120
+
+
+def test_F26_existing_authoritative_event_promoted_no_duplicate():
+    ledger = el.build_ledger(
+        _discovery([_cand(contact_ms=31000, vis=False, outcome="UNKNOWN")]), TRACK, DUR)
+    timeline = el.authoritative_timeline(ledger)
+    timeline[0]["cross_verified"] = True
+    vstats.attach_canonical(timeline[0], {
+        "canonical_event_type": "SHOT", "canonical_action_type": "SHOT",
+        "canonical_result": "OUTCOME_NOT_VISIBLE", "outcome_visible": False})
+    full = {"action_timeline": timeline}
+    # promotion needs NO actor gate re-pass — the event already holds authority
+    vstats.merge_discovered_scoring_events(
+        full, [_scan_row(ts="00:31")], track=TRACK, actor_gate=el.validate_actor)
+    assert len(full["action_timeline"]) == 1, "promotion must not duplicate"
+    ev = full["action_timeline"][0]
+    assert ev["canonical_event_type"] == "GOAL"
+    assert ev["ledger_contact_ms"] == 31000, "ledger contact ms untouched by promotion"
+
+
+def test_F27_contact_ms_unchanged_through_full_chain(tmp_path, monkeypatch):
+    import server
+    ledger = el.build_ledger(_discovery([_cand(contact_ms=31420)]), TRACK, DUR)
+    assert ledger["events"][0]["contact_ms"] == 31420
+    timeline = el.authoritative_timeline(ledger)
+    assert timeline[0]["event_start_ms"] == 31420
+    timeline[0]["cross_verified"] = True
+    full = attach_event_evidence_authority({"action_timeline": timeline})
+    ev = full["action_timeline"][0]
+    assert ev["event_id"].startswith("evt_") and ev["event_start_ms"] == 31420
+    full = el.create_event_native_evidence(full, track=TRACK)
+    full = attach_event_evidence_authority(full)
+    c = [x for x in full["video_comments"] if x.get("event_native")][0]
+    assert c["event_id"] == ev["event_id"] and c["evidence_time_ms"] == 31420
+    assert c["evidence_id"].startswith("evd_")
+    c["proof_verified"] = True
+    seen = []
+
+    def fake_extract(video_path, seconds, out_path):
+        seen.append(float(seconds))
+        Path(out_path).write_bytes(b"jpg")
+        return True
+
+    monkeypatch.setattr(server, "_extract_video_frame", fake_extract)
+    monkeypatch.setattr(server, "UPLOAD_DIR", tmp_path)
+    vid = tmp_path / "v.mp4"
+    vid.write_bytes(b"0")
+    doc = {"id": "f27test", "anchors": [], "full_report": full}
+    enriched = server.ensure_video_frames(doc, video_path_override=str(vid))
+    out = [x for x in enriched if x.get("event_native")][0]
+    assert seen == [31.42]
+    assert out["frame_time_ms"] == 31420
+    assert compute_proof_frame_verified(out) is True
