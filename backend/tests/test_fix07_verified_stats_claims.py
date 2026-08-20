@@ -467,3 +467,212 @@ def test_V50_zero_new_model_calls():
     body = body.split("\nasync def ", 1)[0]
     assert body.count("call_gemini_with_video(") == 1, \
         "the cross-verification stage must stay a single verifier call"
+
+
+# ------------------------------------------- C01–C06 correction tests
+
+def test_C01_goal_missing_action_not_counted():
+    et, at, res, vis = vstats.normalize_canonical("GOAL", "UNKNOWN", "SCORED", True)
+    assert et == "UNCLASSIFIED", "GOAL without explicit SHOT action must fail closed"
+    vs, _ = _stats([_ev("01:10", "GOAL", "UNKNOWN", "SCORED", True)])
+    assert vs["goals"] == 0 and vs["shots"] == 0
+
+
+def test_C01_goal_missing_action_never_becomes_shot():
+    et, *_ = vstats.normalize_canonical("GOAL", None, "SCORED", True)
+    assert et == "UNCLASSIFIED"
+    et, *_ = vstats.normalize_canonical("GOAL", "JUNK_ACTION", "SCORED", True)
+    assert et == "UNCLASSIFIED"
+    et, *_ = vstats.normalize_canonical("GOAL", "PASS", "SCORED", True)
+    assert et == "PASS", "demote to the explicitly supplied action only"
+
+
+def test_C01_assist_missing_action_not_counted():
+    et, *_ = vstats.normalize_canonical("ASSIST", "UNKNOWN", "TEAMMATE_SCORED", True)
+    assert et == "UNCLASSIFIED"
+    vs, _ = _stats([_ev("01:10", "ASSIST", "UNKNOWN", "TEAMMATE_SCORED", True)])
+    assert vs["assists"] == 0
+
+
+def test_C02_missing_scan_field_not_performed():
+    full = {"action_timeline": [_goal()]}
+    scan = vstats.merge_discovered_scoring_events(full, None)
+    assert scan["performed"] is False
+    full["_scoring_scan"] = scan
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is False
+    assert vs["stats_completeness"]["goals_assists"] == "verified_timeline_events"
+
+
+def test_C02_malformed_scan_field_not_performed():
+    for bad in ("junk", 5, {"x": 1}, True):
+        full = {"action_timeline": []}
+        scan = vstats.merge_discovered_scoring_events(full, bad)
+        assert scan["performed"] is False
+        assert full["action_timeline"] == []
+
+
+def test_C02_verifier_failure_no_authoritative_zero():
+    full = {"action_timeline": [],
+            "cross_verification": {"status": "fail_closed_error",
+                                   "reason": "verifier_error"},
+            "match_stats": {"goals": 2, "minutes_analysed": 20}}
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)
+    vs = full["verified_stats"]
+    assert vs["available"] is False
+    assert vs["scoring_scan"]["performed"] is False
+    assert "goals" not in vs, "verifier failure must not publish verified zeros"
+    ms = full["match_stats"]
+    assert ms["source"] == "verified_events_unavailable"
+    assert "goals" not in ms and "assists" not in ms
+    assert "verified_stat_line" not in full
+
+
+def test_C03_scan_promotes_shot_to_goal():
+    shot = _ev("01:10", "SHOT", "SHOT", "OUTCOME_NOT_VISIBLE", False)
+    full = _merged_stats([shot], [_disc("01:10", "GOAL", "SHOT", "SCORED")])
+    evs = full["action_timeline"]
+    assert len(evs) == 1, "promotion must not duplicate the event"
+    e = evs[0]
+    assert e["canonical_event_type"] == "GOAL"
+    assert e["canonical_result"] == "SCORED" and e["outcome_visible"] is True
+    assert e.get("promoted_by_scoring_scan") is True
+    assert full["verified_stats"]["goals"] == 1
+
+
+def test_C03_scan_promotes_pass_to_assist():
+    p = _ev("02:10", "PASS", "PASS", "COMPLETED", True)
+    full = _merged_stats([p], [_disc("02:10", "ASSIST", "PASS", "TEAMMATE_SCORED")])
+    evs = full["action_timeline"]
+    assert len(evs) == 1
+    assert evs[0]["canonical_event_type"] == "ASSIST"
+    assert full["verified_stats"]["assists"] == 1
+
+
+def _track(times):
+    return {"points": [{"t": float(t), "x": 0.5, "y": 0.5} for t in times]}
+
+
+def test_C04_goal_without_track_support_rejected():
+    track = _track(range(100, 125))  # usable track, no point near 70 s
+    full = {"action_timeline": []}
+    scan = vstats.merge_discovered_scoring_events(
+        full, [_disc("01:10", "GOAL", "SHOT", "SCORED")], track=track)
+    assert scan["performed"] is True
+    assert full["action_timeline"] == [], "no player support → goal not added"
+
+
+def test_C04_assist_without_track_support_rejected():
+    full = {"action_timeline": []}
+    vstats.merge_discovered_scoring_events(
+        full, [_disc("02:10", "ASSIST", "PASS", "TEAMMATE_SCORED")],
+        track=_track(range(300, 325)))
+    assert full["action_timeline"] == []
+
+
+def test_C04_promotion_also_requires_track_support():
+    shot = _ev("01:10", "SHOT", "SHOT", "OUTCOME_NOT_VISIBLE", False)
+    full = {"action_timeline": [shot]}
+    vstats.merge_discovered_scoring_events(
+        full, [_disc("01:10", "GOAL", "SHOT", "SCORED")], track=_track(range(200, 225)))
+    assert full["action_timeline"][0]["canonical_event_type"] == "SHOT"
+
+
+def test_C04_track_supported_goal_accepted_with_same_snap():
+    track = _track([66, 67, 68, 71, 72, 100, 101, 102, 103, 104])
+    full = {"action_timeline": []}
+    vstats.merge_discovered_scoring_events(
+        full, [_disc("01:10", "GOAL", "SHOT", "SCORED")], track=track)
+    assert len(full["action_timeline"]) == 1
+    assert full["action_timeline"][0]["timestamp"] == "01:11", \
+        "same <=2 s snap as the existing cross-verification path"
+
+
+def test_C04_no_usable_track_keeps_verifier_only_behavior():
+    full = {"action_timeline": []}
+    vstats.merge_discovered_scoring_events(
+        full, [_disc("01:10", "GOAL", "SHOT", "SCORED")],
+        track={"points": [{"t": 1.0}]})  # <10 points → track_ok false
+    assert len(full["action_timeline"]) == 1
+
+
+def test_C05_technical_sections_reconciled():
+    full = _recon({"action_timeline": [_goal()],
+                   "technical": {"shooting": {"score": 7,
+                                              "notes": "Scored three goals.",
+                                              "evidence": "Three goals from open play.",
+                                              "verdict": "Elite. Netted a hat-trick."},
+                                 "passing": {"notes": "Crisp passing under pressure."}}})
+    t = str(full["technical"]).lower()
+    assert "three goals" not in t and "hat-trick" not in t
+    assert "crisp passing" in t, "unrelated developmental prose must survive"
+    assert full["technical"]["shooting"]["score"] == 7
+
+
+def test_C05_tactical_physical_mentality_parents_package():
+    full = _recon({
+        "action_timeline": [_goal()],
+        "tactical": {"positioning": {"notes": "Scored three goals from the wing."}},
+        "physical": {"pace": {"notes": "Quick over 10 metres. A hat-trick of goals."}},
+        "mentality": {"composure": {"notes": "Calm head. Netted a brace."}},
+        "parents_package": {
+            "message_to_player": "You scored three goals today - amazing!",
+            "watch_together": ["Watch his three goals back to back.",
+                               "Watch the build-up before the goal."]}})
+    assert "three goals" not in str(full["tactical"]).lower()
+    phys = str(full["physical"]).lower()
+    assert "hat-trick" not in phys and "quick over 10 metres" in phys
+    ment = str(full["mentality"]).lower()
+    assert "brace" not in ment and "calm head" in ment
+    pp = full["parents_package"]
+    assert "three goals" not in str(pp).lower()
+    assert "Watch the build-up before the goal." in pp["watch_together"]
+
+
+def test_C06_bound_snapshot_moment_obeys_canonical_type():
+    shot = _ev("01:00", "SHOT", "SHOT", "SAVED", True)
+    full = {"action_timeline": [shot],
+            "snapshot_moments": [{"title": "Scores from distance",
+                                  "desc": "He finishes brilliantly."}]}
+    full = attach_event_evidence_authority(full)
+    full["snapshot_moments"][0]["event_id"] = full["action_timeline"][0]["event_id"]
+    full = vstats.apply_verified_stats_authority(full)
+    m = full["snapshot_moments"][0]
+    assert m["title"] == "Shot attempt"
+    assert "finishes" not in m["desc"].lower()
+
+
+def test_C06_bound_pass_moment_assist_language_removed():
+    p = _ev("01:00", "PASS", "PASS", "COMPLETED", True)
+    full = {"action_timeline": [p],
+            "snapshot_moments": [{"title": "Assist for winner",
+                                  "desc": "Sets up the goal."}]}
+    full = attach_event_evidence_authority(full)
+    full["snapshot_moments"][0]["event_id"] = full["action_timeline"][0]["event_id"]
+    full = vstats.apply_verified_stats_authority(full)
+    m = full["snapshot_moments"][0]
+    assert m["title"] == "Pass"
+    assert "sets up the goal" not in m["desc"].lower()
+
+
+def test_C06_goal_and_teammate_assist_language_allowed():
+    g = _goal(title="Goal", description="Scores low into the corner.")
+    a = _assist("02:10", description="His teammate scores from the cutback.")
+    full = _recon({"action_timeline": [g, a]})
+    evs = full["action_timeline"]
+    assert evs[0]["description"] == "Scores low into the corner."
+    assert evs[1]["description"] == "His teammate scores from the cutback."
+
+
+def test_C06_event_title_aggregate_contradiction():
+    full = _recon({"action_timeline": [_goal(title="Hat-trick hero")]})
+    assert full["action_timeline"][0]["title"] == "Goal"
+
+
+def test_C06_assist_ambiguous_scorer_wording_fails_closed():
+    a = _assist("02:10", description="He scores from the cutback.")
+    full = _recon({"action_timeline": [a]})
+    assert full["action_timeline"][0]["description"] == "Verified assist."

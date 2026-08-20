@@ -48,9 +48,9 @@ def normalize_canonical(ev_type, act_type, result, visible):
     res = _enum(result, RESULTS, "UNKNOWN")
     vis = visible is True
     if et == "GOAL":
-        if at == "UNKNOWN":
-            at = "SHOT"
         if at != "SHOT":
+            # C01 — never manufacture the action type: without an explicitly
+            # supplied SHOT action there is no GOAL. Fail closed.
             et = at if at in EVENT_TYPES else "UNCLASSIFIED"
         elif not (res == "SCORED" and vis):
             et = "SHOT"
@@ -97,20 +97,30 @@ def _event_action(e: dict) -> str:
     return _LEGACY_ACTION.get(str(e.get("action_type") or "").lower(), "UNKNOWN")
 
 
-def merge_discovered_scoring_events(full: dict, discovered: list) -> dict:
+def merge_discovered_scoring_events(full: dict, discovered, track: dict | None = None) -> dict:
     """PART 4/5 — merge the verifier's full-video scoring scan with the
     surviving timeline. Only identity-CONFIRMED, outcome-visible GOAL/ASSIST
-    discoveries are ADDED (before FIX01 assigns event_id). EXACT normalized
-    timestamp + compatible canonical action dedup — no fuzzy matching.
+    discoveries are ADDED (before FIX01 assigns event_id) or PROMOTE the
+    existing event at the EXACT same time/action (a shot the scan verified as
+    a goal, a pass verified as an assist). No fuzzy matching. C02: the scan is
+    performed ONLY when the verifier returned a valid list. C04: with a usable
+    accepted track, a discovery needs the same player-presence support the
+    existing cross-verification applies (point within 8 s, snap <= 2 s).
     Returns the scoring-scan metadata (unresolved candidates included)."""
-    scan = {"performed": True, "unresolved_goal_attempts": 0,
+    performed = isinstance(discovered, list)
+    scan = {"performed": performed, "unresolved_goal_attempts": 0,
             "unresolved_assist_candidates": 0}
+    if not performed:
+        return scan  # C02 — missing/malformed scan never becomes a claim
+    pts = [p for p in ((track or {}).get("points") or [])
+           if isinstance(p, dict) and isinstance(p.get("t"), (int, float))]
+    track_ok = len(pts) >= 10  # same threshold as _apply_cross_verification
     timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
-    existing = set()
+    index = {}
     for e in timeline:
         ts = _ts_secs(e.get("timestamp"))
         if ts is not None:
-            existing.add((ts, _event_action(e)))
+            index[(ts, _event_action(e))] = e
     for d in (discovered or []):
         if not isinstance(d, dict):
             continue
@@ -126,12 +136,30 @@ def merge_discovered_scoring_events(full: dict, discovered: list) -> dict:
                 scan["unresolved_assist_candidates"] += 1
             continue
         if et not in ("GOAL", "ASSIST"):
-            continue  # the scan only ADDS verified goals/assists
+            continue  # the scan only adds/promotes verified goals/assists
         ts = _ts_secs(d.get("timestamp"))
-        if ts is None or (ts, at) in existing:
-            continue  # same scoring event already survives — never duplicate
+        if ts is None:
+            continue
+        if track_ok:
+            near = [p for p in pts if abs(float(p["t"]) - ts) <= 8]
+            if not near:
+                continue  # C04 — no player support around the timestamp
+            best = min(near, key=lambda p: abs(float(p["t"]) - ts))
+            if abs(float(best["t"]) - ts) <= 2:
+                ts = int(round(float(best["t"])))  # same snap as existing path
+        tgt = index.get((ts, at))
+        if tgt is not None:
+            # C03 — the scan corrects a misclassified event at the EXACT same
+            # time/action: promote canonical fields, never duplicate.
+            cur = _enum(tgt.get("canonical_event_type"), EVENT_TYPES, "UNCLASSIFIED")
+            if cur != et:
+                tgt["canonical_event_type"] = et
+                tgt["canonical_result"] = "SCORED" if et == "GOAL" else "TEAMMATE_SCORED"
+                tgt["outcome_visible"] = True
+                tgt["promoted_by_scoring_scan"] = True
+            continue
         note = str(d.get("note") or "").strip()
-        timeline.append({
+        new_ev = {
             "timestamp": _mmss(ts),
             "action_type": at.lower(),
             "title": "Goal" if et == "GOAL" else "Assist",
@@ -142,8 +170,9 @@ def merge_discovered_scoring_events(full: dict, discovered: list) -> dict:
             "canonical_result": res,
             "outcome_visible": True,
             "discovered_by_scoring_scan": True,
-        })
-        existing.add((ts, at))
+        }
+        timeline.append(new_ev)
+        index[(ts, at)] = new_ev
     full["action_timeline"] = timeline
     return scan
 
@@ -420,50 +449,79 @@ _SAFE_TITLE = {"GOAL": "Goal", "ASSIST": "Assist", "SHOT": "Shot attempt",
                "UNCLASSIFIED": "Verified match involvement"}
 
 
-def _scrub_lang(text: str, safe: str, *patterns) -> str:
+_TEAMMATE_RE = re.compile(r"\bteammate'?s?\b", re.I)
+
+
+def _sentence_lang_ok(sent: str, et: str) -> bool:
+    """C06 — outcome language a sentence may carry, given the bound event's
+    canonical type. ASSIST text may reference scoring ONLY when it clearly
+    attributes it to a teammate; ambiguous scorer wording fails closed."""
+    if et == "GOAL":
+        return not _ASSIST_LANG.search(sent)
+    if et == "ASSIST":
+        return not (_GOAL_LANG.search(sent) and not _TEAMMATE_RE.search(sent))
+    return not (_GOAL_LANG.search(sent) or _ASSIST_LANG.search(sent))
+
+
+def _event_safe_text(text: str, et: str, vs: dict, safe: str):
+    """Returns (new_text, changed): drops sentences with forbidden outcome
+    language or unsupported aggregate claims; deterministic fallback."""
     parts = re.split(r"(?<=[.!?])\s+", text)
-    kept = [s for s in parts if not any(p.search(s) for p in patterns)]
+    kept = [s for s in parts if _sentence_lang_ok(s, et) and _sentence_supported(s, vs)]
+    if len(kept) == len(parts):
+        return text, False
     out = " ".join(kept).strip()
-    return out if out else f"Verified {safe.lower()}."
+    return (out if out else f"Verified {safe.lower()}."), True
 
 
-def _reconcile_event_texts(full: dict) -> None:
-    """PART 15/16 — event-bound text and exactly-bound video comments may not
-    claim an outcome beyond the event's canonical classification."""
+def _reconcile_event_texts(full: dict, vs: dict) -> None:
+    """PART 15/16 + C06 — event-bound text, exactly-bound video comments and
+    exactly-bound snapshot/cinematic moments may not claim an outcome beyond
+    the event's canonical classification, nor an unsupported aggregate."""
     events = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
     by_id = {}
     for e in events:
         et = _enum(e.get("canonical_event_type"), EVENT_TYPES, "UNCLASSIFIED")
         if e.get("event_id"):
             by_id[e["event_id"]] = et
-        bad = []
-        if et not in ("GOAL", "ASSIST"):
-            bad.append(_GOAL_LANG)
-        if et != "ASSIST":
-            bad.append(_ASSIST_LANG)
-        if not bad:
-            continue
         safe = _SAFE_TITLE.get(et, "Verified match involvement")
         title = e.get("title")
-        if isinstance(title, str) and any(p.search(title) for p in bad):
+        if isinstance(title, str) and (not _sentence_lang_ok(title, et)
+                                       or not _sentence_supported(title, vs)):
             e["title"] = safe
         desc = e.get("description")
-        if isinstance(desc, str) and any(p.search(desc) for p in bad):
-            e["description"] = _scrub_lang(desc, safe, *bad)
+        if isinstance(desc, str):
+            new, changed = _event_safe_text(desc, et, vs, safe)
+            if changed:
+                e["description"] = new
     for c in (full.get("video_comments") or []):
         if not isinstance(c, dict):
             continue
         et = by_id.get(c.get("event_id"))
         if et is None:
             continue  # only EXACTLY event-bound comments are event-gated
-        bad = []
-        if et not in ("GOAL", "ASSIST"):
-            bad.append(_GOAL_LANG)
-        if et != "ASSIST":
-            bad.append(_ASSIST_LANG)
         txt = c.get("comment")
-        if bad and isinstance(txt, str) and any(p.search(txt) for p in bad):
-            c["comment"] = _scrub_lang(txt, _SAFE_TITLE.get(et, "involvement"), *bad)
+        if isinstance(txt, str):
+            new, changed = _event_safe_text(txt, et, vs,
+                                            _SAFE_TITLE.get(et, "involvement"))
+            if changed:
+                c["comment"] = new
+    for m in (full.get("snapshot_moments") or []):
+        if not isinstance(m, dict):
+            continue
+        et = by_id.get(m.get("event_id"))
+        if et is None:
+            continue  # unbound moments keep numeric-only reconciliation
+        safe = _SAFE_TITLE.get(et, "Verified match involvement")
+        title = m.get("title")
+        if isinstance(title, str) and (not _sentence_lang_ok(title, et)
+                                       or not _sentence_supported(title, vs)):
+            m["title"] = safe
+        desc = m.get("desc")
+        if isinstance(desc, str):
+            new, changed = _event_safe_text(desc, et, vs, safe)
+            if changed:
+                m["desc"] = new
 
 
 def reconcile_verified_claims(full: dict) -> None:
@@ -478,7 +536,8 @@ def reconcile_verified_claims(full: dict) -> None:
     for key in ("executive_summary", "final_summary"):
         if isinstance(full.get(key), str):
             full[key] = _reconcile_str(full[key], vs, fallback=line)
-    for key in ("scout_view", "parent_summary", "coach_notes", "parent_tips"):
+    for key in ("scout_view", "parent_summary", "coach_notes", "parent_tips",
+                "technical", "tactical", "physical", "mentality", "parents_package"):
         if key in full and full.get(key) is not None:
             full[key] = _walk(full[key], vs)
     snap = full.get("snapshot")
@@ -494,15 +553,28 @@ def reconcile_verified_claims(full: dict) -> None:
                     if isinstance(m.get(k), str):
                         m[k] = _reconcile_str(m[k], vs,
                                               fallback="Verified match involvement")
-    _reconcile_event_texts(full)
+    _reconcile_event_texts(full, vs)
 
 
 def apply_verified_stats_authority(full: dict) -> dict:
     """FIX07 pipeline step (after FIX01 attach, before proof authority):
-    build verified stats → rebuild match_stats → reconcile claims."""
+    build verified stats → rebuild match_stats → reconcile claims.
+    C02: a failed verifier fails closed — no authoritative zeros."""
     if not isinstance(full, dict):
         return full
     scan = full.pop("_scoring_scan", None)
+    xv = full.get("cross_verification") if isinstance(full.get("cross_verification"), dict) else {}
+    if str(xv.get("status") or "") == "fail_closed_error":
+        full["verified_stats"] = {
+            "version": VERIFIED_STATS_VERSION,
+            "source": "cross_verified_events",
+            "available": False,
+            "reason": "verifier_failed",
+            "scoring_scan": {"performed": False},
+        }
+        full.pop("verified_stat_line", None)
+        rebuild_match_stats(full)  # → verified_events_unavailable
+        return full
     build_verified_stats(full, scan)
     rebuild_match_stats(full)
     reconcile_verified_claims(full)

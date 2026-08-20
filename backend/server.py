@@ -8218,7 +8218,7 @@ async def _cross_verify_full_report(
         # surviving timeline (verified GOAL/ASSIST discoveries only, exact-time
         # dedup) BEFORE FIX01 assigns event ids. Deterministic — zero AI here.
         full["_scoring_scan"] = vstats.merge_discovered_scoring_events(
-            full, verify.get("discovered_scoring_events") or [])
+            full, verify.get("discovered_scoring_events"), track=gt_track)
         logger.info(
             f"[cross-verify] {report_id}: {meta.get('events_checked')} claims checked · "
             f"{meta.get('events_dropped')} dropped · max score gap {meta.get('max_score_gap')} · "
