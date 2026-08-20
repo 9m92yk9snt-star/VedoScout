@@ -16,11 +16,15 @@ def fmt_mmss(t: float) -> str:
 _fmt_mmss = fmt_mmss  # back-compat alias
 
 
-def compute_movement_map(track: dict | None, tap_times: list[float] | None = None) -> dict | None:
+def compute_movement_map(track: dict | None, tap_times: list[float] | None = None,
+                         motion: dict | None = None) -> dict | None:
     """Return {tracked_seconds, segments, passages, track_start_*, points, bursts,
     top_speed_*, intensity, fast_candidates, fast_near_tap, trail} or None when
     too little data. tap_times = absolute video seconds of the user's taps
-    (incl. time offset) — used for identity-safe fastest-moment candidates."""
+    (incl. time offset) — used for identity-safe fastest-moment candidates.
+    motion — FIX06 camera-compensated residual samples: when provided, all
+    speed-derived fields (top speed, bursts, intensity, fast candidates)
+    consume the compensated series instead of raw screen displacement."""
     pts = (track or {}).get("points") or []
     segs = (track or {}).get("segments") or []
     if len(pts) < 6:
@@ -34,12 +38,18 @@ def compute_movement_map(track: dict | None, tap_times: list[float] | None = Non
         }
         for p in pts
     ]
-    speeds = []
-    for a, b in zip(centers, centers[1:]):
-        dt = b["t"] - a["t"]
-        if 0.01 < dt <= 0.35:
-            v = ((b["x"] - a["x"]) ** 2 + (b["y"] - a["y"]) ** 2) ** 0.5 / dt
-            speeds.append((b["t"], v))
+    if motion is not None:
+        # FIX06: camera pan/tilt/zoom removed — only the player residual
+        # (normalized to the actual frame geometry) counts as movement.
+        speeds = [(float(s["t1"]), float(s["v_norm"]))
+                  for s in (motion.get("samples") or []) if s.get("ok")]
+    else:
+        speeds = []
+        for a, b in zip(centers, centers[1:]):
+            dt = b["t"] - a["t"]
+            if 0.01 < dt <= 0.35:
+                v = ((b["x"] - a["x"]) ** 2 + (b["y"] - a["y"]) ** 2) ** 0.5 / dt
+                speeds.append((b["t"], v))
     if not speeds:
         return None
     sm = []

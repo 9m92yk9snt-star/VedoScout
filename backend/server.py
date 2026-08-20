@@ -8789,7 +8789,12 @@ async def generate_full_report_task(report_id: str) -> None:
             if not gt_track:
                 return
             try:
-                mm_map = await asyncio.to_thread(compute_movement_map, gt_track, tap_times=tap_times)
+                # FIX06 — camera-compensated residual samples (deterministic
+                # CV, fail-closed) feed BOTH movement map and pace metrics.
+                motion = await asyncio.to_thread(
+                    compute_motion_samples, str(file_path), gt_track)
+                mm_map = await asyncio.to_thread(
+                    compute_movement_map, gt_track, tap_times=tap_times, motion=motion)
                 chosen_fast = None
                 if mm_map:
                     try:
@@ -8819,7 +8824,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 pace_m = await asyncio.to_thread(
                     compute_speed_metrics,
                     gt_track, (doc.get("player_details") or {}).get("age"),
-                    trusted_windows=tap_times)
+                    trusted_windows=tap_times, motion=motion)
                 await db.reports.update_one(
                     {"id": report_id},
                     {"$set": {
@@ -15441,6 +15446,7 @@ from telestration import render_telestration, detect_player_bbox, crop_box_regio
 from player_tracking import track_player, track_at
 import cv_shadow
 from movement_metrics import compute_movement_map, fmt_mmss
+from motion_compensation import compute_motion_samples
 from speed_metrics import compute_speed_metrics
 from progression import build_progression
 from score_context import build_score_context
