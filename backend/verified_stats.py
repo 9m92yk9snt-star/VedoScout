@@ -368,11 +368,22 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
            if n["passes_attempted"] > 0 else None)
     scan = scan if isinstance(scan, dict) else {}
     performed = scan.get("performed") is True
+    # FIX09 — general (non-scoring) totals are authoritative ONLY when the
+    # discovery coverage contract is COMPLETE. Legacy reports without any
+    # event_discovery state keep the historical presentation.
+    ed = full.get("event_discovery") if isinstance(full.get("event_discovery"), dict) else None
+    cov_state = str(ed.get("coverage_state") or "").upper() if ed else None
+    general_auth = cov_state is None or cov_state == "COMPLETE"
+    other_label = ("verified_timeline_events" if cov_state is None else
+                   {"COMPLETE": "coverage_contract_complete",
+                    "PARTIAL": "partial_verified_events"}.get(cov_state, "unavailable"))
     vs = {
         "version": VERIFIED_STATS_VERSION,
         "source": "cross_verified_events",
         "available": True,
         "goals_assists_available": performed,
+        "general_totals_authoritative": general_auth,
+        "coverage_state": cov_state,
         "scoring_scan": {
             "performed": performed,
             "verified_goals": n["goals"] if performed else None,
@@ -382,7 +393,7 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
         },
         "stats_completeness": {
             "goals_assists": "full_video_scoring_scan" if performed else "unavailable",
-            "other_actions": "verified_timeline_events",
+            "other_actions": other_label,
         },
         "total_actions": n["total_actions"],
         "pass_completion_pct": pct,
@@ -403,10 +414,15 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
     def _plural(cnt, word):
         return f"{cnt} {word}{'' if cnt == 1 else 's'}"
 
-    if performed:
+    if performed and general_auth:
         full["verified_stat_line"] = " · ".join([
             _plural(n["goals"], "goal"), _plural(n["assists"], "assist"),
             _plural(n["shots"], "shot")])
+    elif performed:
+        # FIX09 P9 — scoring authority is independent; a partial event
+        # coverage contract must never append a partial shot total.
+        full["verified_stat_line"] = " · ".join([
+            _plural(n["goals"], "goal"), _plural(n["assists"], "assist")])
     else:
         # C09 — never present an incomplete "0 goals · 0 assists" line
         full.pop("verified_stat_line", None)
@@ -424,30 +440,50 @@ def rebuild_match_stats(full: dict) -> None:
         full["match_stats"] = {"minutes_analysed": minutes,
                                "source": "verified_events_unavailable"}
         return
-    full["match_stats"] = {
-        "total_actions": vs["total_actions"],
-        "shots": vs["shots"],
-        "shots_on_target": vs["shots_on_target"],
-        "key_passes": vs["key_passes"],
-        "passes_attempted": vs["passes_attempted"],
-        "passes_completed": vs["passes_completed"],
-        "pass_completion_pct": vs["pass_completion_pct"],
-        "crosses_attempted": vs["crosses_attempted"],
-        "crosses_completed": vs["crosses_completed"],
-        "dribbles_attempted": vs["dribbles_attempted"],
-        "successful_dribbles": vs["successful_dribbles"],
-        "duels_contested": vs["duels_contested"],
-        "duels_won": f"{vs['duels_won']}/{vs['duels_contested']}",
-        "tackles_attempted": vs["tackles_attempted"],
-        "tackles_won": vs["tackles_won"],
-        "interceptions": vs["interceptions"],
-        "recoveries": vs["recoveries"],
-        "defensive_actions": vs["defensive_actions"],
-        "first_touches": vs["first_touches"],
-        "runs": vs["runs"],
-        "minutes_analysed": minutes,
-        "source": "verified_events",
-    }
+    if vs.get("general_totals_authoritative", True) is True:
+        full["match_stats"] = {
+            "total_actions": vs["total_actions"],
+            "shots": vs["shots"],
+            "shots_on_target": vs["shots_on_target"],
+            "key_passes": vs["key_passes"],
+            "passes_attempted": vs["passes_attempted"],
+            "passes_completed": vs["passes_completed"],
+            "pass_completion_pct": vs["pass_completion_pct"],
+            "crosses_attempted": vs["crosses_attempted"],
+            "crosses_completed": vs["crosses_completed"],
+            "dribbles_attempted": vs["dribbles_attempted"],
+            "successful_dribbles": vs["successful_dribbles"],
+            "duels_contested": vs["duels_contested"],
+            "duels_won": f"{vs['duels_won']}/{vs['duels_contested']}",
+            "tackles_attempted": vs["tackles_attempted"],
+            "tackles_won": vs["tackles_won"],
+            "interceptions": vs["interceptions"],
+            "recoveries": vs["recoveries"],
+            "defensive_actions": vs["defensive_actions"],
+            "first_touches": vs["first_touches"],
+            "runs": vs["runs"],
+            "minutes_analysed": minutes,
+            "source": "verified_events",
+        }
+    else:
+        # FIX09 P7 — partial/unavailable event coverage: NEVER publish general
+        # action counts as authoritative full-match totals. Observed verified
+        # counts survive only under an explicitly partial namespace.
+        observed = {k: vs[k] for k in (
+            "total_actions", "shots", "shots_on_target", "key_passes",
+            "passes_attempted", "passes_completed", "pass_completion_pct",
+            "crosses_attempted", "crosses_completed", "dribbles_attempted",
+            "successful_dribbles", "duels_contested", "duels_won",
+            "tackles_attempted", "tackles_won", "interceptions", "recoveries",
+            "defensive_actions", "first_touches", "runs")}
+        full["match_stats"] = {
+            "minutes_analysed": minutes,
+            "source": "verified_events",
+            "general_actions_source": ("partial_verified_events"
+                                       if vs.get("coverage_state") == "PARTIAL"
+                                       else "unavailable"),
+            "observed_verified_counts": observed,
+        }
     if vs.get("goals_assists_available") is True:
         # C08 — goal/assist totals exist ONLY behind a valid completed scan
         full["match_stats"]["goals"] = vs["goals"]
@@ -558,8 +594,14 @@ def _sentence_supported(sent: str, vs: dict, ts_auth: dict | None = None) -> boo
     for m in _AGG_RE.finditer(sent):
         c = _num(m.group(1))
         key = _AGG_KEY.get(re.sub(r"\s+", " ", m.group(2).lower()))
-        if c is not None and key and c != vs[key]:
-            return False
+        if c is not None and key:
+            # FIX09 P10 — with a partial/unavailable coverage contract, NO
+            # aggregate general-action claim survives, even when the number
+            # equals the internally observed partial count.
+            if vs.get("general_totals_authoritative", True) is not True:
+                return False
+            if c != vs[key]:
+                return False
     return True
 
 

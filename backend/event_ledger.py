@@ -115,23 +115,105 @@ def build_discovery_prompt(duration_s, player_details: dict | None = None) -> st
     return prompt
 
 
-def validate_coverage(coverage, buckets: list[tuple[int, int]]) -> bool:
-    """PART 2 — every expected 5s bucket must have a well-formed coverage row.
-    Anything missing/malformed → the ledger is NOT exhaustive."""
+def bucket_index_for(contact_ms, buckets: list[tuple[int, int]], duration_ms: int):
+    """Deterministic [start, end) bucket assignment; the exact video-duration
+    contact belongs ONLY to the final bucket. None when unassignable."""
+    if not buckets or not _is_int(contact_ms) or contact_ms < 0 or contact_ms > duration_ms:
+        return None
+    if contact_ms == duration_ms:
+        return len(buckets) - 1
+    idx = contact_ms // BUCKET_MS
+    return idx if idx < len(buckets) else None
+
+
+def validate_coverage_contract(discovery, duration_s) -> dict:
+    """FIX09 P1–P3 — STRICT coverage-contract validation with diagnostics.
+    Proves the contract is structurally complete and internally consistent —
+    it can NEVER prove the model saw every real-world action, so it is never
+    called 'exhaustive'. Requires exact unique bucket-set equality, reconciled
+    events_found against the RAW discovery rows (actor authority is separate),
+    and target_seen consistency."""
+    buckets = build_coverage_buckets(duration_s)
+    dur_ms = buckets[-1][1] if buckets else 0
+    out = {"complete": False,
+           "expected_bucket_count": len(buckets),
+           "received_bucket_count": 0,
+           "missing_buckets": [], "duplicate_buckets": [], "unexpected_buckets": [],
+           "malformed_rows": 0, "events_found_mismatches": [],
+           "unbucketable_events": 0, "coverage_contradictions": []}
+    coverage = discovery.get("coverage") if isinstance(discovery, dict) else None
     if not buckets or not isinstance(coverage, list):
-        return False
+        return out
+    ok = True
+    keys = []          # ALL well-formed keys — duplicates never disappear
     rows = {}
     for r in coverage:
-        if not isinstance(r, dict):
-            return False
-        if not (_is_int(r.get("start_ms")) and _is_int(r.get("end_ms"))):
-            return False
-        if not isinstance(r.get("target_seen"), bool):
-            return False
-        if not _is_int(r.get("events_found")) or r["events_found"] < 0:
-            return False
-        rows[(r["start_ms"], r["end_ms"])] = r
-    return all(b in rows for b in buckets)
+        if not (isinstance(r, dict) and _is_int(r.get("start_ms")) and _is_int(r.get("end_ms"))
+                and isinstance(r.get("target_seen"), bool)
+                and _is_int(r.get("events_found")) and r["events_found"] >= 0):
+            out["malformed_rows"] += 1
+            ok = False
+            continue
+        key = (r["start_ms"], r["end_ms"])
+        keys.append(key)
+        rows.setdefault(key, r)
+    out["received_bucket_count"] = len(keys) + out["malformed_rows"]
+    seen_counts = {}
+    for k in keys:
+        seen_counts[k] = seen_counts.get(k, 0) + 1
+    expected = set(buckets)
+    out["duplicate_buckets"] = sorted([list(k) for k, c in seen_counts.items() if c > 1])
+    out["unexpected_buckets"] = sorted([list(k) for k in seen_counts if k not in expected])
+    out["missing_buckets"] = sorted([list(b) for b in buckets if b not in seen_counts])
+    if out["duplicate_buckets"] or out["unexpected_buckets"] or out["missing_buckets"]:
+        ok = False
+    for k, r in rows.items():
+        if r["events_found"] > 0 and r["target_seen"] is not True:
+            out["coverage_contradictions"].append(list(k))
+            ok = False
+    # P2 — reconcile events_found against the RAW discovery event rows using
+    # canonical contact_ms (NOT the actor-verified ledger: wrong-player
+    # rejections must never fake a coverage mismatch).
+    per_bucket = {b: 0 for b in buckets}
+    raw = discovery.get("events")
+    if not isinstance(raw, list):
+        ok = False
+    else:
+        for ev in raw:
+            c = None
+            if isinstance(ev, dict):
+                c = ev.get("contact_ms")
+                if not _is_int(c):
+                    c = ev.get("start_ms")
+            idx = bucket_index_for(c, buckets, dur_ms)
+            if idx is None:
+                out["unbucketable_events"] += 1
+                ok = False
+                continue
+            per_bucket[buckets[idx]] += 1
+        for b in buckets:
+            r = rows.get(b)
+            if r is not None and seen_counts.get(b) == 1 \
+                    and r["events_found"] != per_bucket[b]:
+                out["events_found_mismatches"].append(
+                    {"bucket": list(b), "declared": r["events_found"],
+                     "actual": per_bucket[b]})
+                ok = False
+    out["complete"] = ok
+    return out
+
+
+def _finalize_coverage_state(ledger: dict) -> dict:
+    """FIX09 P4 — precise coverage-contract semantics, never 'proven
+    exhaustive': COMPLETE / PARTIAL / UNAVAILABLE."""
+    if ledger.get("status") != "ok" or not ledger.get("track_usable"):
+        ledger["coverage_state"] = "UNAVAILABLE"
+    elif ledger.get("coverage_contract_complete") is True:
+        ledger["coverage_state"] = "COMPLETE"
+    else:
+        ledger["coverage_state"] = "PARTIAL"
+    ledger["discovery_complete"] = ledger["coverage_state"] == "COMPLETE"
+    return ledger
 
 
 # ------------------------------------------------ spatial actor validation
@@ -343,13 +425,14 @@ def build_ledger(discovery, track, duration_s) -> dict:
     pts = [p for p in ((track or {}).get("points") or [])
            if isinstance(p, dict) and isinstance(p.get("t"), (int, float))]
     ledger["track_usable"] = len(pts) >= _MIN_TRACK_POINTS
+    contract = validate_coverage_contract(discovery, duration_s)
+    ledger["coverage_contract"] = contract
+    ledger["coverage_contract_complete"] = contract["complete"]
     if not isinstance(discovery, dict):
-        return ledger
-    ledger["discovery_complete"] = validate_coverage(
-        discovery.get("coverage"), build_coverage_buckets(duration_s))
+        return _finalize_coverage_state(ledger)
     cands = discovery.get("events")
     if not isinstance(cands, list):
-        return ledger
+        return _finalize_coverage_state(ledger)
     ledger["status"] = "ok"
     seen = set()
     events = []
@@ -405,7 +488,7 @@ def build_ledger(discovery, track, duration_s) -> dict:
     events.sort(key=lambda e: (e["contact_ms"], e["action_type"]))
     ledger["events"] = events
     ledger["candidates_verified"] = len(events)
-    return ledger
+    return _finalize_coverage_state(ledger)
 
 
 def project_to_timeline(ledger) -> list[dict]:
@@ -447,16 +530,35 @@ def authoritative_timeline(ledger) -> list[dict]:
 
 
 def discovery_summary(ledger) -> dict:
-    """Compact report-facing discovery state. Never silently exhaustive."""
+    """FIX09 P12 — compact deterministic audit state. The contract can be
+    structurally COMPLETE; it is never described as 'proven exhaustive'."""
     if not isinstance(ledger, dict):
-        return {"status": "unavailable", "event_discovery_complete": False}
-    return {
+        return {"status": "unavailable", "coverage_state": "UNAVAILABLE",
+                "coverage_contract_complete": False,
+                "event_discovery_complete": False}
+    contract = ledger.get("coverage_contract") if isinstance(
+        ledger.get("coverage_contract"), dict) else {}
+    out = {
         "status": ledger.get("status"),
+        "coverage_state": ledger.get("coverage_state") or "UNAVAILABLE",
+        "coverage_contract_complete": ledger.get("coverage_contract_complete") is True,
         "event_discovery_complete": ledger.get("discovery_complete") is True,
         "track_usable": ledger.get("track_usable") is True,
+        "expected_bucket_count": contract.get("expected_bucket_count"),
+        "received_bucket_count": contract.get("received_bucket_count"),
         "candidates_total": ledger.get("candidates_total"),
         "candidates_verified": ledger.get("candidates_verified"),
     }
+    for k in ("missing_buckets", "duplicate_buckets", "unexpected_buckets",
+              "events_found_mismatches", "coverage_contradictions"):
+        v = contract.get(k)
+        if v:
+            out[k] = v[:10]
+    if contract.get("unbucketable_events"):
+        out["unbucketable_events"] = contract["unbucketable_events"]
+    if contract.get("malformed_rows"):
+        out["malformed_coverage_rows"] = contract["malformed_rows"]
+    return out
 
 
 DISCOVERY_UNAVAILABLE_NOTICE = (
@@ -477,13 +579,27 @@ def ledger_prompt_block(ledger) -> str:
     for e in evs[:80]:
         desc = (e.get("description") or "")[:120]
         lines.append(f"- {_mmss(e['contact_ms'])} — {e['action_type']}: {desc}")
+    if (ledger or {}).get("coverage_state") == "COMPLETE":
+        tail = (
+            "\nTHE EVENT LEDGER IS THE AUTHORITATIVE OBSERVED-EVENT SOURCE. Do NOT "
+            "invent new goals, new assists, new event timestamps or new target-player "
+            "actions. Any football example or timestamp you use in prose MUST come "
+            "from this ledger."
+        )
+    else:
+        # FIX09 P11 — partial coverage contract: verified moments only.
+        tail = (
+            "\nEVENT COVERAGE IS PARTIAL. The entries above are verified individual "
+            "moments only — NOT a complete match record. DO NOT describe event counts "
+            "as complete match totals. DO NOT claim \"all\", \"every\", \"only\" or "
+            "exhaustive totals from the event ledger. Do NOT invent new goals, new "
+            "assists, new event timestamps or new target-player actions. Any football "
+            "example or timestamp you use in prose MUST come from this ledger."
+        )
     return (
         "\n\n📋 OBSERVED EVENT LEDGER (machine-validated: each entry passed exact "
         "contact-time spatial verification against the tapped player's own track):\n"
-        + "\n".join(lines)
-        + "\nTHE EVENT LEDGER IS THE OBSERVED EVENT SOURCE. Do NOT invent new goals, "
-        "new assists, new event timestamps or new target-player actions. Any football "
-        "example or timestamp you use in prose MUST come from this ledger."
+        + "\n".join(lines) + tail
     )
 
 

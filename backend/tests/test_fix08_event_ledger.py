@@ -54,14 +54,26 @@ def _chain(contact_ms, shot=True, goal=True, cont=True):
             "continuous_causal_sequence": cont}
 
 
-def _coverage(duration_s=DUR):
-    return [{"start_ms": b[0], "end_ms": b[1], "target_seen": True, "events_found": 0}
-            for b in el.build_coverage_buckets(duration_s)]
+def _coverage(duration_s=DUR, events=None):
+    """Reconciled coverage rows (FIX09): events_found matches the raw events."""
+    dur_ms = int(round(duration_s * 1000))
+    rows = []
+    for (s, e) in el.build_coverage_buckets(duration_s):
+        n = 0
+        for ev in (events or []):
+            c = ev.get("contact_ms") if isinstance(ev.get("contact_ms"), int) \
+                else ev.get("start_ms")
+            if isinstance(c, int) and (s <= c < e or (c == dur_ms and e == dur_ms)):
+                n += 1
+        rows.append({"start_ms": s, "end_ms": e, "target_seen": n > 0,
+                     "events_found": n})
+    return rows
 
 
 def _discovery(events, duration_s=DUR, coverage=None):
     return {"events": events,
-            "coverage": coverage if coverage is not None else _coverage(duration_s)}
+            "coverage": coverage if coverage is not None
+            else _coverage(duration_s, events)}
 
 
 # ------------------------------------------ E01–E05 spatial actor validation
