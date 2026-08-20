@@ -4,6 +4,17 @@
 React + FastAPI + MongoDB app that analyses football match footage of a tapped player and produces verified scouting reports. User taps are ground truth; FIX04 accepted geometry is the owned track; FIX02 is fail-closed (identity==CONFIRMED && event==CONFIRMED only). Authority chain: VIDEO → TAPPED PLAYER → CROSS-VERIFIED EVENT → CANONICAL ACTION+OUTCOME → STABLE EVENT_ID → DETERMINISTIC VERIFIED STATS → CLAIM RECONCILIATION → REPORT.
 
 ## Completed phases (all committed, all suites green)
+- FIX08 — PLAYER EVENT LEDGER + EVENT-NATIVE EVIDENCE (June 2026), branch fix-08-player-event-ledger-evidence, commit df1fb73:
+  - NEW backend/event_ledger.py: ONE dedicated bounded event-discovery video pass (session `discover-{id}`, same Gemini infra) with 5s coverage-bucket completeness contract; deterministic ledger build with EXACT contact-time spatial actor validation against FIX04 track (resolve bbox ≤1s gap, IoU≥0.15 or body-scaled center match; reasons ACTOR_MATCH/NO_TARGET_TRACK/INVALID_ACTOR_BOX/ACTOR_MISMATCH/TRACK_GAP/INVALID_TIMESTAMP); ±8s presence is never actor authority
+  - Goal chain: SHOT+SCORED+visible+actor verified only; assist chain: PASS/CROSS + continuous teammate shot→goal chain + visible; teammate shot only → KEY_PASS; enforced again via vstats.normalize_canonical
+  - Ledger projects into action_timeline (replaces the LLM 6-15 highlight list when status ok + track usable) → existing verifier verifies → FIX01 ids → event-native evidence rows (priority GOAL/ASSIST/KEY_PASS/SHOT, exact event_id + evidence_time_ms, max 6) → FIX07 stats → FIX02 proof; corrective retry path reuses the persisted ledger (discovery never re-run)
+  - verified_stats.py Part 11: timestamped goal/assist claims (goal-lang or assist-lang + MM:SS token) must resolve to a verified GOAL/ASSIST at that EXACT canonical time (teammate wording may resolve to assist times); threaded ts_auth through all reconciliation
+  - build_snapshot_moments in _persist_video_frames (after frames/identity/proof/R2): authority snapshot moments ONLY from verified events with exact proof frames (2 real beat 4 fabricated); pdf_v2 accepts authority moments at any count (legacy keeps ≥4 gate)
+  - Prompt: FULL_REPORT_PROMPT "6-15" cap removed; ledger context block injected (model writes ABOUT ledger, never invents events); discovery prompt carries full schema + coverage contract
+  - Model calls per full report: BEFORE 1 full + 1 verify (+1 corrective retry when gated); AFTER +EXACTLY ONE discovery = discovery + full + verify
+  - Updated pinned guards: FIX03/02/01 call-site counts 7→8, FIX01 attach count 2→4, FIX00B session order includes discover-
+  - Tests: FIX08 29 passed; regressions FIX07 87, FIX06 33, FIX05 30, FIX04 38, FIX03 26, FIX02 29, FIX01 29, FIX00B 31, FIX00A 16
+  - Known limitations: discovery failure falls back to legacy pass-1 timeline (fail-open for discovery only; verification stays fail-closed); snapshot moments require strict exact-time proof frames; frontend untouched (graceful fallback for legacy reports)
 - FIX00A tap authority (16), FIX00B ready contract (31), FIX01 evidence authority (29), FIX02 fail-closed (29), FIX03 video timebase (26)
 - FIX04 tracking geometry + Corr 01/02 (38)
 - FIX05 ground anchor/ellipse + Corr 01 (30)
