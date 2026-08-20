@@ -864,3 +864,62 @@ def test_C19_no_scoring_events_empty_scan_zero_allowed():
     assert vs["goals"] == 0 and vs["assists"] == 0
     assert full["match_stats"]["goals"] == 0
     assert full["verified_stat_line"].startswith("0 goals · 0 assists")
+
+
+# ------------------------- C20–C26 coverage from verified scoring rows only
+
+def _scan_unavailable(full):
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is False
+    assert vs["goals_assists_available"] is False
+    assert vs["goals"] is None and vs["assists"] is None
+    assert "goals" not in full["match_stats"] and "assists" not in full["match_stats"]
+
+
+def test_C20_wrong_player_scan_row_cannot_cover_goal():
+    full = _merged_stats([_goal("01:10")],
+                         [_disc("01:10", "GOAL", "SHOT", "SCORED",
+                                identity="WRONG_PLAYER")])
+    _scan_unavailable(full)
+    assert len(full["action_timeline"]) == 1, "wrong-player row must not merge"
+
+
+def test_C21_saved_scan_row_cannot_cover_goal():
+    full = _merged_stats([_goal("01:10")],
+                         [_disc("01:10", "GOAL", "SHOT", "SAVED")])
+    _scan_unavailable(full)
+
+
+def test_C22_invisible_outcome_scan_row_cannot_cover_goal():
+    full = _merged_stats([_goal("01:10")],
+                         [_disc("01:10", "GOAL", "SHOT", "SCORED", vis=False)])
+    _scan_unavailable(full)
+
+
+def test_C23_teammate_shot_scan_row_cannot_cover_assist():
+    full = _merged_stats([_assist("02:10")],
+                         [_disc("02:10", "ASSIST", "PASS", "TEAMMATE_SHOT")])
+    _scan_unavailable(full)
+
+
+def test_C24_not_visible_identity_scan_row_cannot_cover_assist():
+    full = _merged_stats([_assist("02:10")],
+                         [_disc("02:10", "ASSIST", "PASS", "TEAMMATE_SCORED",
+                                identity="NOT_VISIBLE")])
+    _scan_unavailable(full)
+
+
+def test_C25_proper_confirmed_goal_row_covers():
+    full = _merged_stats([_goal("01:10")],
+                         [_disc("01:10", "GOAL", "SHOT", "SCORED")])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is True
+    assert vs["goals"] == 1 and full["match_stats"]["goals"] == 1
+
+
+def test_C26_proper_confirmed_assist_row_covers():
+    full = _merged_stats([_assist("02:10")],
+                         [_disc("02:10", "ASSIST", "PASS", "TEAMMATE_SCORED")])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is True
+    assert vs["assists"] == 1 and full["match_stats"]["assists"] == 1

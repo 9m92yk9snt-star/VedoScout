@@ -162,15 +162,20 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
             return int(round(float(best["t"]))), True
         return ts, True
 
-    scan_keys = set()  # C15 — what the full-video scan claims to cover
+    scan_keys = set()  # C15/C20 — coverage comes from VERIFIED scoring rows ONLY
     for d in discovered:
-        det = str(d.get("canonical_event_type") or "").strip().upper()
+        if str(d.get("identity") or "").upper() != "CONFIRMED":
+            continue  # WRONG_PLAYER / NOT_VISIBLE rows never cover a known event
+        det, dat, _dres, _dvis = normalize_canonical(
+            d.get("canonical_event_type"), d.get("canonical_action_type"),
+            d.get("canonical_result"), d.get("outcome_visible"))
         if det not in ("GOAL", "ASSIST"):
-            continue
+            continue  # normalize_canonical is the single trust authority:
+            # only SHOT+SCORED+visible survives as GOAL and only
+            # PASS/CROSS+TEAMMATE_SCORED+visible survives as ASSIST
         dts = _ts_secs(d.get("timestamp"))
         if dts is None:
             continue
-        dat = str(d.get("canonical_action_type") or "").strip().upper()
         scan_keys.add((_snap(dts)[0], det, dat))
     timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
     index = {}
