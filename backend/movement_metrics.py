@@ -3,6 +3,8 @@ player track (player_tracking.py). Pure math on ground-truth data — no AI."""
 
 from __future__ import annotations
 
+from speed_metrics import is_physical_outlier
+
 BURST_MIN_PTS = 3     # ≥3 consecutive fast samples (~0.24 s) = one burst
 MAX_TRAIL = 90
 NEAR_TAP_S = 2.0      # a moment ≤2 s from a user tap counts as identity-anchored
@@ -16,11 +18,15 @@ def fmt_mmss(t: float) -> str:
 _fmt_mmss = fmt_mmss  # back-compat alias
 
 
-def compute_movement_map(track: dict | None, tap_times: list[float] | None = None) -> dict | None:
+def compute_movement_map(track: dict | None, tap_times: list[float] | None = None,
+                         motion: dict | None = None, age=None) -> dict | None:
     """Return {tracked_seconds, segments, passages, track_start_*, points, bursts,
     top_speed_*, intensity, fast_candidates, fast_near_tap, trail} or None when
     too little data. tap_times = absolute video seconds of the user's taps
-    (incl. time offset) — used for identity-safe fastest-moment candidates."""
+    (incl. time offset) — used for identity-safe fastest-moment candidates.
+    motion — FIX06 camera-compensated residual samples: when provided, all
+    speed-derived fields (top speed, bursts, intensity, fast candidates)
+    consume the compensated series instead of raw screen displacement."""
     pts = (track or {}).get("points") or []
     segs = (track or {}).get("segments") or []
     if len(pts) < 6:
@@ -34,32 +40,65 @@ def compute_movement_map(track: dict | None, tap_times: list[float] | None = Non
         }
         for p in pts
     ]
-    speeds = []
-    for a, b in zip(centers, centers[1:]):
-        dt = b["t"] - a["t"]
-        if 0.01 < dt <= 0.35:
-            v = ((b["x"] - a["x"]) ** 2 + (b["y"] - a["y"]) ** 2) ** 0.5 / dt
-            speeds.append((b["t"], v))
+    if motion is not None:
+        # FIX06: camera pan/tilt/zoom removed — only the player residual
+        # counts as movement. Contiguous SAFE runs: every rejected interval
+        # breaks continuity (C02) — never smoothed or counted across. A
+        # PHYSICAL outlier (shared speed_metrics classification) is rejected
+        # and breaks continuity exactly like a failed camera transform, so
+        # it can never become a candidate, burst bridge or intensity input.
+        runs, cur, prev_t1 = [], [], None
+        for s in (motion.get("samples") or []):
+            contiguous = prev_t1 is not None and abs(float(s["t0"]) - prev_t1) <= 1e-9
+            prev_t1 = float(s["t1"])
+            if not s.get("ok") or is_physical_outlier(s, age):
+                if cur:
+                    runs.append(cur)
+                    cur = []
+                continue
+            if cur and not contiguous:
+                runs.append(cur)
+                cur = []
+            cur.append((float(s["t1"]), float(s["v_norm"])))
+        if cur:
+            runs.append(cur)
+    else:
+        runs, cur = [], []
+        for a, b in zip(centers, centers[1:]):
+            dt = b["t"] - a["t"]
+            if 0.01 < dt <= 0.35:
+                v = ((b["x"] - a["x"]) ** 2 + (b["y"] - a["y"]) ** 2) ** 0.5 / dt
+                cur.append((b["t"], v))
+            elif cur:  # gap breaks continuity
+                runs.append(cur)
+                cur = []
+        if cur:
+            runs.append(cur)
+    speeds = [x for r in runs for x in r]
     if not speeds:
         return None
-    sm = []
-    for i in range(len(speeds)):
-        lo, hi = max(0, i - 1), min(len(speeds), i + 2)
-        sm.append((speeds[i][0], sum(v for _, v in speeds[lo:hi]) / (hi - lo)))
+    # smoothing WITHIN each safe run only
+    sm_runs = []
+    for r in runs:
+        sm_runs.append([(r[i][0], sum(v for _, v in r[max(0, i - 1):i + 2])
+                         / (min(len(r), i + 2) - max(0, i - 1))) for i in range(len(r))])
+    sm = [x for sr in sm_runs for x in sr]
     vmax_t, vmax = max(sm, key=lambda s: s[1])
     svals = sorted(v for _, v in sm)
     median_v = svals[len(svals) // 2]
     thr = max(0.4, 1.7 * median_v)
-    bursts, run = 0, 0
-    for _, v in sm:
-        if v > thr:
-            run += 1
-        else:
-            if run >= BURST_MIN_PTS:
-                bursts += 1
-            run = 0
-    if run >= BURST_MIN_PTS:
-        bursts += 1
+    bursts = 0
+    for sr in sm_runs:  # a burst can never span a rejected interval
+        run = 0
+        for _, v in sr:
+            if v > thr:
+                run += 1
+            else:
+                if run >= BURST_MIN_PTS:
+                    bursts += 1
+                run = 0
+        if run >= BURST_MIN_PTS:
+            bursts += 1
     # Fastest-moment candidates (top-5 by speed) + best sample near a user tap.
     ranked = sorted(sm, key=lambda s: s[1], reverse=True)
     fast_candidates = [{"t": round(t, 2), "v": round(v, 4)} for t, v in ranked[:5]]
