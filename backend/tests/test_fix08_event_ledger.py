@@ -37,7 +37,7 @@ def _box(x=0.40, y=0.30, w=0.06, h=0.18):
 def _cand(contact_ms=31500, at="SHOT", outcome="SCORED", vis=True, box=None,
           chain=None, sid="s1", description="Factual action.", **kw):
     c = {"sequence_id": sid, "start_ms": max(0, contact_ms - 2000),
-         "contact_ms": contact_ms, "end_ms": contact_ms + 1500,
+         "contact_ms": contact_ms, "end_ms": contact_ms + 3000,
          "action_type": at, "foot": "RIGHT",
          "actor_box": box if box is not None else _box(),
          "outcome": outcome, "outcome_visible": vis,
@@ -372,7 +372,7 @@ def test_E25_fix01_ids_exact_deterministic_joins():
     full = attach_event_evidence_authority({"action_timeline": timeline})
     e = full["action_timeline"][0]
     assert e["event_id"].startswith("evt_")
-    assert e["event_start_ms"] == 32000  # 31500 ms → "00:32" → exact canonical ms
+    assert e["event_start_ms"] == 31500  # C01 — exact ledger contact ms preserved
     eid = e["event_id"]
     full = attach_event_evidence_authority(full)  # idempotent
     assert full["action_timeline"][0]["event_id"] == eid
@@ -434,3 +434,248 @@ def test_exactly_one_discovery_call_site():
     for token in ("LlmChat", "call_gemini", "httpx", "aiohttp", "requests.",
                   "urllib", "socket", "emergentintegrations"):
         assert token not in lsrc, f"forbidden call path in event_ledger.py: {token}"
+
+
+# ================== FIX08 CORRECTION 01 — F01–F16 ==================
+
+def _verdict(i, **kw):
+    v = {"claim_id": i, "identity": "CONFIRMED", "event": "CONFIRMED",
+         "corrected_timestamp": None, "note": "seen",
+         "canonical_event_type": "SHOT", "canonical_action_type": "SHOT",
+         "canonical_result": "OUTCOME_NOT_VISIBLE", "outcome_visible": False}
+    v.update(kw)
+    return v
+
+
+def test_F01_contact_ms_survives_exactly():
+    import server
+    ledger = el.build_ledger(_discovery([_cand(contact_ms=31420)]), TRACK, DUR)
+    timeline = el.authoritative_timeline(ledger)
+    assert timeline[0]["event_start_ms"] == 31420
+    assert timeline[0]["ledger_contact_ms"] == 31420
+    full = {"action_timeline": timeline}
+    # the verifier proposing another time must NOT overwrite ledger authority
+    server._apply_cross_verification(
+        full, {"verdicts": [_verdict(0, corrected_timestamp="00:29",
+                                     canonical_event_type="GOAL",
+                                     canonical_result="SCORED",
+                                     outcome_visible=True)]}, TRACK)
+    ev = full["action_timeline"][0]
+    assert ev["ledger_contact_ms"] == 31420
+    assert ev["timestamp"] == "00:31", "presentation timestamp must not be rewritten"
+    assert ev["verifier_corrected_timestamp"] == "00:29", "diagnostic only"
+    full = attach_event_evidence_authority(full)
+    assert full["action_timeline"][0]["event_start_ms"] == 31420, \
+        "event_start_ms must equal the exact ledger contact, never rounded MM:SS"
+
+
+def test_F02_event_native_evidence_time_ms_exact():
+    ledger = el.build_ledger(_discovery([_cand(contact_ms=31420)]), TRACK, DUR)
+    timeline = el.authoritative_timeline(ledger)
+    timeline[0]["cross_verified"] = True
+    full = attach_event_evidence_authority({"action_timeline": timeline})
+    full = el.create_event_native_evidence(full, track=TRACK)
+    c = [x for x in full["video_comments"] if x.get("event_native")][0]
+    assert c["evidence_time_ms"] == 31420
+    assert c["event_track_locked"] is True
+    assert isinstance(c.get("event_track_box"), dict)
+
+
+def _native_row(ems=31420, locked=True):
+    return {"timestamp": "00:31", "comment": "Verified goal.",
+            "identity_confidence": "high", "event_id": "evt_x",
+            "evidence_id": "evd_x", "evidence_time_ms": ems,
+            "event_native": True, "proof_verified": True,
+            **({"event_track_locked": True,
+                "event_track_box": {"x": 0.4, "y": 0.3, "w": 0.06, "h": 0.18}}
+               if locked else {})}
+
+
+def test_F03_exact_frame_uses_milliseconds_not_mmss(tmp_path, monkeypatch):
+    import server
+    seen = []
+
+    def fake_extract(video_path, seconds, out_path):
+        seen.append(float(seconds))
+        Path(out_path).write_bytes(b"jpg")
+        return True
+
+    monkeypatch.setattr(server, "_extract_video_frame", fake_extract)
+    vid = tmp_path / "v.mp4"
+    vid.write_bytes(b"0")
+    doc = {"id": "f03test", "anchors": [],
+           "full_report": {"video_comments": [_native_row()]}}
+    monkeypatch.setattr(server, "UPLOAD_DIR", tmp_path)
+    enriched = server.ensure_video_frames(doc, video_path_override=str(vid))
+    assert seen == [31.42], f"must extract at exact 31.420s, got {seen}"
+    out = enriched[0]
+    assert out["frame_time_ms"] == 31420
+    assert out["proof_frame_verified"] is True
+
+
+def test_F04_event_track_locked_zero_identity_model_calls(tmp_path, monkeypatch):
+    import server
+    calls = []
+
+    async def fake_verify(*a, **kw):
+        calls.append(a)
+        return "confirmed"
+
+    monkeypatch.setattr(server, "verify_frame_identity", fake_verify)
+    row = _native_row()
+    row["frame_url"] = "/api/uploads/frames/t1/frame_00.jpg"
+    import asyncio
+    stats = asyncio.run(server._verify_enriched_frames(
+        "t1", {"fingerprint": {}}, tmp_path / "v.mp4", tmp_path, [row], ["ref.jpg"]))
+    assert calls == [], "event_track_locked must cause ZERO verify_frame_identity calls"
+    assert row.get("identity_verified") is None, "separate semantics — not model-verified"
+    assert row.get("frame_url"), "frame must survive without a model check"
+
+
+def test_F05_locked_still_requires_exact_frame_time():
+    row = _native_row()
+    row["frame_url"] = "/api/uploads/frames/t1/frame_00.jpg"
+    row["frame_time_ms"] = 31420
+    assert compute_proof_frame_verified(row) is True
+    row["frame_time_ms"] = 31460
+    assert compute_proof_frame_verified(row) is False, \
+        "exact frame_time_ms == evidence_time_ms stays mandatory"
+    assert compute_proof_frame_verified({**_native_row(locked=False),
+                                         "frame_url": "/api/x.jpg",
+                                         "frame_time_ms": 31420}) is False, \
+        "unlocked + unverified identity can never be proof"
+
+
+def _scan_row(ts="00:20", et="GOAL", at="SHOT", res="SCORED", box=None, contact=None):
+    r = {"timestamp": ts, "identity": "CONFIRMED", "canonical_event_type": et,
+         "canonical_action_type": at, "canonical_result": res,
+         "outcome_visible": True, "note": "seen clearly"}
+    if box is not None:
+        r["actor_box"] = box
+    if contact is not None:
+        r["contact_ms"] = contact
+    return r
+
+
+def test_F06_secondary_scoring_goal_wrong_actor_rejected():
+    full = {"action_timeline": []}
+    scan = vstats.merge_discovered_scoring_events(
+        full, [_scan_row(box=_box(x=0.75), contact=20000)],
+        track=TRACK, actor_gate=el.validate_actor)
+    assert full["action_timeline"] == [], "wrong-actor scan goal must not be added"
+    assert scan["unresolved_goal_attempts"] == 1
+
+
+def test_F07_secondary_scoring_assist_wrong_actor_rejected():
+    full = {"action_timeline": []}
+    scan = vstats.merge_discovered_scoring_events(
+        full, [_scan_row(et="ASSIST", at="PASS", res="TEAMMATE_SCORED",
+                         box=_box(x=0.02, y=0.9), contact=20000)],
+        track=TRACK, actor_gate=el.validate_actor)
+    assert full["action_timeline"] == []
+    assert scan["unresolved_assist_candidates"] == 1
+
+
+def test_F08_secondary_scoring_exact_actor_allowed():
+    full = {"action_timeline": []}
+    vstats.merge_discovered_scoring_events(
+        full, [_scan_row(box=_box(), contact=20120)],
+        track=TRACK, actor_gate=el.validate_actor)
+    assert len(full["action_timeline"]) == 1
+    ev = full["action_timeline"][0]
+    assert ev["canonical_event_type"] == "GOAL"
+    assert ev["actor_spatial_verified"] is True
+    assert ev["event_start_ms"] == 20120, "C01 — exact scan contact preserved"
+    # missing actor_box must also fail closed
+    full2 = {"action_timeline": []}
+    vstats.merge_discovered_scoring_events(
+        full2, [_scan_row(contact=20000)], track=TRACK, actor_gate=el.validate_actor)
+    assert full2["action_timeline"] == []
+
+
+def test_F09_assist_chain_missing_receive_not_assist():
+    ch = _chain(10000)
+    ch["teammate_receive_ms"] = None
+    et, *_ = el.classify_candidate(
+        _cand(contact_ms=10000, at="PASS", outcome="TEAMMATE_SCORED", chain=ch))
+    assert et != "ASSIST"
+
+
+def test_F10_assist_chain_out_of_order_not_assist():
+    ch = _chain(10000)
+    ch["teammate_shot_ms"] = ch["goal_outcome_ms"] + 500  # shot AFTER goal
+    et, *_ = el.classify_candidate(
+        _cand(contact_ms=10000, at="PASS", outcome="TEAMMATE_SCORED", chain=ch))
+    assert et != "ASSIST"
+    ch2 = _chain(10000)
+    ch2["pass_contact_ms"] = 9000  # differs from canonical contact
+    et2, *_ = el.classify_candidate(
+        _cand(contact_ms=10000, at="PASS", outcome="TEAMMATE_SCORED", chain=ch2))
+    assert et2 != "ASSIST"
+
+
+def test_F11_assist_chain_outside_bounds_not_assist():
+    ch = _chain(10000)
+    ch["goal_outcome_ms"] = 14000  # beyond candidate end (13000)
+    et, *_ = el.classify_candidate(
+        _cand(contact_ms=10000, at="PASS", outcome="TEAMMATE_SCORED", chain=ch))
+    assert et != "ASSIST"
+    # beyond video duration
+    et2, *_ = el.classify_candidate(
+        _cand(contact_ms=10000, at="PASS", outcome="TEAMMATE_SCORED",
+              chain=_chain(10000)), contact_ms=10000, duration_ms=11000)
+    assert et2 != "ASSIST"
+
+
+def test_F12_valid_ordered_assist_chain_is_assist():
+    et, at, res, vis = el.classify_candidate(
+        _cand(contact_ms=10000, at="PASS", outcome="TEAMMATE_SCORED",
+              chain=_chain(10000)),
+        contact_ms=10000, duration_ms=int(DUR * 1000))
+    assert (et, res, vis) == ("ASSIST", "TEAMMATE_SCORED", True)
+
+
+def test_F13_authority_snapshot_keys_and_partial_count():
+    full = _authority_chain({"action_timeline": [_goal_event("00:31"),
+                                                 _assist_event("02:10")]})
+    for c in full["video_comments"]:
+        _framed(full, c)
+    moments = el.build_snapshot_moments(full)
+    assert [m["key"] for m in moments] == ["strength", "noticed"], \
+        "authority moments must use the keys SnapshotsSection renders, in order"
+    dsrc = (BACKEND.parent / "frontend" / "src" / "components" / "report-v2"
+            / "derive.js").read_text()
+    assert "snapshot_moments_authority" in dsrc, \
+        "derive.js must accept authority moments at any count 1..4"
+    assert "smList.length >= 1" in dsrc and "smList.length >= 4" in dsrc
+
+
+def test_F14_authority_keys_render_in_snapshots_section():
+    ssrc = (BACKEND.parent / "frontend" / "src" / "components" / "report-v2"
+            / "snapshots.jsx").read_text()
+    assert 'const ORDER = ["strength", "noticed", "hidden", "develop"]' in ssrc
+    for key in ("strength", "noticed", "hidden", "develop"):
+        assert key in ssrc
+    assert "byKey[k] ? (" in ssrc, "missing keys must be skipped, not fabricated"
+
+
+def test_F15_no_legacy_timeline_fallback():
+    assert el.authoritative_timeline(None) == []
+    assert el.authoritative_timeline({"status": "invalid", "track_usable": True}) == []
+    assert el.authoritative_timeline({"status": "ok", "track_usable": False,
+                                      "events": [{"contact_ms": 1000}]}) == []
+    src = (BACKEND / "server.py").read_text()
+    assert src.count("event_ledger.authoritative_timeline(") == 2, \
+        "both pipelines must route the timeline through the C06 authority helper"
+    assert "EVENT DISCOVERY UNAVAILABLE" in el.ledger_prompt_block(None)
+    assert "EVENT DISCOVERY UNAVAILABLE" in el.ledger_prompt_block(
+        {"status": "invalid", "events": []})
+
+
+def test_F16_incomplete_discovery_never_claims_exhaustive():
+    cov = _coverage()[:-2]
+    ledger = el.build_ledger(_discovery([_cand()], coverage=cov), TRACK, DUR)
+    assert ledger["discovery_complete"] is False
+    assert len(ledger["events"]) == 1, "partial verified candidates remain"
+    summary = el.discovery_summary(ledger)
+    assert summary["event_discovery_complete"] is False

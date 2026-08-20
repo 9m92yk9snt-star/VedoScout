@@ -480,7 +480,8 @@ def test_T22_no_new_model_call_sites():
     assert src.count("verify_preview_summary(") == 2
     # deterministic layer wiring: exactly the two shared-pipeline call sites
     assert src.count("apply_fail_closed_proof_authority(") == 2
-    assert src.count("compute_proof_frame_verified(") == 3
+    # FIX 08 — +1 deterministic call site (event-native exact frames): 3 → 4
+    assert src.count("compute_proof_frame_verified(") == 4
     ea = (BACKEND / "evidence_authority.py").read_text().lower()
     for banned in ("gemini", "openai", "httpx", "emergent", "llmchat"):
         assert banned not in ea

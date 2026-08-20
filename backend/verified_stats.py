@@ -126,7 +126,8 @@ def _valid_scan_row(d) -> bool:
     return note is None or isinstance(note, str)
 
 
-def merge_discovered_scoring_events(full: dict, discovered, track: dict | None = None) -> dict:
+def merge_discovered_scoring_events(full: dict, discovered, track: dict | None = None,
+                                    actor_gate=None) -> dict:
     """PART 4/5 — merge the verifier's full-video scoring scan with the
     surviving timeline. Only identity-CONFIRMED, outcome-visible GOAL/ASSIST
     discoveries are ADDED (before FIX01 assigns event_id) or PROMOTE the
@@ -217,6 +218,25 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
                 tgt["promoted_by_scoring_scan"] = True
             continue
         note = str(d.get("note") or "").strip()
+        # FIX 08 C03 — a NOVEL scoring event from the secondary scan must pass
+        # the SAME exact contact-time spatial actor gate as ledger events when
+        # a usable track exists. ±8 s presence alone can never create a target
+        # GOAL/ASSIST. No usable track → existing verifier-only behavior
+        # (FIX07 C04) is preserved exactly.
+        gate_contact = None
+        if actor_gate is not None and track_ok:
+            _c = d.get("contact_ms")
+            cand = {"contact_ms": _c if isinstance(_c, int) and not isinstance(_c, bool)
+                    else ts * 1000,
+                    "start_ms": ts * 1000,
+                    "actor_box": d.get("actor_box")}
+            ok, _reason, gate_contact = actor_gate(cand, track)
+            if not ok:
+                if at == "SHOT":
+                    scan["unresolved_goal_attempts"] += 1
+                else:
+                    scan["unresolved_assist_candidates"] += 1
+                continue
         new_ev = {
             "timestamp": _mmss(ts),
             "action_type": at.lower(),
@@ -229,6 +249,11 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
             "outcome_visible": True,
             "discovered_by_scoring_scan": True,
         }
+        if actor_gate is not None and track_ok and isinstance(gate_contact, int):
+            new_ev["actor_spatial_verified"] = True
+            new_ev["ledger_contact_ms"] = gate_contact
+            new_ev["event_start_ms"] = gate_contact  # C01 — exact ms authority
+            new_ev["event_end_ms"] = gate_contact
         timeline.append(new_ev)
         index[(ts, at)] = new_ev
     full["action_timeline"] = timeline

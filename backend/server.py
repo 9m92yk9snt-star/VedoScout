@@ -1879,6 +1879,29 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
         ts = c.get("timestamp", "")
         out_path = frames_dir / f"frame_{idx:02d}.jpg"
         ph_marker = out_path.with_suffix(".ph")
+        # FIX 08 C02 — event-native evidence: deterministic track identity only.
+        # Exact frame at evidence_time_ms/1000.0 (never the rounded MM:SS), no
+        # fingerprint window pick, no placeholder, no substitute frame.
+        if c.get("event_native"):
+            out = dict(c)
+            ems = out.get("evidence_time_ms")
+            ok = False
+            if (out.get("event_track_locked") and isinstance(ems, int)
+                    and not isinstance(ems, bool) and have_video):
+                if out_path.exists() and not ph_marker.exists():
+                    ok = True
+                else:
+                    ph_marker.unlink(missing_ok=True)
+                    ok = _extract_video_frame(video_path, max(0.0, ems / 1000.0), out_path)
+            if ok:
+                out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
+                out["frame_time_ms"] = ems  # exact canonical contact moment
+                if out.get("evidence_id"):
+                    out["proof_frame_verified"] = compute_proof_frame_verified(out)
+            else:
+                out["frame_url"] = None  # fail closed — text-only evidence
+            enriched.append(out)
+            continue
         frame_meta = None
         if not out_path.exists():
             ok = False
@@ -2908,7 +2931,7 @@ GOAL RULES: classify GOAL only when the tapped player visibly performs the scori
 ASSIST RULES: classify ASSIST only when the tapped player visibly makes the final pass/cross, the teammate visibly receives it and visibly scores in one continuous sequence. Camera cuts before the finish → keep what you saw: "PASS", "KEY_PASS" (teammate shot seen) or "CROSS". Same no-inference rules as goals.
 If uncertain: "UNCLASSIFIED" / "UNKNOWN" / "UNKNOWN". Do not guess.
 
-ADDITIONALLY — FULL-VIDEO SCORING INVOLVEMENT SCAN (independent of the claims above): re-watch the ENTIRE video and list EVERY visible goal by the tapped player, every visible assist by the tapped player, shots wrongly labelled as goals, possible final passes/crosses leading to goals, and scoring involvements completely missing from the claims. Apply the exact same GOAL/ASSIST rules and identity strictness.
+ADDITIONALLY — FULL-VIDEO SCORING INVOLVEMENT SCAN (independent of the claims above): re-watch the ENTIRE video and list EVERY visible goal by the tapped player, every visible assist by the tapped player, shots wrongly labelled as goals, possible final passes/crosses leading to goals, and scoring involvements completely missing from the claims. Apply the exact same GOAL/ASSIST rules and identity strictness. For EVERY discovered scoring event also return contact_ms (the exact media millisecond of the action contact) and actor_box (the normalized bounding box x/y/w/h, 0..1, top-left corner, of the player PERFORMING the action at that contact — the actual actor you see, never a guess).
 
 THEN score the tapped player yourself — integers 1-10, using ONLY moments where you are certain it is the tapped player, judged against typical {age}-year-old players in the {position} position: technical, tactical, physical, mentality, overall_development. Be conservative: unproven ability is not scored.
 
@@ -2916,7 +2939,7 @@ FINALLY list contradictions — claims among the list that cannot both be true.
 
 Return ONLY valid JSON, no markdown:
 {{"verdicts": [{{"claim_id": <int>, "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "event": "CONFIRMED" | "NOT_SEEN", "corrected_timestamp": "MM:SS" or null, "note": "<max 12 words>", "canonical_event_type": "<see above>", "canonical_action_type": "<see above>", "canonical_result": "<see above>", "outcome_visible": true | false}}],
- "discovered_scoring_events": [{{"timestamp": "MM:SS", "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "canonical_event_type": "GOAL" | "ASSIST" | "SHOT" | "KEY_PASS" | "PASS" | "CROSS" | "UNCLASSIFIED", "canonical_action_type": "SHOT" | "PASS" | "CROSS" | "UNKNOWN", "canonical_result": "SCORED" | "TEAMMATE_SCORED" | "TEAMMATE_SHOT" | "SAVED" | "BLOCKED" | "OFF_TARGET" | "NO_GOAL" | "OUTCOME_NOT_VISIBLE" | "COMPLETED" | "UNKNOWN", "outcome_visible": true | false, "note": "<max 16 words factual description>"}}],
+ "discovered_scoring_events": [{{"timestamp": "MM:SS", "contact_ms": <int exact media milliseconds of the action contact>, "actor_box": {{"x": <0..1>, "y": <0..1>, "w": <0..1>, "h": <0..1>}}, "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "canonical_event_type": "GOAL" | "ASSIST" | "SHOT" | "KEY_PASS" | "PASS" | "CROSS" | "UNCLASSIFIED", "canonical_action_type": "SHOT" | "PASS" | "CROSS" | "UNKNOWN", "canonical_result": "SCORED" | "TEAMMATE_SCORED" | "TEAMMATE_SHOT" | "SAVED" | "BLOCKED" | "OFF_TARGET" | "NO_GOAL" | "OUTCOME_NOT_VISIBLE" | "COMPLETED" | "UNKNOWN", "outcome_visible": true | false, "note": "<max 16 words factual description>"}}],
  "independent_scores": {{"technical": <1-10>, "tactical": <1-10>, "physical": <1-10>, "mentality": <1-10>, "overall_development": <1-10>}},
  "contradictions": ["<short description>"]}}
 """
@@ -2960,10 +2983,17 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
             dropped.append({"timestamp": ev.get("timestamp"), "title": ev.get("title"),
                             "reason": reason})
             continue
-        # corrected_timestamp may ONLY be applied to a fully CONFIRMED event
+        # corrected_timestamp may ONLY be applied to a fully CONFIRMED event.
+        # FIX 08 C01 — for ledger events the exact contact ms is authority:
+        # the verifier's time is stored as diagnostic only, never applied.
+        _ledger_row = isinstance(ev.get("ledger_contact_ms"), int) and \
+            not isinstance(ev.get("ledger_contact_ms"), bool)
         cts = v.get("corrected_timestamp")
         if cts and _mmss_to_secs(cts) is not None:
-            ev["timestamp"] = str(cts).strip()
+            if _ledger_row:
+                ev["verifier_corrected_timestamp"] = str(cts).strip()
+            else:
+                ev["timestamp"] = str(cts).strip()
         sec = _mmss_to_secs(ev.get("timestamp"))
         if sec is not None and track_ok:
             near = [p for p in pts if abs(float(p["t"]) - sec) <= 8]
@@ -2972,7 +3002,7 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
                                 "reason": "NO_TRACK"})
                 continue
             best = min(near, key=lambda p: abs(float(p["t"]) - sec))
-            if abs(float(best["t"]) - sec) <= 2:
+            if abs(float(best["t"]) - sec) <= 2 and not _ledger_row:
                 mm, ss = divmod(int(round(float(best["t"]))), 60)
                 ev["timestamp"] = f"{mm:02d}:{ss:02d}"
         ev["cross_verified"] = True
@@ -7621,6 +7651,9 @@ async def _verify_enriched_frames(
     tasks = [
         _check_one_safe(i, c) for i, c in enumerate(enriched)
         if isinstance(c, dict) and not c.get("anchor_locked")
+        # FIX 08 C02 — event_track_locked frames carry deterministic FIX04
+        # track identity: ZERO per-event model calls, no nearby re-window.
+        and not c.get("event_track_locked")
         and str(c.get("frame_url") or "").startswith("/api/uploads/frames/")
     ]
     checked = len(tasks)
@@ -8014,6 +8047,7 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
         # Unconfirmed non-anchor images may not be presented as proof.
         for c in enriched:
             if (isinstance(c, dict) and not c.get("anchor_locked")
+                    and not c.get("event_track_locked")
                     and c.get("identity_verified") is not True and c.get("frame_url")):
                 c["identity_verified"] = False
                 c["identity_verification_status"] = "error"
@@ -8233,7 +8267,8 @@ async def _cross_verify_full_report(
         # surviving timeline (verified GOAL/ASSIST discoveries only, exact-time
         # dedup) BEFORE FIX01 assigns event ids. Deterministic — zero AI here.
         full["_scoring_scan"] = vstats.merge_discovered_scoring_events(
-            full, verify.get("discovered_scoring_events"), track=gt_track)
+            full, verify.get("discovered_scoring_events"), track=gt_track,
+            actor_gate=event_ledger.validate_actor)
         logger.info(
             f"[cross-verify] {report_id}: {meta.get('events_checked')} claims checked · "
             f"{meta.get('events_dropped')} dropped · max score gap {meta.get('max_score_gap')} · "
@@ -8483,11 +8518,11 @@ async def _run_identity_corrective_pass(
         )
         retry = scrub_hedging(retry)
         retry = _filter_low_identity_evidence(retry, report_id)
-        # FIX 08 — the persisted validated ledger (ONE discovery per report,
-        # never re-run here) stays the timeline authority for the replacement.
+        # FIX 08 C06 — the persisted validated ledger (ONE discovery per report,
+        # never re-run here) is the ONLY event authority for the replacement:
+        # discovery failure yields an EMPTY timeline, never the model's list.
         _lg = fresh.get("event_ledger")
-        if isinstance(_lg, dict) and _lg.get("status") == "ok" and _lg.get("track_usable"):
-            retry["action_timeline"] = event_ledger.project_to_timeline(_lg)
+        retry["action_timeline"] = event_ledger.authoritative_timeline(_lg)
         retry["event_discovery"] = event_ledger.discovery_summary(_lg)
         _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
         await _cross_verify_full_report(
@@ -8502,7 +8537,7 @@ async def _run_identity_corrective_pass(
         # (stale IDs from the replaced body are never copied).
         retry = attach_event_evidence_authority(retry)
         # FIX 08 — event-native evidence rows for important verified events.
-        retry = event_ledger.create_event_native_evidence(retry)
+        retry = event_ledger.create_event_native_evidence(retry, track=gt_track)
         retry = attach_event_evidence_authority(retry)
         # FIX 07 — the corrective path runs the SAME verified-stats authority.
         retry = vstats.apply_verified_stats_authority(retry)
@@ -8960,13 +8995,11 @@ async def generate_full_report_task(report_id: str) -> None:
             _movement_pace_core(),
         )
         full = scrub_hedging(full)
-        # FIX 08 — when discovery succeeded with a usable track, the validated
-        # ledger (NOT the prose model's 6-15 highlight list) is the timeline
-        # authority; the existing cross verifier then verifies those claims.
-        if (isinstance(event_ledger_obj, dict)
-                and event_ledger_obj.get("status") == "ok"
-                and event_ledger_obj.get("track_usable")):
-            full["action_timeline"] = event_ledger.project_to_timeline(event_ledger_obj)
+        # FIX 08 C06 — the validated ledger is the ONLY event authority. The
+        # prose model's action_timeline is NEVER used — discovery failure or an
+        # unusable track yields an EMPTY authoritative timeline, not a legacy
+        # highlight list.
+        full["action_timeline"] = event_ledger.authoritative_timeline(event_ledger_obj)
         full["event_discovery"] = event_ledger.discovery_summary(event_ledger_obj)
         _apply_tracking_verification(full, anchor_payload_list, gt_track, gt_t_off)
         # GROW YOUR GAME — hard 100%-evidence gate (drops unproven lessons).
@@ -9004,7 +9037,7 @@ async def generate_full_report_task(report_id: str) -> None:
         full = attach_event_evidence_authority(full)
         # FIX 08 — event-native evidence rows for important verified events
         # (deterministic; frames/identity/proof reuse the existing machinery).
-        full = event_ledger.create_event_native_evidence(full)
+        full = event_ledger.create_event_native_evidence(full, track=gt_track)
         full = attach_event_evidence_authority(full)
         # FIX 07 — deterministic verified stats + match_stats rebuild + claim
         # reconciliation over cross-verified canonical events (zero LLM).

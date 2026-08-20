@@ -196,17 +196,66 @@ def validate_actor(candidate: dict, track) -> tuple[bool, str, int | None]:
 
 # --------------------------------------------------- canonical classification
 
-def classify_candidate(c: dict):
-    """PART 6/7 — deterministic canonical classification of a spatially
+def _chain_of(c: dict):
+    sc = c.get("scoring_chain")
+    return sc if isinstance(sc, dict) else None
+
+
+def _valid_assist_chain(c: dict, contact_ms, duration_ms=None) -> bool:
+    """C04 — STRICT temporal assist chain: all four chain times present,
+    continuous, ordered inside the candidate window, pass contact equals the
+    canonical contact, and everything inside the video duration."""
+    sc = _chain_of(c)
+    if not sc or sc.get("continuous_causal_sequence") is not True:
+        return False
+    pc, tr, tsh, go = (sc.get("pass_contact_ms"), sc.get("teammate_receive_ms"),
+                       sc.get("teammate_shot_ms"), sc.get("goal_outcome_ms"))
+    if not all(_is_int(v) for v in (pc, tr, tsh, go)):
+        return False
+    if _is_int(contact_ms) and pc != contact_ms:
+        return False
+    start = c.get("start_ms") if _is_int(c.get("start_ms")) else pc
+    end = c.get("end_ms") if _is_int(c.get("end_ms")) else go
+    if not (start <= pc <= tr <= tsh <= go <= end):
+        return False
+    if _is_int(duration_ms) and not all(
+            0 <= v <= duration_ms for v in (start, pc, tr, tsh, go, end)):
+        return False
+    return True
+
+
+def _valid_key_pass_chain(c: dict, contact_ms, duration_ms=None) -> bool:
+    """C04 — KEY_PASS needs a valid continuous pass→receive→shot chain;
+    the goal outcome may be absent."""
+    sc = _chain_of(c)
+    if not sc or sc.get("continuous_causal_sequence") is not True:
+        return False
+    pc, tr, tsh = (sc.get("pass_contact_ms"), sc.get("teammate_receive_ms"),
+                   sc.get("teammate_shot_ms"))
+    if not all(_is_int(v) for v in (pc, tr, tsh)):
+        return False
+    if _is_int(contact_ms) and pc != contact_ms:
+        return False
+    start = c.get("start_ms") if _is_int(c.get("start_ms")) else pc
+    end = c.get("end_ms") if _is_int(c.get("end_ms")) else tsh
+    if not (start <= pc <= tr <= tsh <= end):
+        return False
+    if _is_int(duration_ms) and not all(
+            0 <= v <= duration_ms for v in (start, pc, tr, tsh, end)):
+        return False
+    return True
+
+
+def classify_candidate(c: dict, contact_ms=None, duration_ms=None):
+    """PART 6/7 + C04 — deterministic canonical classification of a spatially
     verified candidate. GOAL and ASSIST chains are enforced here AND again by
     verified_stats.normalize_canonical (single shared hard gate)."""
+    if not _is_int(contact_ms):
+        contact_ms = c.get("contact_ms") if _is_int(c.get("contact_ms")) \
+            else c.get("start_ms")
     at = str(c.get("action_type") or "").strip().upper()
     out = str(c.get("outcome") or "").strip().upper()
     vis = c.get("outcome_visible") is True
-    sc = c.get("scoring_chain") if isinstance(c.get("scoring_chain"), dict) else {}
-    chain_ok = (sc.get("continuous_causal_sequence") is True
-                and _is_int(sc.get("teammate_shot_ms")))
-    goal_seen = _is_int(sc.get("goal_outcome_ms"))
     et, res = at, out or "UNKNOWN"
     if at == "SHOT":
         if out == "SCORED" and vis:
@@ -214,9 +263,11 @@ def classify_candidate(c: dict):
         elif not vis:
             res = "OUTCOME_NOT_VISIBLE"
     elif at in ("PASS", "CROSS"):
-        if out == "TEAMMATE_SCORED" and vis and chain_ok and goal_seen:
+        if (out == "TEAMMATE_SCORED" and vis
+                and _valid_assist_chain(c, contact_ms, duration_ms)):
             et, res = "ASSIST", "TEAMMATE_SCORED"
-        elif vis and chain_ok and out in ("TEAMMATE_SCORED", "TEAMMATE_SHOT"):
+        elif (vis and out in ("TEAMMATE_SCORED", "TEAMMATE_SHOT")
+                and _valid_key_pass_chain(c, contact_ms, duration_ms)):
             et, res = "KEY_PASS", "TEAMMATE_SHOT"
         elif out in ("TEAMMATE_SCORED", "TEAMMATE_SHOT"):
             res = "COMPLETED" if vis else "OUTCOME_NOT_VISIBLE"
@@ -287,7 +338,9 @@ def build_ledger(discovery, track, duration_s) -> dict:
             _drop("DUPLICATE")
             continue
         seen.add(key)
-        et, cat, res, vis = classify_candidate(c)
+        et, cat, res, vis = classify_candidate(
+            c, contact_ms=contact,
+            duration_ms=int(round(max(0.0, float(duration_s or 0)) * 1000)) or None)
         start = c.get("start_ms") if _is_int(c.get("start_ms")) else contact
         end = c.get("end_ms") if _is_int(c.get("end_ms")) else contact
         foot = str(c.get("foot") or "UNKNOWN").strip().upper()
@@ -329,10 +382,26 @@ def project_to_timeline(ledger) -> list[dict]:
             "outcome": "neutral",
             "identity_confidence": "high",
             "event_source": "fix08_ledger",
+            "actor_spatial_verified": True,
             "ledger_sequence_id": e["sequence_id"],
             "ledger_contact_ms": e["contact_ms"],
+            # C01 — canonical authority stays millisecond exact; the MM:SS
+            # timestamp above is presentation only. FIX01 preserves these.
+            "event_start_ms": e["contact_ms"],
+            "event_end_ms": e["contact_ms"],
         })
     return rows
+
+
+def authoritative_timeline(ledger) -> list[dict]:
+    """C06 — the prose model is NEVER event authority for FIX08 reports.
+    Valid ledger with usable track → projected verified candidates (possibly
+    partial). Discovery failed / malformed / no usable track → EMPTY timeline,
+    never the legacy 6-15 model highlight list."""
+    if (isinstance(ledger, dict) and ledger.get("status") == "ok"
+            and ledger.get("track_usable")):
+        return project_to_timeline(ledger)
+    return []
 
 
 def discovery_summary(ledger) -> dict:
@@ -348,12 +417,20 @@ def discovery_summary(ledger) -> dict:
     }
 
 
+DISCOVERY_UNAVAILABLE_NOTICE = (
+    "\n\n📋 EVENT DISCOVERY UNAVAILABLE — DO NOT INVENT SPECIFIC EVENTS OR "
+    "TIMESTAMPS. Write only general development observations without citing "
+    "specific moments, goals, assists or times."
+)
+
+
 def ledger_prompt_block(ledger) -> str:
     """PART 9 — compact ledger context for the full-report prompt: the model
-    writes ABOUT these observed events; it never invents new ones."""
+    writes ABOUT these observed events; it never invents new ones. When no
+    verified ledger exists, an explicit unavailable notice is injected (C06)."""
     evs = ((ledger or {}).get("events") or [])
     if not evs:
-        return ""
+        return DISCOVERY_UNAVAILABLE_NOTICE
     lines = []
     for e in evs[:80]:
         desc = (e.get("description") or "")[:120]
@@ -373,10 +450,12 @@ def ledger_prompt_block(ledger) -> str:
 _PRIORITY = {"GOAL": 0, "ASSIST": 1, "KEY_PASS": 2, "SHOT": 3}
 
 
-def create_event_native_evidence(full: dict, max_rows: int = 6) -> dict:
-    """PART 12 — deterministic evidence rows EXACTLY bound to important
-    VERIFIED events that have no exact evidence row yet. Zero model calls;
-    the existing frame/identity/proof machinery consumes these rows."""
+def create_event_native_evidence(full: dict, max_rows: int = 6, track=None) -> dict:
+    """PART 12 + C02 — deterministic evidence rows EXACTLY bound to important
+    VERIFIED events that have no exact evidence row yet. Zero model calls.
+    event_track_locked (deterministic FIX04 identity at the exact contact) is
+    set ONLY for spatially verified events whose target bbox resolves at
+    event_start_ms — otherwise the row stays text-only downstream."""
     if not isinstance(full, dict):
         return full
     events = [e for e in (full.get("action_timeline") or [])
@@ -406,7 +485,7 @@ def create_event_native_evidence(full: dict, max_rows: int = 6) -> dict:
             continue
         desc = str(e.get("description") or e.get("title")
                    or "Verified match involvement").strip()
-        comments.append({
+        row = {
             "timestamp": e.get("timestamp"),
             "comment": desc,
             "player_check": "FIX08 event-native evidence — created deterministically "
@@ -415,7 +494,18 @@ def create_event_native_evidence(full: dict, max_rows: int = 6) -> dict:
             "event_id": e["event_id"],
             "evidence_time_ms": e["event_start_ms"],
             "event_native": True,
-        })
+        }
+        # C02 — deterministic identity: spatially verified event + exact
+        # target bbox at contact. NEVER marked anchor_locked (separate
+        # semantics) and NEVER model-checked downstream.
+        if (e.get("actor_spatial_verified") is True
+                or e.get("event_source") == "fix08_ledger"):
+            pt, _why = resolve_target_box(track, e["event_start_ms"])
+            if pt is not None:
+                row["event_track_locked"] = True
+                row["event_track_box"] = {"x": float(pt["x"]), "y": float(pt["y"]),
+                                          "w": float(pt["w"]), "h": float(pt["h"])}
+        comments.append(row)
         bound.add(e["event_id"])
         created += 1
     return full
@@ -452,13 +542,15 @@ def build_snapshot_moments(full: dict, max_moments: int = 4):
 
     seen = set()
     moments = []
+    # C05 — keys the current web SnapshotsSection actually renders, in order.
+    snap_keys = ("strength", "noticed", "hidden", "develop")
     for e, c in sorted(usable, key=_prio):
         if e["event_id"] in seen:
             continue
         seen.add(e["event_id"])
         et = str(e.get("canonical_event_type") or "").upper()
         moments.append({
-            "key": f"moment{len(moments) + 1}",
+            "key": snap_keys[len(moments)],
             "title": str(e.get("title") or _SAFE_TITLE.get(et, "Key moment")),
             "desc": str(e.get("description") or "").strip()[:200],
             "timestamp": e.get("timestamp"),
