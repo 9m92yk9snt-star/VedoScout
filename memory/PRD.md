@@ -9,6 +9,12 @@ React + FastAPI + MongoDB app that analyses football match footage of a tapped p
 - FIX05 ground anchor/ellipse + Corr 01 (30)
 - FIX06 pace/distance camera compensation + Corr 01/02 (33)
 - FIX07 verified stats & claim reconciliation (V01–V50), commit d2b5d27; INTRO_CLIP_VERSION bumped 1→2
+- FIX07 — CORRECTION 02 (June 2026), commit 275dae9:
+  - C07 `_valid_scan_row` schema validation: scan performed only when discovered_scoring_events is a list and EVERY row matches schema (parseable ts, identity/event/action/result enums, boolean outcome_visible, optional string note); [] is a valid completed scan; malformed scans never partially trusted
+  - C08 `verified_stats.goals_assists_available`; goals/assists = None when scan not performed; match_stats omits goals/assists keys and carries `goals_assists_source` ("full_video_scoring_scan" | "unavailable"); other timeline stats remain
+  - C09 verified_stat_line only exists behind a valid completed scan
+  - C10 `_sentence_supported` fails closed on goal/assist claims when totals unavailable; `_canonical_line` returns neutral "Verified match involvement." (never manufactured zeros); exact verified event language remains
+  - Tests: FIX07 suite 74 passed (67 + C07–C13); regressions FIX06 33, FIX05 30, FIX04 38, FIX03 26, FIX02 29, FIX01 29, FIX00B 31, FIX00A 16; server.py untouched
 - FIX07 — CORRECTION 01 (June 2026), commit c563105:
   - C01 normalize_canonical: GOAL/ASSIST never manufacture missing action type (GOAL+UNKNOWN → UNCLASSIFIED)
   - C02 scoring_scan.performed only for a valid verifier list; verifier fail_closed_error → verified_stats.available=False, match_stats source=verified_events_unavailable (no authoritative zeros)
