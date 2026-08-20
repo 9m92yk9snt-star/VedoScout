@@ -378,6 +378,7 @@ def test_V45_complete_scoring_example():
     timeline = [_assist("02:00"), _assist("03:00")]
     discovered = [
         _disc("01:10", "GOAL", "SHOT", "SCORED"),                 # missed goal
+        _disc("02:00", "ASSIST", "PASS", "TEAMMATE_SCORED"),      # known (C15 coverage)
         _disc("03:00", "ASSIST", "PASS", "TEAMMATE_SCORED"),      # duplicate
         _disc("04:00", "ASSIST", "CROSS", "TEAMMATE_SCORED"),     # missed assist
     ]
@@ -794,3 +795,72 @@ def test_C13_scan_unavailable_event_stays_goal_total_unavailable():
     low = full["executive_summary"].lower()
     assert "1 goal" not in low, "aggregate must not pose as a complete total"
     assert "0 goal" not in low
+
+
+# ------------------------------- C14–C19 final scoring scan integrity
+
+def test_C14_scoring_scan_result_enum_strict():
+    full = {"action_timeline": []}
+    scan = vstats.merge_discovered_scoring_events(
+        full, [_disc("01:10", "SHOT", "SHOT", "WON")])
+    assert scan["performed"] is False, "WON is not in the scoring-scan schema"
+    full["_scoring_scan"] = scan
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)
+    assert full["verified_stats"]["goals_assists_available"] is False
+    assert "goals" not in full["match_stats"]
+    for res in ("FAILED", "POSSESSION_WON", "POSSESSION_LOST", "INCOMPLETE",
+                "UNRESOLVED"):
+        s = vstats.merge_discovered_scoring_events(
+            {"action_timeline": []}, [_disc("01:10", "SHOT", "SHOT", res)])
+        assert s["performed"] is False, f"{res} must invalidate the whole scan"
+    assert {"WON", "FAILED", "POSSESSION_WON"} <= vstats.RESULTS, \
+        "general RESULTS enum must remain unchanged"
+
+
+def test_C15_known_goal_omitted_by_scan():
+    full = _merged_stats([_goal("01:10")], [])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is False
+    assert vs["goals_assists_available"] is False
+    assert vs["goals"] is None and vs["assists"] is None
+    assert "goals" not in full["match_stats"]
+    assert "verified_stat_line" not in full
+    assert full["action_timeline"][0]["canonical_event_type"] == "GOAL", \
+        "the individual exact verified event must remain"
+
+
+def test_C16_known_assist_omitted_by_scan():
+    full = _merged_stats([_assist("02:10")], [])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is False
+    assert vs["goals_assists_available"] is False and vs["assists"] is None
+    assert "assists" not in full["match_stats"]
+    assert full["action_timeline"][0]["canonical_event_type"] == "ASSIST"
+
+
+def test_C17_known_goal_covered_by_scan():
+    full = _merged_stats([_goal("01:10")], [_disc("01:10", "GOAL", "SHOT", "SCORED")])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is True
+    assert vs["goals"] == 1 and full["match_stats"]["goals"] == 1
+    assert len(full["action_timeline"]) == 1
+
+
+def test_C18_known_assist_covered_by_scan():
+    full = _merged_stats([_assist("02:10")],
+                         [_disc("02:10", "ASSIST", "PASS", "TEAMMATE_SCORED")])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is True
+    assert vs["assists"] == 1 and full["match_stats"]["assists"] == 1
+    assert len(full["action_timeline"]) == 1
+
+
+def test_C19_no_scoring_events_empty_scan_zero_allowed():
+    full = _merged_stats([_ev("01:00", "PASS", "PASS", "COMPLETED", True)], [])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is True
+    assert vs["goals_assists_available"] is True
+    assert vs["goals"] == 0 and vs["assists"] == 0
+    assert full["match_stats"]["goals"] == 0
+    assert full["verified_stat_line"].startswith("0 goals · 0 assists")

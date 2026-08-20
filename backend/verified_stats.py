@@ -100,6 +100,10 @@ def _event_action(e: dict) -> str:
 _SCAN_IDENTITIES = {"CONFIRMED", "WRONG_PLAYER", "NOT_VISIBLE"}
 _SCAN_EVENT_TYPES = {"GOAL", "ASSIST", "SHOT", "KEY_PASS", "PASS", "CROSS", "UNCLASSIFIED"}
 _SCAN_ACTION_TYPES = {"SHOT", "PASS", "CROSS", "UNKNOWN"}
+# C14 — EXACTLY the result enum of the discovered_scoring_events schema in
+# VERIFICATION_PROMPT; the broader general RESULTS enum is NOT acceptable here.
+_SCAN_RESULTS = {"SCORED", "TEAMMATE_SCORED", "TEAMMATE_SHOT", "SAVED", "BLOCKED",
+                 "OFF_TARGET", "NO_GOAL", "OUTCOME_NOT_VISIBLE", "COMPLETED", "UNKNOWN"}
 
 
 def _valid_scan_row(d) -> bool:
@@ -114,7 +118,7 @@ def _valid_scan_row(d) -> bool:
         return False
     if str(d.get("canonical_action_type") or "").strip().upper() not in _SCAN_ACTION_TYPES:
         return False
-    if str(d.get("canonical_result") or "").strip().upper() not in RESULTS:
+    if str(d.get("canonical_result") or "").strip().upper() not in _SCAN_RESULTS:
         return False
     if not isinstance(d.get("outcome_visible"), bool):
         return False
@@ -144,6 +148,30 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
     pts = [p for p in ((track or {}).get("points") or [])
            if isinstance(p, dict) and isinstance(p.get("t"), (int, float))]
     track_ok = len(pts) >= 10  # same threshold as _apply_cross_verification
+
+    def _snap(ts):
+        """Same track snap as the existing cross-verification path.
+        Returns (snapped_ts, player_supported)."""
+        if not track_ok:
+            return ts, True
+        near = [p for p in pts if abs(float(p["t"]) - ts) <= 8]
+        if not near:
+            return ts, False
+        best = min(near, key=lambda p: abs(float(p["t"]) - ts))
+        if abs(float(best["t"]) - ts) <= 2:
+            return int(round(float(best["t"]))), True
+        return ts, True
+
+    scan_keys = set()  # C15 — what the full-video scan claims to cover
+    for d in discovered:
+        det = str(d.get("canonical_event_type") or "").strip().upper()
+        if det not in ("GOAL", "ASSIST"):
+            continue
+        dts = _ts_secs(d.get("timestamp"))
+        if dts is None:
+            continue
+        dat = str(d.get("canonical_action_type") or "").strip().upper()
+        scan_keys.add((_snap(dts)[0], det, dat))
     timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
     index = {}
     for e in timeline:
@@ -169,13 +197,9 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
         ts = _ts_secs(d.get("timestamp"))
         if ts is None:
             continue
-        if track_ok:
-            near = [p for p in pts if abs(float(p["t"]) - ts) <= 8]
-            if not near:
-                continue  # C04 — no player support around the timestamp
-            best = min(near, key=lambda p: abs(float(p["t"]) - ts))
-            if abs(float(best["t"]) - ts) <= 2:
-                ts = int(round(float(best["t"])))  # same snap as existing path
+        ts, supported = _snap(ts)
+        if not supported:
+            continue  # C04 — no player support around the timestamp
         tgt = index.get((ts, at))
         if tgt is not None:
             # C03 — the scan corrects a misclassified event at the EXACT same
@@ -203,6 +227,21 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
         timeline.append(new_ev)
         index[(ts, at)] = new_ev
     full["action_timeline"] = timeline
+    # C15 — a FULL scan must cover every surviving verified GOAL/ASSIST at the
+    # EXACT normalized time/action; an omission means the scan is incomplete
+    # and aggregate goal/assist authority is withdrawn (events remain).
+    for e in timeline:
+        if e.get("cross_verified") is not True:
+            continue
+        et = _enum(e.get("canonical_event_type"), EVENT_TYPES, "UNCLASSIFIED")
+        if et not in ("GOAL", "ASSIST"):
+            continue
+        ts = _ts_secs(e.get("timestamp"))
+        key = (ts, et, "SHOT" if et == "GOAL" else _event_action(e))
+        if ts is None or key not in scan_keys:
+            scan["performed"] = False
+            scan["incomplete_scoring_coverage"] = True
+            break
     return scan
 
 
