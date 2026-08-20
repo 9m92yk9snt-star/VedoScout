@@ -2565,7 +2565,7 @@ Track ONLY that player across the video. If you lose sight of them in some momen
 Before writing ANY evidence timestamp (in video_comments or a sub-skill evidence list), silently re-identify the player at that exact moment: where are they in the frame, are they fully or partially visible, who stands in front of/behind them, and why is this the SAME player the user tapped. If you cannot re-identify the tapped player with reasonable certainty at a moment, DO NOT cite that moment. For every video_comments entry, fill in the player_check and identity_confidence fields honestly.
 
 🎯 ACTION TIMELINE (chronological match report)
-In action_timeline, list EVERY clearly observable involvement of the tapped player in strict chronological order — touches, passes, dribbles, shots, runs, duels, defensive actions. Aim for 6-15 entries depending on footage length. Rate each single action 1-10 (or null when the action is not ratable). THE SAME IDENTITY RULES APPLY: re-identify the tapped player at every timestamp; if you cannot, OMIT the entry entirely. Never list an action performed by a different player. Timestamps must be real moments you observed in the footage — never invented.
+In action_timeline, list EVERY clearly observable involvement of the tapped player in strict chronological order — touches, passes, dribbles, shots, runs, duels, defensive actions. List them ALL — do NOT cap the list at a fixed count; a heavily involved player can easily produce 20-40+ entries. Rate each single action 1-10 (or null when the action is not ratable). THE SAME IDENTITY RULES APPLY: re-identify the tapped player at every timestamp; if you cannot, OMIT the entry entirely. Never list an action performed by a different player. Timestamps must be real moments you observed in the footage — never invented.
 
 🎯 CONTENT AWARENESS (from pre-analysis)
 CONTENT_TYPE: {content_type}
@@ -8055,10 +8055,25 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
                         c["tele_clip_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "video/mp4")
                     except Exception as e:
                         logger.warning(f"R2 flush clip failed {report_id}/{p.name}: {e}")
+    # FIX 08 — authority snapshot moments from verified events with an EXACT
+    # proof frame (built AFTER frames/identity/proof state + R2 flush).
+    snap_set = {}
+    try:
+        fr = doc.get("full_report") or {}
+        if fr.get("evidence_authority_version"):
+            fr = dict(fr)
+            fr["video_comments"] = enriched
+            moments = event_ledger.build_snapshot_moments(fr)
+            if moments is not None:
+                snap_set = {"full_report.snapshot_moments": moments,
+                            "full_report.snapshot_moments_authority": True}
+    except Exception:
+        logger.exception(f"[fix08] snapshot moments failed for {report_id}")
     await db.reports.update_one(
         {"id": report_id},
         {"$set": {
             "full_report.video_comments": enriched,
+            **snap_set,
             **({"identity_stats": stats} if stats else {}),
         }},
     )
@@ -8328,7 +8343,8 @@ def _collect_anchor_crop_paths(anchor_payload_list: list) -> tuple[list[str], li
 
 
 async def _compose_full_prompt(doc: dict, audio_events_full, anchor_payload_list: list,
-                               crop_path_str, gt_track, gt_t_off) -> str:
+                               crop_path_str, gt_track, gt_t_off,
+                               event_ledger_obj=None) -> str:
     """EXISTING full-report prompt composition (precision priors + identity
     profile + identity memory + ground-truth positions), extracted verbatim so
     the normal pipeline and corrective-only recovery build the SAME prompt."""
@@ -8397,6 +8413,13 @@ async def _compose_full_prompt(doc: dict, audio_events_full, anchor_payload_list
             full_prompt += gt_block
     except Exception:
         pass
+    # FIX 08 — inject the validated event ledger: the observed event source.
+    try:
+        lb = event_ledger.ledger_prompt_block(event_ledger_obj)
+        if lb:
+            full_prompt += lb
+    except Exception:
+        pass
     return full_prompt
 
 
@@ -8460,6 +8483,12 @@ async def _run_identity_corrective_pass(
         )
         retry = scrub_hedging(retry)
         retry = _filter_low_identity_evidence(retry, report_id)
+        # FIX 08 — the persisted validated ledger (ONE discovery per report,
+        # never re-run here) stays the timeline authority for the replacement.
+        _lg = fresh.get("event_ledger")
+        if isinstance(_lg, dict) and _lg.get("status") == "ok" and _lg.get("track_usable"):
+            retry["action_timeline"] = event_ledger.project_to_timeline(_lg)
+        retry["event_discovery"] = event_ledger.discovery_summary(_lg)
         _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
         await _cross_verify_full_report(
             report_id, retry,
@@ -8471,6 +8500,9 @@ async def _run_identity_corrective_pass(
         # FIX 01 — the corrective replacement is a NEW analysis body: it gets
         # its own authority namespace/IDs via the SAME normalisation helper
         # (stale IDs from the replaced body are never copied).
+        retry = attach_event_evidence_authority(retry)
+        # FIX 08 — event-native evidence rows for important verified events.
+        retry = event_ledger.create_event_native_evidence(retry)
         retry = attach_event_evidence_authority(retry)
         # FIX 07 — the corrective path runs the SAME verified-stats authority.
         retry = vstats.apply_verified_stats_authority(retry)
@@ -8545,7 +8577,8 @@ async def _corrective_only_recovery(report_id: str, doc: dict) -> None:
         for e in (doc.get("audio_events_full") or []) if isinstance(e, dict)
     ]
     full_prompt = await _compose_full_prompt(
-        doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off)
+        doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off,
+        event_ledger_obj=doc.get("event_ledger"))
     outcome = await _run_identity_corrective_pass(
         report_id, full_prompt=full_prompt, file_path=file_path, marker_path=marker_path,
         crop_path_str=crop_path_str, anchor_crops_full=anchor_crops_full,
@@ -8790,6 +8823,53 @@ async def generate_full_report_task(report_id: str) -> None:
                 f"seeds={gt_track.get('seed_count')} (Δ={gt_t_off:+.2f}s)"
             )
 
+        # ── FIX 08 — ONE dedicated event-discovery pass (bounded, whole video).
+        # Its only job is enumerating the tapped player's involvements; the
+        # deterministic ledger (spatial actor validation against the FIX04
+        # track) is built in code. Failure keeps the legacy pass-1 timeline.
+        event_ledger_obj = None
+        try:
+            _disc_dur = await asyncio.to_thread(_video_duration_seconds, file_path)
+            disc_prompt = event_ledger.build_discovery_prompt(
+                _disc_dur, doc.get("player_details") or {})
+            try:
+                _idp = doc.get("identity_profile")
+                if _idp:
+                    disc_prompt += identity_profile_block(_idp)
+            except Exception:
+                pass
+            try:
+                _gtb = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
+                if _gtb:
+                    disc_prompt += _gtb
+            except Exception:
+                pass
+            discovery = await call_gemini_with_video(
+                session_id=f"discover-{report_id}",
+                prompt=disc_prompt,
+                video_path=str(file_path),
+                marker_path=marker_path,
+                crop_path=crop_path_str,
+                anchor_crops=anchor_crops_full if anchor_crops_full else None,
+                timeout_s=420.0,
+            )
+            event_ledger_obj = event_ledger.build_ledger(discovery, gt_track, _disc_dur)
+            await db.reports.update_one(
+                {"id": report_id},
+                {"$set": {"event_discovery_raw": discovery,
+                          "event_ledger": event_ledger_obj}},
+            )
+            logger.info(
+                f"[fix08] {report_id}: ledger "
+                f"{event_ledger_obj.get('candidates_verified')}/"
+                f"{event_ledger_obj.get('candidates_total')} verified · "
+                f"complete={event_ledger_obj.get('discovery_complete')} · "
+                f"track_usable={event_ledger_obj.get('track_usable')}"
+            )
+        except Exception:
+            logger.exception(f"[fix08] event discovery failed for {report_id}")
+            event_ledger_obj = None
+
         # ── CV SHADOW MODE (additive, feature-flagged, observe-only) ──
         # Runs the new identity engine in the background AFTER production tracking.
         # It never touches gt_track, analysis, markers or proofs — diagnostics only.
@@ -8864,7 +8944,8 @@ async def generate_full_report_task(report_id: str) -> None:
 
         # ── Full-report prompt (shared verbatim with corrective-only recovery) ──
         full_prompt = await _compose_full_prompt(
-            doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off)
+            doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off,
+            event_ledger_obj=event_ledger_obj)
         # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
         full, _mm_done = await asyncio.gather(
             call_gemini_with_video(
@@ -8879,6 +8960,14 @@ async def generate_full_report_task(report_id: str) -> None:
             _movement_pace_core(),
         )
         full = scrub_hedging(full)
+        # FIX 08 — when discovery succeeded with a usable track, the validated
+        # ledger (NOT the prose model's 6-15 highlight list) is the timeline
+        # authority; the existing cross verifier then verifies those claims.
+        if (isinstance(event_ledger_obj, dict)
+                and event_ledger_obj.get("status") == "ok"
+                and event_ledger_obj.get("track_usable")):
+            full["action_timeline"] = event_ledger.project_to_timeline(event_ledger_obj)
+        full["event_discovery"] = event_ledger.discovery_summary(event_ledger_obj)
         _apply_tracking_verification(full, anchor_payload_list, gt_track, gt_t_off)
         # GROW YOUR GAME — hard 100%-evidence gate (drops unproven lessons).
         try:
@@ -8912,6 +9001,10 @@ async def generate_full_report_task(report_id: str) -> None:
         # FIX 01 — attach the event/evidence authority layer (stable IDs, ms
         # metadata, exact joins) AFTER all verification/filtering, right before
         # the body is persisted. Deterministic — zero LLM.
+        full = attach_event_evidence_authority(full)
+        # FIX 08 — event-native evidence rows for important verified events
+        # (deterministic; frames/identity/proof reuse the existing machinery).
+        full = event_ledger.create_event_native_evidence(full)
         full = attach_event_evidence_authority(full)
         # FIX 07 — deterministic verified stats + match_stats rebuild + claim
         # reconciliation over cross-verified canonical events (zero LLM).
@@ -15477,6 +15570,7 @@ from movement_metrics import compute_movement_map, fmt_mmss
 from motion_compensation import compute_motion_samples
 from speed_metrics import compute_speed_metrics
 import verified_stats as vstats
+import event_ledger
 from progression import build_progression
 from score_context import build_score_context
 from score_meaning import build_score_meaning, build_score_meaning_teaser

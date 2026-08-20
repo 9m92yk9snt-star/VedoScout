@@ -472,7 +472,8 @@ console.log(JSON.stringify({{
 
 def test_T22_no_new_model_call_sites():
     src = (BACKEND / "server.py").read_text()
-    assert src.count("call_gemini_with_video(") == 7
+    # FIX 08 added EXACTLY ONE dedicated event-discovery call site (7 → 8).
+    assert src.count("call_gemini_with_video(") == 8
     assert src.count("call_gemini_text(") == 2
     assert src.count("verify_frame_identity(") == 5
     assert src.count("verify_ring_placement(") == 1
