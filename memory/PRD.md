@@ -9,6 +9,9 @@ React + FastAPI + MongoDB app that analyses football match footage of a tapped p
 - FIX05 ground anchor/ellipse + Corr 01 (30)
 - FIX06 pace/distance camera compensation + Corr 01/02 (33)
 - FIX07 verified stats & claim reconciliation (V01–V50), commit d2b5d27; INTRO_CLIP_VERSION bumped 1→2
+- FIX07 — CORRECTION 04 (June 2026), commit 2a3f74e:
+  - C20 scan coverage keys built ONLY from verified scoring rows: identity==CONFIRMED + normalize_canonical survivors (GOAL=SHOT+SCORED+visible, ASSIST=PASS/CROSS+TEAMMATE_SCORED+visible) + parseable snapped ts; WRONG_PLAYER/NOT_VISIBLE/SAVED/invisible/TEAMMATE_SHOT rows stay structurally valid but never cover a known GOAL/ASSIST
+  - Tests C20–C26. FIX07 suite 87 passed; regressions FIX06 33, FIX05 30, FIX04 38, FIX03 26, FIX02 29, FIX01 29, FIX00B 31, FIX00A 16; server.py untouched
 - FIX07 — CORRECTION 03 (June 2026), commit 8198acd:
   - C14 dedicated `_SCAN_RESULTS` enum (SCORED, TEAMMATE_SCORED, TEAMMATE_SHOT, SAVED, BLOCKED, OFF_TARGET, NO_GOAL, OUTCOME_NOT_VISIBLE, COMPLETED, UNKNOWN) — `_valid_scan_row` no longer accepts general RESULTS values (WON/FAILED/POSSESSION_* invalidate whole scan); general RESULTS unchanged
   - C15 full-scan consistency: every surviving cross-verified canonical GOAL/ASSIST must have an exact-time/action scan entry (same track snap, no fuzzy); omission → performed=false + incomplete_scoring_coverage=true → goals_assists unavailable, events remain; extracted shared `_snap` helper
