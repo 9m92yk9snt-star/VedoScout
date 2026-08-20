@@ -27,7 +27,7 @@ def _track(times, x=0.40, y=0.30, w=0.06, h=0.18):
                        for t in times]}
 
 
-TRACK = _track([i * 0.5 for i in range(0, 160)])  # 0.0s … 79.5s every 0.5 s
+TRACK = _track([i * 0.08 for i in range(0, 1000)])  # 12.5 Hz — 0.0s … 79.92s
 
 
 def _box(x=0.40, y=0.30, w=0.06, h=0.18):
@@ -684,11 +684,11 @@ def test_F16_incomplete_discovery_never_claims_exhaustive():
 # ============ FIX08 CORRECTION 02 — F17–F27 (close-duel + fail-closed) ============
 
 def test_F17_exact_contact_time_interpolation():
-    # moving player: x drifts 0.40→0.50 between 31.0s and 32.0s
-    track = _track([i * 0.5 for i in range(0, 62)])  # 0..30.5
+    # moving player: x drifts 0.40→0.50 across one normal 0.2 s track interval
+    track = _track([i * 0.08 for i in range(0, 388)])  # 0 … 30.96s @ 12.5 Hz
     track["points"].append({"t": 31.0, "x": 0.40, "y": 0.30, "w": 0.06, "h": 0.18})
-    track["points"].append({"t": 32.0, "x": 0.50, "y": 0.34, "w": 0.08, "h": 0.20})
-    box, why = el.resolve_target_box(track, 31500)
+    track["points"].append({"t": 31.2, "x": 0.50, "y": 0.34, "w": 0.08, "h": 0.20})
+    box, why = el.resolve_target_box(track, 31100)
     assert why == "OK"
     assert abs(box["x"] - 0.45) < 1e-9 and abs(box["y"] - 0.32) < 1e-9
     assert abs(box["w"] - 0.07) < 1e-9 and abs(box["h"] - 0.19) < 1e-9
@@ -831,3 +831,60 @@ def test_F27_contact_ms_unchanged_through_full_chain(tmp_path, monkeypatch):
     assert seen == [31.42]
     assert out["frame_time_ms"] == 31420
     assert compute_proof_frame_verified(out) is True
+
+
+# ========= FIX08 CORRECTION 03 — F28–F32 (interpolation gap fail-closed) =========
+
+def _gap_track(gap_s, t0_idx=125):
+    """12.5 Hz track with one missing-track stretch of gap_s after point t0."""
+    times = [i * 0.08 for i in range(0, t0_idx + 1)]        # … up to ~10.0 s
+    t0 = times[-1]
+    times += [t0 + gap_s + i * 0.08 for i in range(0, 50)]  # resume after gap
+    return _track(times), t0
+
+
+def test_F28_normal_sample_interval_interpolates():
+    for gap in (0.08, 0.16):
+        track, t0 = _gap_track(gap)
+        contact = int(round((t0 + gap / 2.0) * 1000))
+        box, why = el.resolve_target_box(track, contact)
+        assert why == "OK", f"normal {gap}s interval must interpolate"
+        assert box is not None and abs(box["x"] - 0.40) < 1e-9
+
+
+def test_F29_quarter_second_interval_allowed():
+    for gap in (0.24, 0.25):
+        track, t0 = _gap_track(gap)
+        contact = int(round((t0 + gap / 2.0) * 1000))
+        box, why = el.resolve_target_box(track, contact)
+        assert why == "OK", f"{gap}s interval must still be within authority"
+
+
+def test_F30_032_interval_track_gap():
+    track, t0 = _gap_track(0.32)
+    contact = int(round((t0 + 0.16) * 1000))
+    box, why = el.resolve_target_box(track, contact)
+    assert box is None and why == "TRACK_GAP"
+
+
+def test_F31_one_second_interval_track_gap():
+    track, t0 = _gap_track(1.0)
+    contact = int(round((t0 + 0.5) * 1000))
+    box, why = el.resolve_target_box(track, contact)
+    assert box is None and why == "TRACK_GAP"
+    ledger = el.build_ledger(_discovery([_cand(contact_ms=contact)]), track, DUR)
+    assert ledger["events"] == []
+
+
+def test_F32_occlusion_gap_never_actor_match():
+    # close duel: tracking lost the target for 0.8 s; the candidate's actor_box
+    # EQUALS the last known target geometry — still must NOT verify.
+    track, t0 = _gap_track(0.8)
+    contact = int(round((t0 + 0.4) * 1000))
+    ok, reason, _ = el.validate_actor(_cand(contact_ms=contact, box=_box()), track)
+    assert ok is False and reason == "TRACK_GAP", \
+        "identity uncertainty gaps must never produce ACTOR_MATCH"
+    ledger = el.build_ledger(_discovery([_cand(contact_ms=contact, box=_box())]),
+                             track, DUR)
+    assert ledger["events"] == []
+    assert any(d["reason"] == "TRACK_GAP" for d in ledger["dropped"])

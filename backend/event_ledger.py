@@ -32,7 +32,11 @@ FEET = {"LEFT", "RIGHT", "UNKNOWN"}
 
 _MIN_TRACK_POINTS = 10          # same usable-track threshold as cross-verification
 _EXACT_POINT_TOL_S = 0.010      # a track point this close IS the contact point
-_INTERP_MAX_GAP_S = 1.5         # bounded normal tracking gap for interpolation
+# C07/CORRECTION 03 — FIX04 samples at 12.5 Hz (~0.08 s). Authoritative
+# geometry may only be interpolated across ~3 normal sample intervals; a
+# longer missing-track stretch (duel/overlap/occlusion/cut) is uncertainty
+# and MUST fail closed as TRACK_GAP — never reconstructed.
+_INTERP_MAX_GAP_S = 0.25
 # C08 — close-duel hardened same-actor geometry (ALL conditions required)
 _MATCH_IOU_MIN = 0.30
 _MATCH_CENTER_FACTOR = 0.45
@@ -176,8 +180,8 @@ def resolve_target_box(track, contact_ms: int, max_gap_s: float = _INTERP_MAX_GA
     if before is None or after is None:
         return None, "TRACK_GAP"  # contact outside the tracked interval
     t0, t1 = float(before["t"]), float(after["t"])
-    if (t1 - t0) > max_gap_s:
-        return None, "TRACK_GAP"  # abnormal gap — no false geometry
+    if (t1 - t0) > max_gap_s + 1e-9:  # tiny epsilon: float safety only
+        return None, "TRACK_GAP"  # uncertainty gap — no false geometry
     if not (_geom_ok(before) and _geom_ok(after)):
         return None, "TRACK_GAP"
     f = (sec - t0) / (t1 - t0) if t1 > t0 else 0.0
