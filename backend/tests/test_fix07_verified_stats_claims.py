@@ -353,12 +353,19 @@ def test_V43_wrong_player_assist():
 
 def test_V44_empty_pass1_timeline_scan_runs_once(monkeypatch):
     calls = {"n": 0}
+    # FIX08 C09 — a novel scan GOAL needs FIX08 spatial actor authority:
+    # usable track + contact_ms + actor_box matching the target geometry.
+    goal_row = {**_disc("01:10", "GOAL", "SHOT", "SCORED"),
+                "contact_ms": 70000,
+                "actor_box": {"x": 0.40, "y": 0.30, "w": 0.06, "h": 0.18}}
+    gt_track = {"points": [{"t": float(60 + i), "x": 0.40, "y": 0.30,
+                            "w": 0.06, "h": 0.18} for i in range(20)]}
 
     async def fake_verify(**kw):
         calls["n"] += 1
         assert "SCORING INVOLVEMENT SCAN" in kw["prompt"]
         return {"verdicts": [],
-                "discovered_scoring_events": [_disc("01:10", "GOAL", "SHOT", "SCORED")],
+                "discovered_scoring_events": [goal_row],
                 "independent_scores": {}}
 
     monkeypatch.setattr(server, "call_gemini_with_video", fake_verify)
@@ -366,7 +373,7 @@ def test_V44_empty_pass1_timeline_scan_runs_once(monkeypatch):
     asyncio.run(server._cross_verify_full_report(
         "t-fix07", full, file_path="/tmp/none.mp4", marker_path=None,
         crop_path_str=None, anchor_crops=None, anchor_payload_list=[],
-        gt_track=None, gt_t_off=None, doc={"player_details": {}}))
+        gt_track=gt_track, gt_t_off=None, doc={"player_details": {}}))
     assert calls["n"] == 1, "verifier must run exactly ONCE"
     full = attach_event_evidence_authority(full)
     full = vstats.apply_verified_stats_authority(full)

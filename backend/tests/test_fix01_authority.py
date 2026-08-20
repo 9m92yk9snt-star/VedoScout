@@ -245,8 +245,9 @@ def test_T14_corrective_new_namespace():
 
 def test_T14_both_pipelines_use_same_helper():
     src = (BACKEND / "server.py").read_text()
-    # exactly two production call sites: normal full report + corrective pass
-    assert src.count("attach_event_evidence_authority(") == 2
+    # FIX 08 — each pipeline calls the SAME helper twice: FIX01 ids, then an
+    # idempotent re-bind after event-native evidence rows are created (2 → 4).
+    assert src.count("attach_event_evidence_authority(") == 4
     assert "full = attach_event_evidence_authority(full)" in src
     assert "retry = attach_event_evidence_authority(retry)" in src
 
@@ -255,8 +256,8 @@ def test_T14_both_pipelines_use_same_helper():
 
 def test_T15_no_new_llm_call_sites():
     src = (BACKEND / "server.py").read_text()
-    # pinned pre-FIX-01 model-call-site counts — FIX 01 adds none
-    assert src.count("call_gemini_with_video(") == 7
+    # FIX 08 added EXACTLY ONE dedicated event-discovery call site (7 → 8).
+    assert src.count("call_gemini_with_video(") == 8
     assert src.count("call_gemini_text(") == 2
     assert src.count("verify_frame_identity(") == 5
     assert src.count("verify_ring_placement(") == 1

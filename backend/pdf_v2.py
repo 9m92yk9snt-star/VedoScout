@@ -329,12 +329,16 @@ def derive_v2(report):
         }
 
     sm_raw = full.get("snapshot_moments")
-    if isinstance(sm_raw, list) and len([x for x in sm_raw if isinstance(x, dict)]) >= 4:
+    _sm_rows = [x for x in sm_raw if isinstance(x, dict)] if isinstance(sm_raw, list) else []
+    # FIX 08 — authority snapshot moments (exact verified evidence) are used
+    # at ANY count (2 real moments beat 4 fabricated ones); legacy lists keep
+    # the original >=4 gate.
+    if _sm_rows and (full.get("snapshot_moments_authority") or len(_sm_rows) >= 4):
         snapshot_moments = [{
             "key": x.get("key"), "title": x.get("title") or "—", "desc": x.get("desc") or "—",
             "timestamp": x.get("timestamp"), "thumb": x.get("frame_url"),
             "annot": x.get("annot") or "circle",
-        } for x in sm_raw[:4] if isinstance(x, dict)]
+        } for x in _sm_rows[:4]]
     else:
         scout_disc = snap.get("scout_discovery")
         snapshot_moments = [

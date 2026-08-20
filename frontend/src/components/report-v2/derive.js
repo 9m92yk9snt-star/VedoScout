@@ -233,8 +233,13 @@ export function deriveV2(report) {
       glance: null,
     };
   };
-  const explicitMoments = Array.isArray(full.snapshot_moments) && full.snapshot_moments.length >= 4
-    ? full.snapshot_moments.slice(0, 4).map((x) => {
+  // FIX 08 C05 — authority snapshot moments (exact verified evidence) are
+  // accepted at ANY count 1..4; legacy explicit lists keep the >=4 gate.
+  // 2 real verified moments render as 2 real cards — never fabricate 4.
+  const smList = Array.isArray(full.snapshot_moments) ? full.snapshot_moments : [];
+  const smAuthority = full.snapshot_moments_authority === true;
+  const explicitMoments = (smAuthority ? smList.length >= 1 : smList.length >= 4)
+    ? smList.slice(0, 4).map((x) => {
         // FIX 01 C01 — authority: the photo must come from the exactly bound
         // evidence object; x.frame_url is never trusted as authority evidence.
         const bound = authority ? resolveAuthorityFrame(full.video_comments, x) : null;
@@ -256,7 +261,9 @@ export function deriveV2(report) {
     buildSnapMoment("noticed", snap.scout_discovery || "scanning awareness vision decision space between the lines", "positive", "scan", !snap.scout_discovery),
     buildSnapMoment("hidden", snapshot.hiddenTalent, "positive", "run"),
     buildSnapMoment("develop", snapshot.developmentArea, "issue", "circle"),
-  ];
+  ].map((m) => (smAuthority ? { ...m, thumb: null } : m));
+  // (authority report with ZERO verified moments → text-only fallback cards,
+  //  never fake key-moment photos)
 
   // ---- Roadmap ----
   const rm = full.development_roadmap || {};
