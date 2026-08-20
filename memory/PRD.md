@@ -9,6 +9,10 @@ React + FastAPI + MongoDB app that analyses football match footage of a tapped p
 - FIX05 ground anchor/ellipse + Corr 01 (30)
 - FIX06 pace/distance camera compensation + Corr 01/02 (33)
 - FIX07 verified stats & claim reconciliation (V01–V50), commit d2b5d27; INTRO_CLIP_VERSION bumped 1→2
+- FIX07 — CORRECTION 03 (June 2026), commit 8198acd:
+  - C14 dedicated `_SCAN_RESULTS` enum (SCORED, TEAMMATE_SCORED, TEAMMATE_SHOT, SAVED, BLOCKED, OFF_TARGET, NO_GOAL, OUTCOME_NOT_VISIBLE, COMPLETED, UNKNOWN) — `_valid_scan_row` no longer accepts general RESULTS values (WON/FAILED/POSSESSION_* invalidate whole scan); general RESULTS unchanged
+  - C15 full-scan consistency: every surviving cross-verified canonical GOAL/ASSIST must have an exact-time/action scan entry (same track snap, no fuzzy); omission → performed=false + incomplete_scoring_coverage=true → goals_assists unavailable, events remain; extracted shared `_snap` helper
+  - Tests C14–C19 added; V45 scan fixture completed for C15. FIX07 suite 80 passed; regressions FIX06 33, FIX05 30, FIX04 38, FIX03 26, FIX02 29, FIX01 29, FIX00B 31, FIX00A 16; server.py untouched
 - FIX07 — CORRECTION 02 (June 2026), commit 275dae9:
   - C07 `_valid_scan_row` schema validation: scan performed only when discovered_scoring_events is a list and EVERY row matches schema (parseable ts, identity/event/action/result enums, boolean outcome_visible, optional string note); [] is a valid completed scan; malformed scans never partially trusted
   - C08 `verified_stats.goals_assists_available`; goals/assists = None when scan not performed; match_stats omits goals/assists keys and carries `goals_assists_source` ("full_video_scoring_scan" | "unavailable"); other timeline stats remain
