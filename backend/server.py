@@ -2899,12 +2899,24 @@ If the action clearly happens but at a slightly different time, mark both CONFIR
 CLAIMS TO VERIFY:
 {claims_block}
 
+For EVERY claim ALSO classify the football action canonically (trust-critical — never guess):
+- canonical_event_type: "GOAL" | "ASSIST" | "SHOT" | "KEY_PASS" | "PASS" | "CROSS" | "DRIBBLE" | "DUEL" | "TACKLE" | "INTERCEPTION" | "RECOVERY" | "FIRST_TOUCH" | "RUN" | "DEFENSIVE_ACTION" | "OTHER" | "UNCLASSIFIED"
+- canonical_action_type: "SHOT" | "PASS" | "CROSS" | "DRIBBLE" | "DUEL" | "TACKLE" | "INTERCEPTION" | "RECOVERY" | "FIRST_TOUCH" | "RUN" | "DEFENSIVE_ACTION" | "OTHER" | "UNKNOWN"
+- canonical_result: "SCORED" | "TEAMMATE_SCORED" | "TEAMMATE_SHOT" | "SAVED" | "BLOCKED" | "OFF_TARGET" | "NO_GOAL" | "OUTCOME_NOT_VISIBLE" | "COMPLETED" | "INCOMPLETE" | "SUCCESS" | "FAILED" | "WON" | "LOST" | "UNRESOLVED" | "POSSESSION_WON" | "POSSESSION_LOST" | "UNKNOWN"
+- outcome_visible: true ONLY when the outcome itself is visible on screen.
+GOAL RULES: classify GOAL only when the tapped player visibly performs the scoring action AND the ball visibly enters the goal / crosses the line. Shot leaves the frame or the goal is hidden by a cut → "SHOT" + "OUTCOME_NOT_VISIBLE". NEVER infer a goal from celebration, players running away, a scoreboard, commentary, body language or title text.
+ASSIST RULES: classify ASSIST only when the tapped player visibly makes the final pass/cross, the teammate visibly receives it and visibly scores in one continuous sequence. Camera cuts before the finish → keep what you saw: "PASS", "KEY_PASS" (teammate shot seen) or "CROSS". Same no-inference rules as goals.
+If uncertain: "UNCLASSIFIED" / "UNKNOWN" / "UNKNOWN". Do not guess.
+
+ADDITIONALLY — FULL-VIDEO SCORING INVOLVEMENT SCAN (independent of the claims above): re-watch the ENTIRE video and list EVERY visible goal by the tapped player, every visible assist by the tapped player, shots wrongly labelled as goals, possible final passes/crosses leading to goals, and scoring involvements completely missing from the claims. Apply the exact same GOAL/ASSIST rules and identity strictness.
+
 THEN score the tapped player yourself — integers 1-10, using ONLY moments where you are certain it is the tapped player, judged against typical {age}-year-old players in the {position} position: technical, tactical, physical, mentality, overall_development. Be conservative: unproven ability is not scored.
 
 FINALLY list contradictions — claims among the list that cannot both be true.
 
 Return ONLY valid JSON, no markdown:
-{{"verdicts": [{{"claim_id": <int>, "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "event": "CONFIRMED" | "NOT_SEEN", "corrected_timestamp": "MM:SS" or null, "note": "<max 12 words>"}}],
+{{"verdicts": [{{"claim_id": <int>, "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "event": "CONFIRMED" | "NOT_SEEN", "corrected_timestamp": "MM:SS" or null, "note": "<max 12 words>", "canonical_event_type": "<see above>", "canonical_action_type": "<see above>", "canonical_result": "<see above>", "outcome_visible": true | false}}],
+ "discovered_scoring_events": [{{"timestamp": "MM:SS", "identity": "CONFIRMED" | "WRONG_PLAYER" | "NOT_VISIBLE", "canonical_event_type": "GOAL" | "ASSIST" | "SHOT" | "KEY_PASS" | "PASS" | "CROSS" | "UNCLASSIFIED", "canonical_action_type": "SHOT" | "PASS" | "CROSS" | "UNKNOWN", "canonical_result": "SCORED" | "TEAMMATE_SCORED" | "TEAMMATE_SHOT" | "SAVED" | "BLOCKED" | "OFF_TARGET" | "NO_GOAL" | "OUTCOME_NOT_VISIBLE" | "COMPLETED" | "UNKNOWN", "outcome_visible": true | false, "note": "<max 16 words factual description>"}}],
  "independent_scores": {{"technical": <1-10>, "tactical": <1-10>, "physical": <1-10>, "mentality": <1-10>, "overall_development": <1-10>}},
  "contradictions": ["<short description>"]}}
 """
@@ -2964,6 +2976,9 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
                 mm, ss = divmod(int(round(float(best["t"]))), 60)
                 ev["timestamp"] = f"{mm:02d}:{ss:02d}"
         ev["cross_verified"] = True
+        # FIX 07 — attach the verifier's canonical classification (normalised,
+        # GOAL/ASSIST hard gates enforced). Never affects keep/drop above.
+        vstats.attach_canonical(ev, v)
         kept.append(ev)
 
     status = "verified"
@@ -8159,15 +8174,18 @@ async def _cross_verify_full_report(
     not exposed as verified evidence."""
     try:
         timeline = [e for e in (full.get("action_timeline") or []) if isinstance(e, dict)]
-        if not timeline:
-            full["cross_verification"] = {"status": "skipped", "reason": "no_timeline"}
-            return
         claims = []
         for i, ev in enumerate(timeline):
             claims.append(
                 f"{i}. At {ev.get('timestamp')}: [{ev.get('action_type') or 'action'}] "
                 f"{ev.get('title') or ''} — {ev.get('description') or ''}"
             )
+        if not claims:
+            # FIX 07 — the SAME verification stage still runs once with an
+            # empty claim list so the full-video scoring scan can look for a
+            # missed goal/assist. This is NOT a second verifier call.
+            claims = ["(No claims from the first pass — return an empty verdicts "
+                      "list and perform the full-video scoring scan.)"]
         pd = doc.get("player_details") or {}
         prompt = VERIFICATION_PROMPT.format(
             claims_block="\n".join(claims),
@@ -8196,6 +8214,11 @@ async def _cross_verify_full_report(
             timeout_s=420.0,
         )
         meta = _apply_cross_verification(full, verify, gt_track)
+        # FIX 07 — merge the verifier's full-video scoring scan with the
+        # surviving timeline (verified GOAL/ASSIST discoveries only, exact-time
+        # dedup) BEFORE FIX01 assigns event ids. Deterministic — zero AI here.
+        full["_scoring_scan"] = vstats.merge_discovered_scoring_events(
+            full, verify.get("discovered_scoring_events"), track=gt_track)
         logger.info(
             f"[cross-verify] {report_id}: {meta.get('events_checked')} claims checked · "
             f"{meta.get('events_dropped')} dropped · max score gap {meta.get('max_score_gap')} · "
@@ -8449,6 +8472,8 @@ async def _run_identity_corrective_pass(
         # its own authority namespace/IDs via the SAME normalisation helper
         # (stale IDs from the replaced body are never copied).
         retry = attach_event_evidence_authority(retry)
+        # FIX 07 — the corrective path runs the SAME verified-stats authority.
+        retry = vstats.apply_verified_stats_authority(retry)
         # FIX 02 — same fail-closed proof gate as the normal pipeline.
         retry = apply_fail_closed_proof_authority(retry)
         await db.reports.update_one(
@@ -8888,6 +8913,9 @@ async def generate_full_report_task(report_id: str) -> None:
         # metadata, exact joins) AFTER all verification/filtering, right before
         # the body is persisted. Deterministic — zero LLM.
         full = attach_event_evidence_authority(full)
+        # FIX 07 — deterministic verified stats + match_stats rebuild + claim
+        # reconciliation over cross-verified canonical events (zero LLM).
+        full = vstats.apply_verified_stats_authority(full)
         # FIX 02 — fail-closed proof eligibility over the authority IDs.
         full = apply_fail_closed_proof_authority(full)
         await db.reports.update_one(
@@ -11562,7 +11590,7 @@ async def admin_featured_clips(user=Depends(get_current_user)):
 
 # ============== SHAREABLE CINEMATIC INTRO CLIP (MP4, 1080x1920) ==============
 
-INTRO_CLIP_VERSION = 1
+INTRO_CLIP_VERSION = 2  # FIX07 — moment text now claim-reconciled; invalidate pre-FIX07 cache
 
 
 async def _build_intro_clip_file(doc: dict) -> Path:
@@ -15448,6 +15476,7 @@ import cv_shadow
 from movement_metrics import compute_movement_map, fmt_mmss
 from motion_compensation import compute_motion_samples
 from speed_metrics import compute_speed_metrics
+import verified_stats as vstats
 from progression import build_progression
 from score_context import build_score_context
 from score_meaning import build_score_meaning, build_score_meaning_teaser
