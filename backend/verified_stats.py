@@ -97,6 +97,31 @@ def _event_action(e: dict) -> str:
     return _LEGACY_ACTION.get(str(e.get("action_type") or "").lower(), "UNKNOWN")
 
 
+_SCAN_IDENTITIES = {"CONFIRMED", "WRONG_PLAYER", "NOT_VISIBLE"}
+_SCAN_EVENT_TYPES = {"GOAL", "ASSIST", "SHOT", "KEY_PASS", "PASS", "CROSS", "UNCLASSIFIED"}
+_SCAN_ACTION_TYPES = {"SHOT", "PASS", "CROSS", "UNKNOWN"}
+
+
+def _valid_scan_row(d) -> bool:
+    """C07 — a scan row must match the expected FIX07 schema exactly."""
+    if not isinstance(d, dict):
+        return False
+    if _ts_secs(d.get("timestamp")) is None:
+        return False
+    if str(d.get("identity") or "").strip().upper() not in _SCAN_IDENTITIES:
+        return False
+    if str(d.get("canonical_event_type") or "").strip().upper() not in _SCAN_EVENT_TYPES:
+        return False
+    if str(d.get("canonical_action_type") or "").strip().upper() not in _SCAN_ACTION_TYPES:
+        return False
+    if str(d.get("canonical_result") or "").strip().upper() not in RESULTS:
+        return False
+    if not isinstance(d.get("outcome_visible"), bool):
+        return False
+    note = d.get("note")
+    return note is None or isinstance(note, str)
+
+
 def merge_discovered_scoring_events(full: dict, discovered, track: dict | None = None) -> dict:
     """PART 4/5 — merge the verifier's full-video scoring scan with the
     surviving timeline. Only identity-CONFIRMED, outcome-visible GOAL/ASSIST
@@ -106,8 +131,12 @@ def merge_discovered_scoring_events(full: dict, discovered, track: dict | None =
     performed ONLY when the verifier returned a valid list. C04: with a usable
     accepted track, a discovery needs the same player-presence support the
     existing cross-verification applies (point within 8 s, snap <= 2 s).
-    Returns the scoring-scan metadata (unresolved candidates included)."""
-    performed = isinstance(discovered, list)
+    Returns the scoring-scan metadata (unresolved candidates included).
+    C07: a FULL scan is valid only when the verifier returned a list whose
+    every row matches the expected schema; [] is a VALID completed scan. A
+    malformed scan is never partially trusted."""
+    performed = (isinstance(discovered, list)
+                 and all(_valid_scan_row(d) for d in discovered))
     scan = {"performed": performed, "unresolved_goal_attempts": 0,
             "unresolved_assist_candidates": 0}
     if not performed:
@@ -267,20 +296,21 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
     pct = (round(n["passes_completed"] / n["passes_attempted"] * 100)
            if n["passes_attempted"] > 0 else None)
     scan = scan if isinstance(scan, dict) else {}
+    performed = scan.get("performed") is True
     vs = {
         "version": VERIFIED_STATS_VERSION,
         "source": "cross_verified_events",
         "available": True,
+        "goals_assists_available": performed,
         "scoring_scan": {
-            "performed": bool(scan.get("performed")),
-            "verified_goals": n["goals"],
-            "verified_assists": n["assists"],
+            "performed": performed,
+            "verified_goals": n["goals"] if performed else None,
+            "verified_assists": n["assists"] if performed else None,
             "unresolved_goal_attempts": int(scan.get("unresolved_goal_attempts") or 0),
             "unresolved_assist_candidates": int(scan.get("unresolved_assist_candidates") or 0),
         },
         "stats_completeness": {
-            "goals_assists": "full_video_scoring_scan" if scan.get("performed")
-            else "verified_timeline_events",
+            "goals_assists": "full_video_scoring_scan" if performed else "unavailable",
             "other_actions": "verified_timeline_events",
         },
         "total_actions": n["total_actions"],
@@ -292,14 +322,23 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
     }
     for k in _COUNT_KEYS:
         vs[k] = n[k]
+    if not performed:
+        # C08 — without a valid completed scan there is NO authoritative
+        # goal/assist total (not even zero). Other canonical stats remain.
+        vs["goals"] = None
+        vs["assists"] = None
     full["verified_stats"] = vs
 
     def _plural(cnt, word):
         return f"{cnt} {word}{'' if cnt == 1 else 's'}"
 
-    full["verified_stat_line"] = " · ".join([
-        _plural(n["goals"], "goal"), _plural(n["assists"], "assist"),
-        _plural(n["shots"], "shot")])
+    if performed:
+        full["verified_stat_line"] = " · ".join([
+            _plural(n["goals"], "goal"), _plural(n["assists"], "assist"),
+            _plural(n["shots"], "shot")])
+    else:
+        # C09 — never present an incomplete "0 goals · 0 assists" line
+        full.pop("verified_stat_line", None)
     return vs
 
 
@@ -316,8 +355,6 @@ def rebuild_match_stats(full: dict) -> None:
         return
     full["match_stats"] = {
         "total_actions": vs["total_actions"],
-        "goals": vs["goals"],
-        "assists": vs["assists"],
         "shots": vs["shots"],
         "shots_on_target": vs["shots_on_target"],
         "key_passes": vs["key_passes"],
@@ -340,6 +377,13 @@ def rebuild_match_stats(full: dict) -> None:
         "minutes_analysed": minutes,
         "source": "verified_events",
     }
+    if vs.get("goals_assists_available") is True:
+        # C08 — goal/assist totals exist ONLY behind a valid completed scan
+        full["match_stats"]["goals"] = vs["goals"]
+        full["match_stats"]["assists"] = vs["assists"]
+        full["match_stats"]["goals_assists_source"] = "full_video_scoring_scan"
+    else:
+        full["match_stats"]["goals_assists_source"] = "unavailable"
 
 
 # ------------------------------------------------------ claim reconciliation
@@ -379,26 +423,27 @@ _AGG_KEY = {"shots": "shots", "key passes": "key_passes", "passes": "passes_atte
 
 
 def _sentence_supported(sent: str, vs: dict) -> bool:
+    g, a = vs.get("goals"), vs.get("assists")
     creator = _CREATOR_RE.search(sent)
     if creator:
         c = _num(creator.group(1))
-        if c is not None and c != vs["assists"]:
+        if c is not None and (a is None or c != a):
             return False
     else:
         for rx in _GOAL_COUNT_RES:
             m = rx.search(sent)
             if m:
                 c = _num(m.group(1))
-                if c is not None and c != vs["goals"]:
+                if c is not None and (g is None or c != g):
                     return False
     for rx, c in _GOAL_FIXED:
-        if rx.search(sent) and vs["goals"] != c:
+        if rx.search(sent) and g != c:
             return False
     for rx in _ASSIST_RES:
         m = rx.search(sent)
         if m:
             c = _num(m.group(1))
-            if c is not None and c != vs["assists"]:
+            if c is not None and (a is None or c != a):
                 return False
     for m in _AGG_RE.finditer(sent):
         c = _num(m.group(1))
@@ -409,6 +454,10 @@ def _sentence_supported(sent: str, vs: dict) -> bool:
 
 
 def _canonical_line(vs: dict) -> str:
+    """C10 — the canonical stat line exists ONLY behind a valid completed
+    scoring scan; otherwise a neutral fallback (never a manufactured zero)."""
+    if vs.get("goals_assists_available") is not True:
+        return "Verified match involvement."
     g, a = vs["goals"], vs["assists"]
     return (f"Verified in this footage: {g} goal{'' if g == 1 else 's'} "
             f"and {a} assist{'' if a == 1 else 's'}.")
@@ -569,6 +618,7 @@ def apply_verified_stats_authority(full: dict) -> dict:
             "version": VERIFIED_STATS_VERSION,
             "source": "cross_verified_events",
             "available": False,
+            "goals_assists_available": False,
             "reason": "verifier_failed",
             "scoring_scan": {"performed": False},
         }

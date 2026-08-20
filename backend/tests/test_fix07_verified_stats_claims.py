@@ -32,10 +32,15 @@ def _assist(ts="02:10", at="PASS", **kw):
     return _ev(ts, "ASSIST", at, "TEAMMATE_SCORED", True, **kw)
 
 
+_PERFORMED_SCAN = {"performed": True, "unresolved_goal_attempts": 0,
+                   "unresolved_assist_candidates": 0}
+
+
 def _stats(events, scan=None):
     full = {"action_timeline": list(events)}
     full = attach_event_evidence_authority(full)
-    return vstats.build_verified_stats(full, scan), full
+    return vstats.build_verified_stats(full, scan if scan is not None
+                                       else dict(_PERFORMED_SCAN)), full
 
 
 # ------------------------------------------------- V01–V08 scoring gates
@@ -180,6 +185,7 @@ def test_V24_invalid_canonical_no_invented_stat():
 def test_V25_model_match_stats_contradiction():
     full = {"action_timeline": [_goal(), _assist("02:00"), _assist("03:00"),
                                 _assist("04:00")],
+            "_scoring_scan": dict(_PERFORMED_SCAN),
             "match_stats": {"goals": 3, "assists": 0, "minutes_analysed": 12}}
     full = attach_event_evidence_authority(full)
     full = vstats.apply_verified_stats_authority(full)
@@ -192,6 +198,7 @@ def test_V25_model_match_stats_contradiction():
 # ------------------------------------------- V26–V31 prose reconciliation
 
 def _recon(full):
+    full.setdefault("_scoring_scan", dict(_PERFORMED_SCAN))
     full = attach_event_evidence_authority(full)
     return vstats.apply_verified_stats_authority(full)
 
@@ -503,7 +510,9 @@ def test_C02_missing_scan_field_not_performed():
     full = vstats.apply_verified_stats_authority(full)
     vs = full["verified_stats"]
     assert vs["scoring_scan"]["performed"] is False
-    assert vs["stats_completeness"]["goals_assists"] == "verified_timeline_events"
+    assert vs["stats_completeness"]["goals_assists"] == "unavailable"
+    assert vs["goals_assists_available"] is False
+    assert vs["goals"] is None and vs["assists"] is None
 
 
 def test_C02_malformed_scan_field_not_performed():
@@ -676,3 +685,112 @@ def test_C06_assist_ambiguous_scorer_wording_fails_closed():
     a = _assist("02:10", description="He scores from the cutback.")
     full = _recon({"action_timeline": [a]})
     assert full["action_timeline"][0]["description"] == "Verified assist."
+
+
+# ------------------------------- C07–C13 scoring completeness fail-closed
+
+def test_C07_missing_scan_no_authoritative_scoring():
+    full = {"action_timeline": [_goal()]}
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)  # no _scoring_scan
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is False
+    assert vs["goals_assists_available"] is False
+    assert vs["goals"] is None and vs["assists"] is None
+    assert vs["scoring_scan"]["verified_goals"] is None
+    assert vs["stats_completeness"]["goals_assists"] == "unavailable"
+    ms = full["match_stats"]
+    assert "goals" not in ms and "assists" not in ms
+    assert ms["goals_assists_source"] == "unavailable"
+    assert "verified_stat_line" not in full
+
+
+def test_C08_malformed_row_scan_not_trusted():
+    good = _disc("01:10", "GOAL", "SHOT", "SCORED")
+    for bad in ([{"foo": "bar"}],
+                [good, {"foo": "bar"}],  # one bad row poisons the whole scan
+                ["not-a-dict"],
+                [_disc("junk-ts", "GOAL", "SHOT", "SCORED")],
+                [_disc("01:10", "GOAL", "SHOT", "SCORED", identity="MAYBE")],
+                [_disc("01:10", "WEIRD_TYPE", "SHOT", "SCORED")],
+                [_disc("01:10", "GOAL", "HEADER", "SCORED")],
+                [_disc("01:10", "GOAL", "SHOT", "NOT_A_RESULT")],
+                [{**good, "outcome_visible": "yes"}],
+                [{**good, "note": 42}]):
+        full = {"action_timeline": []}
+        scan = vstats.merge_discovered_scoring_events(full, bad)
+        assert scan["performed"] is False, f"malformed scan trusted: {bad}"
+        assert full["action_timeline"] == [], \
+            "a malformed scan must never be partially trusted"
+        full["_scoring_scan"] = scan
+        full = attach_event_evidence_authority(full)
+        full = vstats.apply_verified_stats_authority(full)
+        assert full["verified_stats"]["goals_assists_available"] is False
+        assert "goals" not in full["match_stats"]
+
+
+def test_C09_valid_empty_scan_zero_totals_allowed():
+    full = _merged_stats([], [])
+    vs = full["verified_stats"]
+    assert vs["scoring_scan"]["performed"] is True
+    assert vs["goals_assists_available"] is True
+    assert vs["goals"] == 0 and vs["assists"] == 0
+    ms = full["match_stats"]
+    assert ms["goals"] == 0 and ms["assists"] == 0
+    assert ms["goals_assists_source"] == "full_video_scoring_scan"
+    assert full["verified_stat_line"].startswith("0 goals · 0 assists")
+
+
+def test_C10_valid_scan_with_goal_total_available():
+    full = _merged_stats([], [_disc("01:10", "GOAL", "SHOT", "SCORED")])
+    vs = full["verified_stats"]
+    assert vs["goals_assists_available"] is True
+    assert vs["goals"] == 1 and vs["scoring_scan"]["verified_goals"] == 1
+    assert full["match_stats"]["goals"] == 1
+    assert full["match_stats"]["goals_assists_source"] == "full_video_scoring_scan"
+    assert full["verified_stat_line"].startswith("1 goal ·")
+
+
+def test_C11_scan_unavailable_claim_removed_no_zero_fallback():
+    full = {"action_timeline": [_goal()],
+            "executive_summary": "Scored 3 goals tonight.",
+            "final_summary": "A three goal masterclass."}
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)  # scan unavailable
+    for k in ("executive_summary", "final_summary"):
+        low = full[k].lower()
+        assert "3 goals" not in low and "three goal" not in low
+        assert "0 goals" not in low and "0 assists" not in low, \
+            "fallback must not manufacture a zero total"
+    assert full["final_summary"] == "Verified match involvement."
+
+
+def test_C12_scan_unavailable_other_stats_remain():
+    full = {"action_timeline": [_ev("01:00", "PASS", "PASS", "COMPLETED", True),
+                                _ev("02:00", "PASS", "PASS", "INCOMPLETE", True)]}
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)
+    vs = full["verified_stats"]
+    assert vs["available"] is True
+    assert vs["passes_attempted"] == 2 and vs["passes_completed"] == 1
+    assert vs["stats_completeness"]["other_actions"] == "verified_timeline_events"
+    ms = full["match_stats"]
+    assert ms["passes_attempted"] == 2 and ms["source"] == "verified_events"
+    assert "goals" not in ms and ms["goals_assists_source"] == "unavailable"
+
+
+def test_C13_scan_unavailable_event_stays_goal_total_unavailable():
+    g = _goal(title="Goal", description="Scores low into the corner.")
+    full = {"action_timeline": [g],
+            "executive_summary": "He managed 1 goal in the match."}
+    full = attach_event_evidence_authority(full)
+    full = vstats.apply_verified_stats_authority(full)
+    e = full["action_timeline"][0]
+    assert e["title"] == "Goal", "exact verified event language may remain"
+    assert e["description"] == "Scores low into the corner."
+    vs = full["verified_stats"]
+    assert vs["goals"] is None and vs["goals_assists_available"] is False
+    assert "goals" not in full["match_stats"]
+    low = full["executive_summary"].lower()
+    assert "1 goal" not in low, "aggregate must not pose as a complete total"
+    assert "0 goal" not in low
