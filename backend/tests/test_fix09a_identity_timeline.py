@@ -643,6 +643,80 @@ def test_C04a_spatial_dominance_pin():
     assert tl["scenes"][0]["reid_state"] == "TAP_PINNED"
     for p in pts:
         assert px(p)[0] < 215, "the grazing rival must not inherit the tap"
+# ── S01: similar pitch signature must NOT rejoin two different highlights ──
+def test_S01_similar_pitch_signature_not_rejoined():
+    sig = [80.0] * 64  # near-identical global green-pitch signature
+    o = [obs(k * STEP, [det(100, 100, ident="target"),
+                        det(300, 150, ident="mate")], sig=sig) for k in range(6)]
+    o += [obs(k * STEP, [det(400, 60, ident="target"),
+                         det(60, 220, ident="opp"),
+                         det(240, 30, ident="mate")],
+              cut=(k == 6), sig=sig) for k in range(6, 12)]
+    tl = run(o, [tap(0, 100, 100)])
+    assert len(tl["scenes"]) == 2, \
+        "similar global signature alone must never join two different highlights"
+    for p in tl["target_points"]:
+        assert not (5 * STEP < p["media_ms"] < 6 * STEP), \
+            "no continuity may be invented across the preserved cut"
+
+
+# ── S02: sequential same-kit teammate must not inherit GLOBAL_TARGET ──
+def test_S02_sequential_teammate_fails_closed():
+    sims = {"target": 0.80, "kitmate": 0.62}
+    negs = {"target": 0.10, "kitmate": 0.68}   # below neg_conflict, still teammate-like
+    ident = lambda e: sims.get((e or {}).get("ident"), 0.0)
+    negf = lambda e: negs.get((e or {}).get("ident"), 0.0)
+    o = []
+    for k in range(18):
+        d = []
+        if k <= 4:
+            d.append(det(100, 100, ident="target"))
+        if k >= 10:
+            d.append(det(300, 120, ident="kitmate"))  # never concurrent with target
+        o.append(obs(k * STEP, d))
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], ident, negf)
+    for p in target_pts(tl):
+        assert p["media_ms"] <= 5 * STEP, \
+            "a non-concurrent same-kit teammate must never win by walkover"
+    assert tl["unresolved_intervals"], "the substitution refusal must be explicit"
+
+
+# ── S03: legitimate non-concurrent target fragment is still re-acquired ──
+def test_S03_true_fragment_reacquired():
+    o = []
+    for k in range(18):
+        d = []
+        if k <= 4:
+            d.append(det(100, 100, ident="target"))
+        if k >= 10:
+            d.append(det(300, 120, ident="target"))   # genuinely the target again
+        o.append(obs(k * STEP, d))
+    tl = run(o, [tap(0, 100, 100)])
+    late = [p for p in target_pts(tl) if p["media_ms"] >= 10 * STEP]
+    assert late, "affirmative-evidence fragments must still be re-acquired"
+    assert sorted(late, key=lambda p: p["media_ms"])[0]["state"] == "REACQUIRED"
+
+
+# ── S04: ambiguous same-kit fragment with insufficient evidence → unresolved ──
+def test_S04_insufficient_evidence_stays_unresolved():
+    sims = {"target": 0.80, "vague": 0.52}
+    negs = {"target": 0.10, "vague": 0.50}     # barely distinguishable from gallery
+    ident = lambda e: sims.get((e or {}).get("ident"), 0.0)
+    negf = lambda e: negs.get((e or {}).get("ident"), 0.0)
+    o = []
+    for k in range(18):
+        d = []
+        if k <= 4:
+            d.append(det(100, 100, ident="target"))
+        if k >= 12:
+            d.append(det(300, 120, ident="vague"))
+        o.append(obs(k * STEP, d))
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], ident, negf)
+    for p in target_pts(tl):
+        assert p["media_ms"] <= 5 * STEP, "insufficient evidence must never be guessed"
+    assert tl["unresolved_intervals"]
+
+
 def test_structural_schema():
     o = [obs(k * STEP, [det(100, 100, ident="target")]) for k in range(6)]
     tl = run(o, [tap(0, 100, 100)])

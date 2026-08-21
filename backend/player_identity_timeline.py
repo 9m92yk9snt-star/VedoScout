@@ -80,7 +80,11 @@ SWITCH_MEAN_GAP = 0.12      # material similarity change between segments
 # R01 — deterministic scene-cut stabilization
 MIN_SCENE_SAMPLES = 3       # smaller scenes are transition/flash artifacts
 REJOIN_SIG_DIFF = 20.0      # 8x8 pooled-gray diff below which two "scenes"
-                            # are the SAME shot (false cut / flash recovery)
+                            # MAY be the same shot (necessary, NOT sufficient)
+LAYOUT_CONTINUITY_MIN = 0.5 # fraction of detections that must persist in
+                            # place across a candidate rejoin boundary — two
+                            # different highlights on similar green pitches
+                            # share global luminance but not player layout
 
 # R02/R03 — evidence-based identity margins (same-kit teammates make a flat
 # 0.10 raw-similarity margin unreachable on real footage; the improvement is
@@ -140,6 +144,41 @@ def _sig_diff(a, b):
     return sum(abs(x - y) for x, y in zip(sa, sb)) / len(sa)
 
 
+def _layout_continuity(oa, ob):
+    """Structural same-shot evidence: fraction of detections in `oa` that have
+    a spatial counterpart in `ob` within plausible one-step motion. Within one
+    shot players barely move between samples; across two different highlights
+    the layout is unrelated even when the pitch/lighting looks identical."""
+    da = [d["box"] for d in (oa.get("detections") or [])]
+    db_ = [d["box"] for d in (ob.get("detections") or [])]
+    if not da or not db_:
+        return None
+    matched = 0
+    for b in da:
+        for c in db_:
+            hr = c[3] / max(1e-6, b[3])
+            if hr < SCALE_STEP[0] or hr > SCALE_STEP[1]:
+                continue
+            if _iou(b, c) >= 0.20:
+                matched += 1
+                break
+            c0, c1 = _center(b), _center(c)
+            if math.hypot(c1[0] - c0[0], c1[1] - c0[1]) <= 0.9 * max(b[3], c[3]):
+                matched += 1
+                break
+    return matched / len(da)
+
+
+def _same_shot(oa, ob):
+    """A rejoin needs BOTH global-signature similarity AND structural layout
+    continuity. Similar green pitch alone must never join two highlights."""
+    d = _sig_diff(oa, ob)
+    if d is None or d >= REJOIN_SIG_DIFF:
+        return False
+    lc = _layout_continuity(oa, ob)
+    return lc is not None and lc >= LAYOUT_CONTINUITY_MIN
+
+
 def _split_scenes(obs):
     """Split at hard cuts, then stabilize deterministically (R01):
     - rejoin consecutive 'scenes' whose boundary frames are the SAME shot
@@ -161,8 +200,7 @@ def _split_scenes(obs):
     while changed and len(raw) > 1:
         changed = False
         for k in range(len(raw) - 1):  # boundary rejoin: same shot continues
-            d = _sig_diff(obs[raw[k][-1]], obs[raw[k + 1][0]])
-            if d is not None and d < REJOIN_SIG_DIFF:
+            if _same_shot(obs[raw[k][-1]], obs[raw[k + 1][0]]):
                 raw[k] = raw[k] + raw.pop(k + 1)
                 changed = True
                 break
@@ -171,13 +209,12 @@ def _split_scenes(obs):
         for k, sc in enumerate(raw):   # minimum scene duration debounce
             if len(sc) >= MIN_SCENE_SAMPLES:
                 continue
-            if 0 < k < len(raw) - 1:
-                d = _sig_diff(obs[raw[k - 1][-1]], obs[raw[k + 1][0]])
-                if d is not None and d < REJOIN_SIG_DIFF:
-                    # flash/artifact INSIDE one continuous shot
-                    raw[k - 1] = raw[k - 1] + raw.pop(k) + raw.pop(k)
-                    changed = True
-                    break
+            if 0 < k < len(raw) - 1 \
+                    and _same_shot(obs[raw[k - 1][-1]], obs[raw[k + 1][0]]):
+                # flash/artifact INSIDE one continuous shot
+                raw[k - 1] = raw[k - 1] + raw.pop(k) + raw.pop(k)
+                changed = True
+                break
             j = k + 1 if k + 1 < len(raw) else k - 1
             sc = raw.pop(k)
             jj = j - 1 if j > k else j
@@ -440,12 +477,24 @@ def _concurrent_best_adj(tracks, idents, tr, used=()):
     return best
 
 
+def _affirmative(ii):
+    """Positive identity evidence in its own right (S02–S04): the fragment
+    must clearly match the tap profile AND beat the negative teammate gallery.
+    The mere absence of a concurrent rival is NOT identity evidence."""
+    if ii["score"] < SIM_T + REACQ_BONUS:
+        return False
+    need = ADJ_MARGIN_STRONG if ii["usable"] >= STRONG_USABLE else MARGIN_T
+    return ii["score"] >= ii["neg"] + need
+
+
 def _wins_margin(ii, best_other_adj):
     """Evidence-scaled acceptance: rich multi-frame evidence may win with a
-    smaller adjusted margin; thin evidence still needs the full margin."""
+    smaller adjusted margin; thin evidence still needs the full margin.
+    With NO concurrent rival the candidate must stand on affirmative
+    evidence — a sequential same-kit teammate never wins by walkover."""
     a = _adj_ident(ii)
     if best_other_adj is None:
-        return True
+        return _affirmative(ii)
     if ii["usable"] >= STRONG_USABLE and a >= best_other_adj + ADJ_MARGIN_STRONG:
         return True
     return a >= best_other_adj + MARGIN_T
