@@ -8858,6 +8858,32 @@ async def generate_full_report_task(report_id: str) -> None:
                 f"seeds={gt_track.get('seed_count')} (Δ={gt_t_off:+.2f}s)"
             )
 
+        # ── FIX 09A — GLOBAL TARGET IDENTITY TIMELINE (synchronous, observe-only).
+        # Scene-aware full-video identity coverage built from local CV only
+        # (zero model calls). Runs ALONGSIDE gt_track — persisted + compared,
+        # but NOT fed into FIX08 event authority in this phase.
+        if player_identity_timeline.TIMELINE_ENABLED and valid_anchors:
+            try:
+                _idtl = await asyncio.to_thread(
+                    player_identity_timeline.build_identity_timeline,
+                    str(file_path),
+                    {"anchors": valid_anchors, "anchor_time_offset": gt_t_off},
+                )
+                _idtl_cmp = player_identity_timeline.compare_with_production(_idtl, gt_track)
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"identity_timeline": _idtl,
+                              "identity_timeline_compare": _idtl_cmp}},
+                )
+                logger.info(
+                    f"[fix09a] {report_id}: status={_idtl.get('status')} "
+                    f"scenes={len(_idtl.get('scenes') or [])} "
+                    f"points={len(_idtl.get('target_points') or [])} "
+                    f"agreement={_idtl_cmp.get('agreement_rate')}"
+                )
+            except Exception:
+                logger.exception(f"[fix09a] identity timeline failed for {report_id}")
+
         # ── FIX 08 — ONE dedicated event-discovery pass (bounded, whole video).
         # Its only job is enumerating the tapped player's involvements; the
         # deterministic ledger (spatial actor validation against the FIX04
@@ -15604,6 +15630,7 @@ from motion_compensation import compute_motion_samples
 from speed_metrics import compute_speed_metrics
 import verified_stats as vstats
 import event_ledger
+import player_identity_timeline
 from progression import build_progression
 from score_context import build_score_context
 from score_meaning import build_score_meaning, build_score_meaning_teaser
