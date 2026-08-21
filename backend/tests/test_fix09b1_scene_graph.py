@@ -106,8 +106,10 @@ def test_b103_scene_cut_resets_only_local_tracks_not_global_target_identity():
 
 
 def test_b104_close_two-player_target_mapping_remains_bounded_hypotheses():
-    left = {"x": 0.095, "y": 0.20, "w": 0.10, "h": 0.30}
-    right = {"x": 0.115, "y": 0.20, "w": 0.10, "h": 0.30}
+    # Equal-distance bodies on opposite sides of the canonical target must not
+    # be resolved by list order or detector confidence.
+    left = {"x": 0.09, "y": 0.20, "w": 0.10, "h": 0.30}
+    right = {"x": 0.11, "y": 0.20, "w": 0.10, "h": 0.30}
     auth = authority([(0, TARGET)])
     out = fsg.assemble_scene_graph([obs(0, [det(left), det(right)])], auth)
     tm = out["frames"][0]["global_target"]
