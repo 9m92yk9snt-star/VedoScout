@@ -96,6 +96,11 @@ STRONG_USABLE = 5           # usable samples needed for the strong margin
 PIN_DOMINANT_IOU = 0.30     # tap spatial dominance: clear best overlap …
 PIN_RIVAL_IOU = 0.15        # … while every rival barely grazes the tap
 
+# FIX09A.1 — tap-independent GLOBAL_TARGET positive prototype bank
+BANK_MAX = 24               # bounded, deduplicated multi-view prototype bank
+BANK_PER_BUCKET = 2         # diversity: best N per (scene, scale-bucket)
+BANK_SINGLE_DISCOUNT = 0.95 # one supporting prototype is weaker than two
+
 STATES = ("VISIBLE", "PARTIAL", "OCCLUDED", "REACQUIRED", "CUT_REID")
 
 
@@ -500,6 +505,73 @@ def _wins_margin(ii, best_other_adj):
     return a >= best_other_adj + MARGIN_T
 
 
+# ─────────────────────────────────────── FIX09A.1 — global prototype bank
+def _harvest_bank(results, ident_fn):
+    """A1 — bounded, diverse GLOBAL_TARGET positive prototype bank harvested
+    ONLY from pass-1 identity-safe observations:
+    - TAP_PINNED scenes only
+    - directly tap-pinned segments (profile-consistent samples), and
+      gate-confirmed fragments only after conservative verification
+      (sample itself must clearly match the tap profile)
+    - never from occluded/predicted geometry (segments hold detections only),
+      overlap/contaminated crops (_usable), duel frames, unresolved
+      candidates or teammate tracks.
+    Diversity is preserved per (scene, scale-bucket) instead of collapsing
+    everything into one averaged appearance."""
+    rows = []
+    for r in results:
+        if r["reid_state"] != "TAP_PINNED":
+            continue
+        duels = r["duel_spans"]
+        for seg in r["segments"]:
+            floor = SIM_T if seg["join"] == "PIN" else SIM_T + REACQ_BONUS
+            for s in seg["samples"]:
+                if not _usable(s):
+                    continue
+                if any(d0 <= s["ms"] <= d1 for d0, d1 in duels):
+                    continue
+                try:
+                    v = float(ident_fn(s["emb"]))
+                except Exception:
+                    continue
+                if v < floor:
+                    continue
+                rows.append({"emb": s["emb"], "score": v, "h": s["box"][3],
+                             "scene": r["sd"]["no"]})
+    buckets = {}
+    for row in rows:
+        h, hb = max(6.0, row["h"]), 0
+        while h > 12.0:
+            h /= 2.0
+            hb += 1
+        buckets.setdefault((row["scene"], hb), []).append(row)
+    bank = []
+    for key in sorted(buckets):
+        items = sorted(buckets[key], key=lambda x: -x["score"])
+        bank.extend(items[:BANK_PER_BUCKET])
+    bank.sort(key=lambda x: -x["score"])
+    return bank[:BANK_MAX]
+
+
+def _bank_sim(emb, bank, pair_sim):
+    """A4 — multi-prototype scoring: a candidate may strongly match one valid
+    target VIEW (far/close/orientation) while differing from others. Robust
+    aggregation: mean of the two strongest prototype matches — acceptance
+    needs two independent supporting views, one lucky match is discounted."""
+    sims = []
+    for p in bank:
+        try:
+            sims.append(float(pair_sim(emb, p["emb"])))
+        except Exception:
+            continue
+    if not sims:
+        return 0.0
+    sims.sort(reverse=True)
+    if len(sims) == 1:
+        return sims[0] * BANK_SINGLE_DISCOUNT
+    return (sims[0] + sims[1]) / 2.0
+
+
 # ─────────────────────────────────────────────── target chain per scene
 def _resume_trim(samples, ident_fn, pin_ms_list):
     """MOT re-match after a real gap must be identity-confirmed — a nearby
@@ -578,11 +650,44 @@ def _crossing_intervals(crossings, tid, span0, span1):
 
 
 def _build_scene_chain(scene_no, tracks, crossings, pins, pin_restrict,
-                       ident_fn, neg_fn, width):
+                       ident_fn, neg_fn, width, guard_fn=None):
     """Returns (segments, reid_state, duel_spans, idents).
     segment = {"track", "samples", "join"}  join ∈ PIN | CUT_REID | REACQ."""
     idents = {tr.tid: _track_ident(tr, ident_fn, neg_fn) for tr in tracks}
     by_tid = {tr.tid: tr for tr in tracks}
+
+    # A5 flip-guard — in pass 2 the prototype bank may RAISE recall but must
+    # never FLIP which concurrent body the tap-time profile prefers. If the
+    # candidate loses the base-profile ordering to a concurrent rival, the two
+    # evidence sources disagree on identity → ambiguity → fail closed.
+    guard_idents = None
+    if guard_fn is not None:
+        guard_idents = {tr.tid: _track_ident(tr, guard_fn, neg_fn) for tr in tracks}
+
+    def _guard_ok(tr, pool_g, used_g=()):
+        if guard_idents is None:
+            return True
+        gi = guard_idents[tr.tid]
+        s0, s1 = tr.samples[0]["ms"], tr.samples[-1]["ms"]
+        for o in pool_g:
+            if o.tid == tr.tid or o.tid in used_g or not o.samples:
+                continue
+            if o.samples[0]["ms"] > s1 or o.samples[-1]["ms"] < s0:
+                continue
+            go = guard_idents[o.tid]
+            # only rivals the base profile GENUINELY recognizes can veto —
+            # ordering among sub-threshold noise scores is meaningless
+            if go["score"] >= SIM_T and go["usable"] >= 3 \
+                    and _adj_ident(go) >= _adj_ident(gi) + MARGIN_T:
+                return False
+        return True
+
+    def _guard_swap_ok(a_samples, b_samples, ov1):
+        if guard_fn is None:
+            return True
+        ag = _post_window_sim(a_samples, ov1, guard_fn)
+        bg = _post_window_sim(b_samples, ov1, guard_fn)
+        return not (ag is not None and bg is not None and ag >= bg + MARGIN_T)
     pin_list = sorted(pins or [])                      # [(ms, tid)]
     pin_ms_by_tid = {}
     for pms, ptid in pin_list:
@@ -634,7 +739,8 @@ def _build_scene_chain(scene_no, tracks, crossings, pins, pin_restrict,
             # candidates are rivals — an untapped body cannot outrank them.
             rival_pool = pool if pin_restrict else tracks
             if _wins_margin(idents[best.tid],
-                            _concurrent_best_adj(rival_pool, idents, best)):
+                            _concurrent_best_adj(rival_pool, idents, best)) \
+                    and _guard_ok(best, rival_pool):
                 _add_segment(best, "CUT_REID")
                 reid_state = ("TAP_PINNED" if pin_restrict
                               else ("CUT_REID" if scene_no > 0 else "APPEARANCE_REID"))
@@ -658,7 +764,9 @@ def _build_scene_chain(scene_no, tracks, crossings, pins, pin_restrict,
             pin_after = any(p >= ov0 for p in pin_ms_by_tid.get(tr.tid, []))
             if (not pin_after and other_tid not in used
                     and b_post is not None and b_post >= SIM_T
-                    and b_post >= (a_post or 0.0) + MARGIN_T):
+                    and b_post >= (a_post or 0.0) + MARGIN_T
+                    and _guard_swap_ok(seg["samples"], other.samples, ov1)
+                    and _guard_ok(other, tracks, used)):
                 # SWAP: MOT followed the wrong body through the duel — the
                 # post-separation evidence says the target continued on the
                 # OTHER local track. Ambiguous middle stays unresolved.
@@ -711,7 +819,8 @@ def _build_scene_chain(scene_no, tracks, crossings, pins, pin_restrict,
                      key=lambda tr: -tr.samples[-1]["ms"])
         for tr, edge in [(t, chain1) for t in fwd] + [(t, chain0) for t in bwd]:
             best_other = _concurrent_best_adj(tracks, idents, tr, used)
-            if _reacq_ok(tr, idents[tr.tid], edge["box"], edge["ms"], best_other, width):
+            if _reacq_ok(tr, idents[tr.tid], edge["box"], edge["ms"], best_other, width) \
+                    and _guard_ok(tr, tracks, used):
                 seg = _add_segment(tr, "REACQ")
                 if seg:
                     _resolve(seg)
@@ -796,12 +905,14 @@ def _emit_scene_points(scene_id, scene_after_cut, segments, ident_fn, width, hei
 
 # ─────────────────────────────────────────────── deterministic core
 def assemble_timeline(observations, taps=None, identity_sim=None,
-                      negative_sim=None):
+                      negative_sim=None, pair_sim=None):
     """Pure deterministic assembly. `observations` = per sampled frame:
-    {media_ms:int, cut:bool, cam_dx, cam_dy, width, height,
+    {media_ms:int, cut:bool, cam_dx, cam_dy, width, height, sig,
      detections:[{box:(x,y,w,h) px, emb, team}]}. `taps` = [{media_ms, box(px)}].
     identity_sim(emb)→[0,1] similarity to the tap identity profile;
-    negative_sim(emb)→[0,1] similarity to the negative teammate gallery."""
+    negative_sim(emb)→[0,1] similarity to the negative teammate gallery;
+    pair_sim(emb_a, emb_b)→[0,1] appearance similarity between two
+    observations — enables the FIX09A.1 tap-independent prototype bank."""
     ident_fn = identity_sim or (lambda e: 0.0)
     neg_fn = negative_sim
     obs = sorted((o for o in (observations or []) if isinstance(o.get("media_ms"), (int, float))),
@@ -916,16 +1027,48 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         # tapped candidates and must pass the strict identity gates later
         restrict_by_scene.setdefault(sd["no"], set()).update(cands.keys())
 
+    # ── two-pass offline reasoning (A2) ──
+    def _chain_all(fn, guard=None):
+        out = []
+        for sd in scene_data:
+            segments, reid_state, duel_spans, idents = _build_scene_chain(
+                sd["no"], sd["tracks"], sd["crossings"], pins_by_scene.get(sd["no"]),
+                restrict_by_scene.get(sd["no"]), fn, neg_fn, width, guard_fn=guard)
+            out.append({"sd": sd, "segments": segments, "reid_state": reid_state,
+                        "duel_spans": duel_spans, "idents": idents})
+        return out
+
+    ident_used = ident_fn
+    results = _chain_all(ident_fn)          # PASS 1 — tap authority + safe tracks
+    bank = []
+    if pair_sim is not None:
+        bank = _harvest_bank(results, ident_fn)
+        if bank:
+            # PASS 2 — revisit every scene with the tap-independent multi-view
+            # profile. The bank is FROZEN from pass-1 safe evidence: pass-2
+            # acceptances are never harvested back (no recursive
+            # self-training / contamination). Positive bank evidence only
+            # RAISES a candidate's identity — every acceptance still passes
+            # the full margin/affirmative/scale/duel gates.
+            def _ident2(e):
+                try:
+                    base = float(ident_fn(e))
+                except Exception:
+                    base = 0.0
+                return max(base, _bank_sim(e, bank, pair_sim))
+            ident_used = _ident2
+            results = _chain_all(_ident2, guard=ident_fn)
+
     points, scenes_out, other_tracks, unresolved = [], [], [], []
     counts = {s: 0 for s in STATES}
-    for sd in scene_data:
+    for r in results:
+        sd = r["sd"]
+        segments, reid_state = r["segments"], r["reid_state"]
+        duel_spans, idents = r["duel_spans"], r["idents"]
         sn = sd["no"]
         scene_id = f"scene_{sn + 1:03d}"
-        segments, reid_state, duel_spans, idents = _build_scene_chain(
-            sn, sd["tracks"], sd["crossings"], pins_by_scene.get(sn),
-            restrict_by_scene.get(sn), ident_fn, neg_fn, width)
         before = len(points)
-        _emit_scene_points(scene_id, sn > 0, segments, ident_fn, width, height, points)
+        _emit_scene_points(scene_id, sn > 0, segments, ident_used, width, height, points)
         scene_pts = points[before:]
         target_tids = {seg["track"].tid for seg in segments}
         fully_used = {seg["track"].tid for seg in segments
@@ -998,6 +1141,8 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         "target_points": points,
         "other_tracks": other_tracks[:300],
         "unresolved_intervals": merged_unresolved,
+        "profile_bank": {"size": len(bank),
+                         "scenes": sorted({p["scene"] + 1 for p in bank})},
         "counts": counts,
         "config": {"sim_t": SIM_T, "margin_t": MARGIN_T, "reacq_bonus": REACQ_BONUS,
                    "max_speed": MAX_SPEED, "overlap_iou": OVERLAP_IOU,
@@ -1123,7 +1268,11 @@ def build_identity_timeline(video_path: str, doc: dict):
         def _neg(emb):
             return max((cv_shadow._sim(emb, n) for n in negatives), default=0.0)
 
-        tl = assemble_timeline(observations, taps, _ident, _neg if negatives else None)
+        def _pair(a, b):
+            return cv_shadow._sim(a, b)
+
+        tl = assemble_timeline(observations, taps, _ident,
+                               _neg if negatives else None, pair_sim=_pair)
         tl.update({
             "hz": HZ,
             "samples": len(observations),

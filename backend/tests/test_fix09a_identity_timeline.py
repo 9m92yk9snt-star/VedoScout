@@ -717,6 +717,190 @@ def test_S04_insufficient_evidence_stays_unresolved():
     assert tl["unresolved_intervals"]
 
 
+# ══════════════ FIX09A.1 — tap-independent global profile (P01–P08) ══════════
+# Synthetic multi-view appearance model: the tap profile only knows the
+# CLOSE view (as real tap-time references do); pair_sim knows that the same
+# physical player looks alike across views, while same-kit teammates match
+# only moderately.
+
+def mk_prof(close=0.80, far=0.35):
+    def prof(e):
+        e = e or {}
+        if e.get("ident") == "target":
+            return close if e.get("view", "close") == "close" else far
+        return {"mate": 0.40, "kitmate": 0.42}.get(e.get("ident"), 0.10)
+    return prof
+
+
+def mk_pair(decoy_far=0.30):
+    def pair(a, b):
+        a, b = a or {}, b or {}
+        ia, ib = a.get("ident"), b.get("ident")
+        if {ia, ib} == {"decoy", "target"}:
+            # decoy strongly resembles the target's FAR view but not the
+            # trusted close-view prototypes (P05 self-contamination trap)
+            tv = a.get("view", "close") if ia == "target" else b.get("view", "close")
+            return 0.90 if tv == "far" else decoy_far
+        if ia == ib:
+            return 0.85 if a.get("view", "close") == b.get("view", "close") else 0.58
+        if a.get("kit") and a.get("kit") == b.get("kit"):
+            return 0.40
+        return 0.10
+    return pair
+
+
+def vdet(x, y, ident="target", view="close", w=30.0, h=60.0, kit="red"):
+    return {"box": (float(x), float(y), float(w), float(h)),
+            "emb": {"ident": ident, "view": view, "kit": kit}, "team": None}
+
+
+def lowneg(e):
+    return 0.05
+
+
+def run_bank(o, taps, prof=None, neg=lowneg, pair=None):
+    return pit.assemble_timeline(o, taps, prof or mk_prof(), neg, pair_sim=pair or mk_pair())
+
+
+# ── P01: multi-view profile → tap-less scene resolves in a different view ──
+def test_P01_multi_view_profile_cut_reid():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]           # close, pinned
+    o += [obs(k * STEP, [vdet(400, 60, view="far", w=14, h=28),
+                         vdet(60, 200, ident="kitmate", view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 14)]
+    tl = run_bank(o, [tap(0, 100, 100)])
+    assert tl["profile_bank"]["size"] > 0
+    s2 = [p for p in target_pts(tl) if p["scene_id"] == "scene_002"]
+    assert s2, "the far-view target must be re-identified WITHOUT a tap"
+    assert tl["scenes"][1]["reid_state"] == "CUT_REID"
+    for p in s2:
+        assert px(p)[0] > 300, "CUT_REID must land on the target, not the kitmate"
+    # without the bank the tap profile alone genuinely fails (proves the fix)
+    tl0 = pit.assemble_timeline(o, [tap(0, 100, 100)], mk_prof(), lowneg)
+    assert not [p for p in target_pts(tl0) if p["scene_id"] == "scene_002"]
+
+
+# ── P02: thin negative gallery must not collapse recall ──
+def test_P02_thin_negative_gallery():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]
+    o += [obs(k * STEP, [vdet(380, 80, view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 14)]
+    tl = run_bank(o, [tap(0, 100, 100)], neg=lambda e: 0.0)  # near-empty gallery
+    s2 = [p for p in target_pts(tl) if p["scene_id"] == "scene_002"]
+    assert s2, "a thin negative gallery must not force REID_FAILED"
+
+
+# ── P03: zero negative support entirely ──
+def test_P03_zero_negative_support():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]
+    o += [obs(k * STEP, [vdet(380, 80, view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 14)]
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], mk_prof(), None,
+                               pair_sim=mk_pair())
+    s2 = [p for p in target_pts(tl) if p["scene_id"] == "scene_002"]
+    assert s2, "no negative gallery at all — strong positive evidence must suffice"
+
+
+# ── P04: same-kit teammate resembling the target moderately never wins ──
+def test_P04_same_kit_teammate_safety():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]
+    o += [obs(k * STEP, [vdet(300, 120, ident="kitmate", view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 14)]
+    tl = run_bank(o, [tap(0, 100, 100)])
+    assert not [p for p in target_pts(tl) if p["scene_id"] == "scene_002"], \
+        "moderate kit-level resemblance must never inherit GLOBAL_TARGET"
+    assert tl["scenes"][1]["reid_state"] in ("UNRESOLVED", "NO_TARGET")
+
+
+# ── P05: no recursive self-contamination of the prototype bank ──
+def test_P05_no_self_contamination():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]           # scene 1: close, pinned
+    o += [obs(k * STEP, [vdet(400, 60, view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 12)]                    # scene 2: bank-resolved
+    o += [obs(k * STEP, [vdet(200, 100, ident="decoy", view="far", w=14, h=28)],
+              cut=(k == 12)) for k in range(12, 18)]                  # scene 3: decoy
+    tl = run_bank(o, [tap(0, 100, 100)])
+    assert [p for p in target_pts(tl) if p["scene_id"] == "scene_002"], \
+        "the far-view target itself must resolve (bank works)"
+    assert not [p for p in target_pts(tl) if p["scene_id"] == "scene_003"], \
+        "a decoy matching a PASS-2 acceptance must not pass — pass-2 samples " \
+        "are never harvested into the trusted bank"
+    assert tl["profile_bank"]["scenes"] == [1], "bank must come from tap-pinned scene 1 only"
+
+
+# ── P06: legitimate target fragment re-acquired via the bank ──
+def test_P06_true_fragment_reacquired_via_bank():
+    o = []
+    for k in range(18):
+        d = []
+        if k <= 4:
+            d.append(vdet(100, 100))                                  # close, pinned
+        if k >= 10:
+            d.append(vdet(300, 120, view="far", w=20, h=40))          # returns, farther
+        o.append(obs(k * STEP, d))
+    tl = run_bank(o, [tap(0, 100, 100)])
+    late = [p for p in target_pts(tl) if p["media_ms"] >= 10 * STEP]
+    assert late, "the returning target fragment must be re-acquired via the bank"
+    assert sorted(late, key=lambda p: p["media_ms"])[0]["state"] == "REACQUIRED"
+
+
+# ── P07: two genuinely indistinguishable candidates stay unresolved ──
+def test_P07_ambiguous_two_candidates_stay_unresolved():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]
+    o += [obs(k * STEP, [vdet(380, 80, ident="twinA", view="far", w=14, h=28),
+                         vdet(60, 200, ident="twinB", view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 14)]
+
+    def pair(a, b):
+        a, b = a or {}, b or {}
+        if {a.get("ident"), b.get("ident")} <= {"twinA", "twinB", "target"} \
+                and a.get("ident") != b.get("ident"):
+            return 0.58   # both twins match the trusted prototypes equally
+        return mk_pair()(a, b)
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], mk_prof(), lowneg, pair_sim=pair)
+    assert not [p for p in target_pts(tl) if p["scene_id"] == "scene_002"], \
+        "equal bank evidence for two concurrent bodies must never be guessed"
+    assert tl["scenes"][1]["reid_state"] == "UNRESOLVED"
+
+
+# ── P08: identity stays scale-independent across cuts (close → far → medium) ──
+def test_P08_diverse_scale_across_cuts():
+    o = [obs(k * STEP, [vdet(60, 180, w=70, h=140)]) for k in range(6)]
+    o += [obs(k * STEP, [vdet(430, 30, view="far", w=12, h=25)],
+              cut=(k == 6)) for k in range(6, 12)]
+    o += [obs(k * STEP, [vdet(200, 100, view="far", w=28, h=55)],
+              cut=(k == 12)) for k in range(12, 18)]
+    tl = run_bank(o, [tap(0, 60, 180, w=70, h=140)])
+    covered = {p["scene_id"] for p in target_pts(tl)}
+    assert covered == {"scene_001", "scene_002", "scene_003"}, \
+        "cross-cut identity must be scale- and position-independent"
+
+
+# ── P09: bank must never FLIP the base-profile ordering of concurrent bodies ──
+def test_P09_bank_cannot_flip_concurrent_preference():
+    o = [obs(k * STEP, [vdet(100, 100)]) for k in range(6)]
+    o += [obs(k * STEP, [vdet(380, 80, ident="candA", view="far", w=14, h=28),
+                         vdet(60, 200, ident="candB", view="far", w=14, h=28)],
+              cut=(k == 6)) for k in range(6, 14)]
+
+    def prof(e):
+        e = e or {}
+        return {"target": 0.80, "candA": 0.62, "candB": 0.45}.get(e.get("ident"), 0.10)
+
+    def pair(a, b):
+        a, b = a or {}, b or {}
+        pr = {a.get("ident"), b.get("ident")}
+        if pr == {"candB", "target"}:
+            return 0.75   # bank strongly prefers B …
+        if pr == {"candA", "target"}:
+            return 0.55   # … while the tap profile prefers A by a full margin
+        return mk_pair()(a, b)
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], prof, lowneg, pair_sim=pair)
+    assert not [p for p in target_pts(tl) if p["scene_id"] == "scene_002"], \
+        "profile/bank ordering disagreement between concurrent bodies = ambiguity"
+    assert tl["scenes"][1]["reid_state"] == "UNRESOLVED"
+
+
 def test_structural_schema():
     o = [obs(k * STEP, [det(100, 100, ident="target")]) for k in range(6)]
     tl = run(o, [tap(0, 100, 100)])
