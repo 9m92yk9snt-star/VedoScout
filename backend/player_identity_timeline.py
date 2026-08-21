@@ -77,6 +77,21 @@ SWITCH_MIN_RUN = 3          # usable samples of persistent opposite identity
 SWITCH_MIN_RUN_NEG = 2      # when the negative gallery dominates every sample
 SWITCH_MEAN_GAP = 0.12      # material similarity change between segments
 
+# R01 — deterministic scene-cut stabilization
+MIN_SCENE_SAMPLES = 3       # smaller scenes are transition/flash artifacts
+REJOIN_SIG_DIFF = 20.0      # 8x8 pooled-gray diff below which two "scenes"
+                            # are the SAME shot (false cut / flash recovery)
+
+# R02/R03 — evidence-based identity margins (same-kit teammates make a flat
+# 0.10 raw-similarity margin unreachable on real footage; the improvement is
+# better reasoning, not lower thresholds: negative-relative adjustment,
+# concurrent-only rivals and evidence-scaled acceptance)
+NEG_REL_W = 0.5             # weight of (score - negative_gallery) evidence
+ADJ_MARGIN_STRONG = 0.05    # adjusted margin with strong multi-frame evidence
+STRONG_USABLE = 5           # usable samples needed for the strong margin
+PIN_DOMINANT_IOU = 0.30     # tap spatial dominance: clear best overlap …
+PIN_RIVAL_IOU = 0.15        # … while every rival barely grazes the tap
+
 STATES = ("VISIBLE", "PARTIAL", "OCCLUDED", "REACQUIRED", "CUT_REID")
 
 
@@ -118,16 +133,58 @@ def _usable(s) -> bool:
 
 
 # ─────────────────────────────────────────────── scene segmentation + MOT
+def _sig_diff(a, b):
+    sa, sb = a.get("sig"), b.get("sig")
+    if not sa or not sb or len(sa) != len(sb):
+        return None
+    return sum(abs(x - y) for x, y in zip(sa, sb)) / len(sa)
+
+
 def _split_scenes(obs):
-    scenes, cur = [], []
+    """Split at hard cuts, then stabilize deterministically (R01):
+    - rejoin consecutive 'scenes' whose boundary frames are the SAME shot
+      (false cut from a pan spike / decode artifact)
+    - a scene shorter than MIN_SCENE_SAMPLES is a transition/flash fragment:
+      if its neighbours are the same shot, the whole run is rejoined
+      (flash inside one clip); otherwise it is absorbed into the next scene.
+    Genuinely different highlight clips are never joined."""
+    raw, cur = [], []
     for i, o in enumerate(obs):
         if o.get("cut") and cur:
-            scenes.append(cur)
+            raw.append(cur)
             cur = []
         cur.append(i)
     if cur:
-        scenes.append(cur)
-    return scenes
+        raw.append(cur)
+
+    changed = True
+    while changed and len(raw) > 1:
+        changed = False
+        for k in range(len(raw) - 1):  # boundary rejoin: same shot continues
+            d = _sig_diff(obs[raw[k][-1]], obs[raw[k + 1][0]])
+            if d is not None and d < REJOIN_SIG_DIFF:
+                raw[k] = raw[k] + raw.pop(k + 1)
+                changed = True
+                break
+        if changed:
+            continue
+        for k, sc in enumerate(raw):   # minimum scene duration debounce
+            if len(sc) >= MIN_SCENE_SAMPLES:
+                continue
+            if 0 < k < len(raw) - 1:
+                d = _sig_diff(obs[raw[k - 1][-1]], obs[raw[k + 1][0]])
+                if d is not None and d < REJOIN_SIG_DIFF:
+                    # flash/artifact INSIDE one continuous shot
+                    raw[k - 1] = raw[k - 1] + raw.pop(k) + raw.pop(k)
+                    changed = True
+                    break
+            j = k + 1 if k + 1 < len(raw) else k - 1
+            sc = raw.pop(k)
+            jj = j - 1 if j > k else j
+            raw[jj] = sorted(raw[jj] + sc)
+            changed = True
+            break
+    return raw
 
 
 def _scene_mot(obs, idxs):
@@ -360,6 +417,40 @@ def _post_window_sim(samples, after_ms, ident_fn):
     return best
 
 
+# ─────────────────────────────────────────────── R02/R03 evidence reasoning
+def _adj_ident(ii):
+    """Negative-relative identity: matching the tap profile matters only to
+    the degree the body matches it BETTER than the negative teammate gallery.
+    Same-kit teammates score high raw similarity but low relative evidence."""
+    return ii["score"] + NEG_REL_W * (ii["score"] - ii["neg"])
+
+
+def _concurrent_best_adj(tracks, idents, tr, used=()):
+    """Best rival evidence among tracks visible AT THE SAME TIME as `tr`.
+    Non-concurrent tracks may be the SAME player (fragments) and must never
+    block selection — they are chained via re-acquisition instead."""
+    s0, s1 = tr.samples[0]["ms"], tr.samples[-1]["ms"]
+    best = None
+    for o in tracks:
+        if o.tid == tr.tid or o.tid in used or not o.samples:
+            continue
+        if o.samples[0]["ms"] <= s1 and o.samples[-1]["ms"] >= s0:
+            a = _adj_ident(idents[o.tid])
+            best = a if best is None else max(best, a)
+    return best
+
+
+def _wins_margin(ii, best_other_adj):
+    """Evidence-scaled acceptance: rich multi-frame evidence may win with a
+    smaller adjusted margin; thin evidence still needs the full margin."""
+    a = _adj_ident(ii)
+    if best_other_adj is None:
+        return True
+    if ii["usable"] >= STRONG_USABLE and a >= best_other_adj + ADJ_MARGIN_STRONG:
+        return True
+    return a >= best_other_adj + MARGIN_T
+
+
 # ─────────────────────────────────────────────── target chain per scene
 def _resume_trim(samples, ident_fn, pin_ms_list):
     """MOT re-match after a real gap must be identity-confirmed — a nearby
@@ -393,23 +484,23 @@ def _resume_trim(samples, ident_fn, pin_ms_list):
     return out
 
 
-def _reacq_ok(cand, cand_ident, last_box, last_ms, best_other_score, width):
+def _reacq_ok(cand, cand_ident, edge_box, edge_ms, best_other_adj, width):
     if cand_ident["usable"] < 1 or cand_ident["team_conflict"] or cand_ident["neg_conflict"]:
         return False
     if cand_ident["score"] < SIM_T + REACQ_BONUS:
         return False
-    if best_other_score is not None and cand_ident["score"] < best_other_score + MARGIN_T:
+    if not _wins_margin(cand_ident, best_other_adj):
         return False
-    first = cand.samples[0]
-    if last_box is not None:
-        hr = first["box"][3] / max(1e-6, last_box[3])
+    edge_s = cand.samples[0] if cand.samples[0]["ms"] > edge_ms else cand.samples[-1]
+    if edge_box is not None:
+        hr = edge_s["box"][3] / max(1e-6, edge_box[3])
         if hr < SCALE_JOIN[0] or hr > SCALE_JOIN[1]:
-            return False  # physically implausible scale jump
-        gap_s = max(0.0, (first["ms"] - last_ms) / 1000.0)
+            return False  # physically implausible scale jump (within scene)
+        gap_s = abs(edge_s["ms"] - edge_ms) / 1000.0
         if 0.0 < gap_s <= 1.0:
-            c0, c1 = _center(last_box), _center(first["box"])
+            c0, c1 = _center(edge_box), _center(edge_s["box"])
             if math.hypot(c1[0] - c0[0], c1[1] - c0[1]) > (
-                    MAX_SPEED * width * gap_s + 1.2 * max(last_box[3], first["box"][3])):
+                    MAX_SPEED * width * gap_s + 1.2 * max(edge_box[3], edge_s["box"][3])):
                 return False  # teleport — a nearby body is not the target
     return True
 
@@ -472,27 +563,34 @@ def _build_scene_chain(scene_no, tracks, crossings, pins, pin_restrict,
             _add_segment(by_tid[ptid], "PIN")
         segments.sort(key=lambda g: g["samples"][0]["ms"])
     else:
-        # tap-less scene (highlight cut) or C04 bounded tap hypotheses —
-        # appearance re-identification with strict gates and a clear margin.
+        # R02/R03 — whole-scene offline re-identification for tap-less scenes
+        # (or C04 bounded tap hypotheses): rank ALL local tracks by
+        # multi-frame negative-relative evidence, drop candidates contradicted
+        # by team/negative identity, and accept the winner only if it clearly
+        # beats every CONCURRENT rival (fragments of the target itself are
+        # chained later, never counted as rivals).
         pool = tracks if not pin_restrict else [tr for tr in tracks
                                                 if tr.tid in pin_restrict]
         cands = []
         for tr in pool:
             ii = idents[tr.tid]
-            if ii["usable"] >= 2 and not ii["team_conflict"] and not ii["neg_conflict"] \
+            if ii["usable"] >= 3 and not ii["team_conflict"] and not ii["neg_conflict"] \
                     and ii["score"] >= SIM_T + CUT_REID_BONUS:
                 cands.append(tr)
-        cands.sort(key=lambda tr: -idents[tr.tid]["score"])
+        cands.sort(key=lambda tr: -_adj_ident(idents[tr.tid]))
         if cands:
             best = cands[0]
-            runner = max((idents[tr.tid]["score"] for tr in tracks if tr.tid != best.tid),
-                         default=0.0)
-            if idents[best.tid]["score"] >= runner + MARGIN_T:
+            # tap authority constrains the hypothesis space: in restricted
+            # mode the target IS one of the tapped candidates, so only those
+            # candidates are rivals — an untapped body cannot outrank them.
+            rival_pool = pool if pin_restrict else tracks
+            if _wins_margin(idents[best.tid],
+                            _concurrent_best_adj(rival_pool, idents, best)):
                 _add_segment(best, "CUT_REID")
                 reid_state = ("TAP_PINNED" if pin_restrict
                               else ("CUT_REID" if scene_no > 0 else "APPEARANCE_REID"))
             else:
-                reid_state = "UNRESOLVED"  # near-equal candidates — never guess
+                reid_state = "UNRESOLVED"  # concurrent near-equal rivals — never guess
         else:
             reid_state = "NO_TARGET" if not tracks else "UNRESOLVED"
 
@@ -537,26 +635,34 @@ def _build_scene_chain(scene_no, tracks, crossings, pins, pin_restrict,
         _resolve(seg)
     segments = [s for s in segments if s["samples"]]
 
-    # ── re-acquisition extension: later identity-verified tracks may join ──
+    # ── R02.5 — bidirectional in-scene reconciliation: once ANY part of the
+    # scene is confidently identified, chain identity-verified fragments both
+    # FORWARD and BACKWARD through the scene (offline video — future frames
+    # legitimately resolve earlier ones). No fragment may overlap the chain
+    # in time (a concurrent body is a different player).
     changed = True
     while changed:
         changed = False
         segments.sort(key=lambda g: g["samples"][0]["ms"])
         if not segments:
             break
-        last = segments[-1]
-        last_ms = last["samples"][-1]["ms"]
-        last_box = last["samples"][-1]["box"]
+        chain0 = segments[0]["samples"][0]
+        chain1 = segments[-1]["samples"][-1]
+        spans = [(g["samples"][0]["ms"], g["samples"][-1]["ms"]) for g in segments]
+
+        def _overlaps_chain(tr):
+            t0, t1 = tr.samples[0]["ms"], tr.samples[-1]["ms"]
+            return any(t0 <= b and t1 >= a for a, b in spans)
+
         cands = [tr for tr in tracks if tr.tid not in used
-                 and tr.samples and tr.samples[0]["ms"] > last_ms]
-        cands.sort(key=lambda tr: tr.samples[0]["ms"])
-        for tr in cands:
-            span = (tr.samples[0]["ms"], tr.samples[-1]["ms"])
-            best_other = max((idents[o.tid]["score"] for o in tracks
-                              if o.tid != tr.tid and o.tid not in used
-                              and o.samples and o.samples[0]["ms"] <= span[1]
-                              and o.samples[-1]["ms"] >= span[0]), default=None)
-            if _reacq_ok(tr, idents[tr.tid], last_box, last_ms, best_other, width):
+                 and tr.samples and not _overlaps_chain(tr)]
+        fwd = sorted((tr for tr in cands if tr.samples[0]["ms"] > chain1["ms"]),
+                     key=lambda tr: tr.samples[0]["ms"])
+        bwd = sorted((tr for tr in cands if tr.samples[-1]["ms"] < chain0["ms"]),
+                     key=lambda tr: -tr.samples[-1]["ms"])
+        for tr, edge in [(t, chain1) for t in fwd] + [(t, chain0) for t in bwd]:
+            best_other = _concurrent_best_adj(tracks, idents, tr, used)
+            if _reacq_ok(tr, idents[tr.tid], edge["box"], edge["ms"], best_other, width):
                 seg = _add_segment(tr, "REACQ")
                 if seg:
                     _resolve(seg)
@@ -680,8 +786,13 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         tbox = tap.get("box")
         if not isinstance(tms, (int, float)) or not tbox:
             continue
-        sd = next((d for d in scene_data
-                   if d["start_ms"] - PIN_WINDOW_MS <= tms <= d["end_ms"] + PIN_WINDOW_MS), None)
+        # R01/F5 — a tap binds to the scene that TRULY contains its timestamp;
+        # the ±window fallback applies only when no scene contains it (a tap
+        # 0.3 s before a cut must not pin a body in the previous clip).
+        sd = next((d for d in scene_data if d["start_ms"] <= tms <= d["end_ms"]), None)
+        if sd is None:
+            sd = next((d for d in scene_data
+                       if d["start_ms"] - PIN_WINDOW_MS <= tms <= d["end_ms"] + PIN_WINDOW_MS), None)
         if sd is None:
             continue
         by_tid = {tr.tid: tr for tr in sd["tracks"]}
@@ -704,7 +815,20 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         if len(cands) == 1:
             pins_by_scene.setdefault(sd["no"], []).append((int(tms), next(iter(cands))))
             continue
-        # multiple bodies overlap the tap — resolve by identity evidence:
+        # C04a — SPATIAL DOMINANCE at the tap MOMENT: the tap box is the
+        # user's statement of WHERE the player is. Judged on each track's
+        # temporally-nearest sample (a box 0.5 s away may belong to a body
+        # that moved into the tapped spot). If one body clearly occupies the
+        # tap while every rival barely grazes it, the tap is not ambiguous.
+        near = sorted(((k[0], -k[1], tid) for tid, k in cands.items()),
+                      key=lambda x: -x[1])          # by nearest-sample IoU
+        (dt1, sp1, sp1_tid), sp2 = near[0], (near[1][1] if len(near) > 1 else 0.0)
+        if dt1 <= 400 and sp1 >= PIN_DOMINANT_IOU \
+                and (sp2 < PIN_RIVAL_IOU or sp1 >= 2.0 * sp2):
+            pins_by_scene.setdefault(sd["no"], []).append((int(tms), sp1_tid))
+            continue
+        # multiple bodies genuinely overlap the tap — resolve by identity
+        # evidence:
         # 1) appearance around the tap (owned, non-overlapped samples only,
         #    matched against the OTHER tap references / negative gallery)
         def _near_sim(tid):
@@ -801,6 +925,22 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
             "reid_state": reid_state,
         })
 
+    # merge overlapping/duplicate unresolved intervals (same scene + reason)
+    merged_unresolved = []
+    for key in sorted({(u["scene_id"], u["reason"]) for u in unresolved}):
+        rows = sorted((u for u in unresolved
+                       if (u["scene_id"], u["reason"]) == key),
+                      key=lambda u: u["start_ms"])
+        for u in rows:
+            last = merged_unresolved[-1] if merged_unresolved else None
+            if (last and last["scene_id"] == u["scene_id"]
+                    and last["reason"] == u["reason"]
+                    and u["start_ms"] <= last["end_ms"]):
+                last["end_ms"] = max(last["end_ms"], u["end_ms"])
+            else:
+                merged_unresolved.append(dict(u))
+    merged_unresolved.sort(key=lambda u: (u["start_ms"], u["scene_id"]))
+
     return {
         "version": VERSION,
         "status": "ok",
@@ -808,7 +948,7 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         "scenes": scenes_out,
         "target_points": points,
         "other_tracks": other_tracks[:300],
-        "unresolved_intervals": unresolved,
+        "unresolved_intervals": merged_unresolved,
         "counts": counts,
         "config": {"sim_t": SIM_T, "margin_t": MARGIN_T, "reacq_bonus": REACQ_BONUS,
                    "max_speed": MAX_SPEED, "overlap_iou": OVERLAP_IOU,
@@ -889,6 +1029,7 @@ def build_identity_timeline(video_path: str, doc: dict):
             # hard cut: big global diff the camera model cannot explain
             cut = (diff > CUT_DIFF and cam.mode != "affine") or diff > CUT_DIFF_HARD
             cam_dx, cam_dy = (0.0, 0.0) if cut else (cam.dx, cam.dy)
+            sig = cv2.resize(tiny, (8, 8), interpolation=cv2.INTER_AREA).flatten().tolist()
 
             boxes = []
             if detector.ok:
@@ -911,7 +1052,7 @@ def build_identity_timeline(video_path: str, doc: dict):
                 dets.append({"box": b, "emb": emb, "team": team.classify(ch)})
             observations.append({
                 "media_ms": int(round(t * 1000)), "cut": cut,
-                "cam_dx": cam_dx, "cam_dy": cam_dy,
+                "cam_dx": cam_dx, "cam_dy": cam_dy, "sig": sig,
                 "width": sw, "height": sh, "detections": dets,
             })
 

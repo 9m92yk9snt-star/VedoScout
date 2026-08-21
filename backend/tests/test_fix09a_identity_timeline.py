@@ -32,9 +32,9 @@ def det(x, y, w=30.0, h=60.0, ident="target", owned=None, team=None):
     return {"box": (float(x), float(y), float(w), float(h)), "emb": emb, "team": team}
 
 
-def obs(ms, dets, cut=False, cam=(0.0, 0.0)):
+def obs(ms, dets, cut=False, cam=(0.0, 0.0), sig=None):
     return {"media_ms": int(ms), "cut": cut, "cam_dx": cam[0], "cam_dy": cam[1],
-            "width": W, "height": H, "detections": dets}
+            "sig": sig, "width": W, "height": H, "detections": dets}
 
 
 def tap(ms, x, y, w=30.0, h=60.0):
@@ -485,7 +485,164 @@ def test_A25_ambiguous_tap_during_overlap():
     assert tl["scenes"][0]["reid_state"] == "TAP_PINNED"
 
 
-# ── structural: schema + counts + config ──
+# ── R01a: one-frame false cut (same shot) is rejoined ──
+def test_R01a_one_frame_false_cut_rejoined():
+    sig = [50.0] * 64
+    o = [obs(k * STEP, [det(100 + 5 * k, 100, ident="target")],
+             cut=(k == 6), sig=sig) for k in range(12)]
+    tl = run(o, [tap(0, 100, 100)])
+    assert len(tl["scenes"]) == 1, "a false cut inside one shot must be rejoined"
+    assert len(target_pts(tl)) == 12
+    assert all(p["state"] == "VISIBLE" for p in target_pts(tl)[1:])
+
+
+# ── R01b: flash/exposure spike inside one shot ──
+def test_R01b_flash_spike_single_scene():
+    base, flash = [50.0] * 64, [255.0] * 64
+    o = []
+    for k in range(12):
+        if k == 6:
+            o.append(obs(k * STEP, [], cut=True, sig=flash))     # blown-out frame
+        else:
+            o.append(obs(k * STEP, [det(100 + 5 * k, 100, ident="target")],
+                         cut=(k == 7), sig=base))
+    tl = run(o, [tap(0, 100, 100)])
+    assert len(tl["scenes"]) == 1, "a flash frame must not create standalone scenes"
+    assert len(target_pts(tl)) >= 11
+
+
+# ── R01c: true hard cut stays split ──
+def test_R01c_true_hard_cut_stays_split():
+    a, b = [30.0] * 64, [200.0] * 64
+    o = [obs(k * STEP, [det(100, 100, ident="target")], sig=a) for k in range(6)]
+    o += [obs(k * STEP, [det(350, 180, ident="target")], cut=(k == 6), sig=b)
+          for k in range(6, 12)]
+    tl = run(o, [tap(0, 100, 100)])
+    assert len(tl["scenes"]) == 2, "genuinely different clips must never be joined"
+
+
+# ── R01d: rapid legitimate highlight cuts all survive ──
+def test_R01d_rapid_legit_cuts_survive():
+    sigs = [[30.0] * 64, [120.0] * 64, [220.0] * 64]
+    o = []
+    for sn in range(3):
+        for k in range(4):
+            i = sn * 4 + k
+            o.append(obs(i * STEP, [det(100 + 40 * sn, 100, ident="target")],
+                         cut=(k == 0 and sn > 0), sig=sigs[sn]))
+    tl = run(o, [tap(0, 100, 100)])
+    assert len(tl["scenes"]) == 3, "rapid legitimate cuts must stay separate scenes"
+
+
+# ── R01e: a tap binds to the scene truly containing its timestamp ──
+def test_R01e_tap_binds_truly_containing_scene():
+    a, b = [30.0] * 64, [200.0] * 64
+    o = [obs(k * STEP, [det(100, 100, ident="mate")], sig=a) for k in range(8)]
+    o += [obs(k * STEP, [det(400, 200, ident="target"), det(100, 100, ident="mate")],
+              cut=(k == 8), sig=b) for k in range(8, 16)]
+    # tap at 1650 ms: truly inside scene_2, but within 600 ms of scene_1's end
+    tl = run(o, [tap(8 * STEP + 50, 400, 200)])
+    s2 = [p for p in target_pts(tl) if p["scene_id"] == "scene_002"]
+    assert s2, "the tap must pin inside the scene that contains it"
+    for p in s2:
+        assert px(p)[0] > 300, "the pinned body is in scene_2, not the old clip"
+    assert tl["scenes"][1]["reid_state"] == "TAP_PINNED"
+    assert not [p for p in target_pts(tl) if p["scene_id"] == "scene_001"]
+
+
+# ── R02a: whole-scene re-id — target only clear LATER in the scene,
+#          then reconciled BACKWARD through identity-verified fragments ──
+def test_R02a_backward_reconciliation():
+    o = []
+    for k in range(6):   # scene_1: tap-pinned
+        o.append(obs(k * STEP, [det(100, 100, ident="target")]))
+    for k in range(6, 20):  # scene_2 (tap-less)
+        d = [det(60, 200, ident="mate")]           # concurrent same-kit rival
+        if k <= 10:
+            d.append(det(300, 100, ident="target"))   # early fragment
+        if k >= 14:
+            d.append(det(380, 100, ident="target"))   # late clear fragment
+        o.append(obs(k * STEP, d, cut=(k == 6)))
+    tl = run(o, [tap(0, 100, 100)])
+    s2 = sorted((p for p in target_pts(tl) if p["scene_id"] == "scene_002"),
+                key=lambda p: p["media_ms"])
+    assert s2, "scene must be resolved via whole-scene evidence"
+    assert tl["scenes"][1]["reid_state"] == "CUT_REID"
+    assert s2[0]["media_ms"] <= 7 * STEP, \
+        "the early fragment must be reconciled backward through the scene"
+    assert s2[-1]["media_ms"] >= 14 * STEP
+    assert any(p["state"] == "REACQUIRED" for p in s2), "fragment joins are re-acquisitions"
+    for p in s2:
+        assert px(p)[0] > 250, "the concurrent mate must never enter the chain"
+
+
+# ── R03a: ranked hypotheses — negative-gallery contradiction eliminates rival ──
+def test_R03a_negative_evidence_eliminates_rival():
+    sims = {"target": 0.66, "mate": 0.62}
+    negs = {"target": 0.30, "mate": 0.78}
+    ident = lambda e: sims.get((e or {}).get("ident"), 0.0)
+    negf = lambda e: negs.get((e or {}).get("ident"), 0.0)
+    o = []
+    for k in range(6):
+        o.append(obs(k * STEP, [det(100, 100, ident="target")]))
+    for k in range(6, 16):
+        o.append(obs(k * STEP, [det(300, 100, ident="target"),
+                                det(80, 200, ident="mate")], cut=(k == 6)))
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], ident, negf)
+    s2 = [p for p in target_pts(tl) if p["scene_id"] == "scene_002"]
+    assert s2, "close raw scores must still resolve via negative-relative evidence"
+    assert tl["scenes"][1]["reid_state"] == "CUT_REID"
+    for p in s2:
+        assert px(p)[0] > 250, "the negative-contradicted rival must never win"
+
+
+# ── R03b: two concurrent indistinguishable candidates stay unresolved ──
+def test_R03b_indistinguishable_concurrent_stays_unresolved():
+    sims = {"target": 0.66}
+    ident = lambda e: sims.get((e or {}).get("ident"), 0.0)
+    o = []
+    for k in range(6):
+        o.append(obs(k * STEP, [det(100, 100, ident="target")]))
+    for k in range(6, 16):
+        o.append(obs(k * STEP, [det(300, 100, ident="target"),
+                                det(80, 200, ident="target")], cut=(k == 6)))
+    tl = pit.assemble_timeline(o, [tap(0, 100, 100)], ident, neg_sim)
+    assert not [p for p in target_pts(tl) if p["scene_id"] == "scene_002"], \
+        "two equal concurrent bodies must never be guessed"
+    assert tl["scenes"][1]["reid_state"] == "UNRESOLVED"
+
+
+# ── R04a: cross-cut re-id is scale- and position-independent ──
+def test_R04a_cross_cut_scale_position_independent():
+    o = []
+    for k in range(6):   # close-up bottom-left
+        o.append(obs(k * STEP, [det(60, 180, w=70.0, h=140.0, ident="target")]))
+    for k in range(6, 14):  # tiny, opposite corner + concurrent same-size mate
+        o.append(obs(k * STEP, [det(430, 20, w=12.0, h=25.0, ident="target"),
+                                det(30, 20, w=12.0, h=25.0, ident="mate")],
+                     cut=(k == 6)))
+    tl = run(o, [tap(0, 60, 180, w=70.0, h=140.0)])
+    s2 = [p for p in target_pts(tl) if p["scene_id"] == "scene_002"]
+    assert s2, "cross-cut re-id must not apply scale or screen-position priors"
+    assert tl["scenes"][1]["reid_state"] == "CUT_REID"
+    for p in s2:
+        assert px(p)[0] > 350
+
+
+# ── C04a: spatially dominant tap binds instantly even with a grazing rival ──
+def test_C04a_spatial_dominance_pin():
+    sims = {"target": 0.55, "mate": 0.60}  # appearance alone could NOT separate
+    ident = lambda e: sims.get((e or {}).get("ident"), 0.0)
+    o = []
+    for k in range(12):
+        o.append(obs(k * STEP, [det(200, 100, ident="target"),
+                                det(226, 96, ident="mate")]))  # rival grazes
+    tl = pit.assemble_timeline(o, [tap(2 * STEP, 200, 100)], ident, neg_sim)
+    pts = target_pts(tl)
+    assert pts, "the dominantly-tapped body must be pinned"
+    assert tl["scenes"][0]["reid_state"] == "TAP_PINNED"
+    for p in pts:
+        assert px(p)[0] < 215, "the grazing rival must not inherit the tap"
 def test_structural_schema():
     o = [obs(k * STEP, [det(100, 100, ident="target")]) for k in range(6)]
     tl = run(o, [tap(0, 100, 100)])
