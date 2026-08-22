@@ -206,6 +206,91 @@ def test_production_readiness_requires_complete_nonempty_contract():
     assert uae.is_production_ready({**good, "metrics": {"sequence_windows": 0}}) is False
 
 
+def test_complete_unresolved_observations_remain_unified_authority():
+    result = {
+        "status": "ok",
+        "sequence_analysis": {"coverage_complete": True,
+                              "incomplete_sequence_ids": []},
+        "canonical_events": {"status": "unresolved", "events": [],
+                             "unresolved": [{"action_id": "a1"}]},
+        "metrics": {"sequence_windows": 1},
+    }
+    assert uae.is_production_ready(result) is True
+
+
+def test_finalise_complete_unresolved_review_stays_operational(monkeypatch):
+    norm = {
+        "coverage_complete": True, "incomplete_sequence_ids": [],
+        "metrics": {"actions_total": 1}, "sequences": [],
+    }
+    canonical = {
+        "status": "unresolved", "events": [],
+        "unresolved": [{"action_id": "a1", "kind": "SHOT"}],
+        "metrics": {"events_accepted": 0, "observations_unresolved": 1,
+                    "observations_rejected": 0},
+    }
+    monkeypatch.setattr(
+        uae.football_sequence_intelligence, "normalise_sequence_analysis",
+        lambda raw, plan: norm,
+    )
+    monkeypatch.setattr(
+        uae.canonical_event_resolver, "resolve_canonical_events",
+        lambda sa, sg, auth: canonical,
+    )
+    monkeypatch.setattr(uae.canonical_output_authority, "build_ledger_compat",
+                        lambda c, coverage_complete=False: {})
+    monkeypatch.setattr(uae.canonical_output_authority, "project_timeline", lambda c: [])
+    monkeypatch.setattr(uae.canonical_output_authority,
+                        "build_event_native_evidence", lambda c: [])
+    prepared = {
+        "sequence_plan": {"analysis_windows": [{"sequence_id": "s1"}]},
+        "scene_graph": {}, "authority": {}, "metrics": {"sequence_windows": 1},
+    }
+    out = uae.finalise_analysis({}, prepared)
+    assert out["status"] == "ok"
+    assert out["event_resolution_status"] == "unresolved"
+    assert uae.is_production_ready(out) is True
+
+
+def test_event_barriers_persist_without_duplicate_geometry_and_restore_safely():
+    result = {
+        "status": "ok",
+        "production_track": {
+            "points": [
+                {"t": .8, "x": .1, "y": .2, "w": .1, "h": .3, "conf": .9},
+                {"t": 1.0, "x": .2, "y": .2, "w": .1, "h": .3, "conf": .9},
+                {"t": 1.2, "x": .3, "y": .2, "w": .1, "h": .3, "conf": .9},
+            ],
+            "segments": [[.8, 1.2]],
+        },
+        "event_track": {
+            "version": "FIX09B.0-EVENT-BRIDGE",
+            "points": [
+                {"t": .8, "x": .1, "y": .2, "w": .1, "h": .3},
+                {"t": 1.0, "identity_barrier": True,
+                 "barrier_reason": "NON_PROOF_IDENTITY_GEOMETRY"},
+                {"t": 1.2, "x": .3, "y": .2, "w": .1, "h": .3},
+            ],
+            "unresolved_intervals": [],
+        },
+    }
+    payload = uae.persistence_payload(result)
+    barriers = payload["unified_event_barriers"]
+    assert barriers["barrier_point_count"] == 1
+    assert barriers["points"][0]["t"] == 1.0
+    assert barriers["unsafe_intervals"] == [[.75, 1.25]]
+    assert all("x" not in p for p in barriers["points"])
+
+    restored = uae.restore_event_track(
+        payload["unified_production_track"], barriers)
+    at_one = next(p for p in restored["points"] if p["t"] == 1.0)
+    assert at_one["identity_barrier"] is True
+    assert "x" not in at_one
+    assert restored["proof_unsafe_intervals"] == [[.75, 1.25]]
+    assert "unresolved_intervals" not in restored
+    assert uae.proof_unsafe_intervals(barriers) == [[.75, 1.25]]
+
+
 def test_retry_request_and_attempt_merge_delegate_to_original_contract(monkeypatch):
     seen = {}
     monkeypatch.setattr(
@@ -266,6 +351,9 @@ def test_server_wiring_retries_only_incomplete_windows_and_clears_stale_truth():
     assert '"legacy_fallback_pending"' in body
     assert "_geometry_authority_track" in body
     assert '"movement_track_source": _movement_track_source' in body
+    assert '"unified_event_barriers": ""' in body
+    assert "proof_unsafe_intervals(" in src
+    assert "restore_event_track(" in src
 
 
 def test_corrective_path_requires_current_ok_canonical_authority():

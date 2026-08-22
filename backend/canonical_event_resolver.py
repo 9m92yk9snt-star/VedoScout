@@ -179,7 +179,9 @@ def _target_ids(frame) -> set[str]:
 
 def _verified_target_id(frame):
     tm = _target_map(frame)
-    if tm.get("status") == "VERIFIED" and isinstance(tm.get("local_track_id"), str):
+    if (tm.get("status") == "VERIFIED"
+            and tm.get("proof_eligible") is True
+            and isinstance(tm.get("local_track_id"), str)):
         return tm["local_track_id"]
     return None
 
@@ -266,9 +268,12 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         if mid and vid and mid == vid:
             exact_support.setdefault(mid, []).append(s)
 
-    if contradictions and not exact_support:
+    if contradictions:
         return {
-            "status": "REJECTED", "reason": "OTHER_PLAYER_VISIBLE_AT_ACTION",
+            "status": "REJECTED", "reason": (
+                "INCONSISTENT_ACTOR_EVIDENCE"
+                if exact_support else "OTHER_PLAYER_VISIBLE_AT_ACTION"
+            ),
             "actor_local_track_id": None, "samples": samples,
             "candidate_local_track_ids": candidates, "proof_eligible": False,
         }
@@ -297,10 +302,10 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
             continue
         before = [f for f in _verified_frames_for_track(
             scene_frames, tid, max(0, start - CONTINUITY_SIDE_MS), pivot)
-                  if int(f["media_ms"]) <= pivot]
+                  if int(f["media_ms"]) < pivot]
         after = [f for f in _verified_frames_for_track(
             scene_frames, tid, pivot, end + CONTINUITY_SIDE_MS)
-                 if int(f["media_ms"]) >= pivot]
+                 if int(f["media_ms"]) > pivot]
         if before and after:
             bridge_lo = int(before[-1]["media_ms"])
             bridge_hi = int(after[0]["media_ms"])
@@ -323,7 +328,16 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
                 unified_authority, int(s["media_ms"]), proof_required=True,
                 max_interp_ms=CONTACT_NEAR_MS)
             if target and _valid_box(target.get("box")) and _valid_box(s.get("box")):
-                if _boxes_match(target["box"], s["box"]):
+                # Interpolated identity is continuity evidence only.  It must
+                # never directly prove (or disprove) which visible body acted.
+                # Direct geometry resolution therefore requires an exact,
+                # proof-eligible GLOBAL_TARGET observation at the same media
+                # time as the actor sample.
+                exact_proof = (
+                    why == "OK_EXACT"
+                    and target.get("proof_eligible") is True
+                )
+                if exact_proof and _boxes_match(target["box"], s["box"]):
                     # Geometry confirms GLOBAL_TARGET, but if local-track id is
                     # unknown keep the canonical actor as GLOBAL_TARGET rather
                     # than fabricate a scene-local id.
@@ -333,7 +347,7 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
                         "samples": samples, "candidate_local_track_ids": candidates,
                         "proof_eligible": True,
                     }
-                if why in ("OK_EXACT", "OK_INTERPOLATED"):
+                if exact_proof:
                     return {
                         "status": "REJECTED", "reason": "UNIFIED_TARGET_GEOMETRY_MISMATCH",
                         "actor_local_track_id": None, "samples": samples,
@@ -353,13 +367,18 @@ def _causal_resolution(action) -> dict:
     outcome = str(action.get("outcome") or "UNKNOWN")
     chain = action.get("causal_chain") if isinstance(action.get("causal_chain"), dict) else {}
     contact = action.get("contact_ms") if _num(action.get("contact_ms")) else None
+    start = int(action.get("start_ms") or 0)
+    end = int(action.get("end_ms") if _num(action.get("end_ms")) else start)
+
+    def _contact_matches(chain_contact) -> bool:
+        return _num(chain_contact) and (contact is None or int(chain_contact) == int(contact))
 
     if kind == "SHOT" and outcome == "GOAL":
         goal_ms = chain.get("goal_outcome_ms")
-        target_contact = chain.get("target_contact_ms") or contact
+        target_contact = chain.get("target_contact_ms")
         ok = (
-            _num(target_contact) and _num(goal_ms)
-            and int(target_contact) <= int(goal_ms)
+            _contact_matches(target_contact) and _num(goal_ms)
+            and start <= int(target_contact) <= int(goal_ms) <= end
             and action.get("outcome_visible") is True
             and chain.get("continuous_visible_sequence") is True
         )
@@ -372,9 +391,15 @@ def _causal_resolution(action) -> dict:
         }
 
     if kind in SCORING_PASS_ACTIONS and outcome == "TEAMMATE_GOAL":
-        vals = [chain.get("target_contact_ms") or contact, chain.get("receiver_ms"),
+        vals = [chain.get("target_contact_ms"), chain.get("receiver_ms"),
                 chain.get("teammate_shot_ms"), chain.get("goal_outcome_ms")]
-        ordered = all(_num(x) for x in vals) and all(int(a) <= int(b) for a, b in zip(vals, vals[1:]))
+        ordered = (
+            all(_num(x) for x in vals)
+            and _contact_matches(vals[0])
+            and start <= int(vals[0])
+            and all(int(a) <= int(b) for a, b in zip(vals, vals[1:]))
+            and int(vals[-1]) <= end
+        )
         receiver = chain.get("receiver_local_track_id")
         actor = action.get("actor_local_track_id")
         different_receiver = isinstance(receiver, str) and (not actor or receiver != actor)

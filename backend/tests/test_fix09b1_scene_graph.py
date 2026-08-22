@@ -218,3 +218,18 @@ def test_b112_every_frame_uses_canonical_media_ms_and_global_target_contract():
     assert out["timebase"] == "canonical_media_ms"
     assert [f["media_ms"] for f in out["frames"]] == [250, 500]
     assert out["global_target_id"] == "GLOBAL_TARGET"
+
+
+def test_b113_predicted_identity_is_continuity_hypothesis_not_verified_actor():
+    auth = authority([(1000, TARGET)])
+    p = auth["target_points"][0]
+    p.update({
+        "state": "OCCLUDED", "identity_strength": "PREDICTED",
+        "predicted": True, "proof_eligible": False,
+    })
+    out = fsg.assemble_scene_graph([obs(1000, [det(TARGET)])], auth)
+    tm = out["frames"][0]["global_target"]
+    assert tm["status"] == "HYPOTHESES"
+    assert tm["local_track_id"] is None
+    assert tm["candidate_local_track_ids"] == ["p001"]
+    assert tm["proof_eligible"] is False

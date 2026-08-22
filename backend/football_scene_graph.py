@@ -196,6 +196,19 @@ def _target_candidates(authority, ms, active):
             best = ranked[0]
             second = ranked[1][0] if len(ranked) > 1 else None
             if second is None or best[0] >= second + TARGET_AMBIG_MARGIN:
+                # A predicted/non-proof canonical point is continuity evidence,
+                # never a directly verified actor identity.  Keep its physical
+                # local-track candidate for B.2/B.3, but do not let downstream
+                # actor resolution promote it through the VERIFIED label.
+                if not resolved.get("proof_eligible"):
+                    return {
+                        "status": "HYPOTHESES",
+                        "reason": "NON_PROOF_IDENTITY_CONTINUITY",
+                        "local_track_id": None,
+                        "candidate_local_track_ids": [best[1]],
+                        "identity_strength": resolved.get("identity_strength"),
+                        "proof_eligible": False,
+                    }
                 return {
                     "status": "VERIFIED", "reason": why,
                     "local_track_id": best[1], "candidate_local_track_ids": [best[1]],

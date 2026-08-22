@@ -315,3 +315,54 @@ def test_b320_micro_outcome_is_unknown_when_outcome_is_not_visible():
     a = action(kind="DUEL", outcome="WON", visible=False)
     out = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
     assert out["events"][0]["canonical_outcome"] == "UNKNOWN"
+
+
+def test_b321_conflicting_visible_actor_samples_never_verify_from_one_good_frame():
+    frames = [
+        frame(1000, target="p001", status="VERIFIED"),
+        frame(1100, target="p002", status="VERIFIED"),
+    ]
+    ev = [
+        {"media_ms": 1000, "box": dict(TB), "visibility": "VISIBLE"},
+        {"media_ms": 1100, "box": dict(TB), "visibility": "VISIBLE"},
+    ]
+    a = action(start=1000, contact=1000, end=1100, actor="p001",
+               box=TB, evidence=ev)
+    out = cer.resolve_canonical_events(
+        analysis([a]), graph(frames), authority([(1000, TB), (1100, OB)]))
+    assert out["events"] == []
+    assert out["rejected"][0]["reason"] == "INCONSISTENT_ACTOR_EVIDENCE"
+
+
+def test_b322_goal_chain_contact_must_equal_canonical_action_contact():
+    chain = {"target_contact_ms": 1050, "receiver_local_track_id": None,
+             "receiver_ms": None, "teammate_shot_ms": None,
+             "goal_outcome_ms": 1400, "continuous_visible_sequence": True}
+    a = action(kind="SHOT", contact=1000, end=1500,
+               outcome="GOAL", visible=True, chain=chain)
+    out = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
+    assert out["events"][0]["canonical_event_type"] == "SHOT"
+    assert out["events"][0]["canonical_outcome"] == "UNKNOWN"
+
+
+def test_b323_assist_chain_must_be_ordered_inside_the_action_interval():
+    chain = {"target_contact_ms": 1000, "receiver_local_track_id": "p003",
+             "receiver_ms": 1500, "teammate_shot_ms": 2200,
+             "goal_outcome_ms": 2600, "continuous_visible_sequence": True}
+    a = action(kind="PASS", contact=1000, end=2400,
+               outcome="TEAMMATE_GOAL", visible=True, chain=chain)
+    out = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
+    assert out["events"][0]["canonical_event_type"] == "PASS"
+    assert out["events"][0]["canonical_outcome"] == "UNKNOWN"
+
+
+def test_b324_interpolated_identity_geometry_cannot_directly_verify_actor():
+    frames = [frame(1000, target=None, status="UNRESOLVED", candidates=[])]
+    a = action(actor=None, box=TB, target_status="UNRESOLVED")
+    # No exact identity observation at the action time.  A midpoint could be
+    # geometrically interpolated from these two points, but interpolation is
+    # continuity evidence and must not become actor proof.
+    auth = authority([(900, TB), (1100, TB)])
+    out = cer.resolve_canonical_events(analysis([a]), graph(frames), auth)
+    assert out["events"] == []
+    assert out["unresolved"][0]["reason"] == "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE"

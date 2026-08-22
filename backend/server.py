@@ -7931,10 +7931,15 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                 evt_ms_by_id[_e["event_id"]] = _e["event_start_ms"]
     except Exception:
         evt_ms_by_id = {}
-    # P19 marker state-fade: ring fades out inside shadow switch-risk windows
-    # (never rides along on a possibly wrong player). Fail-open: no shadow
-    # data or flag off → exactly the previous behaviour.
-    risky_windows = []
+    # P19 marker state-fade: ring fades out inside any canonical FIX09B
+    # identity barrier as well as CV-shadow switch-risk windows. Raw video
+    # context may remain visible there; the ellipse may not.
+    risky_windows = [
+        (float(w[0]), float(w[1]))
+        for w in unified_analysis_engine.proof_unsafe_intervals(
+            doc.get("unified_event_barriers"))
+    ]
+    identity_risky_windows = list(risky_windows)
     clip_cap = TELE_CLIP_MAX
     try:
         if os.environ.get("CV_MARKER_STATE_FADE", "1") == "1":
@@ -7973,7 +7978,9 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                     logger.info(f"[teleclip] {report_id}: gap bridging ACTIVE — "
                                 f"+{len(track_pts) - _n0} interpolated points in {len(_bw)} safe windows")
     except Exception:
-        risky_windows = []
+        # CV diagnostics are additive. A shadow failure must never erase the
+        # canonical uncertainty already persisted by FIX09B.
+        risky_windows = identity_risky_windows
         clip_cap = TELE_CLIP_MAX
     made = 0
     clipped_secs = []
@@ -8536,10 +8543,12 @@ async def _run_identity_corrective_pass(
                     "sequence_analysis": fresh.get("football_sequence_analysis") or {},
                 },
             )
-            _corr_track = (
-                fresh.get("unified_production_track")
-                or gt_track
+            _corr_track = unified_analysis_engine.restore_event_track(
+                fresh.get("unified_production_track"),
+                fresh.get("unified_event_barriers"),
             )
+            if not (_corr_track.get("points") or []):
+                _corr_track = gt_track
             _apply_tracking_verification(retry, anchor_payload_list, _corr_track, gt_t_off)
             retry["cross_verification"] = {
                 "status": "canonical_authority",
@@ -9096,6 +9105,7 @@ async def generate_full_report_task(report_id: str) -> None:
                 "unified_scoring_scan": "",
                 "unified_analysis_metrics": "",
                 "unified_production_track": "",
+                "unified_event_barriers": "",
                 "unified_event_track": "",
                 "unified_event_track_source": "",
                 "event_ledger": "",

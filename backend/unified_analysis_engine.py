@@ -28,6 +28,7 @@ import unified_event_bridge
 import unified_identity_authority
 
 VERSION = 1
+BARRIER_RISK_PAD_S = 0.25
 
 
 def compact_identity_timeline(identity_timeline: dict | None) -> dict:
@@ -91,6 +92,107 @@ def _compact_production_track(track: dict | None) -> dict:
         "segments": deepcopy(src.get("segments") or []),
         "seed_count": src.get("seed_count"),
     }
+
+
+def _compact_event_barriers(track: dict | None) -> dict:
+    """Persist identity barriers without duplicating the geometry track.
+
+    The event adapter contains the same accepted geometry as the production
+    track plus time-only barrier rows.  Persisting both complete tracks wastes
+    document budget; dropping the barriers, however, lets later proof renders
+    interpolate straight through a short unresolved/predicted interval.
+    """
+    src = track if isinstance(track, dict) else {}
+    points = []
+    for p in src.get("points") or []:
+        if not (isinstance(p, dict) and p.get("identity_barrier") is True
+                and isinstance(p.get("t"), (int, float))
+                and not isinstance(p.get("t"), bool)):
+            continue
+        points.append({
+            "t": round(float(p["t"]), 3),
+            "scene_id": p.get("scene_id"),
+            "barrier_reason": p.get("barrier_reason"),
+            "barrier_reasons": deepcopy(p.get("barrier_reasons") or []),
+            "identity_barrier": True,
+            "proof_eligible": False,
+        })
+    by_t = {}
+    for p in points:
+        by_t[p["t"]] = p
+    points = [by_t[t] for t in sorted(by_t)]
+
+    intervals = []
+    for row in src.get("unresolved_intervals") or []:
+        if not isinstance(row, dict):
+            continue
+        a, b = row.get("start_ms"), row.get("end_ms")
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                   for v in (a, b)):
+            continue
+        lo, hi = sorted((max(0.0, float(a) / 1000.0),
+                         max(0.0, float(b) / 1000.0)))
+        intervals.append([lo, hi])
+    for p in points:
+        intervals.append([
+            max(0.0, float(p["t"]) - BARRIER_RISK_PAD_S),
+            float(p["t"]) + BARRIER_RISK_PAD_S,
+        ])
+    merged = []
+    for lo, hi in sorted(intervals):
+        if merged and lo <= merged[-1][1] + 1e-9:
+            merged[-1][1] = max(merged[-1][1], hi)
+        else:
+            merged.append([lo, hi])
+    return {
+        "version": src.get("version"),
+        "points": points,
+        "unsafe_intervals": [[round(a, 3), round(b, 3)] for a, b in merged],
+        "barrier_point_count": len(points),
+    }
+
+
+def restore_event_track(production_track: dict | None,
+                        barrier_payload: dict | None) -> dict:
+    """Rebuild the persisted proof-safe track view for legacy consumers."""
+    production = deepcopy(production_track) if isinstance(production_track, dict) else {}
+    barriers = barrier_payload if isinstance(barrier_payload, dict) else {}
+    rows = []
+    for p in production.get("points") or []:
+        if isinstance(p, dict) and isinstance(p.get("t"), (int, float)):
+            rows.append(deepcopy(p))
+    rows.extend(deepcopy(barriers.get("points") or []))
+    by_t = {}
+    for p in rows:
+        if not isinstance(p, dict) or not isinstance(p.get("t"), (int, float)):
+            continue
+        t = round(float(p["t"]), 3)
+        old = by_t.get(t)
+        if old is None or p.get("identity_barrier") is True:
+            p["t"] = t
+            by_t[t] = p
+    production["points"] = [by_t[t] for t in sorted(by_t)]
+    # Keep the compact seconds-based proof mask under its own explicit schema.
+    # Legacy ``unresolved_intervals`` uses millisecond dictionaries; reusing
+    # that key for ``[start_s, end_s]`` pairs creates a silent type conflict.
+    production["proof_unsafe_intervals"] = proof_unsafe_intervals(barriers)
+    return production
+
+
+def proof_unsafe_intervals(barrier_payload: dict | None) -> list[list[float]]:
+    """Return validated global video-time windows where proof must be hidden."""
+    src = barrier_payload if isinstance(barrier_payload, dict) else {}
+    out = []
+    for row in src.get("unsafe_intervals") or []:
+        if not (isinstance(row, (list, tuple)) and len(row) == 2):
+            continue
+        a, b = row
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                   for v in (a, b)):
+            continue
+        lo, hi = sorted((max(0.0, float(a)), max(0.0, float(b))))
+        out.append([lo, hi])
+    return out
 
 
 def _compact_scene_graph(scene_graph: dict | None) -> dict:
@@ -251,11 +353,11 @@ def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> d
     evidence = canonical_output_authority.build_event_native_evidence(canonical)
     scoring_scan = _scoring_scan(canonical, sequence_analysis)
 
-    status = "ok"
-    if not sequence_analysis.get("coverage_complete"):
-        status = "partial_coverage"
-    if canonical.get("status") == "unresolved" and not canonical.get("events"):
-        status = "unresolved"
+    # Complete review is operationally successful even when every observed
+    # action remains explicitly unresolved.  Falling back to legacy FIX08 in
+    # precisely that case would let weaker identity evidence overrule the new
+    # fail-closed authority.
+    status = "ok" if sequence_analysis.get("coverage_complete") else "partial_coverage"
     return {
         "version": VERSION,
         "status": status,
@@ -266,6 +368,7 @@ def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> d
         "sequence_plan": plan,
         "sequence_analysis": sequence_analysis,
         "canonical_events": canonical,
+        "event_resolution_status": canonical.get("status"),
         "event_ledger": ledger,
         "action_timeline": timeline,
         "event_native_evidence": evidence,
@@ -321,7 +424,7 @@ def is_production_ready(result: dict | None) -> bool:
         and seq.get("coverage_complete") is True
         and not (seq.get("incomplete_sequence_ids") or [])
         and int((r.get("metrics") or {}).get("sequence_windows") or 0) > 0
-        and canonical.get("status") in {"ok", "empty"}
+        and canonical.get("status") in {"ok", "empty", "unresolved"}
     )
 
 
@@ -353,5 +456,6 @@ def persistence_payload(result: dict | None) -> dict:
         "unified_scoring_scan": deepcopy(r.get("scoring_scan") or {}),
         "unified_analysis_metrics": deepcopy(r.get("metrics") or {}),
         "unified_production_track": _compact_production_track(r.get("production_track")),
+        "unified_event_barriers": _compact_event_barriers(r.get("event_track")),
         "unified_event_track_source": r.get("event_track_source"),
     }
