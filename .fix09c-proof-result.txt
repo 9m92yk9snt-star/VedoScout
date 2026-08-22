@@ -1,0 +1,11 @@
+source_sha=e0910e4f6f03b1ba6248c46dee146a19bf800630
+patch_exit=0
+compile_exit=0
+tests_exit=0
+--- patch ---
+FIX09C canonical event telestration patch applied
+--- compile ---
+--- tests ---
+........................................................................ [ 80%]
+..................                                                       [100%]
+90 passed in 0.34s

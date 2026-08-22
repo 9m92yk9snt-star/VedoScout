@@ -7688,6 +7688,40 @@ async def _telestrate_verified_frames(
     first = str(pd.get("player_name") or "").strip().split(" ")[0]
     label = f"{first.upper()} · TRACKED" if first else "YOUR PLAYER"
     done = 0
+
+    # FIX09C — canonical event-native evidence already carries proof-grade
+    # GLOBAL_TARGET geometry for the exact extracted evidence frame. Render it
+    # directly; do not ask another detector/model to relocate the player and do
+    # not require a nearby user tap. Predicted/unresolved identity never reaches
+    # event_track_locked, and proof_frame_verified keeps exact event/time binding.
+    for c in enriched:
+        if not (isinstance(c, dict) and c.get("event_native")
+                and c.get("event_track_locked")
+                and c.get("proof_frame_verified") is True
+                and isinstance(c.get("event_track_box"), dict)):
+            continue
+        fu = str(c.get("frame_url") or "")
+        if not fu.startswith("/api/uploads/frames/"):
+            continue
+        frame_path = frames_dir / Path(fu).name
+        if not frame_path.exists():
+            continue
+        b = c["event_track_box"]
+        try:
+            x, y, w, h = (float(b[k]) for k in ("x", "y", "w", "h"))
+            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0 and w > 0 and h > 0
+                    and x + w <= 1.05 and y + h <= 1.05):
+                continue
+            box = {"x0": x, "y0": y, "x1": x + w, "y1": y + h}
+        except (KeyError, TypeError, ValueError):
+            continue
+        if await asyncio.to_thread(render_telestration, str(frame_path), box, label, True, y):
+            c["telestrated"] = True
+            c["tele_ring"] = True
+            c["tele_canonical_event"] = True
+            c["tele_box"] = {k: float(box[k]) for k in ("x0", "y0", "x1", "y1")}
+            done += 1
+
     for c in enriched:
         if not (isinstance(c, dict) and c.get("anchor_locked") and isinstance(c.get("anchor_box"), dict)):
             continue
