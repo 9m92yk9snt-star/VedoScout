@@ -105,7 +105,7 @@ def test_b103_scene_cut_resets_only_local_tracks_not_global_target_identity():
     assert out["frames"][2]["global_target"]["local_track_id"] == "p001"
 
 
-def test_b104_close_two-player_target_mapping_remains_bounded_hypotheses():
+def test_b104_close_two_player_target_mapping_remains_bounded_hypotheses():
     # Equal-distance bodies on opposite sides of the canonical target must not
     # be resolved by list order or detector confidence.
     left = {"x": 0.09, "y": 0.20, "w": 0.10, "h": 0.30}
