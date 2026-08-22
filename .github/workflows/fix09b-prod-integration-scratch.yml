@@ -1,0 +1,93 @@
+name: FIX09B production integration scratch
+
+on:
+  push:
+    branches:
+      - fix-09b-prod-integration-scratch
+
+permissions:
+  contents: write
+
+jobs:
+  integrate-and-test:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply asserted production integration patch
+        id: patch
+        shell: bash
+        run: |
+          set +e
+          python backend/scripts/apply_fix09b_production_integration.py > /tmp/patch.txt 2>&1
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Compile patched production spine
+        id: compile
+        shell: bash
+        run: |
+          set +e
+          if [ "${{ steps.patch.outputs.rc }}" = "0" ]; then
+            python -m py_compile \
+              backend/server.py \
+              backend/unified_analysis_engine.py \
+              backend/unified_identity_authority.py \
+              backend/unified_event_bridge.py \
+              backend/football_scene_graph.py \
+              backend/football_sequence_intelligence.py \
+              backend/canonical_event_resolver.py \
+              backend/canonical_output_authority.py \
+              > /tmp/compile.txt 2>&1
+            rc=$?
+          else
+            printf 'SKIPPED because patch failed\n' > /tmp/compile.txt
+            rc=99
+          fi
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Run deterministic FIX09B/FIX09C tests
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          if [ "${{ steps.patch.outputs.rc }}" = "0" ] && [ "${{ steps.compile.outputs.rc }}" = "0" ]; then
+            cd backend
+            python -m pytest -q \
+              tests/test_fix09b0_unified_identity_authority.py \
+              tests/test_fix09b0_event_bridge.py \
+              tests/test_fix09b1_scene_graph.py \
+              tests/test_fix09b2_sequence_intelligence.py \
+              tests/test_fix09b3_canonical_event_resolver.py \
+              tests/test_fix09c_canonical_output_authority.py \
+              > /tmp/tests.txt 2>&1
+            rc=$?
+          else
+            printf 'SKIPPED because patch/compile failed\n' > /tmp/tests.txt
+            rc=99
+          fi
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist scratch result and patched server
+        shell: bash
+        run: |
+          {
+            printf 'source_sha=%s\n' "$GITHUB_SHA"
+            printf 'patch_exit=%s\n' "${{ steps.patch.outputs.rc }}"
+            printf 'compile_exit=%s\n' "${{ steps.compile.outputs.rc }}"
+            printf 'tests_exit=%s\n' "${{ steps.tests.outputs.rc }}"
+            printf '%s\n' '--- patch ---'
+            cat /tmp/patch.txt
+            printf '%s\n' '--- compile ---'
+            cat /tmp/compile.txt
+            printf '%s\n' '--- tests ---'
+            cat /tmp/tests.txt
+          } > .fix09b-prod-integration-result.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add backend/server.py .fix09b-prod-integration-result.txt
+          git commit -m 'Scratch: apply and test FIX09B production integration' || true
+          git push
