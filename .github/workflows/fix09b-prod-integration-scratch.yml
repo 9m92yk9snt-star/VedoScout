@@ -24,9 +24,14 @@ jobs:
         shell: bash
         run: |
           set +e
-          sed -i 's|SERVER = ROOT / "server.py"|SERVER = ROOT / "backend" / "server.py"|' backend/scripts/apply_fix09b_production_integration.py
-          python backend/scripts/apply_fix09b_production_integration.py > /tmp/patch.txt 2>&1
-          rc=$?
+          if grep -q '^import unified_analysis_engine$' backend/server.py; then
+            printf 'already integrated on this scratch branch\n' > /tmp/patch.txt
+            rc=0
+          else
+            sed -i 's|SERVER = ROOT / "server.py"|SERVER = ROOT / "backend" / "server.py"|' backend/scripts/apply_fix09b_production_integration.py
+            python backend/scripts/apply_fix09b_production_integration.py > /tmp/patch.txt 2>&1
+            rc=$?
+          fi
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           exit 0
       - name: Compile patched production spine
