@@ -1,0 +1,7 @@
+source_sha=3331975bb8790b158f849fd965879bbec712993d
+exit_code=4
+--- pytest output ---
+ImportError while loading conftest '/home/runner/work/VedoScout/VedoScout/backend/tests/conftest.py'.
+tests/conftest.py:10: in <module>
+    from dotenv import load_dotenv
+E   ModuleNotFoundError: No module named 'dotenv'
