@@ -21,6 +21,7 @@ import hashlib
 import math
 from copy import deepcopy
 
+import football_scene_graph as fsg
 import unified_identity_authority as uia
 
 VERSION = 1
@@ -33,6 +34,9 @@ BOX_IOU_MIN = 0.18
 BOX_CENTER_H = 0.75
 DUP_CONTACT_MS = 450
 DUP_EDGE_MS = 700
+RECEIVER_TEAM_WINDOW_MS = 500
+RECEIVER_TEAM_MIN_SAMPLES = 2
+RECEIVER_BALL_WINDOW_MS = 500
 
 CONTACT_ACTIONS = {
     "RECEIVE", "FIRST_TOUCH", "CONTROL", "PASS", "CROSS", "KEY_PASS", "SHOT",
@@ -134,6 +138,115 @@ def _player_by_id(frame, track_id):
         if isinstance(p, dict) and p.get("local_track_id") == track_id:
             return p
     return None
+
+
+def _receiver_team_resolution(scene_frames, chain, actor_local_track_id) -> dict:
+    """Verify that an assist receiver is a distinct, observed teammate.
+
+    Receiver identity comes from the scene-local track in the visible causal
+    chain. Team relation comes only from the target-relative kit authority in
+    B.1. Model text such as ``TEAMMATE_GOAL`` is never team evidence.
+    """
+    receiver = chain.get("receiver_local_track_id")
+    receiver_ms = chain.get("receiver_ms")
+    base = {
+        "status": "UNRESOLVED",
+        "reason": "RECEIVER_TEAM_EVIDENCE_MISSING",
+        "receiver_local_track_id": receiver if isinstance(receiver, str) else None,
+        "receiver_ms": int(receiver_ms) if _num(receiver_ms) else None,
+        "evidence": [],
+    }
+    if not isinstance(actor_local_track_id, str) or not actor_local_track_id:
+        return {**base, "reason": "ACTOR_LOCAL_TRACK_UNRESOLVED"}
+    if not isinstance(receiver, str) or not receiver or not _num(receiver_ms):
+        return {**base, "reason": "RECEIVER_IDENTITY_UNRESOLVED"}
+    if receiver == actor_local_track_id:
+        return {**base, "status": "REJECTED", "reason": "RECEIVER_IS_TARGET_ACTOR"}
+
+    pivot = _near_frame(scene_frames, receiver_ms)
+    if pivot is None or _player_by_id(pivot, receiver) is None:
+        return {**base, "reason": "RECEIVER_NOT_OBSERVED_AT_RECEIPT"}
+
+    def possession_support(track_id, media_ms):
+        if not isinstance(track_id, str) or not _num(media_ms):
+            return {
+                "status": "UNRESOLVED", "likely_holder_samples": 0,
+                "candidate_samples": 0, "evidence": [],
+            }
+        evidence = []
+        for fr in scene_frames:
+            if abs(int(fr["media_ms"]) - int(media_ms)) > RECEIVER_BALL_WINDOW_MS:
+                continue
+            pos = fr.get("possession") or {}
+            holder = pos.get("holder_local_track_id")
+            candidates = [x for x in pos.get("candidate_local_track_ids") or []
+                          if isinstance(x, str)]
+            if holder == track_id:
+                relation = "LIKELY_HOLDER"
+            elif track_id in candidates:
+                relation = "POSSESSION_CANDIDATE"
+            else:
+                continue
+            evidence.append({
+                "media_ms": int(fr["media_ms"]),
+                "relation": relation,
+                "possession_status": pos.get("status"),
+            })
+        likely = sum(x["relation"] == "LIKELY_HOLDER" for x in evidence)
+        return {
+            "status": "VERIFIED" if likely >= 1 else "UNRESOLVED",
+            "likely_holder_samples": likely,
+            "candidate_samples": len(evidence) - likely,
+            "evidence": evidence[:12],
+        }
+
+    evidence = []
+    for fr in scene_frames:
+        if abs(int(fr["media_ms"]) - int(receiver_ms)) > RECEIVER_TEAM_WINDOW_MS:
+            continue
+        p = _player_by_id(fr, receiver)
+        if p is None:
+            continue
+        label = p.get("team")
+        confidence = p.get("team_confidence")
+        source = p.get("team_source")
+        if (source != fsg.TEAM_SOURCE or not _num(confidence)
+                or float(confidence) < fsg.TEAM_LABEL_MIN_CONFIDENCE):
+            continue
+        if label not in {"target_team", "opponent", "other"}:
+            continue
+        evidence.append({
+            "media_ms": int(fr["media_ms"]),
+            "team": label,
+            "confidence": round(float(confidence), 4),
+            "source": source,
+        })
+
+    base["evidence"] = evidence[:12]
+    target_count = sum(x["team"] == "target_team" for x in evidence)
+    opponent_count = sum(x["team"] == "opponent" for x in evidence)
+    other_count = sum(x["team"] == "other" for x in evidence)
+    base["sample_counts"] = {
+        "target_team": target_count,
+        "opponent": opponent_count,
+        "other": other_count,
+    }
+    actor_ball = possession_support(actor_local_track_id, chain.get("target_contact_ms"))
+    receiver_ball = possession_support(receiver, receiver_ms)
+    base["actor_ball_relation"] = actor_ball
+    base["receiver_ball_relation"] = receiver_ball
+    if target_count and opponent_count:
+        return {**base, "reason": "RECEIVER_TEAM_EVIDENCE_CONFLICT"}
+    if opponent_count >= RECEIVER_TEAM_MIN_SAMPLES:
+        return {**base, "status": "REJECTED", "reason": "RECEIVER_OPPONENT_VERIFIED"}
+    if target_count < RECEIVER_TEAM_MIN_SAMPLES:
+        return {**base, "reason": "RECEIVER_TEAM_EVIDENCE_INSUFFICIENT"}
+    if actor_ball["status"] != "VERIFIED":
+        return {**base, "reason": "TARGET_PASS_CONTACT_BALL_UNRESOLVED"}
+    if receiver_ball["status"] != "VERIFIED":
+        return {**base, "reason": "RECEIVER_BALL_CONTINUITY_UNRESOLVED"}
+    return {**base, "status": "VERIFIED",
+            "reason": "RECEIVER_TEAM_AND_BALL_TRANSFER_VERIFIED"}
 
 
 def _map_box_to_local(frame, box) -> tuple[str | None, bool]:
@@ -361,7 +474,7 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
     }
 
 
-def _causal_resolution(action) -> dict:
+def _causal_resolution(action, scene_frames) -> dict:
     """Classify outcome only from the visible same-sequence causal chain."""
     kind = str(action.get("kind") or "OTHER")
     outcome = str(action.get("outcome") or "UNKNOWN")
@@ -402,15 +515,30 @@ def _causal_resolution(action) -> dict:
         )
         receiver = chain.get("receiver_local_track_id")
         actor = action.get("actor_local_track_id")
-        different_receiver = isinstance(receiver, str) and (not actor or receiver != actor)
-        ok = (ordered and different_receiver and action.get("outcome_visible") is True
-              and chain.get("continuous_visible_sequence") is True)
+        different_receiver = (isinstance(actor, str) and isinstance(receiver, str)
+                              and receiver != actor)
+        visible_chain = (action.get("outcome_visible") is True
+                         and chain.get("continuous_visible_sequence") is True)
+        team_resolution = _receiver_team_resolution(scene_frames, chain, actor)
+        ok = (ordered and different_receiver and visible_chain
+              and team_resolution["status"] == "VERIFIED")
+        if ok:
+            reason = "VISIBLE_CONTINUOUS_ASSIST_CHAIN_WITH_TEAMMATE"
+        elif not ordered or not visible_chain:
+            reason = "ASSIST_CHAIN_INCOMPLETE"
+        elif not different_receiver:
+            reason = "ASSIST_RECEIVER_IDENTITY_UNRESOLVED"
+        elif team_resolution["status"] == "REJECTED":
+            reason = "ASSIST_RECEIVER_NOT_TEAMMATE"
+        else:
+            reason = "ASSIST_RECEIVER_TEAM_UNRESOLVED"
         return {
             "canonical_event_type": "ASSIST" if ok else kind,
             "canonical_action_type": kind,
             "canonical_outcome": "TEAMMATE_GOAL" if ok else "UNKNOWN",
             "causal_verified": bool(ok),
-            "reason": "VISIBLE_CONTINUOUS_ASSIST_CHAIN" if ok else "ASSIST_CHAIN_INCOMPLETE",
+            "reason": reason,
+            "receiver_team_resolution": team_resolution,
         }
 
     if kind == "SHOT":
@@ -481,6 +609,7 @@ def _proof_payload(action, actor_resolution, causal) -> dict:
         "outcome_ms": int(chain["goal_outcome_ms"]) if _num(chain.get("goal_outcome_ms")) else None,
         "proof_eligible": bool(actor_resolution.get("proof_eligible")),
         "causal_verified": bool(causal.get("causal_verified")),
+        "receiver_team_evidence": deepcopy(causal.get("receiver_team_resolution")),
     }
 
 
@@ -527,7 +656,8 @@ def _merge_event(dst, src):
     # Never upgrade a weaker duplicate into GOAL/ASSIST unless that duplicate
     # itself has verified causal evidence. Prefer the causally stronger row.
     if src.get("causal_verified") and not dst.get("causal_verified"):
-        for k in ("canonical_event_type", "canonical_outcome", "causal_verified", "resolution_reason"):
+        for k in ("canonical_event_type", "canonical_outcome", "causal_verified",
+                  "resolution_reason", "receiver_team_resolution"):
             dst[k] = src.get(k)
         dproof["causal_verified"] = True
     dst["proof"] = dproof
@@ -574,7 +704,7 @@ def resolve_canonical_events(sequence_analysis: dict | None, scene_graph: dict |
         # normalised action remains untouched.
         action_for_causal = deepcopy(action)
         action_for_causal["actor_local_track_id"] = actor.get("actor_local_track_id")
-        causal = _causal_resolution(action_for_causal)
+        causal = _causal_resolution(action_for_causal, scene_frames)
         cms = _canonical_ms(action)
         proof = _proof_payload(action, actor, causal)
         event = {
@@ -601,6 +731,7 @@ def resolve_canonical_events(sequence_analysis: dict | None, scene_graph: dict |
             "details": deepcopy(action.get("details") or []),
             "proof": proof,
             "causal_chain": deepcopy(action.get("causal_chain") or {}),
+            "receiver_team_resolution": deepcopy(causal.get("receiver_team_resolution")),
         }
 
         # Scoring claims fail closed to the underlying target action, not to

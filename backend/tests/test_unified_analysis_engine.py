@@ -154,6 +154,8 @@ def test_persistence_strips_dense_graph_and_repeated_identity_geometry():
             "player_points": [{"media_ms": i} for i in range(1000)],
             "ball_points": [{"media_ms": i} for i in range(1000)],
             "scenes": [{"scene_id": "s1", "start_ms": 0, "end_ms": 999}],
+            "team_authority": {"status": "ok", "source": "KIT_CHROMA_SCENE_CLUSTER",
+                               "target_samples": 12, "labeled_detections": 640},
         },
         "sequence_plan": {
             "analysis_windows": [{"sequence_id": "q1", "scene_id": "s1",
@@ -174,6 +176,10 @@ def test_persistence_strips_dense_graph_and_repeated_identity_geometry():
     assert "ball_points" not in p["football_scene_graph"]
     assert "target_points" not in p["unified_identity_authority"]
     assert "graph_context" not in p["football_sequence_plan"]["analysis_windows"][0]
+    assert p["football_scene_graph"]["team_authority"] == {
+        "status": "ok", "source": "KIT_CHROMA_SCENE_CLUSTER",
+        "target_samples": 12, "labeled_detections": 640,
+    }
     assert p["unified_production_track"]["points"] == [
         {"t": 1.0, "x": .1, "y": .2, "w": .1, "h": .3, "conf": .9}
     ]

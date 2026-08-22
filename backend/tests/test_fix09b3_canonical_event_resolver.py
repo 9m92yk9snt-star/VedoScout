@@ -13,27 +13,43 @@ OB = {"x": .55, "y": .20, "w": .10, "h": .30}
 RB = {"x": .35, "y": .20, "w": .10, "h": .30}
 
 
-def player(ms, tid, box, *, target_candidate=False, target_verified=False):
+def player(ms, tid, box, *, target_candidate=False, target_verified=False,
+           team=None, team_confidence=None, team_source=None):
     return {
         "media_ms": ms, "scene_id": "scene_001", "local_track_id": tid,
-        "box": dict(box), "confidence": .9, "team": None,
+        "box": dict(box), "confidence": .9, "team": team,
+        "team_confidence": team_confidence, "team_source": team_source,
         "global_target_candidate": target_candidate,
         "global_target_verified": target_verified,
     }
 
 
 def frame(ms, *, target="p001", status="VERIFIED", candidates=None,
-          p1=TB, p2=OB, p3=RB, include_p3=True):
+          p1=TB, p2=OB, p3=RB, include_p3=True, teams=None, holder=None):
     cand = list(candidates if candidates is not None else ([target] if target else []))
+    team_map = ({"p001": "target_team", "p002": "opponent", "p003": "target_team"}
+                if teams is None else dict(teams))
+
+    def team_kwargs(tid):
+        label = team_map.get(tid)
+        return {
+            "team": label,
+            "team_confidence": .95 if label else None,
+            "team_source": cer.fsg.TEAM_SOURCE if label else None,
+        }
+
     players = [
         player(ms, "p001", p1, target_candidate="p001" in cand,
-               target_verified=status == "VERIFIED" and target == "p001"),
+               target_verified=status == "VERIFIED" and target == "p001",
+               **team_kwargs("p001")),
         player(ms, "p002", p2, target_candidate="p002" in cand,
-               target_verified=status == "VERIFIED" and target == "p002"),
+               target_verified=status == "VERIFIED" and target == "p002",
+               **team_kwargs("p002")),
     ]
     if include_p3:
         players.append(player(ms, "p003", p3, target_candidate="p003" in cand,
-                              target_verified=status == "VERIFIED" and target == "p003"))
+                              target_verified=status == "VERIFIED" and target == "p003",
+                              **team_kwargs("p003")))
     return {
         "media_ms": ms, "scene_id": "scene_001", "players": players,
         "global_target": {
@@ -43,8 +59,16 @@ def frame(ms, *, target="p001", status="VERIFIED", candidates=None,
             "identity_strength": "GLOBAL", "proof_eligible": status == "VERIFIED",
         },
         "ball": None, "ball_state": "MISSING", "ball_candidates": [],
-        "possession": {"status": "NO_BALL", "holder_local_track_id": None,
-                       "candidate_local_track_ids": [], "target_relation": "UNKNOWN"},
+        "possession": {
+            "status": "LIKELY" if holder else "NO_BALL",
+            "holder_local_track_id": holder,
+            "candidate_local_track_ids": [holder] if holder else [],
+            "target_relation": (
+                "TARGET_LIKELY_POSSESSION" if holder == target
+                else "OTHER_PLAYER_POSSESSION_CANDIDATE" if holder
+                else "UNKNOWN"
+            ),
+        },
     }
 
 
@@ -118,7 +142,10 @@ def analysis(actions, *, seq="seq_1", start=0, end=5000):
 
 
 def standard_graph():
-    return graph([frame(ms) for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)])
+    return graph([
+        frame(ms, holder="p001" if ms == 1000 else "p003" if ms == 1500 else None)
+        for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)
+    ])
 
 
 def test_b301_visible_actor_matching_verified_global_target_becomes_canonical_event():
@@ -216,6 +243,8 @@ def test_b309_complete_pass_receive_shot_goal_chain_becomes_assist():
     e = out["events"][0]
     assert e["canonical_event_type"] == "ASSIST"
     assert e["canonical_action_type"] == "PASS"
+    assert e["receiver_team_resolution"]["status"] == "VERIFIED"
+    assert e["proof"]["receiver_team_evidence"]["status"] == "VERIFIED"
     assert out["metrics"]["assists"] == 1
 
 
@@ -366,3 +395,72 @@ def test_b324_interpolated_identity_geometry_cannot_directly_verify_actor():
     out = cer.resolve_canonical_events(analysis([a]), graph(frames), auth)
     assert out["events"] == []
     assert out["unresolved"][0]["reason"] == "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE"
+
+
+def _assist_action():
+    chain = {"target_contact_ms": 1000, "receiver_local_track_id": "p003",
+             "receiver_ms": 1500, "teammate_shot_ms": 2200,
+             "goal_outcome_ms": 2500, "continuous_visible_sequence": True}
+    return action(kind="PASS", end=2700, outcome="TEAMMATE_GOAL",
+                  visible=True, chain=chain)
+
+
+def test_b325_opponent_receiver_cannot_be_promoted_to_assist():
+    frames = [frame(ms, teams={"p001": "target_team", "p002": "opponent",
+                               "p003": "opponent"},
+                    holder="p001" if ms == 1000 else "p003" if ms == 1500 else None)
+              for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)]
+    out = cer.resolve_canonical_events(analysis([_assist_action()]), graph(frames), authority())
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "PASS"
+    assert event["canonical_outcome"] == "UNKNOWN"
+    assert event["resolution_reason"] == "ASSIST_RECEIVER_NOT_TEAMMATE"
+    assert event["receiver_team_resolution"]["status"] == "REJECTED"
+    assert out["metrics"]["assists"] == 0
+
+
+def test_b326_unknown_receiver_team_downgrades_to_pass_without_deleting_action():
+    frames = [frame(ms, teams={"p001": "target_team", "p002": "opponent"},
+                    holder="p001" if ms == 1000 else "p003" if ms == 1500 else None)
+              for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)]
+    out = cer.resolve_canonical_events(analysis([_assist_action()]), graph(frames), authority())
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "PASS"
+    assert event["resolution_reason"] == "ASSIST_RECEIVER_TEAM_UNRESOLVED"
+    assert event["receiver_team_resolution"]["status"] == "UNRESOLVED"
+    assert out["metrics"]["assists"] == 0
+
+
+def test_b327_conflicting_receiver_team_samples_fail_closed():
+    frames = [frame(ms, holder="p001" if ms == 1000 else "p003" if ms == 1500 else None)
+              for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)]
+    for fr in frames:
+        if fr["media_ms"] == 1500:
+            receiver = next(p for p in fr["players"] if p["local_track_id"] == "p003")
+            receiver["team"] = "opponent"
+    out = cer.resolve_canonical_events(analysis([_assist_action()]), graph(frames), authority())
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "PASS"
+    assert event["receiver_team_resolution"]["reason"] == "RECEIVER_TEAM_EVIDENCE_CONFLICT"
+
+
+def test_b328_single_receiver_team_sample_is_not_enough_for_assist():
+    frames = [frame(ms, teams={"p001": "target_team", "p002": "opponent"},
+                    holder="p001" if ms == 1000 else "p003" if ms == 1500 else None)
+              for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)]
+    receiver = next(p for p in frames[4]["players"] if p["local_track_id"] == "p003")
+    receiver.update({"team": "target_team", "team_confidence": .95,
+                     "team_source": cer.fsg.TEAM_SOURCE})
+    out = cer.resolve_canonical_events(analysis([_assist_action()]), graph(frames), authority())
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "PASS"
+    assert event["receiver_team_resolution"]["reason"] == "RECEIVER_TEAM_EVIDENCE_INSUFFICIENT"
+
+
+def test_b329_teammate_label_without_ball_transfer_is_not_an_assist():
+    frames = [frame(ms) for ms in (500, 750, 1000, 1250, 1500, 2000, 2500, 3000)]
+    out = cer.resolve_canonical_events(analysis([_assist_action()]), graph(frames), authority())
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "PASS"
+    assert event["receiver_team_resolution"]["status"] == "UNRESOLVED"
+    assert event["receiver_team_resolution"]["reason"] == "TARGET_PASS_CONTACT_BALL_UNRESOLVED"

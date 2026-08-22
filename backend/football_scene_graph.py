@@ -55,6 +55,21 @@ BALL_SCORE_MARGIN = 0.12
 POSSESSION_MAX_H = 1.10
 POSSESSION_AMBIG_MARGIN_H = 0.22
 
+# Kit colour is supporting team-relation evidence only.  It never identifies
+# GLOBAL_TARGET.  A scoring-pass receiver must later have an exact, confident
+# ``target_team`` observation before B.3 may promote the pass to ASSIST.
+TEAM_SOURCE = "KIT_CHROMA_SCENE_CLUSTER"
+TEAM_MIN_TARGET_SAMPLES = 3
+TEAM_MIN_KIT_SAMPLES = 30
+TEAM_MIN_CLUSTER_SAMPLES = 3
+TEAM_MAX_TARGET_MEDIAN_SPREAD = 10.0
+TEAM_MIN_CLUSTER_SEPARATION = 10.0
+TEAM_MAX_TARGET_CENTER_DISTANCE = 18.0
+TEAM_MIN_TARGET_CENTER_MARGIN = 4.0
+TEAM_MIN_TARGET_CLUSTER_AGREEMENT = 0.80
+TEAM_CLASSIFY_MAX_DISTANCE = 18.0
+TEAM_LABEL_MIN_CONFIDENCE = 0.60
+
 
 def _num(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
@@ -154,6 +169,8 @@ def _associate_players(live, detections, ms, cam_dx, cam_dy, scene_id, next_id):
         tr["misses"] = 0
         tr["confidence"] = float(d.get("confidence") or 0.0)
         tr["team"] = d.get("team")
+        tr["team_confidence"] = d.get("team_confidence")
+        tr["team_source"] = d.get("team_source")
         tr["matched"] = True
 
     for ti, tr in enumerate(live):
@@ -169,6 +186,8 @@ def _associate_players(live, detections, ms, cam_dx, cam_dy, scene_id, next_id):
             "box": _box(d["box"]), "last_ms": ms,
             "vx": 0.0, "vy": 0.0, "misses": 0, "matched": True,
             "confidence": float(d.get("confidence") or 0.0), "team": d.get("team"),
+            "team_confidence": d.get("team_confidence"),
+            "team_source": d.get("team_source"),
         })
         next_id += 1
 
@@ -318,6 +337,225 @@ def _possession(ball, active, target_map):
             "candidate_local_track_ids": cand, "target_relation": rel}
 
 
+def _valid_chroma(value) -> bool:
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) == 2
+        and all(_num(v) and math.isfinite(float(v)) and 0.0 <= float(v) <= 255.0
+                for v in value)
+    )
+
+
+def _chroma(value):
+    return float(value[0]), float(value[1])
+
+
+def _chroma_distance(a, b) -> float:
+    return math.hypot(float(a[0]) - float(b[0]), float(a[1]) - float(b[1]))
+
+
+def _median(values):
+    ordered = sorted(float(v) for v in values)
+    n = len(ordered)
+    if n % 2:
+        return ordered[n // 2]
+    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2.0
+
+
+def _median_chroma(samples):
+    return (_median([x[0] for x in samples]), _median([x[1] for x in samples]))
+
+
+def _detection_for_player(observation, player):
+    """Recover the exact detector row used by a scene-graph player row."""
+    if not isinstance(observation, dict) or not _valid_box((player or {}).get("box")):
+        return None
+    ranked = []
+    for d in observation.get("players") or []:
+        if not isinstance(d, dict) or not _valid_box(d.get("box")):
+            continue
+        ranked.append((_iou(player["box"], d["box"]), d))
+    ranked.sort(reverse=True, key=lambda x: x[0])
+    # A matched MOT row stores the current detector box exactly.  Requiring a
+    # near-exact overlap prevents chroma from a neighbouring same-kit body from
+    # becoming the target anchor during a crowd/overlap.
+    return ranked[0][1] if ranked and ranked[0][0] >= 0.85 else None
+
+
+def _clear_team_labels(observations):
+    for o in observations or []:
+        if not isinstance(o, dict):
+            continue
+        for d in o.get("players") or []:
+            if not isinstance(d, dict):
+                continue
+            d.pop("team", None)
+            d.pop("team_confidence", None)
+            d.pop("team_source", None)
+
+
+def _sample_evenly(rows, limit=400):
+    if len(rows) <= limit:
+        return list(rows)
+    # Cover the whole video rather than fitting only the opening scene.
+    return [rows[round(i * (len(rows) - 1) / (limit - 1))] for i in range(limit)]
+
+
+def apply_team_authority(observations, unified_authority, model_factory=None) -> dict:
+    """Attach fail-closed target-relative kit labels to detector observations.
+
+    The target kit anchor is derived only from scene frames where the shared
+    GLOBAL_TARGET authority is proof-eligible and maps unambiguously to one
+    current detector body.  K-means remains supporting evidence: insufficient,
+    unstable or weakly separated colour evidence produces no team labels.
+
+    ``observations`` is mutated intentionally to avoid duplicating a dense
+    90-minute detection stream in memory.  ``unified_authority`` is read-only.
+    """
+    valid_obs = sorted(
+        (o for o in observations or [] if isinstance(o, dict) and _num(o.get("media_ms"))),
+        key=lambda o: float(o["media_ms"]),
+    )
+    _clear_team_labels(valid_obs)
+    base = {
+        "version": 1,
+        "status": "unresolved",
+        "source": TEAM_SOURCE,
+        "target_samples": 0,
+        "kit_samples": 0,
+        "labeled_detections": 0,
+    }
+    if not valid_obs:
+        return {**base, "reason": "NO_OBSERVATIONS"}
+
+    provisional = assemble_scene_graph(valid_obs, unified_authority or {})
+    frames = provisional.get("frames") or []
+    target_samples = []
+    for o, fr in zip(valid_obs, frames):
+        if int(round(float(o["media_ms"]))) != int(fr.get("media_ms", -1)):
+            continue
+        tm = fr.get("global_target") or {}
+        if not (tm.get("status") == "VERIFIED" and tm.get("proof_eligible") is True):
+            continue
+        tid = tm.get("local_track_id")
+        player = next((p for p in fr.get("players") or []
+                       if isinstance(p, dict) and p.get("local_track_id") == tid), None)
+        det = _detection_for_player(o, player)
+        if det and _valid_chroma(det.get("kit_chroma")):
+            target_samples.append(_chroma(det["kit_chroma"]))
+
+    all_samples = [
+        _chroma(d["kit_chroma"])
+        for o in valid_obs for d in (o.get("players") or [])
+        if isinstance(d, dict) and _valid_chroma(d.get("kit_chroma"))
+    ]
+    base["target_samples"] = len(target_samples)
+    base["kit_samples"] = len(all_samples)
+    if len(target_samples) < TEAM_MIN_TARGET_SAMPLES:
+        return {**base, "reason": "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"}
+    if len(all_samples) < TEAM_MIN_KIT_SAMPLES:
+        return {**base, "reason": "INSUFFICIENT_KIT_SAMPLES"}
+
+    anchor = _median_chroma(target_samples)
+    target_spread = _median([_chroma_distance(x, anchor) for x in target_samples])
+    base["target_median_spread"] = round(target_spread, 4)
+    if target_spread > TEAM_MAX_TARGET_MEDIAN_SPREAD:
+        return {**base, "reason": "UNSTABLE_TARGET_KIT_ANCHOR"}
+
+    try:
+        if model_factory is None:
+            import cv_detect
+            model_factory = cv_detect.TeamModel
+        fit_samples = _sample_evenly(all_samples)
+        model = model_factory(anchor)
+        for sample in fit_samples:
+            model.add(sample)
+        # TeamModel performs early fits at fixed sample counts. Refit once on
+        # the evenly distributed final sample so all video sections contribute.
+        model._fit()
+        centers = [tuple(float(v) for v in c) for c in model.centers]
+        target_ci = int(model.target_ci)
+    except Exception as exc:
+        return {**base, "reason": "TEAM_MODEL_FIT_FAILED",
+                "detail": type(exc).__name__[:80]}
+
+    if len(centers) != 2 or target_ci not in (0, 1):
+        return {**base, "reason": "TEAM_MODEL_UNRESOLVED"}
+    assignments = [min(range(2), key=lambda i: _chroma_distance(s, centers[i]))
+                   for s in fit_samples]
+    cluster_counts = [assignments.count(0), assignments.count(1)]
+    separation = _chroma_distance(centers[0], centers[1])
+    target_distance = _chroma_distance(anchor, centers[target_ci])
+    other_distance = _chroma_distance(anchor, centers[1 - target_ci])
+    target_agreement = (
+        sum(min(range(2), key=lambda i: _chroma_distance(s, centers[i])) == target_ci
+            for s in target_samples) / len(target_samples)
+    )
+    base.update({
+        "fit_samples": len(fit_samples),
+        "cluster_counts": cluster_counts,
+        "cluster_separation": round(separation, 4),
+        "target_center_distance": round(target_distance, 4),
+        "target_center_margin": round(other_distance - target_distance, 4),
+        "target_cluster_agreement": round(target_agreement, 4),
+    })
+    if min(cluster_counts) < TEAM_MIN_CLUSTER_SAMPLES:
+        return {**base, "reason": "TEAM_CLUSTER_TOO_SMALL"}
+    if separation < TEAM_MIN_CLUSTER_SEPARATION:
+        return {**base, "reason": "TEAM_CLUSTERS_NOT_SEPARABLE"}
+    if target_distance > TEAM_MAX_TARGET_CENTER_DISTANCE:
+        return {**base, "reason": "TARGET_ANCHOR_OUTSIDE_TEAM_CLUSTER"}
+    if other_distance - target_distance < TEAM_MIN_TARGET_CENTER_MARGIN:
+        return {**base, "reason": "TARGET_TEAM_CLUSTER_AMBIGUOUS"}
+    if target_agreement < TEAM_MIN_TARGET_CLUSTER_AGREEMENT:
+        return {**base, "reason": "TARGET_KIT_CLUSTER_INCONSISTENT"}
+
+    labeled = 0
+    for o in valid_obs:
+        for d in o.get("players") or []:
+            if not isinstance(d, dict) or not _valid_chroma(d.get("kit_chroma")):
+                continue
+            sample = _chroma(d["kit_chroma"])
+            distances = [_chroma_distance(sample, c) for c in centers]
+            ci = 0 if distances[0] <= distances[1] else 1
+            near, far = distances[ci], distances[1 - ci]
+            if near > TEAM_CLASSIFY_MAX_DISTANCE:
+                d["team"] = "other"
+                d["team_confidence"] = round(min(1.0, (near - TEAM_CLASSIFY_MAX_DISTANCE) / 18.0), 4)
+                d["team_source"] = TEAM_SOURCE
+                labeled += 1
+                continue
+            closeness = max(0.0, 1.0 - near / TEAM_CLASSIFY_MAX_DISTANCE)
+            margin = max(0.0, min(1.0, (far - near) / 12.0))
+            confidence = 0.5 * closeness + 0.5 * margin
+            if confidence < TEAM_LABEL_MIN_CONFIDENCE:
+                continue
+            d["team"] = "target_team" if ci == target_ci else "opponent"
+            d["team_confidence"] = round(confidence, 4)
+            d["team_source"] = TEAM_SOURCE
+            labeled += 1
+    return {**base, "status": "ok", "reason": None,
+            "labeled_detections": labeled}
+
+
+def _annotate_kit_chroma(frame_bgr, people):
+    """Extract torso chroma on the original frame for each person detection."""
+    import cv_detect
+
+    height, width = frame_bgr.shape[:2]
+    for d in people or []:
+        if not isinstance(d, dict) or not _valid_box(d.get("box")):
+            continue
+        b = d["box"]
+        x = max(0, min(width - 1, int(round(b["x"] * width))))
+        y = max(0, min(height - 1, int(round(b["y"] * height))))
+        w = max(1, min(width - x, int(round(b["w"] * width))))
+        h = max(1, min(height - y, int(round(b["h"] * height))))
+        chroma = cv_detect.torso_chroma(frame_bgr, (x, y, w, h))
+        if _valid_chroma(chroma):
+            d["kit_chroma"] = [round(float(chroma[0]), 4), round(float(chroma[1]), 4)]
+
+
 def assemble_scene_graph(observations, unified_authority) -> dict:
     """Pure deterministic scene graph over precomputed detections."""
     obs = sorted((o for o in observations or [] if isinstance(o, dict) and _num(o.get("media_ms"))),
@@ -334,7 +572,7 @@ def assemble_scene_graph(observations, unified_authority) -> dict:
     scene_id = f"scene_{scene_no + 1:03d}"
     scene_start = int(obs[0]["media_ms"])
     previous_ball = None
-    target_verified = target_hyp = ball_seen = possession_target = 0
+    target_verified = target_hyp = ball_seen = possession_target = team_labeled = 0
 
     for oi, o in enumerate(obs):
         ms = int(round(float(o["media_ms"])))
@@ -375,9 +613,13 @@ def assemble_scene_graph(observations, unified_authority) -> dict:
                 "media_ms": ms, "scene_id": scene_id,
                 "local_track_id": tr["local_track_id"], "box": deepcopy(tr["box"]),
                 "confidence": tr.get("confidence"), "team": tr.get("team"),
+                "team_confidence": tr.get("team_confidence"),
+                "team_source": tr.get("team_source"),
                 "global_target_candidate": tr["local_track_id"] in target_set,
                 "global_target_verified": tr["local_track_id"] == target_map.get("local_track_id"),
             }
+            if row["team"] is not None:
+                team_labeled += 1
             player_points.append(row)
             active_rows.append(row)
 
@@ -409,6 +651,7 @@ def assemble_scene_graph(observations, unified_authority) -> dict:
             "target_hypothesis_frames": target_hyp,
             "ball_seen_frames": ball_seen,
             "target_possession_frames": possession_target,
+            "team_labeled_player_points": team_labeled,
         },
     }
 
@@ -499,15 +742,18 @@ def build_scene_graph(video_path: str, unified_authority: dict) -> dict:
             cut = (diff > 45.0 and cam.mode != "affine") or diff > 75.0
             prev_tiny = tiny
             people, balls = _detect_people_and_ball(detector, frame)
+            _annotate_kit_chroma(frame, people)
             observations.append({
                 "media_ms": int(round(t * 1000)), "cut": bool(cut),
                 "cam_dx": 0.0 if cut else float(cam.dx) / 160.0,
                 "cam_dy": 0.0 if cut else float(cam.dy) / max(tiny_h, 1),
                 "players": people, "balls": balls,
             })
+        team_authority = apply_team_authority(observations, unified_authority)
         graph = assemble_scene_graph(observations, unified_authority)
+        graph["team_authority"] = team_authority
         graph["compute_s"] = round(time.time() - started, 2)
-        graph["detector"] = "yolov8n.onnx/person+sports_ball"
+        graph["detector"] = "yolov8n.onnx/person+sports_ball+kit_chroma"
         return graph
     except Exception as exc:
         return {"version": VERSION, "status": "error", "reason": str(exc)[:240]}

@@ -213,6 +213,7 @@ def _compact_scene_graph(scene_graph: dict | None) -> dict:
         "hz": sg.get("hz"),
         "scenes": deepcopy(sg.get("scenes") or []),
         "metrics": deepcopy(sg.get("metrics") or {}),
+        "team_authority": deepcopy(sg.get("team_authority") or {}),
         "compute_s": sg.get("compute_s"),
         "detector": sg.get("detector"),
         "dense_graph_persisted": False,

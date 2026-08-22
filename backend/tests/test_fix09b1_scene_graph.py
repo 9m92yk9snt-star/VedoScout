@@ -48,8 +48,11 @@ def authority(rows=None, unresolved=None):
     }
 
 
-def det(box, conf=0.9, team=None):
-    return {"box": dict(box), "confidence": conf, "team": team}
+def det(box, conf=0.9, team=None, chroma=None):
+    row = {"box": dict(box), "confidence": conf, "team": team}
+    if chroma is not None:
+        row["kit_chroma"] = list(chroma)
+    return row
 
 
 def ball(x=0.145, y=0.485, conf=0.8):
@@ -233,3 +236,76 @@ def test_b113_predicted_identity_is_continuity_hypothesis_not_verified_actor():
     assert tm["local_track_id"] is None
     assert tm["candidate_local_track_ids"] == ["p001"]
     assert tm["proof_eligible"] is False
+
+
+class _FixedTeamModel:
+    def __init__(self, anchor, centers=((45.0, 55.0), (170.0, 180.0))):
+        self.anchor = anchor
+        self.centers = list(centers)
+        self.target_ci = 0
+        self.samples = []
+
+    def add(self, sample):
+        self.samples.append(sample)
+
+    def _fit(self):
+        return None
+
+
+def _team_observations(count=10):
+    mate = {"x": 0.35, "y": 0.21, "w": 0.10, "h": 0.30}
+    return [
+        obs(ms, [
+            det(TARGET, chroma=(45.0, 55.0)),
+            det(mate, chroma=(47.0, 54.0)),
+            det(OTHER, chroma=(170.0, 180.0)),
+        ])
+        for ms in range(0, count * 125, 125)
+    ]
+
+
+def test_b114_team_authority_labels_only_from_verified_global_target_anchor():
+    observations = _team_observations()
+    auth = authority([(o["media_ms"], TARGET) for o in observations])
+    auth_before = copy.deepcopy(auth)
+    diag = fsg.apply_team_authority(
+        observations, auth, model_factory=lambda anchor: _FixedTeamModel(anchor))
+    assert diag["status"] == "ok"
+    assert diag["target_samples"] == 10
+    assert diag["labeled_detections"] == 30
+
+    out = fsg.assemble_scene_graph(observations, auth)
+    first = {p["local_track_id"]: p for p in out["frames"][0]["players"]}
+    assert first["p001"]["team"] == "target_team"
+    assert first["p002"]["team"] == "target_team"
+    assert first["p003"]["team"] == "opponent"
+    assert all(p["team_source"] == fsg.TEAM_SOURCE for p in first.values())
+    assert all(p["team_confidence"] >= fsg.TEAM_LABEL_MIN_CONFIDENCE
+               for p in first.values())
+    assert all("kit_chroma" not in p for p in out["player_points"])
+    assert auth == auth_before
+
+
+def test_b115_non_proof_identity_cannot_seed_team_authority():
+    observations = _team_observations()
+    auth = authority([(o["media_ms"], TARGET) for o in observations])
+    for point in auth["target_points"]:
+        point.update({"state": "OCCLUDED", "identity_strength": "PREDICTED",
+                      "predicted": True, "proof_eligible": False})
+    diag = fsg.apply_team_authority(
+        observations, auth, model_factory=lambda anchor: _FixedTeamModel(anchor))
+    assert diag["status"] == "unresolved"
+    assert diag["reason"] == "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"
+    assert not any(d.get("team") for o in observations for d in o["players"])
+
+
+def test_b116_weakly_separated_kit_clusters_fail_closed():
+    observations = _team_observations()
+    auth = authority([(o["media_ms"], TARGET) for o in observations])
+    diag = fsg.apply_team_authority(
+        observations, auth,
+        model_factory=lambda anchor: _FixedTeamModel(
+            anchor, centers=((45.0, 55.0), (50.0, 58.0))))
+    assert diag["status"] == "unresolved"
+    assert diag["reason"] == "TEAM_CLUSTERS_NOT_SEPARABLE"
+    assert not any(d.get("team") for o in observations for d in o["players"])
