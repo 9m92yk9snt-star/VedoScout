@@ -1,0 +1,40 @@
+name: FIX09B deterministic verification
+
+on:
+  push:
+    branches:
+      - fix-09b-ci-verify
+    paths-ignore:
+      - .fix09b-ci-pass.txt
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pytest
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run deterministic regression suite
+        working-directory: backend
+        run: |
+          python -m pytest -q \
+            tests/test_fix09b0_unified_identity_authority.py \
+            tests/test_fix09b0_event_bridge.py \
+            tests/test_fix09b1_scene_graph.py \
+            tests/test_fix09b2_sequence_intelligence.py \
+            tests/test_fix09b3_canonical_event_resolver.py \
+            tests/test_fix09c_canonical_output_authority.py
+      - name: Write pass marker
+        run: |
+          printf 'PASS\nsource_sha=%s\n' "${GITHUB_SHA}" > .fix09b-ci-pass.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .fix09b-ci-pass.txt
+          git commit -m 'CI scratch: FIX09B regression suite passed'
+          git push
