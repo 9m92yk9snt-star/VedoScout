@@ -1,8 +1,8 @@
 """FIX 09C — one canonical event truth for every product surface.
 
-The B.3 resolver is the factual football-event authority.  This module adapts
+The B.3 resolver is the factual football-event authority. This module adapts
 that truth into the existing report schema without re-discovering, re-timing or
-re-identifying events.  Report timeline, deterministic stats, evidence frames,
+re-identifying events. Report timeline, deterministic stats, evidence frames,
 proof clips, snapshots and renderer metadata can therefore share the SAME
 stable event_id and canonical media time.
 
@@ -15,14 +15,16 @@ from copy import deepcopy
 VERSION = 1
 
 # Existing FIX07 vocabulary is intentionally kept for statistical compatibility.
-# Rich micro-actions remain available in football_action_type/details instead of
-# being falsely promoted to a statistical category they do not mean.
+# IMPORTANT: rich micro-actions are NOT automatically equivalent to countable
+# legacy stats. A carry is not necessarily a take-on/dribble, and RECEIVE / CONTROL
+# are not extra FIRST_TOUCH attempts. Those details remain available through
+# football_action_type/details without inflating deterministic match totals.
 _STATS_ACTION = {
     "SHOT": "SHOT", "PASS": "PASS", "CROSS": "CROSS", "KEY_PASS": "PASS",
-    "DRIBBLE": "DRIBBLE", "TAKE_ON": "DRIBBLE", "CARRY": "DRIBBLE",
+    "DRIBBLE": "DRIBBLE", "TAKE_ON": "DRIBBLE",
     "DUEL": "DUEL", "TACKLE": "TACKLE", "INTERCEPTION": "INTERCEPTION",
-    "RECOVERY": "RECOVERY", "FIRST_TOUCH": "FIRST_TOUCH", "RECEIVE": "FIRST_TOUCH",
-    "CONTROL": "FIRST_TOUCH", "RUN": "RUN", "OFF_BALL_RUN": "RUN",
+    "RECOVERY": "RECOVERY", "FIRST_TOUCH": "FIRST_TOUCH",
+    "RUN": "RUN", "OFF_BALL_RUN": "RUN",
 }
 
 _TITLE = {
@@ -95,8 +97,6 @@ def project_event(event: dict) -> dict:
              else event.get("start_ms") or 0)
     end_ms = int(event.get("end_ms") if isinstance(event.get("end_ms"), int) else ms)
     causal_visible = bool(event.get("causal_verified"))
-    # Non-scoring results such as COMPLETED/SAVED already require visible
-    # evidence in B.3 before becoming non-UNKNOWN.
     outcome_visible = causal_visible or result not in {"UNKNOWN", "OUTCOME_NOT_VISIBLE"}
     title_key = football_event if football_event in _TITLE else football_action
     return {
@@ -118,7 +118,6 @@ def project_event(event: dict) -> dict:
         "canonical_action_type": stats_action,
         "canonical_result": result,
         "outcome_visible": outcome_visible,
-        # Rich football truth retained independently of FIX07's narrower enum.
         "football_event_type": football_event,
         "football_action_type": football_action,
         "football_outcome": event.get("canonical_outcome"),
@@ -147,9 +146,6 @@ def _best_proof_frame(event) -> dict | None:
     if isinstance(cg, dict) and isinstance(cg.get("media_ms"), int) and isinstance(cg.get("box"), dict):
         return {"media_ms": cg["media_ms"], "box": deepcopy(cg["box"]),
                 "visibility": cg.get("visibility") or "VISIBLE", "kind": "CONTACT"}
-    # Occluded contact: use the closest physically visible actor keyframe from
-    # THE SAME canonical event. It stays bound by event_id; the frame timestamp
-    # records the actual visible evidence moment and contact geometry stays null.
     keys = [r for r in proof.get("actor_keyframes") or []
             if isinstance(r, dict) and isinstance(r.get("media_ms"), int)
             and isinstance(r.get("box"), dict) and r.get("visibility") != "OCCLUDED"]
