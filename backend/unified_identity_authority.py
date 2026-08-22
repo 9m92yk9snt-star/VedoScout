@@ -36,6 +36,7 @@ TAP_AUTHORITY_MS = 650
 AGREE_IOU_MIN = 0.18
 AGREE_CENTER_H = 0.70
 MAX_RESOLVE_INTERP_MS = 500
+PRODUCTION_SEGMENT_GAP_S = 0.35
 
 
 def _is_num(v) -> bool:
@@ -463,11 +464,25 @@ def to_production_track(authority) -> dict:
         if old is None or rank.get(p.get("authority_source"), 0) > rank.get(old.get("authority_source"), 0):
             best[p["t"]] = p
     out = [best[k] for k in sorted(best)]
+    segments = []
+    last_scene = None
+    for p in out:
+        scene = p.get("scene_id")
+        if (segments and scene == last_scene
+                and float(p["t"]) - float(segments[-1][1]) <= PRODUCTION_SEGMENT_GAP_S):
+            segments[-1][1] = float(p["t"])
+        else:
+            segments.append([float(p["t"]), float(p["t"])])
+        last_scene = scene
+    segments = [
+        [round(a, 3), round(b, 3)] for a, b in segments
+        if b - a >= PRODUCTION_SEGMENT_GAP_S - 1e-9
+    ]
     return {
         "version": "FIX09B.0",
         "global_target_id": GLOBAL_TARGET_ID,
         "authority": "UNIFIED_IDENTITY",
         "points": out,
-        "segments": [],
+        "segments": segments,
         "seed_count": len((authority or {}).get("tap_times_ms") or []) if isinstance(authority, dict) else 0,
     }

@@ -300,3 +300,18 @@ def test_b318_event_ids_are_stable_for_same_scene_action_time_and_actor():
     one = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
     two = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
     assert one["events"][0]["event_id"] == two["events"][0]["event_id"]
+
+
+def test_b319_pass_outcome_is_unknown_when_outcome_is_not_visible():
+    a = action(kind="PASS", outcome="COMPLETED", visible=False)
+    out = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
+    e = out["events"][0]
+    assert e["canonical_event_type"] == "PASS"
+    assert e["canonical_outcome"] == "UNKNOWN"
+    assert e["causal_verified"] is False
+
+
+def test_b320_micro_outcome_is_unknown_when_outcome_is_not_visible():
+    a = action(kind="DUEL", outcome="WON", visible=False)
+    out = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
+    assert out["events"][0]["canonical_outcome"] == "UNKNOWN"

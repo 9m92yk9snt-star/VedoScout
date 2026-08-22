@@ -7,7 +7,7 @@ none owns a competing player/event truth:
         → FIX09B.0 GLOBAL_TARGET authority
         → FIX09B.1 all-player + ball scene graph
         → FIX09B.2 sequence discovery/understanding plan
-        → (one injected whole-video multimodal call)
+        → (one injected whole-video multimodal call; one bounded contract retry)
         → FIX09B.2 strict normalisation
         → FIX09B.3 canonical target event resolution
         → FIX09C output projection
@@ -28,6 +28,128 @@ import unified_event_bridge
 import unified_identity_authority
 
 VERSION = 1
+
+
+def compact_identity_timeline(identity_timeline: dict | None) -> dict:
+    """Persist FIX09A run metadata without a second dense target-point copy."""
+    tl = identity_timeline if isinstance(identity_timeline, dict) else {}
+    return {
+        "version": tl.get("version"),
+        "status": tl.get("status"),
+        "reason": tl.get("reason"),
+        "global_target_id": tl.get("global_target_id"),
+        "timebase": tl.get("timebase") or "canonical_media_ms",
+        "scenes": deepcopy(tl.get("scenes") or []),
+        "unresolved_intervals": deepcopy(tl.get("unresolved_intervals") or []),
+        "other_tracks": deepcopy(tl.get("other_tracks") or []),
+        "profile_bank": deepcopy(tl.get("profile_bank") or {}),
+        "recovery": deepcopy(tl.get("recovery") or {}),
+        "counts": deepcopy(tl.get("counts") or {}),
+        "config": deepcopy(tl.get("config") or {}),
+        "target_point_count": len(tl.get("target_points") or []),
+        "dense_target_points_persisted": False,
+    }
+
+
+def _compact_identity_authority(authority: dict | None) -> dict:
+    """Keep identity decisions/metrics without duplicating render geometry."""
+    auth = authority if isinstance(authority, dict) else {}
+    return {
+        "version": auth.get("version"),
+        "status": auth.get("status"),
+        "global_target_id": auth.get("global_target_id"),
+        "timebase": auth.get("timebase"),
+        "scenes": deepcopy(auth.get("scenes") or []),
+        "unresolved_intervals": deepcopy(auth.get("unresolved_intervals") or []),
+        "tap_times_ms": deepcopy(auth.get("tap_times_ms") or []),
+        "metrics": deepcopy(auth.get("metrics") or {}),
+        "identity_profile": deepcopy(auth.get("identity_profile") or {}),
+        "target_point_count": len(auth.get("target_points") or []),
+        "dense_target_points_persisted": False,
+    }
+
+
+def _compact_production_track(track: dict | None) -> dict:
+    """Persist the one geometry stream required by proof/render consumers."""
+    src = track if isinstance(track, dict) else {}
+    points = []
+    for p in src.get("points") or []:
+        if not isinstance(p, dict):
+            continue
+        if not all(isinstance(p.get(k), (int, float)) and not isinstance(p.get(k), bool)
+                   for k in ("t", "x", "y", "w", "h")):
+            continue
+        points.append({
+            "t": p["t"], "x": p["x"], "y": p["y"], "w": p["w"], "h": p["h"],
+            "conf": p.get("conf", 0.9),
+        })
+    return {
+        "version": src.get("version"),
+        "authority": src.get("authority"),
+        "global_target_id": src.get("global_target_id"),
+        "points": points,
+        "segments": deepcopy(src.get("segments") or []),
+        "seed_count": src.get("seed_count"),
+    }
+
+
+def _compact_scene_graph(scene_graph: dict | None) -> dict:
+    """Persist diagnostics without duplicating the dense per-frame graph.
+
+    At 8 Hz, ``frames`` plus the duplicated ``player_points`` collection can
+    exceed MongoDB's 16 MB document limit on ordinary match footage. The full
+    graph remains in memory for B.2/B.3; persistence keeps reproducible run
+    metadata and scene boundaries only.
+    """
+    sg = scene_graph if isinstance(scene_graph, dict) else {}
+    return {
+        "version": sg.get("version"),
+        "status": sg.get("status"),
+        "reason": sg.get("reason"),
+        "global_target_id": sg.get("global_target_id"),
+        "timebase": sg.get("timebase"),
+        "hz": sg.get("hz"),
+        "scenes": deepcopy(sg.get("scenes") or []),
+        "metrics": deepcopy(sg.get("metrics") or {}),
+        "compute_s": sg.get("compute_s"),
+        "detector": sg.get("detector"),
+        "dense_graph_persisted": False,
+    }
+
+
+def _compact_sequence_plan(plan: dict | None) -> dict:
+    """Remove repeated graph_context rows while retaining exact window truth."""
+    src = plan if isinstance(plan, dict) else {}
+    analysis = []
+    for w in src.get("analysis_windows") or []:
+        if not isinstance(w, dict):
+            continue
+        analysis.append({
+            k: deepcopy(w.get(k)) for k in (
+                "sequence_id", "scene_id", "start_ms", "end_ms", "review_hz",
+                "coverage_reason", "verified_frames", "hypothesis_frames",
+            )
+        } | {"graph_context_rows": len(w.get("graph_context") or [])})
+    refinement = []
+    for r in src.get("refinement_windows") or []:
+        if not isinstance(r, dict):
+            continue
+        refinement.append({
+            k: deepcopy(r.get(k)) for k in (
+                "refinement_id", "scene_id", "start_ms", "end_ms", "review_hz",
+                "reasons", "sequence_ids",
+            )
+        } | {"trigger_count": len(r.get("trigger_ms") or [])})
+    return {
+        "version": src.get("version"),
+        "status": src.get("status"),
+        "global_target_id": src.get("global_target_id"),
+        "timebase": src.get("timebase"),
+        "analysis_windows": analysis,
+        "refinement_windows": refinement,
+        "metrics": deepcopy(src.get("metrics") or {}),
+        "graph_context_persisted": False,
+    }
 
 
 def prepare_analysis(
@@ -158,8 +280,49 @@ def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> d
             "events_unresolved": canonical.get("metrics", {}).get("observations_unresolved", 0),
             "events_rejected": canonical.get("metrics", {}).get("observations_rejected", 0),
             "coverage_complete": sequence_analysis.get("coverage_complete") is True,
+            "model_attempts": max(
+                1,
+                int(raw_model_result.get("attempts") or 1)
+                if isinstance(raw_model_result, dict)
+                and isinstance(raw_model_result.get("attempts"), int)
+                and not isinstance(raw_model_result.get("attempts"), bool)
+                else 1,
+            ),
         },
     }
+
+
+def build_retry_request(prepared: dict | None, sequence_ids,
+                        player_details: dict | None = None) -> dict:
+    """Build one bounded retry request for incomplete original windows only."""
+    ctx = prepared if isinstance(prepared, dict) else {}
+    plan = football_sequence_intelligence.subset_sequence_plan(
+        ctx.get("sequence_plan"), sequence_ids)
+    prompt = football_sequence_intelligence.build_analysis_prompt(
+        plan,
+        deepcopy(player_details) if isinstance(player_details, dict) else {},
+        deepcopy(ctx.get("identity_context") or {}),
+    )
+    return {"sequence_plan": plan, "analysis_prompt": prompt}
+
+
+def merge_model_attempts(results) -> dict:
+    """Public orchestration wrapper for deterministic bounded-attempt merge."""
+    return football_sequence_intelligence.merge_raw_sequence_results(results)
+
+
+def is_production_ready(result: dict | None) -> bool:
+    """True only when every supplied B.2 window passed its response contract."""
+    r = result if isinstance(result, dict) else {}
+    seq = r.get("sequence_analysis") if isinstance(r.get("sequence_analysis"), dict) else {}
+    canonical = r.get("canonical_events") if isinstance(r.get("canonical_events"), dict) else {}
+    return bool(
+        r.get("status") == "ok"
+        and seq.get("coverage_complete") is True
+        and not (seq.get("incomplete_sequence_ids") or [])
+        and int((r.get("metrics") or {}).get("sequence_windows") or 0) > 0
+        and canonical.get("status") in {"ok", "empty"}
+    )
 
 
 def apply_result_to_report(full: dict, result: dict | None) -> dict:
@@ -171,24 +334,24 @@ def apply_result_to_report(full: dict, result: dict | None) -> dict:
 
 
 def persistence_payload(result: dict | None) -> dict:
-    """Compact, explicit DB payload for diagnostics/replay without raw prompt.
+    """Compact, explicit DB payload for diagnostics/audit without raw prompt.
 
-    The raw model response may be persisted separately by the server if needed;
-    the authoritative structures below are deterministic outputs.
+    Dense frame data stays ephemeral to respect MongoDB's document limit; the
+    authoritative decisions and enough run metadata for operational audit are
+    retained below.
     """
     r = result if isinstance(result, dict) else {}
     return {
         "unified_analysis_version": VERSION,
         "unified_analysis_status": r.get("status"),
-        "unified_identity_authority": deepcopy(r.get("identity_authority") or {}),
-        "football_scene_graph": deepcopy(r.get("scene_graph") or {}),
-        "football_sequence_plan": deepcopy(r.get("sequence_plan") or {}),
+        "unified_identity_authority": _compact_identity_authority(r.get("identity_authority")),
+        "football_scene_graph": _compact_scene_graph(r.get("scene_graph")),
+        "football_sequence_plan": _compact_sequence_plan(r.get("sequence_plan")),
         "football_sequence_analysis": deepcopy(r.get("sequence_analysis") or {}),
         "canonical_events": deepcopy(r.get("canonical_events") or {}),
         "event_ledger": deepcopy(r.get("event_ledger") or {}),
         "unified_scoring_scan": deepcopy(r.get("scoring_scan") or {}),
         "unified_analysis_metrics": deepcopy(r.get("metrics") or {}),
-        "unified_production_track": deepcopy(r.get("production_track") or {}),
-        "unified_event_track": deepcopy(r.get("event_track") or {}),
+        "unified_production_track": _compact_production_track(r.get("production_track")),
         "unified_event_track_source": r.get("event_track_source"),
     }

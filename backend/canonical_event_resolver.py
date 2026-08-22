@@ -398,17 +398,23 @@ def _causal_resolution(action) -> dict:
         }
 
     if kind in SCORING_PASS_ACTIONS:
-        normal = outcome if outcome in {"COMPLETED", "INCOMPLETE", "TEAMMATE_SHOT"} else "UNKNOWN"
+        normal = (
+            outcome
+            if action.get("outcome_visible") is True
+            and outcome in {"COMPLETED", "INCOMPLETE", "TEAMMATE_SHOT"}
+            else "UNKNOWN"
+        )
         return {
             "canonical_event_type": kind, "canonical_action_type": kind,
             "canonical_outcome": normal, "causal_verified": normal != "UNKNOWN",
             "reason": "VISIBLE_PASS_OUTCOME" if normal != "UNKNOWN" else "PASS_OUTCOME_UNVERIFIED",
         }
 
+    visible_outcome = outcome if action.get("outcome_visible") is True else "UNKNOWN"
     return {
         "canonical_event_type": kind,
         "canonical_action_type": kind,
-        "canonical_outcome": outcome if action.get("outcome_visible") else (outcome if outcome in {"COMPLETED", "INCOMPLETE", "WON", "LOST"} else "UNKNOWN"),
+        "canonical_outcome": visible_outcome,
         "causal_verified": True,
         "reason": "TARGET_ACTION_VERIFIED",
     }

@@ -266,3 +266,86 @@ def test_b215_causal_timestamps_outside_window_are_removed_not_rewritten():
     got = out["sequences"][0]["actions"][0]["causal_chain"]
     assert got["target_contact_ms"] == 500 and got["receiver_ms"] == 700
     assert got["teammate_shot_ms"] is None and got["goal_outcome_ms"] is None
+
+
+def test_b216_reviewed_coverage_cannot_hide_an_omitted_sequence_row():
+    plan = _plan_one(); w = plan["analysis_windows"][0]
+    out = fsi.normalise_sequence_analysis({
+        "sequences": [],
+        "coverage": [{"sequence_id": w["sequence_id"], "reviewed": True,
+                      "target_seen": False, "actions_found": 0}],
+    }, plan)
+    assert out["coverage_complete"] is False
+    assert out["missing_sequence_ids"] == [w["sequence_id"]]
+    assert out["coverage"][0]["contract_complete"] is False
+
+
+def test_b217_actions_found_must_match_actions_that_survive_normalisation():
+    plan = _plan_one(); w = plan["analysis_windows"][0]
+    malformed = _action(w, evidence_ms=[], actor_evidence=[])
+    out = fsi.normalise_sequence_analysis({
+        "sequences": [{"sequence_id": w["sequence_id"], "scene_id": w["scene_id"],
+                       "actions": [malformed]}],
+        "coverage": [{"sequence_id": w["sequence_id"], "reviewed": True,
+                      "target_seen": True, "actions_found": 1}],
+    }, plan)
+    assert out["coverage_complete"] is False
+    assert out["action_count_mismatch_ids"] == [w["sequence_id"]]
+    assert out["coverage"][0]["normalised_actions"] == 0
+
+
+def test_b218_duplicate_contract_rows_are_incomplete_not_double_truth():
+    plan = _plan_one(); w = plan["analysis_windows"][0]
+    seq = {"sequence_id": w["sequence_id"], "scene_id": w["scene_id"], "actions": []}
+    cov = {"sequence_id": w["sequence_id"], "reviewed": True,
+           "target_seen": False, "actions_found": 0}
+    out = fsi.normalise_sequence_analysis(
+        {"sequences": [seq, dict(seq)], "coverage": [cov, dict(cov)]}, plan)
+    assert out["coverage_complete"] is False
+    assert out["coverage"][0]["sequence_rows"] == 2
+    assert out["coverage"][0]["coverage_rows"] == 2
+
+
+def test_b219_retry_subset_keeps_only_original_incomplete_windows_and_links():
+    frames = [frame(ms) for ms in range(0, 16001, 1000)]
+    plan = fsi.build_sequence_plan(graph(frames))
+    assert len(plan["analysis_windows"]) >= 2
+    wanted = plan["analysis_windows"][1]["sequence_id"]
+    retry = fsi.subset_sequence_plan(plan, [wanted, "invented"])
+    assert [w["sequence_id"] for w in retry["analysis_windows"]] == [wanted]
+    assert all(r["sequence_ids"] == [wanted] for r in retry["refinement_windows"])
+    assert retry["metrics"]["retry_subset"] is True
+
+
+def test_b220_attempt_merge_replaces_only_retried_window_with_latest_rows():
+    first = {
+        "sequences": [
+            {"sequence_id": "s1", "scene_id": "scene_001", "actions": []},
+            {"sequence_id": "s2", "scene_id": "scene_001", "actions": []},
+        ],
+        "coverage": [
+            {"sequence_id": "s1", "reviewed": True, "actions_found": 0},
+            {"sequence_id": "s2", "reviewed": False, "actions_found": 0},
+        ],
+    }
+    retry = {
+        "sequences": [{"sequence_id": "s2", "scene_id": "scene_001",
+                       "summary": "retried", "actions": []}],
+        "coverage": [{"sequence_id": "s2", "reviewed": True, "actions_found": 0}],
+    }
+    merged = fsi.merge_raw_sequence_results([first, retry])
+    assert merged["attempts"] == 2
+    assert {s["sequence_id"] for s in merged["sequences"]} == {"s1", "s2"}
+    assert next(s for s in merged["sequences"] if s["sequence_id"] == "s2")["summary"] == "retried"
+    assert next(c for c in merged["coverage"] if c["sequence_id"] == "s2")["reviewed"] is True
+
+
+def test_b221_attempt_merge_preserves_latest_duplicate_rows_for_contract_rejection():
+    duplicate = {"sequence_id": "s1", "scene_id": "scene_001", "actions": []}
+    cov = {"sequence_id": "s1", "reviewed": True, "actions_found": 0}
+    merged = fsi.merge_raw_sequence_results([{
+        "sequences": [duplicate, dict(duplicate)],
+        "coverage": [cov, dict(cov)],
+    }])
+    assert len(merged["sequences"]) == 2
+    assert len(merged["coverage"]) == 2

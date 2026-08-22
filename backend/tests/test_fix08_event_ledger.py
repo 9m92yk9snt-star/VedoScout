@@ -428,8 +428,9 @@ def test_exactly_one_discovery_call_site():
     assert src.count('session_id=f"discover-') == 1, \
         "FIX08 adds EXACTLY ONE dedicated discovery call"
     body = src.split("async def generate_full_report_task", 1)[1].split("\nasync def ", 1)[0]
-    assert body.count("call_gemini_with_video(") == 2, \
-        "normal pipeline: discovery + full analysis only (verify lives in its own helper)"
+    assert body.count("call_gemini_with_video(") == 3, \
+        ("normal pipeline has sequence + fallback discovery + full call sites; "
+         "sequence and legacy discovery are mutually exclusive")
     lsrc = (BACKEND / "event_ledger.py").read_text()
     for token in ("LlmChat", "call_gemini", "httpx", "aiohttp", "requests.",
                   "urllib", "socket", "emergentintegrations"):

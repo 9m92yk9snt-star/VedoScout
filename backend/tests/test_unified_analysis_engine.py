@@ -1,5 +1,6 @@
 """Integrated FIX09B→FIX09C orchestration contract tests."""
 import copy
+import json
 import sys
 from pathlib import Path
 
@@ -120,6 +121,7 @@ def test_persistence_payload_contains_authoritative_layers_not_prompt_text():
     assert p["canonical_events"] == {"e": 5}
     assert p["unified_event_track_source"] == "UNIFIED"
     assert "analysis_prompt" not in p
+    assert "unified_event_track" not in p
 
 
 def test_prepare_does_not_mutate_fix04_identity_or_anchor_inputs(monkeypatch):
@@ -138,3 +140,138 @@ def test_prepare_does_not_mutate_fix04_identity_or_anchor_inputs(monkeypatch):
                         lambda b, fallback_fix04_track=None: ({"points": []}, "FIX04_FALLBACK"))
     uae.prepare_analysis(video_path="v", fix04_track=fix, identity_timeline=tl, anchors=anchors)
     assert (fix, tl, anchors) == before
+
+
+def test_persistence_strips_dense_graph_and_repeated_identity_geometry():
+    result = {
+        "status": "ok",
+        "identity_authority": {
+            "status": "ok", "target_points": [{"media_ms": i} for i in range(1000)],
+            "unresolved_intervals": [], "metrics": {"points": 1000},
+        },
+        "scene_graph": {
+            "status": "ok", "frames": [{"media_ms": i} for i in range(1000)],
+            "player_points": [{"media_ms": i} for i in range(1000)],
+            "ball_points": [{"media_ms": i} for i in range(1000)],
+            "scenes": [{"scene_id": "s1", "start_ms": 0, "end_ms": 999}],
+        },
+        "sequence_plan": {
+            "analysis_windows": [{"sequence_id": "q1", "scene_id": "s1",
+                                  "start_ms": 0, "end_ms": 999,
+                                  "graph_context": [{"media_ms": i} for i in range(1000)]}],
+            "refinement_windows": [],
+        },
+        "production_track": {
+            "authority": "UNIFIED_IDENTITY", "points": [
+                {"t": 1.0, "x": .1, "y": .2, "w": .1, "h": .3,
+                 "conf": .9, "scene_id": "s1", "authority_source": "GLOBAL"}
+            ], "segments": [[1.0, 1.5]],
+        },
+    }
+    p = uae.persistence_payload(result)
+    assert "frames" not in p["football_scene_graph"]
+    assert "player_points" not in p["football_scene_graph"]
+    assert "ball_points" not in p["football_scene_graph"]
+    assert "target_points" not in p["unified_identity_authority"]
+    assert "graph_context" not in p["football_sequence_plan"]["analysis_windows"][0]
+    assert p["unified_production_track"]["points"] == [
+        {"t": 1.0, "x": .1, "y": .2, "w": .1, "h": .3, "conf": .9}
+    ]
+
+
+def test_compact_identity_timeline_keeps_counts_not_dense_points():
+    compact = uae.compact_identity_timeline({
+        "version": 1, "status": "ok", "global_target_id": "GLOBAL_TARGET",
+        "target_points": [{"media_ms": i} for i in range(500)],
+        "scenes": [{"scene_id": "s1"}], "counts": {"VISIBLE": 500},
+    })
+    assert compact["target_point_count"] == 500
+    assert compact["dense_target_points_persisted"] is False
+    assert "target_points" not in compact
+
+
+def test_production_readiness_requires_complete_nonempty_contract():
+    good = {
+        "status": "ok",
+        "sequence_analysis": {"coverage_complete": True, "incomplete_sequence_ids": []},
+        "canonical_events": {"status": "empty"},
+        "metrics": {"sequence_windows": 1},
+    }
+    assert uae.is_production_ready(good) is True
+    assert uae.is_production_ready({**good, "status": "partial_coverage"}) is False
+    assert uae.is_production_ready({
+        **good, "sequence_analysis": {"coverage_complete": True,
+                                       "incomplete_sequence_ids": ["s1"]},
+    }) is False
+    assert uae.is_production_ready({**good, "metrics": {"sequence_windows": 0}}) is False
+
+
+def test_retry_request_and_attempt_merge_delegate_to_original_contract(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        uae.football_sequence_intelligence, "subset_sequence_plan",
+        lambda plan, ids: seen.setdefault("plan", {"analysis_windows": [{"sequence_id": ids[0]}]}),
+    )
+    monkeypatch.setattr(
+        uae.football_sequence_intelligence, "build_analysis_prompt",
+        lambda plan, pd, identity: seen.setdefault("prompt_args", (plan, pd, identity)) and "RETRY",
+    )
+    monkeypatch.setattr(
+        uae.football_sequence_intelligence, "merge_raw_sequence_results",
+        lambda rows: {"attempts": len(rows)},
+    )
+    prepared = {"sequence_plan": {"analysis_windows": []},
+                "identity_context": {"global_target_id": "GLOBAL_TARGET"}}
+    req = uae.build_retry_request(prepared, ["s2"], {"position": "LW"})
+    assert req["analysis_prompt"] == "RETRY"
+    assert req["sequence_plan"]["analysis_windows"][0]["sequence_id"] == "s2"
+    assert uae.merge_model_attempts([{}, {}]) == {"attempts": 2}
+
+
+def test_continuous_match_persistence_stays_below_mongo_document_budget():
+    points = [
+        {"t": i / 5, "x": .1, "y": .2, "w": .1, "h": .3,
+         "conf": .9, "scene_id": "s1", "authority_source": "GLOBAL"}
+        for i in range(90 * 60 * 5)
+    ]
+    result = {
+        "status": "ok",
+        "identity_authority": {
+            "status": "ok", "target_points": [
+                {"media_ms": i * 200, "box": {"x": .1, "y": .2, "w": .1, "h": .3}}
+                for i in range(90 * 60 * 5)
+            ],
+        },
+        "scene_graph": {
+            "frames": [{"media_ms": i * 125} for i in range(90 * 60 * 8)],
+            "player_points": [{}] * (90 * 60 * 8 * 22),
+            "ball_points": [{}] * (90 * 60 * 8),
+            "scenes": [{"scene_id": "s1", "start_ms": 0, "end_ms": 5_400_000}],
+        },
+        "sequence_plan": {"analysis_windows": [], "refinement_windows": []},
+        "production_track": {"points": points, "segments": [[0, 5399.8]]},
+    }
+    payload = uae.persistence_payload(result)
+    encoded = json.dumps(payload, separators=(",", ":")).encode()
+    assert len(encoded) < 8 * 1024 * 1024
+
+
+def test_server_wiring_retries_only_incomplete_windows_and_clears_stale_truth():
+    src = (BACKEND / "server.py").read_text()
+    body = src.split("async def generate_full_report_task", 1)[1].split("\nasync def ", 1)[0]
+    assert "for _attempt_no in range(2):" in body
+    assert "is_production_ready(_unified_candidate)" in body
+    assert "build_retry_request(" in body
+    assert '"canonical_events": ""' in body
+    assert '"legacy_fallback_pending"' in body
+    assert "_geometry_authority_track" in body
+    assert '"movement_track_source": _movement_track_source' in body
+
+
+def test_corrective_path_requires_current_ok_canonical_authority():
+    src = (BACKEND / "server.py").read_text()
+    body = src.split("async def _run_identity_corrective_pass", 1)[1]
+    body = body.split("\nasync def ", 1)[0]
+    assert 'fresh.get("unified_analysis_status") == "ok"' in body
+    assert "if not _canonical_authority:" in body
+    assert 'fresh.get("unified_scoring_scan")' in body

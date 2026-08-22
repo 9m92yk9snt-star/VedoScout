@@ -566,6 +566,12 @@ RETURN ONLY VALID JSON with this exact top-level shape:
   "coverage": [{{"sequence_id":"supplied sequence_id","reviewed":true,"target_seen":true,"actions_found":0}}]
 }}
 
+Return EXACTLY ONE sequences row and EXACTLY ONE coverage row for EVERY supplied
+analysis window, including windows where no action is found. For an empty window,
+return actions=[] and actions_found=0. actions_found MUST equal the number of
+actions returned for that sequence. Never claim reviewed=true for an omitted or
+truncated sequence row.
+
 Do not cap the number of actions. Every factual action/detail needs visible evidence_ms from the same sequence."""
 
 
@@ -692,9 +698,17 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
         if isinstance(w, dict) and w.get("sequence_id")
     }
     sequences = []
+    sequence_ids_returned = set()
+    sequence_row_counts = {}
     seen_action_ids = set()
     for s in obj.get("sequences") or []:
         if not isinstance(s, dict) or s.get("sequence_id") not in windows:
+            continue
+        sid = s["sequence_id"]
+        sequence_row_counts[sid] = sequence_row_counts.get(sid, 0) + 1
+        if s["sequence_id"] in sequence_ids_returned:
+            # One supplied window has one response row. Duplicate rows are an
+            # incomplete/malformed model contract, never extra event recall.
             continue
         w = windows[s["sequence_id"]]
         if str(s.get("scene_id")) != str(w.get("scene_id")):
@@ -718,21 +732,63 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
             "summary": str(s.get("summary") or "")[:500],
             "actions": sorted(actions, key=lambda a: (a["start_ms"], a["end_ms"], a["action_id"])),
         })
+        sequence_ids_returned.add(w["sequence_id"])
 
-    coverage_raw = {
-        r.get("sequence_id"): r for r in obj.get("coverage") or []
-        if isinstance(r, dict) and r.get("sequence_id") in windows
+    coverage_raw = {}
+    coverage_row_counts = {}
+    for r in obj.get("coverage") or []:
+        if not isinstance(r, dict) or r.get("sequence_id") not in windows:
+            continue
+        sid = r["sequence_id"]
+        coverage_row_counts[sid] = coverage_row_counts.get(sid, 0) + 1
+        if sid not in coverage_raw:
+            coverage_raw[sid] = r
+    actions_by_sequence = {
+        s["sequence_id"]: len(s.get("actions") or []) for s in sequences
     }
     coverage = []
+    missing_sequence_ids = []
+    action_count_mismatch_ids = []
     for sid in windows:
         r = coverage_raw.get(sid)
+        reported_actions = (
+            int(r.get("actions_found"))
+            if r and isinstance(r.get("actions_found"), int)
+            and not isinstance(r.get("actions_found"), bool)
+            and r.get("actions_found") >= 0
+            else None
+        )
+        sequence_returned = sid in sequence_ids_returned
+        actual_actions = actions_by_sequence.get(sid)
+        action_count_matches = (
+            reported_actions is not None
+            and actual_actions is not None
+            and reported_actions == actual_actions
+        )
+        contract_complete = bool(
+            r and r.get("reviewed") is True
+            and sequence_returned
+            and action_count_matches
+            and sequence_row_counts.get(sid) == 1
+            and coverage_row_counts.get(sid) == 1
+        )
+        if not sequence_returned:
+            missing_sequence_ids.append(sid)
+        if sequence_returned and not action_count_matches:
+            action_count_mismatch_ids.append(sid)
         coverage.append({
             "sequence_id": sid,
             "reviewed": bool(r and r.get("reviewed") is True),
             "target_seen": bool(r and r.get("target_seen") is True),
-            "actions_found": int(r.get("actions_found")) if r and isinstance(r.get("actions_found"), int) and r.get("actions_found") >= 0 else None,
+            "actions_found": reported_actions,
+            "normalised_actions": actual_actions,
+            "sequence_returned": sequence_returned,
+            "sequence_rows": sequence_row_counts.get(sid, 0),
+            "coverage_rows": coverage_row_counts.get(sid, 0),
+            "contract_complete": contract_complete,
         })
-    complete = bool(windows) and all(r["reviewed"] for r in coverage)
+    incomplete_sequence_ids = [r["sequence_id"] for r in coverage if not r["contract_complete"]]
+    complete = bool(windows) and not incomplete_sequence_ids
     actions_total = sum(len(s["actions"]) for s in sequences)
     return {
         "version": VERSION,
@@ -747,5 +803,85 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
             "returned_sequences": len(sequences),
             "actions_total": actions_total,
             "reviewed_windows": sum(1 for r in coverage if r["reviewed"]),
+            "contract_complete_windows": sum(1 for r in coverage if r["contract_complete"]),
+            "missing_sequence_windows": len(missing_sequence_ids),
+            "action_count_mismatches": len(action_count_mismatch_ids),
         },
+        "incomplete_sequence_ids": incomplete_sequence_ids,
+        "missing_sequence_ids": missing_sequence_ids,
+        "action_count_mismatch_ids": action_count_mismatch_ids,
+    }
+
+
+def subset_sequence_plan(plan: dict | None, sequence_ids) -> dict:
+    """Return a prompt-safe retry plan for only incomplete original windows.
+
+    IDs and canonical boundaries are copied from the original plan; this helper
+    cannot create new windows or move an existing one across a scene cut.
+    """
+    src = plan if isinstance(plan, dict) else {}
+    wanted = {str(x) for x in (sequence_ids or []) if isinstance(x, str) and x}
+    analysis = [
+        deepcopy(w) for w in (src.get("analysis_windows") or [])
+        if isinstance(w, dict) and str(w.get("sequence_id")) in wanted
+    ]
+    kept_ids = {w.get("sequence_id") for w in analysis}
+    refinement = []
+    for r in src.get("refinement_windows") or []:
+        if not isinstance(r, dict):
+            continue
+        linked = [sid for sid in (r.get("sequence_ids") or []) if sid in kept_ids]
+        if not linked:
+            continue
+        row = deepcopy(r)
+        row["sequence_ids"] = linked
+        refinement.append(row)
+    return {
+        "version": src.get("version") or VERSION,
+        "status": "ok" if analysis else "empty",
+        "global_target_id": src.get("global_target_id") or GLOBAL_TARGET_ID,
+        "timebase": src.get("timebase") or "canonical_media_ms",
+        "analysis_windows": analysis,
+        "refinement_windows": refinement,
+        "metrics": {
+            "analysis_windows": len(analysis),
+            "refinement_windows": len(refinement),
+            "retry_subset": True,
+        },
+    }
+
+
+def merge_raw_sequence_results(results) -> dict:
+    """Merge bounded model attempts by supplied sequence_id, latest wins.
+
+    A retry is allowed to replace an incomplete first row for the same window,
+    while unrelated already-complete windows stay intact. Unknown top-level
+    fields are deliberately ignored so prose/model metadata never becomes
+    analysis authority.
+    """
+    sequences = {}
+    coverage = {}
+    attempts = 0
+    for raw in results or []:
+        if not isinstance(raw, dict):
+            continue
+        attempts += 1
+        attempt_sequences = {}
+        for row in raw.get("sequences") or []:
+            if isinstance(row, dict) and isinstance(row.get("sequence_id"), str):
+                attempt_sequences.setdefault(row["sequence_id"], []).append(deepcopy(row))
+        for sid, rows in attempt_sequences.items():
+            # The latest attempt replaces this window as a unit, but duplicate
+            # rows inside that attempt stay visible to the strict normaliser.
+            sequences[sid] = rows
+        attempt_coverage = {}
+        for row in raw.get("coverage") or []:
+            if isinstance(row, dict) and isinstance(row.get("sequence_id"), str):
+                attempt_coverage.setdefault(row["sequence_id"], []).append(deepcopy(row))
+        for sid, rows in attempt_coverage.items():
+            coverage[sid] = rows
+    return {
+        "sequences": [row for rows in sequences.values() for row in rows],
+        "coverage": [row for rows in coverage.values() for row in rows],
+        "attempts": attempts,
     }

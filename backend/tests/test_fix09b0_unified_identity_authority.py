@@ -151,3 +151,21 @@ def test_b14_invalid_sources_fail_safe_to_empty():
     a = uia.build_unified_identity_authority({"points": [{"t": "bad"}]}, {"target_points": [{}]})
     assert a["status"] == "empty"
     assert a["target_points"] == []
+
+
+def test_b15_production_adapter_emits_same_scene_contiguous_segments():
+    a = uia.build_unified_identity_authority(
+        None,
+        tl(
+            ap(0, .20, .30), ap(200, .21, .30), ap(400, .22, .30),
+            ap(1000, .30, .30, scene="scene_002"),
+            ap(1200, .31, .30, scene="scene_002"),
+            ap(1400, .32, .30, scene="scene_002"),
+            scenes=[
+                {"scene_id": "scene_001", "start_ms": 0, "end_ms": 500},
+                {"scene_id": "scene_002", "start_ms": 900, "end_ms": 1500},
+            ],
+        ),
+    )
+    tr = uia.to_production_track(a)
+    assert tr["segments"] == [[0.0, 0.4], [1.0, 1.4]]
