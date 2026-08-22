@@ -22,6 +22,7 @@ jobs:
         shell: bash
         run: |
           set +e
+          sed -i 's|SERVER = ROOT / "server.py"|SERVER = ROOT / "backend" / "server.py"|' backend/scripts/apply_fix09b_production_integration.py
           python backend/scripts/apply_fix09b_production_integration.py > /tmp/patch.txt 2>&1
           rc=$?
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
