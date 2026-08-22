@@ -349,3 +349,18 @@ def test_b221_attempt_merge_preserves_latest_duplicate_rows_for_contract_rejecti
     }])
     assert len(merged["sequences"]) == 2
     assert len(merged["coverage"]) == 2
+
+
+def test_b222_invalid_returned_action_cannot_be_hidden_by_reporting_zero():
+    plan = _plan_one(); w = plan["analysis_windows"][0]
+    malformed = _action(w, evidence_ms=[], actor_evidence=[])
+    out = fsi.normalise_sequence_analysis({
+        "sequences": [{"sequence_id": w["sequence_id"],
+                       "scene_id": w["scene_id"], "actions": [malformed]}],
+        "coverage": [{"sequence_id": w["sequence_id"], "reviewed": True,
+                      "target_seen": True, "actions_found": 0}],
+    }, plan)
+    assert out["coverage_complete"] is False
+    assert out["action_count_mismatch_ids"] == [w["sequence_id"]]
+    assert out["coverage"][0]["raw_actions"] == 1
+    assert out["coverage"][0]["normalised_actions"] == 0

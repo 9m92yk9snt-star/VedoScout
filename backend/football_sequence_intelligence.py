@@ -508,6 +508,7 @@ SEQUENCE RULES
 - Distinguish target action from teammate/opponent action. Track possession transfer and who performs the next action.
 - For a pass/cross that might become an assist, inspect the continuous visible chain: TARGET contact → teammate receive/use → teammate shot → visible goal. A cut breaks the causal chain.
 - For a target goal, require target shot contact and a visible goal outcome in the same causal sequence.
+- start_ms/end_ms describe the target's own action. Later receiver/shot/goal timestamps belong in causal_chain and may occur after action end, but they MUST remain inside the same supplied no-cut sequence window.
 - The target does NOT need to remain on screen after his pass if the teammate's outcome remains continuously visible.
 - If contact is briefly occluded, use adjacent frames to describe what is visible, but mark contact_visibility=OCCLUDED rather than fabricating exact contact.
 - Replays/duplicate views of the same real-world action must be marked duplicate_of, not counted as a second action.
@@ -700,6 +701,7 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
     sequences = []
     sequence_ids_returned = set()
     sequence_row_counts = {}
+    raw_action_counts = {}
     seen_action_ids = set()
     for s in obj.get("sequences") or []:
         if not isinstance(s, dict) or s.get("sequence_id") not in windows:
@@ -713,8 +715,10 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
         w = windows[s["sequence_id"]]
         if str(s.get("scene_id")) != str(w.get("scene_id")):
             continue
+        raw_actions = s.get("actions")
+        raw_action_counts[sid] = len(raw_actions) if isinstance(raw_actions, list) else None
         actions = []
-        for a in s.get("actions") or []:
+        for a in raw_actions if isinstance(raw_actions, list) else []:
             n = _normalise_action(a, w)
             if n is None:
                 continue
@@ -760,10 +764,13 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
         )
         sequence_returned = sid in sequence_ids_returned
         actual_actions = actions_by_sequence.get(sid)
+        raw_actions = raw_action_counts.get(sid)
         action_count_matches = (
             reported_actions is not None
             and actual_actions is not None
+            and raw_actions is not None
             and reported_actions == actual_actions
+            and reported_actions == raw_actions
         )
         contract_complete = bool(
             r and r.get("reviewed") is True
@@ -781,6 +788,7 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
             "reviewed": bool(r and r.get("reviewed") is True),
             "target_seen": bool(r and r.get("target_seen") is True),
             "actions_found": reported_actions,
+            "raw_actions": raw_actions,
             "normalised_actions": actual_actions,
             "sequence_returned": sequence_returned,
             "sequence_rows": sequence_row_counts.get(sid, 0),

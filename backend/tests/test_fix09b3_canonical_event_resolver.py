@@ -374,15 +374,15 @@ def test_b322_goal_chain_contact_must_equal_canonical_action_contact():
     assert out["events"][0]["canonical_outcome"] == "UNKNOWN"
 
 
-def test_b323_assist_chain_must_be_ordered_inside_the_action_interval():
+def test_b323_assist_outcome_may_follow_pass_end_inside_same_sequence():
     chain = {"target_contact_ms": 1000, "receiver_local_track_id": "p003",
              "receiver_ms": 1500, "teammate_shot_ms": 2200,
              "goal_outcome_ms": 2600, "continuous_visible_sequence": True}
     a = action(kind="PASS", contact=1000, end=2400,
                outcome="TEAMMATE_GOAL", visible=True, chain=chain)
     out = cer.resolve_canonical_events(analysis([a]), standard_graph(), authority())
-    assert out["events"][0]["canonical_event_type"] == "PASS"
-    assert out["events"][0]["canonical_outcome"] == "UNKNOWN"
+    assert out["events"][0]["canonical_event_type"] == "ASSIST"
+    assert out["events"][0]["canonical_outcome"] == "TEAMMATE_GOAL"
 
 
 def test_b324_interpolated_identity_geometry_cannot_directly_verify_actor():
@@ -464,3 +464,45 @@ def test_b329_teammate_label_without_ball_transfer_is_not_an_assist():
     assert event["canonical_event_type"] == "PASS"
     assert event["receiver_team_resolution"]["status"] == "UNRESOLVED"
     assert event["receiver_team_resolution"]["reason"] == "TARGET_PASS_CONTACT_BALL_UNRESOLVED"
+
+
+def test_b330_occluded_or_unknown_actor_box_never_becomes_direct_identity_proof():
+    for visibility in ("OCCLUDED", "UNKNOWN"):
+        ev = [{"media_ms": 1000, "box": dict(TB), "visibility": visibility}]
+        a = action(actor=None, box=None, evidence=ev,
+                   contact_visibility=visibility)
+        out = cer.resolve_canonical_events(
+            analysis([a]), standard_graph(), authority())
+        assert out["events"] == []
+        assert out["unresolved"][0]["reason"] == \
+            "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE"
+
+
+def test_b331_one_target_match_cannot_override_other_visible_actor_body():
+    frames = [
+        frame(1000, target="p001", status="VERIFIED"),
+        frame(1100, target=None, status="HYPOTHESES",
+              candidates=["p001", "p002"]),
+    ]
+    ev = [
+        {"media_ms": 1000, "box": dict(TB), "visibility": "VISIBLE"},
+        {"media_ms": 1100, "box": dict(OB), "visibility": "VISIBLE"},
+    ]
+    a = action(start=1000, contact=1000, end=1100, actor="p001",
+               box=None, evidence=ev)
+    out = cer.resolve_canonical_events(
+        analysis([a]), graph(frames), authority())
+    assert out["events"] == []
+    assert out["unresolved"][0]["reason"] == "INCONSISTENT_VISIBLE_ACTOR_TRACK"
+
+
+def test_b332_scoring_chain_cannot_cross_supplied_sequence_boundary():
+    chain = {"target_contact_ms": 1000, "receiver_local_track_id": "p003",
+             "receiver_ms": 1500, "teammate_shot_ms": 2200,
+             "goal_outcome_ms": 2600, "continuous_visible_sequence": True}
+    a = action(kind="PASS", contact=1000, end=1600,
+               outcome="TEAMMATE_GOAL", visible=True, chain=chain)
+    out = cer.resolve_canonical_events(
+        analysis([a], end=2500), standard_graph(), authority())
+    assert out["events"][0]["canonical_event_type"] == "PASS"
+    assert out["events"][0]["canonical_outcome"] == "UNKNOWN"

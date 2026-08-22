@@ -174,7 +174,7 @@ def test_B0E04_event_after_conflict_is_not_permanently_poisoned():
     assert led["candidates_verified"] == 1
 
 
-def test_B0E05_migration_gate_falls_back_when_unified_geometry_is_too_sparse():
+def test_B0E05_sparse_unified_geometry_stays_authoritative_and_fail_closed():
     fallback = {"points": [{"t": i / 10, **BOX} for i in range(12)]}
     bundle = bridge.build_identity_bundle(
         fix04_track=None,
@@ -182,8 +182,9 @@ def test_B0E05_migration_gate_falls_back_when_unified_geometry_is_too_sparse():
         anchors=[],
     )
     tr, source = bridge.choose_event_track(bundle, fallback_fix04_track=fallback)
-    assert source == "FIX04_FALLBACK"
-    assert tr is fallback
+    assert source == "UNIFIED_IDENTITY"
+    assert tr is bundle["event_track"]
+    assert tr is not fallback
 
 
 def test_B0E06_bridge_does_not_mutate_unified_authority():

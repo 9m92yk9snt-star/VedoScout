@@ -48,6 +48,7 @@ MICRO_ACTIONS = {
     "ACCELERATION", "DECELERATION", "DUEL", "PRESS", "RUN", "OFF_BALL_RUN",
     "SPACE_CREATION", "SCAN", "BODY_ORIENTATION", "SUPPORT", "OTHER",
 }
+VISIBLE_GEOMETRY = {"VISIBLE", "PARTIAL"}
 
 
 def _num(v) -> bool:
@@ -304,19 +305,27 @@ def _action_evidence_samples(action, scene_frames) -> list[dict]:
     for e in action.get("actor_evidence") or []:
         if not isinstance(e, dict) or not _num(e.get("media_ms")) or not _valid_box(e.get("box")):
             continue
+        visibility = str(e.get("visibility") or "UNKNOWN").upper()
         fr = _near_frame(scene_frames, e["media_ms"])
-        mapped, amb = _map_box_to_local(fr, e["box"])
+        # Occluded/unknown boxes remain diagnostics only. They are not observed
+        # body geometry and can never directly prove or disprove identity.
+        if visibility in VISIBLE_GEOMETRY:
+            mapped, amb = _map_box_to_local(fr, e["box"])
+        else:
+            mapped, amb = None, False
         rows.append({
-            "media_ms": int(e["media_ms"]), "visibility": e.get("visibility"),
+            "media_ms": int(e["media_ms"]), "visibility": visibility,
             "box": deepcopy(e["box"]), "graph_frame_ms": int(fr["media_ms"]) if fr else None,
             "mapped_local_track_id": mapped, "mapping_ambiguous": amb,
             "verified_target_id": _verified_target_id(fr),
             "target_candidate_ids": sorted(_target_ids(fr)),
+            "geometry_proof_eligible": visibility in VISIBLE_GEOMETRY,
         })
     # actor_box/contact_ms is another visible mapping source when the model
     # explicitly supplied it and contact itself was not marked occluded.
     if (_valid_box(action.get("actor_box")) and _num(action.get("contact_ms"))
-            and action.get("contact_visibility") != "OCCLUDED"):
+            and str(action.get("contact_visibility") or "UNKNOWN").upper()
+            in VISIBLE_GEOMETRY):
         ms = int(action["contact_ms"])
         fr = _near_frame(scene_frames, ms)
         mapped, amb = _map_box_to_local(fr, action["actor_box"])
@@ -326,6 +335,7 @@ def _action_evidence_samples(action, scene_frames) -> list[dict]:
             "mapped_local_track_id": mapped, "mapping_ambiguous": amb,
             "verified_target_id": _verified_target_id(fr),
             "target_candidate_ids": sorted(_target_ids(fr)),
+            "geometry_proof_eligible": True,
         })
     return rows
 
@@ -375,11 +385,30 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
     contradictions = []
     exact_support = {}
     for s in samples:
+        if s.get("geometry_proof_eligible") is not True:
+            continue
         mid, vid = s.get("mapped_local_track_id"), s.get("verified_target_id")
         if mid and vid and mid != vid:
             contradictions.append((s["media_ms"], mid, vid))
         if mid and vid and mid == vid:
             exact_support.setdefault(mid, []).append(s)
+
+    # Actor evidence describes one physical actor. If its visible boxes map to
+    # multiple bodies, one correct frame cannot bless the whole action.
+    # Preserve the observation for refinement instead of attributing a player.
+    visible_mapped_ids = {
+        s.get("mapped_local_track_id") for s in samples
+        if s.get("geometry_proof_eligible") is True
+        and not s.get("mapping_ambiguous")
+        and isinstance(s.get("mapped_local_track_id"), str)
+    }
+    if len(visible_mapped_ids) > 1:
+        return {
+            "status": "UNRESOLVED", "reason": "INCONSISTENT_VISIBLE_ACTOR_TRACK",
+            "actor_local_track_id": None, "samples": samples,
+            "candidate_local_track_ids": sorted(visible_mapped_ids),
+            "proof_eligible": False,
+        }
 
     if contradictions:
         return {
@@ -482,6 +511,12 @@ def _causal_resolution(action, scene_frames) -> dict:
     contact = action.get("contact_ms") if _num(action.get("contact_ms")) else None
     start = int(action.get("start_ms") or 0)
     end = int(action.get("end_ms") if _num(action.get("end_ms")) else start)
+    sequence_start = int(
+        action.get("sequence_start_ms")
+        if _num(action.get("sequence_start_ms")) else start)
+    sequence_end = int(
+        action.get("sequence_end_ms")
+        if _num(action.get("sequence_end_ms")) else end)
 
     def _contact_matches(chain_contact) -> bool:
         return _num(chain_contact) and (contact is None or int(chain_contact) == int(contact))
@@ -491,7 +526,8 @@ def _causal_resolution(action, scene_frames) -> dict:
         target_contact = chain.get("target_contact_ms")
         ok = (
             _contact_matches(target_contact) and _num(goal_ms)
-            and start <= int(target_contact) <= int(goal_ms) <= end
+            and start <= int(target_contact) <= end
+            and sequence_start <= int(target_contact) <= int(goal_ms) <= sequence_end
             and action.get("outcome_visible") is True
             and chain.get("continuous_visible_sequence") is True
         )
@@ -509,9 +545,10 @@ def _causal_resolution(action, scene_frames) -> dict:
         ordered = (
             all(_num(x) for x in vals)
             and _contact_matches(vals[0])
-            and start <= int(vals[0])
+            and start <= int(vals[0]) <= end
+            and sequence_start <= int(vals[0])
             and all(int(a) <= int(b) for a, b in zip(vals, vals[1:]))
-            and int(vals[-1]) <= end
+            and int(vals[-1]) <= sequence_end
         )
         receiver = chain.get("receiver_local_track_id")
         actor = action.get("actor_local_track_id")
@@ -591,11 +628,14 @@ def _proof_payload(action, actor_resolution, causal) -> dict:
         {"media_ms": int(s["media_ms"]), "box": deepcopy(s["box"]),
          "visibility": s.get("visibility")}
         for s in actor_resolution.get("samples") or []
-        if _valid_box(s.get("box")) and s.get("visibility") != "OCCLUDED"
+        if _valid_box(s.get("box"))
+        and str(s.get("visibility") or "UNKNOWN").upper() in VISIBLE_GEOMETRY
     ]
     contact_geom = None
     contact = action.get("contact_ms")
-    if _num(contact) and action.get("contact_visibility") != "OCCLUDED":
+    if (_num(contact)
+            and str(action.get("contact_visibility") or "UNKNOWN").upper()
+            in VISIBLE_GEOMETRY):
         near = min(visible_actor, key=lambda r: abs(r["media_ms"] - int(contact)), default=None)
         if near and abs(near["media_ms"] - int(contact)) <= CONTACT_NEAR_MS:
             contact_geom = deepcopy(near)

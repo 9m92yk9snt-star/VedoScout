@@ -180,6 +180,10 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
     never nearest, never semantic, never first-available."""
     if not isinstance(full, dict):
         return full
+    canonical_mode = (
+        isinstance(full.get("analysis_authority"), dict)
+        and full["analysis_authority"].get("output") == "FIX09C"
+    )
     verified_event_ids = set()
     for e in (full.get("action_timeline") or []):
         if not isinstance(e, dict):
@@ -193,16 +197,26 @@ def apply_fail_closed_proof_authority(full: dict) -> dict:
         if not isinstance(c, dict):
             continue
         ok = bool(c.get("event_id")) and c["event_id"] in verified_event_ids
+        if canonical_mode:
+            ok = ok and c.get("canonical_event_native") is True
         c["proof_verified"] = ok
         if ok and c.get("evidence_id"):
             verified_evidence_ids.add(c["evidence_id"])
     for row in _iter_structured_rows(full):
         if not isinstance(row, dict):
             continue
-        row["proof_verified"] = (
-            (bool(row.get("evidence_id")) and row["evidence_id"] in verified_evidence_ids)
-            or (bool(row.get("event_id")) and row["event_id"] in verified_event_ids)
+        evidence_ok = (
+            bool(row.get("evidence_id"))
+            and row["evidence_id"] in verified_evidence_ids
         )
+        event_ok = (
+            bool(row.get("event_id"))
+            and row["event_id"] in verified_event_ids
+        )
+        # In FIX09C, an exact timestamp alone is not a semantic join. A rich
+        # report claim inherits proof only through the deterministic canonical
+        # evidence row, never merely through the event's millisecond.
+        row["proof_verified"] = evidence_ok if canonical_mode else (evidence_ok or event_ok)
     return full
 
 

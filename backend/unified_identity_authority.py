@@ -377,6 +377,30 @@ def _same_scene(a, b) -> bool:
     return sa is None or sb is None or sa == sb
 
 
+def _unresolved_overlap(authority, start_ms: int, end_ms: int,
+                        scene_id=None) -> bool:
+    """Return whether an explicit identity barrier intersects this span.
+
+    Exact points and interpolation use the same barrier contract. Otherwise a
+    raw B.1/B.3 consumer could cross a FIX09A/FIX09B unresolved interval even
+    though the legacy event adapter correctly fails closed there.
+    """
+    lo, hi = sorted((int(start_ms), int(end_ms)))
+    for row in (authority or {}).get("unresolved_intervals") or []:
+        if not isinstance(row, dict):
+            continue
+        a, b = row.get("start_ms"), row.get("end_ms")
+        if not (_is_num(a) and _is_num(b)):
+            continue
+        ua, ub = sorted((int(round(float(a))), int(round(float(b)))))
+        row_scene = row.get("scene_id")
+        if scene_id is not None and row_scene is not None and scene_id != row_scene:
+            continue
+        if max(lo, ua) <= min(hi, ub):
+            return True
+    return False
+
+
 def resolve_target_at(authority, media_ms: int, *, proof_required=False,
                       max_interp_ms=MAX_RESOLVE_INTERP_MS):
     """Resolve canonical target geometry at one media time.
@@ -385,7 +409,8 @@ def resolve_target_at(authority, media_ms: int, *, proof_required=False,
     accepted points in the same scene, never across a source conflict, cut, or
     predicted geometry when proof is required.
     """
-    if not isinstance(authority, dict) or not isinstance(media_ms, int):
+    if (not isinstance(authority, dict) or not isinstance(media_ms, int)
+            or isinstance(media_ms, bool)):
         return None, "INVALID_INPUT"
     pts = [p for p in authority.get("target_points") or []
            if isinstance(p, dict) and isinstance(p.get("media_ms"), int)]
@@ -398,6 +423,13 @@ def resolve_target_at(authority, media_ms: int, *, proof_required=False,
     pts.sort(key=lambda p: p["media_ms"])
     exact = next((p for p in pts if p["media_ms"] == media_ms), None)
     if exact:
+        # A direct user tap may intentionally resolve a weaker inherited
+        # timeline interval. Every other exact point remains subordinate to an
+        # explicit identity barrier.
+        if (_unresolved_overlap(authority, media_ms, media_ms, exact.get("scene_id"))
+                and not (exact.get("tap_authority") is True
+                         and exact.get("proof_eligible") is True)):
+            return None, "UNRESOLVED_IDENTITY"
         return deepcopy(exact), "OK_EXACT"
     before = max((p for p in pts if p["media_ms"] < media_ms), key=lambda p: p["media_ms"], default=None)
     after = min((p for p in pts if p["media_ms"] > media_ms), key=lambda p: p["media_ms"], default=None)
@@ -407,13 +439,12 @@ def resolve_target_at(authority, media_ms: int, *, proof_required=False,
         return None, "SCENE_CUT"
     if after["media_ms"] - before["media_ms"] > int(max_interp_ms):
         return None, "TARGET_GAP"
-    # Never interpolate across an explicitly unresolved interval.
-    for u in authority.get("unresolved_intervals") or []:
-        if not isinstance(u, dict):
-            continue
-        a, b = u.get("start_ms"), u.get("end_ms")
-        if _is_num(a) and _is_num(b) and int(a) <= media_ms <= int(b):
-            return None, "UNRESOLVED_IDENTITY"
+    # Never interpolate across any part of an explicitly unresolved interval,
+    # even when the requested instant itself sits just outside the barrier.
+    interp_scene = before.get("scene_id") or after.get("scene_id")
+    if _unresolved_overlap(
+            authority, before["media_ms"], after["media_ms"], interp_scene):
+        return None, "UNRESOLVED_IDENTITY"
     f = (media_ms - before["media_ms"]) / max(1, after["media_ms"] - before["media_ms"])
     bb, ab = before["box"], after["box"]
     box = {k: float(bb[k]) + (float(ab[k]) - float(bb[k])) * f for k in ("x", "y", "w", "h")}

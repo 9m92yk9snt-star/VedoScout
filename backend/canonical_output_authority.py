@@ -96,8 +96,9 @@ def project_event(event: dict) -> dict:
              else event.get("contact_ms") if isinstance(event.get("contact_ms"), int)
              else event.get("start_ms") or 0)
     end_ms = int(event.get("end_ms") if isinstance(event.get("end_ms"), int) else ms)
-    causal_visible = bool(event.get("causal_verified"))
-    outcome_visible = causal_visible or result not in {"UNKNOWN", "OUTCOME_NOT_VISIBLE"}
+    # Actor/action verification and outcome visibility are separate facts. A
+    # FEINT/DUEL/PASS can be safely attributed while its result remains unknown.
+    outcome_visible = result not in {"UNKNOWN", "OUTCOME_NOT_VISIBLE"}
     title_key = football_event if football_event in _TITLE else football_action
     return {
         "event_id": event.get("event_id"),
@@ -177,6 +178,8 @@ def build_event_native_evidence(canonical_bundle: dict | None, max_rows=8) -> li
             "event_id": e.get("event_id"),
             "evidence_time_ms": fr["media_ms"],
             "event_native": True,
+            "canonical_event_native": True,
+            "event_source": "fix09b_canonical",
             "event_track_locked": True,
             "event_track_box": deepcopy(fr["box"]),
             "event_keyframe_kind": fr["kind"],
@@ -257,7 +260,24 @@ def apply_to_report(full: dict, canonical_bundle: dict | None,
         "timebase": "canonical_media_ms",
     }
     if add_event_evidence:
-        current = [c for c in full.get("video_comments") or [] if isinstance(c, dict)]
+        current = []
+        for c in full.get("video_comments") or []:
+            if not isinstance(c, dict):
+                continue
+            # Rebuild deterministic FIX09C rows on every application. All
+            # model-authored/legacy comments remain useful context, but cannot
+            # impersonate canonical event evidence through matching fields.
+            if (c.get("canonical_event_native") is True
+                    and c.get("event_source") == "fix09b_canonical"):
+                continue
+            # Authority fields are deterministic outputs, not model input. A
+            # free comment carrying/echoing a canonical event_id must not block
+            # creation of the real event-native evidence row.
+            c.pop("event_id", None)
+            c.pop("event_track_locked", None)
+            c.pop("proof_verified", None)
+            c["canonical_event_native"] = False
+            current.append(c)
         event_ids = {c.get("event_id") for c in current if c.get("event_id")}
         for row in build_event_native_evidence(canonical_bundle):
             if row.get("event_id") not in event_ids:

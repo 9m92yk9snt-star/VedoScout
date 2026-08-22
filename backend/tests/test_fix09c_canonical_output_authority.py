@@ -7,6 +7,10 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 import canonical_output_authority as coa  # noqa: E402
+from evidence_authority import (  # noqa: E402
+    apply_fail_closed_proof_authority,
+    attach_event_evidence_authority,
+)
 
 
 BOX = {"x": .1, "y": .2, "w": .1, "h": .3}
@@ -79,6 +83,7 @@ def test_c04_micro_action_remains_rich_detail_but_does_not_fake_a_stats_category
     assert row["canonical_action_type"] == "OTHER"
     assert row["canonical_event_type"] == "OTHER"
     assert row["title"] == "Body feint"
+    assert row["outcome_visible"] is False
 
 
 def test_c05_visible_contact_is_the_event_native_proof_frame():
@@ -157,3 +162,28 @@ def test_c14_event_native_evidence_priority_prefers_goal_and_assist():
     ]
     rows = coa.build_event_native_evidence(bundle(evs), max_rows=2)
     assert [r["event_id"] for r in rows] == ["g", "a"]
+
+
+def test_c15_model_comment_cannot_borrow_canonical_proof_by_timestamp():
+    full = {
+        "action_timeline": [],
+        "video_comments": [{"timestamp": "00:01", "comment": "unrelated model claim",
+                            "event_id": "evt_fixed", "event_track_locked": True}],
+        "technical": {"passing": {"evidence": [
+            {"timestamp": "00:01", "detail": "free model detail"}
+        ]}},
+    }
+    coa.apply_to_report(full, bundle([event()]), {"coverage_complete": True})
+    attach_event_evidence_authority(full)
+    apply_fail_closed_proof_authority(full)
+
+    model_row = next(c for c in full["video_comments"]
+                     if c.get("comment") == "unrelated model claim")
+    canonical_row = next(c for c in full["video_comments"]
+                         if c.get("canonical_event_native") is True)
+    skill_row = full["technical"]["passing"]["evidence"][0]
+    assert model_row.get("event_id") == "evt_fixed"
+    assert model_row["proof_verified"] is False
+    assert canonical_row["proof_verified"] is True
+    assert skill_row.get("event_id") == "evt_fixed"
+    assert skill_row["proof_verified"] is False

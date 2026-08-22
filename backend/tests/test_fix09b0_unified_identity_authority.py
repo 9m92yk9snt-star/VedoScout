@@ -169,3 +169,27 @@ def test_b15_production_adapter_emits_same_scene_contiguous_segments():
     )
     tr = uia.to_production_track(a)
     assert tr["segments"] == [[0.0, 0.4], [1.0, 1.4]]
+
+
+def test_b16_exact_point_inside_unresolved_interval_is_not_identity_proof():
+    a = uia.build_unified_identity_authority(
+        None,
+        tl(ap(1000, .2, .3), unresolved=[{
+            "scene_id": "scene_001", "start_ms": 950, "end_ms": 1050,
+            "reason": "REID_UNRESOLVED",
+        }]),
+    )
+    p, why = uia.resolve_target_at(a, 1000, proof_required=True)
+    assert p is None and why == "UNRESOLVED_IDENTITY"
+
+
+def test_b17_interpolation_cannot_cross_barrier_before_requested_instant():
+    a = uia.build_unified_identity_authority(
+        None,
+        tl(ap(900, .2, .3), ap(1100, .3, .3), unresolved=[{
+            "scene_id": "scene_001", "start_ms": 950, "end_ms": 980,
+            "reason": "REID_UNRESOLVED",
+        }]),
+    )
+    p, why = uia.resolve_target_at(a, 1000, proof_required=False)
+    assert p is None and why == "UNRESOLVED_IDENTITY"

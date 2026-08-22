@@ -220,13 +220,18 @@ def identity_context(authority: dict | None) -> dict:
 
 def choose_event_track(bundle: dict | None, fallback_fix04_track=None,
                        min_geometry_points=10) -> tuple[dict | None, str]:
-    """Migration gate: use unified event geometry only when FIX08 can consume it."""
+    """Select the one event/proof identity authority.
+
+    Once a unified bundle exists, sparse safe geometry must remain sparse and
+    fail closed. Falling back merely because fewer than ten proof points exist
+    silently removes its barriers and restores FIX04 as a competing target
+    authority. ``min_geometry_points`` remains accepted for compatibility but
+    is no longer an authority gate.
+    """
     if isinstance(bundle, dict):
         tr = bundle.get("event_track")
-        if isinstance(tr, dict):
-            n = sum(1 for p in tr.get("points") or []
-                    if isinstance(p, dict) and not p.get("identity_barrier")
-                    and all(_is_num(p.get(k)) for k in ("x", "y", "w", "h")))
-            if n >= int(min_geometry_points):
-                return tr, "UNIFIED_IDENTITY"
+        auth = bundle.get("authority")
+        if (isinstance(tr, dict) and isinstance(auth, dict)
+                and auth.get("global_target_id") == uia.GLOBAL_TARGET_ID):
+            return tr, "UNIFIED_IDENTITY"
     return fallback_fix04_track, "FIX04_FALLBACK"
