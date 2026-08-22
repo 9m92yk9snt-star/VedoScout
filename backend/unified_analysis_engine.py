@@ -1,6 +1,6 @@
 """ScoutMePlay unified analysis engine — FIX09B → FIX09C orchestration.
 
-This is the single production spine.  Specialist modules remain modular, but
+This is the single production spine. Specialist modules remain modular, but
 none owns a competing player/event truth:
 
     FIX04 local evidence + FIX09A global identity
@@ -13,7 +13,7 @@ none owns a competing player/event truth:
         → FIX09C output projection
 
 The module deliberately does NOT import server.py, database code, Emergent,
-Gemini, or any network client.  The server owns the model call and persistence;
+Gemini, or any network client. The server owns the model call and persistence;
 this engine owns the analysis state and deterministic truth transformation.
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ def prepare_analysis(
     """Build deterministic identity/scene/sequence state and model prompt.
 
     This function decodes the video for the B.1 graph and may therefore be
-    called through ``asyncio.to_thread`` by an async server.  It performs zero
+    called through ``asyncio.to_thread`` by an async server. It performs zero
     network/model calls and mutates none of its inputs.
     """
     bundle = unified_event_bridge.build_identity_bundle(
@@ -86,6 +86,32 @@ def prepare_analysis(
     }
 
 
+def _scoring_scan(canonical: dict, sequence_analysis: dict) -> dict:
+    """Expose FIX09B's exhaustive scoring-authority state to FIX07.
+
+    FIX07 historically required a separate whole-video scoring scan before it
+    would publish goal/assist totals. In the unified engine, that responsibility
+    belongs to the same B.2 sequence review + B.3 canonical resolver. The scan
+    is considered performed only when every planned sequence window was
+    reviewed. Unresolved target SHOT/PASS/CROSS observations remain explicit
+    diagnostics; they never become goals/assists by themselves.
+    """
+    unresolved = [u for u in (canonical or {}).get("unresolved") or [] if isinstance(u, dict)]
+    goal_unresolved = sum(1 for u in unresolved if str(u.get("kind") or "").upper() == "SHOT")
+    assist_unresolved = sum(
+        1 for u in unresolved
+        if str(u.get("kind") or "").upper() in {"PASS", "CROSS", "KEY_PASS"}
+    )
+    return {
+        "performed": (sequence_analysis or {}).get("coverage_complete") is True,
+        "authority": "FIX09B_CANONICAL_EVENTS",
+        "verified_goals": int((canonical or {}).get("metrics", {}).get("goals") or 0),
+        "verified_assists": int((canonical or {}).get("metrics", {}).get("assists") or 0),
+        "unresolved_goal_attempts": goal_unresolved,
+        "unresolved_assist_candidates": assist_unresolved,
+    }
+
+
 def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> dict:
     """Turn one B.2 observation response into canonical event/output truth."""
     ctx = prepared if isinstance(prepared, dict) else {}
@@ -101,6 +127,7 @@ def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> d
         canonical, coverage_complete=sequence_analysis.get("coverage_complete") is True)
     timeline = canonical_output_authority.project_timeline(canonical)
     evidence = canonical_output_authority.build_event_native_evidence(canonical)
+    scoring_scan = _scoring_scan(canonical, sequence_analysis)
 
     status = "ok"
     if not sequence_analysis.get("coverage_complete"):
@@ -120,6 +147,7 @@ def finalise_analysis(raw_model_result: dict | None, prepared: dict | None) -> d
         "event_ledger": ledger,
         "action_timeline": timeline,
         "event_native_evidence": evidence,
+        "scoring_scan": scoring_scan,
         "production_track": deepcopy(ctx.get("production_track") or {}),
         "event_track": deepcopy(ctx.get("event_track") or {}),
         "event_track_source": ctx.get("event_track_source"),
@@ -158,7 +186,9 @@ def persistence_payload(result: dict | None) -> dict:
         "football_sequence_analysis": deepcopy(r.get("sequence_analysis") or {}),
         "canonical_events": deepcopy(r.get("canonical_events") or {}),
         "event_ledger": deepcopy(r.get("event_ledger") or {}),
+        "unified_scoring_scan": deepcopy(r.get("scoring_scan") or {}),
         "unified_analysis_metrics": deepcopy(r.get("metrics") or {}),
         "unified_production_track": deepcopy(r.get("production_track") or {}),
+        "unified_event_track": deepcopy(r.get("event_track") or {}),
         "unified_event_track_source": r.get("event_track_source"),
     }
