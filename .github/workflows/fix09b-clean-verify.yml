@@ -1,0 +1,74 @@
+name: FIX09B clean branch verification
+
+on:
+  push:
+    branches:
+      - fix-09b-clean-verify
+    paths-ignore:
+      - .fix09b-clean-result.txt
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal test dependencies
+        run: python -m pip install --disable-pip-version-check pytest python-dotenv
+      - name: Compile production integration
+        id: compile
+        shell: bash
+        run: |
+          set +e
+          python -m py_compile \
+            backend/server.py \
+            backend/unified_analysis_engine.py \
+            backend/unified_identity_authority.py \
+            backend/unified_event_bridge.py \
+            backend/football_scene_graph.py \
+            backend/football_sequence_intelligence.py \
+            backend/canonical_event_resolver.py \
+            backend/canonical_output_authority.py \
+            > /tmp/compile.txt 2>&1
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Run FIX09B/FIX09C deterministic suite
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          cd backend
+          python -m pytest -q \
+            tests/test_fix09b0_unified_identity_authority.py \
+            tests/test_fix09b0_event_bridge.py \
+            tests/test_fix09b1_scene_graph.py \
+            tests/test_fix09b2_sequence_intelligence.py \
+            tests/test_fix09b3_canonical_event_resolver.py \
+            tests/test_fix09c_canonical_output_authority.py \
+            tests/test_fix09c_stats_precision.py \
+            tests/test_unified_analysis_engine.py \
+            > /tmp/tests.txt 2>&1
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist verification result
+        shell: bash
+        run: |
+          {
+            printf 'source_sha=%s\n' "$GITHUB_SHA"
+            printf 'compile_exit=%s\n' "${{ steps.compile.outputs.rc }}"
+            printf 'tests_exit=%s\n' "${{ steps.tests.outputs.rc }}"
+            printf '%s\n' '--- compile ---'
+            cat /tmp/compile.txt
+            printf '%s\n' '--- tests ---'
+            cat /tmp/tests.txt
+          } > .fix09b-clean-result.txt
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .fix09b-clean-result.txt
+          git commit -m 'CI scratch: record clean FIX09B verification' || true
+          git push
