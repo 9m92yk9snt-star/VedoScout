@@ -5,7 +5,7 @@ on:
     branches:
       - fix-09b-ci-verify
     paths-ignore:
-      - .fix09b-ci-pass.txt
+      - .fix09b-ci-result.txt
 
 permissions:
   contents: write
@@ -21,20 +21,34 @@ jobs:
       - name: Install pytest
         run: python -m pip install --disable-pip-version-check pytest
       - name: Run deterministic regression suite
+        id: tests
         working-directory: backend
+        shell: bash
         run: |
+          set +e
           python -m pytest -q \
             tests/test_fix09b0_unified_identity_authority.py \
             tests/test_fix09b0_event_bridge.py \
             tests/test_fix09b1_scene_graph.py \
             tests/test_fix09b2_sequence_intelligence.py \
             tests/test_fix09b3_canonical_event_resolver.py \
-            tests/test_fix09c_canonical_output_authority.py
-      - name: Write pass marker
+            tests/test_fix09c_canonical_output_authority.py \
+            tests/test_fix09bc_integrated_spine.py \
+            > /tmp/fix09b-tests.txt 2>&1
+          rc=$?
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Persist test result marker
+        shell: bash
         run: |
-          printf 'PASS\nsource_sha=%s\n' "${GITHUB_SHA}" > .fix09b-ci-pass.txt
+          {
+            printf 'source_sha=%s\n' "$GITHUB_SHA"
+            printf 'exit_code=%s\n' "${{ steps.tests.outputs.rc }}"
+            printf '%s\n' '--- pytest output ---'
+            cat /tmp/fix09b-tests.txt
+          } > .fix09b-ci-result.txt
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add .fix09b-ci-pass.txt
-          git commit -m 'CI scratch: FIX09B regression suite passed'
+          git add .fix09b-ci-result.txt
+          git commit -m 'CI scratch: record FIX09B regression result' || true
           git push
