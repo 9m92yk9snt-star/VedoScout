@@ -1,9 +1,18 @@
-source_sha=5fd2c9c6702a3522575cc39c48d8e2c972a8a608
-patch_exit=0
-compile_exit=0
-tests_exit=1
+source_sha=dd1f70cd86b6df795095353ec70224f10b349d84
+patch_exit=1
+compile_exit=99
+tests_exit=99
 --- patch ---
-FIX09B/FIX09C production integration patch applied
+Traceback (most recent call last):
+  File "/home/runner/work/VedoScout/VedoScout/backend/scripts/apply_fix09b_production_integration.py", line 255, in <module>
+    main()
+  File "/home/runner/work/VedoScout/VedoScout/backend/scripts/apply_fix09b_production_integration.py", line 190, in main
+    text = regex_once(
+           ^^^^^^^^^^^
+  File "/home/runner/work/VedoScout/VedoScout/backend/scripts/apply_fix09b_production_integration.py", line 28, in regex_once
+    raise RuntimeError(f"{label}: expected exactly 1 regex match, found {count}")
+RuntimeError: replace FIX09A/FIX08 production block: expected exactly 1 regex match, found 0
 --- compile ---
+SKIPPED because patch failed
 --- tests ---
-/opt/hostedtoolcache/Python/3.11.16/x64/bin/python: No module named pytest
+SKIPPED because patch/compile failed
