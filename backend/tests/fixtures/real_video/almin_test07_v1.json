@@ -28,6 +28,7 @@
       "physical_gate": {
         "require_target_release": true,
         "require_player_intervention": true,
+        "require_physical_outcome": "GOALKEEPER_SAVE_EVIDENCE",
         "must_not_assert_physical_outcome": ["GOAL_PLANE_CROSSING"]
       },
       "canonical_later": {
@@ -67,7 +68,9 @@
       "physical_gate": {
         "require_target_release": true,
         "require_non_target_verified_jersey_touch_after_target_release": "10",
-        "forbid_non_target_verified_jersey_touch": "12"
+        "require_non_target_verified_jersey_strike_after_target_release": "10",
+        "forbid_non_target_verified_jersey_touch": "12",
+        "require_goal_plane_crossing": true
       },
       "canonical_later": {
         "expected_target_event": "ASSIST",
