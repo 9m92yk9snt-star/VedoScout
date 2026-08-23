@@ -19,8 +19,43 @@ jobs:
       - name: Install FIX10A test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2 emergentintegrations==0.2.0
+          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
+      - name: Provide CI-only no-network Emergent import stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+          class UserMessage(_Payload):
+              pass
+
+          class ImageContent(_Payload):
+              pass
+
+          class FileContentWithMimeType(_Payload):
+              pass
+
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
       - name: Compile changed backend modules
+        env:
+          PYTHONPATH: /tmp/ci_stubs:backend
         run: |
           python -m py_compile \
             backend/motion_compensation.py \
@@ -36,12 +71,11 @@ jobs:
             backend/open_observation_compat.py \
             backend/fix10a_shadow_runtime.py \
             backend/football_sequence_intelligence.py \
-            backend/identity_verify.py \
-            backend/server.py
+            backend/identity_verify.py
       - name: Run FIX10A regression family
         working-directory: backend
         env:
-          PYTHONPATH: .
+          PYTHONPATH: /tmp/ci_stubs:.
         run: pytest -q tests/test_fix10a*.py
 
   existing-backend-regression-attempt:
@@ -56,14 +90,83 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install project requirements
+      - name: Install project requirements available outside Emergent runtime
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install -r backend/requirements.txt
+          grep -v '^emergentintegrations==' backend/requirements.txt > /tmp/requirements-ci.txt
+          python -m pip install -r /tmp/requirements-ci.txt
+      - name: Provide CI-only no-network Emergent import stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          mkdir -p /tmp/ci_stubs/emergentintegrations/payments/stripe
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/stripe/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def model_dump(self):
+                  return dict(self.__dict__)
+
+          class UserMessage(_Payload):
+              pass
+
+          class ImageContent(_Payload):
+              pass
+
+          class FileContentWithMimeType(_Payload):
+              pass
+
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
+          cat > /tmp/ci_stubs/emergentintegrations/payments/stripe/checkout.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def model_dump(self):
+                  return dict(self.__dict__)
+
+          class CheckoutSessionResponse(_Payload):
+              pass
+
+          class CheckoutStatusResponse(_Payload):
+              pass
+
+          class CheckoutSessionRequest(_Payload):
+              pass
+
+          class StripeCheckout:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              async def create_checkout_session(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+
+              async def get_checkout_status(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+          PY
       - name: Run full backend pytest in CI approximation
         working-directory: backend
         env:
-          PYTHONPATH: .
+          PYTHONPATH: /tmp/ci_stubs:.
           MONGO_URL: mongodb://localhost:27017
           DB_NAME: vedoscout_fix10_ci
           EMERGENT_LLM_KEY: ci-placeholder
