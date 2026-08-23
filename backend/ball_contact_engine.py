@@ -169,8 +169,13 @@ def _likely_holder(frame, ball_box):
 def _possession_transition(track_id, prev_frame, prev_ball, next_frame, next_ball, trajectory_score):
     if not isinstance(track_id, str):
         return {"score": 0.0, "kind": "UNRESOLVED", "before_holder": None, "after_holder": None}
-    before_holder = _likely_holder(prev_frame, prev_ball.get("box")) if prev_ball else None
-    after_holder = _likely_holder(next_frame, next_ball.get("box")) if next_ball else None
+    # A window edge or decode gap must never manufacture RECEIVE/RELEASE merely
+    # because one side of the physical chain is absent. Both sides are required.
+    if prev_frame is None or prev_ball is None or next_frame is None or next_ball is None:
+        return {"score": 0.0, "kind": "INSUFFICIENT_BOTH_SIDES",
+                "before_holder": None, "after_holder": None}
+    before_holder = _likely_holder(prev_frame, prev_ball.get("box"))
+    after_holder = _likely_holder(next_frame, next_ball.get("box"))
     if before_holder == track_id and after_holder != track_id:
         score, kind = 1.0, "RELEASE"
     elif before_holder != track_id and after_holder == track_id:
@@ -212,6 +217,10 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
         next_ball = _nearest_trajectory_side(trajectory, i, +1)
         prev_frame = _frame_near(frames, prev_ball["media_ms"]) if prev_ball else None
         next_frame = _frame_near(frames, next_ball["media_ms"]) if next_ball else None
+        has_both_sides = (
+            prev_ball is not None and next_ball is not None
+            and prev_frame is not None and next_frame is not None
+        )
         trajectory_evidence = _trajectory_change(prev_ball, ball, next_ball)
         for player in cur_frame.get("players") or []:
             if not isinstance(player, dict) or not _valid_box(player.get("box")):
@@ -233,9 +242,12 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
                 track_id is not None
                 and str(player.get("association_state") or "") != "HYPOTHESES"
             )
-            dynamic_support = (
-                trajectory_evidence["score"] >= TRAJECTORY_SIGNAL_MIN
-                or possession["score"] >= POSSESSION_SIGNAL_MIN
+            dynamic_support = bool(
+                has_both_sides
+                and (
+                    trajectory_evidence["score"] >= TRAJECTORY_SIGNAL_MIN
+                    or possession["score"] >= POSSESSION_SIGNAL_MIN
+                )
             )
             overall = (
                 0.38 * geometry["score"]
@@ -246,6 +258,8 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             rejection_reasons = []
             if geometry["distance_h"] > CONTACT_MAX_H:
                 rejection_reasons.append("BALL_OUTSIDE_LOWER_BODY_CONTACT_ZONE")
+            if not has_both_sides:
+                rejection_reasons.append("INSUFFICIENT_BEFORE_AFTER_PHYSICS")
             if not dynamic_support:
                 rejection_reasons.append("NO_INDEPENDENT_BALL_OR_POSSESSION_CHANGE")
             if continuity < CONTINUITY_SIGNAL_MIN:
@@ -256,6 +270,7 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
                 rejection_reasons.append("PLAYER_ASSOCIATION_UNRESOLVED")
             qualifies_verified = bool(
                 measured
+                and has_both_sides
                 and geometry["distance_h"] <= CONTACT_MAX_H
                 and dynamic_support
                 and continuity >= CONTINUITY_SIGNAL_MIN
@@ -266,6 +281,7 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             occluded_supported = bool(
                 not measured
                 and ball.get("state") == "PREDICTED_SHORT_GAP"
+                and has_both_sides
                 and geometry["distance_h"] <= CONTACT_MAX_H
                 and trajectory_evidence["score"] >= TRAJECTORY_SIGNAL_MIN
                 and continuity >= CONTINUITY_SIGNAL_MIN
