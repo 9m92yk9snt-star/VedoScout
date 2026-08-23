@@ -160,3 +160,16 @@ def test_ga07_goal_may_become_visible_after_strike_without_false_unresolved():
     out = soe.reconstruct_post_strike_outcome(_strike(), trajectory, graph, goal_geometry=geometry)
     assert out["goal_plane_crossing"]["status"] == "VERIFIED"
     assert out["physical_outcome"] == "GOAL_PLANE_CROSSING"
+
+
+def test_ga08_ball_center_crossing_is_not_enough_for_goal():
+    # The final center is 0.5% beyond the line, but a 2%-wide ball still
+    # straddles it.  The entire ball has not crossed, so physical GOAL evidence
+    # must remain unresolved even when the independent visual reader says it
+    # believes there was a crossing.
+    trajectory = [_ball(1000, .84), _ball(1040, .895)]
+    graph = {"touches": [_touch(1000, "p015", kinds=["RELEASE"])]}
+    geometry = _provider_geometry("VERIFIED_CROSSING", [(1000, .90), (1040, .90)])
+    out = soe.reconstruct_post_strike_outcome(_strike(), trajectory, graph, goal_geometry=geometry)
+    assert out["goal_plane_crossing"]["status"] == "UNRESOLVED"
+    assert out["physical_outcome"] != "GOAL_PLANE_CROSSING"
