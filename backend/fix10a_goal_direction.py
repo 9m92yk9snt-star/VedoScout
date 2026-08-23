@@ -13,6 +13,7 @@ import json
 import math
 import os
 import tempfile
+from copy import deepcopy
 from pathlib import Path
 
 import cv2
@@ -25,10 +26,27 @@ VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
 MAX_GOAL_REVIEWS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "16"))
 MIN_FIELD_SIDE_FRAMES = 2
+GEOMETRY_NEAR_MS = 500
+BALL_ROW_NEAR_MS = 80
+FIELD_SIDE_MIN_DISTANCE = 0.01
 
 
 def _num(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _valid_box(box) -> bool:
+    if not isinstance(box, dict):
+        return False
+    try:
+        x, y, w, h = (float(box[k]) for k in ("x", "y", "w", "h"))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return -0.1 <= x <= 1.1 and -0.1 <= y <= 1.1 and 0 < w <= 1.2 and 0 < h <= 1.2
+
+
+def _center(box):
+    return float(box["x"]) + float(box["w"]) / 2.0, float(box["y"]) + float(box["h"]) / 2.0
 
 
 def _extract_json(text: str) -> dict | None:
@@ -247,3 +265,163 @@ def wrap_goal_geometry_provider(base_provider, api_key: str | None,
     return GoalDirectionProvider(
         base_provider, api_key, session_prefix, video_path, max_reviews=max_reviews
     )
+
+
+def _segment_from_line(line):
+    if not isinstance(line, dict):
+        return None
+    try:
+        p1, p2 = line["p1"], line["p2"]
+        a = (float(p1["x"]), float(p1["y"]))
+        b = (float(p2["x"]), float(p2["y"]))
+    except (TypeError, KeyError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in (*a, *b)) or a == b:
+        return None
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    if abs(dx) >= abs(dy):
+        return (a, b) if a[0] <= b[0] else (b, a)
+    return (a, b) if a[1] <= b[1] else (b, a)
+
+
+def _nearest_timed(rows, media_ms, max_ms=GEOMETRY_NEAR_MS):
+    valid = [
+        row for row in rows or []
+        if isinstance(row, dict) and _num(row.get("media_ms"))
+    ]
+    if not valid or not _num(media_ms):
+        return None
+    best = min(valid, key=lambda row: abs(int(row["media_ms"]) - int(media_ms)))
+    return best if abs(int(best["media_ms"]) - int(media_ms)) <= max_ms else None
+
+
+def _line_at(goal_geometry, media_ms):
+    if not isinstance(goal_geometry, dict):
+        return None
+    timed = _nearest_timed(goal_geometry.get("line_by_ms"), media_ms)
+    if timed:
+        segment = _segment_from_line(timed.get("line"))
+        if segment is not None:
+            return segment
+    return _segment_from_line(goal_geometry.get("line"))
+
+
+def _field_point_at(goal_geometry, media_ms):
+    if not isinstance(goal_geometry, dict):
+        return None
+    if str(goal_geometry.get("field_side_status") or "UNRESOLVED").upper() != "VERIFIED":
+        return None
+    timed = _nearest_timed(goal_geometry.get("field_side_by_ms"), media_ms)
+    if not timed:
+        return None
+    point = timed.get("point")
+    if not isinstance(point, dict):
+        return None
+    try:
+        x, y = float(point["x"]), float(point["y"])
+    except (TypeError, ValueError, KeyError):
+        return None
+    if not (math.isfinite(x) and math.isfinite(y) and 0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+        return None
+    return (x, y)
+
+
+def _signed_side(point, segment):
+    if point is None or segment is None:
+        return None
+    a, b = segment
+    vx, vy = b[0] - a[0], b[1] - a[1]
+    length = math.hypot(vx, vy)
+    if length <= 1e-9:
+        return None
+    nx, ny = -vy / length, vx / length
+    return (point[0] - a[0]) * nx + (point[1] - a[1]) * ny
+
+
+def _ball_row_at(ball_trajectory, media_ms):
+    rows = [
+        row for row in ball_trajectory or []
+        if isinstance(row, dict) and row.get("state") == "MEASURED"
+        and _num(row.get("media_ms")) and _valid_box(row.get("box"))
+        and row.get("used_fallback") is not True
+    ]
+    if not rows or not _num(media_ms):
+        return None
+    best = min(rows, key=lambda row: abs(int(row["media_ms"]) - int(media_ms)))
+    return best if abs(int(best["media_ms"]) - int(media_ms)) <= BALL_ROW_NEAR_MS else None
+
+
+def _downgrade_crossing(outcome, reason: str, details=None):
+    row = deepcopy(outcome) if isinstance(outcome, dict) else {}
+    crossing = deepcopy(row.get("goal_plane_crossing")) if isinstance(row.get("goal_plane_crossing"), dict) else {}
+    crossing["undirected_status"] = crossing.get("status")
+    crossing["undirected_reason"] = crossing.get("reason")
+    crossing["status"] = "UNRESOLVED"
+    crossing["crossing_ms"] = None
+    crossing["reason"] = reason
+    crossing["direction"] = "UNRESOLVED"
+    crossing["direction_evidence"] = details or {}
+    row["goal_plane_crossing"] = crossing
+    intervention = row.get("intervention") if isinstance(row.get("intervention"), dict) else {}
+    row["physical_outcome"] = (
+        "PLAYER_INTERVENTION" if intervention.get("status") == "VERIFIED" else "UNRESOLVED"
+    )
+    row["direction_gate"] = {"status": "UNRESOLVED", "reason": reason}
+    row["canonical_event_type"] = None
+    return row
+
+
+def apply_direction_gate(outcome: dict, ball_trajectory, goal_geometry) -> dict:
+    """Require field→goal direction for independent verified whole-ball crossings.
+
+    Legacy/static deterministic geometry is left unchanged.  The gate only
+    tightens results created from the independent multi-frame goal provider.
+    """
+    row = deepcopy(outcome) if isinstance(outcome, dict) else {}
+    crossing = row.get("goal_plane_crossing") if isinstance(row.get("goal_plane_crossing"), dict) else {}
+    if crossing.get("status") != "VERIFIED":
+        return row
+    if not isinstance(goal_geometry, dict) or goal_geometry.get("source") != "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW":
+        return row
+    evidence = crossing.get("evidence") or []
+    first = next((item for item in evidence if isinstance(item, dict)), None)
+    if not first or not (_num(first.get("from_ms")) and _num(first.get("to_ms"))):
+        return _downgrade_crossing(row, "CROSSING_SEGMENT_EVIDENCE_MISSING")
+    from_ms, to_ms = int(first["from_ms"]), int(first["to_ms"])
+    before_ball, after_ball = _ball_row_at(ball_trajectory, from_ms), _ball_row_at(ball_trajectory, to_ms)
+    before_line, after_line = _line_at(goal_geometry, from_ms), _line_at(goal_geometry, to_ms)
+    before_field, after_field = _field_point_at(goal_geometry, from_ms), _field_point_at(goal_geometry, to_ms)
+    if not all(x is not None for x in (before_ball, after_ball, before_line, after_line, before_field, after_field)):
+        return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_UNAVAILABLE")
+    before_field_d = _signed_side(before_field, before_line)
+    after_field_d = _signed_side(after_field, after_line)
+    before_ball_d = _signed_side(_center(before_ball["box"]), before_line)
+    after_ball_d = _signed_side(_center(after_ball["box"]), after_line)
+    values = (before_field_d, after_field_d, before_ball_d, after_ball_d)
+    if any(value is None for value in values):
+        return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_UNAVAILABLE")
+    if abs(before_field_d) < FIELD_SIDE_MIN_DISTANCE or abs(after_field_d) < FIELD_SIDE_MIN_DISTANCE:
+        return _downgrade_crossing(row, "FIELD_SIDE_POINT_TOO_CLOSE_TO_GOAL_LINE")
+    before_field_sign = 1 if before_field_d > 0 else -1
+    after_field_sign = 1 if after_field_d > 0 else -1
+    before_ball_sign = 1 if before_ball_d > 0 else -1 if before_ball_d < 0 else 0
+    after_ball_sign = 1 if after_ball_d > 0 else -1 if after_ball_d < 0 else 0
+    details = {
+        "from_ms": from_ms,
+        "to_ms": to_ms,
+        "before_field_sign": before_field_sign,
+        "after_field_sign": after_field_sign,
+        "before_ball_sign": before_ball_sign,
+        "after_ball_sign": after_ball_sign,
+    }
+    if before_ball_sign == before_field_sign and after_ball_sign == -after_field_sign:
+        crossing = deepcopy(crossing)
+        crossing["direction"] = "FIELD_TO_GOAL"
+        crossing["direction_status"] = "VERIFIED"
+        crossing["direction_evidence"] = details
+        row["goal_plane_crossing"] = crossing
+        row["direction_gate"] = {"status": "VERIFIED", "reason": "FIELD_TO_GOAL_DIRECTION_VERIFIED"}
+        return row
+    if before_ball_sign == -before_field_sign and after_ball_sign == after_field_sign:
+        return _downgrade_crossing(row, "REVERSE_GOAL_TO_FIELD_CROSSING", details)
+    return _downgrade_crossing(row, "FIELD_TO_GOAL_DIRECTION_NOT_PROVEN", details)
