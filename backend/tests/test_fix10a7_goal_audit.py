@@ -139,3 +139,24 @@ def test_ga06_trace_output_retains_bounded_goal_geometry_evidence():
     assert out["goal_geometry_evidence"]["source"] == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"
     assert len(out["goal_geometry_evidence"]["line_by_ms"]) == 3
     assert out["canonical_event_type"] is None
+
+
+def test_ga07_goal_may_become_visible_after_strike_without_false_unresolved():
+    # At release time the camera has not yet exposed a trustworthy goal line.
+    # Geometry starts 600ms later, but the measured ball crossing occurs inside
+    # that later supported interval.  A7 must use the later time-aligned lines
+    # rather than requiring geometry at the strike frame itself.
+    trajectory = [
+        _ball(1000, .50),
+        _ball(1600, .84),
+        _ball(1700, .89),
+        _ball(1800, .95),
+    ]
+    graph = {"touches": [_touch(1000, "p015", kinds=["RELEASE"])]}
+    geometry = _provider_geometry(
+        "VERIFIED_CROSSING",
+        [(1600, .90), (1700, .91), (1800, .92)],
+    )
+    out = soe.reconstruct_post_strike_outcome(_strike(), trajectory, graph, goal_geometry=geometry)
+    assert out["goal_plane_crossing"]["status"] == "VERIFIED"
+    assert out["physical_outcome"] == "GOAL_PLANE_CROSSING"
