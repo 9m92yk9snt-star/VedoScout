@@ -246,7 +246,6 @@ def _assert_required_jersey_touch(touches: list[dict], jersey: str) -> dict:
 def _assert_ordered_jersey_touch(touches: list[dict], strikes: list[dict], jersey: str,
                                  decisive_start_ms: int, decisive_end_ms: int,
                                  case_start_ms: int, case_end_ms: int) -> dict:
-    """Require target release first, then required teammate jersey touch."""
     releases = _target_releases(strikes, case_start_ms, case_end_ms)
     if not releases:
         return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_ORDERED_CHAIN", "jersey": str(jersey)}
@@ -279,6 +278,64 @@ def _assert_ordered_jersey_touch(touches: list[dict], strikes: list[dict], jerse
     return {
         "status": UNRESOLVED,
         "reason": "ORDERED_DECISIVE_JERSEY_TOUCH_NOT_RESOLVED",
+        "jersey": str(jersey),
+        "target_release_ms": first_release_ms,
+    }
+
+
+def _assert_ordered_jersey_strike(touches: list[dict], strikes: list[dict], jersey: str,
+                                  decisive_start_ms: int, decisive_end_ms: int,
+                                  case_start_ms: int, case_end_ms: int) -> dict:
+    """Require the required jersey touch itself to own a later physical strike."""
+    releases = _target_releases(strikes, case_start_ms, case_end_ms)
+    if not releases:
+        return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_SCORER_CHAIN", "jersey": str(jersey)}
+    first_release_ms = min(int(row["media_ms"]) for row in releases)
+    touch_by_id = {
+        t.get("touch_id"): t for t in touches
+        if isinstance(t.get("touch_id"), str) and t.get("status") == "VERIFIED"
+    }
+    candidate_strikes = []
+    for strike in strikes:
+        if strike.get("status") != "VERIFIED_PHYSICAL_RELEASE" or strike.get("global_target_id") == "GLOBAL_TARGET":
+            continue
+        if not _num(strike.get("media_ms")):
+            continue
+        ms = int(strike["media_ms"])
+        if not max(first_release_ms + 1, decisive_start_ms) <= ms <= decisive_end_ms:
+            continue
+        touch = touch_by_id.get(strike.get("touch_id"))
+        if not isinstance(touch, dict) or touch.get("global_target_id") == "GLOBAL_TARGET":
+            continue
+        candidate_strikes.append((strike, touch))
+    matches = [
+        (strike, touch) for strike, touch in candidate_strikes
+        if _jersey_number(touch) == str(jersey)
+    ]
+    if matches:
+        return {
+            "status": PASS,
+            "reason": "ORDERED_TARGET_RELEASE_TO_VERIFIED_JERSEY_STRIKE",
+            "jersey": str(jersey),
+            "target_release_ms": first_release_ms,
+            "strike_ms": [int(strike["media_ms"]) for strike, _ in matches],
+            "touch_ids": [touch.get("touch_id") for _, touch in matches],
+        }
+    resolved = [
+        (_jersey_number(touch), int(strike["media_ms"]))
+        for strike, touch in candidate_strikes if _jersey_number(touch) is not None
+    ]
+    if resolved:
+        return {
+            "status": FAIL,
+            "reason": "DECISIVE_PHYSICAL_STRIKE_RESOLVED_TO_DIFFERENT_JERSEY",
+            "jersey": str(jersey),
+            "target_release_ms": first_release_ms,
+            "observed": resolved,
+        }
+    return {
+        "status": UNRESOLVED,
+        "reason": "DECISIVE_JERSEY_STRIKE_NOT_RESOLVED",
         "jersey": str(jersey),
         "target_release_ms": first_release_ms,
     }
@@ -372,6 +429,11 @@ def validate_case(case: dict, physical_result: dict | None,
             "name": "require_player_intervention",
             **_assert_player_intervention(outcomes, intervention_start, intervention_end),
         })
+    if gate.get("require_physical_outcome"):
+        assertions.append({
+            "name": "require_physical_outcome",
+            **_assert_required_outcome(outcomes, str(gate["require_physical_outcome"])),
+        })
     if gate.get("require_goal_plane_crossing") is True:
         assertions.append({"name": "require_goal_plane_crossing", **_assert_required_outcome(outcomes, "GOAL_PLANE_CROSSING")})
     if gate.get("must_not_assert_physical_outcome"):
@@ -391,6 +453,19 @@ def validate_case(case: dict, physical_result: dict | None,
                 touches,
                 strikes,
                 str(gate["require_non_target_verified_jersey_touch_after_target_release"]),
+                decisive_start,
+                decisive_end,
+                start,
+                end,
+            ),
+        })
+    if gate.get("require_non_target_verified_jersey_strike_after_target_release") is not None:
+        assertions.append({
+            "name": "require_non_target_verified_jersey_strike_after_target_release",
+            **_assert_ordered_jersey_strike(
+                touches,
+                strikes,
+                str(gate["require_non_target_verified_jersey_strike_after_target_release"]),
                 decisive_start,
                 decisive_end,
                 start,
