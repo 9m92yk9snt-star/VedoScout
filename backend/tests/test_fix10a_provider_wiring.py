@@ -117,9 +117,12 @@ async def test_pw02_shadow_autowires_supporting_callbacks_only(monkeypatch):
     assert built["api_key"] == "test-key"
     assert built["video_path"] == "video.mp4"
     # jersey_vote_provider is the existing sixth positional orchestration
-    # argument; goal/role are keyword-only providers.
+    # argument. The normal shadow goal callback is deliberately wrapped by the
+    # fail-closed field-side direction provider before it reaches A7.
     assert captured["args"][5] is jersey
-    assert captured["kwargs"]["goal_geometry_provider"] is goal
+    wrapped_goal = captured["kwargs"]["goal_geometry_provider"]
+    assert isinstance(wrapped_goal, fsr.fix10a_goal_direction.GoalDirectionProvider)
+    assert wrapped_goal.base_provider is goal
     assert captured["kwargs"]["role_evidence_provider"] is role
     assert out["fix10a_supporting_vision"]["enabled"] is True
     assert out["fix10a_canonical_authority"] is False
