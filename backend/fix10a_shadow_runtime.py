@@ -12,14 +12,23 @@ import re
 from pathlib import Path
 
 import event_trace
+import fix10a_vision_providers
 import physical_match_reconstruction
 
 VERSION = 1
 FLAG = "FIX10A_SHADOW_ENABLED"
+SUPPORT_VISION_FLAG = "FIX10A_SUPPORT_VISION_ENABLED"
 
 
 def shadow_enabled() -> bool:
     return str(os.environ.get(FLAG, "0")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def support_vision_enabled() -> bool:
+    # Shadow mode itself is already explicit opt-in.  Supporting A6/A7 readers
+    # default on inside shadow so a real acceptance run gets the full evidence
+    # stack; operators can disable them separately for cost/debug isolation.
+    return str(os.environ.get(SUPPORT_VISION_FLAG, "1")).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _safe_component(value, fallback="trace") -> str:
@@ -90,7 +99,8 @@ async def _persist_trace(report_id: str, trace: dict, r2_storage, local_dir) -> 
 async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                      db, r2_storage=None, source_video: dict | None = None,
                      local_dir=None, jersey_vote_provider=None,
-                     goal_geometry_provider=None, role_evidence=None) -> dict:
+                     goal_geometry_provider=None, role_evidence=None,
+                     role_evidence_provider=None, vision_api_key: str | None = None) -> dict:
     """Run FIX10A only after a successful unified result; never mutate it.
 
     Any exception is converted to diagnostic state. The caller's existing report
@@ -105,6 +115,33 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                 "canonical_authority": False}
 
     try:
+        support_mode = {
+            "enabled": False,
+            "jersey_provider": bool(jersey_vote_provider),
+            "goal_provider": bool(goal_geometry_provider),
+            "role_provider": bool(role_evidence_provider),
+        }
+        if support_vision_enabled():
+            api_key = str(vision_api_key or os.environ.get("EMERGENT_LLM_KEY") or "")
+            if api_key:
+                bundle = fix10a_vision_providers.build_shadow_providers(
+                    api_key,
+                    f"fix10a-{_safe_component(report_id, 'report')}",
+                    str(video_path),
+                )
+                if jersey_vote_provider is None:
+                    jersey_vote_provider = bundle.jersey_vote_provider
+                if goal_geometry_provider is None:
+                    goal_geometry_provider = bundle.goal_geometry_provider
+                if role_evidence_provider is None:
+                    role_evidence_provider = bundle.role_evidence_provider
+                support_mode.update({
+                    "enabled": True,
+                    "jersey_provider": bool(jersey_vote_provider),
+                    "goal_provider": bool(goal_geometry_provider),
+                    "role_provider": bool(role_evidence_provider),
+                })
+
         physical = await asyncio.to_thread(
             physical_match_reconstruction.reconstruct_physical_match,
             str(video_path),
@@ -116,6 +153,7 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
             source_video=source_video or {},
             goal_geometry_provider=goal_geometry_provider,
             role_evidence=role_evidence or {},
+            role_evidence_provider=role_evidence_provider,
         )
         manifests = []
         for trace in physical.get("traces") or []:
@@ -130,6 +168,7 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
             "fix10a_version": VERSION,
             "fix10a_physical_summary": compact,
             "fix10a_trace_manifest": manifests,
+            "fix10a_supporting_vision": support_mode,
             "fix10a_canonical_authority": False,
         }
         if db is not None:
