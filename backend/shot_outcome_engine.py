@@ -20,6 +20,8 @@ INTERVENTION_MIN_TRAJECTORY_CHANGE = 0.25
 STOP_SPEED_NORM_S = 0.22
 AWAY_DOT_MIN = 0.05
 GOAL_GEOMETRY_NEAR_MS = 500
+MAX_GOAL_CROSSING_OBSERVATION_GAP_MS = 250
+BALL_PLANE_EPS = 1e-6
 
 
 def _num(value) -> bool:
@@ -150,12 +152,24 @@ def _segment_from_line(line):
     return a, b
 
 
+def _canonical_segment(segment):
+    """Stabilise endpoint order so signed line-side tests survive p1/p2 swaps."""
+    if not isinstance(segment, tuple) or len(segment) != 2:
+        return segment
+    a, b = segment
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    if abs(dx) >= abs(dy):
+        return (a, b) if a[0] <= b[0] else (b, a)
+    return (a, b) if a[1] <= b[1] else (b, a)
+
+
 def _goal_segment(goal_geometry):
     """Legacy/static goal segment reader retained for deterministic fixtures."""
     if not isinstance(goal_geometry, dict):
         return None
     line = goal_geometry.get("line") if isinstance(goal_geometry.get("line"), dict) else goal_geometry
-    return _segment_from_line(line)
+    segment = _segment_from_line(line)
+    return _canonical_segment(segment) if segment is not None else None
 
 
 def _goal_segment_at(goal_geometry, media_ms):
@@ -173,7 +187,7 @@ def _goal_segment_at(goal_geometry, media_ms):
             continue
         segment = _segment_from_line(row.get("line"))
         if segment is not None:
-            rows.append((int(row["media_ms"]), segment))
+            rows.append((int(row["media_ms"]), _canonical_segment(segment)))
     if rows and _num(media_ms):
         best_ms, best = min(rows, key=lambda item: abs(item[0] - int(media_ms)))
         if abs(best_ms - int(media_ms)) <= GOAL_GEOMETRY_NEAR_MS:
@@ -183,6 +197,42 @@ def _goal_segment_at(goal_geometry, media_ms):
         if goal_geometry.get("source") == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW":
             return None
     return _goal_segment(goal_geometry)
+
+
+def _line_ball_metrics(row, segment):
+    """Ball extent relative to one time-aligned goal plane segment.
+
+    The ball detector supplies an axis-aligned box in normalized image space.
+    Projecting half of that box onto the line normal is conservative: the ball
+    counts as wholly beyond the plane only when even its nearest box edge is on
+    the far side.  Tangential extent is also required to remain between posts.
+    """
+    if not isinstance(row, dict) or not _valid_box(row.get("box")) or segment is None:
+        return None
+    a, b = _canonical_segment(segment)
+    vx, vy = b[0] - a[0], b[1] - a[1]
+    length = math.hypot(vx, vy)
+    if length <= 1e-9:
+        return None
+    tx, ty = vx / length, vy / length
+    nx, ny = -ty, tx
+    cx, cy = _center(row["box"])
+    relx, rely = cx - a[0], cy - a[1]
+    signed_distance = relx * nx + rely * ny
+    along = relx * tx + rely * ty
+    box = row["box"]
+    half_normal = abs(nx) * float(box["w"]) / 2.0 + abs(ny) * float(box["h"]) / 2.0
+    half_tangent = abs(tx) * float(box["w"]) / 2.0 + abs(ty) * float(box["h"]) / 2.0
+    mouth_margin = min(along, length - along) - half_tangent
+    return {
+        "media_ms": int(row["media_ms"]),
+        "center": (cx, cy),
+        "signed_distance": signed_distance,
+        "half_normal_extent": half_normal,
+        "mouth_margin": mouth_margin,
+        "whole_ball_on_one_side": abs(signed_distance) > half_normal + BALL_PLANE_EPS,
+        "whole_ball_between_posts": mouth_margin > BALL_PLANE_EPS,
+    }
 
 
 def _visual_crossing_audit(goal_geometry):
@@ -208,54 +258,91 @@ def _goal_crossing_evidence(rows, goal_geometry):
         and r.get("time_authority") == "ACTUAL_MEDIA_PTS"
         and r.get("used_fallback") is not True
     ]
-    evidence = []
-    geometry_seen = False
-    for left, right in zip(measured, measured[1:]):
-        if right.get("cut_barrier") is True:
-            continue
-        midpoint = int(round((int(left["media_ms"]) + int(right["media_ms"])) / 2.0))
-        segment = _goal_segment_at(goal_geometry, midpoint)
-        if segment is None:
-            continue
-        geometry_seen = True
-        a, b = _center(left["box"]), _center(right["box"])
-        hit, t, _u = _segment_intersection(a, b, segment[0], segment[1])
-        if not hit:
-            continue
-        ms = int(round(int(left["media_ms"]) + t * (int(right["media_ms"]) - int(left["media_ms"]))))
-        evidence.append({
-            "from_ms": int(left["media_ms"]), "to_ms": int(right["media_ms"]),
-            "crossing_ms": ms,
-            "from_center": {"x": a[0], "y": a[1]},
-            "to_center": {"x": b[0], "y": b[1]},
-            "goal_geometry_media_ms": midpoint,
-        })
-    if not geometry_seen:
+    samples = []
+    for row in measured:
+        segment = _goal_segment_at(goal_geometry, int(row["media_ms"]))
+        metrics = _line_ball_metrics(row, segment)
+        if metrics is not None:
+            metrics["cut_barrier"] = bool(row.get("cut_barrier"))
+            samples.append(metrics)
+    if not samples:
         return {"status": "UNRESOLVED", "crossing_ms": None,
                 "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": [],
                 "visual_audit": audit}
+
+    field_sign = None
+    last_field_sample = None
+    evidence = []
+    for sample in samples:
+        if sample.get("cut_barrier") is True:
+            field_sign = None
+            last_field_sample = None
+        distance = float(sample["signed_distance"])
+        sign = 1 if distance > 0 else -1 if distance < 0 else 0
+        if field_sign is None:
+            # We establish the field side only from a frame where the whole ball
+            # is visibly on one side of the plane.  A straddling first frame is
+            # not enough to decide which side is pre-goal.
+            if sign and sample["whole_ball_on_one_side"]:
+                field_sign = sign
+                last_field_sample = sample
+            continue
+        if sign == field_sign:
+            last_field_sample = sample
+            continue
+        if sign == 0:
+            continue
+        # The center has changed sides.  A goal still needs the detector box to
+        # be wholly beyond the plane AND wholly between the posts.
+        if not sample["whole_ball_on_one_side"] or not sample["whole_ball_between_posts"]:
+            continue
+        previous = last_field_sample
+        if not isinstance(previous, dict):
+            continue
+        gap = int(sample["media_ms"]) - int(previous["media_ms"])
+        if gap <= 0 or gap > MAX_GOAL_CROSSING_OBSERVATION_GAP_MS:
+            continue
+        before_d = float(previous["signed_distance"])
+        after_d = float(sample["signed_distance"])
+        denom = abs(before_d) + abs(after_d)
+        t = abs(before_d) / denom if denom > 1e-12 else 0.5
+        crossing_ms = int(round(int(previous["media_ms"]) + t * gap))
+        evidence.append({
+            "from_ms": int(previous["media_ms"]),
+            "to_ms": int(sample["media_ms"]),
+            "crossing_ms": crossing_ms,
+            "from_center": {"x": previous["center"][0], "y": previous["center"][1]},
+            "to_center": {"x": sample["center"][0], "y": sample["center"][1]},
+            "whole_ball_beyond_margin": round(
+                abs(after_d) - float(sample["half_normal_extent"]), 6
+            ),
+            "whole_ball_between_posts_margin": round(float(sample["mouth_margin"]), 6),
+            "observation_gap_ms": gap,
+        })
+        break
+
     if evidence:
         if audit["status"] == "VERIFIED_NO_CROSSING":
             return {"status": "UNRESOLVED", "crossing_ms": None,
-                    "reason": "TRAJECTORY_GEOMETRY_CONFLICTS_WITH_VISUAL_NO_CROSSING",
+                    "reason": "WHOLE_BALL_PHYSICS_CONFLICTS_WITH_VISUAL_NO_CROSSING",
                     "evidence": evidence[:4], "visual_audit": audit}
         if audit["present"] and audit["status"] != "VERIFIED_CROSSING":
             return {"status": "UNRESOLVED", "crossing_ms": None,
                     "reason": "INDEPENDENT_VISUAL_CROSSING_UNRESOLVED",
                     "evidence": evidence[:4], "visual_audit": audit}
         return {"status": "VERIFIED", "crossing_ms": evidence[0]["crossing_ms"],
-                "reason": "MEASURED_BALL_CROSSED_TIME_ALIGNED_GOAL_SEGMENT",
+                "reason": "WHOLE_BALL_CROSSED_TIME_ALIGNED_GOAL_PLANE",
                 "evidence": evidence[:4], "visual_audit": audit}
     if audit["status"] == "VERIFIED_CROSSING":
         return {"status": "UNRESOLVED", "crossing_ms": None,
-                "reason": "VISUAL_CROSSING_WITHOUT_MEASURED_TRAJECTORY_CROSSING",
+                "reason": "VISUAL_CROSSING_WITHOUT_WHOLE_BALL_PHYSICAL_CROSSING",
                 "evidence": [], "visual_audit": audit}
     if audit["status"] == "VERIFIED_NO_CROSSING":
         return {"status": "REJECTED", "crossing_ms": None,
-                "reason": "INDEPENDENT_VISUAL_NO_CROSSING_AND_NO_MEASURED_CROSSING",
+                "reason": "INDEPENDENT_VISUAL_NO_CROSSING_AND_NO_WHOLE_BALL_CROSSING",
                 "evidence": [], "visual_audit": audit}
     return {"status": "UNRESOLVED", "crossing_ms": None,
-            "reason": "NO_PROVEN_GOAL_SEGMENT_CROSSING", "evidence": [],
+            "reason": "NO_PROVEN_WHOLE_BALL_GOAL_PLANE_CROSSING", "evidence": [],
             "visual_audit": audit}
 
 
