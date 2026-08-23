@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 
 import event_trace
+import fix10a_goal_direction
 import fix10a_vision_providers
 import physical_match_reconstruction
 
@@ -119,26 +120,39 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
             "enabled": False,
             "jersey_provider": bool(jersey_vote_provider),
             "goal_provider": bool(goal_geometry_provider),
+            "goal_direction_provider": False,
             "role_provider": bool(role_evidence_provider),
         }
         if support_vision_enabled():
             api_key = str(vision_api_key or os.environ.get("EMERGENT_LLM_KEY") or "")
             if api_key:
+                session_prefix = f"fix10a-{_safe_component(report_id, 'report')}"
                 bundle = fix10a_vision_providers.build_shadow_providers(
                     api_key,
-                    f"fix10a-{_safe_component(report_id, 'report')}",
+                    session_prefix,
                     str(video_path),
                 )
                 if jersey_vote_provider is None:
                     jersey_vote_provider = bundle.jersey_vote_provider
                 if goal_geometry_provider is None:
-                    goal_geometry_provider = bundle.goal_geometry_provider
+                    # A7 goal geometry remains the existing independent reader;
+                    # this wrapper only adds field-side orientation and a
+                    # per-report review budget. It does not receive event truth.
+                    goal_geometry_provider = fix10a_goal_direction.wrap_goal_geometry_provider(
+                        bundle.goal_geometry_provider,
+                        api_key,
+                        session_prefix,
+                        str(video_path),
+                    )
                 if role_evidence_provider is None:
                     role_evidence_provider = bundle.role_evidence_provider
                 support_mode.update({
                     "enabled": True,
                     "jersey_provider": bool(jersey_vote_provider),
                     "goal_provider": bool(goal_geometry_provider),
+                    "goal_direction_provider": isinstance(
+                        goal_geometry_provider, fix10a_goal_direction.GoalDirectionProvider
+                    ),
                     "role_provider": bool(role_evidence_provider),
                 })
 
