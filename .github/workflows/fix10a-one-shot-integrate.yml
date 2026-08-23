@@ -1,0 +1,72 @@
+name: FIX10A one-shot guarded integration
+
+on:
+  push:
+    branches:
+      - fix10-match-intelligence
+    paths:
+      - .github/workflows/fix10a-one-shot-integrate.yml
+      - backend/tools/apply_fix10a_integrations.py
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact FIX10 branch head
+        uses: actions/checkout@v4
+        with:
+          ref: fix10-match-intelligence
+          fetch-depth: 1
+
+      - name: Apply guarded integration patch
+        run: python backend/tools/apply_fix10a_integrations.py
+
+      - name: Verify only approved existing files changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only | sort > /tmp/fix10_changed.txt
+          printf '%s\n' \
+            backend/football_sequence_intelligence.py \
+            backend/server.py | sort > /tmp/fix10_expected.txt
+          diff -u /tmp/fix10_expected.txt /tmp/fix10_changed.txt
+
+      - name: Compile and contract-check integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            backend/football_sequence_intelligence.py \
+            backend/server.py \
+            backend/open_observation_compat.py \
+            backend/fix10a_shadow_runtime.py
+          git diff --check
+          python - <<'PY'
+          from pathlib import Path
+          fsi = Path('backend/football_sequence_intelligence.py').read_text()
+          server = Path('backend/server.py').read_text()
+          assert fsi.count('import open_observation_compat') == 1
+          assert fsi.count('open_observation_compat.preserve_open_observation(a, normalised)') == 1
+          assert '"raw_kind": "concise free-form visible football action label; may be outside canonical enum"' in fsi
+          assert server.count('import fix10a_shadow_runtime') == 1
+          assert server.count('fix10a_shadow_runtime.run_shadow(') == 1
+          assert server.count('if fix10a_shadow_runtime.shadow_enabled():') == 1
+          # Shadow call must be after successful FIX09B canonical persistence and before legacy fallback.
+          success = server.index('if _unified_result is not None:')
+          shadow = server.index('fix10a_shadow_runtime.run_shadow(', success)
+          fallback = server.index('if _unified_result is None:', shadow)
+          assert success < shadow < fallback
+          PY
+
+      - name: Commit guarded integration only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "FIX10A guarded integration"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend/football_sequence_intelligence.py backend/server.py
+          git commit -m "FIX10A: wire open perception and shadow runtime"
+          git push origin HEAD:fix10-match-intelligence
