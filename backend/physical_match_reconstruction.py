@@ -50,7 +50,9 @@ def _window_unresolved_reasons(contact_result, jersey_result, outcomes):
         if out.get("physical_outcome") in {"UNRESOLVED", "UNRESOLVED_TERMINAL_VISIBILITY"}:
             reasons.append("POST_STRIKE_OUTCOME_UNRESOLVED")
         crossing = out.get("goal_plane_crossing") if isinstance(out.get("goal_plane_crossing"), dict) else {}
-        if crossing.get("status") != "VERIFIED":
+        # REJECTED is resolved negative evidence (the ball was verified not to
+        # cross); only a genuinely unknown crossing belongs in unresolved logs.
+        if crossing.get("status") == "UNRESOLVED":
             reasons.append("GOAL_PLANE_CROSSING_UNRESOLVED")
     return list(dict.fromkeys(reasons))
 
