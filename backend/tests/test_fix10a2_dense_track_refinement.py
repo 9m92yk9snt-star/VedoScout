@@ -172,3 +172,12 @@ def test_a208_far_new_body_cannot_steal_existing_local_id(monkeypatch):
     assert len(second) == 1
     assert second[0]["local_track_id"] == "p002"
     assert second[0]["association_state"] == "NEW_LOCAL_TRACK"
+
+
+def test_a209_zero_media_time_is_a_real_previous_timestamp():
+    track = {"last_ms": 0, "vx": 1.0, "vy": 0.0}
+    predicted = dtr._residual_predict(track, dict(BASE), 40)
+    # 1.0 normalized units/s for 40 ms must move x by exactly 0.04.  Treating
+    # last_ms=0 as falsy would incorrectly produce zero residual movement.
+    assert abs(predicted["x"] - (BASE["x"] + 0.04)) < 1e-9
+    assert dtr._last_ms(track, 40) == 0
