@@ -76,6 +76,12 @@ def _new_track_id(next_id: int) -> str:
     return f"p{int(next_id):03d}"
 
 
+def _last_ms(track: dict, default_ms: int) -> int:
+    """Return a track timestamp without treating valid media time 0 as missing."""
+    value = track.get("last_ms") if isinstance(track, dict) else None
+    return int(round(float(value))) if _num(value) else int(default_ms)
+
+
 def seed_scene_tracks(scene_graph: dict | None, scene_id: str, start_ms: int) -> dict:
     """Seed local tracks from the nearest broad graph frame in one scene.
 
@@ -174,7 +180,7 @@ def transform_box_affine(box: dict, matrix, frame_size) -> dict | None:
 
 
 def _residual_predict(track: dict, affine_box: dict, media_ms: int) -> dict:
-    dt = max(0.0, (int(media_ms) - int(track.get("last_ms") or media_ms)) / 1000.0)
+    dt = max(0.0, (int(media_ms) - _last_ms(track, media_ms)) / 1000.0)
     return {
         "x": affine_box["x"] + float(track.get("vx") or 0.0) * dt,
         "y": affine_box["y"] + float(track.get("vy") or 0.0) * dt,
@@ -339,7 +345,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         predictions = {}
         if matrix is not None:
             for ti, tr in enumerate(live):
-                if media_ms - int(tr.get("last_ms") or media_ms) > TRACK_MAX_GAP_MS:
+                if media_ms - _last_ms(tr, media_ms) > TRACK_MAX_GAP_MS:
                     continue
                 tb = transform_box_affine(tr.get("box"), matrix, (w, h))
                 if tb is not None:
@@ -379,11 +385,10 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             if ti in used_tracks or di in used_dets or di in ambiguous_det_candidates:
                 continue
             tr, det = live[ti], detections[di]
-            old_box = tr["box"]
             pred = predictions.get(ti)
             if pred is None:
                 continue
-            dt = max(1e-3, (media_ms - int(tr.get("last_ms") or media_ms)) / 1000.0)
+            dt = max(1e-3, (media_ms - _last_ms(tr, media_ms)) / 1000.0)
             pcx, pcy = _center(pred); dcx, dcy = _center(det["box"])
             tr["vx"] = (dcx - pcx) / dt
             tr["vy"] = (dcy - pcy) / dt
@@ -458,7 +463,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
 
         # Expire only by time; unresolved/ambiguous bodies do not rewrite the
         # last accepted geometry of an existing track.
-        live = [tr for tr in live if media_ms - int(tr.get("last_ms") or media_ms) <= TRACK_MAX_GAP_MS]
+        live = [tr for tr in live if media_ms - _last_ms(tr, media_ms) <= TRACK_MAX_GAP_MS]
         target_map = _resolve_dense_target(identity_authority or {}, media_ms, players_out)
         output_frames.append({
             "media_ms": media_ms,
