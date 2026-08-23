@@ -116,7 +116,9 @@ async def test_pw02_shadow_autowires_supporting_callbacks_only(monkeypatch):
     out = await fsr.run_shadow(report_id="r1", video_path="video.mp4", unified_result=unified, db=db)
     assert built["api_key"] == "test-key"
     assert built["video_path"] == "video.mp4"
-    assert captured["kwargs"]["jersey_vote_provider"] is jersey
+    # jersey_vote_provider is the existing sixth positional orchestration
+    # argument; goal/role are keyword-only providers.
+    assert captured["args"][5] is jersey
     assert captured["kwargs"]["goal_geometry_provider"] is goal
     assert captured["kwargs"]["role_evidence_provider"] is role
     assert out["fix10a_supporting_vision"]["enabled"] is True
