@@ -19,6 +19,7 @@ MIN_RELEASE_TRAJECTORY_CHANGE = 0.20
 INTERVENTION_MIN_TRAJECTORY_CHANGE = 0.25
 STOP_SPEED_NORM_S = 0.22
 AWAY_DOT_MIN = 0.05
+GOAL_GEOMETRY_NEAR_MS = 500
 
 
 def _num(value) -> bool:
@@ -135,10 +136,9 @@ def _segment_intersection(a, b, c, d):
     return (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0), t, u
 
 
-def _goal_segment(goal_geometry):
-    if not isinstance(goal_geometry, dict):
+def _segment_from_line(line):
+    if not isinstance(line, dict):
         return None
-    line = goal_geometry.get("line") if isinstance(goal_geometry.get("line"), dict) else goal_geometry
     p1, p2 = line.get("p1"), line.get("p2")
     try:
         a = (float(p1["x"]), float(p1["y"]))
@@ -150,11 +150,62 @@ def _goal_segment(goal_geometry):
     return a, b
 
 
+def _goal_segment(goal_geometry):
+    """Legacy/static goal segment reader retained for deterministic fixtures."""
+    if not isinstance(goal_geometry, dict):
+        return None
+    line = goal_geometry.get("line") if isinstance(goal_geometry.get("line"), dict) else goal_geometry
+    return _segment_from_line(line)
+
+
+def _goal_segment_at(goal_geometry, media_ms):
+    """Use geometry nearest the reviewed media time so camera pan is not frozen."""
+    if not isinstance(goal_geometry, dict):
+        return None
+    if (
+        goal_geometry.get("source") == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"
+        and str(goal_geometry.get("status") or "UNRESOLVED").upper() != "VERIFIED"
+    ):
+        return None
+    rows = []
+    for row in goal_geometry.get("line_by_ms") or []:
+        if not isinstance(row, dict) or not _num(row.get("media_ms")):
+            continue
+        segment = _segment_from_line(row.get("line"))
+        if segment is not None:
+            rows.append((int(row["media_ms"]), segment))
+    if rows and _num(media_ms):
+        best_ms, best = min(rows, key=lambda item: abs(item[0] - int(media_ms)))
+        if abs(best_ms - int(media_ms)) <= GOAL_GEOMETRY_NEAR_MS:
+            return best
+        # A multi-frame provider explicitly supplied time-varying geometry; do
+        # not silently fall back to a stale static line outside its support.
+        if goal_geometry.get("source") == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW":
+            return None
+    return _goal_segment(goal_geometry)
+
+
+def _visual_crossing_audit(goal_geometry):
+    row = goal_geometry.get("visual_crossing_audit") if isinstance(goal_geometry, dict) else None
+    if not isinstance(row, dict):
+        return {"present": False, "status": "UNRESOLVED", "confidence": None, "reason": None}
+    status = str(row.get("status") or "UNRESOLVED").upper()
+    if status not in {"VERIFIED_CROSSING", "VERIFIED_NO_CROSSING", "UNRESOLVED"}:
+        status = "UNRESOLVED"
+    return {
+        "present": True,
+        "status": status,
+        "confidence": row.get("confidence"),
+        "reason": row.get("reason"),
+    }
+
+
 def _goal_crossing_evidence(rows, goal_geometry):
-    segment = _goal_segment(goal_geometry)
-    if segment is None:
+    audit = _visual_crossing_audit(goal_geometry)
+    if _goal_segment_at(goal_geometry, rows[0].get("media_ms") if rows else None) is None:
         return {"status": "UNRESOLVED", "crossing_ms": None,
-                "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": []}
+                "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": [],
+                "visual_audit": audit}
     measured = [
         r for r in rows
         if r.get("state") == "MEASURED" and _valid_box(r.get("box"))
@@ -164,6 +215,10 @@ def _goal_crossing_evidence(rows, goal_geometry):
     evidence = []
     for left, right in zip(measured, measured[1:]):
         if right.get("cut_barrier") is True:
+            continue
+        midpoint = int(round((int(left["media_ms"]) + int(right["media_ms"])) / 2.0))
+        segment = _goal_segment_at(goal_geometry, midpoint)
+        if segment is None:
             continue
         a, b = _center(left["box"]), _center(right["box"])
         hit, t, _u = _segment_intersection(a, b, segment[0], segment[1])
@@ -175,12 +230,31 @@ def _goal_crossing_evidence(rows, goal_geometry):
             "crossing_ms": ms,
             "from_center": {"x": a[0], "y": a[1]},
             "to_center": {"x": b[0], "y": b[1]},
+            "goal_geometry_media_ms": midpoint,
         })
     if evidence:
+        if audit["status"] == "VERIFIED_NO_CROSSING":
+            return {"status": "UNRESOLVED", "crossing_ms": None,
+                    "reason": "TRAJECTORY_GEOMETRY_CONFLICTS_WITH_VISUAL_NO_CROSSING",
+                    "evidence": evidence[:4], "visual_audit": audit}
+        if audit["present"] and audit["status"] != "VERIFIED_CROSSING":
+            return {"status": "UNRESOLVED", "crossing_ms": None,
+                    "reason": "INDEPENDENT_VISUAL_CROSSING_UNRESOLVED",
+                    "evidence": evidence[:4], "visual_audit": audit}
         return {"status": "VERIFIED", "crossing_ms": evidence[0]["crossing_ms"],
-                "reason": "MEASURED_BALL_CROSSED_GOAL_SEGMENT", "evidence": evidence[:4]}
+                "reason": "MEASURED_BALL_CROSSED_TIME_ALIGNED_GOAL_SEGMENT",
+                "evidence": evidence[:4], "visual_audit": audit}
+    if audit["status"] == "VERIFIED_CROSSING":
+        return {"status": "UNRESOLVED", "crossing_ms": None,
+                "reason": "VISUAL_CROSSING_WITHOUT_MEASURED_TRAJECTORY_CROSSING",
+                "evidence": [], "visual_audit": audit}
+    if audit["status"] == "VERIFIED_NO_CROSSING":
+        return {"status": "REJECTED", "crossing_ms": None,
+                "reason": "INDEPENDENT_VISUAL_NO_CROSSING_AND_NO_MEASURED_CROSSING",
+                "evidence": [], "visual_audit": audit}
     return {"status": "UNRESOLVED", "crossing_ms": None,
-            "reason": "NO_PROVEN_GOAL_SEGMENT_CROSSING", "evidence": []}
+            "reason": "NO_PROVEN_GOAL_SEGMENT_CROSSING", "evidence": [],
+            "visual_audit": audit}
 
 
 def _role_resolution(role_evidence, track_id):
@@ -243,11 +317,11 @@ def _intervention_evidence(touch, rows):
 
 
 def _moves_away_after_intervention(rows, intervention_ms, goal_geometry):
-    segment = _goal_segment(goal_geometry)
+    segment = _goal_segment_at(goal_geometry, intervention_ms)
     if segment is None:
         return False
     # Goal-segment midpoint is enough for a conservative screen-space direction
-    # check once explicit goal geometry has been supplied by a trusted source.
+    # check once explicit, time-aligned goal geometry has been supplied.
     gx = (segment[0][0] + segment[1][0]) / 2.0
     gy = (segment[0][1] + segment[1][1]) / 2.0
     after = [
@@ -279,11 +353,19 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
         intervention.get("status") == "VERIFIED"
         and _moves_away_after_intervention(rows, intervention.get("media_ms"), goal_geometry)
     )
+    audit = _visual_crossing_audit(goal_geometry)
+    non_crossing_audit_ok = (
+        not audit["present"] or audit["status"] == "VERIFIED_NO_CROSSING"
+    )
+    geometry_available = _goal_segment_at(
+        goal_geometry, intervention.get("media_ms") if intervention.get("media_ms") is not None else start
+    ) is not None
     save_verified = bool(
         intervention.get("status") == "VERIFIED"
         and role.get("status") == "VERIFIED" and role.get("role") == "GOALKEEPER"
         and crossing.get("status") != "VERIFIED"
-        and goal_geometry is not None
+        and geometry_available
+        and non_crossing_audit_ok
         and (intervention.get("kind") == "CATCH_LIKE_STOP" or moves_away)
     )
     if crossing.get("status") == "VERIFIED":
@@ -316,6 +398,7 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
         "strike_actor_track_id": strike.get("player_track_id"),
         "physical_outcome": physical_outcome,
         "goal_plane_crossing": crossing,
+        "goal_geometry_evidence": deepcopy(goal_geometry) if isinstance(goal_geometry, dict) else None,
         "intervention": intervention,
         "intervention_role": role,
         "save_evidence": save,
