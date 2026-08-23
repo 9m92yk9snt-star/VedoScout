@@ -15,6 +15,7 @@ import ball_trajectory
 import dense_replay
 import dense_track_refinement
 import event_trace
+import fix10a_goal_direction
 import jersey_consensus
 import shot_outcome_engine
 import touch_graph
@@ -169,13 +170,20 @@ def reconstruct_physical_match(
                 goal_geometry = _safe_provider(
                     goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
                 )
-                outcomes.append(shot_outcome_engine.reconstruct_post_strike_outcome(
+                outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
                     strike,
                     trajectory,
                     touch_with_jersey,
                     goal_geometry=goal_geometry,
                     role_evidence=window_roles,
-                ))
+                )
+                # Independent goal geometry must also prove the direction of a
+                # verified whole-ball crossing. A reverse goal→field path or
+                # missing playable-field orientation is downgraded before A8.
+                outcome = fix10a_goal_direction.apply_direction_gate(
+                    outcome, trajectory, goal_geometry
+                )
+                outcomes.append(outcome)
 
             unresolved = _window_unresolved_reasons(
                 contact_result, jersey_result, outcomes
