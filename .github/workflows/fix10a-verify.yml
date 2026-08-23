@@ -70,6 +70,7 @@ jobs:
             backend/physical_match_reconstruction.py \
             backend/open_observation_compat.py \
             backend/fix10a_vision_providers.py \
+            backend/fix10a_goal_direction.py \
             backend/fix10a_shadow_runtime.py \
             backend/golden_fixture_validator.py \
             backend/run_real_video_golden.py \
