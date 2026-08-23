@@ -1,0 +1,326 @@
+"""FIX10A7 — post-strike / intervention / goal-plane physical evidence.
+
+This layer never receives the primary model's GOAL/SAVED story.  It derives
+post-strike physics only from the FIX10A Touch Graph and dense ball trajectory.
+Goal-line crossing is emitted only when explicit goal geometry and measured
+ball points prove it.  Player intervention may be verified without knowing the
+player's role; SAVED evidence requires stronger goalkeeper + post-intervention
+support and still is not a canonical event in FIX10A.
+"""
+from __future__ import annotations
+
+import hashlib
+import math
+from copy import deepcopy
+
+VERSION = 1
+MAX_POST_STRIKE_MS = 3000
+MIN_RELEASE_TRAJECTORY_CHANGE = 0.20
+INTERVENTION_MIN_TRAJECTORY_CHANGE = 0.25
+STOP_SPEED_NORM_S = 0.22
+AWAY_DOT_MIN = 0.05
+
+
+def _num(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _valid_box(box) -> bool:
+    if not isinstance(box, dict):
+        return False
+    try:
+        x, y, w, h = (float(box[k]) for k in ("x", "y", "w", "h"))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return -0.1 <= x <= 1.1 and -0.1 <= y <= 1.1 and 0 < w <= 1.2 and 0 < h <= 1.2
+
+
+def _center(box):
+    return float(box["x"]) + float(box["w"]) / 2.0, float(box["y"]) + float(box["h"]) / 2.0
+
+
+def _strike_id(touch_id, media_ms):
+    raw = f"{touch_id}|{int(media_ms)}".encode("utf-8")
+    return "strike_" + hashlib.sha1(raw).hexdigest()[:16]
+
+
+def _trajectory_rows(ball_trajectory, start_ms, end_ms, scene_id=None):
+    rows = []
+    for row in ball_trajectory or []:
+        if not isinstance(row, dict) or not _num(row.get("media_ms")):
+            continue
+        ms = int(row["media_ms"])
+        if not (int(start_ms) <= ms <= int(end_ms)):
+            continue
+        if scene_id is not None and row.get("scene_id") not in {None, scene_id}:
+            continue
+        rows.append(row)
+    return sorted(rows, key=lambda r: int(r["media_ms"]))
+
+
+def _velocity_between(a, b):
+    if not (isinstance(a, dict) and isinstance(b, dict)
+            and _valid_box(a.get("box")) and _valid_box(b.get("box"))):
+        return None
+    dt = (int(b["media_ms"]) - int(a["media_ms"])) / 1000.0
+    if dt <= 0:
+        return None
+    ax, ay = _center(a["box"]); bx, by = _center(b["box"])
+    return {"x": (bx - ax) / dt, "y": (by - ay) / dt}
+
+
+def _speed(vector):
+    if not isinstance(vector, dict) or not _num(vector.get("x")) or not _num(vector.get("y")):
+        return None
+    return math.hypot(float(vector["x"]), float(vector["y"]))
+
+
+def _measured_near(rows, media_ms, side=0, max_ms=220):
+    candidates = [
+        r for r in rows
+        if r.get("state") == "MEASURED" and _valid_box(r.get("box"))
+        and (side == 0 or (int(r["media_ms"]) - int(media_ms)) * side > 0)
+        and abs(int(r["media_ms"]) - int(media_ms)) <= max_ms
+    ]
+    return min(candidates, key=lambda r: abs(int(r["media_ms"]) - int(media_ms)), default=None)
+
+
+def find_strike_releases(touch_graph: dict | None, ball_trajectory=None) -> list[dict]:
+    """Find physically meaningful release/strike candidates, not semantic SHOTs."""
+    graph = touch_graph if isinstance(touch_graph, dict) else {}
+    touches = [t for t in graph.get("touches") or [] if isinstance(t, dict)]
+    trajectory = list(ball_trajectory or [])
+    out = []
+    for touch in touches:
+        if touch.get("status") != "VERIFIED" or not isinstance(touch.get("player_track_id"), str):
+            continue
+        kinds = set(str(x) for x in (touch.get("possession_kinds") or []))
+        change = float(touch.get("trajectory_change") or 0.0)
+        is_release = "RELEASE" in kinds
+        physical_strike = is_release or change >= MIN_RELEASE_TRAJECTORY_CHANGE
+        if not physical_strike:
+            continue
+        ms = int(touch.get("representative_ms") or touch.get("media_ms") or 0)
+        rows = _trajectory_rows(trajectory, ms, ms + 300, touch.get("scene_id"))
+        cur = _measured_near(rows, ms, side=0)
+        after = _measured_near(rows, ms, side=1)
+        post_velocity = _velocity_between(cur, after) if cur and after else None
+        out.append({
+            "strike_id": _strike_id(touch.get("touch_id"), ms),
+            "touch_id": touch.get("touch_id"),
+            "media_ms": ms,
+            "scene_id": touch.get("scene_id"),
+            "player_track_id": touch.get("player_track_id"),
+            "global_target_id": touch.get("global_target_id"),
+            "status": "VERIFIED_PHYSICAL_RELEASE",
+            "semantic_action": None,
+            "post_velocity": post_velocity,
+            "post_speed": _speed(post_velocity),
+            "trajectory_change": change,
+            "proof_eligible": bool(touch.get("proof_eligible")),
+        })
+    return out
+
+
+def _segment_intersection(a, b, c, d):
+    """Return (hit, t, u) for AB and CD in normalized image coordinates."""
+    ax, ay = a; bx, by = b; cx, cy = c; dx, dy = d
+    r = (bx - ax, by - ay); s = (dx - cx, dy - cy)
+    den = r[0] * s[1] - r[1] * s[0]
+    if abs(den) < 1e-12:
+        return False, None, None
+    q = (cx - ax, cy - ay)
+    t = (q[0] * s[1] - q[1] * s[0]) / den
+    u = (q[0] * r[1] - q[1] * r[0]) / den
+    return (0.0 <= t <= 1.0 and 0.0 <= u <= 1.0), t, u
+
+
+def _goal_segment(goal_geometry):
+    if not isinstance(goal_geometry, dict):
+        return None
+    line = goal_geometry.get("line") if isinstance(goal_geometry.get("line"), dict) else goal_geometry
+    p1, p2 = line.get("p1"), line.get("p2")
+    try:
+        a = (float(p1["x"]), float(p1["y"]))
+        b = (float(p2["x"]), float(p2["y"]))
+    except (TypeError, KeyError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in (*a, *b)) or a == b:
+        return None
+    return a, b
+
+
+def _goal_crossing_evidence(rows, goal_geometry):
+    segment = _goal_segment(goal_geometry)
+    if segment is None:
+        return {"status": "UNRESOLVED", "crossing_ms": None,
+                "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": []}
+    measured = [
+        r for r in rows
+        if r.get("state") == "MEASURED" and _valid_box(r.get("box"))
+        and r.get("time_authority") == "ACTUAL_MEDIA_PTS"
+        and r.get("used_fallback") is not True
+    ]
+    evidence = []
+    for left, right in zip(measured, measured[1:]):
+        if right.get("cut_barrier") is True:
+            continue
+        a, b = _center(left["box"]), _center(right["box"])
+        hit, t, _u = _segment_intersection(a, b, segment[0], segment[1])
+        if not hit:
+            continue
+        ms = int(round(int(left["media_ms"]) + t * (int(right["media_ms"]) - int(left["media_ms"]))))
+        evidence.append({
+            "from_ms": int(left["media_ms"]), "to_ms": int(right["media_ms"]),
+            "crossing_ms": ms,
+            "from_center": {"x": a[0], "y": a[1]},
+            "to_center": {"x": b[0], "y": b[1]},
+        })
+    if evidence:
+        return {"status": "VERIFIED", "crossing_ms": evidence[0]["crossing_ms"],
+                "reason": "MEASURED_BALL_CROSSED_GOAL_SEGMENT", "evidence": evidence[:4]}
+    return {"status": "UNRESOLVED", "crossing_ms": None,
+            "reason": "NO_PROVEN_GOAL_SEGMENT_CROSSING", "evidence": []}
+
+
+def _role_resolution(role_evidence, track_id):
+    source = role_evidence if isinstance(role_evidence, dict) else {}
+    row = source.get(track_id) if isinstance(track_id, str) else None
+    if not isinstance(row, dict):
+        return {"status": "UNRESOLVED", "role": None, "reason": "ROLE_EVIDENCE_MISSING"}
+    role = str(row.get("role") or "UNKNOWN").upper()
+    status = str(row.get("status") or "UNRESOLVED").upper()
+    if status != "VERIFIED" or role not in {"GOALKEEPER", "OUTFIELD"}:
+        return {"status": "UNRESOLVED", "role": None, "reason": "ROLE_EVIDENCE_UNRESOLVED"}
+    return {"status": "VERIFIED", "role": role, "reason": row.get("reason") or "ROLE_VERIFIED"}
+
+
+def _first_other_touch(touch_graph, strike, max_ms=MAX_POST_STRIKE_MS):
+    graph = touch_graph if isinstance(touch_graph, dict) else {}
+    start = int(strike["media_ms"])
+    actor = strike.get("player_track_id")
+    scene = strike.get("scene_id")
+    candidates = [
+        t for t in graph.get("touches") or []
+        if isinstance(t, dict) and t.get("status") == "VERIFIED"
+        and isinstance(t.get("player_track_id"), str)
+        and t.get("player_track_id") != actor
+        and t.get("scene_id") == scene
+        and _num(t.get("media_ms"))
+        and start < int(t["media_ms"]) <= start + int(max_ms)
+    ]
+    return min(candidates, key=lambda t: int(t["media_ms"]), default=None)
+
+
+def _intervention_evidence(touch, rows):
+    if not isinstance(touch, dict):
+        return {"status": "NONE", "player_track_id": None, "media_ms": None,
+                "kind": None, "trajectory_change": 0.0}
+    ms = int(touch.get("representative_ms") or touch.get("media_ms") or 0)
+    before = _measured_near(rows, ms, side=-1)
+    at = _measured_near(rows, ms, side=0)
+    after = _measured_near(rows, ms, side=1)
+    v_before = _velocity_between(before, at) if before and at else None
+    v_after = _velocity_between(at, after) if at and after else None
+    sb, sa = _speed(v_before), _speed(v_after)
+    change = float(touch.get("trajectory_change") or 0.0)
+    if change < INTERVENTION_MIN_TRAJECTORY_CHANGE and not (
+        sb is not None and sa is not None and sb > STOP_SPEED_NORM_S and sa <= STOP_SPEED_NORM_S
+    ):
+        return {"status": "UNRESOLVED", "player_track_id": touch.get("player_track_id"),
+                "media_ms": ms, "kind": "CONTACT_WITHOUT_CLEAR_POST_STRIKE_EFFECT",
+                "trajectory_change": change, "speed_before": sb, "speed_after": sa}
+    if sa is not None and sa <= STOP_SPEED_NORM_S and touch.get("possession_after") == touch.get("player_track_id"):
+        kind = "CATCH_LIKE_STOP"
+    else:
+        kind = "DEFLECTION_OR_PARRY_LIKE"
+    return {
+        "status": "VERIFIED", "player_track_id": touch.get("player_track_id"),
+        "media_ms": ms, "kind": kind, "trajectory_change": round(change, 4),
+        "speed_before": sb, "speed_after": sa,
+        "touch_id": touch.get("touch_id"),
+    }
+
+
+def _moves_away_after_intervention(rows, intervention_ms, goal_geometry):
+    segment = _goal_segment(goal_geometry)
+    if segment is None:
+        return False
+    # Goal-segment midpoint is enough for a conservative screen-space direction
+    # check once explicit goal geometry has been supplied by a trusted source.
+    gx = (segment[0][0] + segment[1][0]) / 2.0
+    gy = (segment[0][1] + segment[1][1]) / 2.0
+    after = [
+        r for r in rows
+        if r.get("state") == "MEASURED" and _valid_box(r.get("box"))
+        and int(r["media_ms"]) >= int(intervention_ms)
+    ]
+    if len(after) < 2:
+        return False
+    a, b = _center(after[0]["box"]), _center(after[min(2, len(after) - 1)]["box"])
+    toward_goal = (gx - a[0], gy - a[1])
+    post = (b[0] - a[0], b[1] - a[1])
+    return post[0] * toward_goal[0] + post[1] * toward_goal[1] < -AWAY_DOT_MIN
+
+
+def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: dict | None,
+                                    goal_geometry=None, role_evidence=None) -> dict:
+    """Build physical outcome evidence for one release/strike candidate."""
+    if not isinstance(strike, dict) or not _num(strike.get("media_ms")):
+        return {"version": VERSION, "status": "invalid", "reason": "INVALID_STRIKE"}
+    start = int(strike["media_ms"])
+    end = start + MAX_POST_STRIKE_MS
+    rows = _trajectory_rows(ball_trajectory, start, end, strike.get("scene_id"))
+    crossing = _goal_crossing_evidence(rows, goal_geometry)
+    other_touch = _first_other_touch(touch_graph, strike)
+    intervention = _intervention_evidence(other_touch, rows)
+    role = _role_resolution(role_evidence, intervention.get("player_track_id"))
+    moves_away = (
+        intervention.get("status") == "VERIFIED"
+        and _moves_away_after_intervention(rows, intervention.get("media_ms"), goal_geometry)
+    )
+    save_verified = bool(
+        intervention.get("status") == "VERIFIED"
+        and role.get("status") == "VERIFIED" and role.get("role") == "GOALKEEPER"
+        and crossing.get("status") != "VERIFIED"
+        and goal_geometry is not None
+        and (intervention.get("kind") == "CATCH_LIKE_STOP" or moves_away)
+    )
+    if crossing.get("status") == "VERIFIED":
+        physical_outcome = "GOAL_PLANE_CROSSING"
+    elif save_verified:
+        physical_outcome = "GOALKEEPER_SAVE_EVIDENCE"
+    elif intervention.get("status") == "VERIFIED":
+        physical_outcome = "PLAYER_INTERVENTION"
+    elif rows and any(r.get("state") in {"MISSING", "AMBIGUOUS"} for r in rows):
+        physical_outcome = "UNRESOLVED_TERMINAL_VISIBILITY"
+    else:
+        physical_outcome = "UNRESOLVED"
+    save = {
+        "status": "VERIFIED" if save_verified else (
+            "REJECTED" if role.get("status") == "VERIFIED" and role.get("role") == "OUTFIELD" else "UNRESOLVED"
+        ),
+        "reason": (
+            "VERIFIED_KEEPER_INTERVENTION_WITH_NON_CROSSING_POST_PATH" if save_verified
+            else "INTERVENTION_BY_VERIFIED_OUTFIELD_PLAYER" if role.get("role") == "OUTFIELD"
+            else "KEEPER_AND_NON_CROSSING_EVIDENCE_INSUFFICIENT"
+        ),
+    }
+    return {
+        "version": VERSION,
+        "status": "ok",
+        "strike_id": strike.get("strike_id"),
+        "touch_id": strike.get("touch_id"),
+        "media_ms": start,
+        "scene_id": strike.get("scene_id"),
+        "strike_actor_track_id": strike.get("player_track_id"),
+        "physical_outcome": physical_outcome,
+        "goal_plane_crossing": crossing,
+        "intervention": intervention,
+        "intervention_role": role,
+        "save_evidence": save,
+        "moves_away_after_intervention": bool(moves_away),
+        "terminal_ball_state": rows[-1].get("state") if rows else "NO_BALL_ROWS",
+        "trajectory_rows_reviewed": len(rows),
+        "canonical_event_type": None,
+    }
