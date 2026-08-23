@@ -1,0 +1,75 @@
+name: FIX10A verification
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fix10a-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install FIX10A test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2 emergentintegrations==0.2.0
+      - name: Compile changed backend modules
+        run: |
+          python -m py_compile \
+            backend/motion_compensation.py \
+            backend/dense_replay.py \
+            backend/dense_track_refinement.py \
+            backend/ball_trajectory.py \
+            backend/ball_contact_engine.py \
+            backend/touch_graph.py \
+            backend/jersey_consensus.py \
+            backend/shot_outcome_engine.py \
+            backend/event_trace.py \
+            backend/physical_match_reconstruction.py \
+            backend/open_observation_compat.py \
+            backend/fix10a_shadow_runtime.py \
+            backend/football_sequence_intelligence.py \
+            backend/identity_verify.py \
+            backend/server.py
+      - name: Run FIX10A regression family
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_fix10a*.py
+
+  existing-backend-regression-attempt:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install project requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+      - name: Run full backend pytest in CI approximation
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: vedoscout_fix10_ci
+          EMERGENT_LLM_KEY: ci-placeholder
+          STRIPE_API_KEY: sk_test_placeholder
+          JWT_SECRET_KEY: fix10-ci-secret
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci-password
+          FIX10A_SHADOW_ENABLED: '0'
+        run: pytest -q
