@@ -76,7 +76,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest -q tests/test_fix10a*.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
 
   existing-backend-regression-attempt:
     runs-on: ubuntu-latest
@@ -175,4 +175,4 @@ jobs:
           ADMIN_EMAIL: ci@example.com
           ADMIN_PASSWORD: ci-password
           FIX10A_SHADOW_ENABLED: '0'
-        run: pytest -q
+        run: pytest --asyncio-mode=auto -q
