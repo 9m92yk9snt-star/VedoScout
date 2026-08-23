@@ -202,10 +202,6 @@ def _visual_crossing_audit(goal_geometry):
 
 def _goal_crossing_evidence(rows, goal_geometry):
     audit = _visual_crossing_audit(goal_geometry)
-    if _goal_segment_at(goal_geometry, rows[0].get("media_ms") if rows else None) is None:
-        return {"status": "UNRESOLVED", "crossing_ms": None,
-                "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": [],
-                "visual_audit": audit}
     measured = [
         r for r in rows
         if r.get("state") == "MEASURED" and _valid_box(r.get("box"))
@@ -213,6 +209,7 @@ def _goal_crossing_evidence(rows, goal_geometry):
         and r.get("used_fallback") is not True
     ]
     evidence = []
+    geometry_seen = False
     for left, right in zip(measured, measured[1:]):
         if right.get("cut_barrier") is True:
             continue
@@ -220,6 +217,7 @@ def _goal_crossing_evidence(rows, goal_geometry):
         segment = _goal_segment_at(goal_geometry, midpoint)
         if segment is None:
             continue
+        geometry_seen = True
         a, b = _center(left["box"]), _center(right["box"])
         hit, t, _u = _segment_intersection(a, b, segment[0], segment[1])
         if not hit:
@@ -232,6 +230,10 @@ def _goal_crossing_evidence(rows, goal_geometry):
             "to_center": {"x": b[0], "y": b[1]},
             "goal_geometry_media_ms": midpoint,
         })
+    if not geometry_seen:
+        return {"status": "UNRESOLVED", "crossing_ms": None,
+                "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": [],
+                "visual_audit": audit}
     if evidence:
         if audit["status"] == "VERIFIED_NO_CROSSING":
             return {"status": "UNRESOLVED", "crossing_ms": None,
