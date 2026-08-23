@@ -1,8 +1,8 @@
 """FIX10A8 — bounded event-trace / black-box recorder.
 
 The trace captures physical evidence for one dense football window so a later
-review can identify exactly where truth changed.  Raw image arrays are never
-persisted here.  The primary multimodal observation may be stored only as a
+review can identify exactly where truth changed. Raw image arrays are never
+persisted here. The primary multimodal observation may be stored only as a
 comparison record; it is not an input to physical reconstruction.
 """
 from __future__ import annotations
@@ -18,6 +18,8 @@ MAX_PLAYERS_PER_FRAME = 32
 MAX_BALL_CANDIDATES = 6
 MAX_CONTACT_ROWS = 240
 MAX_PRIMARY_ACTIONS = 80
+MAX_DIAGNOSTIC_OUTCOMES = 20
+MAX_DIAGNOSTIC_JERSEYS = 24
 
 
 def _num(value) -> bool:
@@ -112,6 +114,199 @@ def _primary_comparison(sequence_analysis, window):
     return {"role": "COMPARISON_ONLY", "sequences": seqs}
 
 
+def _median_positive_delta(rows) -> int:
+    times = sorted({
+        int(row["media_ms"]) for row in rows or []
+        if isinstance(row, dict) and _num(row.get("media_ms"))
+    })
+    deltas = [b - a for a, b in zip(times, times[1:]) if b > a]
+    if not deltas:
+        return 0
+    deltas.sort()
+    return int(deltas[len(deltas) // 2])
+
+
+def _longest_state_run_ms(rows, predicate, sample_interval_ms: int) -> int:
+    ordered = sorted(
+        (row for row in rows or [] if isinstance(row, dict) and _num(row.get("media_ms"))),
+        key=lambda row: int(row["media_ms"]),
+    )
+    longest = 0
+    start = last = None
+    for row in ordered:
+        ms = int(row["media_ms"])
+        if predicate(row):
+            if start is None:
+                start = ms
+            last = ms
+            continue
+        if start is not None and last is not None:
+            longest = max(longest, last - start + max(0, int(sample_interval_ms)))
+        start = last = None
+    if start is not None and last is not None:
+        longest = max(longest, last - start + max(0, int(sample_interval_ms)))
+    return int(max(0, longest))
+
+
+def _ball_diagnostics(decoded_frames, trajectory) -> dict:
+    frames = [x for x in decoded_frames or [] if isinstance(x, dict)]
+    rows = [
+        x for x in trajectory or []
+        if isinstance(x, dict) and _num(x.get("media_ms"))
+    ]
+    states = {}
+    for row in rows:
+        state = str(row.get("state") or "UNKNOWN").upper()
+        states[state] = states.get(state, 0) + 1
+    measured = int(states.get("MEASURED", 0))
+    total = len(rows)
+    candidate_frames = sum(bool(frame.get("ball_candidates")) for frame in frames)
+    total_candidates = sum(len(frame.get("ball_candidates") or []) for frame in frames)
+    sample_interval = _median_positive_delta(rows or frames)
+    measured_times = sorted(
+        int(row["media_ms"]) for row in rows
+        if str(row.get("state") or "").upper() == "MEASURED"
+    )
+    return {
+        "decoded_frames": len(frames),
+        "frames_with_ball_candidates": int(candidate_frames),
+        "ball_candidate_frame_ratio": round(candidate_frames / len(frames), 4) if frames else 0.0,
+        "total_ball_candidates": int(total_candidates),
+        "trajectory_rows": total,
+        "trajectory_states": dict(sorted(states.items())),
+        "measured_rows": measured,
+        "measured_ratio": round(measured / total, 4) if total else 0.0,
+        "median_sample_interval_ms": int(sample_interval),
+        "longest_missing_run_ms": _longest_state_run_ms(
+            rows,
+            lambda row: str(row.get("state") or "").upper() == "MISSING",
+            sample_interval,
+        ),
+        "longest_unmeasured_run_ms": _longest_state_run_ms(
+            rows,
+            lambda row: str(row.get("state") or "").upper() != "MEASURED",
+            sample_interval,
+        ),
+        "first_measured_ms": measured_times[0] if measured_times else None,
+        "last_measured_ms": measured_times[-1] if measured_times else None,
+    }
+
+
+def _contact_diagnostics(contacts: dict) -> dict:
+    row = contacts if isinstance(contacts, dict) else {}
+    return {
+        "accepted": len(row.get("accepted") or []),
+        "unresolved": len(row.get("unresolved") or []),
+        "rejected": len(row.get("rejected") or []),
+        "metrics": _strip_images(row.get("metrics") or {}),
+    }
+
+
+def _jersey_diagnostics(jerseys: dict) -> dict:
+    source = jerseys if isinstance(jerseys, dict) else {}
+    status_counts = {}
+    tracks = []
+    for track_id, row in sorted(source.items(), key=lambda item: str(item[0])):
+        if not isinstance(row, dict):
+            continue
+        status = str(row.get("status") or "UNKNOWN").upper()
+        status_counts[status] = status_counts.get(status, 0) + 1
+        tracks.append({
+            "track_id": str(track_id)[:80],
+            "status": status,
+            "number": row.get("number"),
+            "leading_number": row.get("leading_number"),
+            "top_posterior": row.get("top_posterior"),
+            "margin": row.get("margin"),
+            "agreeing_frames": row.get("agreeing_frames"),
+            "reason": str(row.get("reason") or "")[:160],
+        })
+        if len(tracks) >= MAX_DIAGNOSTIC_JERSEYS:
+            break
+    return {
+        "tracks_reviewed": len(source),
+        "status_counts": dict(sorted(status_counts.items())),
+        "tracks": tracks,
+    }
+
+
+def _outcome_diagnostics(outcomes) -> list[dict]:
+    rows = []
+    for outcome in outcomes or []:
+        if not isinstance(outcome, dict):
+            continue
+        crossing = outcome.get("goal_plane_crossing") if isinstance(outcome.get("goal_plane_crossing"), dict) else {}
+        geometry = outcome.get("goal_geometry_evidence") if isinstance(outcome.get("goal_geometry_evidence"), dict) else {}
+        intervention = outcome.get("intervention") if isinstance(outcome.get("intervention"), dict) else {}
+        role = outcome.get("intervention_role") if isinstance(outcome.get("intervention_role"), dict) else {}
+        save = outcome.get("save_evidence") if isinstance(outcome.get("save_evidence"), dict) else {}
+        direction = outcome.get("direction_gate") if isinstance(outcome.get("direction_gate"), dict) else {}
+        visual = crossing.get("visual_audit") if isinstance(crossing.get("visual_audit"), dict) else {}
+        rows.append({
+            "strike_id": outcome.get("strike_id"),
+            "media_ms": outcome.get("media_ms"),
+            "physical_outcome": outcome.get("physical_outcome"),
+            "terminal_ball_state": outcome.get("terminal_ball_state"),
+            "trajectory_rows_reviewed": outcome.get("trajectory_rows_reviewed"),
+            "goal_crossing": {
+                "status": crossing.get("status"),
+                "reason": crossing.get("reason"),
+                "crossing_ms": crossing.get("crossing_ms"),
+                "direction": crossing.get("direction"),
+                "direction_status": crossing.get("direction_status"),
+                "undirected_status": crossing.get("undirected_status"),
+                "visual_audit_status": visual.get("status"),
+            },
+            "goal_geometry": {
+                "status": geometry.get("status"),
+                "source": geometry.get("source"),
+                "line_frames": len(geometry.get("line_by_ms") or []),
+                "field_side_status": geometry.get("field_side_status"),
+                "field_side_frames": len(geometry.get("field_side_by_ms") or []),
+                "field_side_reason": geometry.get("field_side_reason"),
+            },
+            "intervention": {
+                "status": intervention.get("status"),
+                "player_track_id": intervention.get("player_track_id"),
+                "media_ms": intervention.get("media_ms"),
+                "kind": intervention.get("kind"),
+            },
+            "role": {
+                "status": role.get("status"),
+                "role": role.get("role"),
+                "reason": role.get("reason"),
+            },
+            "save": {
+                "status": save.get("status"),
+                "reason": save.get("reason"),
+            },
+            "direction_gate": {
+                "status": direction.get("status"),
+                "reason": direction.get("reason"),
+            },
+        })
+        if len(rows) >= MAX_DIAGNOSTIC_OUTCOMES:
+            break
+    return rows
+
+
+def _diagnostics(decoded_frames, trajectory, contacts, graph, jerseys, outcomes) -> dict:
+    touch_rows = graph.get("touches") or [] if isinstance(graph, dict) else []
+    return {
+        "ball": _ball_diagnostics(decoded_frames, trajectory),
+        "contacts": _contact_diagnostics(contacts),
+        "touches": {
+            "total": len(touch_rows),
+            "verified": sum(
+                isinstance(touch, dict) and touch.get("status") == "VERIFIED"
+                for touch in touch_rows
+            ),
+        },
+        "jersey": _jersey_diagnostics(jerseys),
+        "outcomes": _outcome_diagnostics(outcomes),
+    }
+
+
 def build_event_trace(*, trace_id: str, source_video: dict | None, window: dict,
                       dense_frames, ball_trajectory, contact_result: dict | None,
                       touch_graph: dict | None, jersey_consensus: dict | None = None,
@@ -122,16 +317,23 @@ def build_event_trace(*, trace_id: str, source_video: dict | None, window: dict,
     contacts = contact_result if isinstance(contact_result, dict) else {}
     graph = touch_graph if isinstance(touch_graph, dict) else {}
     jerseys = jersey_consensus if isinstance(jersey_consensus, dict) else {}
+    decoded = _compact_dense_frames(dense_frames)
     trajectory = [
         _strip_images(x) for x in (ball_trajectory or [])[:MAX_FRAMES]
         if isinstance(x, dict)
     ]
+    consensus = jerseys.get("consensus_by_track") or jerseys
+    outcomes = [_strip_images(x) for x in (outcome_evidence or []) if isinstance(x, dict)]
+    diagnostics = _diagnostics(
+        decoded, trajectory, contacts, graph,
+        consensus if isinstance(consensus, dict) else {}, outcomes,
+    )
     return {
         "version": VERSION,
         "trace_id": str(trace_id)[:120],
         "source_video": _strip_images(source_video or {}),
         "window": _strip_images(window),
-        "decoded_frames": _compact_dense_frames(dense_frames),
+        "decoded_frames": decoded,
         "ball_trajectory": trajectory,
         "contacts": {
             "accepted": [_strip_images(x) for x in (contacts.get("accepted") or [])[:MAX_CONTACT_ROWS]],
@@ -140,9 +342,10 @@ def build_event_trace(*, trace_id: str, source_video: dict | None, window: dict,
             "metrics": _strip_images(contacts.get("metrics") or {}),
         },
         "touch_graph": _strip_images(graph),
-        "jersey_consensus": _strip_images(jerseys.get("consensus_by_track") or jerseys),
+        "jersey_consensus": _strip_images(consensus),
         "strike_evidence": [_strip_images(x) for x in (strike_evidence or [])],
-        "outcome_evidence": [_strip_images(x) for x in (outcome_evidence or [])],
+        "outcome_evidence": outcomes,
+        "diagnostics": diagnostics,
         "primary_observation": _primary_comparison(sequence_analysis, window),
         "contradictions": list(dict.fromkeys(
             str(x)[:240] for x in (contradictions or []) if str(x).strip()
@@ -160,6 +363,7 @@ def compact_trace_summary(trace: dict | None) -> dict:
     graph = row.get("touch_graph") if isinstance(row.get("touch_graph"), dict) else {}
     jerseys = row.get("jersey_consensus") if isinstance(row.get("jersey_consensus"), dict) else {}
     outcomes = row.get("outcome_evidence") or []
+    diagnostics = row.get("diagnostics") if isinstance(row.get("diagnostics"), dict) else {}
     return {
         "version": VERSION,
         "trace_id": row.get("trace_id"),
@@ -178,6 +382,7 @@ def compact_trace_summary(trace: dict | None) -> dict:
             x.get("physical_outcome") for x in outcomes
             if isinstance(x, dict) and x.get("physical_outcome")
         ][:20],
+        "diagnostics": _strip_images(diagnostics),
         "contradictions": list(row.get("contradictions") or [])[:20],
         "unresolved_reasons": list(row.get("unresolved_reasons") or [])[:20],
     }
