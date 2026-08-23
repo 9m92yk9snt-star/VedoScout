@@ -180,6 +180,73 @@ def _extract_json(text: str) -> dict | None:
         return None
 
 
+async def read_visible_jersey_number(
+    api_key: str,
+    session_id: str,
+    crop_path: str,
+) -> dict:
+    """Read only the visibly legible shirt number from ONE player crop.
+
+    FIX10A6 supporting evidence only.  This API intentionally accepts no
+    expected number, player name, target identity or family-provided hint, so a
+    teammate-number read cannot be biased toward GLOBAL_TARGET.  Unreadable or
+    low-confidence crops fail closed to ``readable=False``.
+    """
+    try:
+        path = Path(crop_path)
+        if not path.exists():
+            return {"readable": False, "number": None, "confidence": "low",
+                    "reason": "crop_missing"}
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=session_id,
+            system_message=(
+                "You read visible football shirt numbers from a single crop. "
+                "Do not identify the player and do not infer a number from context. "
+                "Respond with STRICT JSON only — no prose, no markdown."
+            ),
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        prompt = (
+            "This image is a crop of one football player. Read ONLY a shirt/jersey number that is "
+            "actually legible on the player's kit. Do not guess from team, position, identity, body shape, "
+            "filename or likely squad number. If digits are partly hidden, blurred, turned away or ambiguous, "
+            "set readable=false.\n"
+            'Respond ONLY with JSON: {"readable": true|false, "number": "0-99"|null, '
+            '"confidence": "high"|"medium"|"low", "reason": "<short visual reason>"}'
+        )
+        msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=_b64(path))])
+        resp = await asyncio.wait_for(chat.send_message(msg), timeout=60)
+        text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
+        data = _extract_json(text)
+        if not data:
+            return {"readable": False, "number": None, "confidence": "low",
+                    "reason": "invalid_json"}
+        confidence = str(data.get("confidence") or "low").lower()
+        if confidence not in {"high", "medium", "low"}:
+            confidence = "low"
+        raw_number = data.get("number")
+        number = None
+        if raw_number is not None and not isinstance(raw_number, bool):
+            text_number = str(raw_number).strip()
+            if text_number.isdigit() and 0 <= int(text_number) <= 99:
+                number = str(int(text_number))
+        readable = bool(
+            data.get("readable") is True
+            and number is not None
+            and confidence in {"high", "medium"}
+        )
+        return {
+            "readable": readable,
+            "number": number if readable else None,
+            "confidence": confidence,
+            "reason": str(data.get("reason") or ("readable" if readable else "not_readable"))[:160],
+        }
+    except Exception as e:
+        logger.warning(f"jersey number read inconclusive ({session_id}): {e}")
+        return {"readable": False, "number": None, "confidence": "low",
+                "reason": "reader_error"}
+
+
 async def build_identity_profile(
     api_key: str,
     session_id: str,
