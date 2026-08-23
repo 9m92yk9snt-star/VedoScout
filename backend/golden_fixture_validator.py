@@ -2,14 +2,14 @@
 
 This module compares a completed FIX10A physical result (and optionally the
 normalised FIX09B sequence analysis) with an external fixture manifest.
-Fixture truth is NEVER an input to reconstruction.  Validation is deliberately
+Fixture truth is NEVER an input to reconstruction. Validation is deliberately
 tri-state:
 
     PASS        evidence satisfies the assertion
     UNRESOLVED  required evidence is absent/insufficient
     FAIL        available evidence positively contradicts a hard assertion
 
-A fixture can pass globally only when every required assertion is PASS.  This
+A fixture can pass globally only when every required assertion is PASS. This
 prevents missing goal geometry, jersey reads or contacts from producing a false
 green acceptance result.
 """
@@ -73,6 +73,15 @@ def _window(case: dict) -> tuple[int, int]:
     return min(a, b), max(a, b)
 
 
+def _reference_range(case: dict, key: str, fallback: tuple[int, int]) -> tuple[int, int]:
+    ranges = case.get("reference_ranges_ms") if isinstance(case, dict) else None
+    row = ranges.get(key) if isinstance(ranges, dict) else None
+    if isinstance(row, list) and len(row) == 2 and all(_num(x) for x in row):
+        a, b = int(row[0]), int(row[1])
+        return min(a, b), max(a, b)
+    return fallback
+
+
 def _trace_overlaps(trace: dict, start_ms: int, end_ms: int) -> bool:
     window = trace.get("window") if isinstance(trace, dict) else None
     if not isinstance(window, dict):
@@ -109,7 +118,7 @@ def _all_touches(traces: list[dict], start_ms: int, end_ms: int) -> list[dict]:
                 continue
             seen.add(key)
             rows.append(touch)
-    return rows
+    return sorted(rows, key=lambda row: int(row["media_ms"]))
 
 
 def _all_strikes(traces: list[dict], start_ms: int, end_ms: int) -> list[dict]:
@@ -127,7 +136,7 @@ def _all_strikes(traces: list[dict], start_ms: int, end_ms: int) -> list[dict]:
                 continue
             seen.add(key)
             rows.append(strike)
-    return rows
+    return sorted(rows, key=lambda row: int(row["media_ms"]))
 
 
 def _all_outcomes(traces: list[dict], start_ms: int, end_ms: int) -> list[dict]:
@@ -145,7 +154,7 @@ def _all_outcomes(traces: list[dict], start_ms: int, end_ms: int) -> list[dict]:
                 continue
             seen.add(key)
             rows.append(outcome)
-    return rows
+    return sorted(rows, key=lambda row: int(row["media_ms"]))
 
 
 def _jersey_number(touch: dict) -> str | None:
@@ -156,35 +165,50 @@ def _jersey_number(touch: dict) -> str | None:
     return str(value) if value is not None else None
 
 
-def _assert_target_release(strikes: list[dict]) -> dict:
-    target = [
+def _target_releases(strikes: list[dict], start_ms: int, end_ms: int) -> list[dict]:
+    return [
         row for row in strikes
-        if row.get("status") == "VERIFIED_PHYSICAL_RELEASE"
+        if _num(row.get("media_ms"))
+        and start_ms <= int(row["media_ms"]) <= end_ms
+        and row.get("status") == "VERIFIED_PHYSICAL_RELEASE"
         and row.get("global_target_id") == "GLOBAL_TARGET"
     ]
+
+
+def _assert_target_release(strikes: list[dict], start_ms: int, end_ms: int) -> dict:
+    target = _target_releases(strikes, start_ms, end_ms)
     if target:
-        return {"status": PASS, "reason": "VERIFIED_TARGET_RELEASE", "count": len(target)}
-    if strikes:
-        return {"status": FAIL, "reason": "RELEASE_EXISTS_BUT_NOT_BOUND_TO_TARGET", "count": len(strikes)}
-    return {"status": UNRESOLVED, "reason": "NO_VERIFIED_PHYSICAL_RELEASE"}
-
-
-def _assert_player_intervention(outcomes: list[dict]) -> dict:
-    verified = [
-        row for row in outcomes
-        if isinstance(row.get("intervention"), dict)
-        and row["intervention"].get("status") == "VERIFIED"
+        return {
+            "status": PASS,
+            "reason": "VERIFIED_TARGET_RELEASE",
+            "count": len(target),
+            "media_ms": [int(x["media_ms"]) for x in target],
+        }
+    in_range = [
+        row for row in strikes
+        if _num(row.get("media_ms")) and start_ms <= int(row["media_ms"]) <= end_ms
     ]
+    if in_range:
+        return {"status": FAIL, "reason": "RELEASE_EXISTS_IN_REFERENCE_RANGE_BUT_NOT_BOUND_TO_TARGET", "count": len(in_range)}
+    return {"status": UNRESOLVED, "reason": "NO_VERIFIED_TARGET_RELEASE_IN_REFERENCE_RANGE"}
+
+
+def _assert_player_intervention(outcomes: list[dict], start_ms: int, end_ms: int) -> dict:
+    verified = []
+    for row in outcomes:
+        intervention = row.get("intervention") if isinstance(row.get("intervention"), dict) else {}
+        ms = intervention.get("media_ms")
+        if intervention.get("status") == "VERIFIED" and _num(ms) and start_ms <= int(ms) <= end_ms:
+            verified.append(row)
     if verified:
         return {"status": PASS, "reason": "VERIFIED_POST_STRIKE_PLAYER_INTERVENTION", "count": len(verified)}
-    return {"status": UNRESOLVED, "reason": "PLAYER_INTERVENTION_NOT_PHYSICALLY_VERIFIED"}
+    return {"status": UNRESOLVED, "reason": "PLAYER_INTERVENTION_NOT_PHYSICALLY_VERIFIED_IN_REFERENCE_RANGE"}
 
 
 def _assert_required_outcome(outcomes: list[dict], expected: str) -> dict:
     observed = [str(row.get("physical_outcome") or "") for row in outcomes]
     if expected in observed:
         return {"status": PASS, "reason": f"PHYSICAL_OUTCOME_{expected}_VERIFIED"}
-    # A different positively verified terminal outcome is a contradiction.
     positive = [x for x in observed if x and x not in {"UNRESOLVED", "UNRESOLVED_TERMINAL_VISIBILITY"}]
     if positive:
         return {"status": FAIL, "reason": "DIFFERENT_PHYSICAL_OUTCOME_VERIFIED", "observed": positive}
@@ -219,19 +243,59 @@ def _assert_required_jersey_touch(touches: list[dict], jersey: str) -> dict:
     return {"status": UNRESOLVED, "reason": "NON_TARGET_JERSEY_TOUCH_NOT_RESOLVED", "jersey": target}
 
 
-def _assert_forbidden_jersey_touch(touches: list[dict], jersey: str) -> dict:
+def _assert_ordered_jersey_touch(touches: list[dict], strikes: list[dict], jersey: str,
+                                 decisive_start_ms: int, decisive_end_ms: int,
+                                 case_start_ms: int, case_end_ms: int) -> dict:
+    """Require target release first, then required teammate jersey touch."""
+    releases = _target_releases(strikes, case_start_ms, case_end_ms)
+    if not releases:
+        return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_ORDERED_CHAIN", "jersey": str(jersey)}
+    first_release_ms = min(int(row["media_ms"]) for row in releases)
+    verified = [
+        touch for touch in touches
+        if touch.get("status") == "VERIFIED"
+        and _num(touch.get("media_ms"))
+        and max(first_release_ms + 1, decisive_start_ms) <= int(touch["media_ms"]) <= decisive_end_ms
+        and touch.get("global_target_id") != "GLOBAL_TARGET"
+    ]
+    matches = [touch for touch in verified if _jersey_number(touch) == str(jersey)]
+    if matches:
+        return {
+            "status": PASS,
+            "reason": "ORDERED_TARGET_RELEASE_TO_VERIFIED_JERSEY_TOUCH",
+            "jersey": str(jersey),
+            "target_release_ms": first_release_ms,
+            "touch_ms": [int(t["media_ms"]) for t in matches],
+        }
+    resolved = [(_jersey_number(t), int(t["media_ms"])) for t in verified if _jersey_number(t) is not None]
+    if resolved:
+        return {
+            "status": FAIL,
+            "reason": "ORDERED_DECISIVE_TOUCH_RESOLVED_TO_DIFFERENT_JERSEY",
+            "jersey": str(jersey),
+            "target_release_ms": first_release_ms,
+            "observed": resolved,
+        }
+    return {
+        "status": UNRESOLVED,
+        "reason": "ORDERED_DECISIVE_JERSEY_TOUCH_NOT_RESOLVED",
+        "jersey": str(jersey),
+        "target_release_ms": first_release_ms,
+    }
+
+
+def _assert_forbidden_jersey_touch(touches: list[dict], jersey: str,
+                                   start_ms: int, end_ms: int) -> dict:
     target = str(jersey)
     bad = [
         t for t in touches
         if t.get("status") == "VERIFIED"
+        and _num(t.get("media_ms")) and start_ms <= int(t["media_ms"]) <= end_ms
         and t.get("global_target_id") != "GLOBAL_TARGET"
         and _jersey_number(t) == target
     ]
     if bad:
         return {"status": FAIL, "reason": "FORBIDDEN_VERIFIED_JERSEY_TOUCH", "jersey": target, "count": len(bad)}
-    # Absence is enough for this narrow safety assertion: FIX10A did not
-    # physically attribute a decisive touch to the forbidden jersey. It does
-    # NOT prove the player was absent from the scene.
     return {"status": PASS, "reason": "NO_FORBIDDEN_VERIFIED_JERSEY_TOUCH", "jersey": target}
 
 
@@ -293,10 +357,21 @@ def validate_case(case: dict, physical_result: dict | None,
     outcomes = _all_outcomes(traces, start, end)
     assertions = []
     gate = case.get("physical_gate") if isinstance(case.get("physical_gate"), dict) else {}
+
+    strike_start, strike_end = _reference_range(case, "target_strike", (start, end))
+    intervention_start, intervention_end = _reference_range(case, "intervention", (start, end))
+    decisive_start, decisive_end = _reference_range(case, "decisive_teammate_touch", (start, end))
+
     if gate.get("require_target_release") is True:
-        assertions.append({"name": "require_target_release", **_assert_target_release(strikes)})
+        assertions.append({
+            "name": "require_target_release",
+            **_assert_target_release(strikes, strike_start, strike_end),
+        })
     if gate.get("require_player_intervention") is True:
-        assertions.append({"name": "require_player_intervention", **_assert_player_intervention(outcomes)})
+        assertions.append({
+            "name": "require_player_intervention",
+            **_assert_player_intervention(outcomes, intervention_start, intervention_end),
+        })
     if gate.get("require_goal_plane_crossing") is True:
         assertions.append({"name": "require_goal_plane_crossing", **_assert_required_outcome(outcomes, "GOAL_PLANE_CROSSING")})
     if gate.get("must_not_assert_physical_outcome"):
@@ -309,10 +384,28 @@ def validate_case(case: dict, physical_result: dict | None,
             "name": "require_non_target_verified_jersey_touch",
             **_assert_required_jersey_touch(touches, str(gate["require_non_target_verified_jersey_touch"])),
         })
+    if gate.get("require_non_target_verified_jersey_touch_after_target_release") is not None:
+        assertions.append({
+            "name": "require_non_target_verified_jersey_touch_after_target_release",
+            **_assert_ordered_jersey_touch(
+                touches,
+                strikes,
+                str(gate["require_non_target_verified_jersey_touch_after_target_release"]),
+                decisive_start,
+                decisive_end,
+                start,
+                end,
+            ),
+        })
     if gate.get("forbid_non_target_verified_jersey_touch") is not None:
         assertions.append({
             "name": "forbid_non_target_verified_jersey_touch",
-            **_assert_forbidden_jersey_touch(touches, str(gate["forbid_non_target_verified_jersey_touch"])),
+            **_assert_forbidden_jersey_touch(
+                touches,
+                str(gate["forbid_non_target_verified_jersey_touch"]),
+                decisive_start,
+                decisive_end,
+            ),
         })
 
     perception = case.get("perception_gate") if isinstance(case.get("perception_gate"), dict) else {}
