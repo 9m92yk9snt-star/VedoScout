@@ -127,3 +127,15 @@ def test_a407_generic_box_geometry_never_invents_left_or_right_foot():
     result = bce.resolve_contacts(bce.detect_contact_candidates(frames, balls))
     assert len(result["accepted"]) == 1
     assert result["accepted"][0]["foot"] == "UNKNOWN"
+
+
+def test_a408_window_edges_cannot_manufacture_receive_or_release():
+    frames, balls = _strike_fixture()
+    candidates = bce.detect_contact_candidates(frames, balls)
+    edges = [row for row in candidates if row["media_ms"] in {960, 1040}]
+    assert edges
+    assert all(row["qualifies_verified"] is False for row in edges)
+    assert all(
+        "INSUFFICIENT_BEFORE_AFTER_PHYSICS" in row["rejection_reasons"]
+        for row in edges
+    )
