@@ -10,6 +10,7 @@ No model calls and no event classification happen here.
 """
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 
 VERSION = 1
@@ -157,6 +158,46 @@ def _best_proof_frame(event) -> dict | None:
     row = min(keys, key=lambda r: abs(int(r["media_ms"]) - pivot))
     return {"media_ms": int(row["media_ms"]), "box": deepcopy(row["box"]),
             "visibility": row.get("visibility") or "VISIBLE", "kind": "ADJACENT_VISIBLE"}
+
+
+def canonical_event_telestration_box(comment: dict | None) -> dict | None:
+    """Return render-safe actor geometry for one canonical evidence frame.
+
+    FIX09C event-native rows deliberately skip the independent image identity
+    model because B.3 already resolved their actor from the shared
+    GLOBAL_TARGET authority.  This helper is the explicit third telestration
+    path beside user taps and model-confirmed legacy frames.  A free/model
+    comment can never enter it by copying only ``event_id`` or a box.
+    """
+    row = comment if isinstance(comment, dict) else {}
+    if not (
+        row.get("canonical_event_native") is True
+        and row.get("event_source") == "fix09b_canonical"
+        and row.get("event_track_locked") is True
+        and row.get("proof_verified") is True
+        and row.get("proof_frame_verified") is True
+        and row.get("frame_time_authority") == "ACTUAL_MEDIA_PTS"
+        and isinstance(row.get("event_id"), str)
+        and row.get("event_id")
+        and isinstance(row.get("evidence_time_ms"), int)
+        and not isinstance(row.get("evidence_time_ms"), bool)
+        and row.get("frame_time_ms") == row.get("evidence_time_ms")
+    ):
+        return None
+    box = row.get("event_track_box")
+    if not isinstance(box, dict):
+        return None
+    try:
+        x, y, w, h = (float(box[k]) for k in ("x", "y", "w", "h"))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in (x, y, w, h)) or w <= 0 or h <= 0:
+        return None
+    x0, y0 = max(0.0, min(1.0, x)), max(0.0, min(1.0, y))
+    x1, y1 = max(0.0, min(1.0, x + w)), max(0.0, min(1.0, y + h))
+    if x1 - x0 <= 1e-4 or y1 - y0 <= 1e-4:
+        return None
+    return {"x0": x0, "y0": y0, "x1": x1, "y1": y1}
 
 
 def build_event_native_evidence(canonical_bundle: dict | None, max_rows=8) -> list[dict]:

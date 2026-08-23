@@ -54,10 +54,13 @@ def valid_reference_doc():
         })
         comments.append({
             "event_id": e["event_id"],
+            "canonical_event_native": True,
+            "event_source": "fix09b_canonical",
             "event_track_locked": True,
             "canonical_event_ms": e["canonical_ms"],
             "evidence_time_ms": e["canonical_ms"],
             "frame_time_ms": e["canonical_ms"],
+            "frame_time_authority": "ACTUAL_MEDIA_PTS",
             "frame_url": f"https://example.test/{e['event_id']}.jpg",
             "proof_frame_verified": True,
         })
@@ -71,6 +74,7 @@ def valid_reference_doc():
             "moment_local_ms": 2000,
             "telestrated": True,
             "tele_ring": True,
+            "tele_authority": "FIX09B_CANONICAL_GEOMETRY",
         })
     scoring = events[:4]
     snapshots = [{
@@ -156,3 +160,35 @@ def test_staging_validator_rejects_legacy_fallback_even_if_counts_look_right():
     result = sv.validate_report_document(doc)
     assert "engine.unified_status" in result["failures"]
     assert "engine.event_track" in result["failures"]
+
+
+def test_staging_validator_rejects_noncanonical_scoring_frame_impersonation():
+    doc = valid_reference_doc()
+    row = doc["full_report"]["video_comments"][0]
+    row["canonical_event_native"] = False
+    result = sv.validate_report_document(doc)
+    assert "proof.scoring_frames" in result["failures"]
+
+
+def test_staging_validator_rejects_clip_without_canonical_geometry_authority():
+    doc = valid_reference_doc()
+    doc["full_report"]["video_comments"][0].pop("tele_authority")
+    result = sv.validate_report_document(doc)
+    assert "proof.clips_and_ellipse" in result["failures"]
+
+
+def test_staging_validator_rejects_unproven_canonical_frame_pts():
+    doc = valid_reference_doc()
+    doc["full_report"]["video_comments"][0].pop("frame_time_authority")
+    result = sv.validate_report_document(doc)
+    assert "proof.scoring_frames" in result["failures"]
+
+
+def test_staging_validator_rejects_canonical_frame_inside_identity_barrier():
+    doc = valid_reference_doc()
+    row = doc["full_report"]["video_comments"][0]
+    row["evidence_time_ms"] = 10_050
+    row["frame_time_ms"] = 10_050
+    doc["unified_event_barriers"]["unsafe_intervals"] = [[10.04, 10.06]]
+    result = sv.validate_report_document(doc)
+    assert "proof.scoring_frames" in result["failures"]

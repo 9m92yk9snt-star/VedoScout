@@ -295,6 +295,9 @@ def test_event_barriers_persist_without_duplicate_geometry_and_restore_safely():
     assert restored["proof_unsafe_intervals"] == [[.75, 1.25]]
     assert "unresolved_intervals" not in restored
     assert uae.proof_unsafe_intervals(barriers) == [[.75, 1.25]]
+    assert uae.is_proof_time_safe(barriers, 500) is True
+    assert uae.is_proof_time_safe(barriers, 1000) is False
+    assert uae.is_proof_time_safe(barriers, True) is False
 
 
 def test_retry_request_and_attempt_merge_delegate_to_original_contract(monkeypatch):
@@ -369,3 +372,23 @@ def test_corrective_path_requires_current_ok_canonical_authority():
     assert 'fresh.get("unified_analysis_status") == "ok"' in body
     assert "if not _canonical_authority:" in body
     assert 'fresh.get("unified_scoring_scan")' in body
+
+
+def test_server_wires_canonical_frame_geometry_into_proof_and_clip_time():
+    src = (BACKEND / "server.py").read_text()
+    ensure = src.split("def ensure_video_frames", 1)[1].split("\nasync def ", 1)[0]
+    tele = src.split("async def _telestrate_verified_frames", 1)[1]
+    tele = tele.split("\nasync def ", 1)[0]
+    clips = src.split("async def _generate_tele_clips", 1)[1]
+    clips = clips.split("\ndef ", 1)[0]
+    tracking = src.split("def _apply_tracking_verification", 1)[1]
+    tracking = tracking.split("\nasync def ", 1)[0]
+
+    assert "_extract_video_frame_at_media_time(" in ensure
+    assert 'out["requested_evidence_time_ms"] = ems' in ensure
+    assert 'out["frame_time_authority"] = "ACTUAL_MEDIA_PTS"' in ensure
+    assert "event_ledger.resolve_target_box(" in ensure
+    assert "canonical_event_telestration_box(c)" in tele
+    assert 'c["tele_authority"] = "FIX09B_CANONICAL_GEOMETRY"' in tele
+    assert 'c.get("canonical_event_ms")' in clips
+    assert 'event_ms = a.get("event_start_ms")' in tracking

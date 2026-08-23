@@ -195,6 +195,15 @@ def proof_unsafe_intervals(barrier_payload: dict | None) -> list[list[float]]:
     return out
 
 
+def is_proof_time_safe(barrier_payload: dict | None, media_ms) -> bool:
+    """Return whether one exact media instant is outside identity barriers."""
+    if (not isinstance(media_ms, int) or isinstance(media_ms, bool)
+            or media_ms < 0):
+        return False
+    sec = media_ms / 1000.0
+    return not any(lo <= sec <= hi for lo, hi in proof_unsafe_intervals(barrier_payload))
+
+
 def _compact_scene_graph(scene_graph: dict | None) -> dict:
     """Persist diagnostics without duplicating the dense per-frame graph.
 
@@ -435,6 +444,11 @@ def apply_result_to_report(full: dict, result: dict | None) -> dict:
     canonical = r.get("canonical_events") if isinstance(r.get("canonical_events"), dict) else {}
     sequence = r.get("sequence_analysis") if isinstance(r.get("sequence_analysis"), dict) else {}
     return canonical_output_authority.apply_to_report(full, canonical, sequence)
+
+
+def canonical_event_telestration_box(comment: dict | None) -> dict | None:
+    """Expose FIX09C's fail-closed still-frame geometry to server rendering."""
+    return canonical_output_authority.canonical_event_telestration_box(comment)
 
 
 def persistence_payload(result: dict | None) -> dict:

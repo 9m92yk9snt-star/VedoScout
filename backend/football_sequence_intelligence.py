@@ -860,12 +860,14 @@ def subset_sequence_plan(plan: dict | None, sequence_ids) -> dict:
 
 
 def merge_raw_sequence_results(results) -> dict:
-    """Merge bounded model attempts by supplied sequence_id, latest wins.
+    """Merge bounded model attempts atomically by sequence_id, latest wins.
 
     A retry is allowed to replace an incomplete first row for the same window,
     while unrelated already-complete windows stay intact. Unknown top-level
     fields are deliberately ignored so prose/model metadata never becomes
-    analysis authority.
+    analysis authority. The sequence and coverage rows for a touched window are
+    one contract unit: a later attempt cannot combine its new sequence row with
+    stale coverage (or vice versa) from an earlier attempt.
     """
     sequences = {}
     coverage = {}
@@ -878,16 +880,24 @@ def merge_raw_sequence_results(results) -> dict:
         for row in raw.get("sequences") or []:
             if isinstance(row, dict) and isinstance(row.get("sequence_id"), str):
                 attempt_sequences.setdefault(row["sequence_id"], []).append(deepcopy(row))
-        for sid, rows in attempt_sequences.items():
-            # The latest attempt replaces this window as a unit, but duplicate
-            # rows inside that attempt stay visible to the strict normaliser.
-            sequences[sid] = rows
         attempt_coverage = {}
         for row in raw.get("coverage") or []:
             if isinstance(row, dict) and isinstance(row.get("sequence_id"), str):
                 attempt_coverage.setdefault(row["sequence_id"], []).append(deepcopy(row))
-        for sid, rows in attempt_coverage.items():
-            coverage[sid] = rows
+        touched = list(dict.fromkeys([*attempt_sequences, *attempt_coverage]))
+        for sid in touched:
+            # Duplicate rows inside one attempt stay visible to the strict
+            # normaliser. A missing counterpart is deliberately removed so it
+            # cannot be inherited from an older attempt and falsely complete
+            # the per-window coverage contract.
+            if sid in attempt_sequences:
+                sequences[sid] = attempt_sequences[sid]
+            else:
+                sequences.pop(sid, None)
+            if sid in attempt_coverage:
+                coverage[sid] = attempt_coverage[sid]
+            else:
+                coverage.pop(sid, None)
     return {
         "sequences": [row for rows in sequences.values() for row in rows],
         "coverage": [row for rows in coverage.values() for row in rows],

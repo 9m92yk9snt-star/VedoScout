@@ -1768,6 +1768,37 @@ def _extract_video_frame(video_path: Path, seconds: float, out_path: Path) -> bo
         return False
 
 
+def _extract_video_frame_at_media_time(
+    video_path: Path, seconds: float, out_path: Path,
+) -> Optional[float]:
+    """Decode the first real frame at/after canonical media time ``seconds``.
+
+    Unlike the legacy ffmpeg thumbnail helper, this returns the ACTUAL decoded
+    media PTS.  Canonical FIX09C evidence must never stamp the requested model
+    time onto a different VFR frame.
+    """
+    import cv2
+
+    cap = cv2.VideoCapture(str(video_path))
+    try:
+        if not cap.isOpened():
+            return None
+        ok, frame, actual_t = video_timebase.read_frame_at(cap, float(seconds))
+        if not ok or frame is None:
+            return None
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        written = cv2.imwrite(
+            str(out_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        if not written or not out_path.exists() or out_path.stat().st_size <= 0:
+            return None
+        return float(actual_t)
+    except Exception as exc:
+        logging.warning("canonical frame extraction failed: %s", exc)
+        return None
+    finally:
+        cap.release()
+
+
 def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
     """For every video_comments entry, ensure a frame JPEG exists on disk and
     attach a `frame_url` to the comment. Falls back to a branded placeholder
@@ -1868,7 +1899,20 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             continue
         # Durable URL already persisted (R2 flush at generation time) — keep it.
         existing_url = c.get("frame_url") or ""
-        if existing_url.startswith("http") or existing_url.startswith("/api/media/"):
+        canonical_native = (
+            c.get("canonical_event_native") is True
+            and c.get("event_source") == "fix09b_canonical"
+        )
+        canonical_frame_current = (
+            canonical_native
+            and c.get("frame_time_authority") == "ACTUAL_MEDIA_PTS"
+            and isinstance(c.get("frame_time_ms"), int)
+            and not isinstance(c.get("frame_time_ms"), bool)
+            and c.get("frame_time_ms") == c.get("evidence_time_ms")
+            and c.get("proof_frame_verified") is True
+        )
+        if ((existing_url.startswith("http") or existing_url.startswith("/api/media/"))
+                and (not canonical_native or canonical_frame_current)):
             enriched.append(c)
             continue
         # STRICT policy holds at read time too: identity-dropped moments stay
@@ -1886,20 +1930,81 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             out = dict(c)
             ems = out.get("evidence_time_ms")
             ok = False
+            if canonical_native and not canonical_frame_current:
+                # A pre-FIX09C cache can contain a JPEG extracted by ffmpeg at
+                # an approximate seek while claiming the requested timestamp.
+                # Strip every derived proof/render artifact before rebuilding.
+                for key in (
+                    "frame_url", "frame_time_ms", "frame_time_authority",
+                    "telestrated", "tele_ring", "tele_authority", "tele_box",
+                    "tele_clip_url", "tele_clip_coverage", "tele_clip_start",
+                    "tele_clip_end", "clip_id", "clip_start_ms", "clip_end_ms",
+                    "moment_local_ms",
+                ):
+                    out.pop(key, None)
+                out["proof_frame_verified"] = False
             if (out.get("event_track_locked") and isinstance(ems, int)
                     and not isinstance(ems, bool) and have_video):
-                if out_path.exists() and not ph_marker.exists():
+                actual_ms = (
+                    out.get("frame_time_ms")
+                    if out_path.exists() and not ph_marker.exists()
+                    and isinstance(out.get("frame_time_ms"), int)
+                    and not isinstance(out.get("frame_time_ms"), bool)
+                    and (not canonical_native
+                         or out.get("frame_time_authority") == "ACTUAL_MEDIA_PTS")
+                    else None
+                )
+                if actual_ms is not None:
                     ok = True
                 else:
                     ph_marker.unlink(missing_ok=True)
-                    ok = _extract_video_frame(video_path, max(0.0, ems / 1000.0), out_path)
+                    if canonical_native:
+                        actual_t = _extract_video_frame_at_media_time(
+                            video_path, max(0.0, ems / 1000.0), out_path)
+                        if actual_t is not None:
+                            actual_ms = int(round(actual_t * 1000.0))
+                            ok = True
+                    else:
+                        ok = _extract_video_frame(
+                            video_path, max(0.0, ems / 1000.0), out_path)
+                        actual_ms = ems if ok else None
+                if ok and canonical_native:
+                    barriers = report_doc.get("unified_event_barriers")
+                    if not unified_analysis_engine.is_proof_time_safe(
+                            barriers, actual_ms):
+                        ok = False
+                        out_path.unlink(missing_ok=True)
+                    elif actual_ms != ems:
+                        # The cited B.3 evidence moment may lie between source
+                        # frames. Preserve the canonical event time separately,
+                        # but make evidence_time_ms describe the frame actually
+                        # shown. Geometry is re-resolved on the same proof-safe
+                        # GLOBAL_TARGET track at that actual PTS.
+                        safe_track = unified_analysis_engine.restore_event_track(
+                            report_doc.get("unified_production_track"), barriers)
+                        actual_box, _actual_reason = event_ledger.resolve_target_box(
+                            safe_track, actual_ms)
+                        if actual_box is None:
+                            ok = False
+                            out_path.unlink(missing_ok=True)
+                        else:
+                            out["requested_evidence_time_ms"] = ems
+                            out["evidence_time_ms"] = actual_ms
+                            out["event_track_box"] = {
+                                k: float(actual_box[k]) for k in ("x", "y", "w", "h")
+                            }
             if ok:
                 out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
-                out["frame_time_ms"] = ems  # exact canonical contact moment
+                out["frame_time_ms"] = int(
+                    out.get("evidence_time_ms")
+                    if canonical_native else ems)
+                if canonical_native:
+                    out["frame_time_authority"] = "ACTUAL_MEDIA_PTS"
                 if out.get("evidence_id"):
                     out["proof_frame_verified"] = compute_proof_frame_verified(out)
             else:
                 out["frame_url"] = None  # fail closed — text-only evidence
+                out["proof_frame_verified"] = False
             enriched.append(out)
             continue
         frame_meta = None
@@ -7680,15 +7785,36 @@ ANCHOR_SNAP_WINDOW = 1.5  # secs — evidence snaps to a user tap within this wi
 async def _telestrate_verified_frames(
     report_id: str, doc: dict, frames_dir: Path, enriched: list, ref_crops: list[str],
 ) -> int:
-    """TV-style spotlight drawn ONLY from GROUND-TRUTH tap anchors (the user's
-    own taps). AI-guessed boxes proved unsafe with same-kit teammates — so
-    no anchor = no graphics, never a wrong ring."""
+    """Draw TV-style spotlight only from an explicit identity authority.
+
+    Accepted paths are: (1) the user's tap box, (2) an independently
+    double-confirmed legacy frame, or (3) FIX09C's exact event-native actor
+    geometry after the still frame passed the fail-closed proof contract.
+    Model-authored free boxes are never rendered.
+    """
     pd = doc.get("player_details") or {}
     fp = doc.get("fingerprint") or {}
     first = str(pd.get("player_name") or "").strip().split(" ")[0]
     label = f"{first.upper()} · TRACKED" if first else "YOUR PLAYER"
     done = 0
     for c in enriched:
+        canonical_box = unified_analysis_engine.canonical_event_telestration_box(c)
+        if canonical_box is not None:
+            fu = str(c.get("frame_url") or "")
+            if not fu.startswith("/api/uploads/frames/"):
+                continue
+            frame_path = frames_dir / Path(fu).name
+            if not frame_path.exists():
+                continue
+            if await asyncio.to_thread(
+                    render_telestration, str(frame_path), canonical_box,
+                    label, True, canonical_box["y0"]):
+                c["telestrated"] = True
+                c["tele_ring"] = True
+                c["tele_authority"] = "FIX09B_CANONICAL_GEOMETRY"
+                c["tele_box"] = dict(canonical_box)
+                done += 1
+            continue
         if not (isinstance(c, dict) and c.get("anchor_locked") and isinstance(c.get("anchor_box"), dict)):
             continue
         fu = str(c.get("frame_url") or "")
@@ -7780,7 +7906,7 @@ async def _telestrate_verified_frames(
             c["tele_box"] = {k: float(box[k]) for k in ("x0", "y0", "x1", "y1")}
             done += 1
     if done:
-        logger.info(f"[tele] {report_id}: {done} anchor-locked frames telestrated")
+        logger.info(f"[tele] {report_id}: {done} authority-locked frames telestrated")
     return done
 
 
@@ -7995,8 +8121,25 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
         if c.get("evidence_id") and not compute_proof_frame_verified(c):
             logger.info(f"[teleclip] {report_id}: moment {i} not proof-verified — no clip")
             continue
+        canonical_ms = (
+            c.get("canonical_event_ms")
+            if c.get("canonical_event_native") is True
+            and isinstance(c.get("canonical_event_ms"), int)
+            and not isinstance(c.get("canonical_event_ms"), bool)
+            else None
+        )
         picked = c.get("frame_picked_ts")
-        sec = float(picked) if isinstance(picked, (int, float)) else _ts_to_seconds(str(c.get("timestamp") or ""))
+        evidence_ms = c.get("evidence_time_ms")
+        if canonical_ms is not None:
+            # The proof clip is centred on the canonical action, while its
+            # still frame may legitimately be an adjacent visible keyframe.
+            sec = max(0.0, canonical_ms / 1000.0)
+        elif isinstance(picked, (int, float)) and not isinstance(picked, bool):
+            sec = float(picked)
+        elif isinstance(evidence_ms, int) and not isinstance(evidence_ms, bool):
+            sec = max(0.0, evidence_ms / 1000.0)
+        else:
+            sec = _ts_to_seconds(str(c.get("timestamp") or ""))
         if sec is None:
             continue
         # PHASE 17 hard gate: never build a proof where identity is uncertain
@@ -8196,7 +8339,12 @@ def _apply_tracking_verification(full: dict, anchors: list, track: dict | None, 
         for a in (full or {}).get("action_timeline") or []:
             if not isinstance(a, dict):
                 continue
-            sec = _mmss_to_secs(a.get("timestamp"))
+            event_ms = a.get("event_start_ms")
+            sec = (
+                max(0.0, event_ms / 1000.0)
+                if isinstance(event_ms, int) and not isinstance(event_ms, bool)
+                else _mmss_to_secs(a.get("timestamp"))
+            )
             if sec is None:
                 continue
             near_anchor = any(
@@ -9187,7 +9335,7 @@ async def generate_full_report_task(report_id: str) -> None:
         # It never touches gt_track, analysis, markers or proofs — diagnostics only.
         # Once FIX09B preparation has decoded the video and built the production
         # scene graph, the old observe-only shadow run would repeat another full
-        # detector pass while competing for the same CPU.  Keep it only as a
+        # detector pass while competing for the same CPU. Keep it only as a
         # fallback diagnostic when unified preparation could not run at all.
         if (cv_shadow.SHADOW_ENABLED and _unified_prepared is None
                 and gt_track and valid_anchors):

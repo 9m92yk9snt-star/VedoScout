@@ -193,3 +193,48 @@ def test_b17_interpolation_cannot_cross_barrier_before_requested_instant():
     )
     p, why = uia.resolve_target_at(a, 1000, proof_required=False)
     assert p is None and why == "UNRESOLVED_IDENTITY"
+
+
+def test_b18_production_adapter_excludes_exact_point_inside_identity_barrier():
+    a = uia.build_unified_identity_authority(
+        None,
+        tl(ap(1000, .2, .3), unresolved=[{
+            "scene_id": "scene_001", "start_ms": 950, "end_ms": 1050,
+            "reason": "REID_UNRESOLVED",
+        }]),
+    )
+    tr = uia.to_production_track(a)
+    assert tr["points"] == []
+    assert tr["segments"] == []
+
+
+def test_b19_production_segments_never_bridge_identity_barrier():
+    a = uia.build_unified_identity_authority(
+        None,
+        tl(
+            *(ap(ms, .2 + ms / 10000.0, .3)
+              for ms in (0, 200, 400, 600, 800, 1000)),
+            unresolved=[{
+                "scene_id": "scene_001", "start_ms": 450, "end_ms": 550,
+                "reason": "REID_UNRESOLVED",
+            }],
+        ),
+    )
+    tr = uia.to_production_track(a)
+    assert [p["t"] for p in tr["points"]] == [0.0, .2, .4, .6, .8, 1.0]
+    assert tr["segments"] == [[0.0, .4], [.6, 1.0]]
+
+
+def test_b20_direct_tap_survives_barrier_without_creating_false_continuity():
+    a = uia.build_unified_identity_authority(
+        f4((1.0, .2, .3, .1, .2, .9)),
+        tl(ap(1000, .2, .3), unresolved=[{
+            "scene_id": "scene_001", "start_ms": 950, "end_ms": 1050,
+            "reason": "REID_UNRESOLVED",
+        }]),
+        anchors=[{"t": 1.0}],
+    )
+    tr = uia.to_production_track(a)
+    assert [p["t"] for p in tr["points"]] == [1.0]
+    assert tr["points"][0]["authority_source"] == "PINNED"
+    assert tr["segments"] == []

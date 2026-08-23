@@ -238,6 +238,12 @@ def compute_proof_frame_verified(comment: dict) -> bool:
             and comment.get("anchor_locked") is not True
             and comment.get("event_track_locked") is not True):
         return False
+    # FIX09C canonical frames are decoded through the VFR-safe media-time
+    # reader. Merely copying the requested timestamp into frame_time_ms is not
+    # evidence that the JPEG actually represents that media instant.
+    if (comment.get("canonical_event_native") is True
+            and comment.get("frame_time_authority") != "ACTUAL_MEDIA_PTS"):
+        return False
     et, ft = comment.get("evidence_time_ms"), comment.get("frame_time_ms")
     return isinstance(et, int) and isinstance(ft, int) and et == ft
 

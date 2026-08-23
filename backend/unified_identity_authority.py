@@ -470,7 +470,10 @@ def to_production_track(authority) -> dict:
     """Compatibility adapter for existing FIX04-track consumers.
 
     Only accepted, non-predicted, proof-eligible canonical geometry is exported.
-    Unresolved conflicts and occlusion predictions are intentionally omitted.
+    Unresolved conflicts, explicit identity barriers, and occlusion predictions
+    are intentionally omitted. A direct user tap may remain as an isolated
+    authoritative point inside an inherited barrier, but continuity segments
+    never bridge that barrier.
     """
     pts = []
     if isinstance(authority, dict):
@@ -478,9 +481,21 @@ def to_production_track(authority) -> dict:
             if not (isinstance(p, dict) and p.get("proof_eligible") and not p.get("predicted")
                     and p.get("state") != "UNRESOLVED" and _valid_box(p.get("box"))):
                 continue
+            media_ms = p.get("media_ms")
+            if not _is_num(media_ms):
+                continue
+            # Every production consumer must obey the same explicit identity
+            # barriers as resolve_target_at(). Otherwise movement/evidence can
+            # silently use geometry that event attribution correctly rejects.
+            if (_unresolved_overlap(
+                    authority, int(round(float(media_ms))),
+                    int(round(float(media_ms))), p.get("scene_id"))
+                    and not (p.get("tap_authority") is True
+                             and p.get("proof_eligible") is True)):
+                continue
             b = p["box"]
             pts.append({
-                "t": round(p["media_ms"] / 1000.0, 3),
+                "t": round(float(media_ms) / 1000.0, 3),
                 "x": round(float(b["x"]), 4), "y": round(float(b["y"]), 4),
                 "w": round(float(b["w"]), 4), "h": round(float(b["h"]), 4),
                 "conf": 1.0 if p.get("tap_authority") else 0.9,
@@ -497,14 +512,26 @@ def to_production_track(authority) -> dict:
     out = [best[k] for k in sorted(best)]
     segments = []
     last_scene = None
+    last_point = None
     for p in out:
         scene = p.get("scene_id")
+        crosses_barrier = bool(
+            last_point is not None
+            and _unresolved_overlap(
+                authority,
+                int(round(float(last_point["t"]) * 1000.0)),
+                int(round(float(p["t"]) * 1000.0)),
+                scene or last_scene,
+            )
+        )
         if (segments and scene == last_scene
-                and float(p["t"]) - float(segments[-1][1]) <= PRODUCTION_SEGMENT_GAP_S):
+                and float(p["t"]) - float(segments[-1][1]) <= PRODUCTION_SEGMENT_GAP_S
+                and not crosses_barrier):
             segments[-1][1] = float(p["t"])
         else:
             segments.append([float(p["t"]), float(p["t"])])
         last_scene = scene
+        last_point = p
     segments = [
         [round(a, 3), round(b, 3)] for a, b in segments
         if b - a >= PRODUCTION_SEGMENT_GAP_S - 1e-9

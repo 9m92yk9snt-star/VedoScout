@@ -10,6 +10,7 @@ import canonical_output_authority as coa  # noqa: E402
 from evidence_authority import (  # noqa: E402
     apply_fail_closed_proof_authority,
     attach_event_evidence_authority,
+    compute_proof_frame_verified,
 )
 
 
@@ -187,3 +188,35 @@ def test_c15_model_comment_cannot_borrow_canonical_proof_by_timestamp():
     assert canonical_row["proof_verified"] is True
     assert skill_row.get("event_id") == "evt_fixed"
     assert skill_row["proof_verified"] is False
+
+
+def test_c16_only_exact_fix09c_frame_geometry_can_drive_canonical_telestration():
+    full = {"action_timeline": [], "video_comments": []}
+    coa.apply_to_report(full, bundle([event()]), {"coverage_complete": True})
+    attach_event_evidence_authority(full)
+    apply_fail_closed_proof_authority(full)
+    row = next(c for c in full["video_comments"]
+               if c.get("canonical_event_native") is True)
+    row.update({
+        "frame_url": "/api/uploads/frames/r/frame.jpg",
+        "frame_time_ms": row["evidence_time_ms"],
+        "frame_time_authority": "ACTUAL_MEDIA_PTS",
+    })
+    row["proof_frame_verified"] = compute_proof_frame_verified(row)
+    assert coa.canonical_event_telestration_box(row) == {
+        "x0": .1, "y0": .2, "x1": .2, "y1": .5,
+    }
+
+    forged = dict(row)
+    forged["canonical_event_native"] = False
+    assert coa.canonical_event_telestration_box(forged) is None
+
+    drifted = dict(row)
+    drifted["frame_time_ms"] += 40
+    assert coa.canonical_event_telestration_box(drifted) is None
+
+    unproven_pts = dict(row)
+    unproven_pts.pop("frame_time_authority")
+    unproven_pts["proof_frame_verified"] = compute_proof_frame_verified(unproven_pts)
+    assert unproven_pts["proof_frame_verified"] is False
+    assert coa.canonical_event_telestration_box(unproven_pts) is None

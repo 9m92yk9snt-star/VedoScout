@@ -364,3 +364,64 @@ def test_b222_invalid_returned_action_cannot_be_hidden_by_reporting_zero():
     assert out["action_count_mismatch_ids"] == [w["sequence_id"]]
     assert out["coverage"][0]["raw_actions"] == 1
     assert out["coverage"][0]["normalised_actions"] == 0
+
+
+def test_b223_retry_sequence_cannot_inherit_stale_coverage_from_first_attempt():
+    plan = _plan_one(); w = plan["analysis_windows"][0]
+    first = {
+        "sequences": [{"sequence_id": w["sequence_id"], "scene_id": w["scene_id"],
+                       "actions": [_action(w), _action(w, action_id="a2", kind="PASS")]}],
+        "coverage": [{"sequence_id": w["sequence_id"], "reviewed": True,
+                      "target_seen": True, "actions_found": 1}],
+    }
+    retry_without_coverage = {
+        "sequences": [{"sequence_id": w["sequence_id"], "scene_id": w["scene_id"],
+                       "actions": [_action(w)]}],
+    }
+    assert fsi.normalise_sequence_analysis(first, plan)["coverage_complete"] is False
+    merged = fsi.merge_raw_sequence_results([first, retry_without_coverage])
+    out = fsi.normalise_sequence_analysis(merged, plan)
+    assert merged["coverage"] == []
+    assert out["coverage_complete"] is False
+    assert out["incomplete_sequence_ids"] == [w["sequence_id"]]
+
+
+def test_b224_retry_coverage_cannot_inherit_stale_sequence_from_first_attempt():
+    plan = _plan_one(); w = plan["analysis_windows"][0]
+    first = {
+        "sequences": [{"sequence_id": w["sequence_id"], "scene_id": w["scene_id"],
+                       "actions": [_action(w)]}],
+        "coverage": [{"sequence_id": w["sequence_id"], "reviewed": False,
+                      "target_seen": True, "actions_found": 1}],
+    }
+    retry_without_sequence = {
+        "coverage": [{"sequence_id": w["sequence_id"], "reviewed": True,
+                      "target_seen": True, "actions_found": 1}],
+    }
+    merged = fsi.merge_raw_sequence_results([first, retry_without_sequence])
+    out = fsi.normalise_sequence_analysis(merged, plan)
+    assert merged["sequences"] == []
+    assert out["coverage_complete"] is False
+    assert out["missing_sequence_ids"] == [w["sequence_id"]]
+
+
+def test_b225_retry_keeps_untouched_complete_window_as_atomic_contract_unit():
+    first = {
+        "sequences": [
+            {"sequence_id": "s1", "scene_id": "scene_001", "actions": []},
+            {"sequence_id": "s2", "scene_id": "scene_001", "actions": []},
+        ],
+        "coverage": [
+            {"sequence_id": "s1", "reviewed": True, "actions_found": 0},
+            {"sequence_id": "s2", "reviewed": False, "actions_found": 0},
+        ],
+    }
+    retry = {
+        "sequences": [{"sequence_id": "s2", "scene_id": "scene_001",
+                       "summary": "retried", "actions": []}],
+        "coverage": [{"sequence_id": "s2", "reviewed": True, "actions_found": 0}],
+    }
+    merged = fsi.merge_raw_sequence_results([first, retry])
+    assert {s["sequence_id"] for s in merged["sequences"]} == {"s1", "s2"}
+    assert {c["sequence_id"] for c in merged["coverage"]} == {"s1", "s2"}
+    assert next(s for s in merged["sequences"] if s["sequence_id"] == "s2")["summary"] == "retried"

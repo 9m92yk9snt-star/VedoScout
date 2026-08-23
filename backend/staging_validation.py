@@ -211,11 +211,15 @@ def validate_report_document(report_doc: dict, expectations: dict | None = None)
         source = by_canonical[event_id]
         candidates = comments_by_event.get(event_id) or []
         good = next((c for c in candidates
-                     if c.get("proof_frame_verified") is True and c.get("frame_url")
+                     if c.get("canonical_event_native") is True
+                     and c.get("event_source") == "fix09b_canonical"
+                     and c.get("proof_frame_verified") is True and c.get("frame_url")
                      and c.get("event_track_locked") is True
+                     and c.get("frame_time_authority") == "ACTUAL_MEDIA_PTS"
                      and c.get("canonical_event_ms") == source.get("canonical_ms")
                      and isinstance(c.get("frame_time_ms"), int)
-                     and c.get("frame_time_ms") == c.get("evidence_time_ms")), None)
+                     and c.get("frame_time_ms") == c.get("evidence_time_ms")
+                     and not _inside_unsafe_window(c.get("frame_time_ms"), barriers)), None)
         if good is None:
             missing_proof.append(event_id)
         else:
@@ -240,7 +244,8 @@ def validate_report_document(report_doc: dict, expectations: dict | None = None)
                 and isinstance(c.get("clip_end_ms"), int)
                 and c["clip_start_ms"] < c["clip_end_ms"]
                 and c.get("moment_local_ms") == event.get("canonical_ms") - c["clip_start_ms"]
-                and c.get("telestrated") is True and c.get("tele_ring") is True):
+                and c.get("telestrated") is True and c.get("tele_ring") is True
+                and c.get("tele_authority") == "FIX09B_CANONICAL_GEOMETRY"):
             bad_clips.append(c.get("event_id"))
     check("proof.clips_and_ellipse",
           len(clip_rows) >= int(expected["min_proof_clips"]) and not bad_clips,

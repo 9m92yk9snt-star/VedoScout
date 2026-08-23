@@ -547,6 +547,108 @@ def test_F05_locked_still_requires_exact_frame_time():
         "unlocked + unverified identity can never be proof"
 
 
+def test_F05b_canonical_frame_uses_actual_pts_and_same_time_geometry(
+        tmp_path, monkeypatch):
+    import server
+    seen = []
+
+    def fake_extract(video_path, seconds, out_path):
+        seen.append(float(seconds))
+        Path(out_path).write_bytes(b"jpg")
+        return 31.46
+
+    monkeypatch.setattr(server, "_extract_video_frame_at_media_time", fake_extract)
+    monkeypatch.setattr(server, "UPLOAD_DIR", tmp_path)
+    vid = tmp_path / "v.mp4"
+    vid.write_bytes(b"0")
+    row = {
+        **_native_row(),
+        "canonical_event_native": True,
+        "event_source": "fix09b_canonical",
+        "canonical_event_ms": 31420,
+    }
+    doc = {
+        "id": "f05btest",
+        "anchors": [],
+        "unified_production_track": TRACK,
+        "unified_event_barriers": {},
+        "full_report": {"video_comments": [row]},
+    }
+    out = server.ensure_video_frames(doc, video_path_override=str(vid))[0]
+    assert seen == [31.42]
+    assert out["requested_evidence_time_ms"] == 31420
+    assert out["evidence_time_ms"] == 31460
+    assert out["frame_time_ms"] == 31460
+    assert out["frame_time_authority"] == "ACTUAL_MEDIA_PTS"
+    assert out["proof_frame_verified"] is True
+    assert out["event_track_box"] == _box()
+
+
+def test_F05c_stale_canonical_remote_frame_without_pts_authority_is_rebuilt(
+        tmp_path, monkeypatch):
+    import server
+    calls = []
+
+    def fake_extract(video_path, seconds, out_path):
+        calls.append(float(seconds))
+        Path(out_path).write_bytes(b"new-jpg")
+        return seconds
+
+    monkeypatch.setattr(server, "_extract_video_frame_at_media_time", fake_extract)
+    monkeypatch.setattr(server, "UPLOAD_DIR", tmp_path)
+    vid = tmp_path / "v.mp4"
+    vid.write_bytes(b"0")
+    row = {
+        **_native_row(),
+        "canonical_event_native": True,
+        "event_source": "fix09b_canonical",
+        "canonical_event_ms": 31420,
+        "frame_url": "https://old.example.test/frame.jpg",
+        "frame_time_ms": 31420,
+        "proof_frame_verified": True,
+        "telestrated": True,
+        "tele_authority": "OLD_UNPROVEN_GEOMETRY",
+    }
+    doc = {"id": "f05ctest", "anchors": [],
+           "full_report": {"video_comments": [row]}}
+    out = server.ensure_video_frames(doc, video_path_override=str(vid))[0]
+    assert calls == [31.42]
+    assert out["frame_url"].startswith("/api/uploads/frames/f05ctest/")
+    assert out["frame_time_authority"] == "ACTUAL_MEDIA_PTS"
+    assert out["proof_frame_verified"] is True
+    assert "tele_authority" not in out and "telestrated" not in out
+
+
+def test_F05d_canonical_frame_inside_identity_barrier_fails_closed(
+        tmp_path, monkeypatch):
+    import server
+
+    def fake_extract(video_path, seconds, out_path):
+        Path(out_path).write_bytes(b"jpg")
+        return 31.46
+
+    monkeypatch.setattr(server, "_extract_video_frame_at_media_time", fake_extract)
+    monkeypatch.setattr(server, "UPLOAD_DIR", tmp_path)
+    vid = tmp_path / "v.mp4"
+    vid.write_bytes(b"0")
+    row = {
+        **_native_row(),
+        "canonical_event_native": True,
+        "event_source": "fix09b_canonical",
+        "canonical_event_ms": 31420,
+    }
+    doc = {
+        "id": "f05dtest",
+        "anchors": [],
+        "unified_production_track": TRACK,
+        "unified_event_barriers": {"unsafe_intervals": [[31.45, 31.47]]},
+        "full_report": {"video_comments": [row]},
+    }
+    out = server.ensure_video_frames(doc, video_path_override=str(vid))[0]
+    assert out["frame_url"] is None
+    assert out["proof_frame_verified"] is False
+
+
 def _scan_row(ts="00:20", et="GOAL", at="SHOT", res="SCORED", box=None, contact=None):
     r = {"timestamp": ts, "identity": "CONFIRMED", "canonical_event_type": et,
          "canonical_action_type": at, "canonical_result": res,
