@@ -77,6 +77,7 @@ def reconstruct_physical_match(
     source_video: dict | None = None,
     goal_geometry_provider=None,
     role_evidence: dict | None = None,
+    role_evidence_provider=None,
     detector_fn=None,
     camera_estimator=None,
     dense_frame_provider=None,
@@ -88,8 +89,11 @@ def reconstruct_physical_match(
       decoding in deterministic tests; production defaults to iter_dense_frames.
     - ``jersey_vote_provider(video_path, requests)`` returns
       ``{track_id: [vote, ...]}``; the provider may crop/read frames externally.
-    - ``goal_geometry_provider(window, strike)`` returns trusted goal-line
-      geometry or None. No geometry means no physical GOAL assertion.
+    - ``goal_geometry_provider(window, strike)`` returns trusted supporting
+      goal-line geometry or None. No geometry means no physical GOAL assertion.
+    - ``role_evidence_provider(video_path, window, strikes, touch_graph,
+      window_evidence)`` returns fail-closed supporting role evidence by local
+      track.  It never receives the primary event story.
     """
     plan = deepcopy(sequence_plan) if isinstance(sequence_plan, dict) else {}
     analysis = deepcopy(sequence_analysis) if isinstance(sequence_analysis, dict) else {}
@@ -142,6 +146,22 @@ def reconstruct_physical_match(
             strikes = shot_outcome_engine.find_strike_releases(
                 touch_with_jersey, trajectory
             )
+            provider_roles = _safe_provider(
+                role_evidence_provider,
+                str(video_path),
+                deepcopy(window),
+                deepcopy(strikes),
+                deepcopy(touch_with_jersey),
+                deepcopy(dense_with_jersey),
+                default={},
+            )
+            window_roles = deepcopy(provider_roles) if isinstance(provider_roles, dict) else {}
+            # Explicit injected evidence (tests/manual staging diagnostics) takes
+            # precedence over a best-effort provider, but neither source can
+            # create canonical truth in FIX10A.
+            if isinstance(role_evidence, dict):
+                window_roles.update(deepcopy(role_evidence))
+
             outcomes = []
             for strike in strikes:
                 goal_geometry = _safe_provider(
@@ -152,7 +172,7 @@ def reconstruct_physical_match(
                     trajectory,
                     touch_with_jersey,
                     goal_geometry=goal_geometry,
-                    role_evidence=deepcopy(role_evidence) if isinstance(role_evidence, dict) else {},
+                    role_evidence=window_roles,
                 ))
 
             unresolved = _window_unresolved_reasons(
@@ -190,6 +210,7 @@ def reconstruct_physical_match(
                 "unresolved_contacts": len(contact_result.get("unresolved") or []),
                 "touches": len(touch_with_jersey.get("touches") or []),
                 "jersey_requests": len(requests),
+                "role_evidence_tracks": len(window_roles),
                 "strikes": len(strikes),
                 "outcomes": len(outcomes),
                 "unresolved_reasons": unresolved,
