@@ -33,6 +33,7 @@ import unified_identity_authority as uia
 
 VERSION = 1
 HZ = float(os.environ.get("FOOTBALL_SCENE_GRAPH_HZ", "8"))
+DETECTOR_ENABLED = os.environ.get("FOOTBALL_SCENE_GRAPH_DETECTOR", "1") == "1"
 
 # Scene-local player association.  Values are deliberately body-relative so
 # the same code works across wide/close camera scales.
@@ -715,9 +716,12 @@ def build_scene_graph(video_path: str, unified_authority: dict) -> dict:
         if not cap.isOpened():
             return {"version": VERSION, "status": "skipped", "reason": "no_video"}
         fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
-        detector = cv_detect.PersonDetector()
+        # This is a production dependency with its own explicit gate.  It must
+        # not inherit the old CV_SHADOW_DETECTOR diagnostics switch.
+        detector = cv_detect.PersonDetector(enabled=DETECTOR_ENABLED)
         if not detector.ok:
-            return {"version": VERSION, "status": "skipped", "reason": "detector_unavailable"}
+            reason = "detector_unavailable" if DETECTOR_ENABLED else "detector_disabled"
+            return {"version": VERSION, "status": "skipped", "reason": reason}
         cam = cv_detect.CameraMotion(out_scale=1.0)
         prev_tiny = None
         prev_sample = None

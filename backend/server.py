@@ -9185,7 +9185,12 @@ async def generate_full_report_task(report_id: str) -> None:
         # ── CV SHADOW MODE (additive, feature-flagged, observe-only) ──
         # Runs the new identity engine in the background AFTER production tracking.
         # It never touches gt_track, analysis, markers or proofs — diagnostics only.
-        if cv_shadow.SHADOW_ENABLED and gt_track and valid_anchors:
+        # Once FIX09B preparation has decoded the video and built the production
+        # scene graph, the old observe-only shadow run would repeat another full
+        # detector pass while competing for the same CPU.  Keep it only as a
+        # fallback diagnostic when unified preparation could not run at all.
+        if (cv_shadow.SHADOW_ENABLED and _unified_prepared is None
+                and gt_track and valid_anchors):
             async def _cv_shadow_bg():
                 try:
                     shadow = await asyncio.to_thread(
