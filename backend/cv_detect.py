@@ -27,11 +27,18 @@ INPUT = 640
 class PersonDetector:
     """YOLOv8n person detection via cv2.dnn. Lazy-loaded; fails safe."""
 
-    def __init__(self):
+    def __init__(self, *, enabled=None):
+        """Load the shared local detector.
+
+        ``enabled=None`` preserves the legacy shadow-mode feature flag.  A
+        production caller must pass its own explicit boolean so disabling the
+        old shadow diagnostics cannot silently disable FIX09A/FIX09B.
+        """
         self.net = None
         self.ok = False
+        self.enabled = DETECTOR_ENABLED if enabled is None else bool(enabled)
         try:
-            if DETECTOR_ENABLED and MODEL_PATH.exists() and MODEL_PATH.stat().st_size > 1_000_000:
+            if self.enabled and MODEL_PATH.exists() and MODEL_PATH.stat().st_size > 1_000_000:
                 self.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
                 self.ok = True
         except Exception as e:

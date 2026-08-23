@@ -1768,6 +1768,37 @@ def _extract_video_frame(video_path: Path, seconds: float, out_path: Path) -> bo
         return False
 
 
+def _extract_video_frame_at_media_time(
+    video_path: Path, seconds: float, out_path: Path,
+) -> Optional[float]:
+    """Decode the first real frame at/after canonical media time ``seconds``.
+
+    Unlike the legacy ffmpeg thumbnail helper, this returns the ACTUAL decoded
+    media PTS.  Canonical FIX09C evidence must never stamp the requested model
+    time onto a different VFR frame.
+    """
+    import cv2
+
+    cap = cv2.VideoCapture(str(video_path))
+    try:
+        if not cap.isOpened():
+            return None
+        ok, frame, actual_t = video_timebase.read_frame_at(cap, float(seconds))
+        if not ok or frame is None:
+            return None
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        written = cv2.imwrite(
+            str(out_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        if not written or not out_path.exists() or out_path.stat().st_size <= 0:
+            return None
+        return float(actual_t)
+    except Exception as exc:
+        logging.warning("canonical frame extraction failed: %s", exc)
+        return None
+    finally:
+        cap.release()
+
+
 def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
     """For every video_comments entry, ensure a frame JPEG exists on disk and
     attach a `frame_url` to the comment. Falls back to a branded placeholder
@@ -1868,7 +1899,20 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             continue
         # Durable URL already persisted (R2 flush at generation time) — keep it.
         existing_url = c.get("frame_url") or ""
-        if existing_url.startswith("http") or existing_url.startswith("/api/media/"):
+        canonical_native = (
+            c.get("canonical_event_native") is True
+            and c.get("event_source") == "fix09b_canonical"
+        )
+        canonical_frame_current = (
+            canonical_native
+            and c.get("frame_time_authority") == "ACTUAL_MEDIA_PTS"
+            and isinstance(c.get("frame_time_ms"), int)
+            and not isinstance(c.get("frame_time_ms"), bool)
+            and c.get("frame_time_ms") == c.get("evidence_time_ms")
+            and c.get("proof_frame_verified") is True
+        )
+        if ((existing_url.startswith("http") or existing_url.startswith("/api/media/"))
+                and (not canonical_native or canonical_frame_current)):
             enriched.append(c)
             continue
         # STRICT policy holds at read time too: identity-dropped moments stay
@@ -1886,20 +1930,81 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
             out = dict(c)
             ems = out.get("evidence_time_ms")
             ok = False
+            if canonical_native and not canonical_frame_current:
+                # A pre-FIX09C cache can contain a JPEG extracted by ffmpeg at
+                # an approximate seek while claiming the requested timestamp.
+                # Strip every derived proof/render artifact before rebuilding.
+                for key in (
+                    "frame_url", "frame_time_ms", "frame_time_authority",
+                    "telestrated", "tele_ring", "tele_authority", "tele_box",
+                    "tele_clip_url", "tele_clip_coverage", "tele_clip_start",
+                    "tele_clip_end", "clip_id", "clip_start_ms", "clip_end_ms",
+                    "moment_local_ms",
+                ):
+                    out.pop(key, None)
+                out["proof_frame_verified"] = False
             if (out.get("event_track_locked") and isinstance(ems, int)
                     and not isinstance(ems, bool) and have_video):
-                if out_path.exists() and not ph_marker.exists():
+                actual_ms = (
+                    out.get("frame_time_ms")
+                    if out_path.exists() and not ph_marker.exists()
+                    and isinstance(out.get("frame_time_ms"), int)
+                    and not isinstance(out.get("frame_time_ms"), bool)
+                    and (not canonical_native
+                         or out.get("frame_time_authority") == "ACTUAL_MEDIA_PTS")
+                    else None
+                )
+                if actual_ms is not None:
                     ok = True
                 else:
                     ph_marker.unlink(missing_ok=True)
-                    ok = _extract_video_frame(video_path, max(0.0, ems / 1000.0), out_path)
+                    if canonical_native:
+                        actual_t = _extract_video_frame_at_media_time(
+                            video_path, max(0.0, ems / 1000.0), out_path)
+                        if actual_t is not None:
+                            actual_ms = int(round(actual_t * 1000.0))
+                            ok = True
+                    else:
+                        ok = _extract_video_frame(
+                            video_path, max(0.0, ems / 1000.0), out_path)
+                        actual_ms = ems if ok else None
+                if ok and canonical_native:
+                    barriers = report_doc.get("unified_event_barriers")
+                    if not unified_analysis_engine.is_proof_time_safe(
+                            barriers, actual_ms):
+                        ok = False
+                        out_path.unlink(missing_ok=True)
+                    elif actual_ms != ems:
+                        # The cited B.3 evidence moment may lie between source
+                        # frames. Preserve the canonical event time separately,
+                        # but make evidence_time_ms describe the frame actually
+                        # shown. Geometry is re-resolved on the same proof-safe
+                        # GLOBAL_TARGET track at that actual PTS.
+                        safe_track = unified_analysis_engine.restore_event_track(
+                            report_doc.get("unified_production_track"), barriers)
+                        actual_box, _actual_reason = event_ledger.resolve_target_box(
+                            safe_track, actual_ms)
+                        if actual_box is None:
+                            ok = False
+                            out_path.unlink(missing_ok=True)
+                        else:
+                            out["requested_evidence_time_ms"] = ems
+                            out["evidence_time_ms"] = actual_ms
+                            out["event_track_box"] = {
+                                k: float(actual_box[k]) for k in ("x", "y", "w", "h")
+                            }
             if ok:
                 out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
-                out["frame_time_ms"] = ems  # exact canonical contact moment
+                out["frame_time_ms"] = int(
+                    out.get("evidence_time_ms")
+                    if canonical_native else ems)
+                if canonical_native:
+                    out["frame_time_authority"] = "ACTUAL_MEDIA_PTS"
                 if out.get("evidence_id"):
                     out["proof_frame_verified"] = compute_proof_frame_verified(out)
             else:
                 out["frame_url"] = None  # fail closed — text-only evidence
+                out["proof_frame_verified"] = False
             enriched.append(out)
             continue
         frame_meta = None
@@ -7680,15 +7785,36 @@ ANCHOR_SNAP_WINDOW = 1.5  # secs — evidence snaps to a user tap within this wi
 async def _telestrate_verified_frames(
     report_id: str, doc: dict, frames_dir: Path, enriched: list, ref_crops: list[str],
 ) -> int:
-    """TV-style spotlight drawn ONLY from GROUND-TRUTH tap anchors (the user's
-    own taps). AI-guessed boxes proved unsafe with same-kit teammates — so
-    no anchor = no graphics, never a wrong ring."""
+    """Draw TV-style spotlight only from an explicit identity authority.
+
+    Accepted paths are: (1) the user's tap box, (2) an independently
+    double-confirmed legacy frame, or (3) FIX09C's exact event-native actor
+    geometry after the still frame passed the fail-closed proof contract.
+    Model-authored free boxes are never rendered.
+    """
     pd = doc.get("player_details") or {}
     fp = doc.get("fingerprint") or {}
     first = str(pd.get("player_name") or "").strip().split(" ")[0]
     label = f"{first.upper()} · TRACKED" if first else "YOUR PLAYER"
     done = 0
     for c in enriched:
+        canonical_box = unified_analysis_engine.canonical_event_telestration_box(c)
+        if canonical_box is not None:
+            fu = str(c.get("frame_url") or "")
+            if not fu.startswith("/api/uploads/frames/"):
+                continue
+            frame_path = frames_dir / Path(fu).name
+            if not frame_path.exists():
+                continue
+            if await asyncio.to_thread(
+                    render_telestration, str(frame_path), canonical_box,
+                    label, True, canonical_box["y0"]):
+                c["telestrated"] = True
+                c["tele_ring"] = True
+                c["tele_authority"] = "FIX09B_CANONICAL_GEOMETRY"
+                c["tele_box"] = dict(canonical_box)
+                done += 1
+            continue
         if not (isinstance(c, dict) and c.get("anchor_locked") and isinstance(c.get("anchor_box"), dict)):
             continue
         fu = str(c.get("frame_url") or "")
@@ -7780,7 +7906,7 @@ async def _telestrate_verified_frames(
             c["tele_box"] = {k: float(box[k]) for k in ("x0", "y0", "x1", "y1")}
             done += 1
     if done:
-        logger.info(f"[tele] {report_id}: {done} anchor-locked frames telestrated")
+        logger.info(f"[tele] {report_id}: {done} authority-locked frames telestrated")
     return done
 
 
@@ -7901,7 +8027,8 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
     if not vp.exists():
         logger.info(f"[teleclip] {report_id}: video not local — skipping clips")
         return
-    track_pts = ((doc.get("player_track") or {}).get("points")) or []
+    _unified_pts = ((doc.get("unified_production_track") or {}).get("points")) or []
+    track_pts = _unified_pts or ((doc.get("player_track") or {}).get("points")) or []
     if not track_pts:
         logger.info(f"[teleclip] {report_id}: no ground-truth track — skipping clips")
         return
@@ -7930,10 +8057,15 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                 evt_ms_by_id[_e["event_id"]] = _e["event_start_ms"]
     except Exception:
         evt_ms_by_id = {}
-    # P19 marker state-fade: ring fades out inside shadow switch-risk windows
-    # (never rides along on a possibly wrong player). Fail-open: no shadow
-    # data or flag off → exactly the previous behaviour.
-    risky_windows = []
+    # P19 marker state-fade: ring fades out inside any canonical FIX09B
+    # identity barrier as well as CV-shadow switch-risk windows. Raw video
+    # context may remain visible there; the ellipse may not.
+    risky_windows = [
+        (float(w[0]), float(w[1]))
+        for w in unified_analysis_engine.proof_unsafe_intervals(
+            doc.get("unified_event_barriers"))
+    ]
+    identity_risky_windows = list(risky_windows)
     clip_cap = TELE_CLIP_MAX
     try:
         if os.environ.get("CV_MARKER_STATE_FADE", "1") == "1":
@@ -7972,7 +8104,9 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
                     logger.info(f"[teleclip] {report_id}: gap bridging ACTIVE — "
                                 f"+{len(track_pts) - _n0} interpolated points in {len(_bw)} safe windows")
     except Exception:
-        risky_windows = []
+        # CV diagnostics are additive. A shadow failure must never erase the
+        # canonical uncertainty already persisted by FIX09B.
+        risky_windows = identity_risky_windows
         clip_cap = TELE_CLIP_MAX
     made = 0
     clipped_secs = []
@@ -7987,8 +8121,25 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
         if c.get("evidence_id") and not compute_proof_frame_verified(c):
             logger.info(f"[teleclip] {report_id}: moment {i} not proof-verified — no clip")
             continue
+        canonical_ms = (
+            c.get("canonical_event_ms")
+            if c.get("canonical_event_native") is True
+            and isinstance(c.get("canonical_event_ms"), int)
+            and not isinstance(c.get("canonical_event_ms"), bool)
+            else None
+        )
         picked = c.get("frame_picked_ts")
-        sec = float(picked) if isinstance(picked, (int, float)) else _ts_to_seconds(str(c.get("timestamp") or ""))
+        evidence_ms = c.get("evidence_time_ms")
+        if canonical_ms is not None:
+            # The proof clip is centred on the canonical action, while its
+            # still frame may legitimately be an adjacent visible keyframe.
+            sec = max(0.0, canonical_ms / 1000.0)
+        elif isinstance(picked, (int, float)) and not isinstance(picked, bool):
+            sec = float(picked)
+        elif isinstance(evidence_ms, int) and not isinstance(evidence_ms, bool):
+            sec = max(0.0, evidence_ms / 1000.0)
+        else:
+            sec = _ts_to_seconds(str(c.get("timestamp") or ""))
         if sec is None:
             continue
         # PHASE 17 hard gate: never build a proof where identity is uncertain
@@ -8188,7 +8339,12 @@ def _apply_tracking_verification(full: dict, anchors: list, track: dict | None, 
         for a in (full or {}).get("action_timeline") or []:
             if not isinstance(a, dict):
                 continue
-            sec = _mmss_to_secs(a.get("timestamp"))
+            event_ms = a.get("event_start_ms")
+            sec = (
+                max(0.0, event_ms / 1000.0)
+                if isinstance(event_ms, int) and not isinstance(event_ms, bool)
+                else _mmss_to_secs(a.get("timestamp"))
+            )
             if sec is None:
                 continue
             near_anchor = any(
@@ -8522,22 +8678,62 @@ async def _run_identity_corrective_pass(
         # never re-run here) is the ONLY event authority for the replacement:
         # discovery failure yields an EMPTY timeline, never the model's list.
         _lg = fresh.get("event_ledger")
-        retry["action_timeline"] = event_ledger.authoritative_timeline(_lg)
-        retry["event_discovery"] = event_ledger.discovery_summary(_lg)
-        _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
-        await _cross_verify_full_report(
-            report_id, retry,
-            file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
-            anchor_crops=(anchor_crops_full + wide_crops_full) or None,
-            anchor_payload_list=anchor_payload_list,
-            gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+        _canonical = fresh.get("canonical_events")
+        _canonical_authority = (
+            fresh.get("unified_analysis_status") == "ok"
+            and isinstance(_canonical, dict)
         )
+        if _canonical_authority:
+            retry = unified_analysis_engine.apply_result_to_report(
+                retry,
+                {
+                    "canonical_events": _canonical,
+                    "sequence_analysis": fresh.get("football_sequence_analysis") or {},
+                },
+            )
+            _corr_track = unified_analysis_engine.restore_event_track(
+                fresh.get("unified_production_track"),
+                fresh.get("unified_event_barriers"),
+            )
+            if not (_corr_track.get("points") or []):
+                _corr_track = gt_track
+            _apply_tracking_verification(retry, anchor_payload_list, _corr_track, gt_t_off)
+            retry["cross_verification"] = {
+                "status": "canonical_authority",
+                "reason": "FIX09B canonical events retained during corrective prose regeneration",
+                "events_checked": len(retry.get("action_timeline") or []),
+                "events_dropped": 0,
+                "verified_at": now_iso(),
+            }
+            retry["_scoring_scan"] = dict(fresh.get("unified_scoring_scan") or {
+                "performed": bool((fresh.get("football_sequence_analysis") or {}).get("coverage_complete")),
+                "authority": "FIX09B_CANONICAL_EVENTS",
+                "verified_goals": 0,
+                "verified_assists": 0,
+                "unresolved_goal_attempts": 0,
+                "unresolved_assist_candidates": 0,
+            })
+        else:
+            retry["action_timeline"] = event_ledger.authoritative_timeline(_lg)
+            retry["event_discovery"] = event_ledger.discovery_summary(_lg)
+            _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
+            await _cross_verify_full_report(
+                report_id, retry,
+                file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
+                anchor_crops=(anchor_crops_full + wide_crops_full) or None,
+                anchor_payload_list=anchor_payload_list,
+                gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+            )
         # FIX 01 — the corrective replacement is a NEW analysis body: it gets
         # its own authority namespace/IDs via the SAME normalisation helper
         # (stale IDs from the replaced body are never copied).
         retry = attach_event_evidence_authority(retry)
         # FIX 08 — event-native evidence rows for important verified events.
-        retry = event_ledger.create_event_native_evidence(retry, track=gt_track)
+        # FIX09B canonical output already projected event-bound proof rows from
+        # the unified geometry. Re-running legacy FIX08 evidence here would let
+        # the old track become a second proof authority during correction.
+        if not _canonical_authority:
+            retry = event_ledger.create_event_native_evidence(retry, track=gt_track)
         retry = attach_event_evidence_authority(retry)
         # FIX 07 — the corrective path runs the SAME verified-stats authority.
         retry = vstats.apply_verified_stats_authority(retry)
@@ -8858,10 +9054,13 @@ async def generate_full_report_task(report_id: str) -> None:
                 f"seeds={gt_track.get('seed_count')} (Δ={gt_t_off:+.2f}s)"
             )
 
-        # ── FIX 09A — GLOBAL TARGET IDENTITY TIMELINE (synchronous, observe-only).
-        # Scene-aware full-video identity coverage built from local CV only
-        # (zero model calls). Runs ALONGSIDE gt_track — persisted + compared,
-        # but NOT fed into FIX08 event authority in this phase.
+        # ── FIX 09A / FIX 09B — ONE GLOBAL_TARGET production spine.
+        # FIX09A remains the scene-aware identity evidence source. FIX09B now
+        # fuses it with FIX04, builds the all-player/ball graph, constructs the
+        # sequence plan and makes ONE whole-video sequence-intelligence call.
+        _idtl = {}
+        _unified_prepared = None
+        _unified_result = None
         if player_identity_timeline.TIMELINE_ENABLED and valid_anchors:
             try:
                 _idtl = await asyncio.to_thread(
@@ -8872,7 +9071,8 @@ async def generate_full_report_task(report_id: str) -> None:
                 _idtl_cmp = player_identity_timeline.compare_with_production(_idtl, gt_track)
                 await db.reports.update_one(
                     {"id": report_id},
-                    {"$set": {"identity_timeline": _idtl,
+                    {"$set": {"identity_timeline":
+                              unified_analysis_engine.compact_identity_timeline(_idtl),
                               "identity_timeline_compare": _idtl_cmp}},
                 )
                 logger.info(
@@ -8883,58 +9083,262 @@ async def generate_full_report_task(report_id: str) -> None:
                 )
             except Exception:
                 logger.exception(f"[fix09a] identity timeline failed for {report_id}")
+                _idtl = {}
 
-        # ── FIX 08 — ONE dedicated event-discovery pass (bounded, whole video).
-        # Its only job is enumerating the tapped player's involvements; the
-        # deterministic ledger (spatial actor validation against the FIX04
-        # track) is built in code. Failure keeps the legacy pass-1 timeline.
-        event_ledger_obj = None
         try:
-            _disc_dur = await asyncio.to_thread(_video_duration_seconds, file_path)
-            disc_prompt = event_ledger.build_discovery_prompt(
-                _disc_dur, doc.get("player_details") or {})
+            if valid_anchors and isinstance(_idtl, dict) and _idtl.get("status") == "ok":
+                _unified_prepared = await asyncio.to_thread(
+                    unified_analysis_engine.prepare_analysis,
+                    video_path=str(file_path),
+                    fix04_track=gt_track or {},
+                    identity_timeline=_idtl,
+                    anchors=valid_anchors,
+                    anchor_time_offset=gt_t_off,
+                    identity_profile=doc.get("identity_profile") or {},
+                    player_details=doc.get("player_details") or {},
+                )
+                logger.info(
+                    f"[fix09b] {report_id}: prepared status={_unified_prepared.get('status')} "
+                    f"identity_points={_unified_prepared.get('metrics', {}).get('identity_points')} "
+                    f"scene_frames={_unified_prepared.get('metrics', {}).get('scene_graph_frames')} "
+                    f"sequence_windows={_unified_prepared.get('metrics', {}).get('sequence_windows')}"
+                )
+        except Exception:
+            logger.exception(f"[fix09b] unified preparation failed for {report_id}")
+            _unified_prepared = None
+
+        event_ledger_obj = None
+        _unified_diagnostics = {
+            "prepared_status": (
+                _unified_prepared.get("status")
+                if isinstance(_unified_prepared, dict) else "not_prepared"
+            ),
+            "attempts": 0,
+        }
+        if isinstance(_unified_prepared, dict) and _unified_prepared.get("status") == "prepared":
             try:
-                _idp = doc.get("identity_profile")
-                if _idp:
-                    disc_prompt += identity_profile_block(_idp)
-            except Exception:
-                pass
-            try:
-                _gtb = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
-                if _gtb:
-                    disc_prompt += _gtb
-            except Exception:
-                pass
-            discovery = await call_gemini_with_video(
-                session_id=f"discover-{report_id}",
-                prompt=disc_prompt,
-                video_path=str(file_path),
-                marker_path=marker_path,
-                crop_path=crop_path_str,
-                anchor_crops=anchor_crops_full if anchor_crops_full else None,
-                timeout_s=420.0,
-            )
-            event_ledger_obj = event_ledger.build_ledger(discovery, gt_track, _disc_dur)
+                # Coverage is a strict response contract. One bounded retry may
+                # review ONLY omitted/malformed original windows; it cannot add
+                # windows, move times across cuts, or promote partial coverage.
+                _sequence_attempts = []
+                _sequence_request = {
+                    "sequence_plan": _unified_prepared.get("sequence_plan") or {},
+                    "analysis_prompt": str(_unified_prepared.get("analysis_prompt") or ""),
+                }
+                _unified_candidate = None
+                _sequence_merged = {}
+                for _attempt_no in range(2):
+                    sequence_prompt = str(_sequence_request.get("analysis_prompt") or "")
+                    try:
+                        _idp = doc.get("identity_profile")
+                        if _idp:
+                            sequence_prompt += identity_profile_block(_idp)
+                    except Exception:
+                        pass
+                    try:
+                        _sequence_geometry = (
+                            _unified_prepared.get("production_track") or gt_track
+                        )
+                        _gtb = _ground_truth_positions_block(
+                            anchor_payload_list, _sequence_geometry, gt_t_off)
+                        if _gtb:
+                            sequence_prompt += _gtb
+                    except Exception:
+                        pass
+                    sequence_raw = await call_gemini_with_video(
+                        session_id=(
+                            f"sequence-{report_id}" if _attempt_no == 0
+                            else f"sequence-retry-{report_id}"
+                        ),
+                        prompt=sequence_prompt,
+                        video_path=str(file_path),
+                        marker_path=marker_path,
+                        crop_path=crop_path_str,
+                        anchor_crops=anchor_crops_full if anchor_crops_full else None,
+                        timeout_s=420.0,
+                    )
+                    _sequence_attempts.append(sequence_raw)
+                    _sequence_merged = unified_analysis_engine.merge_model_attempts(
+                        _sequence_attempts)
+                    _unified_candidate = unified_analysis_engine.finalise_analysis(
+                        _sequence_merged, _unified_prepared)
+                    if unified_analysis_engine.is_production_ready(_unified_candidate):
+                        _unified_result = _unified_candidate
+                        break
+                    _incomplete_ids = list(
+                        (_unified_candidate.get("sequence_analysis") or {}).get(
+                            "incomplete_sequence_ids") or []
+                    )
+                    if _attempt_no >= 1 or not _incomplete_ids:
+                        break
+                    _sequence_request = unified_analysis_engine.build_retry_request(
+                        _unified_prepared,
+                        _incomplete_ids,
+                        doc.get("player_details") or {},
+                    )
+                    if not (_sequence_request.get("sequence_plan") or {}).get("analysis_windows"):
+                        break
+
+                _seq_analysis = (
+                    (_unified_candidate or {}).get("sequence_analysis") or {}
+                )
+                _unified_diagnostics = {
+                    "prepared_status": _unified_prepared.get("status"),
+                    "result_status": (_unified_candidate or {}).get("status"),
+                    "attempts": len(_sequence_attempts),
+                    "metrics": dict((_unified_candidate or {}).get("metrics") or {}),
+                    "incomplete_sequence_ids": list(
+                        _seq_analysis.get("incomplete_sequence_ids") or []),
+                    "missing_sequence_ids": list(
+                        _seq_analysis.get("missing_sequence_ids") or []),
+                    "action_count_mismatch_ids": list(
+                        _seq_analysis.get("action_count_mismatch_ids") or []),
+                }
+                if _unified_result is not None:
+                    event_ledger_obj = _unified_result.get("event_ledger")
+                    _payload = unified_analysis_engine.persistence_payload(_unified_result)
+                    # Keep operational response diagnostics, not another full
+                    # copy of every action. The normalised sequence authority
+                    # and final canonical decisions are already persisted as
+                    # the audit record for this run.
+                    _response_summary = {
+                        "schema": "FIX09B_SEQUENCE_RESPONSE_SUMMARY",
+                        "attempts": int(_sequence_merged.get("attempts") or 0),
+                        "sequence_rows": len(_sequence_merged.get("sequences") or []),
+                        "coverage_rows": len(_sequence_merged.get("coverage") or []),
+                        "raw_actions_persisted": False,
+                    }
+                    _payload["football_sequence_raw"] = _response_summary
+                    _payload["event_discovery_raw"] = _response_summary
+                    await db.reports.update_one(
+                        {"id": report_id},
+                        {"$set": _payload,
+                         "$unset": {"unified_analysis_diagnostics": "",
+                                    "unified_event_track": ""}},
+                    )
+                    logger.info(
+                        f"[fix09b] {report_id}: canonical events="
+                        f"{_unified_result.get('metrics', {}).get('events_accepted')} "
+                        f"unresolved={_unified_result.get('metrics', {}).get('events_unresolved')} "
+                        f"coverage_complete={_unified_result.get('metrics', {}).get('coverage_complete')} "
+                        f"attempts={len(_sequence_attempts)}"
+                    )
+                else:
+                    logger.warning(
+                        f"[fix09b] {report_id}: response contract not production-ready; "
+                        f"falling back safely diagnostics={_unified_diagnostics}"
+                    )
+            except Exception as exc:
+                logger.exception(f"[fix09b] unified sequence analysis failed for {report_id}")
+                _unified_diagnostics = {
+                    **_unified_diagnostics,
+                    "result_status": "error",
+                    "error": str(exc)[:240],
+                }
+                _unified_result = None
+                event_ledger_obj = None
+
+        # Migration fallback only: if the new production spine could not run at
+        # all, preserve the already-shipped FIX08 safety path instead of
+        # fabricating an empty report. Successful FIX09B runs never use FIX04 as
+        # the final event authority.
+        if _unified_result is None:
+            _fallback_unset = {
+                "canonical_events": "",
+                "football_scene_graph": "",
+                "football_sequence_plan": "",
+                "football_sequence_analysis": "",
+                "football_sequence_raw": "",
+                "unified_identity_authority": "",
+                "unified_scoring_scan": "",
+                "unified_analysis_metrics": "",
+                "unified_production_track": "",
+                "unified_event_barriers": "",
+                "unified_event_track": "",
+                "unified_event_track_source": "",
+                "event_ledger": "",
+                "event_discovery_raw": "",
+            }
+            # Clear any previous successful run BEFORE attempting fallback.
+            # Otherwise a fallback failure could leave stale canonical events
+            # available to corrective/finalisation code for this new run.
             await db.reports.update_one(
                 {"id": report_id},
-                {"$set": {"event_discovery_raw": discovery,
-                          "event_ledger": event_ledger_obj}},
+                {"$set": {"unified_analysis_status": "legacy_fallback_pending",
+                          "unified_analysis_diagnostics": _unified_diagnostics},
+                 "$unset": _fallback_unset},
             )
-            logger.info(
-                f"[fix08] {report_id}: ledger "
-                f"{event_ledger_obj.get('candidates_verified')}/"
-                f"{event_ledger_obj.get('candidates_total')} verified · "
-                f"complete={event_ledger_obj.get('discovery_complete')} · "
-                f"track_usable={event_ledger_obj.get('track_usable')}"
+            try:
+                _disc_dur = await asyncio.to_thread(_video_duration_seconds, file_path)
+                disc_prompt = event_ledger.build_discovery_prompt(
+                    _disc_dur, doc.get("player_details") or {})
+                try:
+                    _idp = doc.get("identity_profile")
+                    if _idp:
+                        disc_prompt += identity_profile_block(_idp)
+                except Exception:
+                    pass
+                try:
+                    _gtb = _ground_truth_positions_block(anchor_payload_list, gt_track, gt_t_off)
+                    if _gtb:
+                        disc_prompt += _gtb
+                except Exception:
+                    pass
+                discovery = await call_gemini_with_video(
+                    session_id=f"discover-{report_id}",
+                    prompt=disc_prompt,
+                    video_path=str(file_path),
+                    marker_path=marker_path,
+                    crop_path=crop_path_str,
+                    anchor_crops=anchor_crops_full if anchor_crops_full else None,
+                    timeout_s=420.0,
+                )
+                event_ledger_obj = event_ledger.build_ledger(discovery, gt_track, _disc_dur)
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"event_discovery_raw": discovery,
+                              "event_ledger": event_ledger_obj,
+                              "unified_analysis_status": "legacy_fallback",
+                              "unified_analysis_diagnostics": _unified_diagnostics}},
+                )
+                logger.warning(
+                    f"[fix09b] {report_id}: LEGACY FIX08 fallback "
+                    f"{event_ledger_obj.get('candidates_verified')}/"
+                    f"{event_ledger_obj.get('candidates_total')} verified"
+                )
+            except Exception:
+                logger.exception(f"[fix08] fallback event discovery failed for {report_id}")
+                event_ledger_obj = None
+                await db.reports.update_one(
+                    {"id": report_id},
+                    {"$set": {"unified_analysis_status": "legacy_fallback_failed",
+                              "unified_analysis_diagnostics": _unified_diagnostics}},
+                )
+
+        # One identity authority, two intentional views: geometry-only for
+        # motion/rendering and barrier-aware for event/proof verification.
+        _geometry_authority_track = gt_track
+        _event_authority_track = gt_track
+        _movement_track_source = "FIX04_FALLBACK"
+        if _unified_result is not None:
+            _unified_geometry_track = _unified_result.get("production_track")
+            if (_unified_geometry_track or {}).get("points"):
+                _geometry_authority_track = _unified_geometry_track
+                _movement_track_source = "UNIFIED_GLOBAL_TARGET"
+            _event_authority_track = (
+                _unified_result.get("event_track")
+                or _geometry_authority_track
             )
-        except Exception:
-            logger.exception(f"[fix08] event discovery failed for {report_id}")
-            event_ledger_obj = None
 
         # ── CV SHADOW MODE (additive, feature-flagged, observe-only) ──
         # Runs the new identity engine in the background AFTER production tracking.
         # It never touches gt_track, analysis, markers or proofs — diagnostics only.
-        if cv_shadow.SHADOW_ENABLED and gt_track and valid_anchors:
+        # Once FIX09B preparation has decoded the video and built the production
+        # scene graph, the old observe-only shadow run would repeat another full
+        # detector pass while competing for the same CPU. Keep it only as a
+        # fallback diagnostic when unified preparation could not run at all.
+        if (cv_shadow.SHADOW_ENABLED and _unified_prepared is None
+                and gt_track and valid_anchors):
             async def _cv_shadow_bg():
                 try:
                     shadow = await asyncio.to_thread(
@@ -8952,21 +9356,22 @@ async def generate_full_report_task(report_id: str) -> None:
         async def _movement_pace_core():
             """Movement map + trusted fastest moment + pace metrics. Runs in
             parallel with the Gemini call — nothing here feeds the prompt."""
-            if not gt_track:
+            if not _geometry_authority_track:
                 return
             try:
                 # FIX06 — camera-compensated residual samples (deterministic
                 # CV, fail-closed) feed BOTH movement map and pace metrics.
                 motion = await asyncio.to_thread(
-                    compute_motion_samples, str(file_path), gt_track)
+                    compute_motion_samples, str(file_path), _geometry_authority_track)
                 mm_map = await asyncio.to_thread(
-                    compute_movement_map, gt_track, tap_times=tap_times, motion=motion,
+                    compute_movement_map, _geometry_authority_track,
+                    tap_times=tap_times, motion=motion,
                     age=(doc.get("player_details") or {}).get("age"))
                 if mm_map:
                     # FIX06 C03 — deterministic trust only: the compensated
                     # fastest-near-tap sample may carry tap trust. NO verifier /
                     # model / network call is permitted on the movement path
-                    # (accepted FIX04 geometry is already the identity authority).
+                    # (accepted unified geometry is already the identity authority).
                     fnt = mm_map.get("fast_near_tap")
                     if fnt:
                         ct, cv_ = float(fnt["t"]), float(fnt["v"])
@@ -8989,7 +9394,8 @@ async def generate_full_report_task(report_id: str) -> None:
                     mm_map.pop("fast_near_tap", None)
                 pace_m = await asyncio.to_thread(
                     compute_speed_metrics,
-                    gt_track, (doc.get("player_details") or {}).get("age"),
+                    _geometry_authority_track,
+                    (doc.get("player_details") or {}).get("age"),
                     trusted_windows=tap_times, motion=motion)
                 await db.reports.update_one(
                     {"id": report_id},
@@ -8998,6 +9404,7 @@ async def generate_full_report_task(report_id: str) -> None:
                         "anchor_time_offset": gt_t_off,
                         "movement_map": mm_map,
                         "pace_metrics": pace_m,
+                        "movement_track_source": _movement_track_source,
                     }},
                 )
             except Exception:
@@ -9005,7 +9412,8 @@ async def generate_full_report_task(report_id: str) -> None:
 
         # ── Full-report prompt (shared verbatim with corrective-only recovery) ──
         full_prompt = await _compose_full_prompt(
-            doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off,
+            doc, audio_events_full, anchor_payload_list, crop_path_str,
+            _geometry_authority_track, gt_t_off,
             event_ledger_obj=event_ledger_obj)
         # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
         full, _mm_done = await asyncio.gather(
@@ -9021,18 +9429,19 @@ async def generate_full_report_task(report_id: str) -> None:
             _movement_pace_core(),
         )
         full = scrub_hedging(full)
-        # FIX 08 C06 — the validated ledger is the ONLY event authority. The
-        # prose model's action_timeline is NEVER used — discovery failure or an
-        # unusable track yields an EMPTY authoritative timeline, not a legacy
-        # highlight list.
-        full["action_timeline"] = event_ledger.authoritative_timeline(event_ledger_obj)
-        full["event_discovery"] = event_ledger.discovery_summary(event_ledger_obj)
-        _apply_tracking_verification(full, anchor_payload_list, gt_track, gt_t_off)
+        if isinstance(_unified_result, dict):
+            full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
+        else:
+            # Legacy fallback: only the validated FIX08 ledger may populate the timeline.
+            full["action_timeline"] = event_ledger.authoritative_timeline(event_ledger_obj)
+            full["event_discovery"] = event_ledger.discovery_summary(event_ledger_obj)
+        _apply_tracking_verification(
+            full, anchor_payload_list, _event_authority_track, gt_t_off)
         # GROW YOUR GAME — hard 100%-evidence gate (drops unproven lessons).
         try:
             _dur = await asyncio.to_thread(_video_duration_seconds, file_path)
             gyg_count = _validate_grow_your_game(
-                full, _dur, gt_track,
+                full, _dur, _geometry_authority_track,
                 (doc.get("player_details") or {}).get("player_name") or "")
             logger.info(f"[gyg] {report_id}: {gyg_count} lessons kept after evidence gate")
         except Exception:
@@ -9044,26 +9453,38 @@ async def generate_full_report_task(report_id: str) -> None:
         except Exception:
             logger.exception(f"parent-corner validation failed for {report_id}")
             full.pop("parent_corner", None)
-        # INTELLIGENT DUAL-PASS — independent verification of every claim
-        # (identity + event) before the report is stored. Fail-open.
-        # FIX 00B — lifecycle: generation done, verification pass starting.
+        # INTELLIGENT verification / canonical authority.
+        # A successful FIX09B run already passed deterministic B.3 actor + causal
+        # resolution, so the legacy verifier is NOT allowed to rediscover or
+        # promote events. Legacy fallback keeps the shipped verifier unchanged.
         await db.reports.update_one(
             {"id": report_id},
             {"$set": {"full_report_status": "verifying"}},
         )
-        await _cross_verify_full_report(
-            report_id, full,
-            file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
-            anchor_crops=anchor_crops_full, anchor_payload_list=anchor_payload_list,
-            gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
-        )
+        if isinstance(_unified_result, dict):
+            full["cross_verification"] = {
+                "status": "canonical_authority",
+                "reason": "FIX09B.3 deterministic actor + causal resolution",
+                "events_checked": len(full.get("action_timeline") or []),
+                "events_dropped": 0,
+                "verified_at": now_iso(),
+            }
+            full["_scoring_scan"] = dict(_unified_result.get("scoring_scan") or {})
+        else:
+            await _cross_verify_full_report(
+                report_id, full,
+                file_path=file_path, marker_path=marker_path, crop_path_str=crop_path_str,
+                anchor_crops=anchor_crops_full, anchor_payload_list=anchor_payload_list,
+                gt_track=gt_track, gt_t_off=gt_t_off, doc=doc,
+            )
         # FIX 01 — attach the event/evidence authority layer (stable IDs, ms
         # metadata, exact joins) AFTER all verification/filtering, right before
         # the body is persisted. Deterministic — zero LLM.
         full = attach_event_evidence_authority(full)
         # FIX 08 — event-native evidence rows for important verified events
         # (deterministic; frames/identity/proof reuse the existing machinery).
-        full = event_ledger.create_event_native_evidence(full, track=gt_track)
+        if _unified_result is None:
+            full = event_ledger.create_event_native_evidence(full, track=gt_track)
         full = attach_event_evidence_authority(full)
         # FIX 07 — deterministic verified stats + match_stats rebuild + claim
         # reconciliation over cross-verified canonical events (zero LLM).
@@ -9099,7 +9520,8 @@ async def generate_full_report_task(report_id: str) -> None:
                 report_id, full_prompt=full_prompt, file_path=file_path,
                 marker_path=marker_path, crop_path_str=crop_path_str,
                 anchor_crops_full=anchor_crops_full, wide_crops_full=wide_crops_full,
-                anchor_payload_list=anchor_payload_list, gt_track=gt_track,
+                anchor_payload_list=anchor_payload_list,
+                gt_track=_event_authority_track,
                 gt_t_off=gt_t_off, doc=doc, identity_stats=identity_stats,
             )
             if outcome == "already_done":
@@ -15631,6 +16053,7 @@ from speed_metrics import compute_speed_metrics
 import verified_stats as vstats
 import event_ledger
 import player_identity_timeline
+import unified_analysis_engine
 from progression import build_progression
 from score_context import build_score_context
 from score_meaning import build_score_meaning, build_score_meaning_teaser

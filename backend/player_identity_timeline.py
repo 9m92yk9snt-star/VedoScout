@@ -1462,7 +1462,13 @@ def build_identity_timeline(video_path: str, doc: dict):
         scale = SMALL_W / W
         sw, sh = SMALL_W, max(2, int(H * scale))
 
-        detector = cv_detect.PersonDetector()
+        # FIX09A has its own production gate (IDENTITY_TIMELINE_ENABLED).
+        # Never inherit CV_SHADOW_DETECTOR: that legacy switch controls only
+        # optional shadow diagnostics and must not disable GLOBAL_TARGET.
+        detector = cv_detect.PersonDetector(enabled=True)
+        if not detector.ok:
+            return {"version": VERSION, "status": "skipped",
+                    "reason": "detector_unavailable"}
         refs, negatives = cv_shadow._build_tap_references(
             cap, fps, anchors, t_off, sw, sh, scale, detector=detector)
         if len(refs) < 2:
