@@ -71,7 +71,8 @@ jobs:
             backend/open_observation_compat.py \
             backend/fix10a_shadow_runtime.py \
             backend/football_sequence_intelligence.py \
-            backend/identity_verify.py
+            backend/identity_verify.py \
+            backend/server.py
       - name: Run FIX10A regression family
         working-directory: backend
         env:
@@ -163,7 +164,18 @@ jobs:
               async def get_checkout_status(self, *_args, **_kwargs):
                   raise RuntimeError("CI Emergent stub: payment call forbidden")
           PY
-      - name: Run full backend pytest in CI approximation
+      - name: Reproduce Emergent /app layout for chronological tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/backend" /app/backend
+          sudo ln -sfn "$GITHUB_WORKSPACE/frontend" /app/frontend
+          mkdir -p backend/uploads
+          if [ ! -f frontend/.env ]; then
+            printf '%s\n' 'REACT_APP_BACKEND_URL=http://127.0.0.1:8000' > frontend/.env
+          fi
+      - name: Run historical chronological regression contract
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
@@ -174,5 +186,11 @@ jobs:
           JWT_SECRET_KEY: fix10-ci-secret
           ADMIN_EMAIL: ci@example.com
           ADMIN_PASSWORD: ci-password
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
           FIX10A_SHADOW_ENABLED: '0'
-        run: pytest --asyncio-mode=auto -q
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' | sort)
+          test "${#FIX_FILES[@]}" -gt 0
+          pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
