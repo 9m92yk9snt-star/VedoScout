@@ -109,7 +109,7 @@ def test_golden04_goal_case_is_unresolved_without_goal_geometry_evidence():
                for a in verdict["assertions"])
 
 
-def test_golden05_number10_touch_passes_and_number12_touch_fails():
+def test_golden05_number10_touch_after_target_release_passes_and_number12_fails():
     case = _manifest()["cases"][2]
     target_strike = {
         "strike_id": "s3", "media_ms": 69000,
@@ -122,6 +122,11 @@ def test_golden05_number10_touch_passes_and_number12_touch_fails():
     )]}
     verdict = gfv.validate_case(case, good)
     assert verdict["status"] == gfv.PASS
+    ordered = next(a for a in verdict["assertions"]
+                   if a["name"] == "require_non_target_verified_jersey_touch_after_target_release")
+    assert ordered["status"] == gfv.PASS
+    assert ordered["target_release_ms"] == 69000
+    assert ordered["touch_ms"] == [70300]
 
     bad = {"traces": [_trace(
         65500, 72500,
@@ -132,7 +137,25 @@ def test_golden05_number10_touch_passes_and_number12_touch_fails():
     assert verdict_bad["status"] == gfv.FAIL
 
 
-def test_golden06_fixture_never_false_passes_when_no_traces_exist():
+def test_golden06_number10_touch_before_target_release_cannot_pass_chain():
+    case = _manifest()["cases"][2]
+    late_target_release = {
+        "strike_id": "s4", "media_ms": 70500,
+        "status": "VERIFIED_PHYSICAL_RELEASE", "global_target_id": "GLOBAL_TARGET",
+    }
+    result = {"traces": [_trace(
+        65500, 72500,
+        touches=[_touch(70300, "10")],
+        strikes=[late_target_release],
+    )]}
+    verdict = gfv.validate_case(case, result)
+    assert verdict["status"] == gfv.UNRESOLVED
+    ordered = next(a for a in verdict["assertions"]
+                   if a["name"] == "require_non_target_verified_jersey_touch_after_target_release")
+    assert ordered["status"] == gfv.UNRESOLVED
+
+
+def test_golden07_fixture_never_false_passes_when_no_traces_exist():
     verdict = gfv.validate_fixture(_manifest(), {"traces": []}, {})
     assert verdict["status"] == gfv.UNRESOLVED
     assert verdict["metrics"]["passed"] == 0
