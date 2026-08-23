@@ -71,12 +71,25 @@ def _base_inputs():
     return plan, analysis, graph, authority
 
 
+def _contact_result(accepted=None, unresolved=None, rejected=None, metrics=None):
+    accepted = list(accepted or [])
+    unresolved = list(unresolved or [])
+    rejected = list(rejected or [])
+    return {
+        "contacts": [*copy.deepcopy(accepted), *copy.deepcopy(unresolved)],
+        "accepted": accepted,
+        "unresolved": unresolved,
+        "rejected": rejected,
+        "metrics": dict(metrics or {}),
+    }
+
+
 def _patch_window(monkeypatch, frames=None, trajectory=None, contact=None):
     frames = list(frames or [_frame()])
     trajectory = list(trajectory or [])
-    contact = contact if contact is not None else {
-        "accepted": [_accepted_contact()], "unresolved": [], "rejected": [], "metrics": {"accepted": 1}
-    }
+    contact = contact if contact is not None else _contact_result(
+        accepted=[_accepted_contact()], metrics={"accepted": 1}
+    )
     monkeypatch.setattr(pmr.dense_replay, "select_critical_windows", lambda *_a: [copy.deepcopy(WINDOW)])
     monkeypatch.setattr(pmr.dense_replay, "iter_dense_frames", lambda *_a, **_k: iter([]))
     monkeypatch.setattr(
@@ -102,9 +115,9 @@ def test_a901_pipeline_builds_physical_touch_chain_without_canonical_events(monk
 
 
 def test_a902_close_10_12_analogue_keeps_nearby_12_at_zero_touches(monkeypatch):
-    _patch_window(monkeypatch, frames=[_frame()], contact={
-        "accepted": [_accepted_contact("p010")], "unresolved": [], "rejected": [], "metrics": {"accepted": 1}
-    })
+    _patch_window(monkeypatch, frames=[_frame()], contact=_contact_result(
+        accepted=[_accepted_contact("p010")], metrics={"accepted": 1}
+    ))
     monkeypatch.setattr(pmr.shot_outcome_engine, "find_strike_releases", lambda *_a: [])
     plan, analysis, graph, authority = _base_inputs()
     out = pmr.reconstruct_physical_match("video.mp4", plan, analysis, graph, authority)
@@ -149,7 +162,7 @@ def test_a905_missing_ball_becomes_unresolved_not_a_guess(monkeypatch):
     _patch_window(monkeypatch, trajectory=[{
         "media_ms": 1000, "state": "MISSING", "box": None,
         "used_fallback": False, "time_authority": "ACTUAL_MEDIA_PTS",
-    }], contact={"accepted": [], "unresolved": [], "rejected": [], "metrics": {}})
+    }], contact=_contact_result())
     monkeypatch.setattr(pmr.shot_outcome_engine, "find_strike_releases", lambda *_a: [])
     plan, analysis, graph, authority = _base_inputs()
     out = pmr.reconstruct_physical_match("video.mp4", plan, analysis, graph, authority)
