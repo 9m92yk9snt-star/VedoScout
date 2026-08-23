@@ -71,7 +71,7 @@ def test_ga02_measured_intersection_cannot_override_visual_no_crossing():
         goal_geometry=_provider_geometry("VERIFIED_NO_CROSSING", [(1000, .90), (1040, .91), (1080, .92)]),
     )
     assert out["goal_plane_crossing"]["status"] == "UNRESOLVED"
-    assert out["goal_plane_crossing"]["reason"] == "TRAJECTORY_GEOMETRY_CONFLICTS_WITH_VISUAL_NO_CROSSING"
+    assert out["goal_plane_crossing"]["reason"] == "WHOLE_BALL_PHYSICS_CONFLICTS_WITH_VISUAL_NO_CROSSING"
     assert out["physical_outcome"] != "GOAL_PLANE_CROSSING"
 
 
