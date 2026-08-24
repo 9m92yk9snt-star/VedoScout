@@ -49,46 +49,143 @@ jobs:
           base64 -d docs/fix10a_goalproof_golden.tmp | gunzip >> backend/tests/test_fix10a_golden_fixture_validator.py
           git apply --check /tmp/fix10a_goalproof.patch
           git apply /tmp/fix10a_goalproof.patch
-      - name: Add fail-closed target strike linkage and fixture goal uniqueness
+      - name: Enforce final target-strike goal linkage and single-goal fixture invariant
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('backend/golden_fixture_validator.py')
-          s = p.read_text(encoding='utf-8')
+          if ! grep -q 'FIX10A_TARGET_GOAL_LINK_V2' backend/golden_fixture_validator.py; then
+          cat >> backend/golden_fixture_validator.py <<'PY'
 
-          if 'def _assert_target_goal_plane_crossing(' not in s:
-              marker = 'def _assert_forbidden_outcomes(outcomes: list[dict], forbidden) -> dict:\n'
-              assert marker in s
-              helper = '''def _assert_target_goal_plane_crossing(strikes: list[dict], outcomes: list[dict],\n                                       start_ms: int, end_ms: int) -> dict:\n    target_releases = _target_releases(strikes, start_ms, end_ms)\n    if not target_releases:\n        return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_GOAL_CHAIN"}\n    target_ids = {str(row.get("strike_id")) for row in target_releases\n                  if isinstance(row.get("strike_id"), str) and row.get("strike_id")}\n    goals = [row for row in outcomes if isinstance(row, dict)\n             and row.get("physical_outcome") == "GOAL_PLANE_CROSSING"]\n    linked = [row for row in goals if str(row.get("strike_id") or "") in target_ids]\n    if linked:\n        return {"status": PASS, "reason": "TARGET_RELEASE_LINKED_TO_GOAL_PLANE_CROSSING",\n                "target_strike_ids": sorted(target_ids),\n                "crossing_ms": [int(row["media_ms"]) for row in linked if _num(row.get("media_ms"))]}\n    if goals:\n        return {"status": FAIL, "reason": "GOAL_PLANE_CROSSING_LINKED_TO_DIFFERENT_STRIKE",\n                "target_strike_ids": sorted(target_ids),\n                "observed_strike_ids": sorted({str(row.get("strike_id") or "") for row in goals})}\n    return {"status": UNRESOLVED, "reason": "TARGET_GOAL_PLANE_CROSSING_NOT_VERIFIED",\n            "target_strike_ids": sorted(target_ids)}\n\n\n'''
-              s = s.replace(marker, helper + marker, 1)
+          # FIX10A_TARGET_GOAL_LINK_V2
+          # Final fail-closed Golden enforcement. Physical reconstruction remains
+          # non-canonical; this only validates that a goal crossing belongs to the
+          # target player's own verified release and that the fixture contains the
+          # exact number of physically verified goals declared by its hard gates.
+          _validate_case_before_target_goal_link = validate_case
 
-          if '"name": "require_target_goal_plane_crossing"' not in s:
-              line = '        assertions.append({"name": "require_goal_plane_crossing", **_assert_required_outcome(outcomes, "GOAL_PLANE_CROSSING")})\n'
-              assert line in s
-              replacement = line + '''        assertions.append({\n            "name": "require_target_goal_plane_crossing",\n            **_assert_target_goal_plane_crossing(strikes, outcomes, strike_start, strike_end),\n        })\n'''
-              s = s.replace(line, replacement, 1)
 
-          if 'def _assert_exact_physical_goal_count(' not in s:
-              marker = 'def validate_fixture(manifest: dict, physical_result: dict | None,\n'
-              assert marker in s
-              helper = '''def _assert_exact_physical_goal_count(manifest: dict, physical_result: dict | None) -> dict:\n    expected = sum(1 for case in (manifest.get("cases") or [])\n                   if isinstance(case, dict)\n                   and isinstance(case.get("physical_gate"), dict)\n                   and case["physical_gate"].get("require_goal_plane_crossing") is True)\n    result = physical_result if isinstance(physical_result, dict) else {}\n    seen, goals = set(), []\n    for trace in result.get("traces") or []:\n        if not isinstance(trace, dict):\n            continue\n        for outcome in trace.get("outcome_evidence") or []:\n            if not isinstance(outcome, dict) or outcome.get("physical_outcome") != "GOAL_PLANE_CROSSING":\n                continue\n            key = (str(outcome.get("strike_id") or ""),\n                   int(outcome["media_ms"]) if _num(outcome.get("media_ms")) else None)\n            if key in seen:\n                continue\n            seen.add(key); goals.append(outcome)\n    observed = len(goals)\n    if observed > expected:\n        status, reason = FAIL, "EXTRA_PHYSICAL_GOAL_CROSSING_ASSERTED"\n    elif observed < expected:\n        status, reason = UNRESOLVED, "REQUIRED_PHYSICAL_GOAL_CROSSING_NOT_VERIFIED"\n    else:\n        status, reason = PASS, "EXACT_PHYSICAL_GOAL_COUNT_MATCH"\n    return {"status": status, "reason": reason, "expected": expected, "observed": observed,\n            "strike_ids": [str(row.get("strike_id") or "") for row in goals]}\n\n\n'''
-              s = s.replace(marker, helper + marker, 1)
+          def _target_goal_link_v2(case: dict, physical_result: dict | None) -> dict:
+              start, end = _window(case)
+              traces = _case_traces(physical_result, case)
+              strikes = _all_strikes(traces, start, end)
+              outcomes = _all_outcomes(traces, start, end)
+              strike_start, strike_end = _reference_range(case, "strike", (start, end))
+              target_releases = _target_releases(strikes, strike_start, strike_end)
+              if not target_releases:
+                  return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_GOAL_CHAIN"}
+              target_ids = {
+                  str(row.get("strike_id")) for row in target_releases
+                  if isinstance(row.get("strike_id"), str) and row.get("strike_id")
+              }
+              goals = [row for row in outcomes if row.get("physical_outcome") == "GOAL_PLANE_CROSSING"]
+              linked = [row for row in goals if str(row.get("strike_id") or "") in target_ids]
+              if linked:
+                  return {
+                      "status": PASS,
+                      "reason": "TARGET_RELEASE_LINKED_TO_GOAL_PLANE_CROSSING",
+                      "target_strike_ids": sorted(target_ids),
+                      "crossing_ms": [int(row["media_ms"]) for row in linked if _num(row.get("media_ms"))],
+                  }
+              if goals:
+                  return {
+                      "status": FAIL,
+                      "reason": "GOAL_PLANE_CROSSING_LINKED_TO_DIFFERENT_STRIKE",
+                      "target_strike_ids": sorted(target_ids),
+                      "observed_strike_ids": sorted({str(row.get("strike_id") or "") for row in goals}),
+                  }
+              return {
+                  "status": UNRESOLVED,
+                  "reason": "TARGET_GOAL_PLANE_CROSSING_NOT_VERIFIED",
+                  "target_strike_ids": sorted(target_ids),
+              }
 
-          if '"fixture_assertions": fixture_assertions' not in s:
-              status_line = '    statuses = [case["status"] for case in cases]\n'
-              assert status_line in s
-              s = s.replace(status_line, '''    fixture_assertions = [{\n        "name": "require_exact_physical_goal_count",\n        **_assert_exact_physical_goal_count(manifest, physical_result),\n    }]\n    statuses = [case["status"] for case in cases] + [a["status"] for a in fixture_assertions]\n''', 1)
-              cases_line = '        "cases": cases,\n'
-              pos = s.index('def validate_fixture(')
-              before, tail = s[:pos], s[pos:]
-              assert cases_line in tail
-              tail = tail.replace(cases_line, cases_line + '        "fixture_assertions": fixture_assertions,\n', 1)
-              s = before + tail
 
-          p.write_text(s, encoding='utf-8')
+          def validate_case(case: dict, physical_result: dict | None,
+                            sequence_analysis: dict | None = None) -> dict:
+              result = _validate_case_before_target_goal_link(case, physical_result, sequence_analysis)
+              gate = case.get("physical_gate") if isinstance(case.get("physical_gate"), dict) else {}
+              if gate.get("require_goal_plane_crossing") is not True:
+                  return result
+              assertions = [
+                  row for row in (result.get("assertions") or [])
+                  if isinstance(row, dict) and row.get("name") != "require_target_goal_plane_crossing"
+              ]
+              assertions.append({
+                  "name": "require_target_goal_plane_crossing",
+                  **_target_goal_link_v2(case, physical_result),
+              })
+              statuses = [row.get("status") for row in assertions]
+              status = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
+              result["assertions"] = assertions
+              result["status"] = status
+              result["reason"] = (
+                  "ASSERTION_FAILURE" if status == FAIL
+                  else "INSUFFICIENT_EVIDENCE" if status == UNRESOLVED
+                  else "ALL_REQUIRED_ASSERTIONS_PASS"
+              )
+              return result
+
+
+          _validate_fixture_before_exact_goal_count = validate_fixture
+
+
+          def _exact_physical_goal_count_v2(manifest: dict, physical_result: dict | None) -> dict:
+              expected = sum(
+                  1 for case in (manifest.get("cases") or [])
+                  if isinstance(case, dict)
+                  and isinstance(case.get("physical_gate"), dict)
+                  and case["physical_gate"].get("require_goal_plane_crossing") is True
+              )
+              result = physical_result if isinstance(physical_result, dict) else {}
+              seen = set()
+              goals = []
+              for trace in result.get("traces") or []:
+                  if not isinstance(trace, dict):
+                      continue
+                  for outcome in trace.get("outcome_evidence") or []:
+                      if not isinstance(outcome, dict) or outcome.get("physical_outcome") != "GOAL_PLANE_CROSSING":
+                          continue
+                      key = (
+                          str(outcome.get("strike_id") or ""),
+                          int(outcome["media_ms"]) if _num(outcome.get("media_ms")) else None,
+                      )
+                      if key in seen:
+                          continue
+                      seen.add(key)
+                      goals.append(outcome)
+              observed = len(goals)
+              if observed > expected:
+                  status, reason = FAIL, "EXTRA_PHYSICAL_GOAL_CROSSING_ASSERTED"
+              elif observed < expected:
+                  status, reason = UNRESOLVED, "REQUIRED_PHYSICAL_GOAL_CROSSING_NOT_VERIFIED"
+              else:
+                  status, reason = PASS, "EXACT_PHYSICAL_GOAL_COUNT_MATCH"
+              return {
+                  "status": status,
+                  "reason": reason,
+                  "expected": expected,
+                  "observed": observed,
+                  "strike_ids": [str(row.get("strike_id") or "") for row in goals],
+              }
+
+
+          def validate_fixture(manifest: dict, physical_result: dict | None,
+                               sequence_analysis: dict | None = None) -> dict:
+              # The base fixture function dynamically resolves the redefined
+              # validate_case above, so each goal case already carries target-link proof.
+              result = _validate_fixture_before_exact_goal_count(manifest, physical_result, sequence_analysis)
+              fixture_assertions = [{
+                  "name": "require_exact_physical_goal_count",
+                  **_exact_physical_goal_count_v2(manifest, physical_result),
+              }]
+              result["fixture_assertions"] = fixture_assertions
+              statuses = [row.get("status") for row in (result.get("cases") or [])] + [
+                  row.get("status") for row in fixture_assertions
+              ]
+              result["status"] = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
+              return result
           PY
+          fi
       - name: Compile and run full FIX10A regressions
         working-directory: backend
         env:
