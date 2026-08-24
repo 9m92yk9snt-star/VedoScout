@@ -171,8 +171,6 @@ jobs:
 
           def validate_fixture(manifest: dict, physical_result: dict | None,
                                sequence_analysis: dict | None = None) -> dict:
-              # The base fixture function dynamically resolves the redefined
-              # validate_case above, so each goal case already carries target-link proof.
               result = _validate_fixture_before_exact_goal_count(manifest, physical_result, sequence_analysis)
               fixture_assertions = [{
                   "name": "require_exact_physical_goal_count",
@@ -195,16 +193,15 @@ jobs:
           set -euo pipefail
           python -m py_compile fix10a_ball_proof_gate.py fix10a_goal_direction.py fix10a_vision_providers.py golden_fixture_validator.py shot_outcome_engine.py tests/test_fix10a7_structured_goal_proof.py tests/test_fix10a_golden_fixture_validator.py
           pytest --asyncio-mode=auto -q tests/test_fix10a*.py
-      - name: Commit verified FIX10A source
+      - name: Publish verified source without changing workflow files
         shell: bash
         run: |
           set -euo pipefail
           rm -f docs/fix10a_goalproof_src00.tmp docs/fix10a_goalproof_src01.tmp docs/fix10a_goalproof_src02.tmp docs/fix10a_goalproof_src03.tmp docs/fix10a_goalproof_test.tmp docs/fix10a_goalproof_golden.tmp
-          rm -f .github/workflows/fix10a-goalproof-one-shot.yml
-          git show 83bd47e5aacc3ef59d373883b86e19762b6cfa37:.github/workflows/fix10a-verify.yml > .github/workflows/fix10a-verify.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add backend/fix10a_ball_proof_gate.py backend/fix10a_goal_direction.py backend/fix10a_vision_providers.py backend/golden_fixture_validator.py backend/shot_outcome_engine.py backend/tests/test_fix10a7_structured_goal_proof.py backend/tests/test_fix10a_golden_fixture_validator.py
+          git add -u docs
           git diff --cached --check
           git commit -m 'FIX10A: bind whole-ball goal proof to target strike'
           git push origin HEAD:fix10-match-intelligence
