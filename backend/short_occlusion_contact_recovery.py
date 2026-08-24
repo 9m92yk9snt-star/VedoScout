@@ -610,7 +610,29 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
     return verified, unresolved
 
 
-def _measured_reacquisition_recoveries(frames, measured, contact_result):
+def _trajectory_discontinuities_between(rows, start_ms, end_ms):
+    """Return A3 discontinuity-rejection evidence strictly inside an interval."""
+    out = []
+    lo, hi = sorted((int(start_ms), int(end_ms)))
+    for row in rows or []:
+        if not isinstance(row, dict) or not _num(row.get("media_ms")):
+            continue
+        media_ms = int(row["media_ms"])
+        if not lo < media_ms < hi:
+            continue
+        provenance = str(row.get("provenance") or "")
+        if "DISCONTINUITY_REJECTED" not in provenance:
+            continue
+        out.append({
+            "media_ms": media_ms,
+            "state": row.get("state"),
+            "provenance": provenance,
+            "proof_eligible": row.get("proof_eligible"),
+        })
+    return out
+
+
+def _measured_reacquisition_recoveries(frames, measured, contact_result, trajectory_rows=None):
     verified = []
     unresolved = []
     for i, anchor in enumerate(measured):
@@ -625,6 +647,22 @@ def _measured_reacquisition_recoveries(frames, measured, contact_result):
         if incoming is None or nxt is None:
             continue
         if int(nxt["media_ms"]) - int(anchor["media_ms"]) > MAX_OUTGOING_SIDE_MS:
+            continue
+        post_anchor_discontinuities = _trajectory_discontinuities_between(
+            trajectory_rows, int(anchor["media_ms"]), int(nxt["media_ms"])
+        )
+        if post_anchor_discontinuities:
+            # A3 has already rejected at least one detector path between this
+            # would-be contact anchor and the measured point used as outgoing
+            # physics. Treat that as contradictory trajectory evidence rather
+            # than bridging across it and manufacturing a release/contact.
+            unresolved.append({
+                "media_ms": int(anchor["media_ms"]),
+                "reason": "POST_ANCHOR_TRAJECTORY_DISCONTINUITY_REJECTED",
+                "mode": "POST_GAP_MEASURED_REACQUISITION",
+                "next_measured_ms": int(nxt["media_ms"]),
+                "discontinuity_rows": post_anchor_discontinuities,
+            })
             continue
         frame = _frame_near(frames, int(anchor["media_ms"]))
         if frame is None or frame.get("cut_barrier") is True:
@@ -695,7 +733,7 @@ def recover_short_occlusion_contacts(dense_frames, ball_trajectory, contact_resu
                 "reason": "INSUFFICIENT_PROOF_MEASURED_TRAJECTORY", "metrics": {"verified": 0}}
 
     measured_verified, measured_unresolved = _measured_reacquisition_recoveries(
-        frames, measured, contact_result or {}
+        frames, measured, contact_result or {}, trajectory_rows=ball_trajectory or []
     )
     flow_verified, flow_unresolved = ([], [])
     if video_path or flow_frame_provider is not None:
