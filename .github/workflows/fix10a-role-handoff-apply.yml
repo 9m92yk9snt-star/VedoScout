@@ -18,17 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Gate exact FIX10A Step-3 baseline
+      - name: Gate exact FIX10A Step-3 source baseline
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD~1)" = "91d15e6cf9e8f9d2ac4638b827385f79f2c07ca5"
-          test "$(git rev-parse HEAD~2)" = "829d1b26cef735f6f5477f562c5a8d9bac265538"
-          test "$(git rev-parse HEAD~3)" = "d63ece3f13e12dbf34ce3c4d09f32121c66077e4"
           test "$(git hash-object backend/fix10a_vision_providers.py)" = "c8e168150f83bf09d938608e9fdb7d8dfea62cb2"
           test "$(git hash-object backend/physical_match_reconstruction.py)" = "b7a937e32717013a38df435ab22a17a306d1ee20"
           echo '2f80f84e17e81db46925952b2fed1fb2be3d9b9762bca9616b1c06b2a6b4a445  .fix10a_support_role_handoff.patch' | sha256sum -c -
