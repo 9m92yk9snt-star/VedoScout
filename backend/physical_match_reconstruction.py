@@ -20,6 +20,7 @@ import fix10a_goal_direction
 import jersey_consensus
 import post_strike_intervention
 import shot_outcome_engine
+import short_occlusion_contact_recovery
 import touch_graph
 
 VERSION = 1
@@ -113,6 +114,17 @@ def reconstruct_physical_match(
             trajectory = ball_trajectory.reconstruct_ball_trajectory(dense_frames)
             candidates = ball_contact_engine.detect_contact_candidates(dense_frames, trajectory)
             contact_result = ball_contact_engine.resolve_contacts(candidates)
+
+            # FIX10A Step 3 is a separate, fail-closed recovery layer.  It does
+            # not relax ordinary A4 gates or feed weak detector proposals into
+            # A3.  Only an independently VERIFIED aggregate short-occlusion
+            # recovery may be appended to the copied A4 result before A5.
+            step3_recovery = short_occlusion_contact_recovery.recover_short_occlusion_contacts(
+                dense_frames, trajectory, contact_result, video_path=str(video_path)
+            )
+            contact_result = short_occlusion_contact_recovery.apply_recovered_contacts(
+                contact_result, step3_recovery
+            )
             touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)
 
             requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)
@@ -183,6 +195,9 @@ def reconstruct_physical_match(
                 "ball_rows": len(trajectory),
                 "accepted_contacts": len(contact_result.get("accepted") or []),
                 "unresolved_contacts": len(contact_result.get("unresolved") or []),
+                "step3_recovered_contacts": int(
+                    ((step3_recovery.get("metrics") or {}).get("verified") or 0)
+                ),
                 "touches": len(touch_with_jersey.get("touches") or []),
                 "jersey_requests": len(requests),
                 "role_evidence_tracks": len(window_roles),
@@ -224,6 +239,9 @@ def reconstruct_physical_match(
             "windows_failed": len(windows) - ok_windows,
             "traces": len(traces),
             "accepted_contacts": sum(int(x.get("accepted_contacts") or 0) for x in window_rows),
+            "step3_recovered_contacts": sum(
+                int(x.get("step3_recovered_contacts") or 0) for x in window_rows
+            ),
             "touches": sum(int(x.get("touches") or 0) for x in window_rows),
             "physical_strikes": sum(int(x.get("strikes") or 0) for x in window_rows),
             "a7_verified_interventions": sum(int(x.get("a7_verified_interventions") or 0) for x in window_rows),
