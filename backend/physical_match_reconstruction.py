@@ -18,6 +18,7 @@ import event_trace
 import fix10a_ball_proof_gate
 import fix10a_goal_direction
 import jersey_consensus
+import post_strike_intervention
 import shot_outcome_engine
 import touch_graph
 
@@ -52,8 +53,6 @@ def _window_unresolved_reasons(contact_result, jersey_result, outcomes):
         if out.get("physical_outcome") in {"UNRESOLVED", "UNRESOLVED_TERMINAL_VISIBILITY"}:
             reasons.append("POST_STRIKE_OUTCOME_UNRESOLVED")
         crossing = out.get("goal_plane_crossing") if isinstance(out.get("goal_plane_crossing"), dict) else {}
-        # REJECTED is resolved negative evidence (the ball was verified not to
-        # cross); only a genuinely unknown crossing belongs in unresolved logs.
         if crossing.get("status") == "UNRESOLVED":
             reasons.append("GOAL_PLANE_CROSSING_UNRESOLVED")
     return list(dict.fromkeys(reasons))
@@ -63,9 +62,6 @@ def _source_meta(source_video, video_path):
     src = deepcopy(source_video) if isinstance(source_video, dict) else {}
     src.setdefault("role", SOURCE_ROLE)
     src.setdefault("path_role", "canonical_web")
-    # Local filesystem paths are diagnostic input only and must not become a
-    # public/download URL. Persistence may retain basename/fingerprint supplied
-    # by the server, but this module does not fingerprint or upload the video.
     src.setdefault("video_path_supplied", bool(video_path))
     return src
 
@@ -86,19 +82,7 @@ def reconstruct_physical_match(
     camera_estimator=None,
     dense_frame_provider=None,
 ) -> dict:
-    """Build bounded physical evidence without changing canonical truth.
-
-    Optional providers exist for production/test injection only:
-    - ``dense_frame_provider(video_path, start_ms, end_ms)`` may replace A1
-      decoding in deterministic tests; production defaults to iter_dense_frames.
-    - ``jersey_vote_provider(video_path, requests)`` returns
-      ``{track_id: [vote, ...]}``; the provider may crop/read frames externally.
-    - ``goal_geometry_provider(window, strike)`` returns trusted supporting
-      goal-line geometry or None. No geometry means no physical GOAL assertion.
-    - ``role_evidence_provider(video_path, window, strikes, touch_graph,
-      window_evidence)`` returns fail-closed supporting role evidence by local
-      track.  It never receives the primary event story.
-    """
+    """Build bounded physical evidence without changing canonical truth."""
     plan = deepcopy(sequence_plan) if isinstance(sequence_plan, dict) else {}
     analysis = deepcopy(sequence_analysis) if isinstance(sequence_analysis, dict) else {}
     graph = deepcopy(scene_graph) if isinstance(scene_graph, dict) else {}
@@ -122,12 +106,8 @@ def reconstruct_physical_match(
                 )
 
             refined = dense_track_refinement.refine_window(
-                dense_iter,
-                graph,
-                authority,
-                str(window.get("scene_id") or ""),
-                detector_fn=detector_fn,
-                camera_estimator=camera_estimator,
+                dense_iter, graph, authority, str(window.get("scene_id") or ""),
+                detector_fn=detector_fn, camera_estimator=camera_estimator,
             )
             dense_frames = list(refined.get("frames") or []) if isinstance(refined, dict) else []
             trajectory = ball_trajectory.reconstruct_ball_trajectory(dense_frames)
@@ -141,77 +121,54 @@ def reconstruct_physical_match(
             )
             if not isinstance(votes_by_track, dict):
                 votes_by_track = {}
-            jersey_result = jersey_consensus.apply_jersey_consensus(
-                dense_frames, touches, votes_by_track
-            )
+            jersey_result = jersey_consensus.apply_jersey_consensus(dense_frames, touches, votes_by_track)
             dense_with_jersey = jersey_result.get("window_evidence") or dense_frames
             touch_with_jersey = jersey_result.get("touch_graph") or touches
 
-            strikes = shot_outcome_engine.find_strike_releases(
-                touch_with_jersey, trajectory
-            )
+            strikes = shot_outcome_engine.find_strike_releases(touch_with_jersey, trajectory)
             provider_roles = _safe_provider(
-                role_evidence_provider,
-                str(video_path),
-                deepcopy(window),
-                deepcopy(strikes),
-                deepcopy(touch_with_jersey),
-                deepcopy(dense_with_jersey),
-                default={},
+                role_evidence_provider, str(video_path), deepcopy(window), deepcopy(strikes),
+                deepcopy(touch_with_jersey), deepcopy(dense_with_jersey), default={},
             )
             window_roles = deepcopy(provider_roles) if isinstance(provider_roles, dict) else {}
-            # Explicit injected evidence (tests/manual staging diagnostics) takes
-            # precedence over a best-effort provider, but neither source can
-            # create canonical truth in FIX10A.
             if isinstance(role_evidence, dict):
                 window_roles.update(deepcopy(role_evidence))
 
             outcomes = []
+            a7_verified = 0
             for strike in strikes:
                 goal_geometry = _safe_provider(
                     goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
                 )
                 outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
-                    strike,
-                    trajectory,
-                    touch_with_jersey,
-                    goal_geometry=goal_geometry,
-                    role_evidence=window_roles,
+                    strike, trajectory, touch_with_jersey,
+                    goal_geometry=goal_geometry, role_evidence=window_roles,
                 )
-                # Independent goal geometry must also prove the direction of a
-                # verified whole-ball crossing. A reverse goal→field path or
-                # missing playable-field orientation is downgraded before A8.
-                outcome = fix10a_goal_direction.apply_direction_gate(
-                    outcome, trajectory, goal_geometry
+                # A7 is intentionally independent of A4/A5 touch truth. It runs
+                # only after a verified physical release and may attach stronger
+                # full-body post-strike evidence to the outcome layer.
+                a7 = post_strike_intervention.detect_post_strike_intervention(
+                    strike, dense_with_jersey, trajectory
                 )
-                # A pixel measurement may be physically useful before it is
-                # certified for proof.  Goal-plane truth therefore needs both
-                # sides of the crossing to be proof-eligible measurements.
-                # This gate can only downgrade an already-produced crossing.
-                outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(
-                    outcome, trajectory
+                if a7.get("status") == "VERIFIED":
+                    a7_verified += 1
+                outcome = post_strike_intervention.apply_intervention_evidence(
+                    outcome, a7, window_roles
                 )
+                outcome = fix10a_goal_direction.apply_direction_gate(outcome, trajectory, goal_geometry)
+                outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, trajectory)
                 outcomes.append(outcome)
 
-            unresolved = _window_unresolved_reasons(
-                contact_result, jersey_result, outcomes
-            )
+            unresolved = _window_unresolved_reasons(contact_result, jersey_result, outcomes)
             unresolved_all.extend(unresolved)
             trace_id = str(window.get("dense_window_id") or "dense_unknown")
             trace = event_trace.build_event_trace(
-                trace_id=trace_id,
-                source_video=source,
-                window=window,
-                dense_frames=dense_with_jersey,
-                ball_trajectory=trajectory,
-                contact_result=contact_result,
-                touch_graph=touch_with_jersey,
-                jersey_consensus=jersey_result,
-                strike_evidence=strikes,
-                outcome_evidence=outcomes,
-                sequence_analysis=analysis,
-                contradictions=[],
-                unresolved_reasons=unresolved,
+                trace_id=trace_id, source_video=source, window=window,
+                dense_frames=dense_with_jersey, ball_trajectory=trajectory,
+                contact_result=contact_result, touch_graph=touch_with_jersey,
+                jersey_consensus=jersey_result, strike_evidence=strikes,
+                outcome_evidence=outcomes, sequence_analysis=analysis,
+                contradictions=[], unresolved_reasons=unresolved,
             )
             summary = event_trace.compact_trace_summary(trace)
             traces.append(trace)
@@ -230,6 +187,7 @@ def reconstruct_physical_match(
                 "jersey_requests": len(requests),
                 "role_evidence_tracks": len(window_roles),
                 "strikes": len(strikes),
+                "a7_verified_interventions": a7_verified,
                 "outcomes": len(outcomes),
                 "unresolved_reasons": unresolved,
             })
@@ -241,16 +199,14 @@ def reconstruct_physical_match(
                 "scene_id": window.get("scene_id"),
                 "start_ms": window.get("start_ms"),
                 "end_ms": window.get("end_ms"),
-                "status": "error",
-                "reason": reason,
+                "status": "error", "reason": reason,
             })
 
     ok_windows = sum(row.get("status") == "ok" for row in window_rows)
     status = (
         "no_critical_windows" if not windows
         else "ok" if ok_windows == len(windows)
-        else "partial" if ok_windows
-        else "error"
+        else "partial" if ok_windows else "error"
     )
     return {
         "version": VERSION,
@@ -270,6 +226,7 @@ def reconstruct_physical_match(
             "accepted_contacts": sum(int(x.get("accepted_contacts") or 0) for x in window_rows),
             "touches": sum(int(x.get("touches") or 0) for x in window_rows),
             "physical_strikes": sum(int(x.get("strikes") or 0) for x in window_rows),
+            "a7_verified_interventions": sum(int(x.get("a7_verified_interventions") or 0) for x in window_rows),
         },
         # Explicitly absent by contract: canonical_events, event_ledger,
         # verified_stats, goals, assists, scorer or report mutation.
