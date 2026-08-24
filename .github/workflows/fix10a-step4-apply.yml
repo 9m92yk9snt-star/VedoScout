@@ -29,20 +29,53 @@ jobs:
           set -euo pipefail
           test "$(git hash-object backend/physical_match_reconstruction.py)" = "2f49c4cdac349bc56f537582356e9815b83922a2"
           test "$(git hash-object backend/shot_outcome_engine.py)" = "d04bb68b819b8dd54875482f2eb1d72714316b24"
-          test "$(git hash-object .fix10a_step4.patch.gz)" = "ae91d5f5af332131339f149ffa5fd67f10cf03cb"
-          echo "Step-4 staging blob diagnostics:"
-          file .fix10a_step4.patch.gz || true
-          printf 'first32='; od -An -tx1 -N32 .fix10a_step4.patch.gz | tr -d '\n '; echo
-          set +e
-          gzip -dc .fix10a_step4.patch.gz > /tmp/fix10a_step4.patch
-          gzip_rc=$?
-          set -e
-          echo "gzip_rc=$gzip_rc extracted_bytes=$(wc -c < /tmp/fix10a_step4.patch)"
-          sha256sum /tmp/fix10a_step4.patch
-          test -s /tmp/fix10a_step4.patch
-          git apply --check /tmp/fix10a_step4.patch
-      - name: Apply Step-4 patch
-        run: git apply /tmp/fix10a_step4.patch
+          test -f backend/contact_role_resolver.py
+          test -f backend/tests/test_fix10a_contact_role_resolver.py
+      - name: Wire Step-4 contact-role authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          pmr = Path('backend/physical_match_reconstruction.py')
+          text = pmr.read_text()
+          old_import = 'import ball_contact_engine\nimport ball_trajectory\nimport dense_replay\n'
+          new_import = 'import ball_contact_engine\nimport ball_trajectory\nimport contact_role_resolver\nimport dense_replay\n'
+          assert text.count(old_import) == 1
+          text = text.replace(old_import, new_import)
+          old_touch = '            touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)\n\n            requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)\n'
+          new_touch = '            touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)\n            touches = contact_role_resolver.apply_contact_roles(touches, contact_result)\n\n            requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)\n'
+          assert text.count(old_touch) == 1
+          pmr.write_text(text.replace(old_touch, new_touch))
+
+          soe = Path('backend/shot_outcome_engine.py')
+          text = soe.read_text()
+          old = (
+              '        is_release = "RELEASE" in kinds\n'
+              '        physical_strike = is_release or change >= MIN_RELEASE_TRAJECTORY_CHANGE\n'
+          )
+          new = (
+              '        contact_role = touch.get("contact_role") if isinstance(touch.get("contact_role"), dict) else None\n'
+              '        if contact_role is not None:\n'
+              '            # Step 4 is explicit release authority when it reviewed a contact.\n'
+              '            # RECEIVE/CONTROL and UNRESOLVED must never be promoted to a strike\n'
+              '            # merely because contact trajectory change is large. Touches with\n'
+              '            # no Step-4 role retain the legacy physical fallback for compatibility.\n'
+              '            if contact_role.get("status") != "VERIFIED":\n'
+              '                continue\n'
+              '            role = str(contact_role.get("role") or "")\n'
+              '            if role != "RELEASE":\n'
+              '                continue\n'
+              '            is_release = True\n'
+              '            physical_strike = True\n'
+              '        else:\n'
+              '            is_release = "RELEASE" in kinds\n'
+              '            physical_strike = is_release or change >= MIN_RELEASE_TRAJECTORY_CHANGE\n'
+          )
+          assert text.count(old) == 1
+          soe.write_text(text.replace(old, new))
+          PY
       - name: Install project requirements available outside Emergent runtime
         shell: bash
         run: |
@@ -102,7 +135,13 @@ jobs:
           python -m py_compile \
             backend/contact_role_resolver.py \
             backend/shot_outcome_engine.py \
-            backend/physical_match_reconstruction.py
+            backend/physical_match_reconstruction.py \
+            backend/tests/test_fix10a_contact_role_resolver.py
+      - name: Run focused Step-4 regression
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a_contact_role_resolver.py
       - name: Run full FIX10A regression family
         working-directory: backend
         env:
