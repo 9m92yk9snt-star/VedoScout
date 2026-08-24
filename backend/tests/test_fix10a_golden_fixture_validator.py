@@ -57,7 +57,7 @@ def test_golden01_manifest_is_locked_and_has_three_cases():
     assert [c["case_id"] for c in manifest["cases"]] == [
         "saved_shot_23s",
         "receive_feint_accel_right_foot_goal_27s",
-        "assist_15_to_scorer_10_not_12",
+        "receive_cross_field_pass_no_goal_70s",
     ]
 
 
@@ -124,84 +124,50 @@ def test_golden05_goal_case_is_unresolved_without_goal_geometry_evidence():
                for a in verdict["assertions"])
 
 
-def _assist_result(scorer_jersey="10", *, target_release_ms=69000,
-                   scorer_touch_ms=70300, scorer_strike_ms=70800):
-    touch = _touch(scorer_touch_ms, scorer_jersey)
-    target_release = _strike(target_release_ms, target=True, suffix="-target")
-    scorer_strike = _strike(
-        scorer_strike_ms,
-        touch_id=touch["touch_id"],
-        target=False,
-        suffix="-scorer",
-    )
-    goal = {
-        "strike_id": scorer_strike["strike_id"],
-        "media_ms": scorer_strike_ms,
-        "physical_outcome": "GOAL_PLANE_CROSSING",
-        "intervention": {"status": "NONE", "media_ms": None},
-    }
-    return {"traces": [_trace(
-        65500, 72500,
-        touches=[touch],
-        strikes=[target_release, scorer_strike],
-        outcomes=[goal],
-    )]}
-
-
-def test_golden06_number10_touch_and_strike_after_target_release_passes():
+def test_golden06_cross_field_pass_case_passes_with_target_release_and_no_goal():
     case = _manifest()["cases"][2]
-    verdict = gfv.validate_case(case, _assist_result("10"))
+    release = _strike(71000, target=True)
+    result = {"traces": [_trace(69800, 73500, strikes=[release], outcomes=[])]}
+    verdict = gfv.validate_case(case, result)
     assert verdict["status"] == gfv.PASS
-    ordered_touch = next(a for a in verdict["assertions"]
-                         if a["name"] == "require_non_target_verified_jersey_touch_after_target_release")
-    ordered_strike = next(a for a in verdict["assertions"]
-                          if a["name"] == "require_non_target_verified_jersey_strike_after_target_release")
-    assert ordered_touch["status"] == gfv.PASS
-    assert ordered_strike["status"] == gfv.PASS
-    assert ordered_strike["strike_ms"] == [70800]
+    required = next(a for a in verdict["assertions"] if a["name"] == "require_target_release")
+    forbidden = next(a for a in verdict["assertions"] if a["name"] == "must_not_assert_physical_outcome")
+    assert required["status"] == gfv.PASS
+    assert forbidden["status"] == gfv.PASS
 
 
-def test_golden07_number12_as_decisive_scorer_fails():
+def test_golden07_cross_field_pass_case_fails_if_goal_is_asserted():
     case = _manifest()["cases"][2]
-    verdict = gfv.validate_case(case, _assist_result("12"))
-    assert verdict["status"] == gfv.FAIL
-    assert any(a["name"] == "forbid_non_target_verified_jersey_touch" and a["status"] == gfv.FAIL
-               for a in verdict["assertions"])
-
-
-def test_golden08_number10_touch_but_number12_strike_fails_scorer_binding():
-    case = _manifest()["cases"][2]
-    touch10 = _touch(70200, "10")
-    touch12 = _touch(70400, "12")
-    target_release = _strike(69000, target=True, suffix="-target")
-    scorer12 = _strike(70800, touch_id=touch12["touch_id"], suffix="-12")
+    release = _strike(71000, target=True)
     goal = {
-        "strike_id": scorer12["strike_id"], "media_ms": 70800,
+        "strike_id": release["strike_id"],
+        "media_ms": 71200,
         "physical_outcome": "GOAL_PLANE_CROSSING",
     }
-    result = {"traces": [_trace(
-        65500, 72500,
-        touches=[touch10, touch12],
-        strikes=[target_release, scorer12],
-        outcomes=[goal],
-    )]}
+    result = {"traces": [_trace(69800, 73500, strikes=[release], outcomes=[goal])]}
     verdict = gfv.validate_case(case, result)
     assert verdict["status"] == gfv.FAIL
-    striker = next(a for a in verdict["assertions"]
-                   if a["name"] == "require_non_target_verified_jersey_strike_after_target_release")
-    assert striker["status"] == gfv.FAIL
+    forbidden = next(a for a in verdict["assertions"] if a["name"] == "must_not_assert_physical_outcome")
+    assert forbidden["status"] == gfv.FAIL
 
 
-def test_golden09_number10_touch_before_target_release_cannot_pass_chain():
+def test_golden08_cross_field_pass_case_is_unresolved_without_target_release():
     case = _manifest()["cases"][2]
-    result = _assist_result(
-        "10", target_release_ms=70500, scorer_touch_ms=70300, scorer_strike_ms=70400
-    )
+    result = {"traces": [_trace(69800, 73500, strikes=[], outcomes=[])]}
     verdict = gfv.validate_case(case, result)
     assert verdict["status"] == gfv.UNRESOLVED
-    ordered = next(a for a in verdict["assertions"]
-                   if a["name"] == "require_non_target_verified_jersey_touch_after_target_release")
-    assert ordered["status"] == gfv.UNRESOLVED
+    required = next(a for a in verdict["assertions"] if a["name"] == "require_target_release")
+    assert required["status"] == gfv.UNRESOLVED
+
+
+def test_golden09_cross_field_pass_case_rejects_wrong_actor_release_in_reference_range():
+    case = _manifest()["cases"][2]
+    wrong_actor_release = _strike(71000, target=False)
+    result = {"traces": [_trace(69800, 73500, strikes=[wrong_actor_release], outcomes=[])]}
+    verdict = gfv.validate_case(case, result)
+    assert verdict["status"] == gfv.FAIL
+    required = next(a for a in verdict["assertions"] if a["name"] == "require_target_release")
+    assert required["status"] == gfv.FAIL
 
 
 def test_golden10_fixture_never_false_passes_when_no_traces_exist():
