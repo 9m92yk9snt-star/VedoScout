@@ -6,202 +6,207 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  goalproof-one-shot:
+  fix10a-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: fix10-match-intelligence
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install focused dependencies
+      - name: Install FIX10A test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
-      - name: Provide no-network Emergent stubs
+      - name: Provide CI-only no-network Emergent import stubs
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p /tmp/ci_stubs/emergentintegrations/llm
-          touch /tmp/ci_stubs/emergentintegrations/__init__.py /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
           cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
           class _Payload:
-              def __init__(self, **kwargs): self.__dict__.update(kwargs)
-          class UserMessage(_Payload): pass
-          class ImageContent(_Payload): pass
-          class FileContentWithMimeType(_Payload): pass
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+          class UserMessage(_Payload):
+              pass
+
+          class ImageContent(_Payload):
+              pass
+
+          class FileContentWithMimeType(_Payload):
+              pass
+
           class LlmChat:
-              def __init__(self, **kwargs): self.__dict__.update(kwargs)
-              def with_model(self, provider, model): self.provider=provider; self.model=model; return self
-              async def send_message(self, _message): raise RuntimeError('CI network/model call forbidden')
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
-      - name: Decode and apply staged source plus regressions
-        shell: bash
+      - name: Compile changed backend modules
+        env:
+          PYTHONPATH: /tmp/ci_stubs:backend
         run: |
-          set -euo pipefail
-          cat docs/fix10a_goalproof_src00.tmp docs/fix10a_goalproof_src01.tmp docs/fix10a_goalproof_src02.tmp docs/fix10a_goalproof_src03.tmp | base64 -d | bunzip2 > /tmp/fix10a_goalproof.patch
-          base64 -d docs/fix10a_goalproof_test.tmp | gunzip > backend/tests/test_fix10a7_structured_goal_proof.py
-          base64 -d docs/fix10a_goalproof_golden.tmp | gunzip >> backend/tests/test_fix10a_golden_fixture_validator.py
-          git apply --check /tmp/fix10a_goalproof.patch
-          git apply /tmp/fix10a_goalproof.patch
-      - name: Enforce final target-strike goal linkage and single-goal fixture invariant
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! grep -q 'FIX10A_TARGET_GOAL_LINK_V2' backend/golden_fixture_validator.py; then
-          cat >> backend/golden_fixture_validator.py <<'PY'
-
-          # FIX10A_TARGET_GOAL_LINK_V2
-          # Final fail-closed Golden enforcement. Physical reconstruction remains
-          # non-canonical; this only validates that a goal crossing belongs to the
-          # target player's own verified release and that the fixture contains the
-          # exact number of physically verified goals declared by its hard gates.
-          _validate_case_before_target_goal_link = validate_case
-
-
-          def _target_goal_link_v2(case: dict, physical_result: dict | None) -> dict:
-              start, end = _window(case)
-              traces = _case_traces(physical_result, case)
-              strikes = _all_strikes(traces, start, end)
-              outcomes = _all_outcomes(traces, start, end)
-              strike_start, strike_end = _reference_range(case, "strike", (start, end))
-              target_releases = _target_releases(strikes, strike_start, strike_end)
-              if not target_releases:
-                  return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_GOAL_CHAIN"}
-              target_ids = {
-                  str(row.get("strike_id")) for row in target_releases
-                  if isinstance(row.get("strike_id"), str) and row.get("strike_id")
-              }
-              goals = [row for row in outcomes if row.get("physical_outcome") == "GOAL_PLANE_CROSSING"]
-              linked = [row for row in goals if str(row.get("strike_id") or "") in target_ids]
-              if linked:
-                  return {
-                      "status": PASS,
-                      "reason": "TARGET_RELEASE_LINKED_TO_GOAL_PLANE_CROSSING",
-                      "target_strike_ids": sorted(target_ids),
-                      "crossing_ms": [int(row["media_ms"]) for row in linked if _num(row.get("media_ms"))],
-                  }
-              if goals:
-                  return {
-                      "status": FAIL,
-                      "reason": "GOAL_PLANE_CROSSING_LINKED_TO_DIFFERENT_STRIKE",
-                      "target_strike_ids": sorted(target_ids),
-                      "observed_strike_ids": sorted({str(row.get("strike_id") or "") for row in goals}),
-                  }
-              return {
-                  "status": UNRESOLVED,
-                  "reason": "TARGET_GOAL_PLANE_CROSSING_NOT_VERIFIED",
-                  "target_strike_ids": sorted(target_ids),
-              }
-
-
-          def validate_case(case: dict, physical_result: dict | None,
-                            sequence_analysis: dict | None = None) -> dict:
-              result = _validate_case_before_target_goal_link(case, physical_result, sequence_analysis)
-              gate = case.get("physical_gate") if isinstance(case.get("physical_gate"), dict) else {}
-              if gate.get("require_goal_plane_crossing") is not True:
-                  return result
-              assertions = [
-                  row for row in (result.get("assertions") or [])
-                  if isinstance(row, dict) and row.get("name") != "require_target_goal_plane_crossing"
-              ]
-              assertions.append({
-                  "name": "require_target_goal_plane_crossing",
-                  **_target_goal_link_v2(case, physical_result),
-              })
-              statuses = [row.get("status") for row in assertions]
-              status = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
-              result["assertions"] = assertions
-              result["status"] = status
-              result["reason"] = (
-                  "ASSERTION_FAILURE" if status == FAIL
-                  else "INSUFFICIENT_EVIDENCE" if status == UNRESOLVED
-                  else "ALL_REQUIRED_ASSERTIONS_PASS"
-              )
-              return result
-
-
-          _validate_fixture_before_exact_goal_count = validate_fixture
-
-
-          def _exact_physical_goal_count_v2(manifest: dict, physical_result: dict | None) -> dict:
-              expected = sum(
-                  1 for case in (manifest.get("cases") or [])
-                  if isinstance(case, dict)
-                  and isinstance(case.get("physical_gate"), dict)
-                  and case["physical_gate"].get("require_goal_plane_crossing") is True
-              )
-              result = physical_result if isinstance(physical_result, dict) else {}
-              seen = set()
-              goals = []
-              for trace in result.get("traces") or []:
-                  if not isinstance(trace, dict):
-                      continue
-                  for outcome in trace.get("outcome_evidence") or []:
-                      if not isinstance(outcome, dict) or outcome.get("physical_outcome") != "GOAL_PLANE_CROSSING":
-                          continue
-                      key = (
-                          str(outcome.get("strike_id") or ""),
-                          int(outcome["media_ms"]) if _num(outcome.get("media_ms")) else None,
-                      )
-                      if key in seen:
-                          continue
-                      seen.add(key)
-                      goals.append(outcome)
-              observed = len(goals)
-              if observed > expected:
-                  status, reason = FAIL, "EXTRA_PHYSICAL_GOAL_CROSSING_ASSERTED"
-              elif observed < expected:
-                  status, reason = UNRESOLVED, "REQUIRED_PHYSICAL_GOAL_CROSSING_NOT_VERIFIED"
-              else:
-                  status, reason = PASS, "EXACT_PHYSICAL_GOAL_COUNT_MATCH"
-              return {
-                  "status": status,
-                  "reason": reason,
-                  "expected": expected,
-                  "observed": observed,
-                  "strike_ids": [str(row.get("strike_id") or "") for row in goals],
-              }
-
-
-          def validate_fixture(manifest: dict, physical_result: dict | None,
-                               sequence_analysis: dict | None = None) -> dict:
-              result = _validate_fixture_before_exact_goal_count(manifest, physical_result, sequence_analysis)
-              fixture_assertions = [{
-                  "name": "require_exact_physical_goal_count",
-                  **_exact_physical_goal_count_v2(manifest, physical_result),
-              }]
-              result["fixture_assertions"] = fixture_assertions
-              statuses = [row.get("status") for row in (result.get("cases") or [])] + [
-                  row.get("status") for row in fixture_assertions
-              ]
-              result["status"] = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
-              return result
-          PY
-          fi
-      - name: Compile and run full FIX10A regressions
+          python -m py_compile \
+            backend/motion_compensation.py \
+            backend/dense_replay.py \
+            backend/dense_track_refinement.py \
+            backend/ball_trajectory.py \
+            backend/ball_contact_engine.py \
+            backend/touch_graph.py \
+            backend/jersey_consensus.py \
+            backend/shot_outcome_engine.py \
+            backend/event_trace.py \
+            backend/physical_match_reconstruction.py \
+            backend/open_observation_compat.py \
+            backend/fix10a_vision_providers.py \
+            backend/fix10a_goal_direction.py \
+            backend/fix10a_shadow_runtime.py \
+            backend/golden_fixture_validator.py \
+            backend/run_real_video_golden.py \
+            backend/football_sequence_intelligence.py \
+            backend/identity_verify.py \
+            backend/server.py
+      - name: Run FIX10A regression family
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
+      - name: Package exact FIX10A runtime for private Golden diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: fix10a-live-runtime
+          path: |
+            backend/*.py
+            backend/models/yolov8n.onnx
+            backend/requirements.txt
+            backend/tests/fixtures/real_video/almin_test07_v1.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  existing-backend-regression-attempt:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install project requirements available outside Emergent runtime
         shell: bash
         run: |
           set -euo pipefail
-          python -m py_compile fix10a_ball_proof_gate.py fix10a_goal_direction.py fix10a_vision_providers.py golden_fixture_validator.py shot_outcome_engine.py tests/test_fix10a7_structured_goal_proof.py tests/test_fix10a_golden_fixture_validator.py
-          pytest --asyncio-mode=auto -q tests/test_fix10a*.py
-      - name: Publish verified source without changing workflow files
+          python -m pip install --upgrade pip
+          grep -v '^emergentintegrations==' backend/requirements.txt > /tmp/requirements-ci.txt
+          python -m pip install -r /tmp/requirements-ci.txt
+      - name: Provide CI-only no-network Emergent import stubs
         shell: bash
         run: |
           set -euo pipefail
-          rm -f docs/fix10a_goalproof_src00.tmp docs/fix10a_goalproof_src01.tmp docs/fix10a_goalproof_src02.tmp docs/fix10a_goalproof_src03.tmp docs/fix10a_goalproof_test.tmp docs/fix10a_goalproof_golden.tmp
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add backend/fix10a_ball_proof_gate.py backend/fix10a_goal_direction.py backend/fix10a_vision_providers.py backend/golden_fixture_validator.py backend/shot_outcome_engine.py backend/tests/test_fix10a7_structured_goal_proof.py backend/tests/test_fix10a_golden_fixture_validator.py
-          git add -u docs
-          git diff --cached --check
-          git commit -m 'FIX10A: bind whole-ball goal proof to target strike'
-          git push origin HEAD:fix10-match-intelligence
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          mkdir -p /tmp/ci_stubs/emergentintegrations/payments/stripe
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/stripe/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def model_dump(self):
+                  return dict(self.__dict__)
+
+          class UserMessage(_Payload):
+              pass
+
+          class ImageContent(_Payload):
+              pass
+
+          class FileContentWithMimeType(_Payload):
+              pass
+
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
+          cat > /tmp/ci_stubs/emergentintegrations/payments/stripe/checkout.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def model_dump(self):
+                  return dict(self.__dict__)
+
+          class CheckoutSessionResponse(_Payload):
+              pass
+
+          class CheckoutStatusResponse(_Payload):
+              pass
+
+          class CheckoutSessionRequest(_Payload):
+              pass
+
+          class StripeCheckout:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              async def create_checkout_session(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+
+              async def get_checkout_status(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+          PY
+      - name: Reproduce Emergent /app layout for chronological tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/backend" /app/backend
+          sudo ln -sfn "$GITHUB_WORKSPACE/frontend" /app/frontend
+          mkdir -p backend/uploads
+          if [ ! -f frontend/.env ]; then
+            printf '%s\n' 'REACT_APP_BACKEND_URL=http://127.0.0.1:8000' > frontend/.env
+          fi
+      - name: Run historical chronological regression contract
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: vedoscout_fix10_ci
+          EMERGENT_LLM_KEY: ci-placeholder
+          STRIPE_API_KEY: sk_test_placeholder
+          JWT_SECRET_KEY: fix10-ci-secret
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci-password
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+          FIX10A_SHADOW_ENABLED: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' | sort)
+          test "${#FIX_FILES[@]}" -gt 0
+          pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
