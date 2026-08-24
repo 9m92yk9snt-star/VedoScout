@@ -6,9 +6,58 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 jobs:
+  apply-fix10a3-once:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.sha == 'a87fcfd3a26c9686e8d00eecf84128171550e14b'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix10-match-intelligence
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify exact staging parent and patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "a87fcfd3a26c9686e8d00eecf84128171550e14b"
+          git apply --check .github/patches/fix10a3-dormant.patch
+      - name: Apply validated A3 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply .github/patches/fix10a3-dormant.patch
+      - name: Run focused A3 checks before commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -q pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92
+          PYTHONPATH=backend pytest -q \
+            backend/tests/test_fix10a3_ball_trajectory.py \
+            backend/tests/test_fix10a3_dormant_reacquisition.py \
+            backend/tests/test_fix10a2_dense_ball_floor.py
+      - name: Commit clean runtime change
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/patches/fix10a3-dormant.patch .github/workflows/apply-fix10a3-once.yml
+          git checkout 95bc41260295a75c7f0021e73268c0220631ad3d -- .github/workflows/fix10a-verify.yml
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'FIX10A3: add dormant ball reacquisition'
+          git push origin HEAD:fix10-match-intelligence
+      - name: Start normal FIX10A verification on final head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh workflow run fix10a-verify.yml --ref fix10-match-intelligence
+
   fix10a-unit:
     runs-on: ubuntu-latest
     steps:
