@@ -1,0 +1,130 @@
+name: FIX10A Step 4 apply
+
+on:
+  push:
+    branches: [fix10-match-intelligence]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Gate exact Step-4 bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD~1)" = "cf6e8a52cbbb31f3f441594eff0266d442d9fcc5"
+          test "$(git hash-object backend/physical_match_reconstruction.py)" = "2f49c4cdac349bc56f537582356e9815b83922a2"
+          test "$(git hash-object backend/shot_outcome_engine.py)" = "d04bb68b819b8dd54875482f2eb1d72714316b24"
+          echo '493bf51fb35196dc6f93975d5b0a5a47340ed4ae84836de48b5ce27555dbccfa  .fix10a_step4.patch.gz' | sha256sum -c -
+          gzip -dc .fix10a_step4.patch.gz > /tmp/fix10a_step4.patch
+          git apply --check /tmp/fix10a_step4.patch
+      - name: Apply Step-4 patch
+        run: git apply /tmp/fix10a_step4.patch
+      - name: Install project requirements available outside Emergent runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          grep -v '^emergentintegrations==' backend/requirements.txt > /tmp/requirements-ci.txt
+          python -m pip install -r /tmp/requirements-ci.txt
+      - name: Provide CI-only no-network Emergent stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          mkdir -p /tmp/ci_stubs/emergentintegrations/payments/stripe
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/stripe/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs): self.__dict__.update(kwargs)
+              def model_dump(self): return dict(self.__dict__)
+          class UserMessage(_Payload): pass
+          class ImageContent(_Payload): pass
+          class FileContentWithMimeType(_Payload): pass
+          class LlmChat:
+              def __init__(self, **kwargs): self.__dict__.update(kwargs)
+              def with_model(self, provider, model): self.provider=provider; self.model=model; return self
+              async def send_message(self, _message): raise RuntimeError('CI Emergent stub: network/model call forbidden')
+          PY
+          cat > /tmp/ci_stubs/emergentintegrations/payments/stripe/checkout.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs): self.__dict__.update(kwargs)
+              def model_dump(self): return dict(self.__dict__)
+          class CheckoutSessionResponse(_Payload): pass
+          class CheckoutStatusResponse(_Payload): pass
+          class CheckoutSessionRequest(_Payload): pass
+          class StripeCheckout:
+              def __init__(self, **kwargs): self.__dict__.update(kwargs)
+              async def create_checkout_session(self, *_a, **_k): raise RuntimeError('CI payment call forbidden')
+              async def get_checkout_status(self, *_a, **_k): raise RuntimeError('CI payment call forbidden')
+          PY
+      - name: Reproduce Emergent app layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/backend" /app/backend
+          sudo ln -sfn "$GITHUB_WORKSPACE/frontend" /app/frontend
+          mkdir -p backend/uploads
+          if [ ! -f frontend/.env ]; then
+            printf '%s\n' 'REACT_APP_BACKEND_URL=http://127.0.0.1:8000' > frontend/.env
+          fi
+      - name: Compile Step-4 modules
+        env:
+          PYTHONPATH: /tmp/ci_stubs:backend
+        run: |
+          python -m py_compile \
+            backend/contact_role_resolver.py \
+            backend/shot_outcome_engine.py \
+            backend/physical_match_reconstruction.py
+      - name: Run full FIX10A regression family
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
+      - name: Run historical FIX00-FIX09 and unified regression contract
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: vedoscout_fix10_step4_ci
+          EMERGENT_LLM_KEY: ci-placeholder
+          STRIPE_API_KEY: sk_test_placeholder
+          JWT_SECRET_KEY: fix10-ci-secret
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci-password
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+          FIX10A_SHADOW_ENABLED: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' | sort)
+          test "${#FIX_FILES[@]}" -gt 0
+          pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
+      - name: Commit verified Step-4 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name '9m92yk9snt-star'
+          git config user.email '9m92yk9snt@privaterelay.appleid.com'
+          git rm .fix10a_step4.patch.gz .github/workflows/fix10a-step4-apply.yml
+          git add backend/contact_role_resolver.py backend/physical_match_reconstruction.py backend/shot_outcome_engine.py backend/tests/test_fix10a_contact_role_resolver.py
+          git commit -m 'FIX10A Step 4: resolve contact roles before physical releases'
+          git push origin HEAD:fix10-match-intelligence
