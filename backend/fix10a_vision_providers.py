@@ -351,6 +351,28 @@ def _first_post_strike_other_touches(strikes, touch_graph) -> dict[str, int]:
     return out
 
 
+def _verified_intervention_track_times(interventions) -> dict[str, int]:
+    """Return only independently VERIFIED A7 intervention actors.
+
+    A7 full-body intervention deliberately bypasses A4/A5 Touch Graph semantics.
+    Supporting role review therefore needs a direct, evidence-only handoff from
+    the already-verified A7 actor; otherwise a hand/arm save can never request a
+    goalkeeper-role read.  No role is inferred here.
+    """
+    out = {}
+    for row in interventions or []:
+        if not isinstance(row, dict):
+            continue
+        if row.get("status") != "VERIFIED" or row.get("proof_eligible") is not True:
+            continue
+        track = row.get("player_track_id")
+        if not isinstance(track, str) or not _num(row.get("media_ms")):
+            continue
+        media_ms = int(row["media_ms"])
+        out[track] = min(media_ms, out.get(track, media_ms))
+    return out
+
+
 def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[dict]:
     requests = []
     for track, pivot_ms in list(track_times.items())[:MAX_ROLE_TRACKS]:
@@ -437,10 +459,15 @@ class ShadowVisionProviders:
         return votes_by_track
 
     def role_evidence_provider(self, video_path: str, window: dict, strikes,
-                               touch_graph: dict, window_evidence) -> dict:
+                               touch_graph: dict, window_evidence, interventions=None) -> dict:
         if not self.api_key:
             return {}
-        track_times = _first_post_strike_other_touches(strikes, touch_graph)
+        # A7 intervention actors are primary role-review candidates because A7
+        # intentionally does not create ordinary A4/A5 touches. Touch-derived
+        # candidates remain useful as secondary supporting context.
+        track_times = _verified_intervention_track_times(interventions)
+        for track, media_ms in _first_post_strike_other_touches(strikes, touch_graph).items():
+            track_times[track] = min(media_ms, track_times.get(track, media_ms))
         requests = _role_review_requests(window_evidence, track_times)
         if not requests:
             return {}

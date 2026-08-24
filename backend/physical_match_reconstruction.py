@@ -9,6 +9,7 @@ reconciliation belongs to FIX10B and the existing B3 authority.
 from __future__ import annotations
 
 from copy import deepcopy
+import inspect
 
 import ball_contact_engine
 import ball_trajectory
@@ -32,6 +33,27 @@ def _safe_provider(provider, *args, default=None):
         return default
     try:
         return provider(*args)
+    except Exception:
+        return default
+
+
+def _safe_role_provider(provider, video_path, window, strikes, touch_graph,
+                        window_evidence, interventions, default=None):
+    """Call new six-argument role providers without breaking old injections."""
+    if provider is None:
+        return default
+    args5 = (video_path, window, strikes, touch_graph, window_evidence)
+    try:
+        signature = inspect.signature(provider)
+        parameters = list(signature.parameters.values())
+        accepts_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in parameters)
+        positional = [
+            p for p in parameters
+            if p.kind in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
+        ]
+        if accepts_varargs or len(positional) >= 6:
+            return provider(*args5, interventions)
+        return provider(*args5)
     except Exception:
         return default
 
@@ -138,17 +160,32 @@ def reconstruct_physical_match(
             touch_with_jersey = jersey_result.get("touch_graph") or touches
 
             strikes = shot_outcome_engine.find_strike_releases(touch_with_jersey, trajectory)
-            provider_roles = _safe_provider(
+
+            # Detect independent A7 intervention actors before role review. A7
+            # intentionally bypasses A4/A5 Touch Graph truth, so waiting until
+            # after role-provider selection would make hand/arm interventions
+            # invisible to goalkeeper/outfield verification.
+            a7_interventions = [
+                post_strike_intervention.detect_post_strike_intervention(
+                    strike, dense_with_jersey, trajectory
+                )
+                for strike in strikes
+            ]
+            a7_verified = sum(
+                isinstance(row, dict) and row.get("status") == "VERIFIED"
+                for row in a7_interventions
+            )
+            provider_roles = _safe_role_provider(
                 role_evidence_provider, str(video_path), deepcopy(window), deepcopy(strikes),
-                deepcopy(touch_with_jersey), deepcopy(dense_with_jersey), default={},
+                deepcopy(touch_with_jersey), deepcopy(dense_with_jersey),
+                deepcopy(a7_interventions), default={},
             )
             window_roles = deepcopy(provider_roles) if isinstance(provider_roles, dict) else {}
             if isinstance(role_evidence, dict):
                 window_roles.update(deepcopy(role_evidence))
 
             outcomes = []
-            a7_verified = 0
-            for strike in strikes:
+            for strike, a7 in zip(strikes, a7_interventions):
                 goal_geometry = _safe_provider(
                     goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
                 )
@@ -156,14 +193,6 @@ def reconstruct_physical_match(
                     strike, trajectory, touch_with_jersey,
                     goal_geometry=goal_geometry, role_evidence=window_roles,
                 )
-                # A7 is intentionally independent of A4/A5 touch truth. It runs
-                # only after a verified physical release and may attach stronger
-                # full-body post-strike evidence to the outcome layer.
-                a7 = post_strike_intervention.detect_post_strike_intervention(
-                    strike, dense_with_jersey, trajectory
-                )
-                if a7.get("status") == "VERIFIED":
-                    a7_verified += 1
                 outcome = post_strike_intervention.apply_intervention_evidence(
                     outcome, a7, window_roles
                 )
