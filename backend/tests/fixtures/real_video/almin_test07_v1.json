@@ -1,0 +1,83 @@
+{
+  "schema": "FIX10_REAL_VIDEO_GOLDEN_V1",
+  "fixture_id": "almin_test07_v1",
+  "source": {
+    "library_name": "Almin test07(2).mp4",
+    "sha256": "8e9f04b4f70cb3174a204ec37ce957ee4ff0f3506a0d1815ef0e86e19b17df34",
+    "duration_ms": 76767,
+    "width": 512,
+    "height": 910,
+    "avg_fps": 30.0,
+    "frame_count": 2303,
+    "video_committed_to_repo": false
+  },
+  "authority": {
+    "ground_truth_source": "USER_CONFIRMED_MATCH_EVENTS_PLUS_FRAME_REVIEW",
+    "target_jersey": "15",
+    "rule": "Fixture expectations are acceptance truth only; they must never be injected into perception or physical reconstruction."
+  },
+  "cases": [
+    {
+      "case_id": "saved_shot_23s",
+      "window_ms": [23550, 25150],
+      "reference_ranges_ms": {
+        "target_strike": [23650, 23950],
+        "intervention": [24250, 24750]
+      },
+      "expected_semantics": ["SHOT", "SAVED"],
+      "physical_gate": {
+        "require_target_release": true,
+        "require_player_intervention": true,
+        "require_physical_outcome": "GOALKEEPER_SAVE_EVIDENCE",
+        "must_not_assert_physical_outcome": ["GOAL_PLANE_CROSSING"]
+      },
+      "canonical_later": {
+        "expected": "SHOT_SAVED",
+        "forbidden": ["GOAL"]
+      }
+    },
+    {
+      "case_id": "receive_feint_accel_right_foot_goal_27s",
+      "window_ms": [27200, 34000],
+      "reference_ranges_ms": {
+        "receive_and_first_touch": [27600, 28350],
+        "feint_and_separation": [28300, 30400],
+        "target_strike": [30600, 31400]
+      },
+      "expected_semantics": ["RECEIVE", "FEINT", "ACCELERATION", "SHOT", "GOAL"],
+      "expected_foot": "RIGHT",
+      "physical_gate": {
+        "require_target_release": true,
+        "require_goal_plane_crossing": true
+      },
+      "perception_gate": {
+        "require_kinds": ["RECEIVE", "FEINT", "ACCELERATION", "SHOT"],
+        "require_shot_foot": "RIGHT"
+      },
+      "canonical_later": {
+        "expected": "GOAL"
+      }
+    },
+    {
+      "case_id": "assist_15_to_scorer_10_not_12",
+      "window_ms": [65500, 72500],
+      "reference_ranges_ms": {
+        "decisive_teammate_touch": [69500, 71250]
+      },
+      "expected_semantics": ["PASS_OR_CROSS", "TEAMMATE_DECISIVE_TOUCH", "TEAMMATE_SHOT", "GOAL"],
+      "physical_gate": {
+        "require_target_release": true,
+        "require_non_target_verified_jersey_touch_after_target_release": "10",
+        "require_non_target_verified_jersey_strike_after_target_release": "10",
+        "forbid_non_target_verified_jersey_touch": "12",
+        "require_goal_plane_crossing": true
+      },
+      "canonical_later": {
+        "expected_target_event": "ASSIST",
+        "expected_scorer_jersey": "10",
+        "forbidden_scorer_jerseys": ["12", "15"],
+        "forbidden": ["DUPLICATE_SCORING_EVENT"]
+      }
+    }
+  ]
+}

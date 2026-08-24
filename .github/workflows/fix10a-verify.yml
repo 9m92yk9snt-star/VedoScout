@@ -1,0 +1,75 @@
+name: FIX10A verification
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-a7-support-once:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Gate exact A7 support staging baseline
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f .fix10a7_support_dense.patch ] || [ ! -f .fix10a7_support_intervention.patch ] || [ ! -f .fix10a7_support_tests.patch ]; then
+            echo 'apply=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          test "$(git hash-object backend/dense_track_refinement.py)" = "5fe73d1e3eda02ad1636b24a2783d4abf78c169b"
+          test "$(git hash-object backend/post_strike_intervention.py)" = "cd2360edb5e99407e77e3d33f597e7e2ce8718b7"
+          echo '743cefa57275f107a3882535f2f4cd13ee06de9ec5d9f6cf42a0c9f46eee9f24  .fix10a7_support_dense.patch' | sha256sum -c -
+          echo '3edfe7b7eab52ce527216470e2cb632c6247ab31f1131863385ca98fd50d424e  .fix10a7_support_intervention.patch' | sha256sum -c -
+          echo '28bf0ea5730cede796fef91b095afb3944d6d97e1d10adee5e83f7514ea4b3ee  .fix10a7_support_tests.patch' | sha256sum -c -
+          cat .fix10a7_support_dense.patch .fix10a7_support_intervention.patch .fix10a7_support_tests.patch > /tmp/fix10a7-support.patch
+          git apply --check /tmp/fix10a7-support.patch
+          echo 'apply=true' >> "$GITHUB_OUTPUT"
+      - name: Apply validated A7 support patch
+        if: steps.gate.outputs.apply == 'true'
+        run: git apply /tmp/fix10a7-support.patch
+      - name: Install focused test dependencies
+        if: steps.gate.outputs.apply == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
+      - name: Compile A7 support modules
+        if: steps.gate.outputs.apply == 'true'
+        env:
+          PYTHONPATH: backend
+        run: |
+          python -m py_compile backend/dense_track_refinement.py backend/post_strike_intervention.py
+      - name: Run focused A7 support and adjacent regressions
+        if: steps.gate.outputs.apply == 'true'
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest --asyncio-mode=auto -q \
+            tests/test_fix10a7_support_intervention.py \
+            tests/test_fix10a7_full_body_intervention.py \
+            tests/test_fix10a2_dense_track_refinement.py \
+            tests/test_fix10a3_ball_trajectory.py \
+            tests/test_fix10a4_ball_contact.py \
+            tests/test_fix10a5_touch_graph.py
+      - name: Commit clean A7 support runtime change
+        if: steps.gate.outputs.apply == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name '9m92yk9snt-star'
+          git config user.email '9m92yk9snt@privaterelay.appleid.com'
+          git rm .fix10a7_support_dense.patch .fix10a7_support_intervention.patch .fix10a7_support_tests.patch
+          git add backend/dense_track_refinement.py backend/post_strike_intervention.py backend/tests/test_fix10a7_support_intervention.py
+          git commit -m 'FIX10A7: add isolated multi-frame ball support for keeper intervention'
+          git push origin HEAD:fix10-match-intelligence

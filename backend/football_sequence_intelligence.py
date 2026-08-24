@@ -34,6 +34,8 @@ import json
 import math
 from copy import deepcopy
 
+import open_observation_compat
+
 VERSION = 1
 GLOBAL_TARGET_ID = "GLOBAL_TARGET"
 
@@ -505,6 +507,7 @@ SEQUENCE RULES
 - Follow the sequence several seconds BEFORE and AFTER each possible target involvement.
 - A sequence may contain: scan, body orientation, receive, first touch, control, turn, feint, direction change, acceleration/deceleration, carry, dribble/take-on, pass/cross/key pass, shot, duel, tackle, interception, recovery, press, support, off-ball run, or space creation.
 - Record micro-actions separately when they are genuinely visible. Do not collapse receive → turn → feint → acceleration → shot into one generic label.
+- Open-world perception: if a visible football behaviour does not fit the canonical kind enum, set kind=OTHER but preserve a concise free-form raw_kind and raw_description. Never discard a visible behaviour merely because the enum has no exact label.
 - Distinguish target action from teammate/opponent action. Track possession transfer and who performs the next action.
 - For a pass/cross that might become an assist, inspect the continuous visible chain: TARGET contact → teammate receive/use → teammate shot → visible goal. A cut breaks the causal chain.
 - For a target goal, require target shot contact and a visible goal outcome in the same causal sequence.
@@ -536,6 +539,8 @@ RETURN ONLY VALID JSON with this exact top-level shape:
         {{
           "action_id": "unique within response",
           "kind": "RECEIVE|FIRST_TOUCH|CONTROL|CARRY|DRIBBLE|TAKE_ON|FEINT|TURN|DIRECTION_CHANGE|ACCELERATION|DECELERATION|PASS|CROSS|KEY_PASS|SHOT|DUEL|TACKLE|INTERCEPTION|RECOVERY|PRESS|RUN|OFF_BALL_RUN|SPACE_CREATION|SCAN|BODY_ORIENTATION|SUPPORT|OTHER",
+          "raw_kind": "concise free-form visible football action label; may be outside canonical enum",
+          "raw_description": "concise factual visible behaviour/context; no inference",
           "start_ms": 0,
           "contact_ms": null,
           "end_ms": 0,
@@ -670,7 +675,7 @@ def _normalise_action(a, window):
     for k in ("target_contact_ms", "receiver_ms", "teammate_shot_ms", "goal_outcome_ms"):
         if chain_out[k] is not None and not (ws <= chain_out[k] <= we):
             chain_out[k] = None
-    return {
+    normalised = {
         "action_id": str(a.get("action_id") or "")[:80] or None,
         "kind": kind,
         "start_ms": start, "contact_ms": contact, "end_ms": end,
@@ -689,6 +694,7 @@ def _normalise_action(a, window):
         "contact_visibility": cv,
         "duplicate_of": str(a.get("duplicate_of"))[:80] if a.get("duplicate_of") else None,
     }
+    return open_observation_compat.preserve_open_observation(a, normalised)
 
 
 def normalise_sequence_analysis(raw, plan: dict) -> dict:
