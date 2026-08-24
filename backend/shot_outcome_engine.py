@@ -99,8 +99,22 @@ def find_strike_releases(touch_graph: dict | None, ball_trajectory=None) -> list
             continue
         kinds = set(str(x) for x in (touch.get("possession_kinds") or []))
         change = float(touch.get("trajectory_change") or 0.0)
-        is_release = "RELEASE" in kinds
-        physical_strike = is_release or change >= MIN_RELEASE_TRAJECTORY_CHANGE
+        contact_role = touch.get("contact_role") if isinstance(touch.get("contact_role"), dict) else None
+        if contact_role is not None:
+            # Step 4 is explicit release authority when it reviewed a contact.
+            # RECEIVE/CONTROL and UNRESOLVED must never be promoted to a strike
+            # merely because contact trajectory change is large. Touches with
+            # no Step-4 role retain the legacy physical fallback for compatibility.
+            if contact_role.get("status") != "VERIFIED":
+                continue
+            role = str(contact_role.get("role") or "")
+            if role != "RELEASE":
+                continue
+            is_release = True
+            physical_strike = True
+        else:
+            is_release = "RELEASE" in kinds
+            physical_strike = is_release or change >= MIN_RELEASE_TRAJECTORY_CHANGE
         if not physical_strike:
             continue
         ms = int(touch.get("representative_ms") or touch.get("media_ms") or 0)

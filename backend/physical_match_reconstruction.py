@@ -13,6 +13,7 @@ import inspect
 
 import ball_contact_engine
 import ball_trajectory
+import contact_role_resolver
 import dense_replay
 import dense_track_refinement
 import event_trace
@@ -148,6 +149,7 @@ def reconstruct_physical_match(
                 contact_result, step3_recovery
             )
             touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)
+            touches = contact_role_resolver.apply_contact_roles(touches, contact_result)
 
             requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)
             votes_by_track = _safe_provider(
