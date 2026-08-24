@@ -30,6 +30,9 @@ jobs:
           test "$(git hash-object backend/physical_match_reconstruction.py)" = "2f49c4cdac349bc56f537582356e9815b83922a2"
           test "$(git hash-object backend/shot_outcome_engine.py)" = "d04bb68b819b8dd54875482f2eb1d72714316b24"
           test "$(git hash-object .fix10a_step4.patch.gz)" = "ae91d5f5af332131339f149ffa5fd67f10cf03cb"
+          echo "Step-4 staging blob diagnostics:"
+          file .fix10a_step4.patch.gz || true
+          printf 'first32='; od -An -tx1 -N32 .fix10a_step4.patch.gz | tr -d '\n '; echo
           gzip -t .fix10a_step4.patch.gz
           gzip -dc .fix10a_step4.patch.gz > /tmp/fix10a_step4.patch
           git apply --check /tmp/fix10a_step4.patch
