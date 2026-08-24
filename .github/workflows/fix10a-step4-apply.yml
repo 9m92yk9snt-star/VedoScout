@@ -1,8 +1,8 @@
 name: FIX10A Step 4 apply
 
 on:
-  push:
-    branches: [fix10-match-intelligence]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -18,15 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 2
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Gate exact Step-4 bootstrap
+      - name: Gate exact Step-4 source baseline
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD~1)" = "cf6e8a52cbbb31f3f441594eff0266d442d9fcc5"
           test "$(git hash-object backend/physical_match_reconstruction.py)" = "2f49c4cdac349bc56f537582356e9815b83922a2"
           test "$(git hash-object backend/shot_outcome_engine.py)" = "d04bb68b819b8dd54875482f2eb1d72714316b24"
           echo '493bf51fb35196dc6f93975d5b0a5a47340ed4ae84836de48b5ce27555dbccfa  .fix10a_step4.patch.gz' | sha256sum -c -
