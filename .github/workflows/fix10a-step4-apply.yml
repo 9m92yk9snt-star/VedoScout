@@ -33,8 +33,13 @@ jobs:
           echo "Step-4 staging blob diagnostics:"
           file .fix10a_step4.patch.gz || true
           printf 'first32='; od -An -tx1 -N32 .fix10a_step4.patch.gz | tr -d '\n '; echo
-          gzip -t .fix10a_step4.patch.gz
+          set +e
           gzip -dc .fix10a_step4.patch.gz > /tmp/fix10a_step4.patch
+          gzip_rc=$?
+          set -e
+          echo "gzip_rc=$gzip_rc extracted_bytes=$(wc -c < /tmp/fix10a_step4.patch)"
+          sha256sum /tmp/fix10a_step4.patch
+          test -s /tmp/fix10a_step4.patch
           git apply --check /tmp/fix10a_step4.patch
       - name: Apply Step-4 patch
         run: git apply /tmp/fix10a_step4.patch
