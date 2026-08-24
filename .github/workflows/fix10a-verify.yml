@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install -q pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92
+          python -m pip install -q pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
           PYTHONPATH=backend pytest -q \
             backend/tests/test_fix10a3_ball_trajectory.py \
             backend/tests/test_fix10a3_dormant_reacquisition.py \
