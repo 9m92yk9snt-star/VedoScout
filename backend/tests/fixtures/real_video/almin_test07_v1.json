@@ -59,24 +59,19 @@
       }
     },
     {
-      "case_id": "assist_15_to_scorer_10_not_12",
-      "window_ms": [65500, 72500],
+      "case_id": "receive_cross_field_pass_no_goal_70s",
+      "window_ms": [69800, 73500],
       "reference_ranges_ms": {
-        "decisive_teammate_touch": [69500, 71250]
+        "target_strike": [70500, 71350]
       },
-      "expected_semantics": ["PASS_OR_CROSS", "TEAMMATE_DECISIVE_TOUCH", "TEAMMATE_SHOT", "GOAL"],
+      "expected_semantics": ["RECEIVE", "PASS_OR_CROSS"],
       "physical_gate": {
         "require_target_release": true,
-        "require_non_target_verified_jersey_touch_after_target_release": "10",
-        "require_non_target_verified_jersey_strike_after_target_release": "10",
-        "forbid_non_target_verified_jersey_touch": "12",
-        "require_goal_plane_crossing": true
+        "must_not_assert_physical_outcome": ["GOAL_PLANE_CROSSING"]
       },
       "canonical_later": {
-        "expected_target_event": "ASSIST",
-        "expected_scorer_jersey": "10",
-        "forbidden_scorer_jerseys": ["12", "15"],
-        "forbidden": ["DUPLICATE_SCORING_EVENT"]
+        "expected_target_event": "PASS_OR_CROSS",
+        "forbidden": ["GOAL", "ASSIST", "DUPLICATE_SCORING_EVENT"]
       }
     }
   ]
