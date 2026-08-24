@@ -1,0 +1,190 @@
+name: FIX10A post-anchor discontinuity gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Gate exact baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object backend/short_occlusion_contact_recovery.py)" = "a2ffdcdd5d586a61dc019314b6c4094c77d85a83"
+          test ! -e backend/tests/test_fix10a4_post_anchor_discontinuity.py
+      - name: Apply fail-closed post-anchor trajectory gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('backend/short_occlusion_contact_recovery.py')
+          s = p.read_text()
+          old = '''def _measured_reacquisition_recoveries(frames, measured, contact_result):\n    verified = []\n    unresolved = []\n'''
+          new = '''def _trajectory_discontinuities_between(rows, start_ms, end_ms):\n    """Return A3 discontinuity-rejection evidence strictly inside an interval."""\n    out = []\n    lo, hi = sorted((int(start_ms), int(end_ms)))\n    for row in rows or []:\n        if not isinstance(row, dict) or not _num(row.get("media_ms")):\n            continue\n        media_ms = int(row["media_ms"])\n        if not lo < media_ms < hi:\n            continue\n        provenance = str(row.get("provenance") or "")\n        if "DISCONTINUITY_REJECTED" not in provenance:\n            continue\n        out.append({\n            "media_ms": media_ms,\n            "state": row.get("state"),\n            "provenance": provenance,\n            "proof_eligible": row.get("proof_eligible"),\n        })\n    return out\n\n\ndef _measured_reacquisition_recoveries(frames, measured, contact_result, trajectory_rows=None):\n    verified = []\n    unresolved = []\n'''
+          assert s.count(old) == 1
+          s = s.replace(old, new, 1)
+          old = '''        if int(nxt["media_ms"]) - int(anchor["media_ms"]) > MAX_OUTGOING_SIDE_MS:\n            continue\n        frame = _frame_near(frames, int(anchor["media_ms"]))\n'''
+          new = '''        if int(nxt["media_ms"]) - int(anchor["media_ms"]) > MAX_OUTGOING_SIDE_MS:\n            continue\n        post_anchor_discontinuities = _trajectory_discontinuities_between(\n            trajectory_rows, int(anchor["media_ms"]), int(nxt["media_ms"])\n        )\n        if post_anchor_discontinuities:\n            # A3 has already rejected at least one detector path between this\n            # would-be contact anchor and the measured point used as outgoing\n            # physics. Treat that as contradictory trajectory evidence rather\n            # than bridging across it and manufacturing a release/contact.\n            unresolved.append({\n                "media_ms": int(anchor["media_ms"]),\n                "reason": "POST_ANCHOR_TRAJECTORY_DISCONTINUITY_REJECTED",\n                "mode": "POST_GAP_MEASURED_REACQUISITION",\n                "next_measured_ms": int(nxt["media_ms"]),\n                "discontinuity_rows": post_anchor_discontinuities,\n            })\n            continue\n        frame = _frame_near(frames, int(anchor["media_ms"]))\n'''
+          assert s.count(old) == 1
+          s = s.replace(old, new, 1)
+          old = '''    measured_verified, measured_unresolved = _measured_reacquisition_recoveries(\n        frames, measured, contact_result or {}\n    )\n'''
+          new = '''    measured_verified, measured_unresolved = _measured_reacquisition_recoveries(\n        frames, measured, contact_result or {}, trajectory_rows=ball_trajectory or []\n    )\n'''
+          assert s.count(old) == 1
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Add focused regression tests
+        shell: bash
+        run: |
+          cat > backend/tests/test_fix10a4_post_anchor_discontinuity.py <<'PY'
+          from __future__ import annotations
+
+          import sys
+          from pathlib import Path
+
+          BACKEND = Path(__file__).resolve().parents[1]
+          sys.path.insert(0, str(BACKEND))
+
+          import short_occlusion_contact_recovery as s3
+
+
+          def _box(cx, cy, w=.03, h=.02):
+              return {"x": cx - w / 2, "y": cy - h / 2, "w": w, "h": h}
+
+
+          def _player():
+              return {
+                  "local_track_id": "p001",
+                  "candidate_local_track_ids": ["p001"],
+                  "box": {"x": .45, "y": .40, "w": .20, "h": .30},
+                  "association_state": "VERIFIED_LOCAL",
+              }
+
+
+          def _frame(ms):
+              return {
+                  "media_ms": ms,
+                  "scene_id": "s1",
+                  "used_fallback": False,
+                  "time_authority": "ACTUAL_MEDIA_PTS",
+                  "cut_barrier": False,
+                  "players": [_player()],
+                  "ball_candidates": [],
+                  "a7_ball_support_candidates": [],
+              }
+
+
+          def _measured(ms, cx, cy):
+              return {
+                  "media_ms": ms,
+                  "state": "MEASURED",
+                  "box": _box(cx, cy),
+                  "confidence": .8,
+                  "proof_eligible": True,
+                  "time_authority": "ACTUAL_MEDIA_PTS",
+                  "used_fallback": False,
+                  "provenance": "LOCAL_DENSE_DETECTOR",
+              }
+
+
+          def _empty_contacts():
+              return {
+                  "version": 1, "contacts": [], "accepted": [], "unresolved": [], "rejected": [],
+                  "metrics": {"accepted": 0, "unresolved": 0, "rejected": 0},
+              }
+
+
+          def _valid_post_gap_fixture():
+              frames = [_frame(500), _frame(567), _frame(900), _frame(933)]
+              trajectory = [
+                  _measured(500, .55, .55),
+                  _measured(567, .55, .59),
+                  _measured(900, .55, .67),
+                  _measured(933, .58, .61),
+              ]
+              return frames, trajectory
+
+
+          def test_s3_post_anchor_discontinuity_blocks_false_measured_reacquisition():
+              frames, trajectory = _valid_post_gap_fixture()
+              trajectory.insert(3, {
+                  "media_ms": 915,
+                  "state": "PREDICTED_SHORT_GAP",
+                  "box": _box(.56, .66),
+                  "confidence": .2,
+                  "proof_eligible": False,
+                  "time_authority": "ACTUAL_MEDIA_PTS",
+                  "used_fallback": False,
+                  "provenance": "KINEMATIC_SHORT_GAP_DISCONTINUITY_REJECTED",
+              })
+              out = s3.recover_short_occlusion_contacts(frames, trajectory, _empty_contacts())
+              assert out["verified"] == []
+              row = next(x for x in out["unresolved"]
+                         if x["reason"] == "POST_ANCHOR_TRAJECTORY_DISCONTINUITY_REJECTED")
+              assert row["media_ms"] == 900
+              assert row["next_measured_ms"] == 933
+              assert row["discontinuity_rows"] == [{
+                  "media_ms": 915,
+                  "state": "PREDICTED_SHORT_GAP",
+                  "provenance": "KINEMATIC_SHORT_GAP_DISCONTINUITY_REJECTED",
+                  "proof_eligible": False,
+              }]
+
+
+          def test_s3_immediate_measured_outgoing_without_contradiction_still_recovers():
+              frames, trajectory = _valid_post_gap_fixture()
+              out = s3.recover_short_occlusion_contacts(frames, trajectory, _empty_contacts())
+              assert out["status"] == "VERIFIED"
+              assert len(out["verified"]) == 1
+              assert out["verified"][0]["media_ms"] == 900
+              assert out["verified"][0]["recovery_mode"] == "POST_GAP_MEASURED_REACQUISITION"
+
+
+          def test_s3_pre_anchor_discontinuity_does_not_block_legitimate_reacquisition():
+              frames, trajectory = _valid_post_gap_fixture()
+              trajectory.insert(2, {
+                  "media_ms": 700,
+                  "state": "PREDICTED_SHORT_GAP",
+                  "box": _box(.55, .61),
+                  "confidence": .2,
+                  "proof_eligible": False,
+                  "time_authority": "ACTUAL_MEDIA_PTS",
+                  "used_fallback": False,
+                  "provenance": "DORMANT_REACQUIRE_DISCONTINUITY_REJECTED",
+              })
+              out = s3.recover_short_occlusion_contacts(frames, trajectory, _empty_contacts())
+              assert out["status"] == "VERIFIED"
+              assert len(out["verified"]) == 1
+              assert out["verified"][0]["media_ms"] == 900
+          PY
+      - name: Install focused test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92
+      - name: Verify focused recovery contract
+        working-directory: backend
+        run: |
+          python -m py_compile short_occlusion_contact_recovery.py tests/test_fix10a4_post_anchor_discontinuity.py
+          PYTHONPATH=. pytest -q tests/test_fix10a4_short_occlusion_recovery.py tests/test_fix10a4_post_anchor_discontinuity.py
+      - name: Commit verified fail-closed gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name '9m92yk9snt-star'
+          git config user.email '9m92yk9snt@privaterelay.appleid.com'
+          git rm .github/workflows/fix10a-post-anchor-gate.yml
+          git add backend/short_occlusion_contact_recovery.py backend/tests/test_fix10a4_post_anchor_discontinuity.py
+          git commit -m 'FIX10A: reject post-anchor trajectory discontinuity in Step 3'
+          git push origin HEAD:fix10-match-intelligence
