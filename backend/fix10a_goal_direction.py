@@ -388,6 +388,58 @@ def apply_direction_gate(outcome: dict, ball_trajectory, goal_geometry) -> dict:
     if not first or not (_num(first.get("from_ms")) and _num(first.get("to_ms"))):
         return _downgrade_crossing(row, "CROSSING_SEGMENT_EVIDENCE_MISSING")
     from_ms, to_ms = int(first["from_ms"]), int(first["to_ms"])
+
+    # Detector-loss recovery lane: the structured visual proof already carries
+    # a strict, continuous whole-ball FIELD_SIDE -> BEYOND transition.  We do
+    # not fabricate detector rows here.  Instead, an independent field-side
+    # review must still orient the visible goal geometry at both endpoints.
+    if str(first.get("proof_lane") or "") == "STRUCTURED_VISUAL_WHOLE_BALL":
+        audit = goal_geometry.get("visual_crossing_audit") if isinstance(goal_geometry.get("visual_crossing_audit"), dict) else {}
+        if not (
+            audit.get("proof_ready") is True
+            and audit.get("same_ball_continuity") is True
+            and str(audit.get("status") or "").upper() == "VERIFIED_CROSSING"
+            and str(audit.get("confidence") or "").lower() == "high"
+        ):
+            return _downgrade_crossing(row, "STRUCTURED_VISUAL_DIRECTION_EVIDENCE_INVALID")
+        crossing_ms = first.get("crossing_ms")
+        if not _num(crossing_ms) or not (from_ms < int(crossing_ms) <= to_ms):
+            return _downgrade_crossing(row, "STRUCTURED_VISUAL_CROSSING_TIME_INVALID")
+        before_line, after_line = _line_at(goal_geometry, from_ms), _line_at(goal_geometry, to_ms)
+        before_field, after_field = _field_point_at(goal_geometry, from_ms), _field_point_at(goal_geometry, to_ms)
+        if not all(x is not None for x in (before_line, after_line, before_field, after_field)):
+            return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_UNAVAILABLE")
+        before_field_d = _signed_side(before_field, before_line)
+        after_field_d = _signed_side(after_field, after_line)
+        if before_field_d is None or after_field_d is None:
+            return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_UNAVAILABLE")
+        if abs(before_field_d) < FIELD_SIDE_MIN_DISTANCE or abs(after_field_d) < FIELD_SIDE_MIN_DISTANCE:
+            return _downgrade_crossing(row, "FIELD_SIDE_POINT_TOO_CLOSE_TO_GOAL_LINE")
+        before_field_sign = 1 if before_field_d > 0 else -1
+        after_field_sign = 1 if after_field_d > 0 else -1
+        if before_field_sign != after_field_sign:
+            return _downgrade_crossing(
+                row, "FIELD_SIDE_ORIENTATION_CONTRADICTS_ACROSS_VISUAL_PROOF",
+                {"from_ms": from_ms, "to_ms": to_ms,
+                 "before_field_sign": before_field_sign, "after_field_sign": after_field_sign},
+            )
+        details = {
+            "from_ms": from_ms, "to_ms": to_ms, "crossing_ms": int(crossing_ms),
+            "before_field_sign": before_field_sign, "after_field_sign": after_field_sign,
+            "proof_lane": "STRUCTURED_VISUAL_WHOLE_BALL",
+            "same_ball_continuity": True,
+        }
+        crossing = deepcopy(crossing)
+        crossing["direction"] = "FIELD_TO_GOAL"
+        crossing["direction_status"] = "VERIFIED"
+        crossing["direction_evidence"] = details
+        row["goal_plane_crossing"] = crossing
+        row["direction_gate"] = {
+            "status": "VERIFIED",
+            "reason": "STRUCTURED_VISUAL_FIELD_TO_GOAL_DIRECTION_VERIFIED",
+        }
+        return row
+
     before_ball, after_ball = _ball_row_at(ball_trajectory, from_ms), _ball_row_at(ball_trajectory, to_ms)
     before_line, after_line = _line_at(goal_geometry, from_ms), _line_at(goal_geometry, to_ms)
     before_field, after_field = _field_point_at(goal_geometry, from_ms), _field_point_at(goal_geometry, to_ms)

@@ -199,3 +199,68 @@ def test_golden11_fixture_never_false_passes_when_no_traces_exist():
     assert verdict["status"] == gfv.UNRESOLVED
     assert verdict["metrics"]["passed"] == 0
     assert verdict["metrics"]["unresolved"] == 3
+
+
+def _goal_analysis():
+    return {"sequences": [{"actions": [
+        {"kind": "RECEIVE", "start_ms": 27800, "end_ms": 28100},
+        {"kind": "FEINT", "start_ms": 28800, "end_ms": 29200},
+        {"kind": "ACCELERATION", "start_ms": 29400, "end_ms": 30100},
+        {"kind": "SHOT", "start_ms": 30900, "end_ms": 31200, "foot": "RIGHT"},
+    ]}]}
+
+
+def test_golden12_goal_crossing_must_be_linked_to_target_players_own_release():
+    case = _manifest()["cases"][1]
+    target = _strike(30900, target=True, suffix="-target")
+    other = _strike(31100, target=False, suffix="-other")
+    wrong_goal = {
+        "strike_id": other["strike_id"],
+        "media_ms": 31500,
+        "physical_outcome": "GOAL_PLANE_CROSSING",
+    }
+    result = {"traces": [_trace(27200, 34000, strikes=[target, other], outcomes=[wrong_goal])]}
+    verdict = gfv.validate_case(case, result, _goal_analysis())
+    assert verdict["status"] == gfv.FAIL
+    linked = next(a for a in verdict["assertions"] if a["name"] == "require_target_goal_plane_crossing")
+    assert linked["status"] == gfv.FAIL
+    assert linked["reason"] == "GOAL_PLANE_CROSSING_LINKED_TO_DIFFERENT_STRIKE"
+
+
+def test_golden13_target_players_own_release_linked_to_crossing_can_pass_goal_case():
+    case = _manifest()["cases"][1]
+    target = _strike(30900, target=True, suffix="-target")
+    goal = {
+        "strike_id": target["strike_id"],
+        "media_ms": 31500,
+        "physical_outcome": "GOAL_PLANE_CROSSING",
+    }
+    result = {"traces": [_trace(27200, 34000, strikes=[target], outcomes=[goal])]}
+    verdict = gfv.validate_case(case, result, _goal_analysis())
+    assert verdict["status"] == gfv.PASS
+    linked = next(a for a in verdict["assertions"] if a["name"] == "require_target_goal_plane_crossing")
+    assert linked["status"] == gfv.PASS
+    assert linked["reason"] == "TARGET_RELEASE_LINKED_TO_GOAL_PLANE_CROSSING"
+
+
+def test_golden14_fixture_rejects_any_second_physical_goal_anywhere_in_video():
+    manifest = _manifest()
+    target = _strike(30900, target=True, suffix="-target")
+    target_goal = {
+        "strike_id": target["strike_id"], "media_ms": 31500,
+        "physical_outcome": "GOAL_PLANE_CROSSING",
+    }
+    extra_goal = {
+        "strike_id": "strike-extra-goal", "media_ms": 50000,
+        "physical_outcome": "GOAL_PLANE_CROSSING",
+    }
+    result = {"traces": [
+        _trace(27200, 34000, strikes=[target], outcomes=[target_goal]),
+        _trace(49500, 50500, outcomes=[extra_goal]),
+    ]}
+    verdict = gfv.validate_fixture(manifest, result, _goal_analysis())
+    assert verdict["status"] == gfv.FAIL
+    exact = next(a for a in verdict["fixture_assertions"] if a["name"] == "require_exact_physical_goal_count")
+    assert exact["status"] == gfv.FAIL
+    assert exact["observed"] == 2
+    assert exact["reason"] == "EXTRA_PHYSICAL_GOAL_CROSSING_ASSERTED"

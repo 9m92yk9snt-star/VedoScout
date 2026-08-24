@@ -252,19 +252,110 @@ def _line_ball_metrics(row, segment):
 def _visual_crossing_audit(goal_geometry):
     row = goal_geometry.get("visual_crossing_audit") if isinstance(goal_geometry, dict) else None
     if not isinstance(row, dict):
-        return {"present": False, "status": "UNRESOLVED", "confidence": None, "reason": None}
+        return {
+            "present": False, "status": "UNRESOLVED", "confidence": None, "reason": None,
+            "proof_ready": False, "same_ball_continuity": False,
+            "first_crossing_media_ms": None, "field_side_before_media_ms": None,
+            "beyond_line_media_ms": None, "structured_evidence": [],
+        }
     status = str(row.get("status") or "UNRESOLVED").upper()
     if status not in {"VERIFIED_CROSSING", "VERIFIED_NO_CROSSING", "UNRESOLVED"}:
         status = "UNRESOLVED"
     return {
         "present": True,
         "status": status,
-        "confidence": row.get("confidence"),
+        "confidence": str(row.get("confidence") or "low").lower(),
         "reason": row.get("reason"),
+        "proof_ready": row.get("proof_ready") is True,
+        "proof_reason": row.get("proof_reason"),
+        "same_ball_continuity": row.get("same_ball_continuity") is True,
+        "first_crossing_media_ms": row.get("first_crossing_media_ms"),
+        "field_side_before_media_ms": row.get("field_side_before_media_ms"),
+        "beyond_line_media_ms": row.get("beyond_line_media_ms"),
+        "structured_evidence": list(row.get("structured_evidence") or []),
     }
 
 
-def _goal_crossing_evidence(rows, goal_geometry):
+def _structured_visual_crossing_proof(goal_geometry, strike_ms):
+    """Validate the independent structured whole-ball proof lane.
+
+    This does not trust a bare visual ``CROSSED`` label.  It requires the
+    provider's machine-checked multi-frame continuity record, verified goal
+    geometry and an ordered field-side -> fully-beyond transition after the
+    physical release.  Direction and final ball-proof gates still run later.
+    """
+    audit = _visual_crossing_audit(goal_geometry)
+    if not isinstance(goal_geometry, dict):
+        return None
+    if goal_geometry.get("source") != "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW":
+        return None
+    if str(goal_geometry.get("status") or "UNRESOLVED").upper() != "VERIFIED":
+        return None
+    if not (
+        audit.get("status") == "VERIFIED_CROSSING"
+        and audit.get("confidence") == "high"
+        and audit.get("proof_ready") is True
+        and audit.get("same_ball_continuity") is True
+    ):
+        return None
+    if not _num(strike_ms):
+        return None
+    before_ms = audit.get("field_side_before_media_ms")
+    crossing_ms = audit.get("first_crossing_media_ms")
+    beyond_ms = audit.get("beyond_line_media_ms")
+    if not all(_num(x) for x in (before_ms, crossing_ms, beyond_ms)):
+        return None
+    start = int(strike_ms)
+    before_ms, crossing_ms, beyond_ms = int(before_ms), int(crossing_ms), int(beyond_ms)
+    if not (start <= before_ms < crossing_ms <= beyond_ms <= start + MAX_POST_STRIKE_MS):
+        return None
+    evidence_rows = [row for row in audit.get("structured_evidence") or [] if isinstance(row, dict)]
+    critical_before = [
+        row for row in evidence_rows
+        if _num(row.get("media_ms")) and int(row["media_ms"]) == before_ms
+        and row.get("ball_visible") is True
+        and str(row.get("relation") or "").upper() == "FIELD_SIDE"
+        and str(row.get("confidence") or "").lower() == "high"
+    ]
+    critical_after = [
+        row for row in evidence_rows
+        if _num(row.get("media_ms")) and int(row["media_ms"]) == beyond_ms
+        and row.get("ball_visible") is True
+        and str(row.get("relation") or "").upper() == "BEYOND_LINE_INSIDE_MOUTH"
+        and str(row.get("confidence") or "").lower() == "high"
+    ]
+    path_rows = sorted(
+        [row for row in evidence_rows if _num(row.get("media_ms")) and before_ms <= int(row["media_ms"]) <= beyond_ms],
+        key=lambda row: int(row["media_ms"]),
+    )
+    if not critical_before or not critical_after or len(path_rows) < 3:
+        return None
+    if any(
+        row.get("ball_visible") is not True
+        or str(row.get("confidence") or "low").lower() not in {"high", "medium"}
+        or str(row.get("relation") or "").upper() not in {
+            "FIELD_SIDE", "ON_OR_STRADDLING_LINE", "BEYOND_LINE_INSIDE_MOUTH"
+        }
+        for row in path_rows
+    ):
+        return None
+    return {
+        "status": "VERIFIED",
+        "crossing_ms": crossing_ms,
+        "reason": "INDEPENDENT_MULTI_FRAME_WHOLE_BALL_CROSSING",
+        "evidence": [{
+            "from_ms": before_ms,
+            "to_ms": beyond_ms,
+            "crossing_ms": crossing_ms,
+            "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
+            "proof_lane": "STRUCTURED_VISUAL_WHOLE_BALL",
+            "same_ball_continuity": True,
+        }],
+        "visual_audit": audit,
+    }
+
+
+def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None):
     audit = _visual_crossing_audit(goal_geometry)
     measured = [
         r for r in rows
@@ -280,6 +371,9 @@ def _goal_crossing_evidence(rows, goal_geometry):
             metrics["cut_barrier"] = bool(row.get("cut_barrier"))
             samples.append(metrics)
     if not samples:
+        visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms)
+        if visual_proof is not None:
+            return visual_proof
         return {"status": "UNRESOLVED", "crossing_ms": None,
                 "reason": "GOAL_GEOMETRY_UNAVAILABLE", "evidence": [],
                 "visual_audit": audit}
@@ -348,6 +442,9 @@ def _goal_crossing_evidence(rows, goal_geometry):
                 "reason": "WHOLE_BALL_CROSSED_TIME_ALIGNED_GOAL_PLANE",
                 "evidence": evidence[:4], "visual_audit": audit}
     if audit["status"] == "VERIFIED_CROSSING":
+        visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms)
+        if visual_proof is not None:
+            return visual_proof
         return {"status": "UNRESOLVED", "crossing_ms": None,
                 "reason": "VISUAL_CROSSING_WITHOUT_WHOLE_BALL_PHYSICAL_CROSSING",
                 "evidence": [], "visual_audit": audit}
@@ -448,7 +545,7 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
     start = int(strike["media_ms"])
     end = start + MAX_POST_STRIKE_MS
     rows = _trajectory_rows(ball_trajectory, start, end, strike.get("scene_id"))
-    crossing = _goal_crossing_evidence(rows, goal_geometry)
+    crossing = _goal_crossing_evidence(rows, goal_geometry, strike_ms=start)
     other_touch = _first_other_touch(touch_graph, strike)
     intervention = _intervention_evidence(other_touch, rows)
     role = _role_resolution(role_evidence, intervention.get("player_track_id"))

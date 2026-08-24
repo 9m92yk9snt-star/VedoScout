@@ -6,8 +6,10 @@ second measurement source whose rows may be useful for search/continuity before
 they are independently certified for proof.  This gate prevents an uncertified
 measurement from becoming goal-plane truth.
 
-The module can only DOWNGRADE an already-produced physical crossing.  It never
-creates contacts, touches, goals, assists, scorer identity, stats or proof.
+The module can only certify or DOWNGRADE an already-produced physical crossing.
+It never creates contacts, touches, canonical goals, assists, scorer identity or
+stats.  A second proof lane accepts only a machine-checked independent
+multi-frame whole-ball transition when ordinary detector proof is unavailable.
 """
 from __future__ import annotations
 
@@ -74,6 +76,45 @@ def apply_ball_proof_gate(outcome: dict, ball_trajectory) -> dict:
     if not segment or not (_num(segment.get("from_ms")) and _num(segment.get("to_ms"))):
         return _downgrade(row, "BALL_PROOF_SEGMENT_EVIDENCE_MISSING")
     from_ms, to_ms = int(segment["from_ms"]), int(segment["to_ms"])
+
+    if str(segment.get("proof_lane") or "") == "STRUCTURED_VISUAL_WHOLE_BALL":
+        audit = crossing.get("visual_audit") if isinstance(crossing.get("visual_audit"), dict) else {}
+        crossing_ms = segment.get("crossing_ms")
+        direction_gate = row.get("direction_gate") if isinstance(row.get("direction_gate"), dict) else {}
+        valid = bool(
+            segment.get("source") == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"
+            and segment.get("same_ball_continuity") is True
+            and audit.get("proof_ready") is True
+            and audit.get("same_ball_continuity") is True
+            and str(audit.get("status") or "").upper() == "VERIFIED_CROSSING"
+            and str(audit.get("confidence") or "").lower() == "high"
+            and crossing.get("direction_status") == "VERIFIED"
+            and crossing.get("direction") == "FIELD_TO_GOAL"
+            and direction_gate.get("status") == "VERIFIED"
+            and _num(crossing_ms)
+            and from_ms < int(crossing_ms) <= to_ms
+        )
+        details = {
+            "from_ms": from_ms,
+            "to_ms": to_ms,
+            "crossing_ms": int(crossing_ms) if _num(crossing_ms) else None,
+            "proof_lane": "STRUCTURED_VISUAL_WHOLE_BALL",
+            "same_ball_continuity": bool(segment.get("same_ball_continuity")),
+            "direction_verified": crossing.get("direction_status") == "VERIFIED",
+            "audit_proof_ready": audit.get("proof_ready") is True,
+        }
+        if not valid:
+            return _downgrade(row, "STRUCTURED_VISUAL_WHOLE_BALL_PROOF_INVALID", details)
+        crossing = deepcopy(crossing)
+        crossing["proof_gate"] = {"status": "VERIFIED", "details": details}
+        row["goal_plane_crossing"] = crossing
+        row["ball_proof_gate"] = {
+            "status": "VERIFIED",
+            "reason": "STRUCTURED_VISUAL_WHOLE_BALL_CROSSING_PROOF",
+            "details": details,
+        }
+        return row
+
     before = _proof_row_at(ball_trajectory, from_ms)
     after = _proof_row_at(ball_trajectory, to_ms)
     details = {

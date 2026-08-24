@@ -238,6 +238,10 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         if len(pairs) < 2 or not api_key:
             return {"geometry_status": "UNRESOLVED", "frames": [],
                     "crossing": "UNRESOLVED", "crossing_confidence": "low",
+                    "ball_evidence": [], "same_ball_continuity": False,
+                    "first_crossing_idx": None, "first_crossing_media_ms": None,
+                    "field_side_before_media_ms": None, "beyond_line_media_ms": None,
+                    "proof_ready": False, "proof_reason": "insufficient_frames",
                     "reason": "insufficient_frames"}
         timeline = ", ".join(f"image {i + 1}={ms}ms" for i, (_path, ms) in enumerate(pairs))
         chat = LlmChat(
@@ -254,14 +258,26 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two "
             "goalpost BASE points where each post meets the ground/goal line. Coordinates must be normalized 0..1 "
             "from top-left of that image. Do not estimate a hidden post. Mark visible=false when both bases are not clear.\n"
-            "BALL AUDIT: Follow only the visibly observable ball in chronological order. CROSSED means the ball is "
-            "clearly seen fully pass beyond the goal line between the posts. NOT_CROSSED means the visible sequence "
-            "clearly proves it did not cross (for example a visible interception/deflection before the line or a "
-            "continuous visible path staying field-side). If the ball or line becomes too small/hidden, use UNRESOLVED. "
-            "Never use celebration, player reaction, net movement alone, scoreboard, or likely football outcome.\n"
+            "BALL AUDIT: Follow only the visibly observable MOVING match ball in chronological order. Ignore any "
+            "stationary spare ball, white field marking, clothing patch or object that cannot be tracked as the same ball. "
+            "For EVERY image return one ball_evidence row. relation=FIELD_SIDE means the whole visible ball is still on "
+            "the playable-field side of the goal plane. ON_OR_STRADDLING_LINE means any part of the ball overlaps the "
+            "goal plane. BEYOND_LINE_INSIDE_MOUTH is allowed only when the ENTIRE visible ball is clearly beyond the "
+            "goal plane and between the inner edges of the two posts. OTHER means visible but not in that goal-crossing "
+            "path. UNRESOLVED means the ball/line relation cannot be seen reliably. Set same_ball_continuity=true ONLY "
+            "if the same moving ball can be continuously identified through every sampled image from the last clear "
+            "FIELD_SIDE frame through the first clear BEYOND_LINE_INSIDE_MOUTH frame; any hidden interval, object switch "
+            "or ambiguity makes it false. first_crossing_idx is the first image where the whole ball is fully beyond the "
+            "line inside the mouth, otherwise null. CROSSED means that strict whole-ball transition is visibly proven. "
+            "NOT_CROSSED means a continuous visible sequence proves it did not cross. Otherwise use UNRESOLVED. Never "
+            "use celebration, player reaction, net movement alone, scoreboard, or likely football outcome.\n"
             'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
             '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
             '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
+            '"ball_evidence":[{"idx":1,"ball_visible":true|false,'
+            '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|"OTHER"|"UNRESOLVED",'
+            '"confidence":"high"|"medium"|"low","reason":"<short visual reason>"}],'
+            '"same_ball_continuity":true|false,"first_crossing_idx":1|null,'
             '"crossing":"CROSSED"|"NOT_CROSSED"|"UNRESOLVED", '
             '"crossing_confidence":"high"|"medium"|"low", "reason":"<short visual reason>"}'
         )
@@ -311,16 +327,122 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         if crossing_conf == "low":
             crossing = "UNRESOLVED"
         geometry_verified = len(cleaned_frames) >= 2
+
+        # A provider-only whole-ball crossing is allowed to become physical
+        # evidence only through this much stricter, machine-checked structure.
+        # The model's top-level CROSSED string by itself remains supporting-only.
+        allowed_relations = {
+            "FIELD_SIDE", "ON_OR_STRADDLING_LINE",
+            "BEYOND_LINE_INSIDE_MOUTH", "OTHER", "UNRESOLVED",
+        }
+        ball_rows_by_idx = {}
+        for row in data.get("ball_evidence") or []:
+            if not isinstance(row, dict):
+                continue
+            try:
+                idx = int(row.get("idx"))
+            except (TypeError, ValueError):
+                continue
+            if not 1 <= idx <= len(pairs) or idx in ball_rows_by_idx:
+                continue
+            relation = str(row.get("relation") or "UNRESOLVED").upper()
+            if relation not in allowed_relations:
+                relation = "UNRESOLVED"
+            confidence = str(row.get("confidence") or "low").lower()
+            if confidence not in _CONF_WEIGHT:
+                confidence = "low"
+            ball_rows_by_idx[idx] = {
+                "idx": idx,
+                "media_ms": int(pairs[idx - 1][1]),
+                "ball_visible": row.get("ball_visible") is True,
+                "relation": relation,
+                "confidence": confidence,
+                "reason": str(row.get("reason") or "ball_relation_review")[:160],
+            }
+        ball_evidence = [ball_rows_by_idx[idx] for idx in sorted(ball_rows_by_idx)]
+        same_ball = data.get("same_ball_continuity") is True
+        try:
+            crossing_idx = int(data.get("first_crossing_idx")) if data.get("first_crossing_idx") is not None else None
+        except (TypeError, ValueError):
+            crossing_idx = None
+        if crossing_idx is not None and not 1 <= crossing_idx <= len(pairs):
+            crossing_idx = None
+
+        field_candidates = [
+            row for row in ball_evidence
+            if crossing_idx is not None and row["idx"] < crossing_idx
+            and row["ball_visible"] and row["relation"] == "FIELD_SIDE"
+            and row["confidence"] == "high"
+        ]
+        beyond_candidates = [
+            row for row in ball_evidence
+            if crossing_idx is not None and row["idx"] >= crossing_idx
+            and row["ball_visible"] and row["relation"] == "BEYOND_LINE_INSIDE_MOUTH"
+            and row["confidence"] == "high"
+        ]
+        before = max(field_candidates, key=lambda row: row["idx"], default=None)
+        after = min(beyond_candidates, key=lambda row: row["idx"], default=None)
+        earliest_beyond = min(
+            (row["idx"] for row in ball_evidence
+             if row["ball_visible"] and row["relation"] == "BEYOND_LINE_INSIDE_MOUTH"
+             and row["confidence"] in {"high", "medium"}),
+            default=None,
+        )
+        path_rows = []
+        path_complete = False
+        if before is not None and after is not None:
+            path_rows = [
+                ball_rows_by_idx.get(idx)
+                for idx in range(int(before["idx"]), int(after["idx"]) + 1)
+            ]
+            path_complete = bool(
+                len(path_rows) >= 3
+                and all(
+                    isinstance(row, dict)
+                    and row.get("ball_visible") is True
+                    and row.get("confidence") in {"high", "medium"}
+                    and row.get("relation") in {
+                        "FIELD_SIDE", "ON_OR_STRADDLING_LINE", "BEYOND_LINE_INSIDE_MOUTH"
+                    }
+                    for row in path_rows
+                )
+            )
+        proof_ready = bool(
+            geometry_verified
+            and crossing == "CROSSED"
+            and crossing_conf == "high"
+            and same_ball
+            and crossing_idx is not None
+            and before is not None and after is not None
+            and earliest_beyond == crossing_idx == int(after["idx"])
+            and path_complete
+        )
+        proof_reason = (
+            "STRUCTURED_MULTI_FRAME_WHOLE_BALL_CROSSING" if proof_ready
+            else "STRUCTURED_WHOLE_BALL_CROSSING_NOT_PROVEN"
+        )
         return {
             "geometry_status": "VERIFIED" if geometry_verified else "UNRESOLVED",
             "frames": cleaned_frames,
             "crossing": crossing,
             "crossing_confidence": crossing_conf,
+            "ball_evidence": ball_evidence,
+            "same_ball_continuity": same_ball,
+            "first_crossing_idx": crossing_idx,
+            "first_crossing_media_ms": int(pairs[crossing_idx - 1][1]) if crossing_idx is not None else None,
+            "field_side_before_media_ms": int(before["media_ms"]) if isinstance(before, dict) else None,
+            "beyond_line_media_ms": int(after["media_ms"]) if isinstance(after, dict) else None,
+            "proof_ready": proof_ready,
+            "proof_reason": proof_reason,
             "reason": str(data.get("reason") or "goal_scene_review")[:220],
         }
     except Exception:
         return {"geometry_status": "UNRESOLVED", "frames": [],
                 "crossing": "UNRESOLVED", "crossing_confidence": "low",
+                "ball_evidence": [], "same_ball_continuity": False,
+                "first_crossing_idx": None, "first_crossing_media_ms": None,
+                "field_side_before_media_ms": None, "beyond_line_media_ms": None,
+                "proof_ready": False, "proof_reason": "goal_scene_reader_error",
                 "reason": "goal_scene_reader_error"}
 
 
@@ -557,6 +679,13 @@ class ShadowVisionProviders:
                 "visual_crossing_audit": {
                     "status": "UNRESOLVED", "confidence": "low",
                     "reason": str((review or {}).get("reason") or "goal_geometry_unresolved")[:220],
+                    "proof_ready": False,
+                    "proof_reason": str((review or {}).get("proof_reason") or "goal_geometry_unresolved")[:220],
+                    "same_ball_continuity": False,
+                    "first_crossing_media_ms": None,
+                    "field_side_before_media_ms": None,
+                    "beyond_line_media_ms": None,
+                    "structured_evidence": [],
                 },
             }
             self._goal_cache[cache_key] = result
@@ -588,6 +717,13 @@ class ShadowVisionProviders:
                 "status": audit_status,
                 "confidence": crossing_conf,
                 "reason": str((review or {}).get("reason") or "goal_scene_review")[:220],
+                "proof_ready": bool((review or {}).get("proof_ready")),
+                "proof_reason": str((review or {}).get("proof_reason") or "STRUCTURED_WHOLE_BALL_CROSSING_NOT_PROVEN")[:220],
+                "same_ball_continuity": (review or {}).get("same_ball_continuity") is True,
+                "first_crossing_media_ms": (review or {}).get("first_crossing_media_ms"),
+                "field_side_before_media_ms": (review or {}).get("field_side_before_media_ms"),
+                "beyond_line_media_ms": (review or {}).get("beyond_line_media_ms"),
+                "structured_evidence": list((review or {}).get("ball_evidence") or []),
             },
         }
         self._goal_cache[cache_key] = result
