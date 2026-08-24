@@ -15,6 +15,7 @@ import ball_trajectory
 import dense_replay
 import dense_track_refinement
 import event_trace
+import fix10a_ball_proof_gate
 import fix10a_goal_direction
 import jersey_consensus
 import shot_outcome_engine
@@ -182,6 +183,13 @@ def reconstruct_physical_match(
                 # missing playable-field orientation is downgraded before A8.
                 outcome = fix10a_goal_direction.apply_direction_gate(
                     outcome, trajectory, goal_geometry
+                )
+                # A pixel measurement may be physically useful before it is
+                # certified for proof.  Goal-plane truth therefore needs both
+                # sides of the crossing to be proof-eligible measurements.
+                # This gate can only downgrade an already-produced crossing.
+                outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(
+                    outcome, trajectory
                 )
                 outcomes.append(outcome)
 
