@@ -64,13 +64,16 @@
       "reference_ranges_ms": {
         "target_strike": [70500, 71350]
       },
-      "expected_semantics": ["RECEIVE", "PASS_OR_CROSS"],
+      "expected_semantics": ["RECEIVE", "PASS"],
       "physical_gate": {
         "require_target_release": true,
         "must_not_assert_physical_outcome": ["GOAL_PLANE_CROSSING"]
       },
+      "perception_gate": {
+        "require_kinds": ["RECEIVE", "PASS"]
+      },
       "canonical_later": {
-        "expected_target_event": "PASS_OR_CROSS",
+        "expected_target_event": "PASS",
         "forbidden": ["GOAL", "ASSIST", "DUPLICATE_SCORING_EVENT"]
       }
     }
