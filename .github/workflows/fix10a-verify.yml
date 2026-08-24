@@ -3,59 +3,210 @@ name: FIX10A verification
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-fix10a3-once:
+  fix10a-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: fix10-match-intelligence
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Check whether exact A3 baseline is still present
-        id: gate
+      - name: Install FIX10A test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
+      - name: Provide CI-only no-network Emergent import stubs
         shell: bash
         run: |
           set -euo pipefail
-          APPLY=false
-          if [ "$(git hash-object backend/ball_trajectory.py)" = "761424feaac1625dc2792eeeec7624c342f370e2" ] \
-             && [ "$(git hash-object backend/dense_track_refinement.py)" = "8c3a5517fe6c1330dff9e506138074af067fe971" ] \
-             && [ -f .github/patches/fix10a3-dormant.patch ] \
-             && echo "8ecdd035294d55ce0f3ea03f289d42c5d5fd5f308a87ac99aea41b8f005d5388  .github/patches/fix10a3-dormant.patch" | sha256sum -c - >/dev/null \
-             && git apply --check .github/patches/fix10a3-dormant.patch; then
-            APPLY=true
-          fi
-          echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
-      - name: Apply validated A3 patch
-        if: steps.gate.outputs.apply == 'true'
-        run: git apply .github/patches/fix10a3-dormant.patch
-      - name: Run focused A3 checks
-        if: steps.gate.outputs.apply == 'true'
-        shell: bash
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+          class UserMessage(_Payload):
+              pass
+
+          class ImageContent(_Payload):
+              pass
+
+          class FileContentWithMimeType(_Payload):
+              pass
+
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
+      - name: Compile changed backend modules
+        env:
+          PYTHONPATH: /tmp/ci_stubs:backend
         run: |
-          set -euo pipefail
-          python -m pip install -q pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
-          PYTHONPATH=backend pytest -q \
-            backend/tests/test_fix10a3_ball_trajectory.py \
-            backend/tests/test_fix10a3_dormant_reacquisition.py \
-            backend/tests/test_fix10a2_dense_ball_floor.py
-      - name: Commit runtime and tests only
-        if: steps.gate.outputs.apply == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git add \
-            backend/ball_trajectory.py \
+          python -m py_compile \
+            backend/motion_compensation.py \
+            backend/dense_replay.py \
             backend/dense_track_refinement.py \
-            backend/tests/test_fix10a3_dormant_reacquisition.py \
-            backend/tests/test_fix10a2_dense_ball_floor.py
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'FIX10A3: add dormant ball reacquisition'
-          git push origin HEAD:fix10-match-intelligence
+            backend/ball_trajectory.py \
+            backend/ball_contact_engine.py \
+            backend/touch_graph.py \
+            backend/jersey_consensus.py \
+            backend/shot_outcome_engine.py \
+            backend/event_trace.py \
+            backend/physical_match_reconstruction.py \
+            backend/open_observation_compat.py \
+            backend/fix10a_vision_providers.py \
+            backend/fix10a_goal_direction.py \
+            backend/fix10a_shadow_runtime.py \
+            backend/golden_fixture_validator.py \
+            backend/run_real_video_golden.py \
+            backend/football_sequence_intelligence.py \
+            backend/identity_verify.py \
+            backend/server.py
+      - name: Run FIX10A regression family
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
+      - name: Package exact FIX10A runtime for private Golden diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: fix10a-live-runtime
+          path: |
+            backend/*.py
+            backend/models/yolov8n.onnx
+            backend/requirements.txt
+            backend/tests/fixtures/real_video/almin_test07_v1.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  existing-backend-regression-attempt:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install project requirements available outside Emergent runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          grep -v '^emergentintegrations==' backend/requirements.txt > /tmp/requirements-ci.txt
+          python -m pip install -r /tmp/requirements-ci.txt
+      - name: Provide CI-only no-network Emergent import stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          mkdir -p /tmp/ci_stubs/emergentintegrations/payments/stripe
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/stripe/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def model_dump(self):
+                  return dict(self.__dict__)
+
+          class UserMessage(_Payload):
+              pass
+
+          class ImageContent(_Payload):
+              pass
+
+          class FileContentWithMimeType(_Payload):
+              pass
+
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
+          cat > /tmp/ci_stubs/emergentintegrations/payments/stripe/checkout.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              def model_dump(self):
+                  return dict(self.__dict__)
+
+          class CheckoutSessionResponse(_Payload):
+              pass
+
+          class CheckoutStatusResponse(_Payload):
+              pass
+
+          class CheckoutSessionRequest(_Payload):
+              pass
+
+          class StripeCheckout:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+
+              async def create_checkout_session(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+
+              async def get_checkout_status(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+          PY
+      - name: Reproduce Emergent /app layout for chronological tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/backend" /app/backend
+          sudo ln -sfn "$GITHUB_WORKSPACE/frontend" /app/frontend
+          mkdir -p backend/uploads
+          if [ ! -f frontend/.env ]; then
+            printf '%s\n' 'REACT_APP_BACKEND_URL=http://127.0.0.1:8000' > frontend/.env
+          fi
+      - name: Run historical chronological regression contract
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: vedoscout_fix10_ci
+          EMERGENT_LLM_KEY: ci-placeholder
+          STRIPE_API_KEY: sk_test_placeholder
+          JWT_SECRET_KEY: fix10-ci-secret
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci-password
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+          FIX10A_SHADOW_ENABLED: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' | sort)
+          test "${#FIX_FILES[@]}" -gt 0
+          pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
