@@ -29,6 +29,7 @@ TARGET_MATCH_IOU_MIN = 0.14
 TARGET_MATCH_CENTER_H = 0.75
 TARGET_MATCH_AMBIG_MARGIN = 0.16
 TARGET_NEAR_MS = 250
+DENSE_BALL_CONF_T = 0.03
 
 
 def _num(value) -> bool:
@@ -224,6 +225,53 @@ def _default_detector():
     return detector
 
 
+def _detect_dense_people_and_ball(detector, frame_bgr):
+    """FIX10A dense detector: preserve low-confidence ball proposals for A3.
+
+    Person detection keeps the existing production threshold.  Only the bounded
+    dense FIX10A window lowers sports-ball proposal recall; A3 trajectory
+    continuity remains responsible for rejecting discontinuous false positives.
+    """
+    import cv_detect
+    if detector is None or not getattr(detector, "ok", False):
+        return [], []
+    H, W = frame_bgr.shape[:2]
+    scale = cv_detect.INPUT / max(H, W)
+    nw, nh = int(W * scale), int(H * scale)
+    img = np.zeros((cv_detect.INPUT, cv_detect.INPUT, 3), np.uint8)
+    img[:nh, :nw] = cv2.resize(frame_bgr, (nw, nh))
+    blob = cv2.dnn.blobFromImage(
+        img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True
+    )
+    detector.net.setInput(blob)
+    out = detector.net.forward()[0].T
+    cls = out[:, 4:].argmax(1)
+    conf = out[:, 4:].max(1)
+    results = {0: [], 32: []}
+    thresholds = {0: float(cv_detect.CONF_T), 32: float(DENSE_BALL_CONF_T)}
+    for cid in (0, 32):
+        threshold = thresholds[cid]
+        keep = (cls == cid) & (conf > threshold)
+        boxes, scores = [], []
+        for row, score in zip(out[keep], conf[keep]):
+            cx, cy, bw, bh = row[:4]
+            boxes.append([int(cx - bw / 2), int(cy - bh / 2), int(bw), int(bh)])
+            scores.append(float(score))
+        idx = cv2.dnn.NMSBoxes(boxes, scores, threshold, cv_detect.NMS_T)
+        for i in np.array(idx).flatten() if len(idx) else []:
+            x, y, bw, bh = boxes[i]
+            results[cid].append({
+                "box": {
+                    "x": max(0.0, min(1.0, x / (W * scale))),
+                    "y": max(0.0, min(1.0, y / (H * scale))),
+                    "w": max(1e-4, min(1.0, bw / (W * scale))),
+                    "h": max(1e-4, min(1.0, bh / (H * scale))),
+                },
+                "confidence": scores[i],
+            })
+    return results[0], results[32]
+
+
 def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list[dict]) -> dict:
     resolved, why = uia.resolve_target_at(
         identity_authority if isinstance(identity_authority, dict) else {},
@@ -298,7 +346,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         if detector is None:
             return {"version": VERSION, "status": "skipped", "reason": "detector_unavailable",
                     "scene_id": scene, "frames": [], "metrics": {}}
-        detector_fn = lambda frame: fsg._detect_people_and_ball(detector, frame)
+        detector_fn = lambda frame: _detect_dense_people_and_ball(detector, frame)
     if camera_estimator is None:
         camera_estimator = _default_camera_estimator
 
