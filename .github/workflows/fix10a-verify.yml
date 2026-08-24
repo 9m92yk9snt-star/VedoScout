@@ -82,11 +82,15 @@ jobs:
         env:
           PYTHONPATH: /tmp/ci_stubs:.
         run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
-      - name: Package exact private detector for Golden diagnostics
+      - name: Package exact FIX10A runtime for private Golden diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: fix10a-runtime-model
-          path: backend/models/yolov8n.onnx
+          name: fix10a-live-runtime
+          path: |
+            backend/*.py
+            backend/models/yolov8n.onnx
+            backend/requirements.txt
+            backend/tests/fixtures/real_video/almin_test07_v1.json
           if-no-files-found: error
           retention-days: 1
           compression-level: 0
