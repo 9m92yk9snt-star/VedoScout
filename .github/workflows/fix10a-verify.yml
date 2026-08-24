@@ -60,6 +60,42 @@ jobs:
           base64 -d docs/fix10a_goalproof_golden.tmp | gunzip >> backend/tests/test_fix10a_golden_fixture_validator.py
           git apply --check /tmp/fix10a_goalproof.patch
           git apply /tmp/fix10a_goalproof.patch
+      - name: Bind Golden goal crossing to target strike and enforce unique physical goal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/golden_fixture_validator.py')
+          text = path.read_text(encoding='utf-8')
+
+          marker = '''def _assert_forbidden_outcomes(outcomes: list[dict], forbidden) -> dict:\n'''
+          helper = '''def _assert_target_goal_plane_crossing(strikes: list[dict], outcomes: list[dict],\n                                       start_ms: int, end_ms: int) -> dict:\n    target_releases = _target_releases(strikes, start_ms, end_ms)\n    if not target_releases:\n        return {\n            "status": UNRESOLVED,\n            "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_GOAL_CHAIN",\n        }\n    target_ids = {\n        str(row.get("strike_id")) for row in target_releases\n        if isinstance(row.get("strike_id"), str) and row.get("strike_id")\n    }\n    goals = [\n        row for row in outcomes\n        if isinstance(row, dict) and row.get("physical_outcome") == "GOAL_PLANE_CROSSING"\n    ]\n    linked = [row for row in goals if str(row.get("strike_id") or "") in target_ids]\n    if linked:\n        return {\n            "status": PASS,\n            "reason": "TARGET_RELEASE_LINKED_TO_GOAL_PLANE_CROSSING",\n            "target_strike_ids": sorted(target_ids),\n            "crossing_ms": [int(row["media_ms"]) for row in linked if _num(row.get("media_ms"))],\n        }\n    if goals:\n        return {\n            "status": FAIL,\n            "reason": "GOAL_PLANE_CROSSING_LINKED_TO_DIFFERENT_STRIKE",\n            "target_strike_ids": sorted(target_ids),\n            "observed_strike_ids": sorted({str(row.get("strike_id") or "") for row in goals}),\n        }\n    return {\n        "status": UNRESOLVED,\n        "reason": "TARGET_GOAL_PLANE_CROSSING_NOT_VERIFIED",\n        "target_strike_ids": sorted(target_ids),\n    }\n\n\n'''
+          if helper not in text:
+              assert marker in text
+              text = text.replace(marker, helper + marker, 1)
+
+          old_goal = '''    if gate.get("require_goal_plane_crossing") is True:\n        assertions.append({"name": "require_goal_plane_crossing", **_assert_required_outcome(outcomes, "GOAL_PLANE_CROSSING")})\n'''
+          new_goal = '''    if gate.get("require_goal_plane_crossing") is True:\n        assertions.append({"name": "require_goal_plane_crossing", **_assert_required_outcome(outcomes, "GOAL_PLANE_CROSSING")})\n        assertions.append({\n            "name": "require_target_goal_plane_crossing",\n            **_assert_target_goal_plane_crossing(strikes, outcomes, strike_start, strike_end),\n        })\n'''
+          if new_goal not in text:
+              assert old_goal in text
+              text = text.replace(old_goal, new_goal, 1)
+
+          fixture_marker = '''def validate_fixture(manifest: dict, physical_result: dict | None,\n                     sequence_analysis: dict | None = None) -> dict:\n'''
+          fixture_helper = '''def _assert_exact_physical_goal_count(manifest: dict, physical_result: dict | None) -> dict:\n    expected = sum(\n        1 for case in (manifest.get("cases") or [])\n        if isinstance(case, dict)\n        and isinstance(case.get("physical_gate"), dict)\n        and case["physical_gate"].get("require_goal_plane_crossing") is True\n    )\n    result = physical_result if isinstance(physical_result, dict) else {}\n    seen = set()\n    goals = []\n    for trace in result.get("traces") or []:\n        if not isinstance(trace, dict):\n            continue\n        for outcome in trace.get("outcome_evidence") or []:\n            if not isinstance(outcome, dict) or outcome.get("physical_outcome") != "GOAL_PLANE_CROSSING":\n                continue\n            key = (str(outcome.get("strike_id") or ""), int(outcome["media_ms"]) if _num(outcome.get("media_ms")) else None)\n            if key in seen:\n                continue\n            seen.add(key)\n            goals.append(outcome)\n    observed = len(goals)\n    if observed > expected:\n        status, reason = FAIL, "EXTRA_PHYSICAL_GOAL_CROSSING_ASSERTED"\n    elif observed < expected:\n        status, reason = UNRESOLVED, "REQUIRED_PHYSICAL_GOAL_CROSSING_NOT_VERIFIED"\n    else:\n        status, reason = PASS, "EXACT_PHYSICAL_GOAL_COUNT_MATCH"\n    return {\n        "status": status,\n        "reason": reason,\n        "expected": expected,\n        "observed": observed,\n        "strike_ids": [str(row.get("strike_id") or "") for row in goals],\n    }\n\n\n'''
+          if fixture_helper not in text:
+              assert fixture_marker in text
+              text = text.replace(fixture_marker, fixture_helper + fixture_marker, 1)
+
+          old_fixture = '''    statuses = [case["status"] for case in cases]\n    status = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS\n    return {\n        "version": VERSION,\n        "fixture_id": manifest.get("fixture_id"),\n        "status": status,\n        "cases": cases,\n'''
+          new_fixture = '''    fixture_assertions = [{\n        "name": "require_exact_physical_goal_count",\n        **_assert_exact_physical_goal_count(manifest, physical_result),\n    }]\n    statuses = [case["status"] for case in cases] + [a["status"] for a in fixture_assertions]\n    status = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS\n    return {\n        "version": VERSION,\n        "fixture_id": manifest.get("fixture_id"),\n        "status": status,\n        "cases": cases,\n        "fixture_assertions": fixture_assertions,\n'''
+          if new_fixture not in text:
+              assert old_fixture in text
+              text = text.replace(old_fixture, new_fixture, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
       - name: Compile and run full FIX10A regression family
         working-directory: backend
         env:
