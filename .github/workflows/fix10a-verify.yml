@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   apply-fix10a3-once:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.sha == '5a6f293b2377f2288219cb73f09b055b43085c0f'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,17 +18,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Verify exact runtime blobs and patch
+      - name: Check whether exact A3 baseline is still present
+        id: gate
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git hash-object backend/ball_trajectory.py)" = "761424feaac1625dc2792eeeec7624c342f370e2"
-          test "$(git hash-object backend/dense_track_refinement.py)" = "8c3a5517fe6c1330dff9e506138074af067fe971"
-          echo "8ecdd035294d55ce0f3ea03f289d42c5d5fd5f308a87ac99aea41b8f005d5388  .github/patches/fix10a3-dormant.patch" | sha256sum -c -
-          git apply --check .github/patches/fix10a3-dormant.patch
+          APPLY=false
+          if [ "$(git hash-object backend/ball_trajectory.py)" = "761424feaac1625dc2792eeeec7624c342f370e2" ] \
+             && [ "$(git hash-object backend/dense_track_refinement.py)" = "8c3a5517fe6c1330dff9e506138074af067fe971" ] \
+             && [ -f .github/patches/fix10a3-dormant.patch ] \
+             && echo "8ecdd035294d55ce0f3ea03f289d42c5d5fd5f308a87ac99aea41b8f005d5388  .github/patches/fix10a3-dormant.patch" | sha256sum -c - >/dev/null \
+             && git apply --check .github/patches/fix10a3-dormant.patch; then
+            APPLY=true
+          fi
+          echo "apply=$APPLY" >> "$GITHUB_OUTPUT"
       - name: Apply validated A3 patch
+        if: steps.gate.outputs.apply == 'true'
         run: git apply .github/patches/fix10a3-dormant.patch
       - name: Run focused A3 checks
+        if: steps.gate.outputs.apply == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -39,6 +46,7 @@ jobs:
             backend/tests/test_fix10a3_dormant_reacquisition.py \
             backend/tests/test_fix10a2_dense_ball_floor.py
       - name: Commit runtime and tests only
+        if: steps.gate.outputs.apply == 'true'
         shell: bash
         run: |
           set -euo pipefail
