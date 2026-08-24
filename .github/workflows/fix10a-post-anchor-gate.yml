@@ -172,7 +172,7 @@ jobs:
       - name: Install focused test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92
+          python -m pip install pytest==9.0.3 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
       - name: Verify focused recovery contract
         working-directory: backend
         run: |
