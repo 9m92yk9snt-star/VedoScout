@@ -145,8 +145,18 @@ def samples_from_frames(frames, points):
 def compute_motion_samples(video_path, track):
     """Decode the accepted-geometry frames at their FIX03 actual media times
     (canonical post-grab PTS, bounded downscale) and run the pure core.
-    Fail-soft: unreadable media yields zero samples → no physical claim."""
+
+    FIX10A0 timebase contract: ``seek_with_preroll`` already grabs the first
+    frame and returns its ACTUAL media PTS. Process that exact frame via
+    ``retrieve()`` before advancing. Every later step advances exactly once
+    through ``grab_frame_time_seconds`` and explicitly unpacks its
+    ``(ok, seconds, used_fallback)`` result. Frames remain aligned 1:1 with the
+    accepted track points; an undecodable point stays ``None`` and therefore
+    rejects both touching motion intervals instead of re-stitching around it.
+    Fail-soft: unreadable media yields zero samples → no physical claim.
+    """
     import video_timebase as vt
+
     pts = (track or {}).get("points") or []
     if len(pts) < 2:
         return {"w": 0, "h": 0, "samples": []}
@@ -156,19 +166,17 @@ def compute_motion_samples(video_path, track):
     try:
         fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
         tol = max(0.012, 0.5 / fps) if fps > 1e-6 else 0.02
-        vt.seek_with_preroll(cap, max(0.0, float(pts[0]["t"]) - 0.5), fps)
+        ok, t, _used_fallback = vt.seek_with_preroll(
+            cap, max(0.0, float(pts[0]["t"]) - 0.5), fps
+        )
         # frames stay ALIGNED 1:1 with the original accepted track points —
         # an undecodable point keeps a None placeholder so both intervals
         # touching it are rejected, never re-stitched (C01)
         frames = [None] * len(pts)
         idx = 0
         last_t = float(pts[-1]["t"])
-        while idx < len(pts):
-            if not cap.grab():
-                break
-            t = vt.grab_frame_time_seconds(cap, fps)
-            if t is None:
-                continue
+
+        while ok and idx < len(pts):
             if t > last_t + tol:
                 break
             while idx < len(pts) and t > float(pts[idx]["t"]) + tol:
@@ -176,15 +184,24 @@ def compute_motion_samples(video_path, track):
             if idx >= len(pts):
                 break
             if abs(t - float(pts[idx]["t"])) <= tol:
+                # retrieve() belongs to the frame that established `t`; never
+                # call grab() between reading the PTS and retrieving the image.
                 okr, fr = cap.retrieve()
                 if okr and fr is not None:
                     g = cv2.cvtColor(fr, cv2.COLOR_BGR2GRAY)
                     if g.shape[1] > PROC_W:
                         s = PROC_W / g.shape[1]
-                        g = cv2.resize(g, (PROC_W, max(2, int(round(g.shape[0] * s)))),
-                                       interpolation=cv2.INTER_AREA)
+                        g = cv2.resize(
+                            g,
+                            (PROC_W, max(2, int(round(g.shape[0] * s)))),
+                            interpolation=cv2.INTER_AREA,
+                        )
                     frames[idx] = g
                 idx += 1
+            if idx >= len(pts):
+                break
+            ok, t, _used_fallback = vt.grab_frame_time_seconds(cap, fps)
+
         return samples_from_frames(frames, pts)
     finally:
         cap.release()
