@@ -307,31 +307,81 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
         dist_h = math.hypot(rx - px, ry - py) / max(float(rb["h"]), float(pb["h"]), 1e-6)
         if ov >= TARGET_MATCH_IOU_MIN or dist_h <= TARGET_MATCH_CENTER_H:
             score = 1.8 * ov + max(0.0, 1.0 - dist_h / TARGET_MATCH_CENTER_H)
-            ranked.append((score, p.get("local_track_id")))
-    ranked = [x for x in sorted(ranked, reverse=True, key=lambda x: x[0]) if isinstance(x[1], str)]
-    if not ranked:
-        return {
-            "status": "UNRESOLVED", "reason": "DENSE_TARGET_BODY_NOT_RESOLVED",
-            "local_track_id": None, "candidate_local_track_ids": [],
-            "proof_eligible": False,
-        }
-    ids = [x[1] for x in ranked[:3]]
-    ambiguous = len(ranked) > 1 and ranked[0][0] - ranked[1][0] < TARGET_MATCH_AMBIG_MARGIN
-    if ambiguous or resolved.get("proof_eligible") is not True:
-        return {
-            "status": "HYPOTHESES",
-            "reason": "DENSE_TARGET_AMBIGUITY" if ambiguous else "NON_PROOF_IDENTITY_CONTINUITY",
-            "local_track_id": None,
-            "candidate_local_track_ids": ids,
-            "proof_eligible": False,
-        }
-    return {
-        "status": "VERIFIED", "reason": why,
-        "local_track_id": ranked[0][1],
-        "candidate_local_track_ids": [ranked[0][1]],
-        "proof_eligible": True,
-    }
+            ranked.append({"score": score, "player": p})
+    ranked.sort(reverse=True, key=lambda x: float(x["score"]))
 
+    normal = [row for row in ranked if isinstance(row["player"].get("local_track_id"), str)]
+    if normal:
+        ids = [row["player"]["local_track_id"] for row in normal[:3]]
+        ambiguous = len(normal) > 1 and float(normal[0]["score"]) - float(normal[1]["score"]) < TARGET_MATCH_AMBIG_MARGIN
+        if ambiguous or resolved.get("proof_eligible") is not True:
+            return {
+                "status": "HYPOTHESES",
+                "reason": "DENSE_TARGET_AMBIGUITY" if ambiguous else "NON_PROOF_IDENTITY_CONTINUITY",
+                "local_track_id": None,
+                "candidate_local_track_ids": ids,
+                "proof_eligible": False,
+            }
+        winner = normal[0]["player"]
+        return {
+            "status": "VERIFIED", "reason": why,
+            "local_track_id": winner["local_track_id"],
+            "candidate_local_track_ids": [winner["local_track_id"]],
+            "proof_eligible": True,
+            "body_box": deepcopy(winner.get("box")),
+            "body_confidence": winner.get("confidence"),
+            "body_team": winner.get("team"),
+            "body_team_confidence": winner.get("team_confidence"),
+            "body_team_source": winner.get("team_source"),
+        }
+
+    # Target-only collapse of detector duplicates. This is permitted only when
+    # proof-level target geometry independently exists and every matching raw
+    # hypothesis points to the same single underlying local track. The raw
+    # HYPOTHESES remain untouched.
+    hypotheses = [row for row in ranked if row["player"].get("association_state") == "HYPOTHESES"]
+    candidate_sets = [
+        {x for x in (row["player"].get("candidate_local_track_ids") or []) if isinstance(x, str)}
+        for row in hypotheses
+    ]
+    union = set().union(*candidate_sets) if candidate_sets else set()
+    unique_geometry = bool(
+        len(hypotheses) == 1
+        or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+    )
+    if (
+        resolved.get("proof_eligible") is True
+        and hypotheses
+        and union and len(union) == 1
+        and all(s == union for s in candidate_sets)
+        and unique_geometry
+    ):
+        track = next(iter(union))
+        winner = hypotheses[0]["player"]
+        predicted = (winner.get("candidate_predicted_boxes") or {}).get(track)
+        return {
+            "status": "VERIFIED",
+            "reason": "PROOF_TARGET_SINGLE_CANDIDATE_HYPOTHESIS_COLLAPSE",
+            "local_track_id": track,
+            "candidate_local_track_ids": [track],
+            "proof_eligible": True,
+            "body_box": deepcopy(winner.get("box")),
+            "body_predicted_box": deepcopy(predicted) if _valid_box(predicted) else None,
+            "body_confidence": winner.get("confidence"),
+            "body_team": winner.get("team"),
+            "body_team_confidence": winner.get("team_confidence"),
+            "body_team_source": winner.get("team_source"),
+            "body_association_state": "VERIFIED_TARGET_HYPOTHESIS_COLLAPSE",
+            "collapsed_hypothesis_count": len(hypotheses),
+        }
+    ids = sorted(union) if union else []
+    return {
+        "status": "HYPOTHESES" if ranked else "UNRESOLVED",
+        "reason": "DENSE_TARGET_HYPOTHESIS_NOT_COLLAPSIBLE" if ranked else "DENSE_TARGET_BODY_NOT_RESOLVED",
+        "local_track_id": None,
+        "candidate_local_track_ids": ids,
+        "proof_eligible": False,
+    }
 
 def refine_window(dense_frames, scene_graph: dict | None, identity_authority: dict | None,
                   scene_id: str, detector_fn=None, camera_estimator=None) -> dict:
@@ -476,6 +526,15 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "team_source": tr.get("team_source"),
             })
 
+        # Preserve the motion-predicted geometry behind unresolved hypotheses.
+        # It remains non-canonical and is consumed only by a later proof-backed
+        # GLOBAL_TARGET hypothesis collapse.
+        predicted_box_by_track = {
+            live[ti]["local_track_id"]: _box(pred)
+            for ti, pred in predictions.items()
+            if ti < len(live) and isinstance(live[ti].get("local_track_id"), str) and _valid_box(pred)
+        }
+
         # Explicit unresolved close-body hypotheses.  Do not allocate a new id
         # to either body because that would silently collapse the alternative.
         for di, candidates in sorted(ambiguous_det_candidates.items()):
@@ -485,6 +544,10 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             players_out.append({
                 "local_track_id": None,
                 "candidate_local_track_ids": sorted(candidates),
+                "candidate_predicted_boxes": {
+                    tid: deepcopy(predicted_box_by_track[tid])
+                    for tid in sorted(candidates) if tid in predicted_box_by_track
+                },
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
                 "association_state": "HYPOTHESES",

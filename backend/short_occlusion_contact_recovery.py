@@ -146,19 +146,33 @@ def _lower_geometry(player_box, ball_box):
 
 
 def _unique_lower_body_actor(frame, ball_box):
-    """Return one VERIFIED_LOCAL actor or an explicit fail-closed reason."""
+    """Return one verified physical actor or an explicit fail-closed reason."""
     if not isinstance(frame, dict) or not _valid_box(ball_box):
         return None, "CONTACT_FRAME_UNAVAILABLE", []
     verified = []
     ambiguous = []
-    for player in frame.get("players") or []:
+    for player in bce._players_for_physics(frame):
         if not isinstance(player, dict) or not _valid_box(player.get("box")):
             continue
-        geom = _lower_geometry(player["box"], ball_box)
-        if float(geom.get("distance_h") or 999.0) > float(bce.CONTACT_MAX_H):
+        geom = bce._best_lower_geometry(player, ball_box)
+        distance = float(geom.get("distance_h") or 999.0)
+        # Very narrow articulated-kick lane: only a proof-backed
+        # GLOBAL_TARGET body can extend from the ordinary contact radius to the
+        # already-existing possession radius, and only with actual lower-body
+        # overlap. It still needs Step3's independent trajectory consequence.
+        target_overlap = bool(
+            bce._actor_identity_key(frame, player.get("local_track_id")) == bce.GLOBAL_TARGET_ACTOR_KEY
+            and geom.get("lower_body_overlap") is True
+            and distance <= float(bce.POSSESSION_MAX_H)
+        )
+        if distance > float(bce.CONTACT_MAX_H) and not target_overlap:
             continue
+        if target_overlap and distance > float(bce.CONTACT_MAX_H):
+            geom = deepcopy(geom)
+            geom["geometry_source"] = "PROOF_TARGET_ARTICULATED_LOWER_BODY_OVERLAP"
+            geom["target_overlap_recovery"] = True
         track = player.get("local_track_id") if isinstance(player.get("local_track_id"), str) else None
-        if player.get("association_state") == "VERIFIED_LOCAL" and track:
+        if player.get("association_state") in {"VERIFIED_LOCAL", "VERIFIED_GLOBAL_TARGET_BODY"} and track:
             verified.append((player, geom))
         else:
             ambiguous.append((player, geom))
@@ -168,7 +182,6 @@ def _unique_lower_body_actor(frame, ball_box):
     if len(verified) != 1:
         return None, "MULTIPLE_LOWER_BODY_ACTORS" if len(verified) > 1 else "NO_UNIQUE_VERIFIED_LOWER_BODY_ACTOR", ids
     return (verified[0][0], verified[0][1]), None, ids
-
 
 def _scene_cut_between(frames, start_ms, end_ms, scene_id=None):
     lo, hi = sorted((int(start_ms), int(end_ms)))
@@ -263,6 +276,7 @@ def _make_contact(*, mode, anchor, actor, geometry, before_row, after_row,
         "media_ms": media_ms,
         "scene_id": recovery_evidence.get("scene_id"),
         "player_track_id": track,
+        "player_actor_key": recovery_evidence.get("actor_key") or f"LOCAL:{track}",
         "player_candidate_track_ids": [track],
         "player_box": deepcopy(actor["box"]),
         "player_association_state": "VERIFIED_LOCAL",
@@ -334,7 +348,7 @@ def _accepted_duplicate(contact_result, media_ms, track_id):
     return False
 
 
-def _support_seed_candidates(frames, anchor, actor):
+def _support_seed_candidates(frames, anchor, actor, anchor_frame):
     anchor_ms = int(anchor["media_ms"]); scene = actor.get("scene_id")
     ax, ay = _center(anchor["box"])
     out = []
@@ -348,7 +362,9 @@ def _support_seed_candidates(frames, anchor, actor):
             continue
         if scene is not None and frame.get("scene_id") != scene:
             continue
-        current_actor = _player_by_id(frame, actor["local_track_id"])
+        current_actor, actor_continuity = bce._player_for_actor_continuity(
+            anchor_frame, actor["local_track_id"], frame
+        )
         if current_actor is None:
             continue
         dt = dt_ms / 1000.0
@@ -367,6 +383,7 @@ def _support_seed_candidates(frames, anchor, actor):
                 "frame": frame,
                 "candidate": candidate,
                 "actor": current_actor,
+                "actor_continuity": deepcopy(actor_continuity),
                 "dt_ms": dt_ms,
                 "anchor_displacement": displacement,
                 "actor_distance_h": actor_h,
@@ -377,7 +394,6 @@ def _support_seed_candidates(frames, anchor, actor):
         float(x["actor_distance_h"]),
     ))
     return out[:MAX_SUPPORT_SEEDS]
-
 
 def _seed_points(box, width, height):
     x, y = _center(box)
@@ -524,7 +540,7 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
         track = actor["local_track_id"]
         if _accepted_duplicate(contact_result, int(anchor["media_ms"]), track):
             continue
-        seeds = _support_seed_candidates(frames, anchor, actor)
+        seeds = _support_seed_candidates(frames, anchor, actor, frame)
         if not seeds:
             continue
         candidates = []
@@ -545,7 +561,9 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
                 continue
             final_node = flow["nodes"][-1]
             final_frame = _frame_near(frames, int(final_node["media_ms"]), max_ms=50)
-            final_actor = _player_by_id(final_frame, track)
+            final_actor, final_actor_continuity = bce._player_for_actor_continuity(
+                seed["frame"], seed["actor"]["local_track_id"], final_frame
+            )
             if final_actor is None:
                 continue
             synthetic_final = {
@@ -576,6 +594,11 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
                 "flow_nodes": deepcopy(flow.get("nodes") or []),
                 "trajectory_change": deepcopy(change),
                 "separation_gain_h": round(float(separation), 4),
+                "actor_key": (seed.get("actor_continuity") or {}).get("actor_key") or bce._actor_identity_key(frame, track),
+                "actor_continuity_chain": [
+                    deepcopy(seed.get("actor_continuity") or {}),
+                    deepcopy(final_actor_continuity or {}),
+                ],
                 "fixture_truth_used": False,
             }
             score = (
@@ -683,7 +706,7 @@ def _measured_reacquisition_recoveries(frames, measured, contact_result, traject
         if _accepted_duplicate(contact_result, int(anchor["media_ms"]), track):
             continue
         next_frame = _frame_near(frames, int(nxt["media_ms"]))
-        next_actor = _player_by_id(next_frame, track)
+        next_actor, next_actor_continuity = bce._player_for_actor_continuity(frame, track, next_frame)
         if next_actor is None:
             continue
         change = _trajectory_change(incoming[0], incoming[1], anchor, nxt)
@@ -702,6 +725,8 @@ def _measured_reacquisition_recoveries(frames, measured, contact_result, traject
             "occlusion_gap_ms": gap_ms,
             "trajectory_change": deepcopy(change),
             "separation_gain_h": round(float(separation), 4),
+            "actor_key": (next_actor_continuity or {}).get("actor_key") or bce._actor_identity_key(frame, track),
+            "actor_continuity_chain": [deepcopy(next_actor_continuity or {})],
             "all_ball_rows_measured_proof_eligible": bool(
                 all(_proof_measured(x) for x in (incoming[0], incoming[1], anchor, nxt))
             ),

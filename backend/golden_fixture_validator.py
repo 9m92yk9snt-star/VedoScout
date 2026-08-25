@@ -649,7 +649,7 @@ def _target_goal_link_v2(case: dict, physical_result: dict | None) -> dict:
     traces = _case_traces(physical_result, case)
     strikes = _all_strikes(traces, start, end)
     outcomes = _all_outcomes(traces, start, end)
-    strike_start, strike_end = _reference_range(case, "strike", (start, end))
+    strike_start, strike_end = _reference_range(case, "target_strike", (start, end))
     target_releases = _target_releases(strikes, strike_start, strike_end)
     if not target_releases:
         return {"status": UNRESOLVED, "reason": "TARGET_RELEASE_NOT_VERIFIED_FOR_GOAL_CHAIN"}
@@ -688,7 +688,8 @@ def validate_case(case: dict, physical_result: dict | None,
         return result
     assertions = [
         row for row in (result.get("assertions") or [])
-        if isinstance(row, dict) and row.get("name") != "require_target_goal_plane_crossing"
+        if isinstance(row, dict)
+        and row.get("name") not in {"require_goal_plane_crossing", "require_target_goal_plane_crossing"}
     ]
     assertions.append({
         "name": "require_target_goal_plane_crossing",
@@ -761,4 +762,54 @@ def validate_fixture(manifest: dict, physical_result: dict | None,
         row.get("status") for row in fixture_assertions
     ]
     result["status"] = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
+    return result
+
+# FIX10A_GOAL_STABILIZATION_LEGACY_ASSERTION_ALIAS
+# Compatibility only: when the goal case has no physical outcomes at all,
+# preserve the historical missing-crossing assertion name as an exact alias
+# of the stricter target-linked verdict. Once any outcome exists, the
+# target-linked assertion is the sole goal-crossing authority so an
+# unrelated PLAYER_INTERVENTION cannot recreate the old unlinked failure.
+_validate_case_before_strict_goal_alias = validate_case
+
+def _case_has_any_physical_outcome(case: dict, physical_result: dict | None) -> bool:
+    window = case.get("window_ms") if isinstance(case.get("window_ms"), list) else None
+    start = int(window[0]) if window and len(window) == 2 else None
+    end = int(window[1]) if window and len(window) == 2 else None
+    for trace in ((physical_result or {}).get("traces") or []):
+        if not isinstance(trace, dict):
+            continue
+        tw = trace.get("window") if isinstance(trace.get("window"), dict) else {}
+        ts, te = tw.get("start_ms"), tw.get("end_ms")
+        if start is not None and end is not None and isinstance(ts, (int, float)) and isinstance(te, (int, float)):
+            if int(te) < start or int(ts) > end:
+                continue
+        if any(isinstance(row, dict) for row in (trace.get("outcome_evidence") or [])):
+            return True
+    return False
+
+def validate_case(case: dict, physical_result: dict | None,
+                  sequence_analysis: dict | None = None) -> dict:
+    result = _validate_case_before_strict_goal_alias(case, physical_result, sequence_analysis)
+    gate = case.get("physical_gate") if isinstance(case.get("physical_gate"), dict) else {}
+    if gate.get("require_goal_plane_crossing") is not True:
+        return result
+    assertions = [row for row in (result.get("assertions") or []) if isinstance(row, dict)]
+    strict = next((row for row in assertions if row.get("name") == "require_target_goal_plane_crossing"), None)
+    if strict is None:
+        return result
+    assertions = [row for row in assertions if row.get("name") != "require_goal_plane_crossing"]
+    if not _case_has_any_physical_outcome(case, physical_result):
+        alias = dict(strict)
+        alias["name"] = "require_goal_plane_crossing"
+        assertions.append(alias)
+    statuses = [row.get("status") for row in assertions]
+    status = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
+    result["assertions"] = assertions
+    result["status"] = status
+    result["reason"] = (
+        "ASSERTION_FAILURE" if status == FAIL
+        else "INSUFFICIENT_EVIDENCE" if status == UNRESOLVED
+        else "ALL_REQUIRED_ASSERTIONS_PASS"
+    )
     return result
