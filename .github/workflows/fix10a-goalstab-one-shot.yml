@@ -68,10 +68,28 @@ jobs:
           cat >> backend/golden_fixture_validator.py <<'PY'
 
           # FIX10A_GOAL_STABILIZATION_LEGACY_ASSERTION_ALIAS
-          # Compatibility only: the historical assertion name is an exact alias
-          # of the stricter target-linked verdict. It never restores the old
-          # unlinked "any goal outcome in the window" acceptance path.
+          # Compatibility only: when the goal case has no physical outcomes at all,
+          # preserve the historical missing-crossing assertion name as an exact alias
+          # of the stricter target-linked verdict. Once any outcome exists, the
+          # target-linked assertion is the sole goal-crossing authority so an
+          # unrelated PLAYER_INTERVENTION cannot recreate the old unlinked failure.
           _validate_case_before_strict_goal_alias = validate_case
+
+          def _case_has_any_physical_outcome(case: dict, physical_result: dict | None) -> bool:
+              window = case.get("window_ms") if isinstance(case.get("window_ms"), list) else None
+              start = int(window[0]) if window and len(window) == 2 else None
+              end = int(window[1]) if window and len(window) == 2 else None
+              for trace in ((physical_result or {}).get("traces") or []):
+                  if not isinstance(trace, dict):
+                      continue
+                  tw = trace.get("window") if isinstance(trace.get("window"), dict) else {}
+                  ts, te = tw.get("start_ms"), tw.get("end_ms")
+                  if start is not None and end is not None and isinstance(ts, (int, float)) and isinstance(te, (int, float)):
+                      if int(te) < start or int(ts) > end:
+                          continue
+                  if any(isinstance(row, dict) for row in (trace.get("outcome_evidence") or [])):
+                      return True
+              return False
 
           def validate_case(case: dict, physical_result: dict | None,
                             sequence_analysis: dict | None = None) -> dict:
@@ -84,9 +102,10 @@ jobs:
               if strict is None:
                   return result
               assertions = [row for row in assertions if row.get("name") != "require_goal_plane_crossing"]
-              alias = dict(strict)
-              alias["name"] = "require_goal_plane_crossing"
-              assertions.append(alias)
+              if not _case_has_any_physical_outcome(case, physical_result):
+                  alias = dict(strict)
+                  alias["name"] = "require_goal_plane_crossing"
+                  assertions.append(alias)
               statuses = [row.get("status") for row in assertions]
               status = FAIL if FAIL in statuses else UNRESOLVED if UNRESOLVED in statuses else PASS
               result["assertions"] = assertions
