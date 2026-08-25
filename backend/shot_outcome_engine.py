@@ -13,6 +13,8 @@ import hashlib
 import math
 from copy import deepcopy
 
+import fix10a_occluded_goal
+
 VERSION = 1
 MAX_POST_STRIKE_MS = 3000
 MIN_RELEASE_TRAJECTORY_CHANGE = 0.20
@@ -355,7 +357,7 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
     }
 
 
-def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None):
+def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=None, strike_actor=None):
     audit = _visual_crossing_audit(goal_geometry)
     measured = [
         r for r in rows
@@ -445,13 +447,49 @@ def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None):
         visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms)
         if visual_proof is not None:
             return visual_proof
+        # A visibly asserted crossing can still be hidden at the exact line.
+        # The dedicated occlusion lane must independently prove the physical
+        # pre-occlusion trajectory and may never trust the bare CROSSED label.
+        occluded = fix10a_occluded_goal.resolve_occluded_crossing(
+            rows, goal_geometry, strike_ms, touch_graph=touch_graph,
+            strike_actor=strike_actor,
+        )
+        if isinstance(occluded, dict) and occluded.get("status") in {"VERIFIED", "REJECTED"}:
+            occluded["visual_audit"] = audit
+            return occluded
         return {"status": "UNRESOLVED", "crossing_ms": None,
-                "reason": "VISUAL_CROSSING_WITHOUT_WHOLE_BALL_PHYSICAL_CROSSING",
-                "evidence": [], "visual_audit": audit}
+                "reason": (occluded or {}).get("reason") or
+                          "VISUAL_CROSSING_WITHOUT_WHOLE_BALL_PHYSICAL_CROSSING",
+                "evidence": list((occluded or {}).get("evidence") or []),
+                "visual_audit": audit,
+                "occlusion_audit": (occluded or {}).get("occlusion_audit"),
+                "reaction_support": (occluded or {}).get("reaction_support")}
     if audit["status"] == "VERIFIED_NO_CROSSING":
         return {"status": "REJECTED", "crossing_ms": None,
                 "reason": "INDEPENDENT_VISUAL_NO_CROSSING_AND_NO_WHOLE_BALL_CROSSING",
                 "evidence": [], "visual_audit": audit}
+
+    # Last chance is the strictly bounded occlusion-aware physical lane.  It is
+    # intentionally evaluated even when the direct visual audit is UNRESOLVED,
+    # because an occluding player can make a literal whole-ball frame
+    # impossible while the pre-occlusion trajectory and independent reactions
+    # still converge.
+    occluded = fix10a_occluded_goal.resolve_occluded_crossing(
+        rows, goal_geometry, strike_ms, touch_graph=touch_graph,
+        strike_actor=strike_actor,
+    )
+    if isinstance(occluded, dict):
+        occluded["visual_audit"] = audit
+        if occluded.get("status") in {"VERIFIED", "REJECTED"}:
+            return occluded
+        if occluded.get("reason"):
+            return {"status": "UNRESOLVED", "crossing_ms": None,
+                    "reason": occluded.get("reason"),
+                    "evidence": list(occluded.get("evidence") or []),
+                    "visual_audit": audit,
+                    "occlusion_audit": occluded.get("occlusion_audit"),
+                    "reaction_support": occluded.get("reaction_support"),
+                    "trajectory_fit": occluded.get("trajectory_fit")}
     return {"status": "UNRESOLVED", "crossing_ms": None,
             "reason": "NO_PROVEN_WHOLE_BALL_GOAL_PLANE_CROSSING", "evidence": [],
             "visual_audit": audit}
@@ -545,7 +583,10 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
     start = int(strike["media_ms"])
     end = start + MAX_POST_STRIKE_MS
     rows = _trajectory_rows(ball_trajectory, start, end, strike.get("scene_id"))
-    crossing = _goal_crossing_evidence(rows, goal_geometry, strike_ms=start)
+    crossing = _goal_crossing_evidence(
+        rows, goal_geometry, strike_ms=start, touch_graph=touch_graph,
+        strike_actor=strike.get("player_track_id"),
+    )
     other_touch = _first_other_touch(touch_graph, strike)
     intervention = _intervention_evidence(other_touch, rows)
     role = _role_resolution(role_evidence, intervention.get("player_track_id"))

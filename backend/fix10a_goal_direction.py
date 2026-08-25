@@ -389,6 +389,75 @@ def apply_direction_gate(outcome: dict, ball_trajectory, goal_geometry) -> dict:
         return _downgrade_crossing(row, "CROSSING_SEGMENT_EVIDENCE_MISSING")
     from_ms, to_ms = int(first["from_ms"]), int(first["to_ms"])
 
+    # Occlusion-aware lane: only the pre-occlusion ball is a detector-backed
+    # measurement.  The resolver carries an explicit projected point just
+    # beyond the line, derived from the bounded proof-eligible trajectory.
+    # This direction gate independently verifies that the measured pre-ball is
+    # on the playable-field side and the projection is on the opposite side.
+    if str(first.get("proof_lane") or "") == "OCCLUDED_TRAJECTORY_GOAL":
+        occ = goal_geometry.get("occlusion_crossing_audit") if isinstance(goal_geometry.get("occlusion_crossing_audit"), dict) else {}
+        reaction = goal_geometry.get("reaction_support_evidence") if isinstance(goal_geometry.get("reaction_support_evidence"), dict) else {}
+        anchors = first.get("anchor_media_ms") if isinstance(first.get("anchor_media_ms"), list) else []
+        if not (
+            str(occ.get("status") or "").upper() == "VERIFIED_OCCLUSION"
+            and str(occ.get("confidence") or "low").lower() in {"high", "medium"}
+            and str(reaction.get("status") or "").upper() == "VERIFIED"
+            and first.get("same_ball_pre_occlusion") is True
+            and len([ms for ms in anchors if _num(ms)]) >= 3
+            and _num(first.get("trajectory_r2"))
+            and float(first.get("trajectory_r2")) >= 0.92
+        ):
+            return _downgrade_crossing(row, "OCCLUDED_GOAL_DIRECTION_EVIDENCE_INVALID")
+        before_point = first.get("pre_ball_center") if isinstance(first.get("pre_ball_center"), dict) else None
+        after_point = first.get("projected_after_point") if isinstance(first.get("projected_after_point"), dict) else None
+        try:
+            before_xy = (float(before_point["x"]), float(before_point["y"]))
+            after_xy = (float(after_point["x"]), float(after_point["y"]))
+        except (TypeError, KeyError, ValueError):
+            return _downgrade_crossing(row, "OCCLUDED_GOAL_PROJECTED_POINTS_MISSING")
+        if not all(math.isfinite(v) and -0.1 <= v <= 1.1 for v in (*before_xy, *after_xy)):
+            return _downgrade_crossing(row, "OCCLUDED_GOAL_PROJECTED_POINTS_INVALID")
+        before_line, after_line = _line_at(goal_geometry, from_ms), _line_at(goal_geometry, to_ms)
+        before_field, after_field = _field_point_at(goal_geometry, from_ms), _field_point_at(goal_geometry, to_ms)
+        if not all(x is not None for x in (before_line, after_line, before_field, after_field)):
+            return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_UNAVAILABLE")
+        before_field_d = _signed_side(before_field, before_line)
+        after_field_d = _signed_side(after_field, after_line)
+        before_ball_d = _signed_side(before_xy, before_line)
+        after_projected_d = _signed_side(after_xy, after_line)
+        values = (before_field_d, after_field_d, before_ball_d, after_projected_d)
+        if any(value is None for value in values):
+            return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_UNAVAILABLE")
+        if abs(before_field_d) < FIELD_SIDE_MIN_DISTANCE or abs(after_field_d) < FIELD_SIDE_MIN_DISTANCE:
+            return _downgrade_crossing(row, "FIELD_SIDE_POINT_TOO_CLOSE_TO_GOAL_LINE")
+        before_field_sign = 1 if before_field_d > 0 else -1
+        after_field_sign = 1 if after_field_d > 0 else -1
+        before_ball_sign = 1 if before_ball_d > 0 else -1 if before_ball_d < 0 else 0
+        after_projected_sign = 1 if after_projected_d > 0 else -1 if after_projected_d < 0 else 0
+        details = {
+            "from_ms": from_ms, "to_ms": to_ms,
+            "before_field_sign": before_field_sign, "after_field_sign": after_field_sign,
+            "before_ball_sign": before_ball_sign, "after_projected_sign": after_projected_sign,
+            "proof_lane": "OCCLUDED_TRAJECTORY_GOAL",
+            "anchor_media_ms": [int(ms) for ms in anchors if _num(ms)],
+        }
+        if before_field_sign != after_field_sign:
+            return _downgrade_crossing(row, "FIELD_SIDE_ORIENTATION_CONTRADICTS_ACROSS_OCCLUSION", details)
+        if before_ball_sign == before_field_sign and after_projected_sign == -after_field_sign:
+            crossing = deepcopy(crossing)
+            crossing["direction"] = "FIELD_TO_GOAL"
+            crossing["direction_status"] = "VERIFIED"
+            crossing["direction_evidence"] = details
+            row["goal_plane_crossing"] = crossing
+            row["direction_gate"] = {
+                "status": "VERIFIED",
+                "reason": "OCCLUDED_TRAJECTORY_FIELD_TO_GOAL_DIRECTION_VERIFIED",
+            }
+            return row
+        if before_ball_sign == -before_field_sign:
+            return _downgrade_crossing(row, "OCCLUDED_TRAJECTORY_STARTS_GOAL_SIDE", details)
+        return _downgrade_crossing(row, "FIELD_TO_GOAL_DIRECTION_NOT_PROVEN", details)
+
     # Detector-loss recovery lane: the structured visual proof already carries
     # a strict, continuous whole-ball FIELD_SIDE -> BEYOND transition.  We do
     # not fabricate detector rows here.  Instead, an independent field-side

@@ -32,7 +32,7 @@ VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
 MAX_JERSEY_REQUESTS = int(os.environ.get("FIX10A_MAX_JERSEY_READS", "24"))
 MAX_ROLE_TRACKS = int(os.environ.get("FIX10A_MAX_ROLE_TRACKS", "4"))
 MAX_ROLE_FRAMES_PER_TRACK = int(os.environ.get("FIX10A_MAX_ROLE_FRAMES", "4"))
-MAX_GOAL_FRAMES = int(os.environ.get("FIX10A_MAX_GOAL_FRAMES", "8"))
+MAX_GOAL_FRAMES = int(os.environ.get("FIX10A_MAX_GOAL_FRAMES", "12"))
 
 ROLE_REVIEW_RADIUS_MS = 900
 ROLE_MIN_SEPARATION_MS = 150
@@ -229,57 +229,97 @@ def aggregate_role_votes(votes) -> dict:
 
 async def read_goal_scene_evidence(api_key: str, session_id: str,
                                    frame_paths: list[str], media_ms: list[int]) -> dict:
-    """Independent multi-frame goal geometry + ball-crossing visual audit."""
+    """Independent multi-frame goal geometry, ball/occlusion and reaction audit.
+
+    Reactions are deliberately returned as support-only observations.  They do
+    not change the direct whole-ball ``crossing`` verdict inside this reader.
+    """
+    empty = {
+        "geometry_status": "UNRESOLVED", "frames": [],
+        "crossing": "UNRESOLVED", "crossing_confidence": "low",
+        "ball_evidence": [], "same_ball_continuity": False,
+        "first_crossing_idx": None, "first_crossing_media_ms": None,
+        "field_side_before_media_ms": None, "beyond_line_media_ms": None,
+        "proof_ready": False, "proof_reason": "insufficient_frames",
+        "occlusion_crossing_audit": {
+            "status": "UNRESOLVED", "confidence": "low",
+            "occlusion_start_media_ms": None, "occlusion_end_media_ms": None,
+            "last_field_side_media_ms": None,
+            "first_beyond_after_occlusion_media_ms": None,
+            "occlusion_rows": [], "visual_contradiction": False,
+            "reason": "insufficient_frames",
+        },
+        "reaction_support_evidence": {
+            "status": "UNRESOLVED", "confidence": "low",
+            "release_player_celebration": {},
+            "goal_mouth_defender_response": {},
+            "goal_mouth_defender_ball_contact": {},
+            "reason": "insufficient_frames",
+        },
+        "reason": "insufficient_frames",
+    }
     try:
         pairs = [
             (Path(path), int(ms)) for path, ms in zip(frame_paths, media_ms)
             if path and Path(path).exists() and _num(ms)
         ]
         if len(pairs) < 2 or not api_key:
-            return {"geometry_status": "UNRESOLVED", "frames": [],
-                    "crossing": "UNRESOLVED", "crossing_confidence": "low",
-                    "ball_evidence": [], "same_ball_continuity": False,
-                    "first_crossing_idx": None, "first_crossing_media_ms": None,
-                    "field_side_before_media_ms": None, "beyond_line_media_ms": None,
-                    "proof_ready": False, "proof_reason": "insufficient_frames",
-                    "reason": "insufficient_frames"}
+            return dict(empty)
         timeline = ", ".join(f"image {i + 1}={ms}ms" for i, (_path, ms) in enumerate(pairs))
         chat = LlmChat(
             api_key=api_key,
             session_id=session_id,
             system_message=(
-                "You inspect football goal geometry and ball visibility from chronological images. "
-                "Do not infer outcomes from celebrations, scoreboards or expected events. Strict JSON only."
+                "You inspect football goal geometry, ball visibility, literal occlusion and post-shot body reactions "
+                "from chronological images. Never infer a GOAL/SAVE from celebration, scoreboards or expected events. "
+                "Return only visible observations as strict JSON."
             ),
         ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
         prompt = (
             f"These images are chronological match frames: {timeline}. The first images are at/just after a "
             "physically detected ball release; no semantic event label is provided.\n"
-            "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two "
-            "goalpost BASE points where each post meets the ground/goal line. Coordinates must be normalized 0..1 "
-            "from top-left of that image. Do not estimate a hidden post. Mark visible=false when both bases are not clear.\n"
-            "BALL AUDIT: Follow only the visibly observable MOVING match ball in chronological order. Ignore any "
-            "stationary spare ball, white field marking, clothing patch or object that cannot be tracked as the same ball. "
-            "For EVERY image return one ball_evidence row. relation=FIELD_SIDE means the whole visible ball is still on "
-            "the playable-field side of the goal plane. ON_OR_STRADDLING_LINE means any part of the ball overlaps the "
-            "goal plane. BEYOND_LINE_INSIDE_MOUTH is allowed only when the ENTIRE visible ball is clearly beyond the "
-            "goal plane and between the inner edges of the two posts. OTHER means visible but not in that goal-crossing "
-            "path. UNRESOLVED means the ball/line relation cannot be seen reliably. Set same_ball_continuity=true ONLY "
-            "if the same moving ball can be continuously identified through every sampled image from the last clear "
-            "FIELD_SIDE frame through the first clear BEYOND_LINE_INSIDE_MOUTH frame; any hidden interval, object switch "
-            "or ambiguity makes it false. first_crossing_idx is the first image where the whole ball is fully beyond the "
-            "line inside the mouth, otherwise null. CROSSED means that strict whole-ball transition is visibly proven. "
-            "NOT_CROSSED means a continuous visible sequence proves it did not cross. Otherwise use UNRESOLVED. Never "
-            "use celebration, player reaction, net movement alone, scoreboard, or likely football outcome.\n"
+            "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
+            "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
+            "visible=false when both bases are not clear.\n"
+            "BALL AUDIT: Follow only the visibly observable MOVING match ball in chronological order. For EVERY image "
+            "return one ball_evidence row. FIELD_SIDE means the whole visible ball is on the playable-field side of the "
+            "goal plane. ON_OR_STRADDLING_LINE means any part overlaps the plane. BEYOND_LINE_INSIDE_MOUTH means the "
+            "ENTIRE visible ball is clearly beyond the plane and between the inner post edges. OCCLUDED_GOAL_MOUTH is "
+            "allowed ONLY when the same moving ball was visible immediately before but is now hidden specifically by a "
+            "player/body in the goal-mouth / goal-line region; ball_visible must be false. OTHER means visible elsewhere. "
+            "UNRESOLVED means relation/identity is unclear. For hidden rows set occluder to PLAYER_BODY, "
+            "GOALKEEPER_BODY, GOAL_STRUCTURE, OTHER or UNKNOWN.\n"
+            "DIRECT CROSSING: same_ball_continuity=true ONLY if the ball is visible and continuously identifiable in "
+            "every sampled image from the last FIELD_SIDE frame through the first BEYOND_LINE_INSIDE_MOUTH frame. Any "
+            "hidden interval makes it false. CROSSED means that strict visible whole-ball transition is proven; "
+            "NOT_CROSSED means a continuous visible sequence proves it did not cross; otherwise UNRESOLVED.\n"
+            "REACTIONS (SUPPORT ONLY): Follow the same release player only if visually traceable from the release frames. "
+            "Report celebration OBSERVED only for a clear post-shot celebratory cue such as both arms raised / obvious "
+            "goal celebration, never merely running. For the player stationed in/nearest the relevant goal mouth, report "
+            "ball_contact as OBSERVED_CONTACT only if literal ball-body contact is visible; NO_VISIBLE_CONTACT only means "
+            "none is visible, not that contact is impossible. Report response=LATE_OR_NO_REACTION only when the player is "
+            "visibly static/late after release rather than making a timely save action. These reaction fields must NOT "
+            "change the crossing verdict.\n"
             'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
             '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
             '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
             '"ball_evidence":[{"idx":1,"ball_visible":true|false,'
-            '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|"OTHER"|"UNRESOLVED",'
-            '"confidence":"high"|"medium"|"low","reason":"<short visual reason>"}],'
+            '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
+            '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
+            '"ball_box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0}|null,'
+            '"occluder":"PLAYER_BODY"|"GOALKEEPER_BODY"|"GOAL_STRUCTURE"|"OTHER"|"UNKNOWN",'
+            '"confidence":"high"|"medium"|"low","reason":"<short literal visual reason>"}],'
             '"same_ball_continuity":true|false,"first_crossing_idx":1|null,'
-            '"crossing":"CROSSED"|"NOT_CROSSED"|"UNRESOLVED", '
-            '"crossing_confidence":"high"|"medium"|"low", "reason":"<short visual reason>"}'
+            '"crossing":"CROSSED"|"NOT_CROSSED"|"UNRESOLVED",'
+            '"crossing_confidence":"high"|"medium"|"low",'
+            '"reaction_evidence":{"release_player_tracked":true|false,'
+            '"release_player_celebration":"OBSERVED"|"NOT_OBSERVED"|"UNRESOLVED",'
+            '"release_player_confidence":"high"|"medium"|"low",'
+            '"goal_mouth_defender_tracked":true|false,'
+            '"goal_mouth_defender_ball_contact":"OBSERVED_CONTACT"|"NO_VISIBLE_CONTACT"|"UNRESOLVED",'
+            '"goal_mouth_defender_response":"ACTIVE_SAVE_ATTEMPT"|"LATE_OR_NO_REACTION"|"OTHER"|"UNRESOLVED",'
+            '"goal_mouth_defender_confidence":"high"|"medium"|"low"},'
+            '"reason":"<short visual reason>"}'
         )
         msg = UserMessage(
             text=prompt,
@@ -288,6 +328,7 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
         text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
         data = _extract_json(text) or {}
+
         cleaned_frames = []
         for row in data.get("frames") or []:
             if not isinstance(row, dict) or row.get("visible") is not True:
@@ -311,13 +352,14 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             confidence = str(row.get("confidence") or "low").lower()
             if confidence not in _CONF_WEIGHT or confidence == "low":
                 continue
-            actual_ms = pairs[idx - 1][1]
             cleaned_frames.append({
                 "idx": idx,
-                "media_ms": actual_ms,
+                "media_ms": int(pairs[idx - 1][1]),
                 "line": {"p1": a, "p2": b},
                 "confidence": confidence,
             })
+        geometry_verified = len(cleaned_frames) >= 2
+
         crossing = str(data.get("crossing") or "UNRESOLVED").upper()
         crossing_conf = str(data.get("crossing_confidence") or "low").lower()
         if crossing not in {"CROSSED", "NOT_CROSSED", "UNRESOLVED"}:
@@ -326,15 +368,12 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             crossing_conf = "low"
         if crossing_conf == "low":
             crossing = "UNRESOLVED"
-        geometry_verified = len(cleaned_frames) >= 2
 
-        # A provider-only whole-ball crossing is allowed to become physical
-        # evidence only through this much stricter, machine-checked structure.
-        # The model's top-level CROSSED string by itself remains supporting-only.
         allowed_relations = {
-            "FIELD_SIDE", "ON_OR_STRADDLING_LINE",
-            "BEYOND_LINE_INSIDE_MOUTH", "OTHER", "UNRESOLVED",
+            "FIELD_SIDE", "ON_OR_STRADDLING_LINE", "BEYOND_LINE_INSIDE_MOUTH",
+            "OCCLUDED_GOAL_MOUTH", "OTHER", "UNRESOLVED",
         }
+        allowed_occluders = {"PLAYER_BODY", "GOALKEEPER_BODY", "GOAL_STRUCTURE", "OTHER", "UNKNOWN"}
         ball_rows_by_idx = {}
         for row in data.get("ball_evidence") or []:
             if not isinstance(row, dict):
@@ -351,15 +390,22 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             confidence = str(row.get("confidence") or "low").lower()
             if confidence not in _CONF_WEIGHT:
                 confidence = "low"
+            occluder = str(row.get("occluder") or "UNKNOWN").upper()
+            if occluder not in allowed_occluders:
+                occluder = "UNKNOWN"
+            ball_box = row.get("ball_box") if _valid_box(row.get("ball_box")) else None
             ball_rows_by_idx[idx] = {
                 "idx": idx,
                 "media_ms": int(pairs[idx - 1][1]),
                 "ball_visible": row.get("ball_visible") is True,
                 "relation": relation,
+                "ball_box": dict(ball_box) if isinstance(ball_box, dict) else None,
+                "occluder": occluder,
                 "confidence": confidence,
-                "reason": str(row.get("reason") or "ball_relation_review")[:160],
+                "reason": str(row.get("reason") or "ball_relation_review")[:180],
             }
         ball_evidence = [ball_rows_by_idx[idx] for idx in sorted(ball_rows_by_idx)]
+
         same_ball = data.get("same_ball_continuity") is True
         try:
             crossing_idx = int(data.get("first_crossing_idx")) if data.get("first_crossing_idx") is not None else None
@@ -367,7 +413,6 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             crossing_idx = None
         if crossing_idx is not None and not 1 <= crossing_idx <= len(pairs):
             crossing_idx = None
-
         field_candidates = [
             row for row in ball_evidence
             if crossing_idx is not None and row["idx"] < crossing_idx
@@ -391,10 +436,7 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         path_rows = []
         path_complete = False
         if before is not None and after is not None:
-            path_rows = [
-                ball_rows_by_idx.get(idx)
-                for idx in range(int(before["idx"]), int(after["idx"]) + 1)
-            ]
+            path_rows = [ball_rows_by_idx.get(idx) for idx in range(int(before["idx"]), int(after["idx"]) + 1)]
             path_complete = bool(
                 len(path_rows) >= 3
                 and all(
@@ -408,19 +450,166 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
                 )
             )
         proof_ready = bool(
-            geometry_verified
-            and crossing == "CROSSED"
-            and crossing_conf == "high"
-            and same_ball
-            and crossing_idx is not None
-            and before is not None and after is not None
-            and earliest_beyond == crossing_idx == int(after["idx"])
-            and path_complete
+            geometry_verified and crossing == "CROSSED" and crossing_conf == "high"
+            and same_ball and crossing_idx is not None and before is not None and after is not None
+            and earliest_beyond == crossing_idx == int(after["idx"]) and path_complete
         )
         proof_reason = (
             "STRUCTURED_MULTI_FRAME_WHOLE_BALL_CROSSING" if proof_ready
             else "STRUCTURED_WHOLE_BALL_CROSSING_NOT_PROVEN"
         )
+
+        # Literal goal-mouth occlusion audit.  This validates *only* that a
+        # bounded body occlusion exists after a clear FIELD_SIDE ball.  It does
+        # not infer that the ball crossed the line.
+        occ_candidates = [
+            row for row in ball_evidence
+            if row.get("ball_visible") is False
+            and row.get("relation") == "OCCLUDED_GOAL_MOUTH"
+            and row.get("confidence") in {"high", "medium"}
+            and row.get("occluder") in {"PLAYER_BODY", "GOALKEEPER_BODY"}
+        ]
+        occ_rows = []
+        if occ_candidates:
+            ordered = sorted(occ_candidates, key=lambda r: r["idx"])
+            occ_rows = [ordered[0]]
+            for row in ordered[1:]:
+                if int(row["idx"]) == int(occ_rows[-1]["idx"]) + 1:
+                    occ_rows.append(row)
+                else:
+                    break
+        occ_start = int(occ_rows[0]["media_ms"]) if occ_rows else None
+        occ_end = int(occ_rows[-1]["media_ms"]) if occ_rows else None
+        before_occ = max(
+            (row for row in ball_evidence
+             if occ_rows and row["idx"] < occ_rows[0]["idx"]
+             and row.get("ball_visible") is True and row.get("relation") == "FIELD_SIDE"
+             and row.get("confidence") == "high"),
+            key=lambda row: row["idx"], default=None,
+        )
+        beyond_after_occ = min(
+            (row for row in ball_evidence
+             if occ_rows and row["idx"] > occ_rows[-1]["idx"]
+             and row.get("ball_visible") is True
+             and row.get("relation") == "BEYOND_LINE_INSIDE_MOUTH"
+             and row.get("confidence") in {"high", "medium"}),
+            key=lambda row: row["idx"], default=None,
+        )
+        visual_contradiction = bool(
+            occ_rows and any(
+                row.get("ball_visible") is True and row.get("confidence") == "high"
+                and row.get("relation") in {"FIELD_SIDE", "OTHER"}
+                and int(occ_rows[-1]["idx"]) < int(row["idx"]) <= int(occ_rows[-1]["idx"]) + 2
+                for row in ball_evidence
+            )
+        )
+        pre_occ_visible_rows = []
+        same_ball_pre_occlusion = False
+        if occ_rows and before_occ is not None:
+            # Preserve a contiguous, bounded visible-ball path immediately
+            # before the first body-occluded frame.  Boxes are provider
+            # observations at exact sampled media times; they never masquerade
+            # as detector measurements.
+            start_idx = max(1, int(occ_rows[0]["idx"]) - 4)
+            candidate_rows = [
+                ball_rows_by_idx.get(idx)
+                for idx in range(start_idx, int(occ_rows[0]["idx"]))
+            ]
+            candidate_rows = [row for row in candidate_rows if isinstance(row, dict)]
+            tail = []
+            for row in reversed(candidate_rows):
+                if not (
+                    row.get("ball_visible") is True
+                    and row.get("confidence") in {"high", "medium"}
+                    and row.get("relation") in {"FIELD_SIDE", "ON_OR_STRADDLING_LINE"}
+                    and isinstance(row.get("ball_box"), dict)
+                ):
+                    break
+                tail.append(row)
+            pre_occ_visible_rows = list(reversed(tail))
+            same_ball_pre_occlusion = len(pre_occ_visible_rows) >= 2
+        occ_span_ok = bool(
+            occ_start is not None and occ_end is not None and 0 <= occ_end - occ_start <= 900
+        )
+        occ_verified = bool(
+            geometry_verified and occ_rows and before_occ is not None and occ_span_ok
+            and same_ball_pre_occlusion and not visual_contradiction
+        )
+        occ_conf = (
+            "high" if occ_verified and all(r.get("confidence") == "high" for r in occ_rows)
+            else "medium" if occ_verified else "low"
+        )
+        occlusion_audit = {
+            "status": "VERIFIED_OCCLUSION" if occ_verified else "UNRESOLVED",
+            "confidence": occ_conf,
+            "occlusion_start_media_ms": occ_start,
+            "occlusion_end_media_ms": occ_end,
+            "last_field_side_media_ms": int(before_occ["media_ms"]) if isinstance(before_occ, dict) else None,
+            "first_beyond_after_occlusion_media_ms": int(beyond_after_occ["media_ms"]) if isinstance(beyond_after_occ, dict) else None,
+            "occlusion_rows": [dict(row) for row in occ_rows],
+            "pre_occlusion_visible_rows": [dict(row) for row in pre_occ_visible_rows],
+            "same_ball_pre_occlusion": same_ball_pre_occlusion,
+            "visual_contradiction": visual_contradiction,
+            "reason": (
+                "BOUNDED_PLAYER_BODY_GOAL_MOUTH_OCCLUSION" if occ_verified
+                else "GOAL_MOUTH_OCCLUSION_NOT_PROVEN"
+            ),
+        }
+
+        # Reaction evidence remains support only.  A positive support verdict
+        # requires two separate literal observations and is never fed into the
+        # direct whole-ball CROSSED verdict above.
+        react = data.get("reaction_evidence") if isinstance(data.get("reaction_evidence"), dict) else {}
+        release_tracked = react.get("release_player_tracked") is True
+        celebration = str(react.get("release_player_celebration") or "UNRESOLVED").upper()
+        celebration_conf = str(react.get("release_player_confidence") or "low").lower()
+        defender_tracked = react.get("goal_mouth_defender_tracked") is True
+        defender_contact = str(react.get("goal_mouth_defender_ball_contact") or "UNRESOLVED").upper()
+        defender_response = str(react.get("goal_mouth_defender_response") or "UNRESOLVED").upper()
+        defender_conf = str(react.get("goal_mouth_defender_confidence") or "low").lower()
+        if celebration not in {"OBSERVED", "NOT_OBSERVED", "UNRESOLVED"}:
+            celebration = "UNRESOLVED"
+        if defender_contact not in {"OBSERVED_CONTACT", "NO_VISIBLE_CONTACT", "UNRESOLVED"}:
+            defender_contact = "UNRESOLVED"
+        if defender_response not in {"ACTIVE_SAVE_ATTEMPT", "LATE_OR_NO_REACTION", "OTHER", "UNRESOLVED"}:
+            defender_response = "UNRESOLVED"
+        if celebration_conf not in _CONF_WEIGHT:
+            celebration_conf = "low"
+        if defender_conf not in _CONF_WEIGHT:
+            defender_conf = "low"
+        contact_contradiction = bool(
+            defender_tracked and defender_contact == "OBSERVED_CONTACT"
+            and defender_conf in {"high", "medium"}
+        )
+        reaction_verified = bool(
+            release_tracked and celebration == "OBSERVED" and celebration_conf in {"high", "medium"}
+            and defender_tracked and defender_response == "LATE_OR_NO_REACTION"
+            and defender_conf in {"high", "medium"}
+            and not contact_contradiction
+        )
+        reaction_conf = (
+            "high" if reaction_verified and celebration_conf == "high" and defender_conf == "high"
+            else "medium" if reaction_verified else "low"
+        )
+        reaction_support = {
+            "status": "CONTRADICTED" if contact_contradiction else ("VERIFIED" if reaction_verified else "UNRESOLVED"),
+            "confidence": reaction_conf,
+            "release_player_celebration": {
+                "status": celebration, "confidence": celebration_conf, "tracked": release_tracked,
+            },
+            "goal_mouth_defender_response": {
+                "status": defender_response, "confidence": defender_conf, "tracked": defender_tracked,
+            },
+            "goal_mouth_defender_ball_contact": {
+                "status": defender_contact, "confidence": defender_conf, "tracked": defender_tracked,
+            },
+            "reason": (
+                "VISIBLE_DEFENDER_BALL_CONTACT_CONTRADICTS_UNOPPOSED_REACTION_SUPPORT" if contact_contradiction
+                else "CELEBRATION_PLUS_LATE_OR_NO_GOAL_MOUTH_REACTION" if reaction_verified
+                else "REACTION_SUPPORT_INSUFFICIENT"
+            ),
+        }
+
         return {
             "geometry_status": "VERIFIED" if geometry_verified else "UNRESOLVED",
             "frames": cleaned_frames,
@@ -434,17 +623,15 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "beyond_line_media_ms": int(after["media_ms"]) if isinstance(after, dict) else None,
             "proof_ready": proof_ready,
             "proof_reason": proof_reason,
+            "occlusion_crossing_audit": occlusion_audit,
+            "reaction_support_evidence": reaction_support,
             "reason": str(data.get("reason") or "goal_scene_review")[:220],
         }
     except Exception:
-        return {"geometry_status": "UNRESOLVED", "frames": [],
-                "crossing": "UNRESOLVED", "crossing_confidence": "low",
-                "ball_evidence": [], "same_ball_continuity": False,
-                "first_crossing_idx": None, "first_crossing_media_ms": None,
-                "field_side_before_media_ms": None, "beyond_line_media_ms": None,
-                "proof_ready": False, "proof_reason": "goal_scene_reader_error",
-                "reason": "goal_scene_reader_error"}
-
+        failed = dict(empty)
+        failed["proof_reason"] = "goal_scene_reader_error"
+        failed["reason"] = "goal_scene_reader_error"
+        return failed
 
 def _first_post_strike_other_touches(strikes, touch_graph) -> dict[str, int]:
     graph = touch_graph if isinstance(touch_graph, dict) else {}
@@ -636,7 +823,10 @@ class ShadowVisionProviders:
             return None
         strike_ms = int(strike["media_ms"])
         end_ms = int(window.get("end_ms")) if isinstance(window, dict) and _num(window.get("end_ms")) else strike_ms + 2600
-        offsets = (-250, 0, 250, 500, 750, 1050, 1500, 2200, 2600)
+        # Dense around the first post-release second so a body occlusion at
+        # the goal line is actually sampled; later frames preserve reaction
+        # context.  The provider call remains bounded by MAX_GOAL_FRAMES.
+        offsets = (-150, 0, 100, 200, 300, 400, 500, 650, 800, 1050, 1350, 1700, 2200, 2600)
         requested = [
             max(0, strike_ms + offset) for offset in offsets
             if strike_ms + offset <= end_ms + 100
@@ -687,6 +877,14 @@ class ShadowVisionProviders:
                     "beyond_line_media_ms": None,
                     "structured_evidence": [],
                 },
+                "occlusion_crossing_audit": dict((review or {}).get("occlusion_crossing_audit") or {
+                    "status": "UNRESOLVED", "confidence": "low",
+                    "reason": "goal_geometry_unresolved",
+                }),
+                "reaction_support_evidence": dict((review or {}).get("reaction_support_evidence") or {
+                    "status": "UNRESOLVED", "confidence": "low",
+                    "reason": "goal_geometry_unresolved",
+                }),
             }
             self._goal_cache[cache_key] = result
             return result
@@ -725,6 +923,17 @@ class ShadowVisionProviders:
                 "beyond_line_media_ms": (review or {}).get("beyond_line_media_ms"),
                 "structured_evidence": list((review or {}).get("ball_evidence") or []),
             },
+            # Separate support lanes.  Neither is allowed to create a crossing
+            # by itself; shot_outcome_engine requires a bounded physical
+            # trajectory projection before these can contribute.
+            "occlusion_crossing_audit": dict((review or {}).get("occlusion_crossing_audit") or {
+                "status": "UNRESOLVED", "confidence": "low",
+                "reason": "GOAL_MOUTH_OCCLUSION_NOT_PROVEN",
+            }),
+            "reaction_support_evidence": dict((review or {}).get("reaction_support_evidence") or {
+                "status": "UNRESOLVED", "confidence": "low",
+                "reason": "REACTION_SUPPORT_INSUFFICIENT",
+            }),
         }
         self._goal_cache[cache_key] = result
         return result
