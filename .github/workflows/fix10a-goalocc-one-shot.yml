@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat docs/fix10a_goalocc_src00.tmp docs/fix10a_goalocc_src01.tmp | base64 -d | bunzip2 > /tmp/goalocc.patch
+          cat docs/fix10a_goalocc_chunk00.tmp docs/fix10a_goalocc_chunk01.tmp docs/fix10a_goalocc_chunk02.tmp docs/fix10a_goalocc_chunk03.tmp docs/fix10a_goalocc_chunk04.tmp docs/fix10a_goalocc_chunk05.tmp docs/fix10a_goalocc_chunk06.tmp | base64 -d | bunzip2 > /tmp/goalocc.patch
           printf '%s  %s\n' '537a533f705874e64083c07eca2bcb4fddff0b56791c216b234aa597e8d3e75a' /tmp/goalocc.patch | sha256sum -c -
           git apply --check /tmp/goalocc.patch
           git apply /tmp/goalocc.patch
@@ -74,10 +74,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -f docs/fix10a_goalocc_src00.tmp docs/fix10a_goalocc_src01.tmp .github/workflows/fix10a-goalocc-one-shot.yml
+          rm -f docs/fix10a_goalocc_src00.tmp docs/fix10a_goalocc_src01.tmp docs/fix10a_goalocc_chunk00.tmp docs/fix10a_goalocc_chunk01.tmp docs/fix10a_goalocc_chunk02.tmp docs/fix10a_goalocc_chunk03.tmp docs/fix10a_goalocc_chunk04.tmp docs/fix10a_goalocc_chunk05.tmp docs/fix10a_goalocc_chunk06.tmp .github/workflows/fix10a-goalocc-one-shot.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add backend/fix10a_occluded_goal.py backend/shot_outcome_engine.py backend/fix10a_goal_direction.py backend/fix10a_ball_proof_gate.py backend/fix10a_vision_providers.py backend/tests/test_fix10a_occluded_goal_crossing.py docs/fix10a_goalocc_src00.tmp docs/fix10a_goalocc_src01.tmp .github/workflows/fix10a-goalocc-one-shot.yml
+          git add backend/fix10a_occluded_goal.py backend/shot_outcome_engine.py backend/fix10a_goal_direction.py backend/fix10a_ball_proof_gate.py backend/fix10a_vision_providers.py backend/tests/test_fix10a_occluded_goal_crossing.py docs/fix10a_goalocc_src00.tmp docs/fix10a_goalocc_src01.tmp docs/fix10a_goalocc_chunk00.tmp docs/fix10a_goalocc_chunk01.tmp docs/fix10a_goalocc_chunk02.tmp docs/fix10a_goalocc_chunk03.tmp docs/fix10a_goalocc_chunk04.tmp docs/fix10a_goalocc_chunk05.tmp docs/fix10a_goalocc_chunk06.tmp .github/workflows/fix10a-goalocc-one-shot.yml
           git diff --cached --check
           git commit -m 'FIX10A: prove goal crossing through bounded occlusion'
           git push origin HEAD:fix10-match-intelligence
