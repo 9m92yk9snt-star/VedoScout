@@ -17,7 +17,7 @@
   "main_agent_can_self_test": true,
   "context_for_next_testing_agent": "Bug fix confirmed. step-mark.png at /api/static/landing/step-mark.png serves 200 OK, image/png, 579022 bytes, natural 1376x768. Rendered screenshot shows clear soccer player: green/white striped jersey #14, round soccer ball, grass pitch, phone with PAUSED overlay + neon yellow bounding box. NO helmet/pads/yard-lines. Regression on /scouts page confirmed - all 4 cinematic images (scouts-hero-tunnel, scouts-boardroom, scouts-data-tablet, scouts-signing-desk) still render.",
   "verification_details": {
-    "image_url": "https://scout-ai-pro-1.preview.emergentagent.com/api/static/landing/step-mark.png",
+    "image_url": "https://vedoscout-main.preview.emergentagent.com/api/static/landing/step-mark.png",
     "http_status": 200,
     "content_type": "image/png",
     "content_length_bytes": 579022,

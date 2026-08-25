@@ -27,7 +27,7 @@
       "natural_width": 720,
       "natural_height": 1280,
       "visible": true,
-      "src_matches_r2_proxy": "https://scout-ai-pro-1.preview.emergentagent.com/api/media/reports/0153da80-.../0153da80-...-marker (HTTP 200, 291877 bytes)"
+      "src_matches_r2_proxy": "https://vedoscout-main.preview.emergentagent.com/api/media/reports/0153da80-.../0153da80-...-marker (HTTP 200, 291877 bytes)"
     },
     "premium_ready_overlay_verification": {
       "approach": "Static + bundle inspection (real overlay requires uploading a fresh video + waiting for Gemini analysis, out of scope for a frontend test run)",

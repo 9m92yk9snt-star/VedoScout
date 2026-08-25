@@ -9,7 +9,7 @@ load_dotenv("/app/backend/.env")
 from motor.motor_asyncio import AsyncIOMotorClient
 import requests
 
-BASE = os.environ["REACT_APP_BACKEND_URL"] if os.environ.get("REACT_APP_BACKEND_URL") else "https://scout-ai-pro-1.preview.emergentagent.com"
+BASE = os.environ["REACT_APP_BACKEND_URL"] if os.environ.get("REACT_APP_BACKEND_URL") else "https://vedoscout-main.preview.emergentagent.com"
 EMAIL = f"smtest.iter80.fe_{uuid.uuid4().hex[:6]}@example.com"
 PW = "Test@2026!Iter80FE"
 

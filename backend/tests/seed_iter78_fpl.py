@@ -5,7 +5,7 @@ sys.path.insert(0, "/app/backend")
 from motor.motor_asyncio import AsyncIOMotorClient
 import requests
 
-BASE = "https://scout-ai-pro-1.preview.emergentagent.com"
+BASE = "https://vedoscout-main.preview.emergentagent.com"
 EMAIL = "smtest.iter78@example.com"
 PW = "Test@2026!Iter78"
 

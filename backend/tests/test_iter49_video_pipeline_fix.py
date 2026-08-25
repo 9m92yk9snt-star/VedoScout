@@ -14,7 +14,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or \
-           "https://scout-ai-pro-1.preview.emergentagent.com"
+           "https://vedoscout-main.preview.emergentagent.com"
 BACKEND_DIR = Path("/app/backend")
 
 

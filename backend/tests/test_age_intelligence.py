@@ -15,7 +15,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com"
+    "REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com"
 ).rstrip("/")
 STAGES_FILE = "/app/backend/data/age_stages.json"
 EXPECTED_STAGE_IDS = ["foundation", "technical", "understanding", "academy_ready", "senior"]
