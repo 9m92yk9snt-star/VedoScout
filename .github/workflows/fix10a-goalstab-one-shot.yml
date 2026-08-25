@@ -61,6 +61,39 @@ jobs:
           printf '%s  %s\n' '04c8dd46b63707f361ecdec8775589a88410ee89424d0afd71639b65589f9a27' /tmp/goalstab.patch | sha256sum -c -
           git apply --check /tmp/goalstab.patch
           git apply /tmp/goalstab.patch
+      - name: Preserve strict legacy goal-crossing assertion contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('backend/golden_fixture_validator.py')
+          text = path.read_text(encoding='utf-8')
+          needle = '''    assertions.append({
+              "name": "require_target_goal_plane_crossing",
+              **_target_goal_link_v2(case, physical_result),
+          })
+          '''
+          # The stabilization patch intentionally makes the target-linked assertion
+          # authoritative. Keep the historical assertion name as an exact alias of
+          # that same strict verdict so old regressions and downstream consumers do
+          # not lose their contract; never restore the old unlinked outcome check.
+          marker = '''    assertions.append({
+              "name": "require_target_goal_plane_crossing",
+              **_target_goal_link_v2(case, physical_result),
+          })
+          '''
+          if marker not in text:
+              raise SystemExit('strict target goal assertion marker not found')
+          replacement = marker + '''    if not any(row.get("name") == "require_goal_plane_crossing" for row in assertions):
+              assertions.append({
+                  "name": "require_goal_plane_crossing",
+                  **_target_goal_link_v2(case, physical_result),
+              })
+          '''
+          text = text.replace(marker, replacement, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
       - name: Compile and run FIX10A family
         working-directory: backend
         env:
