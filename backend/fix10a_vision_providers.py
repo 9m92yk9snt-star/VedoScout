@@ -826,7 +826,7 @@ class ShadowVisionProviders:
         # Dense around the first post-release second so a body occlusion at
         # the goal line is actually sampled; later frames preserve reaction
         # context.  The provider call remains bounded by MAX_GOAL_FRAMES.
-        offsets = (-150, 0, 100, 200, 300, 400, 500, 650, 800, 1050, 1350, 1700, 2200, 2600)
+        offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
         requested = [
             max(0, strike_ms + offset) for offset in offsets
             if strike_ms + offset <= end_ms + 100
@@ -841,14 +841,19 @@ class ShadowVisionProviders:
         with tempfile.TemporaryDirectory(prefix="fix10a_goal_") as temp:
             root = Path(temp)
             paths, actual_times = [], []
+            seen_actual_ms = set()
             for index, requested_ms in enumerate(requested):
                 got = frames.get(int(requested_ms))
                 if not got:
                     continue
                 actual_ms, frame = got
+                actual_ms = int(actual_ms)
+                if actual_ms in seen_actual_ms:
+                    continue
                 path = root / f"goal_{index:03d}.jpg"
                 if _write_jpg(path, frame):
-                    paths.append(str(path)); actual_times.append(int(actual_ms))
+                    seen_actual_ms.add(actual_ms)
+                    paths.append(str(path)); actual_times.append(actual_ms)
             if len(paths) < 2:
                 self._goal_cache[cache_key] = None
                 return None
