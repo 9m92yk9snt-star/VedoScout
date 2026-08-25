@@ -1,0 +1,171 @@
+name: FIX10A goal sampling one-shot
+
+on:
+  push:
+    branches: [fix10-match-intelligence]
+    paths:
+      - .github/workflows/fix10a-goal-sampling-one-shot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix10-match-intelligence
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install focused FIX10A dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
+      - name: Provide CI-only no-network Emergent import stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              def model_dump(self):
+                  return dict(self.__dict__)
+          class UserMessage(_Payload):
+              pass
+          class ImageContent(_Payload):
+              pass
+          class FileContentWithMimeType(_Payload):
+              pass
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+              async def send_message(self, _message):
+                  raise RuntimeError('CI Emergent stub: network/model call forbidden')
+          PY
+      - name: Apply dense early goal sampling and regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('backend/fix10a_vision_providers.py')
+          text = p.read_text()
+          old = """        offsets = (-150, 0, 100, 200, 300, 400, 500, 650, 800, 1050, 1350, 1700, 2200, 2600)"""
+          new = """        offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)"""
+          if old not in text:
+              raise SystemExit('expected goal review offsets not found')
+          text = text.replace(old, new, 1)
+          old2 = """            paths, actual_times = [], []
+            for index, requested_ms in enumerate(requested):
+                got = frames.get(int(requested_ms))
+                if not got:
+                    continue
+                actual_ms, frame = got
+                path = root / f\"goal_{index:03d}.jpg\"
+                if _write_jpg(path, frame):
+                    paths.append(str(path)); actual_times.append(int(actual_ms))"""
+          new2 = """            paths, actual_times = [], []
+            seen_actual_ms = set()
+            for index, requested_ms in enumerate(requested):
+                got = frames.get(int(requested_ms))
+                if not got:
+                    continue
+                actual_ms, frame = got
+                actual_ms = int(actual_ms)
+                if actual_ms in seen_actual_ms:
+                    continue
+                path = root / f\"goal_{index:03d}.jpg\"
+                if _write_jpg(path, frame):
+                    seen_actual_ms.add(actual_ms)
+                    paths.append(str(path)); actual_times.append(actual_ms)"""
+          if old2 not in text:
+              raise SystemExit('expected goal frame packing block not found')
+          text = text.replace(old2, new2, 1)
+          p.write_text(text)
+
+          t = Path('backend/tests/test_fix10a_goal_review_sampling.py')
+          t.write_text(r'''from __future__ import annotations
+
+import asyncio
+import numpy as np
+
+import fix10a_vision_providers as providers
+
+
+def test_goal_review_sampling_is_dense_immediately_after_release_and_dedupes_actual_pts(monkeypatch):
+    captured = {}
+
+    def fake_read_frames(_video_path, requested):
+        requested = list(requested)
+        captured["requested"] = requested
+        out = {}
+        strike = 30900
+        for ms in requested:
+            # Deliberately map two requested instants to the same decoded PTS.
+            actual = 30967 if ms in {strike + 50, strike + 100} else int(ms)
+            out[int(ms)] = (actual, np.zeros((32, 32, 3), dtype=np.uint8))
+        return out
+
+    def fake_write(path, _image):
+        path.write_bytes(b"x")
+        return True
+
+    async def fake_review(_api_key, _session_id, _paths, media_ms):
+        captured["actual_times"] = list(media_ms)
+        return {
+            "geometry_status": "UNRESOLVED",
+            "frames": [],
+            "reason": "sampling-test",
+            "proof_reason": "sampling-test",
+        }
+
+    monkeypatch.setattr(providers, "_read_frames", fake_read_frames)
+    monkeypatch.setattr(providers, "_write_jpg", fake_write)
+    monkeypatch.setattr(providers, "read_goal_scene_evidence", fake_review)
+
+    bundle = providers.ShadowVisionProviders("key", "sample").bind_video_path("dummy.mp4")
+    result = bundle.goal_geometry_provider(
+        {"dense_window_id": "w", "end_ms": 34000},
+        {"media_ms": 30900},
+    )
+
+    requested = captured["requested"]
+    early = [ms for ms in requested if 30900 <= ms <= 31100]
+    assert early == [30900, 30950, 31000, 31050, 31100]
+    actual = captured["actual_times"]
+    assert len(actual) == len(set(actual))
+    assert actual.count(30967) == 1
+    assert result["status"] == "UNRESOLVED"
+''')
+          PY
+      - name: Compile and run full FIX10A family
+        shell: bash
+        env:
+          PYTHONPATH: /tmp/ci_stubs:backend
+        run: |
+          set -euo pipefail
+          python -m py_compile backend/fix10a_vision_providers.py backend/tests/test_fix10a_goal_review_sampling.py
+          cd backend
+          pytest --asyncio-mode=auto -q tests/test_fix10a*.py
+      - name: Commit verified sampling fix and remove staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/fix10a-goal-sampling-one-shot.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/fix10a_vision_providers.py backend/tests/test_fix10a_goal_review_sampling.py .github/workflows/fix10a-goal-sampling-one-shot.yml
+          git diff --cached --check
+          git commit -m 'FIX10A: densify pre-occlusion goal review frames'
+          git push origin HEAD:fix10-match-intelligence
