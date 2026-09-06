@@ -1,0 +1,352 @@
+name: Stage isolated FIX10A lifecycle patch
+
+on:
+  push:
+    branches:
+      - chatgpt-fix10a-shadow-lifecycle
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message != 'FIX10A lifecycle staging patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt-fix10a-shadow-lifecycle
+          fetch-depth: 0
+
+      - name: Apply reviewed shadow-only patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          runtime = Path("backend/fix10a_shadow_runtime.py")
+          text = runtime.read_text(encoding="utf-8")
+
+          old = "import asyncio\nimport os\n"
+          new = "import asyncio\nimport logging\nimport os\n"
+          if text.count(old) != 1:
+              raise SystemExit(f"runtime import anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          old = "import physical_match_reconstruction\n\nVERSION = 1\n"
+          new = "import physical_match_reconstruction\n\nlogger = logging.getLogger(\"elite-scout\")\n\nVERSION = 1\n"
+          if text.count(old) != 1:
+              raise SystemExit(f"runtime logger anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          anchor = '''def support_vision_enabled() -> bool:
+              # Shadow mode itself is already explicit opt-in.  Supporting A6/A7 readers
+              # default on inside shadow so a real acceptance run gets the full evidence
+              # stack; operators can disable them separately for cost/debug isolation.
+              return str(os.environ.get(SUPPORT_VISION_FLAG, "1")).strip().lower() in {"1", "true", "yes", "on"}
+          '''
+          lifecycle = '''def support_vision_enabled() -> bool:
+              # Shadow mode itself is already explicit opt-in.  Supporting A6/A7 readers
+              # default on inside shadow so a real acceptance run gets the full evidence
+              # stack; operators can disable them separately for cost/debug isolation.
+              return str(os.environ.get(SUPPORT_VISION_FLAG, "1")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+          # --- FIX10A shadow-only task lifecycle -------------------------------------
+          # Tasks created by create_task() are kept strongly referenced here while they
+          # run. Completed tasks are removed automatically; registry size tracks
+          # currently active shadow tasks. This governs task lifecycle ONLY; it never
+          # reads, writes, or influences canonical output.
+          _SHADOW_TASKS: set = set()
+
+
+          def spawn_shadow(**kwargs) -> "asyncio.Task | None":
+              """Schedule an observe-only FIX10A shadow run without blocking the caller.
+
+              Non-blocking, never raises into the caller, never touches canonical output.
+              Keeps a strong reference while running, removes it on completion, and logs
+              START / ERROR / CANCELLED with report_id.
+              """
+              report_id = str(kwargs.get("report_id") or "unknown")
+              try:
+                  task = asyncio.create_task(run_shadow(**kwargs))
+              except Exception as exc:  # scheduling must never break the report flow
+                  logger.warning("[fix10a] %s: shadow SCHEDULE-FAILED %s: %s",
+                                 report_id, type(exc).__name__, str(exc)[:200])
+                  return None
+              _SHADOW_TASKS.add(task)
+              logger.info("[fix10a] %s: shadow START (active=%d)", report_id, len(_SHADOW_TASKS))
+
+              def _on_done(finished: "asyncio.Task") -> None:
+                  _SHADOW_TASKS.discard(finished)
+                  try:
+                      if finished.cancelled():
+                          logger.warning("[fix10a] %s: shadow CANCELLED (active=%d)",
+                                         report_id, len(_SHADOW_TASKS))
+                          return
+                      exc = finished.exception()
+                      if exc is not None:
+                          logger.warning("[fix10a] %s: shadow ERROR (uncaught) %s: %s",
+                                         report_id, type(exc).__name__, str(exc)[:200])
+                  except Exception:  # a done-callback must never raise
+                      pass
+
+              task.add_done_callback(_on_done)
+              return task
+          '''
+          if text.count(anchor) != 1:
+              raise SystemExit(f"runtime lifecycle anchor count={text.count(anchor)}")
+          text = text.replace(anchor, lifecycle, 1)
+
+          old = '''    if not shadow_enabled():
+              return {"version": VERSION, "status": "disabled", "canonical_authority": False}
+          '''
+          new = '''    if not shadow_enabled():
+              logger.info("[fix10a] %s: shadow SKIP status=disabled", report_id)
+              return {"version": VERSION, "status": "disabled", "canonical_authority": False}
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"runtime disabled-log anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          old = '''    if result.get("status") != "ok" or sequence.get("coverage_complete") is not True:
+              return {"version": VERSION, "status": "skipped", "reason": "UNIFIED_RESULT_NOT_PRODUCTION_READY",
+                      "canonical_authority": False}
+          '''
+          new = '''    if result.get("status") != "ok" or sequence.get("coverage_complete") is not True:
+              logger.info("[fix10a] %s: shadow SKIP status=skipped reason=UNIFIED_RESULT_NOT_PRODUCTION_READY", report_id)
+              return {"version": VERSION, "status": "skipped", "reason": "UNIFIED_RESULT_NOT_PRODUCTION_READY",
+                      "canonical_authority": False}
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"runtime skip-log anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          old = '''        if db is not None:
+                  await db.reports.update_one({"id": report_id}, {"$set": update})
+              return {**update, "status": status}
+          '''
+          new = '''        if db is not None:
+                  await db.reports.update_one({"id": report_id}, {"$set": update})
+              logger.info("[fix10a] %s: shadow SUCCESS status=%s traces=%d support_vision=%s",
+                          report_id, status, len(manifests), support_mode.get("enabled"))
+              return {**update, "status": status}
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"runtime success-log anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+
+          old = '''    except Exception as exc:
+              error = f"{type(exc).__name__}: {str(exc)[:200]}"
+              update = {
+          '''
+          new = '''    except Exception as exc:
+              error = f"{type(exc).__name__}: {str(exc)[:200]}"
+              logger.warning("[fix10a] %s: shadow ERROR %s", report_id, error)
+              update = {
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"runtime error-log anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+          runtime.write_text(text, encoding="utf-8")
+
+          server = Path("backend/server.py")
+          text = server.read_text(encoding="utf-8")
+          old = '''                    if fix10a_shadow_runtime.shadow_enabled():
+                                  asyncio.create_task(fix10a_shadow_runtime.run_shadow(
+                                      report_id=report_id,
+                                      video_path=str(file_path),
+                                      unified_result=_unified_result,
+                                      db=db,
+                                      r2_storage=r2_storage,
+                                      source_video={
+                                          "role": "CANONICAL_WEB_VIDEO",
+                                          "fingerprint": doc.get("fingerprint") or {},
+                                      },
+                                      local_dir=UPLOAD_DIR / ".fix10a_traces",
+                                  ))
+          '''
+          new = '''                    if fix10a_shadow_runtime.shadow_enabled():
+                                  fix10a_shadow_runtime.spawn_shadow(
+                                      report_id=report_id,
+                                      video_path=str(file_path),
+                                      unified_result=_unified_result,
+                                      db=db,
+                                      r2_storage=r2_storage,
+                                      source_video={
+                                          "role": "CANONICAL_WEB_VIDEO",
+                                          "fingerprint": doc.get("fingerprint") or {},
+                                      },
+                                      local_dir=UPLOAD_DIR / ".fix10a_traces",
+                                  )
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"server shadow-call anchor count={text.count(old)}")
+          text = text.replace(old, new, 1)
+          server.write_text(text, encoding="utf-8")
+
+          test_path = Path("backend/tests/test_fix10a_shadow_task_lifecycle.py")
+          if test_path.exists():
+              raise SystemExit("lifecycle test unexpectedly already exists")
+          test_path.write_text(r'''"""Regression tests for FIX10A shadow task lifecycle (shadow-only).
+
+          Proves the fire-and-forget drop bug is fixed:
+            * the task stays strongly referenced while running,
+            * it is removed from the registry on completion,
+            * exceptions and cancellation are observable via logs,
+            * scheduling is non-blocking (main analysis is not blocked),
+            * FIX10A only ever writes fix10a_* diagnostic fields (cannot mutate canonical).
+          """
+          import asyncio
+          import logging
+
+          import fix10a_shadow_runtime as mod
+
+
+          class _FakeReports:
+              def __init__(self):
+                  self.sets = []
+              async def update_one(self, flt, update):
+                  self.sets.append((flt, update))
+
+
+          class _FakeDB:
+              def __init__(self):
+                  self.reports = _FakeReports()
+
+
+          def test_task_referenced_while_running_then_removed(monkeypatch):
+              async def scenario():
+                  mod._SHADOW_TASKS.clear()
+                  release = asyncio.Event()
+
+                  async def fake_run(**kwargs):
+                      await release.wait()
+                      return {"status": "ok"}
+
+                  monkeypatch.setattr(mod, "run_shadow", fake_run)
+                  task = mod.spawn_shadow(report_id="R1")
+                  assert isinstance(task, asyncio.Task)
+                  assert not task.done()
+                  assert task in mod._SHADOW_TASKS
+                  release.set()
+                  await asyncio.wait_for(task, timeout=1)
+                  await asyncio.sleep(0)
+                  assert task not in mod._SHADOW_TASKS
+                  assert len(mod._SHADOW_TASKS) == 0
+
+              asyncio.run(scenario())
+
+
+          def test_uncaught_exception_is_logged_and_removed(monkeypatch, caplog):
+              async def scenario():
+                  mod._SHADOW_TASKS.clear()
+
+                  async def boom(**kwargs):
+                      raise ValueError("kaboom")
+
+                  monkeypatch.setattr(mod, "run_shadow", boom)
+                  with caplog.at_level(logging.WARNING, logger="elite-scout"):
+                      task = mod.spawn_shadow(report_id="R2")
+                      await asyncio.sleep(0.05)
+                  assert task not in mod._SHADOW_TASKS
+                  msgs = " ".join(r.getMessage() for r in caplog.records)
+                  assert "R2" in msgs and "ERROR" in msgs
+
+              asyncio.run(scenario())
+
+
+          def test_cancelled_is_logged_and_removed(monkeypatch, caplog):
+              async def scenario():
+                  mod._SHADOW_TASKS.clear()
+
+                  async def hang(**kwargs):
+                      await asyncio.sleep(10)
+
+                  monkeypatch.setattr(mod, "run_shadow", hang)
+                  with caplog.at_level(logging.WARNING, logger="elite-scout"):
+                      task = mod.spawn_shadow(report_id="R3")
+                      await asyncio.sleep(0)
+                      task.cancel()
+                      await asyncio.sleep(0.05)
+                  assert task.cancelled()
+                  assert task not in mod._SHADOW_TASKS
+                  msgs = " ".join(r.getMessage() for r in caplog.records)
+                  assert "R3" in msgs and "CANCELLED" in msgs
+
+              asyncio.run(scenario())
+
+
+          def test_shadow_only_writes_fix10a_fields(monkeypatch):
+              """Real run_shadow: proves it can only emit fix10a_* diagnostics."""
+              async def scenario():
+                  monkeypatch.setenv("FIX10A_SHADOW_ENABLED", "1")
+                  monkeypatch.setenv("FIX10A_SUPPORT_VISION_ENABLED", "0")
+                  monkeypatch.setattr(
+                      mod.physical_match_reconstruction, "reconstruct_physical_match",
+                      lambda *a, **k: {"status": "ok", "timebase": "canonical_media_ms", "traces": []},
+                  )
+                  db = _FakeDB()
+                  unified = {"status": "ok", "sequence_analysis": {"coverage_complete": True},
+                             "sequence_plan": {}, "scene_graph": {}, "identity_authority": {}}
+                  out = await mod.run_shadow(report_id="R-CANON", video_path="/tmp/x.mp4",
+                                             unified_result=unified, db=db)
+                  assert out["fix10a_canonical_authority"] is False
+                  assert db.reports.sets, "shadow should persist its diagnostic update"
+                  flt, update = db.reports.sets[-1]
+                  assert flt == {"id": "R-CANON"}
+                  assert set(update.keys()) == {"$set"}
+                  set_doc = update["$set"]
+                  assert all(k.startswith("fix10a_") for k in set_doc)
+                  assert set_doc["fix10a_canonical_authority"] is False
+
+              asyncio.run(scenario())
+
+
+          def test_skip_path_persists_nothing(monkeypatch):
+              async def scenario():
+                  monkeypatch.setenv("FIX10A_SHADOW_ENABLED", "1")
+                  db = _FakeDB()
+                  unified = {"status": "partial_coverage",
+                             "sequence_analysis": {"coverage_complete": False}}
+                  out = await mod.run_shadow(report_id="R4", video_path="/tmp/x.mp4",
+                                             unified_result=unified, db=db)
+                  assert out["status"] == "skipped"
+                  assert out["canonical_authority"] is False
+                  assert db.reports.sets == []
+
+              asyncio.run(scenario())
+          ''', encoding="utf-8")
+
+          expected = {
+              "backend/fix10a_shadow_runtime.py",
+              "backend/server.py",
+              "backend/tests/test_fix10a_shadow_task_lifecycle.py",
+          }
+          changed = set(subprocess.check_output(["git", "status", "--porcelain"], text=True).splitlines())
+          names = {row[3:] for row in changed}
+          if names != expected:
+              raise SystemExit(f"unexpected changed files: {sorted(names)}")
+          PY
+
+          python -m py_compile \
+            backend/fix10a_shadow_runtime.py \
+            backend/server.py \
+            backend/tests/test_fix10a_shadow_task_lifecycle.py
+
+      - name: Commit only the three reviewed files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            backend/fix10a_shadow_runtime.py \
+            backend/server.py \
+            backend/tests/test_fix10a_shadow_task_lifecycle.py
+          test "$(git diff --cached --name-only | wc -l)" -eq 3
+          git diff --cached --name-only
+          git commit -m "FIX10A lifecycle staging patch"
+          git push origin HEAD:chatgpt-fix10a-shadow-lifecycle
