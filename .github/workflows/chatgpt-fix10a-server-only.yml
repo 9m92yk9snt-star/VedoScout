@@ -1,0 +1,67 @@
+name: Stage FIX10A server wiring patch
+
+on:
+  push:
+    branches:
+      - chatgpt-fix10a-shadow-lifecycle
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-server:
+    if: github.event_name == 'pull_request' || github.event.head_commit.message != 'FIX10A server lifecycle staging patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt-fix10a-shadow-lifecycle
+          fetch-depth: 0
+
+      - name: Patch only the FIX10A server launch call
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/server.py")
+          text = path.read_text(encoding="utf-8")
+          old_call = "asyncio.create_task(fix10a_shadow_runtime.run_shadow("
+          new_call = "fix10a_shadow_runtime.spawn_shadow("
+          old_end = '                            local_dir=UPLOAD_DIR / ".fix10a_traces",\n                        ))'
+          new_end = '                            local_dir=UPLOAD_DIR / ".fix10a_traces",\n                        )'
+
+          if old_call not in text and new_call in text:
+              print("server wiring already patched")
+              raise SystemExit(0)
+          if text.count(old_call) != 1:
+              raise SystemExit(f"unexpected old call count={text.count(old_call)}")
+          if text.count(old_end) != 1:
+              raise SystemExit(f"unexpected closing anchor count={text.count(old_end)}")
+
+          text = text.replace(old_call, new_call, 1)
+          text = text.replace(old_end, new_end, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          python -m py_compile backend/server.py
+          test "$(git diff --name-only | tr -d '\r')" = "backend/server.py"
+
+      - name: Commit server wiring only
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- backend/server.py; then
+            echo "No server change to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- backend/server.py
+          test "$(git diff --cached --name-only)" = "backend/server.py"
+          git commit -m "FIX10A server lifecycle staging patch"
+          git push origin HEAD:chatgpt-fix10a-shadow-lifecycle
