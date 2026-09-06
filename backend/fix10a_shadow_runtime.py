@@ -7,6 +7,7 @@ trace artifacts, and never returns data to B3/FIX09C event truth.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 from pathlib import Path
@@ -15,6 +16,8 @@ import event_trace
 import fix10a_goal_direction
 import fix10a_vision_providers
 import physical_match_reconstruction
+
+logger = logging.getLogger("elite-scout")
 
 VERSION = 1
 FLAG = "FIX10A_SHADOW_ENABLED"
@@ -30,6 +33,49 @@ def support_vision_enabled() -> bool:
     # default on inside shadow so a real acceptance run gets the full evidence
     # stack; operators can disable them separately for cost/debug isolation.
     return str(os.environ.get(SUPPORT_VISION_FLAG, "1")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+# --- FIX10A shadow-only task lifecycle -------------------------------------
+# Tasks created by create_task() are kept strongly referenced here while they
+# run. Completed tasks are removed automatically; registry size tracks
+# currently active shadow tasks. This governs task lifecycle ONLY; it never
+# reads, writes, or influences canonical output.
+_SHADOW_TASKS: set = set()
+
+
+def spawn_shadow(**kwargs) -> "asyncio.Task | None":
+    """Schedule an observe-only FIX10A shadow run without blocking the caller.
+
+    Non-blocking, never raises into the caller, never touches canonical output.
+    Keeps a strong reference while running, removes it on completion, and logs
+    START / ERROR / CANCELLED with report_id.
+    """
+    report_id = str(kwargs.get("report_id") or "unknown")
+    try:
+        task = asyncio.create_task(run_shadow(**kwargs))
+    except Exception as exc:  # scheduling must never break the report flow
+        logger.warning("[fix10a] %s: shadow SCHEDULE-FAILED %s: %s",
+                       report_id, type(exc).__name__, str(exc)[:200])
+        return None
+    _SHADOW_TASKS.add(task)
+    logger.info("[fix10a] %s: shadow START (active=%d)", report_id, len(_SHADOW_TASKS))
+
+    def _on_done(finished: "asyncio.Task") -> None:
+        _SHADOW_TASKS.discard(finished)
+        try:
+            if finished.cancelled():
+                logger.warning("[fix10a] %s: shadow CANCELLED (active=%d)",
+                               report_id, len(_SHADOW_TASKS))
+                return
+            exc = finished.exception()
+            if exc is not None:
+                logger.warning("[fix10a] %s: shadow ERROR (uncaught) %s: %s",
+                               report_id, type(exc).__name__, str(exc)[:200])
+        except Exception:  # a done-callback must never raise
+            pass
+
+    task.add_done_callback(_on_done)
+    return task
 
 
 def _safe_component(value, fallback="trace") -> str:
@@ -108,10 +154,12 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
     flow must continue regardless of this return value.
     """
     if not shadow_enabled():
+        logger.info("[fix10a] %s: shadow SKIP status=disabled", report_id)
         return {"version": VERSION, "status": "disabled", "canonical_authority": False}
     result = unified_result if isinstance(unified_result, dict) else {}
     sequence = result.get("sequence_analysis") if isinstance(result.get("sequence_analysis"), dict) else {}
     if result.get("status") != "ok" or sequence.get("coverage_complete") is not True:
+        logger.info("[fix10a] %s: shadow SKIP status=skipped reason=UNIFIED_RESULT_NOT_PRODUCTION_READY", report_id)
         return {"version": VERSION, "status": "skipped", "reason": "UNIFIED_RESULT_NOT_PRODUCTION_READY",
                 "canonical_authority": False}
 
@@ -187,9 +235,12 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
         }
         if db is not None:
             await db.reports.update_one({"id": report_id}, {"$set": update})
+        logger.info("[fix10a] %s: shadow SUCCESS status=%s traces=%d support_vision=%s",
+                    report_id, status, len(manifests), support_mode.get("enabled"))
         return {**update, "status": status}
     except Exception as exc:
         error = f"{type(exc).__name__}: {str(exc)[:200]}"
+        logger.warning("[fix10a] %s: shadow ERROR %s", report_id, error)
         update = {
             "fix10a_status": "error",
             "fix10a_version": VERSION,
