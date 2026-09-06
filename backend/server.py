@@ -9228,7 +9228,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     # defaults OFF. The task writes only fix10a_* diagnostics and
                     # can never mutate canonical B3/FIX09C truth.
                     if fix10a_shadow_runtime.shadow_enabled():
-                        asyncio.create_task(fix10a_shadow_runtime.run_shadow(
+                        fix10a_shadow_runtime.spawn_shadow(
                             report_id=report_id,
                             video_path=str(file_path),
                             unified_result=_unified_result,
@@ -9239,7 +9239,7 @@ async def generate_full_report_task(report_id: str) -> None:
                                 "fingerprint": doc.get("fingerprint") or {},
                             },
                             local_dir=UPLOAD_DIR / ".fix10a_traces",
-                        ))
+                        )
                 else:
                     logger.warning(
                         f"[fix09b] {report_id}: response contract not production-ready; "
