@@ -5,6 +5,7 @@ Call `build_seo_social_router(db=..., admin_dep=...)` and include in the api rou
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,8 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("elite-scout")
 
 PAGE_DEFS = [
     {

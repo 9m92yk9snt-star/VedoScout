@@ -91,7 +91,7 @@ def test_pdf_contains_statsbomb_strings(report):
     import glob
     for p in glob.glob("/app/backend/pdfs/*.pdf"):
         try: os.remove(p)
-        except: pass
+        except Exception: pass
     r = requests.get(f"{BASE_URL}/api/reports/{rid}/pdf", headers=h, timeout=120)
     assert r.status_code == 200
     assert r.headers.get("content-type", "").startswith("application/pdf")

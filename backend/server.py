@@ -3117,11 +3117,11 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
         vstats.attach_canonical(ev, v)
         kept.append(ev)
 
-    status = "verified"
+    verify_status = "verified"
     if timeline and not kept:
         # FIX 02 — FAIL CLOSED: the verifier confirmed NOTHING. The original
         # timeline is NEVER restored — no proof is better than wrong proof.
-        status = "rejected_all"
+        verify_status = "rejected_all"
     if timeline:
         full["action_timeline"] = kept
 
@@ -3252,7 +3252,7 @@ def _validate_grow_your_game(full: dict, duration_s: float, gt_track: Optional[d
         if len(what) < 40:
             drops.append(f"{tid}:what_too_short")
             continue
-        if first and first not in what.lower() and not any(mm["timestamp"] in what for mm in moments):
+        if first and first not in what.lower() and not any(mo["timestamp"] in what for mo in moments):
             drops.append(f"{tid}:not_personal")
             continue
         if any(len(str(les.get(k) or "").strip()) < 20
@@ -8306,9 +8306,9 @@ def _ground_truth_positions_block(anchors: list, track: dict | None, t_off: floa
         cx = int((float(b.get("x", 0)) + float(b.get("w", 0)) / 2) * 100)
         cy = int((float(b.get("y", 0)) + float(b.get("h", 0)) / 2) * 100)
         hh = int(float(b.get("h", 0)) * 100)
-        mm, ss = divmod(int(t), 60)
+        mins, ss = divmod(int(t), 60)
         rows.append(
-            f"- At {mm:02d}:{ss:02d} ({t:.1f}s): centred ~{cx}% from the left, ~{cy}% from the top, "
+            f"- At {mins:02d}:{ss:02d} ({t:.1f}s): centred ~{cx}% from the left, ~{cy}% from the top, "
             f"body height ≈ {hh}% of the frame."
         )
     if not rows:

@@ -35,6 +35,20 @@ def support_vision_enabled() -> bool:
     return str(os.environ.get(SUPPORT_VISION_FLAG, "1")).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _shadow_max_sec() -> float:
+    """Hard wall-clock ceiling for one shadow run (env-tunable).
+
+    Sits above the per-report vision budget so the run always reaches a
+    terminal state even if a non-vision stage stalls. On expiry the run is
+    recorded as a diagnostic timeout; canonical output is never touched.
+    """
+    try:
+        value = float(os.environ.get("FIX10A_SHADOW_MAX_SEC", "900"))
+    except (TypeError, ValueError):
+        value = 900.0
+    return value if value > 0 else 900.0
+
+
 # --- FIX10A shadow-only task lifecycle -------------------------------------
 # asyncio keeps only a WEAK reference to tasks created by create_task(), so a
 # fire-and-forget shadow task can be dropped and silently cancelled mid-run.
@@ -175,6 +189,7 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
             "goal_direction_provider": False,
             "role_provider": bool(role_evidence_provider),
         }
+        bundle = None
         if support_vision_enabled():
             api_key = str(vision_api_key or os.environ.get("EMERGENT_LLM_KEY") or "")
             if api_key:
@@ -208,19 +223,28 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                     "role_provider": bool(role_evidence_provider),
                 })
 
-        physical = await asyncio.to_thread(
-            physical_match_reconstruction.reconstruct_physical_match,
-            str(video_path),
-            result.get("sequence_plan") or {},
-            sequence,
-            result.get("scene_graph") or {},
-            result.get("identity_authority") or {},
-            jersey_vote_provider,
-            source_video=source_video or {},
-            goal_geometry_provider=goal_geometry_provider,
-            role_evidence=role_evidence or {},
-            role_evidence_provider=role_evidence_provider,
+        physical = await asyncio.wait_for(
+            asyncio.to_thread(
+                physical_match_reconstruction.reconstruct_physical_match,
+                str(video_path),
+                result.get("sequence_plan") or {},
+                sequence,
+                result.get("scene_graph") or {},
+                result.get("identity_authority") or {},
+                jersey_vote_provider,
+                source_video=source_video or {},
+                goal_geometry_provider=goal_geometry_provider,
+                role_evidence=role_evidence or {},
+                role_evidence_provider=role_evidence_provider,
+            ),
+            timeout=_shadow_max_sec(),
         )
+        if bundle is not None:
+            try:
+                support_mode["vision_requests_used"] = bundle.vision_requests_used()
+                support_mode["vision_budget_exhausted"] = bundle.budget_exhausted()
+            except Exception:
+                pass
         manifests = []
         for trace in physical.get("traces") or []:
             if isinstance(trace, dict):
@@ -243,10 +267,13 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                     report_id, status, len(manifests), support_mode.get("enabled"))
         return {**update, "status": status}
     except Exception as exc:
-        error = f"{type(exc).__name__}: {str(exc)[:200]}"
-        logger.warning("[fix10a] %s: shadow ERROR %s", report_id, error)
+        timed_out = isinstance(exc, asyncio.TimeoutError)
+        error = ("shadow wall-clock ceiling exceeded" if timed_out
+                 else f"{type(exc).__name__}: {str(exc)[:200]}")
+        logger.warning("[fix10a] %s: shadow %s %s", report_id,
+                       "TIMEOUT" if timed_out else "ERROR", error)
         update = {
-            "fix10a_status": "error",
+            "fix10a_status": "timeout" if timed_out else "error",
             "fix10a_version": VERSION,
             "fix10a_error": error,
             "fix10a_canonical_authority": False,
@@ -256,4 +283,4 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                 await db.reports.update_one({"id": report_id}, {"$set": update})
         except Exception:
             pass
-        return {**update, "status": "error"}
+        return {**update, "status": update["fix10a_status"]}
