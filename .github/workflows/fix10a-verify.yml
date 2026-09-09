@@ -1,10 +1,31 @@
-name: FIX10 staging smoke
+name: FIX10 production server integration
 
 on: [push]
 
+permissions:
+  contents: write
+
 jobs:
-  smoke:
+  integrate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo FIX10_STAGING_SMOKE_OK
+        with:
+          ref: chatgpt-production-hardening
+          fetch-depth: 0
+      - name: Patch server
+        run: |
+          python .github/scripts/patch_fix10_server.py
+          python -m py_compile backend/server.py
+          git diff --check
+      - name: Commit server
+        run: |
+          if git diff --quiet -- backend/server.py; then
+            echo "Server already integrated"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/server.py
+          git commit -m "FIX10: integrate synchronous production reconciliation"
+          git push origin HEAD:chatgpt-production-hardening
