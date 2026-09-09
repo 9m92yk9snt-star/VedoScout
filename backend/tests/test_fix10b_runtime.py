@@ -1,4 +1,4 @@
-"""FIX10B unified-result runtime bridge tests."""
+"""FIX10B production unified-result reconciliation tests."""
 from __future__ import annotations
 
 import sys
@@ -92,20 +92,15 @@ def _unified():
     }
 
 
-def test_fix10b_runtime01_flag_defaults_off(monkeypatch):
-    monkeypatch.delenv(rt.FLAG, raising=False)
-    assert rt.canonical_enabled() is False
+def test_fix10b_runtime01_candidate_is_production_enabled_without_feature_flag():
     candidate = rt.build_candidate(_unified(), _physical_assist())
-    assert candidate["enabled"] is False
-    # Candidate is still computed for deterministic audit/CI; the caller is the
-    # authority gate and must not apply it unless enabled.
+    assert candidate["enabled"] is True
+    assert candidate["mode"] == "production"
     assert candidate["summary"]["proposals_applied"] == 1
 
 
-def test_fix10b_runtime02_flag_enables_canonical_candidate(monkeypatch):
-    monkeypatch.setenv(rt.FLAG, "1")
+def test_fix10b_runtime02_assist_reconciles_every_projection():
     candidate = rt.build_candidate(_unified(), _physical_assist())
-    assert candidate["enabled"] is True
     result = candidate["unified_result"]
     assert result["canonical_events"]["events"][0]["canonical_event_type"] == "ASSIST"
     assert result["event_ledger"]["events"][0]["canonical_event_type"] == "ASSIST"
