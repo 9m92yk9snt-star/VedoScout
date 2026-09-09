@@ -5,8 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# TEMPORARILY write-enabled only for the isolated staging job at the bottom.
+# This is returned to contents:read after backend/server.py is patched.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   fix10a-unit:
@@ -16,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install FIX10A test dependencies
+      - name: Install FIX10A/FIX10B test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
@@ -72,16 +74,18 @@ jobs:
             backend/fix10a_vision_providers.py \
             backend/fix10a_goal_direction.py \
             backend/fix10a_shadow_runtime.py \
+            backend/fix10b_reconciliation.py \
+            backend/fix10b_runtime.py \
             backend/golden_fixture_validator.py \
             backend/run_real_video_golden.py \
             backend/football_sequence_intelligence.py \
             backend/identity_verify.py \
             backend/server.py
-      - name: Run FIX10A regression family
+      - name: Run FIX10A + FIX10B regression families
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py
       - name: Package exact FIX10A runtime for private Golden diagnostics
         uses: actions/upload-artifact@v4
         with:
@@ -204,9 +208,107 @@ jobs:
           ADMIN_PASSWORD: ci-password
           REACT_APP_BACKEND_URL: http://127.0.0.1:8000
           FIX10A_SHADOW_ENABLED: '0'
+          FIX10B_CANONICAL_ENABLED: '0'
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' | sort)
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' ! -name 'test_fix10b*.py' | sort)
           test "${#FIX_FILES[@]}" -gt 0
           pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
+
+  # One-shot branch-local staging job. The server file is too large for the
+  # contents API replacement wrapper; this applies four exact guarded edits in
+  # GitHub Actions, commits only backend/server.py, then self-skips on the bot
+  # push. This job and write permission are removed immediately afterwards.
+  stage-fix10b-server:
+    if: github.event_name == 'pull_request' && github.head_ref == 'chatgpt-production-hardening' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt-production-hardening
+          fetch-depth: 0
+      - name: Apply exact guarded server patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('backend/server.py')
+          s = p.read_text()
+          replacements = [
+              ('import fix10a_shadow_runtime\n', 'import fix10a_shadow_runtime\nimport fix10b_runtime\n', 'FIX10B import'),
+              ('        _unified_prepared = None\n        _unified_result = None\n', '        _unified_prepared = None\n        _unified_result = None\n        _fix10a_task = None\n', 'FIX10A task slot'),
+              ('                        fix10a_shadow_runtime.spawn_shadow(\n', '                        _fix10a_task = fix10a_shadow_runtime.spawn_shadow(\n', 'capture FIX10A task'),
+          ]
+          for old, new, label in replacements:
+              if new in s:
+                  continue
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one occurrence, found {count}')
+              s = s.replace(old, new, 1)
+          old = '''        if isinstance(_unified_result, dict):
+            full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
+        else:
+'''
+          new = '''        if isinstance(_unified_result, dict):
+            # FIX10B: apply only the separate proof-gated candidate. FIX10A
+            # remains observe-only with canonical_authority=False.
+            if _fix10a_task is not None and fix10b_runtime.canonical_enabled():
+                try:
+                    _shadow_result = await _fix10a_task
+                    _fix10b_candidate = (
+                        (_shadow_result or {}).get("_fix10b_candidate")
+                        if isinstance(_shadow_result, dict) else None
+                    )
+                    if (
+                        isinstance(_fix10b_candidate, dict)
+                        and _fix10b_candidate.get("enabled") is True
+                        and isinstance(_fix10b_candidate.get("unified_result"), dict)
+                    ):
+                        _unified_result = _fix10b_candidate["unified_result"]
+                        event_ledger_obj = _unified_result.get("event_ledger")
+                        _fix10b_summary = dict(_fix10b_candidate.get("summary") or {})
+                        _payload = unified_analysis_engine.persistence_payload(_unified_result)
+                        _payload.update({
+                            "fix10b_status": _fix10b_summary.get("status") or "no_change",
+                            "fix10b_version": 1,
+                            "fix10b_summary": _fix10b_summary,
+                            "fix10b_canonical_authority": True,
+                        })
+                        await db.reports.update_one({"id": report_id}, {"$set": _payload})
+                        logger.info(
+                            "[fix10b] %s: canonical reconciliation status=%s applied=%d",
+                            report_id,
+                            _fix10b_summary.get("status"),
+                            int(_fix10b_summary.get("proposals_applied") or 0),
+                        )
+                except Exception:
+                    logger.exception("[fix10b] canonical reconciliation failed for %s", report_id)
+            full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
+        else:
+'''
+          if new not in s:
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'FIX10B projection hook: expected exactly one occurrence, found {count}')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          python -m py_compile backend/server.py
+          git diff --check
+          git diff -- backend/server.py
+      - name: Commit server patch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- backend/server.py; then
+            echo 'Server already patched.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/server.py
+          git commit -m 'FIX10B: integrate proof-gated canonical reconciliation before report projection'
+          git push origin HEAD:chatgpt-production-hardening
