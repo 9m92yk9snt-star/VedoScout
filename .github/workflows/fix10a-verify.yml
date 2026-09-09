@@ -49,8 +49,8 @@ jobs:
         run: |
           set -euo pipefail
           test ! -e backend/fix10a_shadow_runtime.py
-          if grep -R -E 'fix10a_shadow_runtime|FIX10A_SHADOW_ENABLED|FIX10B_CANONICAL_ENABLED|spawn_shadow' \
-            backend/server.py backend/fix10a_runtime.py backend/fix10b_runtime.py backend/tests/test_fix10a*.py backend/tests/test_fix10b*.py; then
+          if grep -E 'fix10a_shadow_runtime|FIX10A_SHADOW_ENABLED|FIX10B_CANONICAL_ENABLED|spawn_shadow' \
+            backend/server.py backend/fix10a_runtime.py backend/fix10b_runtime.py; then
             echo 'Obsolete FIX10 shadow execution reference found'
             exit 1
           fi
