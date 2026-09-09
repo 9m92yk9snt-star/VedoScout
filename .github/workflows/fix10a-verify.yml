@@ -44,6 +44,16 @@ jobs:
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
+      - name: Verify FIX10 has no shadow execution path
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend/fix10a_shadow_runtime.py
+          if grep -R -E 'fix10a_shadow_runtime|FIX10A_SHADOW_ENABLED|FIX10B_CANONICAL_ENABLED|spawn_shadow' \
+            backend/server.py backend/fix10a_runtime.py backend/fix10b_runtime.py backend/tests/test_fix10a*.py backend/tests/test_fix10b*.py; then
+            echo 'Obsolete FIX10 shadow execution reference found'
+            exit 1
+          fi
       - name: Compile production FIX10 path
         env:
           PYTHONPATH: /tmp/ci_stubs:backend
@@ -183,7 +193,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
       - name: Install frontend dependencies
         working-directory: frontend
         run: |
