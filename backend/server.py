@@ -27,7 +27,8 @@ import httpx
 # Local modules
 import r2_storage
 import video_timebase
-import fix10a_shadow_runtime
+import fix10a_runtime
+import fix10b_runtime
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -9224,11 +9225,12 @@ async def generate_full_report_task(report_id: str) -> None:
                         f"coverage_complete={_unified_result.get('metrics', {}).get('coverage_complete')} "
                         f"attempts={len(_sequence_attempts)}"
                     )
-                    # FIX10A — observe-only physical reconstruction. Feature flag
-                    # defaults OFF. The task writes only fix10a_* diagnostics and
-                    # can never mutate canonical B3/FIX09C truth.
-                    if fix10a_shadow_runtime.shadow_enabled():
-                        fix10a_shadow_runtime.spawn_shadow(
+                    # FIX10A + FIX10B production path. Physical reconstruction
+                    # is awaited here; there is no shadow/background task. FIX10A
+                    # contributes physical evidence and FIX10B is the proof-gated
+                    # canonical reconciliation authority.
+                    try:
+                        _fix10a_result = await fix10a_runtime.run(
                             report_id=report_id,
                             video_path=str(file_path),
                             unified_result=_unified_result,
@@ -9239,6 +9241,38 @@ async def generate_full_report_task(report_id: str) -> None:
                                 "fingerprint": doc.get("fingerprint") or {},
                             },
                             local_dir=UPLOAD_DIR / ".fix10a_traces",
+                        )
+                        _fix10b_candidate = (
+                            (_fix10a_result or {}).get("_fix10b_candidate")
+                            if isinstance(_fix10a_result, dict) else None
+                        )
+                        if (
+                            isinstance(_fix10b_candidate, dict)
+                            and _fix10b_candidate.get("enabled") is True
+                            and isinstance(_fix10b_candidate.get("unified_result"), dict)
+                        ):
+                            _unified_result = _fix10b_candidate["unified_result"]
+                            event_ledger_obj = _unified_result.get("event_ledger")
+                            _fix10b_summary = dict(_fix10b_candidate.get("summary") or {})
+                            _payload = unified_analysis_engine.persistence_payload(_unified_result)
+                            _payload.update({
+                                "fix10b_status": _fix10b_summary.get("status") or "no_change",
+                                "fix10b_version": int(_fix10b_candidate.get("version") or 2),
+                                "fix10b_mode": "production",
+                                "fix10b_summary": _fix10b_summary,
+                                "fix10b_canonical_authority": True,
+                            })
+                            await db.reports.update_one({"id": report_id}, {"$set": _payload})
+                            logger.info(
+                                "[fix10b] %s: production reconciliation status=%s applied=%d",
+                                report_id,
+                                _fix10b_summary.get("status"),
+                                int(_fix10b_summary.get("proposals_applied") or 0),
+                            )
+                    except Exception:
+                        logger.exception(
+                            "[fix10] production physical reconciliation failed for %s; retaining FIX09B truth",
+                            report_id,
                         )
                 else:
                     logger.warning(
