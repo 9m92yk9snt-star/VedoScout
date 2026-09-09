@@ -1,8 +1,10 @@
 """FIX10A shadow runtime — execute/persist physical evidence without authority.
 
 This module is the production adapter around ``physical_match_reconstruction``.
-It is feature-flagged OFF by default, writes only diagnostic FIX10A fields and
-trace artifacts, and never returns data to B3/FIX09C event truth.
+FIX10A itself remains feature-flagged and writes only diagnostic ``fix10a_*``
+fields.  After physical reconstruction it may also build an in-memory FIX10B
+candidate for the caller; that candidate has no authority here and can become
+canonical only through the separate FIX10B server gate.
 """
 from __future__ import annotations
 
@@ -17,6 +19,7 @@ from pathlib import Path
 import event_trace
 import fix10a_goal_direction
 import fix10a_vision_providers
+import fix10b_runtime
 import physical_match_reconstruction
 
 logger = logging.getLogger("elite-scout")
@@ -31,7 +34,7 @@ def shadow_enabled() -> bool:
 
 
 def support_vision_enabled() -> bool:
-    # Shadow mode itself is already explicit opt-in.  Supporting A6/A7 readers
+    # Shadow mode itself is already explicit opt-in. Supporting A6/A7 readers
     # default on inside shadow so a real acceptance run gets the full evidence
     # stack; operators can disable them separately for cost/debug isolation.
     return str(os.environ.get(SUPPORT_VISION_FLAG, "1")).strip().lower() in {"1", "true", "yes", "on"}
@@ -167,10 +170,13 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                      local_dir=None, jersey_vote_provider=None,
                      goal_geometry_provider=None, role_evidence=None,
                      role_evidence_provider=None, vision_api_key: str | None = None) -> dict:
-    """Run FIX10A only after a successful unified result; never mutate it.
+    """Run FIX10A after a successful unified result; never mutate that input.
 
     Any exception is converted to diagnostic state. The caller's existing report
-    flow must continue regardless of this return value.
+    flow must continue regardless of this return value. A successful run returns
+    an internal ``_fix10b_candidate`` in memory, but the persisted document still
+    contains only ``fix10a_*`` diagnostics and FIX10A canonical authority remains
+    false.
     """
     if not shadow_enabled():
         logger.info("[fix10a] %s: shadow SKIP status=disabled", report_id)
@@ -245,6 +251,12 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
             role_evidence=role_evidence or {},
             role_evidence_provider=role_evidence_provider,
         )
+
+        # Build the reconciliation candidate while the full physical traces are
+        # still in memory. It is diagnostic here. Only the caller may grant the
+        # separate FIX10B authority gate.
+        fix10b_candidate = fix10b_runtime.build_candidate(result, physical)
+
         manifests = []
         for trace in physical.get("traces") or []:
             if isinstance(trace, dict):
@@ -263,13 +275,15 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
             "fix10a_physical_summary": compact,
             "fix10a_trace_manifest": manifests,
             "fix10a_supporting_vision": support_mode,
+            "fix10a_fix10b_preview": fix10b_candidate.get("summary") or {},
             "fix10a_error": None,
             "fix10a_canonical_authority": False,
         }
         await _persist_fix10a_fields(db, report_id, update)
-        logger.info("[fix10a] %s: shadow SUCCESS status=%s traces=%d support_vision=%s elapsed=%.3fs",
-                    report_id, status, len(manifests), support_mode.get("enabled"), elapsed)
-        return {**update, "status": status}
+        logger.info("[fix10a] %s: shadow SUCCESS status=%s traces=%d support_vision=%s elapsed=%.3fs fix10b_proposals=%d",
+                    report_id, status, len(manifests), support_mode.get("enabled"), elapsed,
+                    int((fix10b_candidate.get("summary") or {}).get("proposals_applied") or 0))
+        return {**update, "status": status, "_fix10b_candidate": fix10b_candidate}
     except Exception as exc:
         error = f"{type(exc).__name__}: {str(exc)[:200]}"
         elapsed = round(max(0.0, time.monotonic() - started_monotonic), 3)
