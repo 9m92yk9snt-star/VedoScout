@@ -114,12 +114,26 @@ def test_shadow_only_writes_fix10a_fields(monkeypatch):
             db=db,
         )
         assert out["fix10a_canonical_authority"] is False
-        assert db.reports.sets, "shadow should persist its diagnostic update"
+        assert len(db.reports.sets) >= 2, "shadow should persist running and terminal diagnostics"
+
+        first_flt, first_update = db.reports.sets[0]
+        assert first_flt == {"id": "R-CANON"}
+        assert set(first_update.keys()) == {"$set"}
+        first_doc = first_update["$set"]
+        assert first_doc["fix10a_status"] == "running"
+        assert first_doc["fix10a_finished_at"] is None
+        assert first_doc["fix10a_canonical_authority"] is False
+        assert all(k.startswith("fix10a_") for k in first_doc)
+
         flt, update = db.reports.sets[-1]
         assert flt == {"id": "R-CANON"}
         assert set(update.keys()) == {"$set"}
         set_doc = update["$set"]
         assert all(k.startswith("fix10a_") for k in set_doc)
+        assert set_doc["fix10a_status"] == "ok"
+        assert isinstance(set_doc["fix10a_started_at"], str)
+        assert isinstance(set_doc["fix10a_finished_at"], str)
+        assert float(set_doc["fix10a_elapsed_seconds"]) >= 0.0
         assert set_doc["fix10a_canonical_authority"] is False
 
     asyncio.run(scenario())
