@@ -63,6 +63,10 @@ def _trace():
     }
 
 
+def _persisted_states(db):
+    return [call[1]["$set"].get("fix10a_status") for call in db.reports.calls]
+
+
 async def test_shadow01_default_off_does_nothing(monkeypatch):
     monkeypatch.delenv(fsr.FLAG, raising=False)
     db = _DB()
@@ -109,11 +113,17 @@ async def test_shadow03_success_persists_compact_summary_and_r2_trace(monkeypatc
     assert key.endswith(".json.gz")
     assert payload[:2] == b"\x1f\x8b"
     assert content_type == "application/gzip"
-    assert len(db.reports.calls) == 1
-    persisted = db.reports.calls[0][1]["$set"]
+
+    # Lifecycle persistence is intentionally two-phase: RUNNING first, then
+    # the terminal diagnostic result. This lets operators distinguish a long
+    # shadow run from a dropped task without granting any canonical authority.
+    assert _persisted_states(db) == ["running", "ok"]
+    persisted = db.reports.calls[-1][1]["$set"]
     assert "traces" not in persisted["fix10a_physical_summary"]
     assert persisted["fix10a_canonical_authority"] is False
     assert persisted["fix10a_trace_manifest"][0]["storage"] == "r2"
+    assert persisted["fix10a_finished_at"]
+    assert persisted["fix10a_elapsed_seconds"] >= 0.0
 
 
 async def test_shadow04_r2_unavailable_uses_local_diagnostic_fallback(monkeypatch, tmp_path):
@@ -136,12 +146,15 @@ async def test_shadow04_r2_unavailable_uses_local_diagnostic_fallback(monkeypatc
     manifest = out["fix10a_trace_manifest"][0]
     assert manifest["storage"] == "local_diagnostic"
     assert Path(manifest["local_path"]).exists()
+    assert _persisted_states(db) == ["running", "ok"]
 
 
 async def test_shadow05_physical_exception_is_diagnostic_and_never_raises(monkeypatch):
     monkeypatch.setenv(fsr.FLAG, "1")
+
     def _boom(*_a, **_k):
         raise RuntimeError("physical failure")
+
     monkeypatch.setattr(fsr.physical_match_reconstruction, "reconstruct_physical_match", _boom)
     db = _DB()
     out = await fsr.run_shadow(
@@ -150,4 +163,8 @@ async def test_shadow05_physical_exception_is_diagnostic_and_never_raises(monkey
     assert out["status"] == "error"
     assert out["fix10a_canonical_authority"] is False
     assert "RuntimeError" in out["fix10a_error"]
-    assert db.reports.calls[0][1]["$set"]["fix10a_status"] == "error"
+    assert _persisted_states(db) == ["running", "error"]
+    terminal = db.reports.calls[-1][1]["$set"]
+    assert terminal["fix10a_canonical_authority"] is False
+    assert terminal["fix10a_finished_at"]
+    assert terminal["fix10a_elapsed_seconds"] >= 0.0
