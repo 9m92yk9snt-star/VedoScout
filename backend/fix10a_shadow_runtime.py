@@ -7,9 +7,11 @@ trace artifacts, and never returns data to B3/FIX09C event truth.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import logging
 import os
 import re
+import time
 from pathlib import Path
 
 import event_trace
@@ -81,6 +83,23 @@ def spawn_shadow(**kwargs) -> "asyncio.Task | None":
 def _safe_component(value, fallback="trace") -> str:
     text = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "")).strip(".-_")
     return (text[:100] or fallback)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def _persist_fix10a_fields(db, report_id: str, fields: dict) -> None:
+    """Best-effort diagnostic persistence; never allowed to break report flow."""
+    if db is None or not isinstance(fields, dict):
+        return
+    safe = {k: v for k, v in fields.items() if str(k).startswith("fix10a_")}
+    if not safe:
+        return
+    try:
+        await db.reports.update_one({"id": report_id}, {"$set": safe})
+    except Exception:
+        pass
 
 
 def _compact_physical_result(result: dict | None) -> dict:
@@ -163,6 +182,18 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
         return {"version": VERSION, "status": "skipped", "reason": "UNIFIED_RESULT_NOT_PRODUCTION_READY",
                 "canonical_authority": False}
 
+    started_at = _utc_now()
+    started_monotonic = time.monotonic()
+    await _persist_fix10a_fields(db, report_id, {
+        "fix10a_status": "running",
+        "fix10a_version": VERSION,
+        "fix10a_started_at": started_at,
+        "fix10a_finished_at": None,
+        "fix10a_elapsed_seconds": 0.0,
+        "fix10a_error": None,
+        "fix10a_canonical_authority": False,
+    })
+
     try:
         support_mode = {
             "enabled": False,
@@ -183,9 +214,6 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                 if jersey_vote_provider is None:
                     jersey_vote_provider = bundle.jersey_vote_provider
                 if goal_geometry_provider is None:
-                    # A7 goal geometry remains the existing independent reader;
-                    # this wrapper only adds field-side orientation and a
-                    # per-report review budget. It does not receive event truth.
                     goal_geometry_provider = fix10a_goal_direction.wrap_goal_geometry_provider(
                         bundle.goal_geometry_provider,
                         api_key,
@@ -225,31 +253,35 @@ async def run_shadow(*, report_id: str, video_path: str, unified_result: dict,
                 ))
         compact = _compact_physical_result(physical)
         status = str(physical.get("status") or "unknown")
+        elapsed = round(max(0.0, time.monotonic() - started_monotonic), 3)
         update = {
             "fix10a_status": status,
             "fix10a_version": VERSION,
+            "fix10a_started_at": started_at,
+            "fix10a_finished_at": _utc_now(),
+            "fix10a_elapsed_seconds": elapsed,
             "fix10a_physical_summary": compact,
             "fix10a_trace_manifest": manifests,
             "fix10a_supporting_vision": support_mode,
+            "fix10a_error": None,
             "fix10a_canonical_authority": False,
         }
-        if db is not None:
-            await db.reports.update_one({"id": report_id}, {"$set": update})
-        logger.info("[fix10a] %s: shadow SUCCESS status=%s traces=%d support_vision=%s",
-                    report_id, status, len(manifests), support_mode.get("enabled"))
+        await _persist_fix10a_fields(db, report_id, update)
+        logger.info("[fix10a] %s: shadow SUCCESS status=%s traces=%d support_vision=%s elapsed=%.3fs",
+                    report_id, status, len(manifests), support_mode.get("enabled"), elapsed)
         return {**update, "status": status}
     except Exception as exc:
         error = f"{type(exc).__name__}: {str(exc)[:200]}"
-        logger.warning("[fix10a] %s: shadow ERROR %s", report_id, error)
+        elapsed = round(max(0.0, time.monotonic() - started_monotonic), 3)
+        logger.warning("[fix10a] %s: shadow ERROR %s elapsed=%.3fs", report_id, error, elapsed)
         update = {
             "fix10a_status": "error",
             "fix10a_version": VERSION,
+            "fix10a_started_at": started_at,
+            "fix10a_finished_at": _utc_now(),
+            "fix10a_elapsed_seconds": elapsed,
             "fix10a_error": error,
             "fix10a_canonical_authority": False,
         }
-        try:
-            if db is not None:
-                await db.reports.update_one({"id": report_id}, {"$set": update})
-        except Exception:
-            pass
+        await _persist_fix10a_fields(db, report_id, update)
         return {**update, "status": "error"}
