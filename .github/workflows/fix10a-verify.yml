@@ -1,31 +1,197 @@
-name: FIX10 production server integration
+name: Production verification
 
-on: [push]
+on: [push, pull_request, workflow_dispatch]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  integrate:
+  fix10_unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          ref: chatgpt-production-hardening
-          fetch-depth: 0
-      - name: Patch server
+          python-version: '3.11'
+      - name: Install focused test dependencies
         run: |
-          python .github/scripts/patch_fix10_server.py
-          python -m py_compile backend/server.py
-          git diff --check
-      - name: Commit server
+          python -m pip install --upgrade pip
+          python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
+      - name: Provide no-network Emergent LLM stub
+        shell: bash
         run: |
-          if git diff --quiet -- backend/server.py; then
-            echo "Server already integrated"
-            exit 0
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+          class UserMessage(_Payload):
+              pass
+          class ImageContent(_Payload):
+              pass
+          class FileContentWithMimeType(_Payload):
+              pass
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
+      - name: Compile production FIX10 path
+        env:
+          PYTHONPATH: /tmp/ci_stubs:backend
+        run: |
+          python -m py_compile \
+            backend/motion_compensation.py \
+            backend/dense_replay.py \
+            backend/dense_track_refinement.py \
+            backend/ball_trajectory.py \
+            backend/ball_contact_engine.py \
+            backend/touch_graph.py \
+            backend/jersey_consensus.py \
+            backend/shot_outcome_engine.py \
+            backend/event_trace.py \
+            backend/physical_match_reconstruction.py \
+            backend/open_observation_compat.py \
+            backend/fix10a_vision_providers.py \
+            backend/fix10a_goal_direction.py \
+            backend/fix10a_runtime.py \
+            backend/fix10b_reconciliation.py \
+            backend/fix10b_runtime.py \
+            backend/golden_fixture_validator.py \
+            backend/run_real_video_golden.py \
+            backend/football_sequence_intelligence.py \
+            backend/identity_verify.py \
+            backend/server.py
+      - name: Run FIX10 production regressions
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py
+
+  backend_regression:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install backend requirements available outside Emergent runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          grep -v '^emergentintegrations==' backend/requirements.txt > /tmp/requirements-ci.txt
+          python -m pip install -r /tmp/requirements-ci.txt
+      - name: Provide no-network Emergent stubs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ci_stubs/emergentintegrations/llm
+          mkdir -p /tmp/ci_stubs/emergentintegrations/payments/stripe
+          touch /tmp/ci_stubs/emergentintegrations/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/llm/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/__init__.py
+          touch /tmp/ci_stubs/emergentintegrations/payments/stripe/__init__.py
+          cat > /tmp/ci_stubs/emergentintegrations/llm/chat.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              def model_dump(self):
+                  return dict(self.__dict__)
+          class UserMessage(_Payload):
+              pass
+          class ImageContent(_Payload):
+              pass
+          class FileContentWithMimeType(_Payload):
+              pass
+          class LlmChat:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              def with_model(self, provider, model):
+                  self.provider = provider
+                  self.model = model
+                  return self
+              async def send_message(self, _message):
+                  raise RuntimeError("CI Emergent stub: network/model call forbidden")
+          PY
+          cat > /tmp/ci_stubs/emergentintegrations/payments/stripe/checkout.py <<'PY'
+          class _Payload:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              def model_dump(self):
+                  return dict(self.__dict__)
+          class CheckoutSessionResponse(_Payload):
+              pass
+          class CheckoutStatusResponse(_Payload):
+              pass
+          class CheckoutSessionRequest(_Payload):
+              pass
+          class StripeCheckout:
+              def __init__(self, **kwargs):
+                  self.__dict__.update(kwargs)
+              async def create_checkout_session(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+              async def get_checkout_status(self, *_args, **_kwargs):
+                  raise RuntimeError("CI Emergent stub: payment call forbidden")
+          PY
+      - name: Reproduce Emergent app layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /app
+          sudo ln -sfn "$GITHUB_WORKSPACE/backend" /app/backend
+          sudo ln -sfn "$GITHUB_WORKSPACE/frontend" /app/frontend
+          mkdir -p backend/uploads
+          if [ ! -f frontend/.env ]; then
+            printf '%s\n' 'REACT_APP_BACKEND_URL=http://127.0.0.1:8000' > frontend/.env
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add backend/server.py
-          git commit -m "FIX10: integrate synchronous production reconciliation"
-          git push origin HEAD:chatgpt-production-hardening
+      - name: Run historical backend regression contract
+        working-directory: backend
+        env:
+          PYTHONPATH: /tmp/ci_stubs:.
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: vedoscout_fix10_ci
+          EMERGENT_LLM_KEY: ci-placeholder
+          STRIPE_API_KEY: sk_test_placeholder
+          JWT_SECRET_KEY: fix10-ci-secret
+          ADMIN_EMAIL: ci@example.com
+          ADMIN_PASSWORD: ci-password
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' ! -name 'test_fix10b*.py' | sort)
+          test "${#FIX_FILES[@]}" -gt 0
+          pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
+
+  frontend_build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --non-interactive
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          CI: 'false'
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+        run: yarn build
