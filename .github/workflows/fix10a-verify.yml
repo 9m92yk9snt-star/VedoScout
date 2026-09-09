@@ -1,17 +1,17 @@
-name: FIX10A verification
+name: FIX10 production verification
 
 on:
   pull_request:
     branches: [main]
   workflow_dispatch:
 
-# TEMPORARILY write-enabled only for the isolated staging job at the bottom.
-# This is returned to contents:read after backend/server.py is patched.
+# TEMPORARY: write is needed only by the one-shot server integration job below.
+# It is returned to contents: read immediately after backend/server.py is patched.
 permissions:
   contents: write
 
 jobs:
-  fix10a-unit:
+  fix10-production-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,29 +33,23 @@ jobs:
           class _Payload:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
           class UserMessage(_Payload):
               pass
-
           class ImageContent(_Payload):
               pass
-
           class FileContentWithMimeType(_Payload):
               pass
-
           class LlmChat:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def with_model(self, provider, model):
                   self.provider = provider
                   self.model = model
                   return self
-
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
-      - name: Compile changed backend modules
+      - name: Compile production backend modules
         env:
           PYTHONPATH: /tmp/ci_stubs:backend
         run: |
@@ -73,7 +67,7 @@ jobs:
             backend/open_observation_compat.py \
             backend/fix10a_vision_providers.py \
             backend/fix10a_goal_direction.py \
-            backend/fix10a_shadow_runtime.py \
+            backend/fix10a_runtime.py \
             backend/fix10b_reconciliation.py \
             backend/fix10b_runtime.py \
             backend/golden_fixture_validator.py \
@@ -86,10 +80,10 @@ jobs:
         env:
           PYTHONPATH: /tmp/ci_stubs:.
         run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py
-      - name: Package exact FIX10A runtime for private Golden diagnostics
+      - name: Package exact FIX10 production runtime for private Golden diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: fix10a-live-runtime
+          name: fix10-production-runtime
           path: |
             backend/*.py
             backend/models/yolov8n.onnx
@@ -132,28 +126,21 @@ jobs:
           class _Payload:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def model_dump(self):
                   return dict(self.__dict__)
-
           class UserMessage(_Payload):
               pass
-
           class ImageContent(_Payload):
               pass
-
           class FileContentWithMimeType(_Payload):
               pass
-
           class LlmChat:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def with_model(self, provider, model):
                   self.provider = provider
                   self.model = model
                   return self
-
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
@@ -161,26 +148,19 @@ jobs:
           class _Payload:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def model_dump(self):
                   return dict(self.__dict__)
-
           class CheckoutSessionResponse(_Payload):
               pass
-
           class CheckoutStatusResponse(_Payload):
               pass
-
           class CheckoutSessionRequest(_Payload):
               pass
-
           class StripeCheckout:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               async def create_checkout_session(self, *_args, **_kwargs):
                   raise RuntimeError("CI Emergent stub: payment call forbidden")
-
               async def get_checkout_status(self, *_args, **_kwargs):
                   raise RuntimeError("CI Emergent stub: payment call forbidden")
           PY
@@ -207,8 +187,6 @@ jobs:
           ADMIN_EMAIL: ci@example.com
           ADMIN_PASSWORD: ci-password
           REACT_APP_BACKEND_URL: http://127.0.0.1:8000
-          FIX10A_SHADOW_ENABLED: '0'
-          FIX10B_CANONICAL_ENABLED: '0'
         shell: bash
         run: |
           set -euo pipefail
@@ -216,11 +194,10 @@ jobs:
           test "${#FIX_FILES[@]}" -gt 0
           pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
 
-  # One-shot branch-local staging job. The server file is too large for the
-  # contents API replacement wrapper; this applies four exact guarded edits in
-  # GitHub Actions, commits only backend/server.py, then self-skips on the bot
-  # push. This job and write permission are removed immediately afterwards.
-  stage-fix10b-server:
+  # One-shot branch-local integration because backend/server.py is too large
+  # for a safe whole-file contents API replacement. Exact guarded replacements
+  # are applied and only backend/server.py is committed by this job.
+  stage-production-server:
     if: github.event_name == 'pull_request' && github.head_ref == 'chatgpt-production-hardening' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -228,7 +205,7 @@ jobs:
         with:
           ref: chatgpt-production-hardening
           fetch-depth: 0
-      - name: Apply exact guarded server patch
+      - name: Replace FIX10A shadow path with synchronous production FIX10A/FIX10B
         shell: bash
         run: |
           set -euo pipefail
@@ -236,79 +213,115 @@ jobs:
           from pathlib import Path
           p = Path('backend/server.py')
           s = p.read_text()
-          replacements = [
-              ('import fix10a_shadow_runtime\n', 'import fix10a_shadow_runtime\nimport fix10b_runtime\n', 'FIX10B import'),
-              ('        _unified_prepared = None\n        _unified_result = None\n', '        _unified_prepared = None\n        _unified_result = None\n        _fix10a_task = None\n', 'FIX10A task slot'),
-              ('                        fix10a_shadow_runtime.spawn_shadow(\n', '                        _fix10a_task = fix10a_shadow_runtime.spawn_shadow(\n', 'capture FIX10A task'),
-          ]
-          for old, new, label in replacements:
-              if new in s:
-                  continue
-              count = s.count(old)
+
+          old_import = 'import fix10a_shadow_runtime\n'
+          new_import = 'import fix10a_runtime\nimport fix10b_runtime\n'
+          if new_import not in s:
+              count = s.count(old_import)
               if count != 1:
-                  raise SystemExit(f'{label}: expected exactly one occurrence, found {count}')
-              s = s.replace(old, new, 1)
-          old = '''        if isinstance(_unified_result, dict):
-            full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
-        else:
-'''
-          new = '''        if isinstance(_unified_result, dict):
-            # FIX10B: apply only the separate proof-gated candidate. FIX10A
-            # remains observe-only with canonical_authority=False.
-            if _fix10a_task is not None and fix10b_runtime.canonical_enabled():
-                try:
-                    _shadow_result = await _fix10a_task
-                    _fix10b_candidate = (
-                        (_shadow_result or {}).get("_fix10b_candidate")
-                        if isinstance(_shadow_result, dict) else None
-                    )
-                    if (
-                        isinstance(_fix10b_candidate, dict)
-                        and _fix10b_candidate.get("enabled") is True
-                        and isinstance(_fix10b_candidate.get("unified_result"), dict)
-                    ):
-                        _unified_result = _fix10b_candidate["unified_result"]
-                        event_ledger_obj = _unified_result.get("event_ledger")
-                        _fix10b_summary = dict(_fix10b_candidate.get("summary") or {})
-                        _payload = unified_analysis_engine.persistence_payload(_unified_result)
-                        _payload.update({
-                            "fix10b_status": _fix10b_summary.get("status") or "no_change",
-                            "fix10b_version": 1,
-                            "fix10b_summary": _fix10b_summary,
-                            "fix10b_canonical_authority": True,
-                        })
-                        await db.reports.update_one({"id": report_id}, {"$set": _payload})
-                        logger.info(
-                            "[fix10b] %s: canonical reconciliation status=%s applied=%d",
-                            report_id,
-                            _fix10b_summary.get("status"),
-                            int(_fix10b_summary.get("proposals_applied") or 0),
+                  raise SystemExit(f'production import: expected exactly 1 old occurrence, found {count}')
+              s = s.replace(old_import, new_import, 1)
+
+          old = '''                    # FIX10A — observe-only physical reconstruction. Feature flag
+                    # defaults OFF. The task writes only fix10a_* diagnostics and
+                    # can never mutate canonical B3/FIX09C truth.
+                    if fix10a_shadow_runtime.shadow_enabled():
+                        fix10a_shadow_runtime.spawn_shadow(
+                            report_id=report_id,
+                            video_path=str(file_path),
+                            unified_result=_unified_result,
+                            db=db,
+                            r2_storage=r2_storage,
+                            source_video={
+                                "role": "CANONICAL_WEB_VIDEO",
+                                "fingerprint": doc.get("fingerprint") or {},
+                            },
+                            local_dir=UPLOAD_DIR / ".fix10a_traces",
                         )
-                except Exception:
-                    logger.exception("[fix10b] canonical reconciliation failed for %s", report_id)
-            full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
-        else:
+'''
+          new = '''                    # FIX10A + FIX10B production path. Physical reconstruction
+                    # is awaited here; there is no shadow/background task. FIX10A
+                    # contributes physical evidence and FIX10B is the proof-gated
+                    # canonical reconciliation authority.
+                    try:
+                        _fix10a_result = await fix10a_runtime.run(
+                            report_id=report_id,
+                            video_path=str(file_path),
+                            unified_result=_unified_result,
+                            db=db,
+                            r2_storage=r2_storage,
+                            source_video={
+                                "role": "CANONICAL_WEB_VIDEO",
+                                "fingerprint": doc.get("fingerprint") or {},
+                            },
+                            local_dir=UPLOAD_DIR / ".fix10a_traces",
+                        )
+                        _fix10b_candidate = (
+                            (_fix10a_result or {}).get("_fix10b_candidate")
+                            if isinstance(_fix10a_result, dict) else None
+                        )
+                        if (
+                            isinstance(_fix10b_candidate, dict)
+                            and _fix10b_candidate.get("enabled") is True
+                            and isinstance(_fix10b_candidate.get("unified_result"), dict)
+                        ):
+                            _unified_result = _fix10b_candidate["unified_result"]
+                            event_ledger_obj = _unified_result.get("event_ledger")
+                            _fix10b_summary = dict(_fix10b_candidate.get("summary") or {})
+                            _payload = unified_analysis_engine.persistence_payload(_unified_result)
+                            _payload.update({
+                                "fix10b_status": _fix10b_summary.get("status") or "no_change",
+                                "fix10b_version": int(_fix10b_candidate.get("version") or 2),
+                                "fix10b_mode": "production",
+                                "fix10b_summary": _fix10b_summary,
+                                "fix10b_canonical_authority": True,
+                            })
+                            await db.reports.update_one({"id": report_id}, {"$set": _payload})
+                            logger.info(
+                                "[fix10b] %s: production reconciliation status=%s applied=%d",
+                                report_id,
+                                _fix10b_summary.get("status"),
+                                int(_fix10b_summary.get("proposals_applied") or 0),
+                            )
+                    except Exception:
+                        # Fail closed: retain the already verified FIX09B result.
+                        logger.exception(
+                            "[fix10] production physical reconciliation failed for %s; retaining FIX09B truth",
+                            report_id,
+                        )
 '''
           if new not in s:
               count = s.count(old)
               if count != 1:
-                  raise SystemExit(f'FIX10B projection hook: expected exactly one occurrence, found {count}')
+                  raise SystemExit(f'production FIX10 block: expected exactly 1 old occurrence, found {count}')
               s = s.replace(old, new, 1)
+
+          # No new FIX10 shadow references may remain in the production server.
+          forbidden = [
+              'fix10a_shadow_runtime',
+              'FIX10A_SHADOW_ENABLED',
+              'FIX10B_CANONICAL_ENABLED',
+              '_fix10a_task',
+          ]
+          leftovers = [x for x in forbidden if x in s]
+          if leftovers:
+              raise SystemExit(f'forbidden FIX10 shadow leftovers in server: {leftovers}')
+
           p.write_text(s)
           PY
           python -m py_compile backend/server.py
           git diff --check
           git diff -- backend/server.py
-      - name: Commit server patch only
+      - name: Commit production server integration only
         shell: bash
         run: |
           set -euo pipefail
           if git diff --quiet -- backend/server.py; then
-            echo 'Server already patched.'
+            echo 'Production server integration already present.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add backend/server.py
-          git commit -m 'FIX10B: integrate proof-gated canonical reconciliation before report projection'
+          git commit -m 'FIX10: run physical reconciliation synchronously in production'
           git push origin HEAD:chatgpt-production-hardening
