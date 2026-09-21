@@ -497,7 +497,7 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
             if len(frames) < 3:
                 continue
             H, W = frames[0][1].shape[:2]
-            i0 = min(range(len(frames)), key=lambda i, _f=frames: abs(_f[i][0] - t_seed))
+            i0 = min(range(len(frames)), key=lambda i: abs(frames[i][0] - t_seed))
             if abs(frames[i0][0] - t_seed) > 0.5:
                 continue
             box_px = [

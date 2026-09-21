@@ -27,7 +27,8 @@ import httpx
 # Local modules
 import r2_storage
 import video_timebase
-import fix10a_shadow_runtime
+import fix10a_runtime
+import fix10b_runtime
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -3117,11 +3118,11 @@ def _apply_cross_verification(full: dict, verify: dict, track: dict | None) -> d
         vstats.attach_canonical(ev, v)
         kept.append(ev)
 
-    verify_status = "verified"
+    status = "verified"
     if timeline and not kept:
         # FIX 02 — FAIL CLOSED: the verifier confirmed NOTHING. The original
         # timeline is NEVER restored — no proof is better than wrong proof.
-        verify_status = "rejected_all"
+        status = "rejected_all"
     if timeline:
         full["action_timeline"] = kept
 
@@ -3252,7 +3253,7 @@ def _validate_grow_your_game(full: dict, duration_s: float, gt_track: Optional[d
         if len(what) < 40:
             drops.append(f"{tid}:what_too_short")
             continue
-        if first and first not in what.lower() and not any(mo["timestamp"] in what for mo in moments):
+        if first and first not in what.lower() and not any(mm["timestamp"] in what for mm in moments):
             drops.append(f"{tid}:not_personal")
             continue
         if any(len(str(les.get(k) or "").strip()) < 20
@@ -8306,9 +8307,9 @@ def _ground_truth_positions_block(anchors: list, track: dict | None, t_off: floa
         cx = int((float(b.get("x", 0)) + float(b.get("w", 0)) / 2) * 100)
         cy = int((float(b.get("y", 0)) + float(b.get("h", 0)) / 2) * 100)
         hh = int(float(b.get("h", 0)) * 100)
-        mins, ss = divmod(int(t), 60)
+        mm, ss = divmod(int(t), 60)
         rows.append(
-            f"- At {mins:02d}:{ss:02d} ({t:.1f}s): centred ~{cx}% from the left, ~{cy}% from the top, "
+            f"- At {mm:02d}:{ss:02d} ({t:.1f}s): centred ~{cx}% from the left, ~{cy}% from the top, "
             f"body height ≈ {hh}% of the frame."
         )
     if not rows:
@@ -9224,11 +9225,12 @@ async def generate_full_report_task(report_id: str) -> None:
                         f"coverage_complete={_unified_result.get('metrics', {}).get('coverage_complete')} "
                         f"attempts={len(_sequence_attempts)}"
                     )
-                    # FIX10A — observe-only physical reconstruction. Feature flag
-                    # defaults OFF. The task writes only fix10a_* diagnostics and
-                    # can never mutate canonical B3/FIX09C truth.
-                    if fix10a_shadow_runtime.shadow_enabled():
-                        fix10a_shadow_runtime.spawn_shadow(
+                    # FIX10A + FIX10B production path. Physical reconstruction
+                    # is awaited here; there is no shadow/background task. FIX10A
+                    # contributes physical evidence and FIX10B is the proof-gated
+                    # canonical reconciliation authority.
+                    try:
+                        _fix10a_result = await fix10a_runtime.run(
                             report_id=report_id,
                             video_path=str(file_path),
                             unified_result=_unified_result,
@@ -9239,6 +9241,38 @@ async def generate_full_report_task(report_id: str) -> None:
                                 "fingerprint": doc.get("fingerprint") or {},
                             },
                             local_dir=UPLOAD_DIR / ".fix10a_traces",
+                        )
+                        _fix10b_candidate = (
+                            (_fix10a_result or {}).get("_fix10b_candidate")
+                            if isinstance(_fix10a_result, dict) else None
+                        )
+                        if (
+                            isinstance(_fix10b_candidate, dict)
+                            and _fix10b_candidate.get("enabled") is True
+                            and isinstance(_fix10b_candidate.get("unified_result"), dict)
+                        ):
+                            _unified_result = _fix10b_candidate["unified_result"]
+                            event_ledger_obj = _unified_result.get("event_ledger")
+                            _fix10b_summary = dict(_fix10b_candidate.get("summary") or {})
+                            _payload = unified_analysis_engine.persistence_payload(_unified_result)
+                            _payload.update({
+                                "fix10b_status": _fix10b_summary.get("status") or "no_change",
+                                "fix10b_version": int(_fix10b_candidate.get("version") or 2),
+                                "fix10b_mode": "production",
+                                "fix10b_summary": _fix10b_summary,
+                                "fix10b_canonical_authority": True,
+                            })
+                            await db.reports.update_one({"id": report_id}, {"$set": _payload})
+                            logger.info(
+                                "[fix10b] %s: production reconciliation status=%s applied=%d",
+                                report_id,
+                                _fix10b_summary.get("status"),
+                                int(_fix10b_summary.get("proposals_applied") or 0),
+                            )
+                    except Exception:
+                        logger.exception(
+                            "[fix10] production physical reconciliation failed for %s; retaining FIX09B truth",
+                            report_id,
                         )
                 else:
                     logger.warning(

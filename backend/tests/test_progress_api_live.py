@@ -12,7 +12,7 @@ import requests
 from pymongo import MongoClient
 
 BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com"
+    "REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com"
 ).rstrip("/")
 
 PREMIUM_EMAIL = "premium@elitescout.com"
@@ -195,7 +195,7 @@ def test_progress_pass_checkout_session_create(premium_headers, mongo):
     r = requests.post(
         f"{BASE_URL}/api/progress/pass/checkout",
         headers=premium_headers,
-        json={"origin_url": "https://vedoscout-main.preview.emergentagent.com"},
+        json={"origin_url": "https://scout-ai-pro-1.preview.emergentagent.com"},
         timeout=60,
     )
     assert r.status_code == 200, r.text

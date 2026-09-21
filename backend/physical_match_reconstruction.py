@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import inspect
+import traceback
 
 import ball_contact_engine
 import ball_trajectory
@@ -27,6 +28,8 @@ import touch_graph
 
 VERSION = 1
 SOURCE_ROLE = "CANONICAL_WEB_VIDEO"
+MAX_ERROR_MESSAGE_CHARS = 400
+MAX_TRACEBACK_CHARS = 5000
 
 
 def _safe_provider(provider, *args, default=None):
@@ -90,6 +93,23 @@ def _source_meta(source_video, video_path):
     return src
 
 
+def _window_error(exc: Exception, stage: str) -> dict:
+    """Return bounded, persistence-safe diagnostics for one failed shadow window."""
+    message = str(exc or "")[:MAX_ERROR_MESSAGE_CHARS]
+    try:
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    except Exception:
+        tb = ""
+    if len(tb) > MAX_TRACEBACK_CHARS:
+        tb = tb[-MAX_TRACEBACK_CHARS:]
+    return {
+        "error_stage": str(stage or "unknown")[:120],
+        "error_type": type(exc).__name__,
+        "error_message": message,
+        "error_traceback": tb,
+    }
+
+
 def reconstruct_physical_match(
     video_path: str,
     sequence_plan: dict | None,
@@ -119,7 +139,9 @@ def reconstruct_physical_match(
     unresolved_all = []
 
     for window in windows:
+        stage = "window_setup"
         try:
+            stage = "dense_replay"
             if dense_frame_provider is None:
                 dense_iter = dense_replay.iter_dense_frames(
                     str(video_path), int(window["start_ms"]), int(window["end_ms"])
@@ -129,44 +151,57 @@ def reconstruct_physical_match(
                     str(video_path), int(window["start_ms"]), int(window["end_ms"])
                 )
 
+            stage = "dense_track_refinement"
             refined = dense_track_refinement.refine_window(
                 dense_iter, graph, authority, str(window.get("scene_id") or ""),
                 detector_fn=detector_fn, camera_estimator=camera_estimator,
             )
             dense_frames = list(refined.get("frames") or []) if isinstance(refined, dict) else []
+
+            stage = "ball_trajectory"
             trajectory = ball_trajectory.reconstruct_ball_trajectory(dense_frames)
+
+            stage = "ball_contact_candidates"
             candidates = ball_contact_engine.detect_contact_candidates(dense_frames, trajectory)
+
+            stage = "ball_contact_resolution"
             contact_result = ball_contact_engine.resolve_contacts(candidates)
 
-            # FIX10A Step 3 is a separate, fail-closed recovery layer.  It does
-            # not relax ordinary A4 gates or feed weak detector proposals into
-            # A3.  Only an independently VERIFIED aggregate short-occlusion
-            # recovery may be appended to the copied A4 result before A5.
+            stage = "short_occlusion_recovery"
             step3_recovery = short_occlusion_contact_recovery.recover_short_occlusion_contacts(
                 dense_frames, trajectory, contact_result, video_path=str(video_path)
             )
+
+            stage = "short_occlusion_apply"
             contact_result = short_occlusion_contact_recovery.apply_recovered_contacts(
                 contact_result, step3_recovery
             )
+
+            stage = "touch_graph"
             touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)
+
+            stage = "contact_role_resolution"
             touches = contact_role_resolver.apply_contact_roles(touches, contact_result)
 
+            stage = "jersey_request_selection"
             requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)
+
+            stage = "jersey_provider"
             votes_by_track = _safe_provider(
                 jersey_vote_provider, str(video_path), deepcopy(requests), default={}
             )
             if not isinstance(votes_by_track, dict):
                 votes_by_track = {}
+
+            stage = "jersey_consensus"
             jersey_result = jersey_consensus.apply_jersey_consensus(dense_frames, touches, votes_by_track)
             dense_with_jersey = jersey_result.get("window_evidence") or dense_frames
             touch_with_jersey = jersey_result.get("touch_graph") or touches
 
+            stage = "strike_detection"
             strikes = shot_outcome_engine.find_strike_releases(touch_with_jersey, trajectory)
 
-            # Detect independent A7 intervention actors before role review. A7
-            # intentionally bypasses A4/A5 Touch Graph truth, so waiting until
-            # after role-provider selection would make hand/arm interventions
-            # invisible to goalkeeper/outfield verification.
+            stage = "intervention_detection"
             a7_interventions = [
                 post_strike_intervention.detect_post_strike_intervention(
                     strike, dense_with_jersey, trajectory
@@ -177,6 +212,8 @@ def reconstruct_physical_match(
                 isinstance(row, dict) and row.get("status") == "VERIFIED"
                 for row in a7_interventions
             )
+
+            stage = "role_provider"
             provider_roles = _safe_role_provider(
                 role_evidence_provider, str(video_path), deepcopy(window), deepcopy(strikes),
                 deepcopy(touch_with_jersey), deepcopy(dense_with_jersey),
@@ -188,23 +225,35 @@ def reconstruct_physical_match(
 
             outcomes = []
             for strike, a7 in zip(strikes, a7_interventions):
+                stage = "goal_geometry_provider"
                 goal_geometry = _safe_provider(
                     goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
                 )
+
+                stage = "shot_outcome_reconstruction"
                 outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
                     strike, trajectory, touch_with_jersey,
                     goal_geometry=goal_geometry, role_evidence=window_roles,
                 )
+
+                stage = "intervention_apply"
                 outcome = post_strike_intervention.apply_intervention_evidence(
                     outcome, a7, window_roles
                 )
+
+                stage = "goal_direction_gate"
                 outcome = fix10a_goal_direction.apply_direction_gate(outcome, trajectory, goal_geometry)
+
+                stage = "ball_proof_gate"
                 outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, trajectory)
                 outcomes.append(outcome)
 
+            stage = "window_unresolved_summary"
             unresolved = _window_unresolved_reasons(contact_result, jersey_result, outcomes)
             unresolved_all.extend(unresolved)
             trace_id = str(window.get("dense_window_id") or "dense_unknown")
+
+            stage = "event_trace"
             trace = event_trace.build_event_trace(
                 trace_id=trace_id, source_video=source, window=window,
                 dense_frames=dense_with_jersey, ball_trajectory=trajectory,
@@ -213,6 +262,8 @@ def reconstruct_physical_match(
                 outcome_evidence=outcomes, sequence_analysis=analysis,
                 contradictions=[], unresolved_reasons=unresolved,
             )
+
+            stage = "trace_summary"
             summary = event_trace.compact_trace_summary(trace)
             traces.append(trace)
             summaries.append(summary)
@@ -240,12 +291,15 @@ def reconstruct_physical_match(
         except Exception as exc:
             reason = f"WINDOW_RECONSTRUCTION_ERROR:{type(exc).__name__}"
             unresolved_all.append(reason)
+            diagnostic = _window_error(exc, stage)
             window_rows.append({
                 "dense_window_id": window.get("dense_window_id"),
                 "scene_id": window.get("scene_id"),
                 "start_ms": window.get("start_ms"),
                 "end_ms": window.get("end_ms"),
-                "status": "error", "reason": reason,
+                "status": "error",
+                "reason": reason,
+                **diagnostic,
             })
 
     ok_windows = sum(row.get("status") == "ok" for row in window_rows)
@@ -254,6 +308,12 @@ def reconstruct_physical_match(
         else "ok" if ok_windows == len(windows)
         else "partial" if ok_windows else "error"
     )
+    failed_by_stage = {}
+    for row in window_rows:
+        if row.get("status") != "error":
+            continue
+        failed_stage = str(row.get("error_stage") or "unknown")
+        failed_by_stage[failed_stage] = failed_by_stage.get(failed_stage, 0) + 1
     return {
         "version": VERSION,
         "status": status,
@@ -268,6 +328,7 @@ def reconstruct_physical_match(
             "critical_windows": len(windows),
             "windows_ok": ok_windows,
             "windows_failed": len(windows) - ok_windows,
+            "windows_failed_by_stage": failed_by_stage,
             "traces": len(traces),
             "accepted_contacts": sum(int(x.get("accepted_contacts") or 0) for x in window_rows),
             "step3_recovered_contacts": sum(

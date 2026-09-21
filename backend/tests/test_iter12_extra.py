@@ -4,7 +4,7 @@ import requests
 import pytest
 
 BASE_URL = os.environ.get(
-    "REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com"
+    "REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com"
 ).rstrip("/")
 
 

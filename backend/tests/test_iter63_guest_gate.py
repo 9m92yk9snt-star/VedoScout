@@ -4,7 +4,7 @@ import uuid
 import time
 import requests
 
-BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("REACT_APP_BACKEND_URL") else "https://vedoscout-main.preview.emergentagent.com"
+BASE = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") if os.environ.get("REACT_APP_BACKEND_URL") else "https://scout-ai-pro-1.preview.emergentagent.com"
 
 
 def _post(path, **kw):

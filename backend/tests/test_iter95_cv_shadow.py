@@ -7,7 +7,7 @@ import re
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com").rstrip("/")
 ADMIN_EMAIL = "admin@elitescout.com"
 ADMIN_PASSWORD = "Admin@2026!Elite"
 REPORT_ID = "d8c04d5d-6618-4db2-a128-865447478ef6"

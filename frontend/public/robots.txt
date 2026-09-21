@@ -5,4 +5,4 @@ Disallow: /api/
 Disallow: /dashboard
 Disallow: /report/
 
-Sitemap: https://vedoscout-main.preview.emergentagent.com/api/sitemap.xml
+Sitemap: https://scout-ai-pro-1.preview.emergentagent.com/api/sitemap.xml

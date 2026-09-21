@@ -3,7 +3,7 @@ import os, io, re
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com").rstrip("/")
 PREMIUM = ("premium@elitescout.com", "Premium@2026")
 
 
@@ -91,7 +91,7 @@ def test_pdf_contains_statsbomb_strings(report):
     import glob
     for p in glob.glob("/app/backend/pdfs/*.pdf"):
         try: os.remove(p)
-        except Exception: pass
+        except: pass
     r = requests.get(f"{BASE_URL}/api/reports/{rid}/pdf", headers=h, timeout=120)
     assert r.status_code == 200
     assert r.headers.get("content-type", "").startswith("application/pdf")

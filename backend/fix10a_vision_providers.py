@@ -17,7 +17,6 @@ import json
 import math
 import os
 import tempfile
-import time
 from pathlib import Path
 
 import cv2
@@ -34,17 +33,6 @@ MAX_JERSEY_REQUESTS = int(os.environ.get("FIX10A_MAX_JERSEY_READS", "24"))
 MAX_ROLE_TRACKS = int(os.environ.get("FIX10A_MAX_ROLE_TRACKS", "4"))
 MAX_ROLE_FRAMES_PER_TRACK = int(os.environ.get("FIX10A_MAX_ROLE_FRAMES", "4"))
 MAX_GOAL_FRAMES = int(os.environ.get("FIX10A_MAX_GOAL_FRAMES", "12"))
-
-# --- Global per-report vision budget ---------------------------------------
-# Individual provider calls already time out (60-90s each), but the shadow runs
-# jersey/role/goal batches for EVERY critical window sequentially, so a large
-# video can accumulate into tens of minutes of gpt-4o traffic with no ceiling.
-# The budget is shared across every provider on one report: a wall-clock
-# deadline and a hard cap on total provider requests. When either is exhausted
-# every provider fails closed (empty / None -> UNRESOLVED), so the run always
-# terminates and persists its diagnostic FIX10A fields. Both are env-tunable.
-VISION_BUDGET_SEC = float(os.environ.get("FIX10A_VISION_BUDGET_SEC", "720"))
-MAX_VISION_REQUESTS = int(os.environ.get("FIX10A_MAX_VISION_REQUESTS", "140"))
 
 ROLE_REVIEW_RADIUS_MS = 900
 ROLE_MIN_SEPARATION_MS = 150
@@ -733,39 +721,10 @@ class ShadowVisionProviders:
         self.api_key = str(api_key or "")
         self.session_prefix = str(session_prefix or "fix10a")
         self._goal_cache = {}
-        # Shared vision budget for this report. Read env at construction so
-        # tests/operators can retune per-run without touching the module.
-        self._max_vision = max(0, int(os.environ.get("FIX10A_MAX_VISION_REQUESTS", str(MAX_VISION_REQUESTS))))
-        try:
-            budget_sec = float(os.environ.get("FIX10A_VISION_BUDGET_SEC", str(VISION_BUDGET_SEC)))
-        except (TypeError, ValueError):
-            budget_sec = VISION_BUDGET_SEC
-        self._budget_deadline = time.monotonic() + budget_sec if budget_sec > 0 else None
-        self._vision_used = 0
-
-    def _budget_open(self) -> bool:
-        """True while the report still has wall-clock time and request budget."""
-        if self._budget_deadline is not None and time.monotonic() >= self._budget_deadline:
-            return False
-        return self._vision_used < self._max_vision
-
-    def _budget_take(self, want: int) -> int:
-        """Reserve up to ``want`` provider requests; return how many are allowed."""
-        if not self._budget_open():
-            return 0
-        grant = min(max(0, int(want)), self._max_vision - self._vision_used)
-        self._vision_used += grant
-        return grant
-
-    def vision_requests_used(self) -> int:
-        return int(self._vision_used)
-
-    def budget_exhausted(self) -> bool:
-        return not self._budget_open()
 
     def jersey_vote_provider(self, video_path: str, requests) -> dict:
         rows = [r for r in (requests or []) if isinstance(r, dict)][:MAX_JERSEY_REQUESTS]
-        if not self.api_key or not rows or not self._budget_open():
+        if not self.api_key or not rows:
             return {}
         frames = _read_frames(video_path, [r.get("media_ms") for r in rows])
         votes_by_track = {}
@@ -795,11 +754,6 @@ class ShadowVisionProviders:
                 job_meta.append((track, actual_ms, row.get("request_id")))
             if not jobs:
                 return {}
-            grant = self._budget_take(len(jobs))
-            if grant <= 0:
-                return {}
-            jobs = jobs[:grant]
-            job_meta = job_meta[:grant]
             try:
                 results = asyncio.run(_bounded_gather(jobs, limit=3))
             except Exception:
@@ -815,7 +769,7 @@ class ShadowVisionProviders:
 
     def role_evidence_provider(self, video_path: str, window: dict, strikes,
                                touch_graph: dict, window_evidence, interventions=None) -> dict:
-        if not self.api_key or not self._budget_open():
+        if not self.api_key:
             return {}
         # A7 intervention actors are primary role-review candidates because A7
         # intentionally does not create ordinary A4/A5 touches. Touch-derived
@@ -849,11 +803,6 @@ class ShadowVisionProviders:
                 job_meta.append((row["track_id"], int(actual_ms)))
             if not jobs:
                 return {}
-            grant = self._budget_take(len(jobs))
-            if grant <= 0:
-                return {}
-            jobs = jobs[:grant]
-            job_meta = job_meta[:grant]
             try:
                 results = asyncio.run(_bounded_gather(jobs, limit=2))
             except Exception:
@@ -868,8 +817,6 @@ class ShadowVisionProviders:
 
     def goal_geometry_provider(self, window: dict, strike: dict):
         if not self.api_key or not isinstance(strike, dict) or not _num(strike.get("media_ms")):
-            return None
-        if not self._budget_open():
             return None
         video_path = str(getattr(self, "video_path", "") or "")
         if not video_path:
@@ -908,9 +855,6 @@ class ShadowVisionProviders:
                     seen_actual_ms.add(actual_ms)
                     paths.append(str(path)); actual_times.append(actual_ms)
             if len(paths) < 2:
-                self._goal_cache[cache_key] = None
-                return None
-            if self._budget_take(1) <= 0:
                 self._goal_cache[cache_key] = None
                 return None
             try:

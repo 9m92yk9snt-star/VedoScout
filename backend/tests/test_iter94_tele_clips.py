@@ -1,7 +1,7 @@
 import os
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com").rstrip("/")
 REPORT_ID = "f5748eb6-14cd-4ffc-bf20-afb88ef1c65a"
 ADMIN_EMAIL = "admin@elitescout.com"
 ADMIN_PASS = "Admin@2026!Elite"

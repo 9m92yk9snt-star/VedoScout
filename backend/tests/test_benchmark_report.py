@@ -6,7 +6,7 @@ import io
 import requests
 import pytest
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://vedoscout-main.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://scout-ai-pro-1.preview.emergentagent.com").rstrip("/")
 
 PREMIUM = ("premium@elitescout.com", "Premium@2026")
 FREE = ("free@elitescout.com", "Free@2026")

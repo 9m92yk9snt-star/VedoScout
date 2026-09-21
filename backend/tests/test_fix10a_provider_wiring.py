@@ -7,7 +7,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-import fix10a_shadow_runtime as fsr  # noqa: E402
+import fix10a_runtime as fxr  # noqa: E402
 import physical_match_reconstruction as pmr  # noqa: E402
 
 
@@ -68,9 +68,8 @@ class _DB:
         self.reports = _Reports()
 
 
-async def test_pw02_shadow_autowires_supporting_callbacks_only(monkeypatch):
-    monkeypatch.setenv(fsr.FLAG, "1")
-    monkeypatch.setenv(fsr.SUPPORT_VISION_FLAG, "1")
+async def test_pw02_production_runtime_autowires_supporting_callbacks(monkeypatch):
+    monkeypatch.setenv(fxr.SUPPORT_VISION_FLAG, "1")
     monkeypatch.setenv("EMERGENT_LLM_KEY", "test-key")
 
     def jersey(*_a, **_k):
@@ -93,7 +92,7 @@ async def test_pw02_shadow_autowires_supporting_callbacks_only(monkeypatch):
         built.update({"api_key": api_key, "session_prefix": session_prefix, "video_path": video_path})
         return _Bundle()
 
-    monkeypatch.setattr(fsr.fix10a_vision_providers, "build_shadow_providers", fake_build)
+    monkeypatch.setattr(fxr.fix10a_vision_providers, "build_shadow_providers", fake_build)
     captured = {}
 
     def fake_reconstruct(*args, **kwargs):
@@ -106,26 +105,36 @@ async def test_pw02_shadow_autowires_supporting_callbacks_only(monkeypatch):
             "unresolved_reasons": [], "metrics": {},
         }
 
-    monkeypatch.setattr(fsr.physical_match_reconstruction, "reconstruct_physical_match", fake_reconstruct)
+    monkeypatch.setattr(fxr.physical_match_reconstruction, "reconstruct_physical_match", fake_reconstruct)
+    monkeypatch.setattr(
+        fxr.fix10b_runtime,
+        "build_candidate",
+        lambda unified, physical: {
+            "version": 2,
+            "enabled": True,
+            "mode": "production",
+            "summary": {},
+            "unified_result": dict(unified),
+        },
+    )
     unified = {
         "status": "ok", "sequence_plan": {},
         "sequence_analysis": {"coverage_complete": True, "sequences": []},
         "scene_graph": {}, "identity_authority": {},
     }
     db = _DB()
-    out = await fsr.run_shadow(report_id="r1", video_path="video.mp4", unified_result=unified, db=db)
+    out = await fxr.run(report_id="r1", video_path="video.mp4", unified_result=unified, db=db)
     assert built["api_key"] == "test-key"
     assert built["video_path"] == "video.mp4"
-    # jersey_vote_provider is the existing sixth positional orchestration
-    # argument. The normal shadow goal callback is deliberately wrapped by the
-    # fail-closed field-side direction provider before it reaches A7.
     assert captured["args"][5] is jersey
     wrapped_goal = captured["kwargs"]["goal_geometry_provider"]
-    assert isinstance(wrapped_goal, fsr.fix10a_goal_direction.GoalDirectionProvider)
+    assert isinstance(wrapped_goal, fxr.fix10a_goal_direction.GoalDirectionProvider)
     assert wrapped_goal.base_provider is goal
     assert captured["kwargs"]["role_evidence_provider"] is role
     assert out["fix10a_supporting_vision"]["enabled"] is True
     assert out["fix10a_canonical_authority"] is False
-    persisted = db.reports.calls[0][1]["$set"]
+    assert out["mode"] == "production"
+    persisted = db.reports.calls[-1][1]["$set"]
     assert persisted["fix10a_canonical_authority"] is False
+    assert persisted["fix10a_mode"] == "production"
     assert "canonical_events" not in persisted
