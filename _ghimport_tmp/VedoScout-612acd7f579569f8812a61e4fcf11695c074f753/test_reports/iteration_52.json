@@ -1,0 +1,82 @@
+{
+  "summary": "Session 122 (iter52) Gemini video timeout fixes VERIFIED — 21/21 pytest cases PASS in test_iter52_session122.py, plus the full 10/10 Session 121 e2e regression suite (test_e2e_full_audit.py) still green. G1 (aggressive preview shrink): make_preview_clip on a synthetic 1280x720 30s source produced a 143,680 B clip → 191,573 B base64 body (target <250 KB / <340 KB). All 5 ffmpeg flags present (480p scale, 15 fps, CRF 32, AAC 32k, mono -ac 1). G2 (content-gate skipped for paid): is_paid_upload branch reads doc.is_paid OR eligibility_consumed in {subscription,prepaid,progress_pass}; stub gate dict contains all 7 required keys (is_football=True, content_type=match, quality=good, player_visible=clear, games_detected=1, camera_distance=medium, gate_skipped_paid=True); `gate_skipped_paid` occurs exactly 1× in server.py; else branch still calls run_content_gate. G3 (LiteLLM timeout=240 + wait_for=300): chat.extra_params={..., 'timeout': 240.0} at L2684, asyncio.wait_for(chat.send_message(...), timeout=300) at L2685; ordering (extra_params BEFORE wait_for) confirmed. G4 (R2 flush BEFORE ready): _flush_preview_artifacts_to_r2(report_id) at L4829 precedes analysis_status='ready' at L4840; 'BEFORE marking the report ready' comment intact at L4821. G5 (Session 120 fast-path): _probe_video_codec returns ('h264','yuv420p') on demo-sample.mp4; transcode_to_web_mp4 completes in 79.8 ms (target <1500 ms) — ~19× faster than the bar. G6 (Session 120 frontend wiring): backendStep prop in PrecisionScanOverlay signature; UploadPage.jsx passes backendStep={backendStep}. G7 (Session 121 e2e): test_e2e_full_audit.py present with 10 test functions, ran separately → 10/10 PASS. G8 (regressions): FAQ 200 with items, admin login 200 with token, VIP eligibility eligible=true reason=subscription, /api/media/{missing} → 404 JSON body, zero chef/Cooking matches in backend or frontend/src.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter52_session122.py",
+    "/app/backend/tests/test_e2e_full_audit.py",
+    "/app/test_reports/pytest/iter52_session122.xml",
+    "/app/test_reports/pytest/iter52_e2e.xml"
+  ],
+  "verifications": {
+    "G1_preview_clip_shrink": {
+      "source": "synthetic 1280x720 30s H.264 clip generated with ffmpeg lavfi testsrc+sine",
+      "measured_output": "143,680 B (target <250 KB) — 42.5% under budget",
+      "measured_base64_body": "≈191,573 B (target <340 KB) — 43.7% under budget",
+      "vs_previous": "user notes: old code 3 MB clip → 4 MB base64 body → ~20× reduction confirmed",
+      "ffmpeg_flags_present": "scale='min(854,iw)':-2,fps=15 + -crf 32 + -c:a aac + -b:a 32k + -ac 1 (all 5)"
+    },
+    "G2_content_gate_skip_paid": {
+      "is_paid_upload_at": "server.py L4746-4749",
+      "conditions": "doc.get('is_paid') OR doc.get('eligibility_consumed') in ('subscription','prepaid','progress_pass')",
+      "stub_gate_dict": "L4752-4762 — all 7 fields present (is_football, content_type, quality, player_visible, games_detected, camera_distance, gate_skipped_paid=True)",
+      "grep_hits": "gate_skipped_paid appears exactly 1× in server.py",
+      "free_tier_path": "else branch at L4763-4764 still calls run_content_gate(report_id, preview_clip_path, marker_path)"
+    },
+    "G3_litellm_timeout": {
+      "extra_params_line": "server.py L2684: chat.extra_params = {**(chat.extra_params or {}), 'timeout': 240.0}",
+      "wait_for_line": "server.py L2685: response = await asyncio.wait_for(chat.send_message(user_message), timeout=300)",
+      "ordering": "extra_params (L2684) precedes asyncio.wait_for (L2685) ✓",
+      "rationale_from_comments": "L2677-2680: 'litellm's own request-level timeout... so that httpx cancels the underlying network syscall, not just the asyncio future'"
+    },
+    "G4_r2_flush_before_ready": {
+      "flush_call_line": "server.py L4829: await _flush_preview_artifacts_to_r2(report_id)",
+      "ready_flag_line": "server.py L4840: 'analysis_status': 'ready'",
+      "comment": "L4821 'Push the playable video and poster to R2 BEFORE marking the report / ready — this closes a race...'",
+      "ordering_verified": "flush idx < ready idx within analyze_preview_task"
+    },
+    "G5_fast_path_speed": {
+      "probe_result": "_probe_video_codec(demo-sample.mp4) returned ('h264', 'yuv420p')",
+      "measured_elapsed": "79.8 ms on 2 MB demo-sample.mp4 (target <1500 ms) — 18.8× under budget",
+      "note": "First run in this iteration was ~80ms (test previously reported 0.01s in iter51 because file was already .web.mp4 renamed; iter52 uses a fresh tmp_path copy so it actually does the shutil.copy2)"
+    },
+    "G6_frontend_wiring": {
+      "overlay_signature": "PrecisionScanOverlay.jsx L33: `export default function PrecisionScanOverlay({ open, phase, uploadPct, backendStep = 0, ... })`",
+      "uploadpage_prop_pass": "UploadPage.jsx L469: `backendStep={backendStep}`"
+    },
+    "G7_e2e_121_still_green": {
+      "file": "/app/backend/tests/test_e2e_full_audit.py",
+      "test_count": "10 test functions across TestStep1..TestStep7 classes",
+      "results": "10 passed in 26.44 s — verified by running suite separately"
+    },
+    "G8_regressions": {
+      "faq_200": "GET /api/faq → 200 with items",
+      "admin_login_200": "POST /api/auth/login admin@elitescout.com → 200 + token",
+      "vip_eligible_subscription": "GET /api/me/upload-eligibility as testvip@scoutmeplay.com → 200 eligible=true reason=subscription",
+      "media_proxy_404_json": "GET /api/media/does-not-exist-key.mp4 → 404 with JSON body",
+      "no_chef_or_cooking": "0 matches for \\bchef\\b|Cooking in /app/backend (excl tests) or /app/frontend/src (excl node_modules)"
+    }
+  },
+  "action_items": [
+    "USER MUST DEPLOY: Session 122 fixes live only in the preview container. Redeploy to push (a) 20× smaller Gemini payload (G1), (b) paid-user gate bypass saving 30-60 s per analysis (G2), and (c) explicit LiteLLM httpx timeout guarding against silent Emergent-proxy stalls (G3). Without deploy, prod scoutmeplay.com will still hit the 4 MB base64 body + full content-gate call on every upload."
+  ],
+  "critical_code_review_comments": [
+    "G1 IS SURGICAL AND CORRECT: the 480p+15fps+CRF32+mono32k tuple is the classic 'small-but-legible' web preset. 143 KB for a 15 s clip is well within Gemini 2.5 Pro's happy path (they document strong performance down to 384p). Fallback (whole video ≤ window+0.5s) still downscales instead of shipping the original — good defensive coding.",
+    "G2 IS WELL-SCOPED: the is_paid_upload check is a pure OR of two doc fields with no side effects, and the stub gate dict has the exact schema shape the downstream gate_rejection_message() + preview prompt builder expect. Zero risk of NoneType errors in the paid branch. However: consider adding gate_skipped_paid=True check as a first-class field in the rejection helper for observability (if some paid user's video genuinely has no football, downstream QA will show 'match/good/clear' — which is the intended tradeoff, but worth logging).",
+    "G3 IS CORRECT BUT SUBTLE: `chat.extra_params` is mutated on the instance before every send_message call — this is safe here because each call is short-lived and the object is scoped to a single request, but if `chat` were ever reused across calls with different timeouts, the previous value would leak. Not a bug today; worth a comment or a per-call override in a future refactor.",
+    "G3 timeout tuning: 240 s httpx budget with 300 s asyncio outer budget gives a 60 s buffer for cancel-propagation, which matches litellm 1.7x behavior observed in issue reports. Good.",
+    "G4: the flush-before-ready ordering is now enforced by explicit code layout AND a load-bearing comment (L4820-4827). This is the correct fix; the race the comment describes is real (frontend polls tightly, R2 flush deletes the local file, video 404s). Excellent hardening.",
+    "MINOR (carried from iter51): server.py is still ~10,946 lines. Session 122 added ~20 lines net. The eventual refactor into routers/tasks/media modules would help but is non-blocking.",
+    "MINOR: `chat.extra_params = {**(chat.extra_params or {}), 'timeout': 240.0}` uses truthiness check — if chat.extra_params were ever set to {} (falsy but valid dict), the spread still works because `{} or {}` is `{}`. Safe. Just noting."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter52_session122.py (new — 21 pytest cases across 8 classes: G1, G2, G3, G4, G5, G6, G7, G8)"
+  ],
+  "success_rate": {"backend": "100% (21/21 iter52 + 10/10 e2e = 31/31)", "frontend": "not tested (testing_type=backend only; G6 verified via file grep as instructed)"},
+  "test_credentials": "testvip@scoutmeplay.com / TestVip@2026! (eligible=true reason=subscription — will trigger is_paid_upload=True path) and admin@elitescout.com / Admin@2026!Elite. Both verified against BASE_URL from /app/frontend/.env REACT_APP_BACKEND_URL.",
+  "seed_data_creation": "G1 generates a fresh synthetic 1280x720 30 s test video via `ffmpeg -f lavfi testsrc+sine` into pytest tmp_path (auto-cleaned). G5 copies demo-sample.mp4 to pytest tmp_path (auto-cleaned). No persistent state, no DB writes, safe to re-run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Session 122 fixes are unit-verified for wiring + measurable for size/speed budgets. Note: per user instruction the actual end-to-end Gemini call was NOT exercised (upstream-latency-dependent, non-deterministic). If Session 123 targets Gemini reliability, the next agent should stub the LiteLLM client and assert timeout=240 is actually passed to acompletion() via captured request params, and separately measure real payload size on a production-scale upload. Reusable regression harness at /app/backend/tests/test_iter52_session122.py — idempotent, safe to re-run. If Session 122 fixes ever regress: G1 will catch payload bloat, G2 will catch missing paid-user branch, G3 will catch timeout removal, G4 will catch flush-after-ready race reintroduction, G5 will catch fast-path removal, G6 will catch backendStep prop removal, G7 will catch full e2e chain breakage. If deploy still shows the 20-min freeze in prod AFTER user redeploys, the culprit is upstream (Emergent LLM proxy or Gemini itself) — not the local code — and the next debug step is to instrument litellm.acompletion() with a request-start / response-first-byte / response-done timing log so we can see WHERE in the 240 s budget it's actually stalling.",
+  "rca of the issue": "User RCA (accurate): FileContentWithMimeType inlined the full clip as base64 in the JSON body → 3 MB clip → 4 MB HTTP payload → Emergent LLM proxy stalled buffering the request before Gemini even saw it → asyncio.wait_for eventually fired but the underlying httpx request was still blocked in the proxy's ingest buffer. Fix (verified): shrink the clip aggressively (G1: 143 KB / 20× smaller), skip the pre-analysis content-gate call entirely for paid users (G2: -1 Gemini call = -30-60 s per upload), and add an explicit litellm timeout=240 that maps to httpx's socket-level cancel (G3: httpx will drop the connection, not just the asyncio task, releasing the ingest buffer). Combined effect: 20× smaller payload × ½ Gemini calls for paid users × httpx-level cancel = the Step-3 stall should be eliminated for paid uploads and dramatically shortened for free uploads. Regression G4/G5/G6/G7/G8 confirm Sessions 117/118/119/120/121 fixes remain intact."
+}

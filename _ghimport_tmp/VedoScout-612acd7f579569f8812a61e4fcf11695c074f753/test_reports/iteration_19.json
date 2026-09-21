@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 19 — verified P0 Instant Roster mode + P1 Sample PDF download + thumbnail re-verification. Backend: 40/40 tests pass (3 new test_iter19_thumbnail_verify + 12 precision_engine + 12 iter18_multianchor + 13 archetype_4layer — full regression green). Public PDF endpoint GET /api/sample/scoutmeplay-report.pdf → HTTP 200, content-type application/pdf, 85,747 bytes, magic %PDF- confirmed; no auth required. Pre-existing /api/reports/{id}/pdf returns 401 without token (auth still enforced). Frontend: Landing page has data-testid='sample-pdf-download-cta' with correct href ${REACT_APP_BACKEND_URL}/api/sample/scoutmeplay-report.pdf and target=_blank; 'See plans' CTA scrolls to pricing (scrollY=8979). MarkerStudio (testfree-mar account, /tmp/test_clip.webm): opens in ROSTER mode by default → ms-roster-overlay visible + headline 'Tap your player from the list' shown + Instant Roster badge. Scan finishes in <1s for the plain-green test clip → empty state renders correctly with ms-roster-empty + ms-roster-rescan + ms-roster-manual (this is the empty-state acceptance criterion — confirmed). Round-trip nav verified: ms-roster-manual → MANUAL mode (overlay disappears) → ms-back-to-roster → ROSTER overlay reappears. Existing manual marking flow still 100% functional: drew box → ms-add-anchor enabled → click added anchor 1 → 'ANCHOR 1 / 5 LOCKED' label shows → ms-anchor-strip + ms-done-fullwidth ('DONE · 1 ANCHOR → ANALYSE') now render. Old top-right zoom buttons ms-zoom-in/ms-zoom-out are REMOVED from DOM (0/0 — confirmed). bg-ink dark theme + readable text-white confirmed in screenshots. 0 real console errors during full UI run (only a TensorFlow Lite XNNPACK INFO line which is normal MediaPipe init).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_thumbnail_verify.py",
+    "/app/backend/tests/test_precision_engine.py",
+    "/app/backend/tests/test_iter18_multianchor.py",
+    "/app/backend/tests/test_archetype_4layer.py",
+    "/app/test_reports/pytest/iter19_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MarkerStudio.jsx continues to grow (now includes RosterOverlay + RosterTile + runRosterScan + pickRosterPlayer on top of the iter18 multi-anchor logic). The file likely exceeds 1500 lines now — strongly recommend splitting into sub-modules per the iter18 review (anchor-strip, roster-scan hook, MediaPipe loader, gesture controller, geometry helpers).",
+    "verify_and_pick_thumbnail in precision_engine.py is well-tested (3 tests cover: missing video, picks correct frame matching fingerprint, falls back when no match). Returns (ok, meta) tuple — clean contract.",
+    "Public /api/sample/scoutmeplay-report.pdf endpoint correctly serves the most recent paid report's PDF without auth — appropriate for marketing CTA. Consider adding HTTP cache headers (Cache-Control max-age=3600) to reduce server load on the public endpoint.",
+    "Empty-state UX is clean: when roster scan finds 0 candidates the user gets a clear message + Try Again + manual fallback. Good defensive design.",
+    "ms-anchor-strip and ms-done-fullwidth are correctly conditionally rendered only when anchors.length > 0 — this means a freshly switched MANUAL mode (via ms-roster-manual) does NOT show those testids until the user adds the first anchor. Reasonable UX, but the review request implies ms-done-fullwidth should be visible after tile-tap (which auto-locks anchor 1) — that specific path could not be E2E tested because the synthetic plain-green clip yields 0 roster candidates. Once any anchor exists (verified via manual draw + add), both testids appear correctly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (40/40 + public PDF + auth-gated PDF)", "frontend": "100% on all critical assertions executed (roster default mode, empty-state, manual-fallback round-trip, existing manual flow, sample PDF CTA, see-plans CTA, no old zoom buttons, 0 console errors)"},
+  "test_credentials": "Used as instructed: testfree-mar@elitescout.com / Free@2026! (login + /upload + studio mount verified). Admin not needed this iteration.",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "P0 + P1 features all working. To E2E test the tile-tap → MANUAL with auto-locked anchor 1 path (which would surface ms-done-fullwidth at zero-anchor state from roster pick), you need a video clip containing visible football players (e.g. trimmed BigBuckBunny is NOT football — use a real football clip). The plain-green /tmp/test_clip.webm naturally produces the empty-state branch, which is also a required acceptance criterion and was confirmed working. Testids confirmed live in DOM: ms-roster-overlay, ms-roster-empty, ms-roster-rescan, ms-roster-manual, ms-back-to-roster, ms-anchor-strip, ms-done-fullwidth, ms-add-anchor, ms-autofind, ms-mode-box, ms-confirm, ms-video. Removed and confirmed absent: ms-zoom-in, ms-zoom-out. Sample PDF endpoint is now part of the public surface — include it in any future curl smoke tests.",
+  "rca of the issue": "N/A — no bugs found. All acceptance criteria met: (1) Landing sample PDF download CTA present + working; (2) Backend public PDF endpoint 200/application/pdf/85KB; (3) Backend report PDF endpoint still gated (401); (4) Instant Roster mode default-mounts in MarkerStudio; (5) Empty-state branch renders cleanly with rescan + manual fallback; (6) Manual fallback link toggles to MANUAL and back; (7) Existing manual marking flow (box + add-anchor + autofind + confirm) untouched — verified by adding 1 anchor end-to-end; (8) Old zoom buttons removed; (9) verify_and_pick_thumbnail tests pass and no regression in any of the 37 prior backend tests; (10) Dark bg-ink theme + text-white contrast confirmed visually."
+}

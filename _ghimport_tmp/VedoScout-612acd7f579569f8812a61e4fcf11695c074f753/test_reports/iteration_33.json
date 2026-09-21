@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 33 — Removed legacy $399 12-month Progress Pass UI and added in-dashboard UpgradeBanner. All backend regression tests (7/7) and all 14 critical frontend assertions passed. Free + Premium users see the new dashboard-upgrade-banner with $29.99 / $49.99 cards; clicking either button fires POST /api/payments/subscribe with correct tier and navigates to checkout.stripe.com. Admin Settings tab no longer renders the 12-month price card (admin-pass-price-input fully removed; admin Single Report Price card with data-testid='admin-price-input' is intact, still at $159). LandingMinimal FAQ now references 'single report and the monthly plans' with Premium $29.99 + VIP $49.99 in the answer; no $399 or '3 reports across 365 days' remains. Mobile (390x844) renders cards stacked vertically. No console errors on admin Settings.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter33_upgrade_banner.py",
+    "/app/test_reports/pytest/iter33.xml"
+  ],
+  "action_items": [
+    "Minor doc nit: the review_request referenced data-testid 'admin-report-price-input' but the actual element in AdminPage.jsx uses 'admin-price-input'. Functionality is correct; only the docstring/expectation in the request was off. Consider renaming the testid to 'admin-report-price-input' for clarity since there is no longer a 'pass price' to disambiguate against.",
+    "(Out of scope for this iter) server.py is 8000+ lines — split into routers per code-review guidelines.",
+    "AdminPage.jsx still keeps the passPrice/passPriceInput state + handlePassPriceSave handler even though the UI card is removed (dead code). Safe to delete the handler + state since /settings/price still returns pass_price but nothing in the UI consumes it. Low priority."
+  ],
+  "critical_code_review_comments": [
+    "DashboardPage.jsx UpgradeBanner is gated cleanly on (!subscription?.tier && !passState?.active) — correct dual-gate so subscribed users and legacy pass-holders are not double-promoted.",
+    "PlayerRow.onUpgradeClick now smooth-scrolls to dashboard-upgrade-banner (verified element + testid match) — no modal opens, as required.",
+    "/api/settings/price still returns pass_price field for backward compat — confirmed in regression test. Good defensive choice.",
+    "POST /api/payments/subscribe correctly accepts tier='premium'|'vip' and rejects unknown tier with 400/422 (verified)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter33_upgrade_banner.py (new — 7 backend regression tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all 14 critical assertions; 2 substring checks failed only due to CSS text-transform:uppercase but visual screenshot confirmed text is rendered correctly)"},
+  "test_credentials": "Used testfree-mar@elitescout.com / Free@2026!, testpremium-mar@elitescout.com / Premium@2026!, admin@elitescout.com / Admin@2026!Elite from /app/memory/test_credentials.md.",
+  "seed_data_creation": "None — used existing seeded test users. Two new kind='subscription' payment_transactions rows (initiated, no payment completed) created when clicking premium and VIP CTAs to obtain checkout URLs. Same pattern as iter32.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All UI removal + new UpgradeBanner verified. Stripe is LIVE — tests stop at hosted Stripe checkout page (cs_live_*). Note that the UpgradeBanner only renders when (!subscription?.tier && !passState?.active). To test an *active* subscription flow (SubscriptionCard render, cancel/resume/change-tier), either flip Stripe to TEST mode + complete a 4242 card, or manually patch users.subscription in Mongo as documented in iter32 context.",
+  "verification_evidence": {
+    "free_user_dashboard": "screenshot showed UNLOCK YOUR FULL POTENTIAL / READY FOR MORE? / UPGRADE YOUR PLAN heading, $29.99 + $49.99 cards with MOST POPULAR / BEST VALUE chips, START PREMIUM and GO VIP CTAs.",
+    "premium_click_redirect": "Browser navigated to https://checkout.stripe.com/* with POST /api/payments/subscribe body={\"tier\":\"premium\",\"origin_url\":\"...\"}.",
+    "vip_click_redirect": "Same flow with tier='vip'.",
+    "admin_settings": "Only SINGLE REPORT PRICE (value $159), ACTIVE LANDING VARIANT (MINIMAL active), and SOCIAL LINKS cards are rendered. No 12-month / pass-price card. Zero console errors.",
+    "landing_faq": "FAQ Q now reads 'What's the difference between the single report and the monthly plans?'. Expanded answer contains Premium $29.99 + VIP $49.99 and no longer mentions $399 or '3 reports across 365 days'.",
+    "mobile_390": "dashboard-upgrade-banner visible; premium card at y=580.78 and VIP card at y=817.78 → cards stacked vertically as required."
+  }
+}

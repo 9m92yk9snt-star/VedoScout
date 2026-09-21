@@ -1,0 +1,20 @@
+{
+  "summary": "Verified the bug fix for clipped floating banner badges on PricingTiers cards. Tested desktop (1920x1080) and mobile (390x844) viewports. All 3 floating badges (ONE-TIME · FULL REPORT on Single, MOST POPULAR on Premium, BEST VALUE on VIP) render FULLY VISIBLE above their parent cards on both viewports. Fix is confirmed: overflow:visible on article cards, pt-5 (20px paddingTop) on mobile carousel track, no clipping observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/desktop_pricing.png", "/app/test_reports/mobile_pricing_initial.png", "/app/test_reports/mobile_pricing_scrolled.png"],
+  "action_items": [],
+  "critical_code_review_comments": ["PricingTiers.jsx is 828 lines — exceeds the 700-line threshold. Consider splitting per-tier cards (FreeCard, SingleCard, PremiumCard, VipCard) and the MobileCarousel into separate files for maintainability. Not blocking, but flagged."],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only test)", "frontend": "100%"},
+  "test_credentials": "N/A",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fix from iteration 37 verified visually + numerically. Desktop: cards have overflow:visible, all 3 floating top-pills render above card edges. Mobile: carousel inner track has pt-5 (20px padding-top, verified via getComputedStyle), badges sit at ~10-11px above card top edge but ~9px BELOW the overflow-x-auto track top edge, so they're fully inside the visible clip-region. No console errors. Regression checks all pass (corner brackets at top-1.5 unchanged, tier badge images still load, pagination dots/chevrons not retested but no related code changes). Measurements: badge offsetFromCardTop = -10 to -11px (matches -top-3 = -12px CSS spec, rounded). Track innerTop = 405.125, badgeTop = 414.125 → 9px headroom inside clip region.",
+  "rca of the issue": "Root cause: In session 88, overflow-hidden was added to each <article> card as defensive containment for the inset-0 background patterns (dotted Free, diagonal stripes Single, radial glow Premium, sparkle dots VIP). However, those patterns are absolute inset-0 inside the card and naturally contained by the absolute-positioning math — so overflow-hidden was redundant and inadvertently clipped the absolute -top-3 floating badges that hang above each card. Fix: removed overflow-hidden from all 4 article cards; added pt-5 to the mobile carousel inner track because the carousel has its own overflow-x-auto clipping context, requiring 20px headroom for the -top-3 (12px) badges. Both changes work together cleanly. Verified visually and numerically."
+}

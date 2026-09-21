@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mobil Mockup — Rewind / Se Beviset</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Archivo',sans-serif; background:#f4f1e8; color:#1d2b1f; padding:40px 24px; }
+  h1 { font-family:'Archivo Black',sans-serif; font-size:26px; text-align:center; letter-spacing:1px; margin-bottom:6px; color:#1d2b1f; }
+  .sub { text-align:center; font-size:14px; color:#5a6b55; margin-bottom:36px; max-width:720px; margin-left:auto; margin-right:auto; }
+  .sub b { color:#1d7a3c; }
+  .phones { display:flex; gap:28px; justify-content:center; flex-wrap:wrap; }
+  .phone-wrap { text-align:center; }
+  .phone {
+    width:300px; height:620px; background:#faf8f2; border-radius:38px;
+    border:5px solid #1d2b1f; overflow:hidden; position:relative;
+    box-shadow:0 20px 50px rgba(29,43,31,.25);
+  }
+  .notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:110px; height:22px; background:#1d2b1f; border-radius:0 0 14px 14px; z-index:50; }
+  .step-label { margin-top:16px; font-family:'Archivo Black',sans-serif; font-size:13px; letter-spacing:1.5px; color:#1d7a3c; text-transform:uppercase; }
+  .step-desc { margin-top:6px; font-size:12.5px; color:#5a6b55; max-width:300px; line-height:1.5; }
+
+  .report { padding:34px 14px 14px; height:100%; overflow:hidden; }
+  .rep-head { font-size:9px; letter-spacing:2px; color:#8a967f; text-transform:uppercase; margin-bottom:8px; text-align:center; }
+  .scroll-hint { text-align:center; font-size:9px; color:#b0b8a6; margin-bottom:10px; }
+  .sec-title { display:flex; align-items:center; gap:7px; font-family:'Archivo Black',sans-serif; font-size:14px; text-transform:uppercase; margin:8px 0 10px; }
+  .sec-title .ico { width:22px; height:22px; border-radius:6px; background:#fef3c7; display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .finding { background:#fff; border:1px solid #e4e0d2; border-radius:12px; padding:11px 12px; margin-bottom:9px; }
+  .f-title { font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .dot { width:7px; height:7px; border-radius:50%; background:#1d7a3c; flex-shrink:0; }
+  .dot.orange { background:#e8862e; }
+  .f-desc { font-size:11px; color:#5a6b55; margin-top:4px; line-height:1.45; }
+  .proof-btn { margin-top:8px; display:inline-flex; align-items:center; gap:6px; background:#1d2b1f; color:#c8f542; font-size:10px; font-weight:700; letter-spacing:.5px; border-radius:18px; padding:6px 12px; }
+  .proof-btn .play { width:14px; height:14px; border-radius:50%; background:#c8f542; color:#1d2b1f; display:flex; align-items:center; justify-content:center; font-size:7px; }
+  .proof-btn.active { outline:2px solid #c8f542; outline-offset:2px; }
+
+  /* dæmpet baggrund i fase 2 */
+  .dimmed { opacity:.45; }
+
+  /* mini-player bottom sheet */
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:#0d1a0f; border-radius:20px 20px 0 0; z-index:40; box-shadow:0 -8px 30px rgba(0,0,0,.4); }
+  .sheet-grab { width:36px; height:4px; border-radius:3px; background:#3a4a3c; margin:8px auto 6px; }
+  .sheet-head { display:flex; justify-content:space-between; align-items:center; padding:0 14px 8px; }
+  .sheet-title { font-size:10px; color:#c8f542; font-weight:700; letter-spacing:.5px; }
+  .sheet-close { font-size:12px; color:#8a967f; border:1px solid #3a4a3c; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; }
+  .sheet-video { position:relative; margin:0 10px; border-radius:10px; overflow:hidden; }
+  .sheet-video img { width:100%; height:150px; object-fit:cover; display:block; }
+  .sv-badge { position:absolute; top:8px; left:8px; background:rgba(0,0,0,.7); color:#c8f542; font-family:'Archivo Black',sans-serif; font-size:10px; padding:3px 8px; border-radius:6px; }
+  .sv-play { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .sv-play span { width:38px; height:38px; border-radius:50%; background:rgba(200,245,66,.92); color:#0d1a0f; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .sheet-bar { display:flex; align-items:center; gap:8px; padding:9px 14px 13px; }
+  .track { flex:1; height:4px; border-radius:3px; background:#2a3a2c; position:relative; }
+  .track .fill { position:absolute; left:0; top:0; bottom:0; width:22%; background:#c8f542; border-radius:3px; }
+  .track .knob { position:absolute; left:22%; top:50%; transform:translate(-50%,-50%); width:11px; height:11px; border-radius:50%; background:#c8f542; }
+  .t-time { font-size:9px; color:#8a967f; }
+
+  .note { max-width:720px; margin:40px auto 0; background:#fff; border:1px solid #dcd8c8; border-radius:14px; padding:18px 22px; font-size:13px; line-height:1.65; color:#3d4a38; }
+  .note b { color:#1d7a3c; }
+  .note .no { color:#b3402e; font-weight:700; }
+</style>
+</head>
+<body>
+  <h1>"SE BEVISET" — PÅ MOBIL</h1>
+  <p class="sub">Løsningen på din bekymring: Du hopper <b>ALDRIG</b> op til videoen. I stedet glider en lille mini-afspiller op fra bunden — <b>videoen kommer til dig</b>, og du bliver præcis hvor du er i rapporten.</p>
+
+  <div class="phones">
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="report">
+          <div class="rep-head">NOAH ANDERSEN · RAPPORT</div>
+          <div class="scroll-hint">… du er scrollet langt ned i rapporten …</div>
+          <div class="sec-title"><span class="ico">⚡</span> DINE STYRKER & FUND</div>
+          <div class="finding">
+            <div class="f-title"><span class="dot"></span>1v1-dribling der skaber mål</div>
+            <div class="f-desc">Eksplosivt retningsskift slår forsvareren og fører til farlig afslutning.</div>
+            <div class="proof-btn"><span class="play">▶</span> SE BEVISET · 00:58</div>
+          </div>
+          <div class="finding">
+            <div class="f-title"><span class="dot"></span>Scanner banen før pasningen</div>
+            <div class="f-desc">Tjekker skulderen to gange og ser rummet før bolden ankommer.</div>
+            <div class="proof-btn"><span class="play">▶</span> SE BEVISET · 01:28</div>
+          </div>
+          <div class="finding">
+            <div class="f-title"><span class="dot orange"></span>Back-post-løb timet perfekt</div>
+            <div class="f-desc">Intelligent bevægelse mod bagerste stolpe skaber en klar chance.</div>
+            <div class="proof-btn"><span class="play">▶</span> SE BEVISET · 03:59</div>
+          </div>
+        </div>
+      </div>
+      <div class="step-label">1 · Du læser et fund</div>
+      <div class="step-desc">Langt nede i rapporten. Hvert fund har sin egen "SE BEVISET"-knap med tidsstempel. Intet sker før du trykker.</div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="report dimmed">
+          <div class="rep-head">NOAH ANDERSEN · RAPPORT</div>
+          <div class="scroll-hint">… rapporten står stille — ingen hop …</div>
+          <div class="sec-title"><span class="ico">⚡</span> DINE STYRKER & FUND</div>
+          <div class="finding">
+            <div class="f-title"><span class="dot"></span>1v1-dribling der skaber mål</div>
+            <div class="f-desc">Eksplosivt retningsskift slår forsvareren og fører til farlig afslutning.</div>
+            <div class="proof-btn active"><span class="play">▶</span> SE BEVISET · 00:58</div>
+          </div>
+          <div class="finding">
+            <div class="f-title"><span class="dot"></span>Scanner banen før pasningen</div>
+            <div class="f-desc">Tjekker skulderen to gange og ser rummet før bolden ankommer.</div>
+            <div class="proof-btn"><span class="play">▶</span> SE BEVISET · 01:28</div>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="sheet-grab"></div>
+          <div class="sheet-head">
+            <div class="sheet-title">▶ Beviset · 1v1-dribling · 00:58</div>
+            <div class="sheet-close">✕</div>
+          </div>
+          <div class="sheet-video">
+            <img src="/api/uploads/demo-frame-dribble.jpg" alt="">
+            <div class="sv-badge">00:58</div>
+            <div class="sv-play"><span>▶</span></div>
+          </div>
+          <div class="sheet-bar">
+            <span class="t-time">00:52</span>
+            <div class="track"><div class="fill"></div><div class="knob"></div></div>
+            <span class="t-time">04:30</span>
+          </div>
+        </div>
+      </div>
+      <div class="step-label">2 · Ét tryk → mini-afspiller</div>
+      <div class="step-desc">En lille afspiller glider op fra bunden og spiller automatisk fra 00:52 (6 sek. før øjeblikket). Rapporten bag den flytter sig IKKE.</div>
+    </div>
+
+    <div class="phone-wrap">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="report">
+          <div class="rep-head">NOAH ANDERSEN · RAPPORT</div>
+          <div class="scroll-hint">… du læser bare videre, hvor du slap …</div>
+          <div class="sec-title"><span class="ico">⚡</span> DINE STYRKER & FUND</div>
+          <div class="finding">
+            <div class="f-title"><span class="dot"></span>1v1-dribling der skaber mål</div>
+            <div class="f-desc">Eksplosivt retningsskift slår forsvareren og fører til farlig afslutning.</div>
+            <div class="proof-btn"><span class="play">✓</span> SET · 00:58</div>
+          </div>
+          <div class="finding">
+            <div class="f-title"><span class="dot"></span>Scanner banen før pasningen</div>
+            <div class="f-desc">Tjekker skulderen to gange og ser rummet før bolden ankommer.</div>
+            <div class="proof-btn"><span class="play">▶</span> SE BEVISET · 01:28</div>
+          </div>
+          <div class="finding">
+            <div class="f-title"><span class="dot orange"></span>Back-post-løb timet perfekt</div>
+            <div class="f-desc">Intelligent bevægelse mod bagerste stolpe skaber en klar chance.</div>
+            <div class="proof-btn"><span class="play">▶</span> SE BEVISET · 03:59</div>
+          </div>
+        </div>
+      </div>
+      <div class="step-label">3 · Luk med ét tryk (✕)</div>
+      <div class="step-desc">Mini-afspilleren glider væk. Du står PRÆCIS samme sted i rapporten. Knappen viser nu "SET ✓" så du kan huske hvilke beviser du har set.</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Hvorfor dette design ikke forstyrrer:</b><br>
+    · <span class="no">Ingen hop</span> op til toppen af rapporten — scrollpositionen er urørt.<br>
+    · Mini-afspilleren dækker kun den nederste ~35% af skærmen og lukkes med ét tryk (eller swipe ned).<br>
+    · Videoen starter automatisk ~6 sekunder <b>før</b> øjeblikket, så du ser hele situationen bygge op.<br>
+    · Vil man se stort, kan mini-afspilleren udvides til fuld skærm med ét tryk på selve videoen.<br>
+    · Samme princip på desktop: en lille flydende afspiller i hjørnet i stedet for scroll-hop.
+  </div>
+</body>
+</html>

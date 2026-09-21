@@ -1,0 +1,110 @@
+{
+  "summary": "iter58 (both) — Backend fix verified end-to-end: UserPublic now exposes subscription_tier on /auth/login and /auth/me, and /me/upload-eligibility reports reason='subscription' for the admin-granted premium user (role='user' + subscription_tier='premium'). 7/7 pytest cases pass. Frontend spot-verified live: new dashboard SubscriptionCard renders with 'ACTIVE PLAN', 'PREMIUM MEMBER', '$29.99 / month', 'UPGRADE TO VIP' (all target copy present, no layout break, no console errors); /upload loads cleanly for both granted-premium and free users; seeded-premium user's Lukas A. report opens fully unlocked with zero LockedOverlay / HeroTeaser / 'PRO SCOUT LOCKED' / 'UNLOCK TO READ' strings and the isPremiumUser refactor did not regress ReportPage. The single test point NOT executed live is the full upload→Gemini→PremiumReadyOverlay e2e (2–5 min wait + Gemini budget), but the branching is deterministic given the verified backend contract + isPremiumUser helper source (see rca section).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verifications": {
+    "backend_pytest": {
+      "file": "/app/backend/tests/test_iter58_premium_subscription_tier.py",
+      "junit": "/app/test_reports/pytest/iter58_results.xml",
+      "result": "7 passed / 0 failed in 3.16s"
+    },
+    "granttest_premium_login_body": {
+      "role": "user",
+      "subscription_tier": "premium",
+      "email": "granttest-premium@elitescout.com"
+    },
+    "granttest_premium_me": {
+      "role": "user",
+      "subscription_tier": "premium"
+    },
+    "granttest_premium_upload_eligibility": {
+      "eligible": true,
+      "reason": "subscription",
+      "subscription.tier": "premium",
+      "prepaid_uploads": 5,
+      "raw": "{\"eligible\":true,\"reason\":\"subscription\",\"free_preview_used\":false,\"prepaid_uploads\":5,\"progress_pass\":{\"active\":false,\"credits_remaining\":0,\"expires_at\":null},\"subscription\":{\"tier\":\"premium\",\"monthly_limit\":2,\"used_this_period\":0,\"remaining\":2}}"
+    },
+    "free_user_subscription_tier_null": {
+      "email_tested": "free@elitescout.com",
+      "login_subscription_tier": null,
+      "me_subscription_tier": null,
+      "note": "freshtest@elitescout.com / Fresh@2026! is NOT seeded in this env (login → 401). Substituted free@elitescout.com / Free@2026 (also seeded, same free-tier assertion) — field-level check identical."
+    },
+    "admin_grant_access_idempotent": {
+      "status": 200,
+      "re_granted": "granttest-premium@elitescout.com",
+      "post_grant_login_subscription_tier": "premium",
+      "post_grant_login_role": "user",
+      "note": "grant-access request body requires 'password' + 'full_name' + 'email' + 'access_type' — 422 without these fields; supplied in test."
+    },
+    "frontend_dashboard_subscription_card": {
+      "data-testid": "dashboard-subscription-card",
+      "text_extract": "ACTIVE PLAN · ACTIVE\nPREMIUM MEMBER\n$29.99 / month — full scout-grade analysis on every upload.\n2 REPORTS / MONTH · ADVANCED AI ANALYSIS · FULL PREMIUM DOSSIER\nNEXT BILLING AUG 3, 2026\nUPGRADE TO VIP · CANCEL SUBSCRIPTION\n$49.99/MO · PRORATION APPLIED",
+      "contains_ACTIVE_PLAN": true,
+      "contains_PREMIUM_MEMBER": true,
+      "contains_UPGRADE_TO_VIP": true,
+      "console_errors": 0
+    },
+    "frontend_upload_page_granted_premium": {
+      "url": "/upload",
+      "hero_teaser_pre_upload": 0,
+      "premium_ready_overlay_pre_upload": 0,
+      "errors": []
+    },
+    "frontend_premium_report_no_regression": {
+      "user": "testpremium-mar@elitescout.com",
+      "report_id": "91476fec-3b53-4ea1-b326-dde878b89f7d",
+      "locked_overlay_count": 0,
+      "hero_teaser_count": 0,
+      "body_contains_PRO_SCOUT_LOCKED": false,
+      "body_contains_UNLOCK_TO_READ": false,
+      "screenshot_confirms_full_content": "Brief Summary, PREMIUM UNLOCKED, FULL REPORT ACTIVE, Technical/Tactical/Physical/Mentality/Overall scores 8/9/7/9/8, Download Premium PDF button — all visible",
+      "css_blur_hits": 22,
+      "css_blur_note": "22 hits are the ambient decorative CSS `blur-3xl` / `blur-2xl` classes on background glow blobs, NOT content blur on locked chapters (visually confirmed via screenshot)."
+    },
+    "frontend_upload_page_free_user": {
+      "user": "free@elitescout.com",
+      "url": "/upload",
+      "loads_ok": true,
+      "errors": []
+    },
+    "e2e_overlay_upload_flow": {
+      "executed_live": false,
+      "reason": "Cost/time (2-5 min per upload, Gemini budget previously exhausted) + Stripe LIVE mode caution.",
+      "verified_via_static_source_and_backend_contract": {
+        "isPremiumUser_source": "/app/frontend/src/lib/premium.js — returns true if role in [admin, premium, vip, scout] OR subscription_tier in [premium, vip]",
+        "granttest_premium_user_object": "role='user', subscription_tier='premium'  ⇒  isPremiumUser === true  ⇒  isPaidTier === true",
+        "skipHeroTeaser_source": "/app/frontend/src/pages/UploadPage.jsx handleSubmit — skipHeroTeaser = isPaidTier || (eligibility.reason==='subscription') || finalData.is_paid  ⇒  TRUE for this user for THREE independent reasons",
+        "state_branch": "skipHeroTeaser===true  ⇒  setPremiumReadyReport(finalData) (never setHeroReport)  ⇒  <PremiumReadyOverlay open={!!premiumReadyReport}> renders, <HeroTeaser> does NOT",
+        "PremiumReadyOverlay_testids_present_in_source": ["premium-ready-overlay", "premium-ready-headline", "premium-ready-subtext", "premium-ready-player-img", "premium-ready-open-btn", "premium-ready-dashboard-btn", "premium-ready-dismiss-btn"],
+        "PremiumReadyOverlay_copy_verified": ["PREMIUM ANALYSIS COMPLETE", "Your Scout Report Is Ready", "Open Full Premium Report", "Go to Dashboard", "Included in your plan · No extra charge"]
+      }
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter58_premium_subscription_tier.py",
+    "/app/test_reports/pytest/iter58_results.xml"
+  ],
+  "action_items": [
+    "Optional: seed freshtest@elitescout.com / Fresh@2026! per /app/memory/test_credentials.md §1d — it is documented as available but returns 401 on this env, so a fresh Hero Teaser must-buy account is not currently reachable via login (the credentials doc claims it is seeded).",
+    "Optional (design polish, non-blocking): the redesigned SubscriptionCard shows '$49.99/MO · PRORATION APPLIED' as a footnote under UPGRADE TO VIP — the copy 'PRORATION APPLIED' may confuse users; consider 'PRORATED FROM PREMIUM' or hiding until user hovers/actively upgrades. Not spec-breaking."
+  ],
+  "critical_code_review_comments": [
+    "isPremiumUser() helper is correctly the single source of truth (frontend/src/lib/premium.js) — good centralization; ReportPage + UploadPage now consume it — remove any remaining PREMIUM_ROLES.includes(user.role) sniff sites via `git grep` to prevent regression.",
+    "PremiumReadyOverlay is 205 lines with heavy motion + gradient markup — consider extracting the shared 'gold crest badge' + 'ambient glow' bits into a <PremiumCelebrationChrome> primitive shared with PremiumReadyBanner (banner variant lives on ReportPage) to prevent visual drift.",
+    "The Fresh@2026! account referenced in /app/memory/test_credentials.md §1d is not actually seeded — either the make_demo_accounts.py script has drifted or the credentials doc is stale. Update one of them.",
+    "grant-access endpoint requires password+full_name every call (upsert). Consider making them optional when the user already exists (currently 422 if omitted for existing user — friction for admins re-upping subscriptions).",
+    "ReportPage.jsx remains ~3250 lines; still deferred split from S126 review — not blocking iter58 but overdue.",
+    "The 22 CSS blur hits (blur-3xl/blur-2xl ambient glow blobs) on the premium report page are pure decoration. Adding a blur='decorative' data attribute could make future regression tests more precise (currently a generic '.blur, [class*=blur]' selector conflates content-blur vs decoration-blur)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter58_premium_subscription_tier.py (NEW)"
+  ],
+  "success_rate": {"backend": "100% (7/7 pytest)", "frontend": "100% of executable checks (4/4 live UI tests) — full upload E2E overlay observation deferred to static/contract verification, see e2e_overlay_upload_flow verification above"},
+  "test_credentials": "granttest-premium@elitescout.com / GrantTest@2026! (admin-granted premium — THE bug repro account, confirmed subscription_tier='premium'); testpremium-mar@elitescout.com / Premium@2026! (seeded premium — Lukas A. report unlocked); admin@elitescout.com / Admin@2026!Elite; free@elitescout.com / Free@2026 (free regression); freshtest@elitescout.com / Fresh@2026! is documented but NOT seeded — returns 401.",
+  "seed_data_creation": "none — re-granted 'premium' access to granttest-premium@elitescout.com via /api/admin/grant-access (idempotent upsert, no duplication).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend contract for the isPremiumUser refactor is verified: UserPublic exposes subscription_tier on /auth/login and /auth/me; /me/upload-eligibility returns reason='subscription' for the granted-premium user. Frontend consumes it correctly (dashboard SubscriptionCard renders new gold design; upload page loads for both tiers; seeded-premium report has zero locked sections). If a future agent needs to physically observe the PremiumReadyOverlay firing at end-of-analysis, mint a small mp4 with imageio-ffmpeg (drawtext/testsrc pattern, 5-10s), POST /api/reports/upload with a MarkerStudio-placed box, then poll GET /api/reports/{id}/status until ready — but budget-check first: Gemini budget was reported previously exhausted (BudgetExceededError → 503 + refund). freshtest@elitescout.com is documented in /app/memory/test_credentials.md §1d but NOT actually seeded on this env.",
+  "rca_of_the_issue": "Bug: Admin 'Grant Access' users kept role='user' but got subscription.tier='premium' — every frontend check (UploadPage.isPaidTier, ReportPage.premiumRole, dashboard variants) only inspected user.role, so these users saw the free-tier blurred HeroTeaser after analysis. Fix layers verified: (1) backend UserPublic + login + /auth/me + reset-password now return subscription_tier so the frontend has the data (verified via pytest); (2) new /app/frontend/src/lib/premium.js isPremiumUser() consumes role OR subscription_tier — single source of truth (source-audited); (3) UploadPage.handleSubmit's skipHeroTeaser branch also honors eligibility.reason==='subscription' AND finalData.is_paid — belt-and-suspenders. Reproduction confirmed non-triggerable now because the backend contract + frontend helper both evaluate correctly for the target user (role=user, subscription_tier=premium ⇒ isPaidTier=true ⇒ setPremiumReadyReport, never setHeroReport)."
+}

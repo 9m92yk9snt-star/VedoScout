@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 30 — Veo URL pre-check on POST /api/me/url-fetch. Verified both backend (3/3 pytest) and frontend (UI toast + help copy + regression tab). All assertions passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_url_fetch_veo.py",
+    "/app/test_reports/pytest/iter30_url_fetch_veo.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "url_video_fetch.py: regex pre-check is precise (case-insensitive, anchored at scheme+host) and runs before any yt-dlp work — pre-check is O(1) and well under the 5s SLA confirmed in the timing assertion.",
+    "_friendly_error() also has a Veo branch for 'too large/filesize' (lines 101-102) — kept as a safety net even though the pre-check fires first; good defensive layering.",
+    "UploadPage.jsx help copy uses JSX entities &amp; / &apos; / &ldquo;/&rdquo; — verified rendered DOM text is correct (no literal '&amp;' visible).",
+    "Toast duration ramp (5s → 12s for msg.length > 80) works — the 218-char Veo message stays on-screen long enough to read."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_url_fetch_veo.py (new)"
+  ],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100% (toast + help copy + tab switch)"},
+  "test_credentials": "testfree-mar@elitescout.com / Free@2026! (per /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — used existing seeded testfree-mar account.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Veo pre-check verified end-to-end. Backend: POST /api/me/url-fetch with a Veo /clubs/.../clips/... or /matches/... URL returns HTTP 400 with detail starting with 'Veo links can't be fetched directly — full matches are several GB. On Veo, open the clip → ⋯ → Download to save the MP4 to your device, then use the \\'Upload File\\' tab here. Max 5 min / 200 MB.' Direct MP4 regression (w3schools mov_bbb.mp4 ≈1MB) still returns 200 + token + preview_url + size_mb. Frontend: toast surfaces the full friendly message at 12s duration; help copy under URL input renders 'Veo & YouTube links can't be fetched directly — download the clip to your device, then use Upload File above.' with no escape artefacts. Upload File tab regression OK (dropzone visible after switching back).",
+  "rca of the issue": "Not a bug fix testing iteration — verified the product-side fix in url_video_fetch.py (lines 50-71, 210-218) and UploadPage.jsx (lines 234-244, 638-667). Original symptom (Danish user report): pasting a Veo /clubs/<club>/clips/<uuid>/ URL surfaced yt-dlp's raw 'ERROR: Unsupported URL' because that route is not in yt-dlp's Veo extractor (only /matches/<slug>/). The fix detects both Veo URL variants with _VEO_CLIP_RX / _VEO_MATCH_RX and raises HTTPException(400, _veo_help_message()) before calling yt-dlp, so users see an actionable instruction (download from Veo → Upload File) instead of a stack trace. Both Veo URL shapes confirmed rejected in <10s (no 2-min hang). Direct MP4 path unaffected."
+}

@@ -1,0 +1,47 @@
+{
+  "summary": "Tested 4 UX features shipped in App.js batch: (1) Mobile bottom-tab nav — FULLY PASS, (2) Mobile/desktop body padding — FULLY PASS, (3) Framer Motion page transition wrapper — PASS (motion.div wrapper detected, no AnimatePresence/key warnings), (4) Live frame strip (Scout Mode) — STATIC CODE-REVIEWED ONLY (Scout Mode requires active upload — context note explicitly allows skipping), (5) Timestamped video evidence on report page — PARTIALLY VERIFIED. Code paths (videoRef, parseTimestamp, seekVideoTo, SectionGrid evidence-seek buttons, video-moment-0 clickable card with role='button' + tabIndex=0) are correctly wired. The only premium account (testpremium-mar@elitescout.com) has a single seeded demo report (is_demo=true Lukas A.) that intentionally renders a 'SAMPLE REPORT' placeholder INSTEAD of a real <video> element (ReportPage.jsx line 1873 ternary), so [data-testid=report-video] is not in the DOM and the click-to-seek seek behavior cannot be exercised live. video-moment-0 was found in the DOM with role='button', tabIndex=0, and the '▶ Play moment 00:24 ...' overlay text as designed. Zero evidence-seek-* buttons were rendered on the demo report — the demo's evidence section likely has no parseable M:SS strings (this is a seed-data limitation, not a click-to-seek code bug).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Timestamped video evidence (testpremium-mar account)", "issue": "Only the seeded demo report (is_demo=true) is available. Demo reports intentionally skip the <video> tag and show a 'SAMPLE REPORT' poster card instead (ReportPage.jsx line 1873-1884), so report-video testid is absent and evidence-seek-* buttons aren't generated. video-moment-0 card IS clickable (role=button tabIndex=0) but the click is a graceful no-op because seekVideoTo correctly guards on `!v` when the ref is null. Live click-to-seek could not be empirically validated on this account.", "affected_selectors": ["[data-testid=report-video]", "[data-testid^=evidence-seek-]", "[data-testid=video-moment-0]"]}
+    ],
+    "design_issues": []
+  },
+  "test_results_detail": {
+    "MOBILE 390x844 @/":  "tabs visible (display:block, h=63px, top=781), 4 tabs present, Home color rgb(31,79,47) FOREST-GREEN ACTIVE",
+    "Body padding-bottom @ mobile":  "56px (exact)",
+    "Click Reports tab (unauth) @/":  "redirected to /login (RequireAuth via /dashboard route)",
+    "Login as testfree-mar@elitescout.com":  "SUCCESS",
+    "After login, @/dashboard, Reports tab color":  "rgb(31,79,47) FOREST-GREEN ACTIVE; Home tab rgba(10,15,13,0.55) inactive",
+    "DESKTOP 1280x800 @/":  "tabs display='none' (md:hidden hides at >=768px), body padding-bottom='0px'",
+    "Page transition (/about → /)":  "motion.div wrapper detected with inline style 'opacity: 1; transform: none;' (settled state) — animation runs on navigation",
+    "AnimatePresence warnings / 'unique key' warnings":  "ZERO",
+    "Scout Mode frame strip (scout-frame-strip, scout-frame-strip-{N})":  "STATIC CODE REVIEW: ScoutMode.jsx FrameStrip sub-component is rendered between stage and MarkingOverlay only during MARKING phase (per review_request — not exercised live, requires active upload)",
+    "Report page <video data-testid=report-video> + videoRef":  "CODE VERIFIED: videoRef defined at line 1565, ref attached at line 1875, but conditionally hidden for is_demo=true reports (line 1873). Could not exercise live because testpremium-mar only has the seeded Lukas A. demo report",
+    "parseTimestamp / seekVideoTo":  "CODE VERIFIED: regex /^\\s*(\\d{1,2}):(\\d{2})(?:\\.\\d+)?\\s*$/, seek logic scrollIntoView + currentTime + play() with loadedmetadata safety wait — correctly null-guarded",
+    "evidence-seek-{key}-{idx} buttons":  "ZERO rendered on the demo report (no parseable M:SS timestamps in seeded demo evidence — backend Gemini-formatting limitation per review_request note, NOT a click-to-seek bug)",
+    "video-moment-0":  "PRESENT with role='button', tabIndex=0, text='▶ Play moment 00:24 Great first touch on a tough ball...' — card is correctly clickable when timestamp parses",
+    "Console errors":  "Only pre-existing Recharts width(-1) warnings and asset 404s. Zero new React/AnimatePresence warnings."
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL: To enable a true end-to-end test of evidence-seek-* and click-to-seek-on-real-video, seed a non-demo premium report for testpremium-mar (or add a second non-demo report to the seed script) that contains a real video_url AND a few parseable M:SS timestamps in section.evidence[] entries. The current Lukas A. demo intentionally skips the video element so live verification of the new <video> ref behavior is impossible on this account.",
+    "OPTIONAL (Gemini prompt): Investigate why the demo report's evidence[] strings don't include M:SS timestamps even though video-moment-0 successfully shows '00:24' — the SectionGrid evidence list (technical/tactical/physical/mentality) seems to receive evidence strings without the leading 'M:SS — ' format that parseTimestamp expects. Could be a regex mismatch with the demo seed format."
+  ],
+  "critical_code_review_comments": [
+    "MobileBottomTabs.jsx is clean, small (105 lines), uses Tailwind md:hidden for breakpoint, env(safe-area-inset-bottom) for iOS notch — all good. resolveTo() correctly routes auth-gated tabs to /login when unauthed so no dead-ends.",
+    "App.js — AnimatePresence mode='wait' initial={false} with location.pathname key on Routes — correct pattern. PageTransition honours prefers-reduced-motion. No console warnings.",
+    "ReportPage.jsx — seekVideoTo has correct null-guards (`if (seconds == null || !v) return false;`), handles autoplay-block via `.catch(() => {})`, uses loadedmetadata listener with 1.2s setTimeout safety fallback. Robust.",
+    "ReportPage.jsx — file is still ~2638 lines, well over 700-line guideline. videoRef + helpers (lines 1565-1596) are buried inside the main component. Consider extracting video-player + click-to-seek into a small <ReportVideoPlayer> component with imperative ref handle (useImperativeHandle). Pre-existing concern, not new.",
+    "Demo-report skip (ReportPage.jsx line 1873): when is_demo is true the <video> tag is replaced with a placeholder, which silently breaks all the new click-to-seek wiring for the only seeded premium account. Either (a) ensure demo reports get a sample-mp4 url so the new feature is demoable, or (b) hide the video-moment cards entirely on demo reports so the 'Play moment' overlay isn't a misleading promise."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "Mobile tabs 100% (8/8 sub-checks) · Page transitions 100% (2/2) · Frame strip SKIPPED-by-design · Click-to-seek 100% static-verified + 70% live (video-moment-0 present + clickable; evidence-seek buttons & live seek not exercised due to demo-only data)"},
+  "test_credentials": "testfree-mar@elitescout.com / Free@2026! ✓ ; testpremium-mar@elitescout.com / Premium@2026! ✓",
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Mobile bottom tabs and page transitions are SOLID — no need to re-test unless code changes. For timestamped video evidence: the test was blocked by the seeded premium account having only a demo report (no <video> element, no parseable timestamps in evidence). Either (a) the main agent should add a fresh non-demo premium report to make_demo_accounts.py for testpremium-mar with a real video_url and M:SS timestamps in technical.evidence, OR (b) treat the static code review as sufficient (the regex, the ref attachment, the SectionGrid button rendering, and the video-moment-0 role=button were all verified by code reading + DOM inspection). Scout Mode frame strip is genuinely hard to test without uploading a real video — keep deferring like iter22 did.",
+  "rca of the issue": "Timestamped click-to-seek could not be exercised live because the only seeded premium report (Lukas A.) has is_demo=true which short-circuits the video render at ReportPage.jsx line 1873. videoRef remains null, so any click on video-moment-0 silently no-ops (correct null-guard in seekVideoTo). Additionally the demo's evidence[] strings don't contain parseable M:SS substrings, so SectionGrid does not emit any evidence-seek-* buttons (only renders the button when parseTimestamp returns non-null). This is a seed-data issue, not a code issue."
+}

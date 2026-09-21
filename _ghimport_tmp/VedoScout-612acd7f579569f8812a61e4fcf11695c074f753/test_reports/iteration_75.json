@@ -1,0 +1,32 @@
+{
+  "summary": "Iter75 regression pass of upload → tap-player → Step-3 pipeline plus landing/login/dashboard/existing-report smoke. All critical fixes verified end-to-end (X-close no longer auto-reopens, guided tap flow works, Step-3 country+photo required, 3 video categories with duration hint, country search works, cross-verified strip correctly absent on old reports). Backend validation for country/photo_source both return HTTP 400 as designed. No new reports were created (verified admin/reports count unchanged), so no LLM budget spent.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter75_upload_validation.py",
+    "/app/test_reports/pytest/iter75.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 14,192 lines — should be split into routers (auth, reports, admin, payments) for maintainability; well beyond the 700-line guideline.",
+    "The upload submit button in UploadPage.jsx does NOT expose a data-testid (only text-based selector works: 'Start …Analysis'). Consider adding data-testid=\"upload-submit\" to match the testing conventions used elsewhere in this file.",
+    "Admin dashboard's 'latest report' widget shows 'Generation was interrupted — Request failed with status code 404' for a stale in-progress report (id starting e0f848db…). Not caused by today's changes but user-visible eyesore — the auto full-report retry endpoint returns 404 for that legacy report; consider handling 404 by hiding the retry card or marking that report as terminally failed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter75_upload_validation.py (new)"
+  ],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% of critical checks (X-fix, guided flow, Step 3 validation, country search, photo crop, 3 categories, hint, existing report render, cross-verified-strip absence on old reports)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None. No new reports created (admin/reports count unchanged at 5, latest is 2026-08-05T11:55). No LLM budget used.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reusable pytest at /app/backend/tests/test_iter75_upload_validation.py covers admin login (Bearer JWT), landing render, upload endpoint country+photo_source 400 validation, and admin/reports listing. Note: /api/reports (owner-scope) does NOT exist — use /api/admin/reports (admin) or /api/reports/mine (user). Upload endpoint form fields (not JSON): file, marker_image (required), player_name, age, position, preferred_foot, video_type, description, country, photo_source ('upload'|'video_crop'). Frontend submit button lacks data-testid — matched via role=button + text 'Analysis'. The 'guided tap' flow requires waiting ~8s after mark-start for ScoutMode auto-open; dismiss intro overlay first. Toast messages captured via querySelectorAll('[data-sonner-toast], [role=\"status\"], [class*=\"toast\"]').",
+  "rca of the issue": "N/A — this iteration was a regression confirmation. All fixes from main agent's overhaul are behaving as specified."
+}

@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 70: Verified the unified DreamPricingTiers rollout across landing, dashboard, and free-preview report page, plus dynamic admin pricing, discount display, guest CTA routing, and logged-in Stripe subscribe. 9/9 backend pytest and 100% frontend testids passed on the public preview URL.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter70_dream_pricing.py",
+    "/app/test_reports/pytest/iter70_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DreamPricingTiers fetches /settings/price on every mount (4 usages on some pages). Consider hoisting into a shared context or SWR cache to avoid redundant network requests when the component appears on Landing + Dashboard + FreePreview in the same session.",
+    "Free preview report serializer (server.py L6459) hard-crashes with KeyError when doc lacks 'player_details' — surfaced as 500 during my seed test. Any minimally seeded/legacy report doc will 500 the entire /reports/{id} endpoint. Use doc.get('player_details') with a sane default."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter70_dream_pricing.py"
+  ],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "100% (all testids + navigation)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (only account) — created + deleted 4 disposable TEST_iter70_* users during the run.",
+  "seed_data_creation": "Created 1 disposable user (test_iter70_05f9fc5a@example.com) + 1 locked report (ec7457…) to test /report/{id} free-preview state and the discount campaign flow. Also created + deactivated 1 TEST_iter70_disc discount campaign. ALL deleted after testing. Prices verified reset to defaults (single=129, premium=29.99, vip=49.99).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "DreamPricingTiers testids used everywhere: dream-pricing-tiers, dream-card-{free|single|premium|vip}, pricing-cta-free, paywall-{single|premium|vip}-cta, paywall-discounted-price, paywall-discount-chip, dream-pricing-trust. Free preview wraps it in <div id='scout-packages' data-testid='fpl-packages'>. When a logged-in user clicks paywall-single-cta on /report/{id}, an in-page Stripe checkout modal appears (embedded checkout, not a redirect) — verified showing US$129.00. Discount flow: POST /api/admin/discounts creates a campaign; the free-preview serializer surfaces it under report.pricing.discount (with .discounted). The Single card then renders slashed original + paywall-discounted-price + paywall-discount-chip. Deactivate campaign via DELETE /api/admin/discounts/{id}. Seed helper: /tmp/seed_iter70.py.",
+  "verified_features": [
+    "GET /api/settings/price returns single=129, premium=29.99, vip=49.99",
+    "PUT /api/admin/pricing {single_price:139} then reset to 129 — both reflected in public /settings/price",
+    "GET /api/static/landing/price-{free,single,premium,vip}.jpg all return 200 image",
+    "POST /api/payments/subscribe {tier:'premium'} and {tier:'vip'} return Stripe checkout URLs for logged-in disposable user",
+    "POST /api/admin/discounts + DELETE lifecycle works",
+    "Landing (/) renders dream-pricing-tiers with all 4 cards, all 4 CTAs, and dream-pricing-trust with 4 items",
+    "Card titles present: YOUR/JOURNEY/STARTS, WHAT/SEE?, KEEP/IMPROVING, CHASE/DREAM",
+    "CTA labels: 'Start Here', 'Get My Report', 'Start Improving', 'Go VIP'",
+    "Trust strip labels: 'No credit card', 'Secure one-time', 'Track. Improve.', 'Maximum exposure.'",
+    "Prices in landing cards: $129, $29.99, $49.99 (dynamic from /settings/price)",
+    "Free CTA (guest) navigates to /upload",
+    "Single CTA (guest) navigates to /signup?plan=single&next=/upload",
+    "Premium CTA (guest) navigates to /signup?plan=premium&next=/?subscribe=premium",
+    "Dashboard shows dream-pricing-tiers for free users",
+    "Free preview report page (/report/{id} for locked report) renders fpl-packages > dream-pricing-tiers with all 4 cards",
+    "Logged-in Single CTA on report page triggers Stripe embedded checkout modal (US$129.00)",
+    "Discount campaign activation surfaces pricing.discount in serializer and renders paywall-discounted-price ($96.75) + paywall-discount-chip ('25% OFF — LIMITED') + slashed $129",
+    "Regression: stats-ticker, reviews-strip, hero-minimal, feature-0..3 all still present on landing",
+    "No React runtime pageerrors on landing, dashboard, or report page (only benign 401 axios warnings from guest eligibility checks)"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "summary": "Iter85: Tested GDPR social-feature consent end-to-end. Backend: 6/6 pytest passed (GET/PUT /api/account/feature-consent grant+withdraw+401, /api/admin/featured-clips admin-only 403/401, seeded reports listed with correct full_report_ready flags, withdrawal on user removes both reports from admin list). Frontend: Dashboard feature-consent-card renders, toggle flips aria-checked false↔true, 'Featured: ON' status badge appears when ON, state persists after page reload. Admin Marketing tab shows seeded full + preview rows with 'Clip ready'/'Preview only' badges, download btn disabled ONLY for preview, /report/{id} link correct. Privacy page has all sections 1–12 including new '9. Social media features (optional consent)' with withdrawal + parent/under-18 wording, no duplicates, no spurious 13. Regression cards (referral-invite, profile-visibility) render fine. Upload consent card presence verified by code (data-testid grep) — could not exercise UI because the card only renders after step 2 (player lock) which requires real object detection; a 320x240 green ffmpeg dummy cannot be locked. Cleanup: temp user + 2 reports deleted, admin feature_consent reset to withdrawn.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin Marketing → CarouselStudioAdmin (unrelated to this feature)", "issues": ["Hydration warning: <span> inside <option> in /app/frontend/src/components/admin/CarouselStudioAdmin.jsx:208 (pre-existing, not introduced by iter85)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter85_feature_consent.py",
+    "/app/backend/tests/seed_iter85.py",
+    "/app/test_reports/pytest/iter85.xml"
+  ],
+  "action_items": [
+    "Optional: fix pre-existing hydration warning (span inside option) in CarouselStudioAdmin.jsx line 208 — unrelated to iter85 feature but noisy in admin console.",
+    "Consider: upload-feature-consent-card is currently only visible after player-lock step; if the desire is to always show it once a file is picked, move earlier in the flow. Not blocking per user's spec."
+  ],
+  "critical_code_review_comments": [
+    "server.py /api/admin/featured-clips correctly joins report.feature_consent.granted with user.feature_consent.status=='granted' — good GDPR withdrawal semantics.",
+    "FEATURE_CONSENT_TEXT_VERSION constant is used consistently (backend upload path + PUT endpoint). Frontend intentionally does not verify version string; if versioning ever changes, add a UI banner prompting re-consent.",
+    "server.py file is 14,700 lines — significantly above 700-line guideline; consider modularization (already flagged in prior iterations)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter85_feature_consent.py (new)",
+    "/app/backend/tests/seed_iter85.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin admin@elitescout.com / Admin@2026!Elite (per /app/memory/test_credentials.md).",
+  "seed_data_creation": "Created + deleted temp user smtest.iter85@example.com with 2 reports (iter85-fc-full-report, iter85-fc-preview-report). Admin feature_consent reset to withdrawn at end.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "seed_iter85.py provides seed/withdraw/grant/clean/reset_admin subcommands for reuse. Note: upload-feature-consent-card only renders after player-lock in step 2 of the upload flow; direct UI verification of the checkbox requires either mocking step 2 or a real detectable video — code path was reviewed instead.",
+  "rca of the issue": "N/A — no issues found in this feature. Prior false negative in an early script was due to case-sensitive check for 'FEATURED: ON' text while actual DOM text is 'Featured: ON'; corrected by asserting on aria-checked attribute of the toggle."
+}

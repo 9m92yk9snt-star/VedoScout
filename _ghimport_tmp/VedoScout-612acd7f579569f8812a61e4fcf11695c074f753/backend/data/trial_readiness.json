@@ -1,0 +1,114 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "Position-specific trial-readiness checklist items. Each item references one or more sub-attribute keys from the report's technical/tactical/physical/mentality sections and is auto-evaluated against two tier thresholds: strong_club (a competitive academy/club team) and pro_academy (a top regional or national academy). logic='min' = take the lowest score across attrs; logic='avg' = average across attrs.",
+    "tier_labels": {
+      "strong_club":  "Ready for Strong Club trial",
+      "pro_academy":  "Ready for Pro Academy trial"
+    }
+  },
+  "_aliases": {
+    "goalkeeper":              ["goalkeeper", "keeper", "gk"],
+    "centre back":             ["centre back", "center back", "central defender", "cb"],
+    "full back":               ["full back", "fullback", "left back", "right back", "wing back", "lb", "rb"],
+    "defensive midfielder":    ["defensive midfielder", "holding midfielder", "anchor", "cdm", "dm", " 6"],
+    "attacking midfielder":    ["attacking midfielder", "number 10", "playmaker", "cam", "am", " 10"],
+    "winger":                  ["left winger", "right winger", "winger", "wide forward", "wide midfielder", "lw", "rw"],
+    "striker":                 ["centre forward", "center forward", "striker", "number 9", "st", "cf", " 9"],
+    "central midfielder":      ["central midfielder", "central mid", "centre midfielder", "box to box", "cm", "midfielder", " 8"]
+  },
+  "centre back": {
+    "items": [
+      {"id": "aerially_competitive",   "label": "Aerially competitive at the position's average height",   "attrs": ["body_control", "balance"],            "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "1v1_defending",          "label": "Composed in 1v1 defending under pressure",                "attrs": ["one_v_one", "decision_making"],         "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "build_up",               "label": "Comfortable progressing the ball under press",           "attrs": ["passing", "first_touch"],              "logic": "min", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "reading",                "label": "Reads danger and steps in early",                         "attrs": ["positioning", "scanning"],              "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough for high-level build-up",              "attrs": ["weak_foot"],                            "logic": "min", "strong_club_min": 5, "pro_academy_min": 6},
+      {"id": "duels",                  "label": "Brave in 50-50 ground duels",                             "attrs": ["courage_in_duels"],                     "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "concentration",          "label": "Concentration sustained across 90 minutes",               "attrs": ["focus", "intensity"],                   "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "leadership",             "label": "Communicates and organises the back line",                "attrs": ["confidence", "competitive_mindset"],    "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7}
+    ]
+  },
+  "full back": {
+    "items": [
+      {"id": "endurance",              "label": "Aerobic base to support attack for 90 minutes",           "attrs": ["intensity", "work_rate"],               "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "acceleration",           "label": "Accelerates well in 1v1 transitions",                      "attrs": ["acceleration"],                         "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "crossing",               "label": "Quality delivery from wide areas",                         "attrs": ["passing"],                              "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "1v1_defending",          "label": "Holds up wingers in 1v1 defending",                        "attrs": ["one_v_one", "agility"],                 "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "positioning",            "label": "Positioning when team is in/out of possession",            "attrs": ["positioning", "decision_making"],       "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "overlap_runs",           "label": "Times overlapping runs without leaving the line exposed",  "attrs": ["timing_of_runs", "game_understanding"], "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "recovery",               "label": "Recovery sprints to track back",                           "attrs": ["speed", "work_rate"],                   "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7}
+    ]
+  },
+  "defensive midfielder": {
+    "items": [
+      {"id": "press_resistant",        "label": "Press-resistant under high pressure",                      "attrs": ["first_touch", "ball_control"],          "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "screen_defence",         "label": "Screens the defence and breaks up play",                   "attrs": ["positioning", "scanning"],              "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "tempo",                  "label": "Controls tempo with simple, accurate passing",             "attrs": ["passing"],                              "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough to receive on either side",             "attrs": ["weak_foot"],                            "logic": "min", "strong_club_min": 5, "pro_academy_min": 6},
+      {"id": "scan_rate",              "label": "Scans before receiving consistently",                      "attrs": ["scanning"],                             "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "duels",                  "label": "Wins midfield ground duels",                               "attrs": ["courage_in_duels", "body_control"],     "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "engine",                 "label": "90-minute engine to cover the middle of the pitch",        "attrs": ["intensity", "work_rate"],               "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "game_iq",                "label": "Reads the game ahead of the play",                         "attrs": ["game_understanding", "decision_making"], "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7}
+    ]
+  },
+  "central midfielder": {
+    "items": [
+      {"id": "press_resistant",        "label": "Press-resistant under U15 intensity",                       "attrs": ["first_touch", "ball_control"],          "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough to start at a strong club",             "attrs": ["weak_foot", "passing"],                 "logic": "min", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "engine",                 "label": "90-minute aerobic base",                                   "attrs": ["intensity", "work_rate"],               "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "scan_rate",              "label": "Scans before receiving consistently",                      "attrs": ["scanning"],                             "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "composed",               "label": "Composed in build-up under pressure",                      "attrs": ["decision_making", "first_touch"],       "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "line_breaker",           "label": "Plays line-breaking passes when on",                       "attrs": ["passing", "game_understanding"],        "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "courage",                "label": "Brave in central duels",                                   "attrs": ["courage_in_duels"],                     "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "final_third",            "label": "Final-third end product (shots/assists)",                  "attrs": ["shooting", "timing_of_runs"],           "logic": "avg", "strong_club_min": 5, "pro_academy_min": 6}
+    ]
+  },
+  "attacking midfielder": {
+    "items": [
+      {"id": "press_resistant",        "label": "Press-resistant in tight central spaces",                  "attrs": ["first_touch", "ball_control"],          "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "creativity",             "label": "Creates clear chances with vision and passing",            "attrs": ["passing", "decision_making"],           "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "scan_rate",              "label": "Scans the half-spaces before receiving",                   "attrs": ["scanning", "positioning"],              "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "1v1",                    "label": "Beats his man in 1v1 situations",                          "attrs": ["dribbling", "one_v_one"],               "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "shooting",               "label": "Strikes the ball cleanly from the edge of the box",         "attrs": ["shooting"],                             "logic": "min", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough to threaten on either side",            "attrs": ["weak_foot"],                            "logic": "min", "strong_club_min": 5, "pro_academy_min": 6},
+      {"id": "press_from_front",       "label": "Presses from the front when team loses the ball",          "attrs": ["work_rate", "response_to_mistakes"],    "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "final_third",            "label": "Final-third runs in behind the defence",                   "attrs": ["timing_of_runs", "off_ball_movement"],  "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7}
+    ]
+  },
+  "winger": {
+    "items": [
+      {"id": "acceleration",           "label": "Explosive acceleration over the first 5m",                  "attrs": ["acceleration"],                         "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "top_speed",              "label": "Top-end speed to beat defenders down the line",            "attrs": ["speed"],                                "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "1v1",                    "label": "Beats his man in 1v1 situations",                          "attrs": ["dribbling", "one_v_one"],               "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "delivery",               "label": "Quality of final ball (cross / cut-back)",                  "attrs": ["passing"],                              "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "shooting",               "label": "Strikes the ball cleanly when cutting inside",             "attrs": ["shooting"],                             "logic": "min", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough to play either flank",                  "attrs": ["weak_foot"],                            "logic": "min", "strong_club_min": 5, "pro_academy_min": 6},
+      {"id": "defensive_work",         "label": "Tracks back to support the full back",                     "attrs": ["work_rate", "positioning"],             "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "timing_of_runs",         "label": "Times runs in behind on diagonal balls",                   "attrs": ["timing_of_runs", "off_ball_movement"],  "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7}
+    ]
+  },
+  "striker": {
+    "items": [
+      {"id": "finishing",              "label": "Finishes chances cleanly with either foot",                 "attrs": ["shooting"],                             "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "movement",               "label": "Movement in the box to create separation",                  "attrs": ["off_ball_movement", "timing_of_runs"], "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "hold_up",                "label": "Holds the ball up with back to goal under pressure",        "attrs": ["body_control", "first_touch"],          "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "press_from_front",       "label": "Leads the press from the front",                            "attrs": ["work_rate", "intensity"],               "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "aerial",                 "label": "Aerial threat in the box",                                  "attrs": ["balance", "courage_in_duels"],          "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough to finish from either side",            "attrs": ["weak_foot"],                            "logic": "min", "strong_club_min": 5, "pro_academy_min": 6},
+      {"id": "1v1_keeper",             "label": "Composed 1v1 with the keeper",                              "attrs": ["confidence", "decision_making"],        "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "explosive_pace",         "label": "Explosive pace in behind the last line",                    "attrs": ["acceleration", "speed"],                "logic": "avg", "strong_club_min": 5, "pro_academy_min": 7}
+    ]
+  },
+  "goalkeeper": {
+    "items": [
+      {"id": "shot_stopping",          "label": "Reactive shot-stopping in 1v1 and from distance",          "attrs": ["one_v_one", "agility"],                 "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "command_of_box",         "label": "Commands the box on crosses and set-pieces",               "attrs": ["confidence", "body_control"],           "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "distribution",           "label": "Distribution accuracy (short and long)",                    "attrs": ["passing"],                              "logic": "min", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "both_footed",            "label": "Both-footed enough to play out of pressure",              "attrs": ["weak_foot"],                            "logic": "min", "strong_club_min": 5, "pro_academy_min": 6},
+      {"id": "communication",          "label": "Organises the back line with clear communication",         "attrs": ["focus", "confidence"],                  "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "reading",                "label": "Reads danger and starts position to claim",                "attrs": ["positioning", "scanning"],              "logic": "avg", "strong_club_min": 6, "pro_academy_min": 7},
+      {"id": "concentration",          "label": "Concentration across long periods of inactivity",          "attrs": ["focus"],                                "logic": "min", "strong_club_min": 6, "pro_academy_min": 7}
+    ]
+  }
+}

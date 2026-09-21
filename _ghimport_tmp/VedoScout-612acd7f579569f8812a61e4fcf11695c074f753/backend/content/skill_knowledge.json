@@ -1,0 +1,378 @@
+{
+  "bands": { "low_max": 6.4, "mid_max": 7.9 },
+  "skills": {
+    "first_touch": {
+      "label": "First Touch", "cat": "technical",
+      "looks_for": "What happens in the half-second the ball arrives — does it stick, or does it bounce away? It is the fastest honesty test in football.",
+      "scale": { "6": "The ball obeys when there's time and space.", "8": "The ball is tamed even with a defender breathing down the neck — rare at youth level.", "9": "The first touch already IS the next move — pro academies build around this." },
+      "translate": {
+        "low": ["{name} is still making friends with the ball — and that friendship is exactly what training fixes fastest.", "Every great first touch started as a bouncy one. This is the most trainable number in the whole report."],
+        "mid": ["When {name} gets a clean moment, the ball settles like it wants to stay.", "The next discovery: keeping that calm touch when someone is chasing — that's what turns heads."],
+        "high": ["The ball arrives and simply… stops. Most {age}-year-olds need two touches for what {name} does in one.", "This is the kind of touch academy coaches remember on the drive home."]
+      },
+      "next_level": "At academy level, a first touch isn't about control — it's about direction. The touch becomes the first pass."
+    },
+    "ball_control": {
+      "label": "Ball Control", "cat": "technical",
+      "looks_for": "Can the ball live close to the feet at speed, in crowds, on bad grass? Control is what makes every other skill possible.",
+      "scale": { "6": "Comfortable in open play, loses it in traffic.", "8": "The ball stays close even in crowded moments — defenders have to foul to get it.", "9": "The ball looks glued — elite academies treat this as a signature trait." },
+      "translate": {
+        "low": ["The ball still escapes {name} in tight moments — which means there's a whole level waiting to be unlocked with daily touches.", "Ten minutes of ball mastery a day rewrites this number faster than any other."],
+        "mid": ["{name} keeps the ball close enough to be trusted with it — teammates notice that long before anyone else does.", "The next step is making the ball feel small in BIG moments."],
+        "high": ["Watch {name}'s feet in traffic: the ball stays inside a shoebox. That's not luck — that's thousands of touches showing up.", "See control like this and you stop watching the ball — you start watching the player."]
+      },
+      "next_level": "The next level asks for control at full sprint — same closeness, twice the speed."
+    },
+    "dribbling": {
+      "label": "Dribbling", "cat": "technical",
+      "looks_for": "Not tricks — bravery with a plan. Does the player attack a defender on purpose, and does the move actually gain ground?",
+      "scale": { "6": "Dribbles when there's space to invite it.", "8": "Takes players on by choice and wins more duels than he loses — academy coaches underline this.", "9": "Beats his man both ways and the defence has to plan for it." },
+      "translate": {
+        "low": ["{name} still passes the responsibility away in 1v1s — courage grows every time a coach says 'try again'.", "Dribbling is a permission skill: once {name} is told mistakes are welcome, this number moves."],
+        "mid": ["{name} dares — and daring is the half of dribbling that can't be taught.", "Now it's about picking the moment: the best dribblers say no as often as they say go."],
+        "high": ["{name} runs AT defenders — on purpose. Most kids this age run away from that moment; {name} invites it.", "That bravery is the loudest line in any match report."]
+      },
+      "next_level": "Higher up, dribbling becomes economics: beat your man AND keep the team's shape alive."
+    },
+    "passing": {
+      "label": "Passing", "cat": "technical",
+      "looks_for": "Weight, timing and choice — can he keep the ball moving under pressure, and does the pass make the receiver's life easier?",
+      "scale": { "6": "Safe, sideways, keeps things ticking when unpressured.", "8": "Finds a teammate even with a defender closing in — most players this age just clear it.", "9": "Breaks lines and flips the pitch — the pass academies are built on." },
+      "translate": {
+        "low": ["{name}'s passes still panic under pressure — which simply means the eyes and feet aren't synced YET.", "This is where wall-passes and rondos quietly build a new player."],
+        "mid": ["{name} keeps teammates in the game — the pass arrives where it should, when it should.", "The discovery ahead: passes that don't just keep the ball, but hurt the opponent."],
+        "high": ["{name} finds a teammate under pressure — something most {age}-year-olds simply cannot do yet.", "A pass like this sends a message: the head is faster than the game."]
+      },
+      "next_level": "The next tier plays forward first: same accuracy, braver direction."
+    },
+    "shooting": {
+      "label": "Shooting", "cat": "technical",
+      "looks_for": "Clean strike, quick release, and the calm to pick a corner instead of just kicking hard.",
+      "scale": { "6": "Strikes well when the ball is set and there's time.", "8": "Gets shots off fast in real game chaos and tests the keeper — that's finishing, not just shooting.", "9": "Chooses placement over power under pressure — elite instinct." },
+      "translate": {
+        "low": ["{name}'s strike is still more enthusiasm than technique — the fun part is that technique is 100% buildable.", "A hundred repetitions of the same clean strike will change this number and {name}'s confidence with it."],
+        "mid": ["{name} hits the target more often than not — keepers have to work.", "The next unlock is speed: half a second faster from chance to shot changes everything."],
+        "high": ["When a chance appears, {name} is already shooting while others are still deciding.", "Coaches call this 'the trigger' — you either build it young or chase it forever."]
+      },
+      "next_level": "Higher levels shrink time: the same finish with half the backswing and no second invitation."
+    },
+    "weak_foot": {
+      "label": "Weak Foot", "cat": "technical",
+      "looks_for": "Not equality — usability. Can the weak foot pass, receive and finish well enough that defenders can't just show him one way?",
+      "scale": { "6": "Emergency use only — defenders can steer him.", "8": "Genuinely two-sided in passes and touches — doubles his options on the pitch.", "9": "Defenders can't plan against him — both feet threaten." },
+      "translate": {
+        "low": ["Right now defenders have a map of {name}: force the weak side. The great news — this is the cheapest superpower in football to build.", "Ten minutes a day against a wall, and in six months this becomes a different report."],
+        "mid": ["{name}'s weak foot is no longer a secret weakness — it does honest work.", "Full trust in it under pressure is the last door to open."],
+        "high": ["Two working feet at {age} turn heads instantly: it means every drill ever done counted twice.", "Defenders lose their favourite trick against {name} — there is no weak side to push him onto."]
+      },
+      "next_level": "At academy level the weak foot isn't tested in drills — it's tested with a defender arriving. That's the standard."
+    },
+    "one_v_one": {
+      "label": "1v1 Duels", "cat": "technical",
+      "looks_for": "The moment football gets personal: does he win his direct duels — with skill, timing or pure will?",
+      "scale": { "6": "Competes but usually needs help.", "8": "Wins most of his direct battles — teammates start giving him the ball on purpose.", "9": "A duel-winner both ways — attack and defence. Academies track this number hard." },
+      "translate": {
+        "low": ["{name} still loses more duels than he wins — every lost duel at {age} is a free lesson nobody has to pay for.", "Duels are won in training courage first, matches second."],
+        "mid": ["{name} holds his own when the game gets personal — that earns respect fast, on both teams.", "The next discovery: winning duels on purpose, not just on effort."],
+        "high": ["When it becomes one against one, {name} usually walks away with the ball — that's a trait, not a coincidence.", "Duel-winners get remembered, because duels are the moments everyone watches."]
+      },
+      "next_level": "Next level up, everyone is fast and strong — duels are won with body position and timing instead."
+    },
+    "positioning": {
+      "label": "Positioning", "cat": "tactical",
+      "looks_for": "Where is he standing when he DOESN'T have the ball? Good positioning is invisible to most parents — and glowing to a trained eye.",
+      "scale": { "6": "Follows the ball like most kids — heart over map.", "8": "Repeatedly in the right zone before the ball arrives — plays the game in advance.", "9": "Organises space for others too — a coach on the pitch." },
+      "translate": {
+        "low": ["{name} still chases the ball like it owes him money — normal at {age}, and exactly what game-understanding training fixes.", "The magic phrase is 'where SHOULD you be?' — asked a hundred times, it becomes instinct."],
+        "mid": ["{name} is starting to appear in the right places before the ball does — the first sign of a thinking footballer.", "This is the quiet skill that makes coaches trust a player with minutes."],
+        "high": ["{name} is already standing where the game is going to happen — that's not running, that's reading.", "Academy coaches flag this early because it's the hardest thing to teach late."]
+      },
+      "next_level": "At higher levels positioning is measured every 5 seconds, not every attack — constant small corrections."
+    },
+    "off_ball_movement": {
+      "label": "Off-Ball Movement", "cat": "tactical",
+      "looks_for": "Runs that create space — for himself AND for teammates. The players who move without reward today get picked tomorrow.",
+      "scale": { "6": "Moves when called, waits when not.", "8": "Makes runs that drag defenders and open doors — even when he never gets the pass.", "9": "His movement is a weapon the whole team plays off." },
+      "translate": {
+        "low": ["When the ball leaves {name}, he switches off — turning those seconds ON is one of the fastest visible upgrades in football.", "The players who move without the ball get it twice as often. That's the whole secret."],
+        "mid": ["{name} keeps playing when the ball is elsewhere — runs that quietly stretch the game.", "The next unlock is timing: same run, two seconds later, completely different result."],
+        "high": ["{name} plays 90% of the game without the ball — and wins that 90%.", "Runs that never get rewarded still get noticed. The trained eye writes those down."]
+      },
+      "next_level": "The next level rewards double movement — the fake run that frees the real one."
+    },
+    "scanning": {
+      "label": "Scanning", "cat": "tactical",
+      "looks_for": "Shoulder checks before the ball arrives. It's the clearest window into how fast a young brain is playing the game.",
+      "scale": { "6": "Looks after receiving — decisions come late.", "8": "Checks his shoulder before the ball arrives — he's playing 2 seconds ahead of everyone.", "9": "Scans constantly and plays what he saw — the trademark of academy midfielders." },
+      "translate": {
+        "low": ["{name} receives the ball and THEN starts looking — flip that order and a completely different player appears.", "Two shoulder checks before every touch. Small habit. Massive discovery."],
+        "mid": ["{name} is starting to look before the ball comes — the game is slowing down for him.", "When scanning becomes automatic, everything else in this report gets easier."],
+        "high": ["{name} already knows what's behind him before the ball arrives — he's playing in the future while others react in the present.", "Ask any academy coach what they look for first in midfielders. This. This exact thing."]
+      },
+      "next_level": "The next level scans under sprint and contact — same eyes, hostile conditions."
+    },
+    "decision_making": {
+      "label": "Decision Making", "cat": "tactical",
+      "looks_for": "Pass, dribble or shoot — and was it the RIGHT one? Slow legs get forgiven long before slow choices do.",
+      "scale": { "6": "Decides late; the good option often expires.", "8": "Picks the right option under pressure more often than not — that's football IQ showing.", "9": "Makes hard choices look obvious — the game bends to his tempo." },
+      "translate": {
+        "low": ["{name} has the tools but hesitates on which one to use — decisions are a muscle, and it grows with every game watched and played.", "The question that builds this: 'what did you see?' — after every single action."],
+        "mid": ["{name} usually chooses well — the ball tends to leave him in a better place than it arrived.", "The next level of this is speed: same good choice, one second sooner."],
+        "high": ["{name} makes the right call while the game is screaming at him — composure like this at {age} is what separates players.", "Feet can be trained. Brains get queued for."]
+      },
+      "next_level": "Higher up, there is no time to decide — the decision must be made before the ball arrives."
+    },
+    "timing_of_runs": {
+      "label": "Timing of Runs", "cat": "tactical",
+      "looks_for": "Not how fast the run is — WHEN it starts. A perfectly timed run beats a fast one every time.",
+      "scale": { "6": "Runs early and gets caught offside, or late and misses it.", "8": "Arrives exactly as the ball does — the kind of timing that creates goals from nothing.", "9": "Times runs off the passer's body shape — practically telepathy." },
+      "translate": {
+        "low": ["{name}'s runs and the passes don't speak the same language yet — timing comes from repetitions with the same teammates.", "One tip changes this: start the run when the passer's head comes UP."],
+        "mid": ["{name}'s runs are starting to sync with the game's rhythm — arriving with the ball instead of after it.", "This skill quietly turns average teams into dangerous ones."],
+        "high": ["{name} arrives at the exact second the ball does — that's not speed, that's a clock in his head.", "Perfectly timed runs are the moments people rewind the video for. Literally."]
+      },
+      "next_level": "The next level times runs against the offside line — a game of centimetres and half-seconds."
+    },
+    "game_understanding": {
+      "label": "Game Understanding", "cat": "tactical",
+      "looks_for": "Does he understand WHY things happen — momentum, space, danger — or is he just reacting to the ball?",
+      "scale": { "6": "Understands his own job in the moment.", "8": "Reads the WHOLE game — presses at the right time, slows it when the team needs air.", "9": "Sees the game like a coach — rare and priceless at youth level." },
+      "translate": {
+        "low": ["{name} plays the moment, not yet the story of the game — watching football WITH questions is the fastest teacher.", "Ten minutes of match analysis together beats an hour of cones for this number."],
+        "mid": ["{name} is starting to sense the game's temperature — when to hurry, when to breathe.", "This is the number that quietly predicts how far the rest can travel."],
+        "high": ["{name} understands the game's WHY — pressing at the right moment, calming it when the team needs air. Coaches build teams around brains like this.", "Legs sell tickets. Understanding wins careers."]
+      },
+      "next_level": "At the next level this becomes leadership — seeing it is step one, organising others around it is step two."
+    },
+    "acceleration": {
+      "label": "Acceleration", "cat": "physical",
+      "looks_for": "The first 5 metres — football's most valuable distance. Most duels are decided before top speed even matters.",
+      "scale": { "6": "Average burst — wins some, loses some.", "8": "First 3 steps win him separations others need 10 metres for.", "9": "Explosive first metres that change what positions he can play." },
+      "translate": {
+        "low": ["{name}'s first steps are still gears, not a spring — and spring can absolutely be trained at {age}.", "Short hill sprints and skipping work: boring, cheap, and they rewrite this number."],
+        "mid": ["{name} gets away cleanly when he decides early — burst and brain are starting to cooperate.", "The next level: exploding on the FIRST step, not the third."],
+        "high": ["{name}'s first three steps are a getaway car — by the time defenders react, the moment is over.", "The first 5 metres get measured, not the 50. {name} wins the ones that matter."]
+      },
+      "next_level": "Higher up, acceleration is used tactically — saved, disguised and released at the perfect moment."
+    },
+    "speed": {
+      "label": "Speed", "cat": "physical",
+      "looks_for": "Real game speed — WITH the ball, under pressure, in the final minutes. Track speed is nice; football speed wins matches.",
+      "scale": { "6": "Keeps up with the game.", "8": "Faster than the game — and crucially, nearly as fast WITH the ball.", "9": "A separation weapon defences must plan entire shapes around." },
+      "translate": {
+        "low": ["{name} isn't winning foot-races yet — but growth spurts rewrite this page more than any other. Patience is a strategy here.", "Meanwhile: players who think fast never look slow."],
+        "mid": ["{name} has honest pace — enough to punish hesitation.", "The real discovery is keeping that pace with the ball attached."],
+        "high": ["{name} moves at a speed that forces opponents to change their plan — that's not a stat, that's leverage.", "And the rarest part: the ball doesn't slow him down much."]
+      },
+      "next_level": "At the next level everyone is fast — the edge becomes speed WITH control and AFTER 60 minutes."
+    },
+    "balance": {
+      "label": "Balance", "cat": "physical",
+      "looks_for": "Staying playable through contact and sharp turns. Balance is why some players bounce off challenges that flatten others.",
+      "scale": { "6": "Stable until contact arrives.", "8": "Rides bumps and stays on his feet with the ball — referees stop mattering.", "9": "Contact barely registers — plays through fouls." },
+      "translate": {
+        "low": ["{name} still goes down easier than he should — core work and single-leg play quietly fix this in months.", "Balance is the least glamorous superpower and one of the most trainable."],
+        "mid": ["{name} stays on his feet when it gets physical — a quiet advantage every single match.", "The next unlock: using balance to shield and turn, not just survive."],
+        "high": ["Defenders bump {name} and he simply… continues. Balance like this makes every other skill usable under fire.", "It can't be faked on video — which is exactly why it counts."]
+      },
+      "next_level": "The next level weaponises balance — shielding, rolling off contact, drawing fouls on purpose."
+    },
+    "agility": {
+      "label": "Agility", "cat": "physical",
+      "looks_for": "Direction changes at speed — the tight-space wiggle that makes defenders look like they're moving in slow motion.",
+      "scale": { "6": "Turns need a moment of setup.", "8": "Changes direction sharply enough to lose markers in phone-booth spaces.", "9": "Twists through gaps that don't officially exist." },
+      "translate": {
+        "low": ["{name} still turns like a bus in tight spaces — ladder and cone work make this one of the fastest numbers to move.", "Every sharp turn trained now is a defender lost later."],
+        "mid": ["{name} can lose a marker in a small space when it matters.", "Next: doing it at full speed without the touch suffering."],
+        "high": ["{name} changes direction like the pitch has trapdoors — defenders commit and he's already gone.", "In small-sided football, this is the skill that makes highlight reels."]
+      },
+      "next_level": "The next level pairs agility with deception — the shoulder drop that sells the wrong direction first."
+    },
+    "intensity": {
+      "label": "Intensity", "cat": "physical",
+      "looks_for": "Does the effort survive the whole video? The trained eye fast-forwards to the last minutes on purpose.",
+      "scale": { "6": "Bright starts, quiet finishes.", "8": "Same hunger in minute 1 and minute 50 — the engine coaches trust.", "9": "Sets the intensity for everyone else — a standard-carrier." },
+      "translate": {
+        "low": ["{name}'s effort comes in waves right now — engines are built, not born, and {age} is exactly when they get built.", "The habit that changes this: sprint back the moment the ball is lost. Every time."],
+        "mid": ["{name} keeps working long after the cameras usually stop caring — that consistency is currency.", "The last minutes of a video get watched on purpose. {name} survives the fast-forward."],
+        "high": ["Minute one and minute fifty look identical for {name} — that engine is a decision he makes, not a gift he got.", "Talent opens doors. Engines keep them open."]
+      },
+      "next_level": "At the next level intensity is managed, not just spent — max effort in the right 20 moments."
+    },
+    "body_control": {
+      "label": "Body Control", "cat": "physical",
+      "looks_for": "Coordination in awkward moments — bouncing balls, bad passes, mid-air adjustments. The clumsy-ball test.",
+      "scale": { "6": "Comfortable with clean service only.", "8": "Tames bad passes and bouncing balls — makes messy football look tidy.", "9": "Adjusts mid-air, mid-stride, mid-chaos — athlete's genes plus training." },
+      "translate": {
+        "low": ["Awkward balls still beat {name} — juggling ugly (bounces, thighs, shoulders) is the playful fix.", "Coordination trains best before 14. The window is wide open."],
+        "mid": ["{name} handles football's messy moments — bad bounces don't break his play.", "The next level: making an awkward ball into an ADVANTAGE."],
+        "high": ["Bad pass, weird bounce, ball in the air — {name}'s body just solves it. That's coordination you can't choreograph.", "Coaches notice players who make messy football look calm."]
+      },
+      "next_level": "Higher levels serve almost no perfect balls — body control becomes a starting requirement."
+    },
+    "confidence": {
+      "label": "Confidence", "cat": "mentality",
+      "looks_for": "Does he WANT the ball — especially right after a mistake? Confidence shows in the hands that go up asking for it.",
+      "scale": { "6": "Confident when things go well.", "8": "Demands the ball even under pressure, even after errors — that's real, not loud.", "9": "His confidence lifts the whole team's — a presence." },
+      "translate": {
+        "low": ["{name} hides a little when the game gets loud — confidence is built from small wins, and this report is a map of them.", "Show {name} his own best moments from this video. Watch what happens."],
+        "mid": ["{name} wants the ball more often than he avoids it — the scale is tipping the right way.", "The breakthrough moment: asking for the ball 10 seconds after losing it."],
+        "high": ["{name} wants the ball even when the game is on fire — courage like this can't be coached into a player, only coached OUT by mistake.", "Protect this. It's worth more than any single skill on this page."]
+      },
+      "next_level": "At the next level everyone gets humbled weekly — confidence must be rebuilt every Monday. That's the skill."
+    },
+    "work_rate": {
+      "label": "Work Rate", "cat": "mentality",
+      "looks_for": "The runs nobody claps for — tracking back, closing down, going again. Effort is the first thing video can verify and the last thing anyone forgives.",
+      "scale": { "6": "Works when the game rewards it.", "8": "Presses, tracks and repeats — with or without applause.", "9": "Outworks everyone as identity, not mood." },
+      "translate": {
+        "low": ["{name} saves his legs for the fun moments — flipping that is free talent lying on the ground.", "Work rate is the only number in this report {name} fully controls tomorrow morning."],
+        "mid": ["{name} does the unglamorous running that wins coaches over.", "Next: making it constant — effort as identity, not as reaction."],
+        "high": ["{name} runs for the team when nobody's watching — the trained eye ALWAYS watches for exactly that.", "Skill decides if you're interesting. Work rate decides if you stay."]
+      },
+      "next_level": "The next level measures work rate in numbers — distance, sprints, presses. It becomes a stat, not an opinion."
+    },
+    "courage_in_duels": {
+      "label": "Courage in Duels", "cat": "mentality",
+      "looks_for": "The 50/50 test: does he go in honestly, or does he pull out at the last step? You can see character in one tackle.",
+      "scale": { "6": "Picks his battles carefully.", "8": "Goes into 50/50s like they're 70/30 — bravery with technique.", "9": "The player others hide behind when the game turns nasty." },
+      "translate": {
+        "low": ["{name} still steps back from the crunch moments — courage grows with padding drills and permission to fail.", "Nobody expects a fearless {age}-year-old. What matters is the direction of travel."],
+        "mid": ["{name} goes into contact honestly — no half-measures that cause injuries.", "The next level: ARRIVING first, because first usually wins."],
+        "high": ["When it's 50/50, {name} makes it 70/30 with pure intent — that mentality is contagious in a good team.", "Bravery gets noted in the margins because it never shows in stats."]
+      },
+      "next_level": "Higher up, duels are chess — courage stays, recklessness gets trained out."
+    },
+    "response_to_mistakes": {
+      "label": "Response to Mistakes", "cat": "mentality",
+      "looks_for": "The 10 seconds AFTER a bad touch. Head up or head down? You learn more from errors than from goals.",
+      "scale": { "6": "Mistakes cost a few minutes of good football.", "8": "Bounces back within seconds — hunts the ball to fix it himself.", "9": "Uses mistakes as fuel — visibly plays BETTER after errors." },
+      "translate": {
+        "low": ["A mistake still switches {name} off for a while — the 5-second rule (sprint to win it back) is the antidote, and it works.", "Every player on TV was once a kid whose head dropped. The ones who made it learned this exact skill."],
+        "mid": ["{name} recovers from errors faster than most — the game doesn't lose him for long.", "The final step: treating the mistake as the START of the next action."],
+        "high": ["{name} answers his own mistakes within seconds — winning the ball back like it's personal. This gets CIRCLED in the notes.", "This is the single strongest predictor of surviving academy football."]
+      },
+      "next_level": "At the next level mistakes are public — crowds, coaches, cameras. The bounce-back must be armour-plated by then."
+    },
+    "competitive_mindset": {
+      "label": "Competitive Mindset", "cat": "mentality",
+      "looks_for": "Does losing bother him — in the right way? The fire that hates losing but keeps its head.",
+      "scale": { "6": "Competes while it's fun.", "8": "Hates losing productively — fights to the whistle without losing control.", "9": "Drags teammates into battles they'd given up on." },
+      "translate": {
+        "low": ["{name} plays for joy more than for victory right now — and honestly, at {age}, joy is the fuel that lasts longest.", "Competitive fire usually arrives with the teenage years. Watch this space."],
+        "mid": ["{name} clearly minds losing — and channels it into playing, not sulking.", "That balance between fire and control is exactly what coaches search for."],
+        "high": ["{name} competes like the result is personal — every duel, every restart, to the final whistle.", "You can teach tactics to a competitor. You can't teach competing to a passenger."]
+      },
+      "next_level": "The next level tests the fire weekly against equals — staying hungry when winning stops being easy."
+    },
+    "focus": {
+      "label": "Focus", "cat": "mentality",
+      "looks_for": "Concentration when the ball is far away — the marking, the line, the small jobs. Switching off for 5 seconds is how goals are conceded.",
+      "scale": { "6": "Locked in when involved, drifts when not.", "8": "Stays switched on through the boring minutes — rare and quietly elite at youth level.", "9": "Ninety-minute concentration — reads danger before it forms." },
+      "translate": {
+        "low": ["{name}'s mind wanders when the ball does — normal at {age}, and trainable with small jobs ('own the offside line for 10 minutes').", "Focus is a muscle. Short reps, growing sets."],
+        "mid": ["{name} stays in the game even when the game isn't with him.", "The next level: focus that TALKS — warning teammates before danger arrives."],
+        "high": ["{name} concentrates through the quiet minutes where most kids mentally leave the pitch — the next level tests exactly this, off the ball.", "Boring-minute focus is what separates 'talented' from 'reliable'. {name} has it."]
+      },
+      "next_level": "At the next level a 5-second nap costs a goal — focus becomes a professional requirement, not a bonus."
+    }
+  },
+  "positions": {
+    "Goalkeeper": {
+      "line": "Watch a young keeper's feet and voice before his hands — shot-stopping is assumed at the next level; the rest is what gets measured.",
+      "weighs": [
+        { "skill": "positioning", "why": "A metre of good positioning saves more shots than a metre of diving ever will." },
+        { "skill": "confidence", "why": "Keepers live alone with their mistakes — confidence decides if one error becomes three." },
+        { "skill": "decision_making", "why": "Come or stay, catch or punch, short or long — a keeper makes more decisions than anyone." }
+      ],
+      "alt": []
+    },
+    "Centre-back": {
+      "line": "For a centre-back, reading the game weighs above everything — the best defenders defend with their brain first.",
+      "weighs": [
+        { "skill": "positioning", "why": "Great centre-backs intercept quietly; poor ones tackle heroically. The trained eye prefers quiet." },
+        { "skill": "courage_in_duels", "why": "The box is a battlefield — hesitation at centre-back is visible from the stands." },
+        { "skill": "passing", "why": "Modern academies demand defenders who START attacks, not just stop them." }
+      ],
+      "alt": [
+        { "strong": ["passing", "scanning"], "weak": ["speed"], "suggest": "Defensive Midfielder", "why": "Eyes and passing range like this often grow best one line higher, where turning the game matters more than recovery pace." }
+      ]
+    },
+    "Full-back": {
+      "line": "Full-back is football's double shift — engine and 1v1 defending weigh first, delivery second.",
+      "weighs": [
+        { "skill": "intensity", "why": "The position runs both boxes all game — no engine, no full-back." },
+        { "skill": "one_v_one", "why": "A full-back is left alone with a winger 30 times per match. Survival is the job." },
+        { "skill": "timing_of_runs", "why": "The overlap only works if it arrives at the exact right second." }
+      ],
+      "alt": [
+        { "strong": ["dribbling", "acceleration"], "weak": [], "suggest": "Winger", "why": "When a full-back's attacking numbers outshine his defending ones, coaches often push him 20 metres forward — the same run, but ending in the box." }
+      ]
+    },
+    "Wing-back": {
+      "line": "Wing-backs are measured as athletes first — the position covers more grass than any other on the pitch.",
+      "weighs": [
+        { "skill": "intensity", "why": "Wing-back without a monster engine isn't a position, it's a liability." },
+        { "skill": "speed", "why": "The whole flank is his — recovering AND attacking it demands real pace." },
+        { "skill": "decision_making", "why": "Alone on the touchline: cross, cut back, recycle or defend — 50 lonely choices a game." }
+      ],
+      "alt": []
+    },
+    "Defensive Midfielder": {
+      "line": "The 6 is measured by brain-speed: scanning and positioning weigh double here, because everything happens around him.",
+      "weighs": [
+        { "skill": "scanning", "why": "The 6 receives with opponents on his back all game — no scanning, no position." },
+        { "skill": "positioning", "why": "He is the shield. One step wrong and the whole defence is exposed." },
+        { "skill": "passing", "why": "Every attack starts through him — his pass sets the team's tempo." }
+      ],
+      "alt": [
+        { "strong": ["dribbling", "one_v_one"], "weak": [], "suggest": "Central Midfielder", "why": "Duel-winning plus ball-carrying suggests he can play higher, where breaking lines himself becomes a weapon instead of a risk." }
+      ]
+    },
+    "Central Midfielder": {
+      "line": "Central midfield is the thinking position — scanning and decisions weigh above athleticism here.",
+      "weighs": [
+        { "skill": "scanning", "why": "The middle is 360° chaos — midfielders live or die by what they see before receiving." },
+        { "skill": "decision_making", "why": "He touches the ball more than anyone; each touch is a decision the team inherits." },
+        { "skill": "passing", "why": "A midfielder's pass is his voice — range and weight decide how much he can say." }
+      ],
+      "alt": [
+        { "strong": ["shooting", "timing_of_runs"], "weak": [], "suggest": "Attacking Midfielder", "why": "A midfielder who arrives and finishes like this may be wasted starting deep — the numbers point ten metres forward." }
+      ]
+    },
+    "Attacking Midfielder": {
+      "line": "The 10 is measured on moments: decision-making and the final pass weigh heaviest — creating what wasn't there.",
+      "weighs": [
+        { "skill": "decision_making", "why": "The 10 gets the ball where mistakes are cheap and magic is expensive — choices define him." },
+        { "skill": "first_touch", "why": "He receives between the lines with his back to goal — the touch must buy him time that isn't there." },
+        { "skill": "off_ball_movement", "why": "Great 10s appear in pockets no one else sees — movement IS the creativity." }
+      ],
+      "alt": [
+        { "strong": ["work_rate", "positioning"], "weak": ["dribbling"], "suggest": "Central Midfielder", "why": "Engine and discipline above flair suggests a future as a box-to-box 8 — more touches, more influence, same attacking moments." }
+      ]
+    },
+    "Winger": {
+      "line": "Wingers are measured on bravery first: 1v1 numbers weigh heaviest, then what he chooses the second he's past his man.",
+      "weighs": [
+        { "skill": "one_v_one", "why": "The winger's whole job description is written in duels — beat your man or the position doesn't exist." },
+        { "skill": "acceleration", "why": "The first three steps decide whether the 1v1 even happens." },
+        { "skill": "decision_making", "why": "Beating the man is half the job — the cross, cut-back or shot afterwards is the paycheck." }
+      ],
+      "alt": [
+        { "strong": ["scanning", "passing"], "weak": ["acceleration"], "suggest": "Central Midfielder", "why": "Eyes and passing ahead of raw burst is a midfielder's profile — central areas reward what he's already best at." },
+        { "strong": ["shooting", "timing_of_runs"], "weak": [], "suggest": "Striker", "why": "Wingers who love the box more than the byline often become strikers — the finishing instinct is the rare part." }
+      ]
+    },
+    "Striker": {
+      "line": "Strikers are measured backwards — from the finish. Timing and the shot trigger weigh above build-up play.",
+      "weighs": [
+        { "skill": "timing_of_runs", "why": "Goals are scored before the ball is kicked — with a run started half a second earlier than the defender's." },
+        { "skill": "shooting", "why": "One touch, one strike — the striker's economy is measured in half-chances converted." },
+        { "skill": "response_to_mistakes", "why": "Strikers miss more than they score. The next chance belongs to the ones who forget instantly." }
+      ],
+      "alt": [
+        { "strong": ["passing", "game_understanding"], "weak": [], "suggest": "Attacking Midfielder", "why": "A striker who creates as naturally as he finishes might influence the game more facing it than backing into it." }
+      ]
+    }
+  }
+}

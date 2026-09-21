@@ -1,0 +1,36 @@
+{
+  "summary": "Iteration 46 — Cloudflare R2 migration for admin demo-video uploads verified end-to-end. All 10 R2-migration pytest cases PASS + 4/4 legacy regression pytest cases PASS. R2 upload flow, streaming proxy (GET/HEAD, Range, 404, 400), delete flow, landing carousel, and legacy /api/uploads/ regression all green. R2 test artefacts cleaned up (0 __probe__ objects remain).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/media/{key:path}", "issue": "Path-traversal 400 only triggers when the client sends fully URL-encoded traversal (e.g. `%2E%2E%2Ffoo`). Requests with a literal slash (e.g. `%2E%2E/foo` or `foo/../bar`) get normalised by uvicorn/starlette and return 404 instead of 400. Not exploitable — the object key still can't escape the R2 bucket — but the 400 branch is less discoverable than the spec suggests. Optional: add a segment-level check on the raw path if strict 400 semantics matter."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_r2_migration.py",
+    "/app/backend/tests/test_demo_videos_delete.py",
+    "/app/test_reports/pytest/iter46_r2.xml",
+    "/app/test_reports/pytest/iter46_regression.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "r2_storage._cfg() lazy-reads env — correct pattern given r2_storage is imported at line 26 of server.py BEFORE load_dotenv(). is_configured() correctly returns True in the running backend.",
+    "stream_r2_media handler is clean: safety check for leading '/', '..', '\\x00' on key; Range header preserved verbatim so R2 returns 206 + Content-Range; ContentType/Accept-Ranges/Cache-Control/ETag/Content-Length forwarded; HEAD closes the botocore body without draining bytes.",
+    "admin_upload_demo_video_file: transcodes to H.264 8-bit yuv420p + AAC + faststart, extracts poster @ 1s, then uploads BOTH .web.mp4 and .poster.jpg to R2 and unlink()s local copies — verified: local /app/backend/uploads/demo_videos/ contained NO files after test upload. Fallback to local if r2_storage.is_configured()==False (safe).",
+    "admin_delete_demo_video: iterates video_url and poster_url — deletes local files for legacy /api/uploads/, deletes R2 objects for /api/media/ keys via key_from_url(). Confirmed R2 object gone after DELETE.",
+    "Verified via boto3 head_object: uploaded video & poster keys exist in bucket 'scoutmeplay' immediately after upload; disappear after DELETE row.",
+    "Existing 2 seeded demo videos still point to /api/uploads/*.web.mp4 and HEAD-returns 200 (regression intact). Only new admin uploads go to R2 — matches Danish user's requirement.",
+    "Cleanup verified: 0 leftover objects under __probe__/ or demo_videos/__probe__ prefixes; 0 leftover TEST_ rows in db.demo_videos (autouse module fixture teardown works)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_r2_migration.py (new — 10 pytest cases covering R2 upload/stream/range/404/400/delete + regression)"
+  ],
+  "success_rate": {"backend": "100% (14/14 across 2 test files)", "frontend": "not tested (testing_type=backend only)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test uploaded a 2-second 320x240 ffmpeg testsrc .mp4 via POST /api/admin/demo-videos/upload-video (row was created then torn down). Also uploaded a text probe __probe__/hello.txt directly via r2_storage. All artefacts deleted at module teardown — verified 0 leftovers in R2 and DB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cloudflare R2 migration (iteration 46) is fully verified for admin demo-video uploads. New uploads go to R2 bucket 'scoutmeplay' with keys under demo_videos/ and are served via /api/media/{key:path} streaming proxy (backend proxy mode — bucket has no public URL). Range/HEAD/GET/404 all work. Do NOT expect /api/reports/upload (player pipeline) to use R2 — that is intentionally still local per user instruction. Legacy /api/uploads/ paths must continue to serve. When writing more R2 tests, use `__probe__/*` object key prefix for easy cleanup, and prefix DB rows with `TEST_` so the sweep can find them.",
+  "rca of the issue": "N/A — this was a feature verification, not a bug fix. The only nit found is that path-traversal detection returns 400 only for fully-URL-encoded traversals; literal '../' segments get normalised by uvicorn/starlette to a 404 before the handler runs. This is not a security issue (R2 keys can't escape the bucket) but is worth noting."
+}

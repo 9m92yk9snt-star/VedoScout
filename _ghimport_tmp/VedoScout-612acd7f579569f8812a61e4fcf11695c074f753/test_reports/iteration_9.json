@@ -1,0 +1,52 @@
+{
+  "summary": "Independent validation of the 4-Layer Intelligence Stack (catalog schema, multi-dimensional ranker, Gemini narrative, lens-strip UI + PDF). All 8 existing pytests in test_archetype_4layer.py pass, plus 7 additional independent tests in test_iter9_independent.py (6/7 pass; 1 caught a real score-out-of-range issue). Frontend renders all required elements with correct content. PDF regenerates with the new sections (PERSONALIZED COMPARISON, 4-LENS, WHAT MODRIC WAS DOING AT AGE 13-14).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/reports/{rid}",
+        "issue": "Lens scores can exceed 10 even though UI displays them with '/10' suffix. Observed live: Build twin (Foden-type) score=11.0, Career-path twin (Lamine Yamal) score=10.3. Visual bar width is clamped to 100% by ReportPage.jsx (Math.min(100,...)), but the numeric value next to '/10' is misleading. Root cause: match_archetype() in server.py picks lens winners by raw internal metric (_build, _path, _role, _style) without clipping/normalising to the 0-10 contract before adding to the `lenses` block. Recommended fix: in _pick(), set 'score': round(min(10.0, max(0.0, winner[metric_key])), 2) — or surface the raw score under a different field and recompute a 0-10 display score."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Report → 4-Lens Twins Strip",
+        "issues": [
+          "Numeric score shows '11.0 /10' and '10.3 /10' for Build and Career-path lenses — credibility hit on premium UI. Bar width is clamped (so no overflow), but the number next to it should also be clamped to 10.0."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_archetype_4layer.py",
+    "/app/backend/tests/test_iter9_independent.py",
+    "/app/test_reports/pytest/iter9_results.xml",
+    "/app/test_reports/pytest/iter9_independent.xml"
+  ],
+  "action_items": [
+    "Normalize lens score to [0, 10] in server.py match_archetype()._pick() so the displayed value matches the '/10' contract (Build=11.0 and Path=10.3 currently shown to user)."
+  ],
+  "critical_code_review_comments": [
+    "server.py: _pick() returns raw winner[metric_key] without clipping to 10. Lens score contract advertised on UI as /10 but actual range observed up to ~11.5.",
+    "server.py is 4726 lines — exceeds the 700-line guideline. Consider splitting into modules (archetype/, reports/, pdf/, auth/).",
+    "ReportPage.jsx LensMatchesStrip relies on the backend honouring the 0-10 contract; defensive clamping there is fine but ideally backend should ship clean numbers.",
+    "Narrative caching: works correctly (verified by repeated GETs returning identical strings); narrative lazy-generation on first paid GET takes ~3-5s — already documented and handled in tests."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter9_independent.py (NEW — 7 independent validation tests)"
+  ],
+  "success_rate": {
+    "backend": "94% (14/15 assertions across both test files; 1 lens-score-range failure on observed live data is a real product bug, not a test bug)",
+    "frontend": "100% (ArchetypeCard, narrative, academy-bio, lens-matches-strip with 4 distinct lens cards all render correctly)"
+  },
+  "test_credentials": "Used premium@elitescout.com / Premium@2026 (from /app/memory/test_credentials.md).",
+  "seed_data_creation": "None. Tested against the existing seeded Lukas A. premium report.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "4-Layer stack is shipping end-to-end. Verified: (1) catalog has profile+academy_bio across all 8 positions; (2) GET /api/reports/{rid} returns archetype.lenses with style/build/role/path each carrying name/lens_label/score/why; (3) Style lens name === primary archetype name; Build & Path lenses differ (Foden-type and Lamine Yamal-type vs Modric-type primary); (4) archetype.narrative (73 words) + archetype.academy_bio_chunk + archetype.age_bracket_used='13-14' present and cached; (5) UI renders [data-testid='archetype-narrative'], [data-testid='archetype-academy-bio'], [data-testid='lens-matches-strip'] with lens-match-style/build/role/path; (6) PDF (after rm cache) regenerates and contains 'PERSONALIZED COMPARISON', '4-LENS COMPARISON', and 'DOING AT AGE 13-14'. Only remaining concern is the lens-score range bug above.",
+  "rca of the issue": "Lens score >10 RCA: In server.py match_archetype(), the _pick(metric_key) helper returns 'score': round(winner[metric_key], 2) where metric_key is one of '_build', '_path', '_role', '_style'. These metrics are computed by adding bonus points (e.g., +5 for build match, +2 for foot match, plus signature_score which is already 0-10), with no upper clip. For tight matches the sum can land ~10.5-11.5. The frontend (LensMatchesStrip ~line 772) clamps the visual bar via Math.min(100, ...) but the score number is printed verbatim via (lens.score ?? 0).toFixed(1) followed by a static '/10' label. Reproduction: log in as premium@elitescout.com, open Lukas A. report, scroll to '4-LENS COMPARISON' card. Mitigation: clip in backend `score: round(min(10.0, max(0.0, winner[metric_key])), 2)` before returning, OR have the frontend cap display value to 10.0."
+}

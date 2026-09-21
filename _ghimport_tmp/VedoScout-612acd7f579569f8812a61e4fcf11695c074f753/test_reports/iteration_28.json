@@ -1,0 +1,56 @@
+{
+  "summary": "Re-test of iteration_27 follow-up fixes: (1) Stripe pill dynamic price, (2) football remains visually round, (3) headline whitespace. All 3 fixes verified PASS. Full regression suite (section order, chip text, CTA hrefs anon vs logged-in, smooth-scroll, mobile no-overflow, zero console errors) also PASS.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results_detail": {
+    "FIX_1_stripe_pill": {
+      "status": "PASS",
+      "note": "Pill text reads 'Unlock for $159' which matches dynamic price from /api/settings/price (returns price=159). HowItWorks3D.jsx line 513 uses {priceLabel} prop. Landing.jsx line 529 passes priceLabel={`$${price}`} where price comes from /api/settings/price. Verified no hardcoded '$159' literal in the component (it's interpolated). The review_request's 'Default price from /api/settings/price is $1' assumption was incorrect — actual API returns 159 — so the visible text is correctly $159 because that IS the dynamic value. Step 4 card title also reads dynamic price."
+    },
+    "FIX_2_football_round": {
+      "status": "PASS",
+      "evidence": "Computed styles confirmed: .football-ball animation-name = 'ballWobble' (outer circle stays round, only ±18° rotateY wobble). .football-panels animation-name = 'panelsSpin' (inner pentagon panels group rotates in 2D). SVG bounding aspect ratio = 0.99 (perfect circle). Logged-in screenshot at 1920x1080 shows perfectly circular ball with dark forest pentagons visible inside."
+    },
+    "FIX_3_headline_whitespace": {
+      "status": "PASS",
+      "evidence": "cinematic-hero-title normalized textContent = 'Upload Your Video. Get a Deep Football Intelligence Report.' Contains expected substring with spaces. No 'Video.Get' or 'FootballIntelligence' joins."
+    },
+    "REGRESSION_anonymous": {
+      "section_order": "PASS — cinematic-hero-section → how-it-works-3d → hero-section → what-you-get → pricing-section",
+      "chip_text": "PASS — 'ScoutMePlay · Pro Scout Intelligence'",
+      "cta_primary_anon": "PASS — href=/signup",
+      "cta_secondary_anon": "PASS — href=#how-it-works, smooth-scroll moves scrollY 0→1066",
+      "mobile_overflow_390x844": "PASS — documentElement.scrollWidth == window.innerWidth (390==390)",
+      "console_errors": "PASS — 0 page errors (only pre-existing recharts width/height warnings, not blocking)"
+    },
+    "REGRESSION_logged_in": {
+      "login": "PASS — testfree-mar@elitescout.com / Free@2026! → redirects to /dashboard",
+      "cinematic_hero_visible_logged_in": "PASS",
+      "cta_primary_logged_in": "PASS — href=/upload (not /signup)",
+      "pill_logged_in": "PASS — 'Unlock for $159' dynamic"
+    }
+  },
+  "test_report_links": [
+    "/app/test_reports/football_t0.png",
+    "/app/test_reports/football_t4.png",
+    "/app/test_reports/loggedin_landing.png",
+    "/app/test_reports/mobile_landing.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Note: review_request stated default price from /api/settings/price is '$1' but production API returns 159 — testing logic adjusted to use API-returned value as source of truth.",
+    "Recharts ResponsiveContainer width/height warnings are present in console (pre-existing, not part of this iteration). Consider setting explicit minWidth/minHeight on radar chart containers in a future cleanup pass.",
+    "Code review of CinematicHero.jsx confirms outer .football-ball is now a static circle wrapper with bounded ballWobble animation; .football-panels group rotates in 2D via panelsSpin. Implementation correctly decouples outer shape from inner panel rotation as described."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (skipped)", "frontend": "100% (all 3 fixes + full regression PASS)" },
+  "test_credentials": "testfree-mar@elitescout.com / Free@2026! (verified working)",
+  "seed_data_creation": "none",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 3 fixes from iteration_27 successfully verified. Cinematic hero, HowItWorks3D, and headline rendering all clean. No regressions detected. Note that /api/settings/price returns 159 in this environment (not $1) — keep this in mind for any future price-related assertions."
+}

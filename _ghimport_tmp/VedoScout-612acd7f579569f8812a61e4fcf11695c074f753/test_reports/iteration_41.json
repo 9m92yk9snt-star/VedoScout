@@ -1,0 +1,30 @@
+{
+  "summary": "Targeted visual asset regression: verified STEP 02 · MARK image on landing page now displays a SOCCER player (not NFL). Confirmed via direct URL fetch, DOM inspection, and rendered screenshot.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100%"},
+  "test_credentials": "N/A - no auth flows tested",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fix confirmed. step-mark.png at /api/static/landing/step-mark.png serves 200 OK, image/png, 579022 bytes, natural 1376x768. Rendered screenshot shows clear soccer player: green/white striped jersey #14, round soccer ball, grass pitch, phone with PAUSED overlay + neon yellow bounding box. NO helmet/pads/yard-lines. Regression on /scouts page confirmed - all 4 cinematic images (scouts-hero-tunnel, scouts-boardroom, scouts-data-tablet, scouts-signing-desk) still render.",
+  "verification_details": {
+    "image_url": "https://scout-ai-pro-1.preview.emergentagent.com/api/static/landing/step-mark.png",
+    "http_status": 200,
+    "content_type": "image/png",
+    "content_length_bytes": 579022,
+    "natural_dimensions": "1376x768",
+    "dom_img_src_confirmed": true,
+    "dom_img_complete": true,
+    "visual_content": "Soccer player #14 in green/white striped jersey with round ball on grass pitch, viewed through phone with PAUSED overlay and neon yellow bounding box tracker",
+    "scouts_page_regression": "PASS - all 4 cinematic images present"
+  }
+}

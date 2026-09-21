@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 17 — verified MarkerStudio (premium fullscreen player-marking sheet) end-to-end with no regressions. Backend: all 12 precision_engine unit tests + 9 iter16 API tests pass (21/21). Frontend: free login → /upload → drop /tmp/test_clip.webm → 'Lock onto your player' button visible → opens MarkerStudio (data-testid='marker-studio') → all 12 control testids present (ms-cancel, ms-confirm, ms-video, ms-play, ms-scrub, ms-frame-back, ms-frame-fwd, ms-mode-navigate, ms-mode-box, ms-autofind, ms-zoom-in, ms-zoom-out) → LOCK button correctly disabled before draw → mode toggle works both directions (top-left chip flips NAVIGATE ↔ MARK BOX) → mouse-drag in MARK BOX mode draws volt-green box with 4 white corner handles → LOCK becomes enabled → clicking it closes the studio and renders upload-mark-preview on UploadPage → Auto-find lazy-loads MediaPipe ObjectDetector from CDN, completes in ~3.5s on solid-green clip with 0 detections and ZERO console errors (graceful failure path confirmed) → ms-cancel closes the studio cleanly. Admin lands at /admin, premium at /dashboard. Premium seeded demo report contains NO confidence badges (High/Medium/Low Confidence). 0 JS console errors across the full studio interaction.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_precision_engine.py",
+    "/app/backend/tests/test_iter16_precision_api.py",
+    "/app/test_reports/pytest/iter17_precision.xml",
+    "/app/test_reports/pytest/iter17_api.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MarkerStudio.jsx is ~1059 lines — exceeds the 700-line guideline. Consider splitting into sub-modules: geometry/hit-test helpers, pointer/touch gesture controller hook, the MediaPipe auto-find loader, and the JSX shell. Would also let unit tests cover the geometry helpers in isolation.",
+    "server.py still ~6413 lines (carried over from iter 16) — same modularisation feedback applies.",
+    "MediaPipe model+wasm (~9MB) is fetched from jsdelivr + storage.googleapis.com on first Auto-find click; the first invocation took ~3.5s in the test env. If users are on slow mobile networks consider preloading on UploadPage mount (low priority — current UX is acceptable since it only blocks the Auto-find affordance, not core box-draw flow).",
+    "Two harmless MediaPipe sourcemap warnings (vision_bundle_mjs.js.map missing) in the compile log — cosmetic only, can be silenced via CRA's GENERATE_SOURCEMAP=false or by adding 'source-map-loader' exclusions."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% on all 13 critical UI assertions executed"},
+  "test_credentials": "All 3 seeded accounts verified working: admin@elitescout.com / Admin@2026!Elite (→ /admin), premium@elitescout.com / Premium@2026 (→ /dashboard), free@elitescout.com / Free@2026 (→ /upload usable).",
+  "seed_data_creation": "None — read-only studio interactions, no DB writes performed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "MarkerStudio shipped clean. Full data-testid registry verified live: marker-studio, ms-cancel, ms-confirm, ms-video, ms-play, ms-scrub, ms-frame-back, ms-frame-fwd, ms-mode-navigate, ms-mode-box, ms-autofind, ms-zoom-in, ms-zoom-out, ms-detection-{0..14}. Studio uses createPortal to document.body and locks scroll. Drawing a box via mouse-drag inside the ms-video bounding box (35%-60% horizontal, 30%-70% vertical worked) correctly enables ms-confirm. Confirm closes the studio and surfaces upload-mark-preview on UploadPage. Auto-find on Playwright Chromium with /tmp/test_clip.webm (VP8, 854x480, solid darkgreen) returns 0 detections in ~3.5s with no console errors — this is the documented graceful-failure path. For full Auto-find dot rendering, a clip with real humans is needed. /tmp/test_clip.mp4 still exists but Playwright Chromium's H.264 decoder is unreliable — stick with the webm. Stripe is LIVE — do not start paid checkouts. Premium demo report id fc3eb463-c805-4b54-9000-107c356a6e75 confirmed free of confidence badges.",
+  "rca of the issue": "N/A — no bugs found. Initial Playwright script had two minor scripting issues that were fixed locally: (1) page.get_by_role with a lambda 'name' param threw because Playwright expects str/regex — switched to pressing Enter on the password input; (2) an f-string contained a backslash in a string subscript — refactored. Neither indicates a product bug."
+}

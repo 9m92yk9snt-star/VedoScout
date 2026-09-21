@@ -1,0 +1,33 @@
+{
+  "summary": "Frontend-only regression test for DemoVideoCarousel visibility fix. Verified the section now renders on / with an empty-state placeholder card when 0 videos exist in DB. Section header, empty-state card copy, and hidden nav arrows all confirmed. Also verified /api/admin/reports regression (returns 401 unauth, NOT 500).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/demo_carousel_empty.png"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "DemoVideoCarousel.jsx code is clean; conditional { videos.length === 0 ? <EmptyStateCard/> : videos.map(...) } correctly swaps empty-state for real cards when a video is uploaded — the empty-state -> real-card regression path is guaranteed by the render logic, so re-uploading a video (already verified in iteration_42) was skipped per main-agent's guidance.",
+    "Section header stale-content nit: the header still reads 'Short walkthroughs recorded by our team. Real screen, real report.' even when 0 videos exist. Considering the empty-state already says 'Coming soon' + 'First workflow clips landing here shortly.', the two messages slightly conflict. Optional: gate the header subtitle behind videos.length > 0. Not a blocker."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend only)", "frontend": "100%"},
+  "test_credentials": "Not needed — logged-out visitor flow only. Admin regression skipped per main-agent note (already verified in iteration_42).",
+  "seed_data_creation": "None. demo_videos collection remains empty as expected.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The DemoVideoCarousel section is now permanently visible on the landing page. When admin uploads a real demo video via /admin → Demo Videos, EmptyStateCard is automatically replaced by VideoCard(s). Full CRUD for demo videos + poster upload + admin CMS was 12/12 verified in iteration_42. If admin adds a video and the empty-state persists, first check /api/demo-videos response payload.",
+  "test_results_detail": {
+    "test_1_section_visible": "PASS — data-testid='demo-video-carousel' found on landing page (logged-out).",
+    "test_2_empty_state_card": "PASS — data-testid='demo-empty-state' rendered inside carousel track with 'COMING SOON' kicker + 'First workflow clips landing here shortly.' heading + subtitle + video icon in dashed border.",
+    "test_3_section_header": "PASS — 'Watch the workflow' kicker and 'it actually works.' heading visible above empty-state card.",
+    "test_4_nav_arrows_hidden": "PASS — demo-carousel-prev / demo-carousel-next NOT present when videos.length === 0 (correctly hidden by videos.length > 1 guard).",
+    "test_5_screenshot": "PASS — /app/test_reports/demo_carousel_empty.png saved. Visual confirms clean layout with dashed border card.",
+    "test_6_admin_reports_regression": "PASS — GET /api/admin/reports (unauth) returned HTTP 401, NOT 500. The KeyError:'video_filename' fix from Session 111 is still holding."
+  }
+}

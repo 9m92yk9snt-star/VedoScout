@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 32 — Stripe subscription wiring (Premium $29.99/mo, VIP $49.99/mo). All 15 backend pytest checks passed and all 4 critical frontend flows verified. Subscription products are auto-provisioned in Stripe at startup, persisted in db.settings, and the new /api/payments/subscribe + /api/me/subscription endpoints work end-to-end. Logged-in user successfully redirected to live Stripe Checkout (test stopped at the hosted page — no payment completed).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Legacy $399 Progress Pass 12-month card still rendered on the dashboard (user noted this is REMAINING HAND-WORK — out of scope for this iteration)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_subscriptions_iter32.py",
+    "/app/test_reports/pytest/iter32_subscriptions.xml"
+  ],
+  "action_items": [
+    "(Out of scope for iter32 but noted by user) Remove the legacy $399 / 12-month Progress Pass plan from the landing+dashboard UI.",
+    "(Future) Add email notifications on subscription.created / .updated / .deleted events."
+  ],
+  "critical_code_review_comments": [
+    "server.py has grown to 8005 lines — strongly recommend splitting into routers (subscriptions.py, payments.py, webhook.py, reports.py) to keep file <700 lines per the code-review guidelines.",
+    "`/api/payments/subscribe` correctly looks up the price_id server-side (no client-driven amount), idempotent product creation, and reuses existing stripe_customer_id when present — solid design.",
+    "Cancel endpoint returns 'Subscription already scheduled for cancellation' as 400 — that branch is unreachable for a no-sub user (correctly short-circuits on the first `if not sub_id` check). Behavior is correct.",
+    "_subscription_state_from_stripe handles tier metadata fallback — good.",
+    "Webhook handler validates Stripe signature before doing any work and rejects invalid signatures with 400 — verified."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_subscriptions_iter32.py (new — 15 tests, all passing)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% (4/4 critical flows)"},
+  "test_credentials": "testpremium-mar@elitescout.com / Premium@2026! and testfree-mar@elitescout.com / Free@2026! used as documented in /app/memory/test_credentials.md.",
+  "seed_data_creation": "None — used existing seeded test users. Test created several `kind:'subscription'` rows in db.payment_transactions (all left in 'initiated'/'unpaid' state since no payment was completed). These will not affect future tests but can be purged with: db.payment_transactions.deleteMany({kind:'subscription', payment_status:{'$in':['initiated','unpaid']}}).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Stripe subscription provisioning is verified: db.settings has stripe_subscription_premium (price_1Tm9RePyHKLMizP3A9KbZHiz) and stripe_subscription_vip (price_1Tm9RePyHKLMizP3v0Si2CZi). The post-payment branch (`payment_status='paid'` → users.subscription set) was NOT exercised end-to-end because LIVE keys forbid completing a real payment in tests. To test SubscriptionCard rendering + cancel/resume/change-tier with an *active* subscription, either (a) flip to Stripe TEST mode and complete a 4242 card, or (b) manually patch a user's `subscription` field in Mongo with {tier:'premium', status:'active', stripe_subscription_id:'sub_xxx', current_period_end:'2030-01-01T00:00:00Z', cancel_at_period_end:false} and reload the dashboard.",
+  "verification_evidence": {
+    "stripe_settings_in_mongo": {
+      "stripe_subscription_premium": {"product_id": "prod_Ulgp7BkJgA47VE", "price_id": "price_1Tm9RePyHKLMizP3A9KbZHiz", "amount": 29.99, "currency": "usd"},
+      "stripe_subscription_vip": {"product_id": "prod_Ulgpp7kNFTMeTL", "price_id": "price_1Tm9RePyHKLMizP3v0Si2CZi", "amount": 49.99, "currency": "usd"}
+    },
+    "payment_transactions_created": "Confirmed kind='subscription', tier='premium', amount=29.99, payment_status='initiated', brand='ScoutMePlay' rows present in Mongo after POST /api/payments/subscribe.",
+    "live_stripe_checkout_redirect_observed": "https://checkout.stripe.com/c/pay/cs_live_b1pIS9tjsps... (browser navigated successfully, no payment completed)."
+  }
+}

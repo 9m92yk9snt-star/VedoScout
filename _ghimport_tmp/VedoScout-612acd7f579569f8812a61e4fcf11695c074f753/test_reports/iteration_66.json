@@ -1,0 +1,59 @@
+{
+  "summary": "Tested the new 'numbers become discovery' package (backend + frontend + PDF) for smtest-premium-1 and smtest-free-1. All 14 pytest cases in /app/backend/tests/test_iter66_score_meaning.py PASS: score_meaning payload shape, 19 skills sorted desc, name substitution, verified-only-at-anchors gating (timing_of_runs at 07:30 verified=false confirmed), Central Midfielder discovery, teaser with unlocked=scanning and 18 label-only locked entries with no numeric leaks, PDF contains 'THE NUMBERS, TRANSLATED / SEEN AT / STRONGER THAN ... OF 10 / A DISCOVERY ABOUT' page and PDF text passes 'AI'/'scout'/'percentile' audit. Frontend renders /report/smtest-premium-1: score-meaning-section with initial 6 cards → 19 after sm-showall-btn, 5 evidence chips (only on verified skills), expand panels show 'What the trained eye watches', 6/8/9 ladder with 'his zone' highlight and 'The road upward', discovery card shows 'CENTRAL MIDFIELDER' with based-on chips (Scanning 8.2 + Passing 8.1) and disclaimer, click-to-seek chip doesn't error. Free preview /report/smtest-free-1 shows exactly ONE open card (Scanning 8.2 with '01:45'), locked list with NO numeric scores, discovery teaser strip, and smt-unlock-btn scrolls to #scout-packages. HOWEVER, copy audit found two RULE VIOLATIONS visible on the report/preview pages outside the new score-meaning section (see below).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/report/smtest-premium-1 (Benchmarks section)",
+        "issues": [
+          "COPY VIOLATION: The benchmarks section contains the literal string 'Percentiles show how your child compares to other players...' — the user rule explicitly forbids the word 'percentile' anywhere on report-facing copy. The PDF is clean; the leak is only in the web UI's benchmarks tooltip/legend."
+        ]
+      },
+      {
+        "screen": "/report/smtest-free-1 (Premium pricing card in 'Train & Track Monthly') + Premium page pricing area",
+        "issues": [
+          "COPY VIOLATION: The middle pricing card lists 'Instant AI analysis — no waiting' as a feature. The word 'AI' must NEVER appear in report-facing copy. This is visible on both the free preview and premium report pages (pricing/packages block)."
+        ]
+      },
+      {
+        "screen": "Site header tagline (all report pages)",
+        "issues": [
+          "POTENTIAL COPY VIOLATION: Header tagline reads 'SEE YOUR GAME THROUGH SCOUT EYES' — the word 'scout' as attribution of analysis is disallowed. All other 'scout' occurrences on the report pages ('Real Scout Review', 'Talk With Scout', 'scout review guarantee', 'scout database', 'the scout watches the video personally') are for the allowed human-service features and are fine. But this header tagline attributes the analysis itself to 'scout eyes'."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter66_score_meaning.py",
+    "/app/test_reports/pytest/iter66_results.xml"
+  ],
+  "action_items": [
+    "Remove the 'Percentiles show how your child compares...' legend/tooltip from the benchmarks section on the premium report page (word 'percentile' must not be shown anywhere).",
+    "Change the 'Instant AI analysis — no waiting' bullet in the Premium pricing card to remove the word 'AI' (e.g. 'Instant analysis — no waiting').",
+    "Consider revising the header tagline 'SEE YOUR GAME THROUGH SCOUT EYES' to avoid 'scout' as an analysis attribution (e.g. 'See your game like never before')."
+  ],
+  "critical_code_review_comments": [
+    "score_meaning.py is clean, deterministic, and correctly gates evidence.verified via anchors (±4s) and identity_verified comments (±5s). Good separation of KB from logic.",
+    "server.py has grown very large (~13k lines) — refactor into modules remains a standing tech-debt item from iter9 review.",
+    "Copy-audit rule enforcement is currently manual — consider adding a lint/build-time guard that scans src/**/*.jsx for /\\bAI\\b/, /\\bpercentile/i, and /\\bscout(s|ing)?\\b/ (with an allowlist for brand + 'Real Scout Review' / 'Talk With Scout' / 'scout database' / 'scout review') to prevent regressions.",
+    "Regression testids overall-score / parent-summary / hero-card don't seem to exist on the page (I did not find them by data-testid). Sections DO render visually (Overall Potential 75/100, dream-path-section present) — recommend adding stable data-testid attributes to those blocks for future test coverage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter66_score_meaning.py (NEW — 14 tests, all passing)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 pytest incl. PDF content + copy audit)",
+    "frontend": "88% — all new score-meaning components render and behave correctly; 2 pre-existing copy violations found outside the new components (percentile in benchmarks, 'AI' in pricing card)"
+  },
+  "test_credentials": "smtest.parent@example.com / SmTest@2026!x (login uses Bearer access_token from /api/auth/login response body — NOT cookie auth).",
+  "seed_data_creation": "None. Used existing smtest-premium-1 and smtest-free-1 as instructed; did not delete.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend feature (score_meaning + teaser + PDF) is production-ready per iter66 tests. Only pending fixes are 2-3 static copy strings (percentile legend, 'AI' pricing bullet, optionally header tagline). Verified evidence anchors for premium: 01:44 (passing), 04:12 (shooting), 06:10 (1v1_duels), 08:44 (work_rate); one non-verified evidence: 07:30 (timing_of_runs) correctly shown as unverified. Free teaser unlocked=scanning at 01:45 (verified).",
+  "rca of the issue": "Percentile leak RCA: The 'Percentiles show how...' string lives in the benchmarks/comparison UI component (not in the new ScoreMeaningSection). The new copy rule was added but the benchmarks tooltip/legend wasn't updated. AI leak RCA: The pricing card feature list in the packages component contains the marketing bullet 'Instant AI analysis — no waiting' — never migrated when the AI-word ban was introduced. Both are 1-line string edits."
+}

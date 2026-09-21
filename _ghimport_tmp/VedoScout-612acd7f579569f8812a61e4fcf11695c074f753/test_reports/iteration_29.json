@@ -1,0 +1,30 @@
+{
+  "summary": "Verified the new canvas-based marker-card on ReportPage. The seeded 'Lukas A.' premium demo report (testpremium-mar@elitescout.com) does NOT carry a marker_filename in DB, so the marker-card never renders on it out of the box. To validate the fix end-to-end against the real production code path I temporarily injected marker_filename + fingerprint.box on that report (pointing at an existing real marker JPG in /app/backend/uploads/), then reverted the injection. With the marker present, every requested check passed: marker-card and full-frame-canvas-wrap exist inside the marker-card, full-frame-canvas is a real <canvas> (1280x720 intrinsic, ~420x235 displayed), the canvas has visible painted pixels (not pure black/transparent — sample pixel inside the box rect returned r=98,g=131,a=255), 76+ lime pixels detected (lime locator drawn), the 'THIS PLAYER' HTML chip text is correct and sits horizontally inside the canvas bounding box, the zoomed-crop canvas (data-testid='locked-player-zoom') still paints correctly, and the visual screenshot shows the big canvas locator and the zoomed crop aligning on the same player (no sky/grass mis-anchor). All regression test-ids (report-player-type, player-fingerprint, back-to-dashboard, locked-player-zoom) still rendered.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional: The seeded Lukas A. demo report still has no marker (marker_filename/fingerprint are absent in DB), which is consistent with /app/memory/test_credentials.md note ('Locked Player chips are absent — that's expected'). If main agent wants the marker-card to be visible by default on the seeded premium report for future demos/tests, update seed_test_accounts.py (or make_demo_accounts.py) to also seed marker_filename + fingerprint.box for the demo report.",
+    "Minor (pre-existing, not related to this fix): Recharts console warning 'width(-1) and height(-1) of chart should be greater than 0' fires twice on the report page — radar chart container likely has 0-size on first paint. Cosmetic.",
+    "Minor: Canvas2D willReadFrequently warning when our test code called getImageData; not a product bug, but if any production code does heavy getImageData on this canvas it should pass willReadFrequently:true."
+  ],
+  "critical_code_review_comments": [
+    "FullFrameWithBoxCanvas.jsx looks solid: uses drawImage(img, 0,0,iw,ih, dx,dy,dw,dh) with contain-fit math, then draws the lime box in the SAME pixel space (no CSS percentage drift) — root cause of the original bug is correctly addressed.",
+    "Box coords are clamped to [0,1] (lines 81-84) — defensive and good.",
+    "img.crossOrigin = 'anonymous' is set, and uploads are served same-origin via /api/uploads — pixel readback (getImageData) works as confirmed in this test. No CORS tainting.",
+    "The HTML 'This player' chip is a sibling absolutely-positioned span using percentages of the canvas DISPLAY size (cw/ch are the internal canvas pixels, but boxX/cw correctly normalises to %). Verified the chip ends up horizontally inside the canvas bbox.",
+    "Edge case to consider for E1 (NOT a current bug): when box.x is very close to 1, the chip clamp 'Math.min(72, leftPct)' caps left at 72% so the chip can sit slightly left of an extreme-right box. Acceptable trade-off vs. overflowing the card."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only test)", "frontend": "100% (all marker-card assertions passed)"},
+  "test_credentials": "testpremium-mar@elitescout.com / Premium@2026! (used). Note: this report had no marker by default; injected marker_filename for the duration of the test and then reverted.",
+  "seed_data_creation": "Temporarily set reports.marker_filename = '18910462-8e10-41b3-a952-24d9dcd3e0ba-marker.jpg' and fingerprint.box={x:0.45,y:0.40,w:0.10,h:0.25} on report id 91476fec-3b53-4ea1-b326-dde878b89f7d, then unset both after the test. DB now back to the original demo state.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The new FullFrameWithBoxCanvas at /app/frontend/src/components/FullFrameWithBoxCanvas.jsx and its wiring in /app/frontend/src/pages/ReportPage.jsx (~line 2070) are working end-to-end on the deployed preview URL. The seeded Lukas A. report does NOT include a marker by default (only seeded premium demo), so to test the marker-card render you need either (a) inject marker_filename + fingerprint.box into reports collection as we did, or (b) upload a real clip with the testfree-mar account which exercises the full marker-studio pipeline. We did NOT attempt a real upload to avoid Stripe-LIVE / heavy AI pipeline.",
+  "rca_of_the_issue": "Original bug RCA — confirmed by code diff: previous renderer used <img className='block max-w-full max-h-full h-auto w-auto'> wrapped in inline-block and overlaid the lime box via percentage CSS on the wrapper. On iOS portrait frames with EXIF rotation, the rendered image rect was smaller than the wrapper rect (because of letterboxing within inline-block baseline padding), so percentages computed against the wrapper landed off the actual image — visible as 'box floating in the sky'. New renderer draws image + box in the same canvas pixel space via drawImage(sx,sy,sw,sh,dx,dy,dw,dh), eliminating every CSS/aspect-ratio layer and matching the proven MarkedCropCanvas approach. Verified in this run: pixel sampling inside the normalised box rect shows real image content (RGB 98,131,…) and lime pixels are present, while the 'THIS PLAYER' chip aligns inside the canvas — exactly the behaviour the user wanted."
+}

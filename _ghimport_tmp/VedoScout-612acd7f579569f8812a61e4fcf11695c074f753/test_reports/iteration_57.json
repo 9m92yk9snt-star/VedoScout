@@ -1,0 +1,106 @@
+{
+  "summary": "Session 130 (iter57) frontend-only test — ALL 7 REQUIREMENTS PASS. Verified live via browser: (1) PremiumReadyBanner renders exclusively on ReportPage for the admin/premium user with correct copy + testids + smooth scroll to report-scores-grid, (2) zero blur + zero LockedOverlay + zero '$159' + zero 'Unlock the full report' string on the premium page, (3) marker JPEG loads via R2 proxy with naturalWidth=720 (well above the 100 threshold), (4) PremiumReadyOverlay is compiled into the JS bundle with every expected testid + copy line + button label (verified via bundle grep — cannot fire real overlay without waiting minutes for Gemini analysis; source at UploadPage.jsx L544-558 wires it as a sibling to HeroTeaser exactly as spec), (5) free@elitescout.com sees LockedOverlay > PricingCards > pricing-card-single + pricing-card-pass with NO PremiumReadyBanner and NO '$159'/'Unlock the full report' legacy string, (6) S125 marker/subject_crop R2 proxy still returns HTTP 200 (image/jpeg, 291877 bytes), (7) S128 fast-path healthy — /api/reports/mine returns 200 and every report is at progress_step=5. PremiumReadyBanner and PremiumReadyOverlay are fully separated components rendered as siblings; both never render simultaneously by design.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "verifications": {
+    "premium_banner_on_report_page": {
+      "report_id": "0153da80-8192-4208-87ac-5e7f6d38eeb5",
+      "user": "admin@elitescout.com (role=admin, unlocked=true)",
+      "premium_ready_banner_present": true,
+      "premium_ready_banner_headline_text": "\u2705 Your Premium Scout Report is Ready",
+      "premium_ready_banner_open_btn_label": "Open Full Premium Report",
+      "premium_ready_banner_subtext": "Your analysis has been completed successfully. Full dossier for Almin13 below.",
+      "locked_overlay_count": 0,
+      "unlock_report_btn_count": 0,
+      "body_contains_$159": false,
+      "body_contains_unlock_the_full_report": false,
+      "body_contains_unlock_full_premium_report_ci": false,
+      "click_smooth_scroll_to_report_scores_grid": "scrollY 0 -> 1292 (target found + scrolled)"
+    },
+    "premium_stays_unblurred": {
+      "blur_locked_count": 0,
+      "report_scores_grid_visible": true,
+      "chapters_present": {"Technical": true, "Tactical": true, "Physical": true, "Mindset": true, "Mentality": true}
+    },
+    "player_image_marker": {
+      "img_count_with_marker_in_src": 1,
+      "natural_width": 720,
+      "natural_height": 1280,
+      "visible": true,
+      "src_matches_r2_proxy": "https://scout-ai-pro-1.preview.emergentagent.com/api/media/reports/0153da80-.../0153da80-...-marker (HTTP 200, 291877 bytes)"
+    },
+    "premium_ready_overlay_verification": {
+      "approach": "Static + bundle inspection (real overlay requires uploading a fresh video + waiting for Gemini analysis, out of scope for a frontend test run)",
+      "source_file": "/app/frontend/src/components/PremiumReadyOverlay.jsx",
+      "source_testids": {
+        "premium-ready-overlay": true,
+        "premium-ready-headline": true,
+        "premium-ready-subtext": true,
+        "premium-ready-open-btn": true,
+        "premium-ready-player-img": true,
+        "premium-ready-dismiss-btn": true
+      },
+      "source_copy": {
+        "headline": "\u2705 Your Premium Scout Report is Ready (split across two lines with 'Scout Report is Ready' in volt colour)",
+        "subtext": "Your analysis has been completed successfully.",
+        "cta_label": "Open Full Premium Report"
+      },
+      "bundle_contains_all_strings": true,
+      "component_wired_as_sibling_to_HeroTeaser": "UploadPage.jsx L525-558 — both HeroTeaser + PremiumReadyOverlay render at top level of the return; the former gated on !!heroReport, the latter on !!premiumReadyReport, so they are mutually exclusive by state.",
+      "state_branching": "L444-451 in handleSubmit: skipHeroTeaser=false -> setHeroReport, skipHeroTeaser=true -> setPremiumReadyReport (isPaidTier == admin/premium/vip/scout)",
+      "overlay_rendered_by_default": false,
+      "console_errors_on_upload_page": 0
+    },
+    "free_tier_flow": {
+      "clone_id": "test-iter56-free-locked (free@elitescout.com owner, is_paid=false)",
+      "premium_ready_banner_present_want_False": false,
+      "locked_overlay_present": true,
+      "pricing_cards_present": true,
+      "pricing_cards_nested_inside_locked_overlay": true,
+      "pricing_card_single_present": true,
+      "pricing_card_pass_present": true,
+      "unlock_report_btn_count": 0,
+      "body_contains_unlock_full_premium_report_ci": false,
+      "body_contains_$159": false,
+      "blur_locked_count": 1
+    },
+    "regression_s125_marker_proxy": {
+      "url": "/api/media/reports/0153da80-.../0153da80-...-marker.jpg",
+      "http_status": 200,
+      "content_type": "image/jpeg",
+      "content_length": 291877
+    },
+    "regression_s128_fast_path": {
+      "endpoint": "/api/reports/mine",
+      "http_status": 200,
+      "reports_returned": 5,
+      "reports_stuck_at_step_2": 0,
+      "all_reports_at_step_5": true
+    },
+    "component_separation_audit": {
+      "PremiumReadyBanner_only_when_unlocked": "ReportPage.jsx L2002-2014 — wrapped in `{unlocked && (...)}` at the very top of the report container",
+      "PremiumReadyOverlay_isolated_from_HeroTeaser": "UploadPage.jsx L525-558 — sibling JSX elements, each gated on its own state slot, never both truthy",
+      "no_double_render_possible": "handleSubmit L440-451 sets EITHER heroReport OR premiumReadyReport, never both"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/seed_iter56.py (reused for free-user report clone; cleaned up post-test)"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PremiumReadyBanner + PremiumReadyOverlay share a large amount of stylistic scaffolding (background gradient, ambient blur blobs, Crown+ShieldCheck badges, Sparkles+Open button, chapters strip). Consider extracting a shared `<PremiumCelebrationChrome>` primitive to prevent visual drift over time.",
+    "PremiumReadyOverlay uses `AnimatePresence` correctly and does not mount when `open=false`, so the DOM stays clean and testable — good.",
+    "The banner's `onOpenReport` fallback `window.scrollTo({top: window.innerHeight * 0.5})` is graceful. Verified live: scores grid is above the viewport-half point on desktop, so it kicks in only if the anchor node is missing (should not happen in practice).",
+    "ReportPage.jsx is now 3250 lines — still deferred split from S126 review. Not blocking S130, but a refactor sweep is overdue.",
+    "PremiumReadyBanner's outer <motion.section> has no rounded corner class while the button + card use volt/dark theme — visually the sharp corners are on-brand (Barlow uppercase / brutalist), just noting in case future design polish adds radius.",
+    "UploadPage skipHeroTeaser branching relies on `isPaidTier` at submit time; if a user upgrades mid-upload (edge case) the wrong overlay could show. Not observed as a real bug — call out for future consideration only."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only per review request)", "frontend": "100% \u2014 all 7 requirements verified"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (premium admin); free@elitescout.com / Free@2026 (free)",
+  "seed_data_creation": "Reused /app/backend/tests/seed_iter56.py to clone the master 0153da80-... report into `test-iter56-free-locked` owned by the free user (is_paid=false, full_report=null). Cleaned up post-test via `python tests/seed_iter56.py --cleanup` — 2 clones removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Session 130 shipped 2 new components — PremiumReadyBanner (top of ReportPage, gated on `unlocked` at ReportPage.jsx L2002-2014) and PremiumReadyOverlay (celebration modal on UploadPage completion, sibling to HeroTeaser at UploadPage.jsx L525-558). Legacy `unlock-report-btn` + `$159` + `Unlock the full report` strings are fully absent for both admin and free tiers. Free tier still correctly renders LockedOverlay > PricingCards > pricing-card-single + pricing-card-pass. Overlay was not visually verified live (would require an actual video upload + 2-3 min Gemini wait) — verified instead via source + JS bundle grep, both confirm all 4 required testids + all 3 required copy lines are present. If a future agent needs to trigger it live, they can either upload a real short clip as a premium user OR patch the initial state of `premiumReadyReport` in UploadPage.jsx for a dev-only test build.",
+  "rca of the issue": "N/A \u2014 no regressions or issues found. All 7 requirements from the Session 130 review pass end-to-end."
+}

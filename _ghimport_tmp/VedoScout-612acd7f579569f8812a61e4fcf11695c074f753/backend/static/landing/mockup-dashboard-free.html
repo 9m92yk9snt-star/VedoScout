@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup v3 — FREE Player Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&family=Barlow+Condensed:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#F6F4EE; --card:#FFFFFF; --green:#2E7D32; --green-dark:#1B5E20; --green-deep:#0F1F14; --green-soft:#E8F2E8; --ink:#15201A; --muted:#75816F; --border:#ECE8DC; --volt:#B9E93C; --lime:#CCFF00; --nav-ink:#0A0F0D; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--ink); display:flex; justify-content:center; }
+  .app { width:860px; background:var(--bg); padding-bottom:110px; }
+  .sv { width:21px; height:21px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+  .hdr { background:var(--nav-ink); position:relative; z-index:5; }
+  .hdr-in { padding:14px 26px 12px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { display:flex; flex-direction:column; }
+  .wm { font-family:'Barlow Condensed',sans-serif; font-weight:900; text-transform:uppercase; color:#fff; font-size:26px; letter-spacing:.14em; line-height:1; display:flex; align-items:baseline; gap:1px; }
+  .wm .me { background:var(--lime); color:var(--nav-ink); padding:0 4px; }
+  .tag { display:flex; align-items:center; gap:6px; font-size:9px; color:rgba(255,255,255,.55); font-weight:700; text-transform:uppercase; letter-spacing:.16em; margin-top:7px; }
+  .tag i { width:4px; height:4px; border-radius:50%; background:var(--lime); box-shadow:0 0 6px rgba(204,255,0,.6); }
+  .hdr-r { display:flex; align-items:center; gap:18px; }
+  .hico { position:relative; color:rgba(255,255,255,.78); }
+  .upcta { display:inline-flex; align-items:center; gap:8px; background:#1F4F2F; color:#fff; font-family:'Barlow Condensed',sans-serif; font-weight:800; text-transform:uppercase; letter-spacing:.12em; font-size:14px; padding:9px 20px; border-radius:999px; }
+  .strip { height:2px; background:rgba(255,255,255,.06); }
+  .strip i { display:block; height:100%; width:22%; background:var(--lime); box-shadow:0 0 8px rgba(204,255,0,.6); }
+  .badge { position:absolute; top:-8px; right:-9px; background:var(--lime); color:var(--nav-ink); font-size:10px; font-weight:800; min-width:17px; height:17px; border-radius:50%; display:flex; align-items:center; justify-content:center; padding:0 3px; }
+  .avatar { width:42px; height:42px; border-radius:50%; overflow:hidden; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.12); background:#DCE5D8; }
+  .avatar img { width:100%; height:100%; object-fit:cover; }
+
+  .hero { position:relative; padding:34px 26px 10px; overflow:hidden; min-height:190px; }
+  .hero img.player { position:absolute; right:0; top:0; width:330px; height:220px; object-fit:cover; -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 22%); mask-image:linear-gradient(90deg,transparent 0,#000 22%); }
+  .hero h1 { font-size:32px; font-weight:800; position:relative; z-index:2; }
+  .hero p { color:#4A5548; font-size:16px; margin-top:8px; max-width:330px; position:relative; z-index:2; line-height:1.5; }
+
+  .pad { padding:0 26px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:18px; box-shadow:0 1px 6px rgba(30,50,35,.05); }
+
+  .band { margin-top:14px; display:flex; align-items:center; padding:22px 24px; gap:22px; position:relative; z-index:3; }
+  .free-ring { width:104px; height:104px; border-radius:50%; border:6px solid #CDE3CC; background:#F1F8F0; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--green-dark); font-weight:800; font-size:19px; line-height:1.05; flex-shrink:0; }
+  .free-ring small { font-size:11.5px; font-weight:700; }
+  .band-mid b { font-size:18px; }
+  .prog { display:flex; align-items:center; gap:10px; margin-top:10px; font-weight:700; color:#4A5548; }
+  .track { width:200px; height:9px; background:#E7E3D6; border-radius:6px; position:relative; overflow:hidden; }
+  .track i { position:absolute; left:0; top:0; bottom:0; background:var(--green); border-radius:6px; }
+  .band-mid .left { font-size:13px; color:var(--muted); margin-top:8px; }
+  .band-sep { width:1px; align-self:stretch; background:var(--border); }
+  .band-r b { font-size:17px; }
+  .band-r p { font-size:13.5px; color:var(--muted); margin-top:5px; line-height:1.45; }
+  .btn { display:inline-flex; align-items:center; gap:8px; background:var(--green-dark); color:#fff; font-weight:700; font-size:14.5px; padding:11px 24px; border-radius:12px; margin-top:12px; }
+  .chev { margin-left:auto; color:#B7BFAF; font-size:24px; font-weight:400; }
+
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:16px; }
+  .stat { padding:20px; }
+  .stat .ic { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; margin-bottom:14px; background:var(--green-soft); color:var(--green); }
+  .stat .num { font-size:32px; font-weight:800; line-height:1; }
+  .stat .num small { font-size:18px; color:var(--muted); font-weight:700; }
+  .stat .lbl { font-size:14px; font-weight:700; margin-top:6px; }
+  .stat .sub { font-size:12px; color:var(--muted); margin-top:5px; line-height:1.4; }
+  .stat .track { width:100%; margin-top:12px; }
+  .btn-line { display:inline-block; border:1.5px solid var(--green); color:var(--green-dark); font-weight:700; font-size:12.5px; padding:8px 14px; border-radius:10px; margin-top:12px; }
+
+  .upsell { margin-top:16px; padding:24px; display:grid; grid-template-columns:1fr 1.05fr; gap:24px; align-items:center; }
+  .up-l .lockic { width:52px; height:52px; border-radius:16px; background:var(--green-soft); color:var(--green-dark); display:flex; align-items:center; justify-content:center; margin-bottom:14px; }
+  .up-l h3 { font-size:21px; font-weight:800; line-height:1.25; }
+  .up-l ul { list-style:none; margin-top:14px; }
+  .up-l li { font-size:14px; color:#3E4A3C; padding:4.5px 0; }
+  .up-l li::before { content:"✓"; color:var(--green); font-weight:800; margin-right:9px; }
+  .preview { background:var(--green-deep); border-radius:16px; padding:18px 20px; color:#fff; }
+  .preview .pt { font-size:13px; color:#C9D6C4; margin-bottom:12px; }
+  .prev-in { display:flex; align-items:center; gap:12px; }
+  .score-ring { width:96px; height:96px; border-radius:50%; background:conic-gradient(var(--volt) 0 82%, #2b4232 82% 100%); display:flex; align-items:center; justify-content:center; position:relative; flex-shrink:0; }
+  .score-ring::after { content:""; position:absolute; inset:9px; background:var(--green-deep); border-radius:50%; }
+  .score-ring .v { position:relative; z-index:2; text-align:center; font-weight:800; font-size:27px; }
+  .score-ring .v small { display:block; font-size:11px; color:#9DB694; font-weight:700; }
+  .score-lbl { font-size:11px; color:#C9D6C4; text-align:center; margin-top:8px; }
+  .btn-full { display:flex; align-items:center; justify-content:center; gap:9px; background:var(--green-dark); color:#fff; font-weight:700; font-size:15px; padding:13px; border-radius:12px; margin-top:14px; }
+
+  .twocol { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
+  .lh { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 8px; }
+  .lh b { font-size:17px; font-weight:800; }
+  .viewall { font-size:13px; font-weight:700; color:var(--green); }
+  .row { display:flex; gap:12px; padding:12px 20px; align-items:flex-start; }
+  .row .ric { width:42px; height:42px; border-radius:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .row b { font-size:14px; display:block; }
+  .row p { font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.4; }
+  .row .t { margin-left:auto; font-size:11px; color:#A9B2A2; white-space:nowrap; }
+  .gdot { width:9px; height:9px; border-radius:50%; background:var(--green); margin-top:5px; flex-shrink:0; }
+  .unread { background:var(--green); color:#fff; font-size:11px; font-weight:700; min-width:19px; height:19px; border-radius:50%; display:flex; align-items:center; justify-content:center; margin-top:3px; }
+  .pav { width:42px; height:42px; border-radius:50%; overflow:hidden; flex-shrink:0; }
+  .pav img { width:100%; height:100%; object-fit:cover; }
+  .msg-locked { position:relative; overflow:hidden; }
+  .msg-fake { filter:blur(4px); opacity:.55; }
+  .msg-over { position:absolute; left:0; right:0; bottom:0; top:52px; background:linear-gradient(180deg,#ffffff05,#fffffff0 62%); display:flex; flex-direction:column; align-items:center; justify-content:flex-end; text-align:center; padding:18px; }
+  .msg-over .l { width:44px; height:44px; border-radius:14px; background:var(--green-soft); color:var(--green-dark); display:flex; align-items:center; justify-content:center; margin-bottom:8px; }
+  .msg-over b { font-size:14.5px; }
+  .msg-over p { font-size:12.5px; color:var(--muted); max-width:300px; margin-top:3px; }
+
+  .comm { margin-top:16px; padding:20px 22px; }
+  .comm-h { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .comm-h b { font-size:17px; font-weight:800; }
+  .comm-g { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .cst .top { display:flex; align-items:center; gap:9px; }
+  .cst .cic { width:36px; height:36px; border-radius:11px; display:flex; align-items:center; justify-content:center; }
+  .cst .cic .sv { width:18px; height:18px; }
+  .cst .num { font-size:24px; font-weight:800; }
+  .cst .lbl { font-size:12.5px; color:#3E4A3C; margin-top:6px; font-weight:500; line-height:1.3; }
+  .cst .wk { font-size:11.5px; color:var(--green); font-weight:700; margin-top:5px; display:block; }
+  .c-green { background:#E8F2E8; color:#2E7D32; } .c-orange { background:#FFF2E2; color:#E08A1E; } .c-blue { background:#E7F0FB; color:#3B78D8; } .c-purple { background:#F1EAFB; color:#8B5CD6; }
+
+  .nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:860px; background:#fff; border-top:1px solid var(--border); display:flex; justify-content:space-around; align-items:center; padding:10px 0 14px; z-index:20; }
+  .nv { text-align:center; font-size:11.5px; color:#7C877A; font-weight:600; position:relative; }
+  .nv .sv { width:21px; height:21px; display:block; margin:0 auto 3px; }
+  .nv.on { color:var(--green-dark); font-weight:800; }
+  .upl { width:52px; height:52px; border-radius:50%; background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center; margin-top:-30px; box-shadow:0 6px 14px rgba(46,125,50,.4); }
+  .nv .badge { top:-4px; right:4px; }
+  .mock { text-align:center; font-size:11px; color:#A9B2A2; letter-spacing:.14em; text-transform:uppercase; padding:24px 0 8px; }
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-brief" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="M5 12h14"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+</svg>
+
+<div class="app">
+  <div class="hdr">
+    <div class="hdr-in">
+      <div class="logo">
+        <span class="wm">SCOUT<span class="me">ME</span>PLAY</span>
+        <span class="tag"><i></i> See your game like never before</span>
+      </div>
+      <div class="hdr-r">
+        <span class="hico"><svg class="sv"><use href="#i-bell"/></svg><span class="badge">2</span></span>
+        <span class="hico"><svg class="sv"><use href="#i-mail"/></svg><span class="badge">1</span></span>
+        <span class="upcta"><svg class="sv" style="width:15px;height:15px;"><use href="#i-up"/></svg> Upload video</span>
+        <div class="avatar"><svg class="sv" style="width:100%;height:100%;padding:9px;color:#8B978A;"><use href="#i-users"/></svg></div>
+      </div>
+    </div>
+    <div class="strip"><i></i></div>
+  </div>
+
+  <div class="hero">
+    <img class="player" src="hero-free.jpg" alt="">
+    <h1>Welcome back, Player! 👋</h1>
+    <p>Keep working. Every match brings you closer to your dream.</p>
+  </div>
+
+  <div class="pad">
+    <div class="card band">
+      <div class="free-ring">FREE<small>MEMBER</small></div>
+      <div class="band-mid">
+        <b>You have 1 free upload</b>
+        <div class="prog">0 <span class="track"><i style="width:3%"></i></span> 1</div>
+        <div class="left">1 upload left</div>
+      </div>
+      <div class="band-sep"></div>
+      <div class="band-r">
+        <b>Unlock your full potential</b>
+        <p>Get complete analysis, PDF reports, benchmarks and more.</p>
+        <span class="btn">See Plans</span>
+      </div>
+      <span class="chev">›</span>
+    </div>
+
+    <div class="stats">
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-file"/></svg></div><div class="num">0</div><div class="lbl">Reports Created</div><div class="sub">Create your first scout report</div><span class="btn-line">Upload a Video</span></div>
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-star"/></svg></div><div class="num">0 <small>/ 1</small></div><div class="lbl">Uploads Used</div><div class="sub">1 free upload left</div><span class="track"><i style="width:3%"></i></span></div>
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-eye"/></svg></div><div class="num">0</div><div class="lbl">Profile Views</div><div class="sub">Upgrade to Premium to get more views</div></div>
+      <div class="card stat"><div class="ic"><svg class="sv"><use href="#i-users"/></svg></div><div class="num">0</div><div class="lbl">Library Exposure</div><div class="sub">Upgrade to Premium to be visible</div></div>
+    </div>
+
+    <div class="card upsell">
+      <div class="up-l">
+        <div class="lockic"><svg class="sv"><use href="#i-lock"/></svg></div>
+        <h3>See What Scouts See<br>Upgrade to Premium</h3>
+        <ul>
+          <li>Full match analysis</li>
+          <li>Player benchmarks</li>
+          <li>Detailed PDF report</li>
+          <li>Visible in the Scout Library</li>
+          <li>Messages with agents &amp; scouts</li>
+        </ul>
+      </div>
+      <div>
+        <div class="preview">
+          <div class="pt">Scout Report Preview</div>
+          <div class="prev-in">
+            <div>
+              <div class="score-ring"><div class="v">82<small>/100</small></div></div>
+              <div class="score-lbl">Overall Score</div>
+            </div>
+            <svg width="200" height="164" viewBox="0 0 200 164" style="margin-left:auto;">
+              <polygon points="100,14 172,54 172,114 100,152 28,114 28,54" fill="none" stroke="#3a5244" stroke-width="1"/>
+              <polygon points="100,42 148,66 148,104 100,126 52,104 52,66" fill="none" stroke="#3a5244" stroke-width="1"/>
+              <polygon points="100,22 162,60 154,110 100,144 40,106 44,58" fill="#4C9A4C55" stroke="#7ED957" stroke-width="2"/>
+              <text x="100" y="9" fill="#C9D6C4" font-size="9.5" text-anchor="middle">Technical 7.8</text>
+              <text x="184" y="52" fill="#C9D6C4" font-size="9.5" text-anchor="middle">Physical 7.2</text>
+              <text x="184" y="124" fill="#C9D6C4" font-size="9.5" text-anchor="middle">Mental 8.6</text>
+              <text x="100" y="162" fill="#C9D6C4" font-size="9.5" text-anchor="middle">Tactical 8.4</text>
+              <text x="16" y="124" fill="#C9D6C4" font-size="9.5" text-anchor="middle">Attacking 8.1</text>
+              <text x="16" y="52" fill="#C9D6C4" font-size="9.5" text-anchor="middle">Defending 6.7</text>
+            </svg>
+          </div>
+        </div>
+        <span class="btn-full"><svg class="sv" style="width:17px;height:17px;"><use href="#i-crown"/></svg> See Plans</span>
+      </div>
+    </div>
+
+    <div class="twocol">
+      <div class="card">
+        <div class="lh"><b>Notifications</b><span class="viewall">View all</span></div>
+        <div class="row"><div class="ric c-green"><svg class="sv" style="width:18px;height:18px;"><use href="#i-shield"/></svg></div><div><b>Your report is ready!</b><p>Your latest report is now available.</p><p style="color:#A9B2A2;margin-top:4px;">2h ago</p></div><span class="gdot"></span></div>
+        <div class="row"><div class="ric c-orange"><svg class="sv" style="width:18px;height:18px;"><use href="#i-mail"/></svg></div><div><b>New message from an Agent</b><p>An agent has sent you a message.</p><p style="color:#A9B2A2;margin-top:4px;">5h ago</p></div><span class="gdot"></span></div>
+        <div class="row" style="padding-bottom:20px;"><div class="ric c-blue"><svg class="sv" style="width:18px;height:18px;"><use href="#i-trend"/></svg></div><div><b>Your profile is getting views!</b><p>Your profile has been viewed 18 times this week.</p><p style="color:#A9B2A2;margin-top:4px;">1d ago</p></div><span class="gdot"></span></div>
+      </div>
+      <div class="card msg-locked">
+        <div class="lh"><b>Messages</b><span class="viewall" style="display:inline-flex;align-items:center;gap:5px;"><svg class="sv" style="width:13px;height:13px;"><use href="#i-lock"/></svg> Premium</span></div>
+        <div class="msg-fake">
+          <div class="row"><div class="pav"><img src="/api/uploads/demo-player.jpg"></div><div><b>Agent Said M.</b><p>Hi! We are interested in seeing more of your games.</p></div><span class="t">1h ago</span><span class="unread">1</span></div>
+          <div class="row"><div class="pav"><img src="/api/uploads/demo-player.jpg"></div><div><b>Scout Fatima A.</b><p>Great performance! Keep up the amazing work.</p></div><span class="t">1d ago</span><span class="unread">1</span></div>
+          <div class="row" style="padding-bottom:20px;"><div class="pav"><img src="/api/uploads/demo-player.jpg"></div><div><b>Agent Ibrahim K.</b><p>We have upcoming trials next month.</p></div><span class="t">2d ago</span></div>
+        </div>
+        <div class="msg-over">
+          <div class="l"><svg class="sv"><use href="#i-lock"/></svg></div>
+          <b>Messages from agents, scouts &amp; clubs</b>
+          <p>Premium members receive and answer messages directly here.</p>
+          <span class="btn" style="margin-top:10px;">Upgrade to Premium</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card comm">
+      <div class="comm-h"><b>ScoutMePlay Community</b><span class="viewall">View all</span></div>
+      <div class="comm-g">
+        <div class="cst"><div class="top"><span class="cic c-green"><svg class="sv"><use href="#i-users"/></svg></span><span class="num">2,847</span></div><span class="lbl">Players in Library</span><span class="wk">↗ +146 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-orange"><svg class="sv"><use href="#i-shield"/></svg></span><span class="num">312</span></div><span class="lbl">Clubs Looking for Players</span><span class="wk">↗ +12 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-blue"><svg class="sv"><use href="#i-search"/></svg></span><span class="num">156</span></div><span class="lbl">Scouts Searching Players</span><span class="wk">↗ +8 this week</span></div>
+        <div class="cst"><div class="top"><span class="cic c-purple"><svg class="sv"><use href="#i-brief"/></svg></span><span class="num">24</span></div><span class="lbl">Active Agents</span><span class="wk">↗ +4 this week</span></div>
+      </div>
+    </div>
+
+    <div class="mock">Mockup v4 · Free dashboard</div>
+  </div>
+
+  <div class="nav">
+    <div class="nv on"><svg class="sv"><use href="#i-home"/></svg>Dashboard</div>
+    <div class="nv"><svg class="sv"><use href="#i-file"/></svg>My Reports</div>
+    <div class="upl"><svg class="sv" style="width:24px;height:24px;"><use href="#i-plus"/></svg></div>
+    <div class="nv"><svg class="sv"><use href="#i-mail"/></svg>Messages<span class="badge">1</span></div>
+    <div class="nv"><svg class="sv"><use href="#i-menu"/></svg>Menu</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 47 — Cloudflare R2 migration for PLAYER video uploads (Fase A) + verification of the pre-existing .mov→R2 migration (Fase B). 7/8 pytest cases PASS. Fase B (4 pre-migrated reports) fully verified: DB overrides, admin listing, R2 objects, HEAD 200 + video/mp4, and Range→206 all green. Fase A end-to-end (login as testfree-mar, POST /api/reports/upload with real football clip + extracted frame as marker, poll status to 'preview_ready', assert video_url is /api/media/reports/{id}/, HEAD 200 video/mp4, local .web.mp4 removed, R2 object present) PASSES. The single failure is pre-existing seeded data drift (not R2-related): premium@elitescout.com's Lukas A. report references /api/uploads/demo-sample.mp4 which does NOT exist on disk (HTTP 404). The URL routing branch itself is intact — the file is just missing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/uploads/demo-sample.mp4 (regression check via premium user's /api/reports/mine)",
+        "issue": "Seeded premium user's Lukas A. report has video_url='/api/uploads/demo-sample.mp4' but the file is MISSING from /app/backend/uploads/ — HEAD returns 404. Not a R2-migration bug (the resolver correctly picks the legacy branch when video_url_override is unset). Seed script or a prior cleanup deleted the demo asset. Consider re-uploading demo-sample.mp4 OR migrating this seeded report to R2 by adding a video_url_override."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_r2_player_uploads.py",
+    "/app/test_reports/pytest/iter47_r2_player_full.xml"
+  ],
+  "action_items": [
+    "Fix the missing demo asset: either restore /app/backend/uploads/demo-sample.mp4 for premium@elitescout.com's Lukas A. seeded report, OR migrate that seeded report to R2 by setting a video_url_override (recommended — same treatment given to the 4 migrated players in Fase B)."
+  ],
+  "critical_code_review_comments": [
+    "_flush_preview_artifacts_to_r2 works end-to-end: verified via real Gemini analysis run — .web.mp4 uploaded to reports/{id}/{id}.web.mp4, DB updated with video_url_override + poster_url_override, local /app/backend/uploads/{id}.web.mp4 deleted. r2_storage.object_exists() confirms presence.",
+    "_resolve_video_url / _resolve_poster_url resolver correctness: 4 migrated reports return /api/media/reports/ (override branch), the premium seeded Lukas A. report returns /api/uploads/... (legacy branch) — both paths exercised.",
+    "/api/media/{key:path} streaming proxy: HEAD returns 200 + content-type video/mp4 + content-length; Range: bytes=0-99 returns 206 with content-range 'bytes 0-99/6413317' — matches R2 spec.",
+    "generate_full_report_task's _ensure_report_video_local() was NOT exercised in this run (the free user's upload stops at preview_ready; full-report generation was not triggered by design in this test). Recommend a follow-up test that pays/manually_unlocks and confirms the video is downloaded from R2 into /tmp for full-report processing.",
+    "Cleanup pipeline is solid: after test, DB row is gone (verified via motor async find) and R2 reports/* object count returned to baseline 4 (only the 4 pre-migrated players remain).",
+    "Content gate rejection is well-behaved: ffmpeg testsrc + solid-color marker both rejected by Gemini with meaningful analysis_error strings; test now uses the real-football sample /app/backend/uploads/10d5db11-….mp4 with an extracted frame as marker to reach preview_ready."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_r2_player_uploads.py (new — 8 pytest cases: 4 Fase B + 2 Fase A regression + 1 R2 proxy Range + 1 Fase A end-to-end upload → R2 flush)"
+  ],
+  "success_rate": {"backend": "87.5% (7/8) — the 1 failure is seeded-asset drift, NOT an R2-migration defect", "frontend": "not tested (testing_type=backend only)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite; testfree-mar@elitescout.com / Free@2026!; premium@elitescout.com / Premium@2026",
+  "seed_data_creation": "Test uploaded a copy of /app/backend/uploads/10d5db11-…mp4 (real football clip, 15s, 480x848 h264) via POST /api/reports/upload as free-tier user with 5 prepaid uploads. Report row created in db.reports, video + poster flushed to R2 under reports/{new_id}/, local .web.mp4 deleted. Cleanup (module teardown) DELETEs the DB row via /api/admin/reports/{id}, R2-lists+deletes any reports/{new_id}/* objects, and does a motor async db.reports.delete_one sweep as belt-and-braces. Verified 0 leftover: db.reports has no 'TEST_R2_MIGRATION' rows and R2 reports/* count is back to baseline 4.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "R2 migration for PLAYER uploads (Fase A) is verified end-to-end with a REAL football clip source (ffmpeg testsrc + colour markers are rejected by Gemini's content gate — do not bother trying). To reproduce: copy /app/backend/uploads/10d5db11-…mp4 to /tmp, extract frame at t=1s as marker JPG, POST both to /api/reports/upload as testfree-mar. Preview completes in ~30-40s. The full-report generation path (which uses _ensure_report_video_local to re-download from R2 to /tmp) was NOT exercised — write a follow-up test that pays or manually_unlocks the report if that codepath needs verification. One pre-existing regression noted: /api/uploads/demo-sample.mp4 is 404 — either restore the asset or migrate that seed report to R2.",
+  "rca of the issue": "The one failing test (`test_faseA_regression_legacy_upload_head_status`) has RCA: premium@elitescout.com's seeded Lukas A. report (id=64f59196-a520-4ba4-a0f9-de96df8802ef) references video_url='/api/uploads/demo-sample.mp4' but /app/backend/uploads/demo-sample.mp4 does not exist on the container filesystem. This is orthogonal to the R2 migration — the _resolve_video_url() branch is intact (no video_url_override → legacy /api/uploads/ URL is returned). Fix: either (a) re-upload demo-sample.mp4 to /app/backend/uploads/ as part of seed script, or (b) migrate this legacy report to R2 by setting a video_url_override that points to an R2-hosted demo asset — same treatment as the 4 Fase-B migrations."
+}

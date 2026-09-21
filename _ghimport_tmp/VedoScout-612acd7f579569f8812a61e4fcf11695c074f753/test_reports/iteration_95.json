@@ -1,0 +1,33 @@
+{
+  "summary": "Iter95: verified the CV identity-safety architecture around premium report d8c04d5d-6618-4db2-a128-865447478ef6 (and the 2 other seeded reports). All 10 backend pytest tests pass. Admin login works, buyer /api/reports/{id} contains full_report + video_comments with frame_url + >=2 tele_clip_url and NO 'cv_shadow' key anywhere in the payload (deep-scanned). Evidence frame returns 200 image/jpeg, tele_clip returns 200 video/mp4. Admin /api/admin/cv-shadow/summary aggregate={reports:3, checked:295, suspect_rate<=0.05, switch_risk_frames:0, gap_bridge_active:true, engine_version:5}, and /api/admin/reports/{id}/cv-shadow returns engine_version=5. Both admin endpoints correctly require auth (403 without token). Frontend: admin can log in and reach /admin, Reports tab shows the cv-shadow-stats-toggle panel; expanding it renders cv-shadow-agg (\"3 reports · 295 track checks · identity match 0.581 · suspect 1% · switch-risk 0 · gap bridging ACTIVE\") plus cv-gap-bridge-status. The Radar button admin-cv-shadow-d8c04d5d-... opens cv-shadow-dialog with cv-shadow-stats (track checks 135, id-match 0.551, suspect 1(1%), switch-risk 0, empty-box 5, crowded 63, tap self-verify 0.818) and a cv-shadow-gallery with 3 flagged-moment thumbs (empty·01:08, empty·01:12, suspect·01:08). VISUAL CHECK PASSED: raw evidence frames (frame_00.jpg and frame_02.jpg) show a green grounded ellipse under the tracked player's feet, rendered BEHIND the boots/legs (occlusion working), and contain NO player-name label, NO 'TRACKED' text, NO chip/pill/pointer overlay. 'TRACKED' string is absent from the buyer report page body. Homepage loads (200). No cost-triggering endpoints were called.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "CvShadowDialog gallery thumbnails", "issue": "On initial dialog open, the 3 flagged-moment thumbnails inside cv-shadow-gallery remained in spinner/skeleton state during the ~3s wait window — the <img> children were 0 at the time of inspection. Blob-fetch may be slow or missing final assignment. Non-blocking; needs a longer wait to confirm they eventually resolve.", "selector": "[data-testid='cv-shadow-gallery'] img", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Admin dashboard reports tab / cv-shadow expand", "issue": "Console warning: 'Encountered two children with the same key' (React key duplication) fires when the CV Shadow panel expands. Cosmetic — likely duplicate report_id used as key across two lists in CvShadowStats/reports table.", "affected_selectors": ["[data-testid='cv-shadow-agg']"]},
+      {"flow": "Admin dashboard load", "issue": "Multiple 404 resource errors in console (6+). Origin not identified in this pass; may be missing static assets/icons. Non-blocking.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter95_cv_shadow.py", "/app/test_reports/pytest/iter95.xml"],
+  "action_items": [
+    "Investigate React duplicate-key warning triggered by CV Shadow reports list (CvShadowStats.jsx) — use a composite key (report_id + index) if report_id can repeat.",
+    "Check the source of the ~6 404 console errors on /admin (likely missing image/icon assets).",
+    "Verify cv-shadow-gallery thumbnails resolve within a reasonable time on dialog open; consider a loaded/error state visible on the thumbs after N seconds."
+  ],
+  "critical_code_review_comments": [
+    "Buyer serialization is properly whitelist-based — full deep scan of the report JSON confirmed 'cv_shadow' string absent for all 3 seeded premium reports. Good.",
+    "Admin cv-shadow endpoints correctly 403 unauthenticated requests.",
+    "Signed tele_clip_url (?tk=&exp=) works without Authorization header — good separation of buyer media auth from admin bearer.",
+    "Phase-15 marker rendering verified visually across two independent frames: grounded ellipse anchored at foot/ground-contact and correctly occluded by the player silhouette."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter95_cv_shadow.py"],
+  "success_rate": {"backend": "100%", "frontend": "~95% (functional; minor console warnings/404s + one thumbnail loading concern)"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite",
+  "seed_data_creation": "None — all verification used existing reports (d8c04d5d..., fe7bc3e5..., 3467a622...). No mutations, uploads, regenerate-evidence, or shadow-run triggers were called.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Reusable regression pytest at /app/backend/tests/test_iter95_cv_shadow.py (10 tests, all passing). Buyer report /api/reports/{id} response shape has video_comments at top level (not nested under full_report). Admin /api/admin/cv-shadow/summary returns {aggregate:{...}, reports:[...]}, and /api/admin/reports/{id}/cv-shadow returns {report_id, cv_shadow:{engine_version,...}}. Frontend testids confirmed working: cv-shadow-stats-toggle, cv-shadow-agg, cv-gap-bridge-status, admin-cv-shadow-{reportId}, cv-shadow-dialog, cv-shadow-stats, cv-shadow-gallery. Do NOT click 'Run shadow analysis now' or hit regenerate-evidence — costly LLM/CV work."
+}

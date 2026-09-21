@@ -1,0 +1,30 @@
+{
+  "summary": "ScoutMePlay backend retest after DKK→USD migration and addition of new embedded-Stripe endpoints. 19/19 backend tests pass: USD price ($1 default + admin edit to 5.0 and restore, legacy `price_dkk` payload still accepted, alias mirrored in response), admin stats now report `currency=USD` and both `revenue_usd` and legacy `revenue_dkk`, public `/api/config/stripe` correctly returns empty publishable_key + embedded_available=false, all three new embedded endpoints (`/payments/embedded/prepay-upload`, `/payments/embedded/unlock`) gracefully return 503 with 'Embedded checkout not configured' (the embedded status route returns 404 for unknown session), legacy redirect `/payments/prepay-upload` still produces a real Stripe URL via emergentintegrations stub and stores the txn with currency='usd' & amount=1.0, legacy `/payments/checkout` returns 404 for non-existent reports, `/webhook/stripe` route exists and rejects bare unsigned POST with 400, all three seeded accounts (admin/free/premium) login successfully, and `/me/upload-eligibility` for FREE user returns a sensible JSON shape.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": [
+    "/app/backend/tests/test_scoutmeplay_usd_embedded.py",
+    "/app/test_reports/pytest/iteration_2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~2050 lines (grew from ~1060 in iteration_1) — strongly recommend extracting routers: payments_legacy.py, payments_embedded.py, admin.py, reports.py. The 700-line guideline is significantly exceeded.",
+    "_embedded_ready() correctly guards on prefix `pk_`/`sk_` AND excludes the Emergent stub, but consider also rejecting placeholder values like 'pk_test_xxx'/'pk_test_' to avoid runtime errors if user pastes partial keys.",
+    "Webhook handler initializes `StripeCheckout` only for the emergentintegrations path; once real Stripe keys arrive, the embedded sessions' `checkout.session.completed` events won't be processed by this handler (different signing secret + different parser). Add an /api/webhook/stripe-embedded route or extend the existing handler to also verify with Stripe's stripe.Webhook.construct_event when STRIPE_WEBHOOK_SECRET is set. Without this, embedded prepay txns will only be credited via the polling /payments/embedded/status endpoint, NOT via webhook.",
+    "Legacy /payments/prepay-upload and /payments/checkout both hardcode `StripeCheckout(api_key=STRIPE_API_KEY)` which is the Emergent stub `sk_test_emergent`. When the user provides real Stripe keys, decide whether legacy flow should also switch to real Stripe — otherwise two parallel Stripe accounts (stub + real) will be in use.",
+    "admin_update_price upper-bound is 999 — fine for USD now but was originally meant for DKK. Document the new range or relax it (e.g., $999 max).",
+    "/api/uploads is still mounted publicly without auth (carryover from iteration_1).",
+    "free_preview_used flag is not exercised here; consider an admin endpoint to reset it for QA.",
+    "Backward-compat alias `price_dkk` in the response is a misleading name now that the currency is USD — keep until frontend is fully migrated, then remove. Add a TODO/deprecation note."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_scoutmeplay_usd_embedded.py (new)"
+  ],
+  "success_rate": { "backend": "100% (19/19)", "frontend": "not tested (backend-only request)" },
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite, free@elitescout.com / Free@2026, premium@elitescout.com / Premium@2026 — all confirmed working. Seed script /app/backend/seed_test_accounts.py re-ran cleanly.",
+  "seed_data_creation": "Ran /app/backend/seed_test_accounts.py once before tests to ensure the three seeded users exist with known passwords. Test also created exactly 1 payment_transactions doc (prepay-upload session) which remains in DB with payment_status='initiated' (will never complete since it's a stub URL).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All endpoints described in this iteration's review_request are green. The FULL upload happy-path was not exercised in this iteration because (a) no /tmp/sample.mp4 was present in this fork and (b) it's unrelated to the USD/embedded changes under review — it was already validated 23/23 in iteration_1. To re-test that flow: curl -sL -o /tmp/sample.mp4 https://www.w3schools.com/html/mov_bbb.mp4 and reuse the /api/reports/upload test in /app/backend/tests/test_elite_scout.py (note: it now also requires a `marker_image` multipart field + `marker_timestamp` form field). Embedded checkout endpoints will continue to 503 until BOTH STRIPE_PUBLISHABLE_KEY=pk_... and STRIPE_SECRET_KEY=sk_... (and sk != sk_test_emergent) are populated in /app/backend/.env and backend restarted. After that, retest the embedded suite — the 503 tests will need to be flipped to expect 200 with client_secret + session_id.",
+  "rca of the issue": "N/A — no bugs found in this iteration. All 19 assertions passed on first run, including the legacy USD currency persistence assertion that confirms the migration is end-to-end (Stripe checkout request → payment_transactions document)."
+}

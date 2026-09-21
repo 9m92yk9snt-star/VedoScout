@@ -1,0 +1,51 @@
+{
+  "summary": "Iter74 — Instagram funnel (guide magnet + funnel admin + discount codes), Carousel Studio, checkout regression with allow_promotion_codes, newsletter welcome email + unsubscribe, and blog regression. Backend: 15/15 pytest pass. Carousel Studio ran ONCE with real LLM (job 37f73665... — topic '5 mistakes football parents make on match day', 7 slides 1080x1080, caption + ZIP OK; job KEPT as demo per instructions). /guide UI verified end-to-end (hero, book image, 5 numbered mistakes, form → success + direct download). Admin → Marketing tab verified: marketing-admin, guide-funnel-admin (3 steps + master toggle + save + leads btn), discount-codes-admin (create/list/delete working), carousel-studio panel with topic/keyword/count/generate. Newsletter welcome email confirmed sent (log line 'Sent email to scoutmeplay@gmail.com (subject: Welcome to The ScoutMePlay Letter ⚽)'). Blog: /api/blog/posts returns 6 published including new bounce-back article; cover image loads 200; /blog listing renders 6 article cards. Final state restored: auto_weekly=true, funnel defaults (report_offer:2/enabled/code='', membership:5/enabled/code='', paid_guide:8/disabled), scoutmeplay@gmail.com KEPT in both guide_leads and newsletter, all TEST_* artifacts + disposable signup user cleaned up, demo carousel job KEPT.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/admin/discount-codes",
+        "issue": "Stripe promotion-code creation FAILS with 'Received unknown parameter: coupon'. In growth_funnel.py _create_stripe_promo the code first creates a Coupon and then calls stripe.PromotionCode.create(coupon=coupon.id, code=code) — the Stripe API version in use rejects the `coupon` parameter. Codes are still saved in DB with stripe_promo_id=null and a warning is returned, but they cannot be redeemed at Stripe checkout. Visible in the admin UI as a toast: 'Stripe error: Received unknown parameter: coupon'. Reproduced with TESTCODEDEBUG and TESTCODEAA5 (both cleaned up).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "GuidePage",
+        "issue": "Invalid-email submission on /guide does not show data-testid='guide-error' — it appears the browser HTML5 required/type=email validator prevents submit before the backend 400 is triggered. Not blocking (invalid emails still get rejected) but the guide-error selector referenced in the review request never activates via UI.",
+        "selector": "[data-testid='guide-error']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter74_funnel_carousel.py",
+    "/app/test_reports/pytest/iter74.xml"
+  ],
+  "action_items": [
+    "FIX: growth_funnel.py _create_stripe_promo — Stripe API rejects `coupon` param on PromotionCode.create. Likely fix: pass `coupon=coupon.id` correctly (already there) but the current Stripe library/API version wants the coupon nested differently, OR use `stripe.PromotionCode.create(code=code, coupon=coupon.id)` with newer Stripe SDK, OR upgrade the stripe python package. Verify STRIPE_SECRET_KEY is a live sk_test_ key (it is — login uses it) and that the Stripe account is on a recent API version. Retest by creating a code and inspecting stripe_promo_id != null and no warning."
+  ],
+  "critical_code_review_comments": [
+    "growth_funnel.py Stripe promo endpoint has no schema-migration/version handling — should catch InvalidRequestError specifically and surface a clearer admin message.",
+    "guide_subscribe stores emails lowercased (good) but the GuideSubscribe pydantic model uses plain `str` — consider EmailStr for validation instead of/in addition to the local EMAIL_RE regex.",
+    "carousel_studio.CarouselRequest slides limit is 4-9 but the LLM appears to always add a CTA/'comment GUIDE' slide (7 slides produced for slides=6). Confirm this is intentional so admin count selector matches actual output count.",
+    "growth_funnel.guide_funnel_loop starts with await asyncio.sleep(180) then sleeps 3600s — fine, but no lock if backend is scaled to multiple workers (would double-send emails). Same issue flagged for blog_studio_weekly_loop in iter73.",
+    "Newsletter subscribe fires-and-forgets welcome email via asyncio.create_task with no retry/logging on failure beyond logger.exception — consider a small in-memory queue with retry for production.",
+    "GuidePage does not surface guide-error data-testid when the browser blocks submit via HTML5 validation. Consider a lightweight client-side email regex that shows the guide-error message before native validation triggers.",
+    "AdminPage.jsx has a small hydration warning in console: 'In HTML, <span> cannot be a child of <option>' — harmless but noisy; fix the option markup."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter74_funnel_carousel.py (new pytest file, 15 tests, reusable — deselect test_funnel_sweep_dry_run_backdated_lead if backend not local, and this file already has cleanup)"
+  ],
+  "success_rate": {"backend": "100% (15/15 pytest)", "frontend": "95% — all admin marketing panels + /guide flow verified; blog & landing regression OK"},
+  "test_credentials": "admin@elitescout.com / Admin@2026!Elite (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "KEPT: (1) Carousel demo job 37f73665-b63a-405b-88bb-d2115ef8d1d2 — 7 slides 1080x1080 + caption + ZIP for owner; (2) scoutmeplay@gmail.com in guide_leads (owner demo); (3) scoutmeplay@gmail.com in newsletter_subscribers (welcome email demo sent to owner inbox). REMOVED: all TEST_iter74_* guide leads, all TESTCODE* discount codes, disposable signup user (TEST_iter74_ck_*), test newsletter subscribers. Funnel config restored to defaults, blog_studio auto_weekly still TRUE.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "test_iter74_funnel_carousel.py is reusable — 15 tests, no LLM dependency (carousel LLM call is done manually via curl, not in pytest). All tests use lowercased-email comparisons (backend stores lowercase). Discount code test currently PASSES because it only checks DB record creation — it prints a WARN if stripe_promo_id is null. Once the Stripe coupon bug is fixed, tighten test_discount_code_create_toggle_delete to assert `d.get('stripe_promo_id')` is set. Blog list endpoint is /api/blog/posts not /api/blog. Blog article endpoint returns {post:{...}, related:[...]}. Auth is Bearer token from POST /api/auth/login (access_token field). Owner's scoutmeplay@gmail.com MUST be preserved in guide_leads AND newsletter (used as demo).",
+  "rca of the issue": "Stripe discount-code bug: growth_funnel._create_stripe_promo calls stripe.Coupon.create() then stripe.PromotionCode.create(coupon=coupon.id, code=code). Stripe API rejects `coupon` as unknown parameter. Reproduction: POST /api/admin/discount-codes {code:'TESTCODEX', percent:15, applies_to:'both'} with admin bearer → response has warning='Stripe error: ... Received unknown parameter: coupon' and stripe_promo_id=null. Recent Stripe python SDK versions may need the parameter passed differently, or the Stripe account may be on an API version where PromotionCode has different parameter naming. Mitigation: upgrade stripe python package OR pin Stripe-Version header at API-call time. Impact: promo codes created via admin UI are NOT actually redeemable at Stripe checkout — the discount-code system is currently non-functional for checkout even though the DB CRUD works."
+}

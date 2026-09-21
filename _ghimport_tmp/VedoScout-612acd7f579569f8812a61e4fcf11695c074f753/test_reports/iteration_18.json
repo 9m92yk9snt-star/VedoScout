@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 18 — verified multi-anchor marking, upload-progress UX (PrecisionScanOverlay phases), KnowledgeCarousel, and HeroTeaser. Backend: 33/33 tests pass — 12 original precision_engine + 12 new iter18 multi-anchor (extract_frame_at, build_anchor_ensemble_block, anchors= kwarg on both prompt builders, login + eligibility + GET /api/reports/mine + premium demo report fetch + upload endpoint auth-gate) + 9 iter16 regression (all still green). Frontend: admin → /upload → set /tmp/test_clip.webm → 'Lock onto your player' → MarkerStudio opens fullscreen with all 5 new testids present (ms-confirm, ms-mode-box, ms-autofind, ms-video, ms-add-anchor). MARK BOX mode → mouse drag draws box → [+ ADD] in top bar adds anchor → ms-anchor-strip and ms-anchor-0 tile both render → top header reads 'ANCHOR 1 / 5 LOCKED' → ms-confirm now reads 'Done'. ✨ Suggest 5 (ms-autofind) lazy-loaded MediaPipe, completed in ~8s, added detected anchors gracefully (4 anchor tiles after autofind, no crash). DONE closes studio → upload-mark-preview renders on UploadPage. ✨ Suggest 5 is correctly DISABLED at HTML level when no anchors AND no box exist (better UX than toast); runAutoSuggest also has a toast.error guard for force-call paths. 0 page errors, 0 console errors across the full UI run. Component files verified: HeroTeaser.jsx (all 6 testids present: hero-teaser, hero-teaser-marker, hero-teaser-score, hero-teaser-unlock, hero-teaser-dismiss, hero-teaser-close); KnowledgeCarousel.jsx (exactly 8 facts, setInterval 6000ms, exports both named + default); PrecisionScanOverlay.jsx (accepts {open, phase, uploadPct}, renders upload-pct testid + volt progress bar in uploading phase, mounts KnowledgeCarousel).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter18_multianchor.py",
+    "/app/backend/tests/test_precision_engine.py",
+    "/app/backend/tests/test_iter16_precision_api.py",
+    "/app/test_reports/pytest/iter18_precision.xml",
+    "/app/test_reports/pytest/iter18_multianchor.xml",
+    "/app/test_reports/pytest/iter18_full.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MarkerStudio.jsx is now ~1418 lines (up from 1059) — exceeds the 700-line guideline more than before. Strongly recommend splitting into sub-modules: anchor-strip view, autofind/MediaPipe hook, gesture controller, geometry helpers. Would also enable focused unit tests on the anchor-add/remove logic.",
+    "server.py upload endpoint correctly extracts per-anchor crops via ffmpeg + extract_player_fingerprint, persists `anchors` list on the report doc, and passes anchor_crops list to Gemini in both sync and background paths. Hard cap of 5 anchors (anchors[1:6]) is enforced. Backward compatibility preserved: marker_box alone still works (verified).",
+    "Multi-anchor extraction silently catches per-anchor failures (logger.warning) — good resilience, but consider surfacing partial-success count in the report doc so the UI can show 'tracked across N/5 anchors'.",
+    "PrecisionScanOverlay sets stepIdx via interval inside useEffect — works but the dependency array `[open, phase]` will re-create the interval if phase flips mid-stream. Acceptable for this flow."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter18_multianchor.py"
+  ],
+  "success_rate": {"backend": "100% (33/33)", "frontend": "100% on all 15 critical UI assertions executed"},
+  "test_credentials": "All 3 seeded accounts verified working: admin@elitescout.com / Admin@2026!Elite (→ /admin, used for upload UI test since it bypasses the free-preview gate), premium@elitescout.com / Premium@2026 (login + report fetch OK), free@elitescout.com / Free@2026 (login lands at /dashboard because the seeded free account already has the free-preview consumed).",
+  "seed_data_creation": "None — no DB writes were performed. The full upload-to-Gemini flow was NOT triggered to avoid Gemini cost and because Stripe is in LIVE mode; multi-anchor backend behaviour was verified via direct unit tests on extract_frame_at and the prompt builders.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 33 backend tests are independent and reusable as a regression suite (`pytest tests/test_precision_engine.py tests/test_iter18_multianchor.py tests/test_iter16_precision_api.py`). New testids confirmed live in browser: ms-anchor-strip, ms-anchor-0, ms-anchor-add-btn, ms-add-anchor, ms-confirm (text now 'Done'), ms-autofind, plus the full ms-* registry from iter 17. HeroTeaser appears only when `eligibility.reason !== 'prepaid'` — admin has unlimited prepaid uploads so admin will NEVER see it (this is correct behaviour, not a bug). To see HeroTeaser live you must use a user with `free_preview_used: false` OR force an upload that returns a free preview, then UploadPage sets heroReport and renders the teaser. ✨ Suggest 5 button is correctly disabled at HTML level when neither anchors nor box exist (`disabled={!anchors.length && !box || ...}`) — better than a toast. /tmp/test_clip.webm is the working clip (solid darkgreen 854x480, 6s). Stripe LIVE — do not initiate paid checkouts.",
+  "rca of the issue": "N/A — no bugs found. All 3 upgrades shipped clean: (1) multi-anchor marking works end-to-end with add/auto-suggest/done; (2) PrecisionScanOverlay has the new 'uploading' phase with upload-pct progress and the KnowledgeCarousel mounted; (3) HeroTeaser file + all 6 testids are wired (visual render requires a free-preview upload, which we did not execute to avoid Gemini cost)."
+}

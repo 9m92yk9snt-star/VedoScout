@@ -1,0 +1,28 @@
+{
+  "summary": "Iter 90: branded /checkout/{single|premium|vip} embedded Stripe checkout — full backend + frontend verification. 10/10 pytest cases passed (guest embedded creation for all 3 tiers with correct admin prices $129/$29.99/$49.99, guest status returns unpaid for embedded ui_mode via _arm_real_stripe branch, invalid tier 400, unknown session 404, embedded/subscribe requires auth + rejects invalid tier + admin creates premium session, embedded/prepay-upload returns new amount+currency fields). Frontend Playwright: all 3 checkout pages render every required data-testid (page, back-btn, logo-home-link, kicker, headline, hero-img with correct tier image, payment-card, product-name, price, price-chip, stripe-wrapper, footer-trust). Correct tier-specific product names + prices displayed. Real Stripe iframe loads inside checkout-stripe-wrapper (Apple Pay + Link + Amazon Pay wallets + Email + Card fields visible in screenshot). Single: 5 benefits + testimonial + trust-row + script-line. Premium: 3 benefits + plan-summary with 7 features + vip-upsell-link. VIP: 3 benefits + 7 features + vip-promo. No horizontal overflow at 390px on any tier. /checkout/bogus correctly redirects to /. Landing page CTAs (paywall-single/premium/vip-cta) all navigate to /checkout/{tier} — NO redirect to checkout.stripe.com. Logged-in admin: /checkout/premium AND /checkout/single both load Stripe embedded form successfully (via /embedded/subscribe and /embedded/prepay-upload respectively). /welcome?guest_session=<bogus> correctly transitions to guest-welcome-error card ('Something went wrong — couldn't find this checkout session') after polling times out (~37s). No real payments completed (live Stripe keys respected). All 32 test payment_transactions docs cleaned up.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter90_embedded_checkout.py",
+    "/app/test_reports/pytest/iter90.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CheckoutPage.jsx is 699 lines — could be split (TierCopy config into a JSON module; benefits/plan blocks into subcomponents) for maintainability, but not blocking.",
+    "GuestWelcomePage polls 15 attempts × 2.5s (~37s) before showing error card — feels slow for a clearly-404 session_id; consider treating a 404 (not a network error) as an immediate 'error' state instead of retrying 15 times. Not blocking, but UX would be snappier.",
+    "backend/.env still has STRIPE_API_KEY='sk_test_emergent' while STRIPE_PUBLISHABLE_KEY is 'pk_live_...' — MISMATCHED environments. Tests happened to pass because the tests use whatever key is armed; owner should confirm the intended env (test vs live) is consistent to avoid surprises. Was flagged in previous iterations too — not caused by this task."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter90_embedded_checkout.py (new)"
+  ],
+  "success_rate": { "backend": "100% (10/10)", "frontend": "100% (all guest tiers + logged-in admin + CTA repointing + welcome regression)" },
+  "test_credentials": "Admin: admin@elitescout.com / Admin@2026!Elite (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — only ephemeral payment_transactions.initiated docs from Stripe session creation. All 32 cleaned up post-test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reusable pytest: /app/backend/tests/test_iter90_embedded_checkout.py covers all guest+auth embedded checkout endpoints and self-cleans. New /checkout/{tier} branded pages fully wired (data-testids listed above). Landing pricing CTAs and StickyPricingCTA now route to /checkout/*, not checkout.stripe.com. Live Stripe keys — DO NOT complete payments."
+}
