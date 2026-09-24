@@ -400,11 +400,21 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
         scoring_outcome = None
         scoring_stitch = None
         for strike in receiver_strikes:
-            scorer_touch = _touch_by_id(touches, strike.get("touch_id"))
-            same_actor, stitch = _same_actor_after_track_split(row, receiver, scorer_touch)
+            scorer_track = strike.get("player_track_id")
+            if scorer_track == receiver_track:
+                same_actor = True
+                stitch = {
+                    "status": "DIRECT",
+                    "from_track": receiver_track,
+                    "to_track": scorer_track,
+                }
+            else:
+                scorer_touch = _touch_by_id(touches, strike.get("touch_id"))
+                same_actor, stitch = _same_actor_after_track_split(
+                    row, receiver, scorer_touch
+                )
             if not same_actor:
                 continue
-            scorer_track = strike.get("player_track_id")
             shot_ms = int(strike["media_ms"])
             if _intervening_other_touch(
                 touches,
