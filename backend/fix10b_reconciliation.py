@@ -565,6 +565,8 @@ def _synth_event(proposal) -> dict:
         "proof_eligible": True,
         "causal_verified": True,
         "receiver_team_evidence": deepcopy(proposal.get("receiver_team_evidence") or {}),
+        "receiver_actor_stitch": deepcopy(proposal.get("receiver_actor_stitch") or {}),
+        "save_proof": deepcopy(proposal.get("save_proof") or {}),
         "fix10b_physical": _physical_proof(proposal),
     }
     return {
