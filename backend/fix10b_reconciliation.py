@@ -332,6 +332,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "receiver_ms": None,
             "teammate_shot_ms": None,
             "goal_outcome_ms": crossing_ms,
+            "physical_outcome_ms": crossing_ms,
             "source_trace_id": row.get("trace_id"),
             "source_touch_id": strike.get("touch_id"),
             "source_strike_id": strike.get("strike_id"),
@@ -361,6 +362,11 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "receiver_ms": None,
             "teammate_shot_ms": None,
             "goal_outcome_ms": None,
+            "physical_outcome_ms": (
+                int((outcome.get("intervention") or {}).get("media_ms"))
+                if _num((outcome.get("intervention") or {}).get("media_ms"))
+                else contact_ms
+            ),
             "canonical_outcome": "SAVED",
             "source_trace_id": row.get("trace_id"),
             "source_touch_id": strike.get("touch_id"),
@@ -448,6 +454,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "scorer_track_id": scoring.get("player_track_id"),
             "teammate_shot_ms": shot_ms,
             "goal_outcome_ms": crossing_ms,
+            "physical_outcome_ms": crossing_ms,
             "source_trace_id": row.get("trace_id"),
             "source_touch_id": target.get("touch_id"),
             "source_strike_id": scoring.get("strike_id"),
@@ -506,8 +513,11 @@ def _event_match(events, proposal):
 
 def _physical_proof(proposal) -> dict:
     evidence_ms = [
-        proposal.get("target_contact_ms"), proposal.get("receiver_ms"),
-        proposal.get("teammate_shot_ms"), proposal.get("goal_outcome_ms"),
+        proposal.get("target_contact_ms"),
+        proposal.get("receiver_ms"),
+        proposal.get("teammate_shot_ms"),
+        proposal.get("goal_outcome_ms"),
+        proposal.get("physical_outcome_ms"),
     ]
     return {
         "source": "FIX10B_PHYSICAL_RECONCILIATION",
@@ -528,6 +538,13 @@ def _synth_event(proposal) -> dict:
     contact = int(proposal["target_contact_ms"])
     scene = str(proposal.get("scene_id") or "scene_unknown")
     kind = proposal["kind"]
+    outcome_ms = int(
+        proposal.get("physical_outcome_ms")
+        if _num(proposal.get("physical_outcome_ms"))
+        else proposal.get("goal_outcome_ms")
+        if _num(proposal.get("goal_outcome_ms"))
+        else contact
+    )
     action_type = "SHOT" if kind in {"GOAL", "SHOT"} else "PASS"
     chain = {
         "target_contact_ms": contact,
@@ -539,12 +556,12 @@ def _synth_event(proposal) -> dict:
     }
     proof = {
         "proof_start_ms": contact,
-        "proof_end_ms": int(proposal.get("goal_outcome_ms") or contact),
+        "proof_end_ms": outcome_ms,
         "evidence_ms": _physical_proof(proposal)["evidence_ms"],
         "actor_keyframes": [],
         "contact_geometry": None,
         "contact_visibility": "PHYSICALLY_VERIFIED",
-        "outcome_ms": proposal.get("goal_outcome_ms"),
+        "outcome_ms": outcome_ms,
         "proof_eligible": True,
         "causal_verified": True,
         "receiver_team_evidence": deepcopy(proposal.get("receiver_team_evidence") or {}),
@@ -559,7 +576,7 @@ def _synth_event(proposal) -> dict:
         "source_action_ids": [],
         "start_ms": contact,
         "contact_ms": contact,
-        "end_ms": int(proposal.get("goal_outcome_ms") or contact),
+        "end_ms": outcome_ms,
         "canonical_ms": contact,
         "canonical_event_type": kind,
         "canonical_action_type": action_type,
@@ -619,7 +636,11 @@ def _apply_proposal(event: dict, proposal: dict) -> dict:
     proof = deepcopy(out.get("proof") or {})
     proof["proof_eligible"] = True
     proof["causal_verified"] = True
-    proof["outcome_ms"] = proposal.get("goal_outcome_ms")
+    proof["outcome_ms"] = (
+        proposal.get("physical_outcome_ms")
+        if _num(proposal.get("physical_outcome_ms"))
+        else proposal.get("goal_outcome_ms")
+    )
     proof["fix10b_physical"] = _physical_proof(proposal)
     merged_ms = set(proof.get("evidence_ms") or [])
     merged_ms.update(_physical_proof(proposal)["evidence_ms"])
