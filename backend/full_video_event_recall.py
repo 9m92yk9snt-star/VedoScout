@@ -72,9 +72,9 @@ def _scene_bounds(sequence_plan: dict, scene_graph: dict) -> dict[str, tuple[int
                 a, b = b, a
             if scene not in bounds:
                 bounds[scene] = (max(0, a), max(0, b))
-            else:
-                lo, hi = bounds[scene]
-                bounds[scene] = (min(lo, max(0, a)), max(hi, max(0, b)))
+            # When the scene graph supplied explicit bounds they are the hard
+            # cut authority. Plan windows are fallback metadata only and must
+            # never widen a known scene.
     return bounds
 
 
