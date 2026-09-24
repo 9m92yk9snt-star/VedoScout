@@ -20,6 +20,7 @@ import dense_track_refinement
 import event_trace
 import fix10a_ball_proof_gate
 import fix10a_goal_direction
+import full_video_event_recall
 import jersey_consensus
 import post_strike_intervention
 import shot_outcome_engine
@@ -131,7 +132,13 @@ def reconstruct_physical_match(
     analysis = deepcopy(sequence_analysis) if isinstance(sequence_analysis, dict) else {}
     graph = deepcopy(scene_graph) if isinstance(scene_graph, dict) else {}
     authority = deepcopy(identity_authority) if isinstance(identity_authority, dict) else {}
-    windows = dense_replay.select_critical_windows(plan, analysis)
+    semantic_windows = dense_replay.select_critical_windows(plan, analysis)
+    recall_plan = full_video_event_recall.build_physical_recall_windows(plan, graph)
+    recall_windows = recall_plan.get("windows") or []
+    windows = full_video_event_recall.union_dense_windows(
+        semantic_windows,
+        recall_windows,
+    )
     source = _source_meta(source_video, video_path)
     traces = []
     summaries = []
@@ -273,6 +280,8 @@ def reconstruct_physical_match(
                 "start_ms": window.get("start_ms"),
                 "end_ms": window.get("end_ms"),
                 "status": "ok",
+                "recall_window": bool(window.get("recall_window")),
+                "window_reasons": list(window.get("reasons") or []),
                 "refined_frames": len(dense_frames),
                 "ball_rows": len(trajectory),
                 "accepted_contacts": len(contact_result.get("accepted") or []),
@@ -298,6 +307,8 @@ def reconstruct_physical_match(
                 "start_ms": window.get("start_ms"),
                 "end_ms": window.get("end_ms"),
                 "status": "error",
+                "recall_window": bool(window.get("recall_window")),
+                "window_reasons": list(window.get("reasons") or []),
                 "reason": reason,
                 **diagnostic,
             })
@@ -308,6 +319,12 @@ def reconstruct_physical_match(
         else "ok" if ok_windows == len(windows)
         else "partial" if ok_windows else "error"
     )
+    recall_rows = [row for row in window_rows if row.get("recall_window") is True]
+    recall_ok = sum(row.get("status") == "ok" for row in recall_rows)
+    recall_failed = len(recall_rows) - recall_ok
+    recall_scan_complete = recall_plan.get("scan_complete") is True
+    recall_verification_complete = bool(recall_scan_complete and recall_failed == 0)
+
     failed_by_stage = {}
     for row in window_rows:
         if row.get("status") != "error":
@@ -324,8 +341,27 @@ def reconstruct_physical_match(
         "trace_summaries": summaries,
         "traces": traces,
         "unresolved_reasons": list(dict.fromkeys(unresolved_all)),
+        "recall_coverage": {
+            "version": full_video_event_recall.VERSION,
+            "scan_complete": recall_scan_complete,
+            "verification_complete": recall_verification_complete,
+            "status": (
+                "verified_complete"
+                if recall_verification_complete
+                else "partial" if recall_scan_complete else "unavailable"
+            ),
+            "planned_windows": len(recall_windows),
+            "executed_windows": len(recall_rows),
+            "windows_ok": recall_ok,
+            "windows_failed": recall_failed,
+            "planner_metrics": deepcopy(recall_plan.get("metrics") or {}),
+        },
         "metrics": {
             "critical_windows": len(windows),
+            "semantic_critical_windows": len(semantic_windows),
+            "physical_recall_windows": len(recall_windows),
+            "physical_recall_windows_ok": recall_ok,
+            "physical_recall_windows_failed": recall_failed,
             "windows_ok": ok_windows,
             "windows_failed": len(windows) - ok_windows,
             "windows_failed_by_stage": failed_by_stage,
