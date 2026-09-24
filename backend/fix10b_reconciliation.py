@@ -27,6 +27,16 @@ CANONICAL_MATCH_MS = 900
 TEAM_CONFIDENCE_MIN = 0.70
 PASS_ACTIONS = {"PASS", "CROSS", "KEY_PASS"}
 
+# FIX11 teammate local-track stitching. A local MOT id may split through a
+# short occlusion; this must not silently erase a real assist. Stitching is
+# conservative and never changes GLOBAL_TARGET identity.
+TRACK_STITCH_STRICT_MS = 500
+TRACK_STITCH_JERSEY_MS = 1400
+TRACK_STITCH_CENTER_H = 0.95
+TRACK_STITCH_STRICT_CENTER_H = 0.55
+TRACK_STITCH_SCALE_MIN = 0.55
+TRACK_STITCH_SCALE_MAX = 1.85
+
 
 def _num(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
@@ -55,6 +65,24 @@ def _verified_goal(outcome: dict) -> bool:
         and outcome.get("physical_outcome") == "GOAL_PLANE_CROSSING"
         and crossing.get("status") == "VERIFIED"
         and _num(crossing.get("crossing_ms"))
+    )
+
+
+def _verified_save(outcome: dict) -> bool:
+    if not isinstance(outcome, dict):
+        return False
+    save = outcome.get("save_evidence") if isinstance(outcome.get("save_evidence"), dict) else {}
+    intervention = outcome.get("intervention") if isinstance(outcome.get("intervention"), dict) else {}
+    role = outcome.get("intervention_role") if isinstance(outcome.get("intervention_role"), dict) else {}
+    crossing = outcome.get("goal_plane_crossing") if isinstance(outcome.get("goal_plane_crossing"), dict) else {}
+    return bool(
+        outcome.get("status") == "ok"
+        and outcome.get("physical_outcome") == "GOALKEEPER_SAVE_EVIDENCE"
+        and save.get("status") == "VERIFIED"
+        and intervention.get("status") == "VERIFIED"
+        and role.get("status") == "VERIFIED"
+        and role.get("role") == "GOALKEEPER"
+        and crossing.get("status") != "VERIFIED"
     )
 
 
@@ -117,14 +145,136 @@ def _first_other_touch_after(touches, *, actor, scene, after_ms, max_ms):
     return min(rows, key=lambda t: int(_touch_ms(t)), default=None)
 
 
-def _intervening_other_touch(touches, *, allowed_actor, scene, start_ms, end_ms) -> bool:
+def _intervening_other_touch(touches, *, allowed_actors, scene, start_ms, end_ms) -> bool:
+    allowed = {x for x in (allowed_actors or []) if isinstance(x, str)}
     return any(
         t.get("scene_id") == scene
-        and t.get("player_track_id") != allowed_actor
+        and t.get("player_track_id") not in allowed
         and _touch_ms(t) is not None
         and int(start_ms) < int(_touch_ms(t)) < int(end_ms)
         for t in touches
     )
+
+
+def _touch_by_id(touches, touch_id):
+    if not isinstance(touch_id, str):
+        return None
+    return next((t for t in touches if t.get("touch_id") == touch_id), None)
+
+
+def _verified_jersey_number(touch):
+    row = touch.get("jersey_posterior") if isinstance(touch, dict) and isinstance(touch.get("jersey_posterior"), dict) else {}
+    number = row.get("number")
+    return str(number) if row.get("status") == "VERIFIED" and number is not None else None
+
+
+def _valid_box(box):
+    if not isinstance(box, dict):
+        return False
+    try:
+        x, y, w, h = (float(box[k]) for k in ("x", "y", "w", "h"))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return -0.1 <= x <= 1.1 and -0.1 <= y <= 1.1 and 0 < w <= 1.2 and 0 < h <= 1.2
+
+
+def _box_continuity(a, b, *, strict=False):
+    if not (_valid_box(a) and _valid_box(b)):
+        return False, None
+    acx, acy = float(a["x"]) + float(a["w"]) / 2.0, float(a["y"]) + float(a["h"]) / 2.0
+    bcx, bcy = float(b["x"]) + float(b["w"]) / 2.0, float(b["y"]) + float(b["h"]) / 2.0
+    ah, bh = float(a["h"]), float(b["h"])
+    ratio = ah / max(bh, 1e-9)
+    distance_h = ((acx - bcx) ** 2 + (acy - bcy) ** 2) ** 0.5 / max(ah, bh, 1e-9)
+    limit = TRACK_STITCH_STRICT_CENTER_H if strict else TRACK_STITCH_CENTER_H
+    ok = TRACK_STITCH_SCALE_MIN <= ratio <= TRACK_STITCH_SCALE_MAX and distance_h <= limit
+    return ok, {"center_distance_h": round(distance_h, 4), "height_ratio": round(ratio, 4)}
+
+
+def _track_boxes(trace, track_id, scene, start_ms, end_ms):
+    rows = []
+    for frame in trace.get("decoded_frames") or [] if isinstance(trace, dict) else []:
+        if not isinstance(frame, dict) or frame.get("scene_id") != scene or not _num(frame.get("media_ms")):
+            continue
+        ms = int(frame["media_ms"])
+        if not int(start_ms) <= ms <= int(end_ms):
+            continue
+        for player in frame.get("players") or []:
+            if isinstance(player, dict) and player.get("local_track_id") == track_id and _valid_box(player.get("box")):
+                rows.append({"media_ms": ms, "box": deepcopy(player["box"])})
+                break
+    rows.sort(key=lambda x: x["media_ms"])
+    return rows
+
+
+def _same_actor_after_track_split(trace, receiver_touch, scorer_touch):
+    """Conservatively stitch one teammate across a local MOT id split.
+
+    Direct local-id equality remains the primary path. Different ids can be
+    linked only when team evidence agrees, the tracks are not simultaneously
+    visible, and frame geometry is continuous. Longer gaps additionally require
+    the same independently VERIFIED jersey number.
+    """
+    if not (_verified_touch(receiver_touch) and _verified_touch(scorer_touch)):
+        return False, {"status": "UNRESOLVED", "reason": "TOUCH_NOT_VERIFIED"}
+    left = receiver_touch.get("player_track_id")
+    right = scorer_touch.get("player_track_id")
+    if left == right:
+        return True, {"status": "DIRECT", "from_track": left, "to_track": right}
+    if not (isinstance(left, str) and isinstance(right, str)):
+        return False, {"status": "UNRESOLVED", "reason": "TRACK_ID_MISSING"}
+    if not (_team_is_target(receiver_touch) and _team_is_target(scorer_touch)):
+        return False, {"status": "UNRESOLVED", "reason": "TEAM_CONTINUITY_UNVERIFIED"}
+
+    scene = receiver_touch.get("scene_id")
+    if scene != scorer_touch.get("scene_id"):
+        return False, {"status": "UNRESOLVED", "reason": "SCENE_BOUNDARY"}
+    start_ms, end_ms = _touch_ms(receiver_touch), _touch_ms(scorer_touch)
+    if start_ms is None or end_ms is None or end_ms < start_ms:
+        return False, {"status": "UNRESOLVED", "reason": "INVALID_TOUCH_TIME"}
+
+    left_rows = _track_boxes(trace, left, scene, start_ms, end_ms)
+    right_rows = _track_boxes(trace, right, scene, start_ms, end_ms)
+    if not left_rows or not right_rows:
+        return False, {"status": "UNRESOLVED", "reason": "TRACK_GEOMETRY_MISSING"}
+
+    right_times = {r["media_ms"] for r in right_rows}
+    if any(r["media_ms"] in right_times for r in left_rows):
+        return False, {"status": "REJECTED", "reason": "TRACKS_VISIBLE_CONCURRENTLY"}
+
+    left_last = left_rows[-1]
+    right_first = right_rows[0]
+    gap_ms = int(right_first["media_ms"]) - int(left_last["media_ms"])
+    if gap_ms < 0:
+        return False, {"status": "REJECTED", "reason": "TRACK_ORDER_CONFLICT"}
+
+    left_jersey = _verified_jersey_number(receiver_touch)
+    right_jersey = _verified_jersey_number(scorer_touch)
+    jersey_match = bool(left_jersey and right_jersey and left_jersey == right_jersey)
+    max_gap = TRACK_STITCH_JERSEY_MS if jersey_match else TRACK_STITCH_STRICT_MS
+    if gap_ms > max_gap:
+        return False, {
+            "status": "UNRESOLVED", "reason": "TRACK_GAP_TOO_LONG",
+            "gap_ms": gap_ms, "jersey_match": jersey_match,
+        }
+
+    geometry_ok, geometry = _box_continuity(
+        left_last["box"], right_first["box"], strict=not jersey_match
+    )
+    if not geometry_ok:
+        return False, {
+            "status": "UNRESOLVED", "reason": "TRACK_GEOMETRY_DISCONTINUITY",
+            "gap_ms": gap_ms, "jersey_match": jersey_match, "geometry": geometry,
+        }
+    return True, {
+        "status": "VERIFIED_STITCH",
+        "reason": "SAME_TEAM_GEOMETRY_AND_JERSEY" if jersey_match else "STRICT_SAME_TEAM_GEOMETRY",
+        "from_track": left,
+        "to_track": right,
+        "gap_ms": gap_ms,
+        "jersey_number": left_jersey if jersey_match else None,
+        "geometry": geometry,
+    }
 
 
 def _goal_proof(outcome: dict) -> dict:
@@ -135,6 +285,16 @@ def _goal_proof(outcome: dict) -> dict:
         "reason": crossing.get("reason"),
         "evidence": deepcopy(crossing.get("evidence") or []),
         "visual_audit": deepcopy(crossing.get("visual_audit") or {}),
+    }
+
+
+def _save_proof(outcome: dict) -> dict:
+    row = outcome if isinstance(outcome, dict) else {}
+    return {
+        "save_evidence": deepcopy(row.get("save_evidence") or {}),
+        "intervention": deepcopy(row.get("intervention") or {}),
+        "intervention_role": deepcopy(row.get("intervention_role") or {}),
+        "goal_plane_crossing": deepcopy(row.get("goal_plane_crossing") or {}),
     }
 
 
@@ -180,6 +340,37 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "reason": "TARGET_RELEASE_PLUS_VERIFIED_GOAL_PLANE_CROSSING",
         })
 
+    # Target physical release -> verified goalkeeper intervention/save. This is
+    # independent of the semantic model having already emitted a SHOT row.
+    for strike in strikes:
+        if strike.get("global_target_id") != GLOBAL_TARGET_ID:
+            continue
+        outcome = outcomes.get(strike.get("strike_id"))
+        if not _verified_save(outcome):
+            continue
+        scene = str(strike.get("scene_id") or "scene_unknown")
+        contact_ms = int(strike["media_ms"])
+        proposals.append({
+            "proposal_id": _proposal_id("SHOT", scene, contact_ms, strike.get("player_track_id")),
+            "kind": "SHOT",
+            "scene_id": scene,
+            "target_contact_ms": contact_ms,
+            "target_track_id": strike.get("player_track_id"),
+            "scorer_track_id": strike.get("player_track_id"),
+            "receiver_track_id": None,
+            "receiver_ms": None,
+            "teammate_shot_ms": None,
+            "goal_outcome_ms": None,
+            "canonical_outcome": "SAVED",
+            "source_trace_id": row.get("trace_id"),
+            "source_touch_id": strike.get("touch_id"),
+            "source_strike_id": strike.get("strike_id"),
+            "goal_proof": _goal_proof(outcome),
+            "save_proof": _save_proof(outcome),
+            "proof_eligible": True,
+            "reason": "TARGET_RELEASE_PLUS_VERIFIED_GOALKEEPER_SAVE",
+        })
+
     # Direct assist: target release -> first other verified touch is teammate ->
     # same teammate owns the next scoring release -> verified goal crossing.
     for target in strikes:
@@ -202,17 +393,25 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
         receiver_strikes = [
             s for s in strikes
             if s.get("scene_id") == scene
-            and s.get("player_track_id") == receiver_track
             and _ms(s) is not None
             and int(receiver_ms) <= int(_ms(s)) <= target_ms + DIRECT_SHOT_MAX_MS
         ]
         scoring = None
         scoring_outcome = None
+        scoring_stitch = None
         for strike in receiver_strikes:
+            scorer_touch = _touch_by_id(touches, strike.get("touch_id"))
+            same_actor, stitch = _same_actor_after_track_split(row, receiver, scorer_touch)
+            if not same_actor:
+                continue
+            scorer_track = strike.get("player_track_id")
             shot_ms = int(strike["media_ms"])
             if _intervening_other_touch(
-                touches, allowed_actor=receiver_track, scene=scene,
-                start_ms=int(receiver_ms), end_ms=shot_ms,
+                touches,
+                allowed_actors={receiver_track, scorer_track},
+                scene=scene,
+                start_ms=int(receiver_ms),
+                end_ms=shot_ms,
             ):
                 continue
             outcome = outcomes.get(strike.get("strike_id"))
@@ -221,7 +420,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             crossing_ms = int((outcome.get("goal_plane_crossing") or {})["crossing_ms"])
             if crossing_ms > target_ms + DIRECT_GOAL_MAX_MS:
                 continue
-            scoring, scoring_outcome = strike, outcome
+            scoring, scoring_outcome, scoring_stitch = strike, outcome, stitch
             break
         if scoring is None:
             continue
@@ -236,7 +435,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "target_track_id": target_track,
             "receiver_track_id": receiver_track,
             "receiver_ms": int(receiver_ms),
-            "scorer_track_id": receiver_track,
+            "scorer_track_id": scoring.get("player_track_id"),
             "teammate_shot_ms": shot_ms,
             "goal_outcome_ms": crossing_ms,
             "source_trace_id": row.get("trace_id"),
@@ -244,6 +443,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "source_strike_id": scoring.get("strike_id"),
             "goal_proof": _goal_proof(scoring_outcome),
             "receiver_team_evidence": deepcopy(receiver.get("team_relation") or {}),
+            "receiver_actor_stitch": deepcopy(scoring_stitch or {}),
             "proof_eligible": True,
             "reason": "TARGET_RELEASE_TO_TEAMMATE_RECEIVE_TO_TEAMMATE_GOAL",
         })
@@ -283,7 +483,7 @@ def _event_match(events, proposal):
         and _num(e.get("canonical_ms"))
         and abs(int(e["canonical_ms"]) - target_ms) <= CANONICAL_MATCH_MS
     ]
-    if proposal.get("kind") == "GOAL":
+    if proposal.get("kind") in {"GOAL", "SHOT"}:
         preferred = [e for e in candidates if e.get("canonical_action_type") == "SHOT"]
     else:
         preferred = [e for e in candidates if e.get("canonical_action_type") in PASS_ACTIONS]
@@ -307,7 +507,9 @@ def _physical_proof(proposal) -> dict:
         "source_strike_id": proposal.get("source_strike_id"),
         "evidence_ms": [int(x) for x in evidence_ms if _num(x)],
         "goal_proof": deepcopy(proposal.get("goal_proof") or {}),
+        "save_proof": deepcopy(proposal.get("save_proof") or {}),
         "receiver_team_evidence": deepcopy(proposal.get("receiver_team_evidence") or {}),
+        "receiver_actor_stitch": deepcopy(proposal.get("receiver_actor_stitch") or {}),
         "proof_eligible": proposal.get("proof_eligible") is True,
     }
 
@@ -316,7 +518,7 @@ def _synth_event(proposal) -> dict:
     contact = int(proposal["target_contact_ms"])
     scene = str(proposal.get("scene_id") or "scene_unknown")
     kind = proposal["kind"]
-    action_type = "SHOT" if kind == "GOAL" else "PASS"
+    action_type = "SHOT" if kind in {"GOAL", "SHOT"} else "PASS"
     chain = {
         "target_contact_ms": contact,
         "receiver_local_track_id": proposal.get("receiver_track_id"),
@@ -351,7 +553,11 @@ def _synth_event(proposal) -> dict:
         "canonical_ms": contact,
         "canonical_event_type": kind,
         "canonical_action_type": action_type,
-        "canonical_outcome": "GOAL" if kind == "GOAL" else "TEAMMATE_GOAL",
+        "canonical_outcome": (
+            "GOAL" if kind == "GOAL"
+            else str(proposal.get("canonical_outcome") or "UNKNOWN") if kind == "SHOT"
+            else "TEAMMATE_GOAL"
+        ),
         "causal_verified": True,
         "resolution_reason": proposal.get("reason"),
         "actor_local_track_id": proposal.get("target_track_id"),
@@ -362,6 +568,7 @@ def _synth_event(proposal) -> dict:
         "proof": proof,
         "causal_chain": chain,
         "receiver_team_resolution": deepcopy(proposal.get("receiver_team_evidence") or {}),
+        "receiver_actor_stitch": deepcopy(proposal.get("receiver_actor_stitch") or {}),
         "reconciliation_authority": "FIX10B_PHYSICAL_RECONCILIATION",
     }
 
@@ -377,6 +584,10 @@ def _apply_proposal(event: dict, proposal: dict) -> dict:
         out["canonical_event_type"] = "GOAL"
         out["canonical_action_type"] = "SHOT"
         out["canonical_outcome"] = "GOAL"
+    elif proposal["kind"] == "SHOT":
+        out["canonical_event_type"] = "SHOT"
+        out["canonical_action_type"] = "SHOT"
+        out["canonical_outcome"] = str(proposal.get("canonical_outcome") or "UNKNOWN")
     else:
         out["canonical_event_type"] = "ASSIST"
         if out.get("canonical_action_type") not in PASS_ACTIONS:
@@ -405,6 +616,9 @@ def _apply_proposal(event: dict, proposal: dict) -> dict:
     proof["evidence_ms"] = sorted(int(x) for x in merged_ms if _num(x))[:60]
     if proposal["kind"] == "ASSIST":
         proof["receiver_team_evidence"] = deepcopy(proposal.get("receiver_team_evidence") or {})
+        proof["receiver_actor_stitch"] = deepcopy(proposal.get("receiver_actor_stitch") or {})
+    if proposal["kind"] == "SHOT":
+        proof["save_proof"] = deepcopy(proposal.get("save_proof") or {})
     out["proof"] = proof
     out["reconciliation_authority"] = "FIX10B_PHYSICAL_RECONCILIATION"
     out["fix10b_previous_classification"] = before
@@ -418,7 +632,7 @@ def _dedupe_events(events):
     for event in sorted(events, key=lambda e: (str(e.get("scene_id") or ""), int(e.get("canonical_ms") or 0), str(e.get("event_id") or ""))):
         duplicate = next((
             old for old in out
-            if event.get("canonical_event_type") in {"GOAL", "ASSIST"}
+            if event.get("canonical_event_type") in {"GOAL", "ASSIST", "SHOT"}
             and old.get("canonical_event_type") == event.get("canonical_event_type")
             and old.get("scene_id") == event.get("scene_id")
             and _num(old.get("canonical_ms")) and _num(event.get("canonical_ms"))
