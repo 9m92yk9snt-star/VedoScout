@@ -311,16 +311,37 @@ def test_b116_weakly_separated_kit_clusters_fail_closed():
     assert not any(d.get("team") for o in observations for d in o["players"])
 
 
-def test_team_anchor_reports_scene_spread_without_labelling_unstable_kit():
-    observations = _team_observations(12)
-    observations[6]["cut"] = True
-    for o in observations[6:]:
+def test_team_anchor_reports_scene_spread_and_labels_only_stable_scenes():
+    observations = _team_observations(20)
+    observations[10]["cut"] = True
+    for o in observations[10:]:
         o["players"][0]["kit_chroma"] = [90.0, 100.0]
+        o["players"][1]["kit_chroma"] = [91.0, 99.0]
     auth = authority([(o["media_ms"], TARGET) for o in observations])
     diag = fsg.apply_team_authority(observations, auth,
-                                    model_factory=lambda anchor: _FixedTeamModel(anchor))
-    assert diag["status"] == "unresolved"
+                                    model_factory=lambda anchor: _FixedTeamModel(
+                                        anchor, centers=(anchor, (170.0, 180.0))))
+    assert diag["status"] == "partial"
     assert diag["reason"] == "UNSTABLE_TARGET_KIT_ANCHOR"
     assert len(diag["target_scene_spreads"]) == 2
     assert all(row["median_spread"] == 0 for row in diag["target_scene_spreads"])
-    assert not any(d.get("team") for o in observations for d in o["players"])
+    assert diag["labeled_detections"] > 0
+    assert all(d.get("team") == "target_team" for o in observations for d in o["players"][:2])
+
+
+def test_scene_local_kit_calibration_does_not_label_scene_without_target_proof():
+    observations = _team_observations(30)
+    observations[10]["cut"] = True
+    observations[20]["cut"] = True
+    for o in observations[10:20]:
+        o["players"][0]["kit_chroma"] = [90.0, 100.0]
+        o["players"][1]["kit_chroma"] = [91.0, 99.0]
+    auth = authority([(o["media_ms"], TARGET) for o in observations[:20]])
+    diag = fsg.apply_team_authority(
+        observations, auth,
+        model_factory=lambda anchor: _FixedTeamModel(anchor, centers=(anchor, (170.0, 180.0))),
+    )
+    assert diag["status"] == "partial"
+    assert diag["labeled_detections"] > 0
+    assert all(d.get("team") is None for o in observations[20:] for d in o["players"])
+    assert diag["scene_models"][2]["reason"] == "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"

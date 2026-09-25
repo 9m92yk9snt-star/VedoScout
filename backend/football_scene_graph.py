@@ -402,7 +402,8 @@ def _sample_evenly(rows, limit=400):
     return [rows[round(i * (len(rows) - 1) / (limit - 1))] for i in range(limit)]
 
 
-def apply_team_authority(observations, unified_authority, model_factory=None) -> dict:
+def apply_team_authority(observations, unified_authority, model_factory=None,
+                         *, _allow_scene_fallback=True) -> dict:
     """Attach fail-closed target-relative kit labels to detector observations.
 
     The target kit anchor is derived only from scene frames where the shared
@@ -433,9 +434,11 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
     frames = provisional.get("frames") or []
     target_samples = []
     samples_by_scene = {}
+    observations_by_scene = {}
     for o, fr in zip(valid_obs, frames):
         if int(round(float(o["media_ms"]))) != int(fr.get("media_ms", -1)):
             continue
+        observations_by_scene.setdefault(str(fr.get("scene_id") or "unknown"), []).append(o)
         tm = fr.get("global_target") or {}
         if not (tm.get("status") == "VERIFIED" and tm.get("proof_eligible") is True):
             continue
@@ -468,6 +471,37 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
                 _chroma_distance(sample, center) for sample in samples
             ]), 4),
         })
+
+    def unresolved(reason):
+        result = {**base, "reason": reason}
+        if not _allow_scene_fallback or reason not in {
+            "UNSTABLE_TARGET_KIT_ANCHOR", "TARGET_KIT_CLUSTER_INCONSISTENT",
+            "TEAM_CLUSTERS_NOT_SEPARABLE", "TARGET_TEAM_CLUSTER_AMBIGUOUS",
+        }:
+            return result
+        # A whole-video kit anchor may mix sun/shade or white balance across
+        # hard cuts. Each scene is allowed to label only its own detections,
+        # using its own proof-eligible target samples and the SAME strict gates.
+        # Never carry a kit label across a cut or manufacture target identity.
+        scene_models = []
+        labeled = 0
+        for scene, rows in sorted(observations_by_scene.items()):
+            local = apply_team_authority(
+                rows, unified_authority, model_factory,
+                _allow_scene_fallback=False,
+            )
+            count = int(local.get("labeled_detections") or 0)
+            labeled += count
+            scene_models.append({
+                "scene_id": scene,
+                "status": local.get("status"),
+                "reason": local.get("reason"),
+                "target_samples": int(local.get("target_samples") or 0),
+                "kit_samples": int(local.get("kit_samples") or 0),
+                "labeled_detections": count,
+            })
+        return {**result, "status": "partial" if labeled else "unresolved",
+                "labeled_detections": labeled, "scene_models": scene_models}
     if len(target_samples) < TEAM_MIN_TARGET_SAMPLES:
         return {**base, "reason": "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"}
     if len(all_samples) < TEAM_MIN_KIT_SAMPLES:
@@ -477,7 +511,7 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
     target_spread = _median([_chroma_distance(x, anchor) for x in target_samples])
     base["target_median_spread"] = round(target_spread, 4)
     if target_spread > TEAM_MAX_TARGET_MEDIAN_SPREAD:
-        return {**base, "reason": "UNSTABLE_TARGET_KIT_ANCHOR"}
+        return unresolved("UNSTABLE_TARGET_KIT_ANCHOR")
 
     try:
         if model_factory is None:
@@ -519,13 +553,13 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
     if min(cluster_counts) < TEAM_MIN_CLUSTER_SAMPLES:
         return {**base, "reason": "TEAM_CLUSTER_TOO_SMALL"}
     if separation < TEAM_MIN_CLUSTER_SEPARATION:
-        return {**base, "reason": "TEAM_CLUSTERS_NOT_SEPARABLE"}
+        return unresolved("TEAM_CLUSTERS_NOT_SEPARABLE")
     if target_distance > TEAM_MAX_TARGET_CENTER_DISTANCE:
         return {**base, "reason": "TARGET_ANCHOR_OUTSIDE_TEAM_CLUSTER"}
     if other_distance - target_distance < TEAM_MIN_TARGET_CENTER_MARGIN:
-        return {**base, "reason": "TARGET_TEAM_CLUSTER_AMBIGUOUS"}
+        return unresolved("TARGET_TEAM_CLUSTER_AMBIGUOUS")
     if target_agreement < TEAM_MIN_TARGET_CLUSTER_AGREEMENT:
-        return {**base, "reason": "TARGET_KIT_CLUSTER_INCONSISTENT"}
+        return unresolved("TARGET_KIT_CLUSTER_INCONSISTENT")
 
     labeled = 0
     for o in valid_obs:
