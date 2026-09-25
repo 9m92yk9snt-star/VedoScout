@@ -16,7 +16,7 @@ import fix10b_reconciliation
 VERSION = 2
 
 
-def _scoring_scan(canonical: dict, sequence_analysis: dict) -> dict:
+def _scoring_scan(canonical: dict, sequence_analysis: dict, physical_result: dict | None = None) -> dict:
     unresolved = [
         u for u in (canonical or {}).get("unresolved") or [] if isinstance(u, dict)
     ]
@@ -29,9 +29,29 @@ def _scoring_scan(canonical: dict, sequence_analysis: dict) -> dict:
         if str(u.get("kind") or "").upper() in {"PASS", "CROSS", "KEY_PASS"}
     )
     reconciliation = canonical.get("reconciliation") if isinstance(canonical, dict) else {}
+    recall = (
+        physical_result.get("recall_coverage")
+        if isinstance(physical_result, dict) and isinstance(physical_result.get("recall_coverage"), dict)
+        else {}
+    )
+    semantic_complete = (sequence_analysis or {}).get("coverage_complete") is True
+    physical_scan_complete = recall.get("scan_complete") is True
+    physical_verification_complete = recall.get("verification_complete") is True
     return {
-        "performed": (sequence_analysis or {}).get("coverage_complete") is True,
+        "performed": bool(semantic_complete or physical_scan_complete),
         "authority": "FIX10B_PHYSICAL_RECONCILIATION",
+        "semantic_response_contract_complete": semantic_complete,
+        "physical_recall_scan_complete": physical_scan_complete,
+        "physical_recall_verification_complete": physical_verification_complete,
+        "coverage_status": (
+            "SEMANTIC_AND_PHYSICAL_COMPLETE"
+            if semantic_complete and physical_verification_complete
+            else "PHYSICAL_COMPLETE_SEMANTIC_INCOMPLETE"
+            if physical_verification_complete
+            else "SEMANTIC_COMPLETE_PHYSICAL_PARTIAL"
+            if semantic_complete
+            else "PARTIAL"
+        ),
         "verified_goals": int((canonical or {}).get("metrics", {}).get("goals") or 0),
         "verified_assists": int((canonical or {}).get("metrics", {}).get("assists") or 0),
         "unresolved_goal_attempts": goal_unresolved,
@@ -93,7 +113,7 @@ def reconcile_unified_result(
     )
     timeline = canonical_output_authority.project_timeline(canonical)
     evidence = canonical_output_authority.build_event_native_evidence(canonical)
-    scoring = _scoring_scan(canonical, sequence)
+    scoring = _scoring_scan(canonical, sequence, physical_result)
 
     metrics = deepcopy(source.get("metrics") or {})
     cmetrics = (
@@ -109,6 +129,8 @@ def reconcile_unified_result(
         "fix10b_proposals_applied": int(
             (canonical.get("reconciliation") or {}).get("proposals_applied") or 0
         ),
+        "physical_recall_scan_complete": scoring.get("physical_recall_scan_complete") is True,
+        "physical_recall_verification_complete": scoring.get("physical_recall_verification_complete") is True,
     })
 
     source.update({

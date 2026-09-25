@@ -247,7 +247,22 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
         img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True
     )
     detector.net.setInput(blob)
-    out = detector.net.forward()[0].T
+    raw = np.asarray(detector.net.forward())
+    # OpenCV can return an empty prediction tensor on a valid decoded frame.
+    # Treat that as no detections; never let a detector shape abort the whole
+    # physical-recall window with an opaque IndexError.
+    if raw.size == 0:
+        return ([], [], []) if include_a7_support else ([], [])
+    if raw.ndim == 3 and raw.shape[0] == 1:
+        raw = raw[0]
+    if raw.ndim != 2:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    # YOLO exports use either (channels, predictions) or its transpose.
+    if (raw.shape[0] >= 5 and raw.shape[0] < raw.shape[1]) or raw.shape[1] < 5:
+        raw = raw.T
+    if raw.shape[1] < 5:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    out = raw
     cls = out[:, 4:].argmax(1)
     conf = out[:, 4:].max(1)
     def collect(cid, threshold):
@@ -259,7 +274,10 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
             scores.append(float(score))
         idx = cv2.dnn.NMSBoxes(boxes, scores, float(threshold), cv_detect.NMS_T)
         rows = []
-        for i in np.array(idx).flatten() if len(idx) else []:
+        for i in np.asarray(idx if idx is not None else [], dtype=int).reshape(-1):
+            i = int(i)
+            if i < 0 or i >= len(boxes):
+                raise ValueError(f"DENSE_DETECTOR_NMS_INDEX:{i}/{len(boxes)}")
             x, y, bw, bh = boxes[i]
             rows.append({
                 "box": {
@@ -346,8 +364,10 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
     ]
     union = set().union(*candidate_sets) if candidate_sets else set()
     unique_geometry = bool(
-        len(hypotheses) == 1
-        or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+        hypotheses and (
+            len(hypotheses) == 1
+            or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+        )
     )
     if (
         resolved.get("proof_eligible") is True
@@ -382,6 +402,56 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
         "candidate_local_track_ids": ids,
         "proof_eligible": False,
     }
+
+def _verify_bracketed_dense_target(frames, authority):
+    """Verify continuous local body between two independent exact target proofs.
+
+    The existing authority stays untouched. A cut, missing frame, competing
+    body, predicted/ambiguous local association, or identity barrier prevents
+    promotion for the entire interval.
+    """
+    exact = [i for i, frame in enumerate(frames)
+             if (frame.get("global_target") or {}).get("status") == "VERIFIED"
+             and (frame.get("global_target") or {}).get("reason") == "OK_EXACT"
+             and frame.get("used_fallback") is not True]
+    for left, right in zip(exact, exact[1:]):
+        start, end = frames[left], frames[right]
+        track = (start.get("global_target") or {}).get("local_track_id")
+        if (not track or track != (end.get("global_target") or {}).get("local_track_id")
+                or start.get("scene_id") != end.get("scene_id")
+                or int(end["media_ms"]) - int(start["media_ms"]) > TARGET_NEAR_MS
+                or right == left + 1):
+            continue
+        middle = frames[left + 1:right]
+        if any(f.get("cut_barrier") or f.get("used_fallback")
+               or f.get("scene_id") != start.get("scene_id")
+               or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
+               or (f.get("global_target") or {}).get("reason") != "NON_PROOF_IDENTITY_CONTINUITY"
+               or (f.get("global_target") or {}).get("candidate_local_track_ids") != [track]
+               or len([p for p in f.get("players") or []
+                       if p.get("local_track_id") == track
+                       and p.get("association_state") == "VERIFIED_LOCAL"]) != 1
+               for f in middle):
+            continue
+        # The canonical resolver enforces unresolved intervals and scene cuts.
+        # Its interpolation is only a geometry cross-check; independent dense
+        # tracking across every source frame supplies the additional proof.
+        if any(uia.resolve_target_at(authority, int(f["media_ms"]),
+                                     max_interp_ms=TARGET_NEAR_MS)[1] != "OK_INTERPOLATED"
+               for f in middle):
+            continue
+        for f in middle:
+            player = next(p for p in f["players"] if p.get("local_track_id") == track)
+            f["global_target"] = {
+                "status": "VERIFIED", "reason": "DENSE_TWO_ANCHOR_CONTINUITY",
+                "local_track_id": track, "candidate_local_track_ids": [track],
+                "proof_eligible": True, "body_box": deepcopy(player["box"]),
+                "body_confidence": player.get("confidence"),
+                "body_team": player.get("team"),
+                "body_team_confidence": player.get("team_confidence"),
+                "body_team_source": player.get("team_source"),
+            }
+
 
 def refine_window(dense_frames, scene_graph: dict | None, identity_authority: dict | None,
                   scene_id: str, detector_fn=None, camera_estimator=None) -> dict:
@@ -606,6 +676,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         })
         prev_gray = gray
 
+    _verify_bracketed_dense_target(output_frames, identity_authority or {})
     return {
         "version": VERSION,
         "status": "ok" if output_frames else "empty",

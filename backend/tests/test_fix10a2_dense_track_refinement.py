@@ -11,9 +11,51 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 import dense_track_refinement as dtr  # noqa: E402
+import touch_graph as tg  # noqa: E402
 
 
 BASE = {"x": 0.10, "y": 0.20, "w": 0.10, "h": 0.30}
+
+
+def test_two_exact_proofs_verify_only_unambiguous_dense_body(monkeypatch):
+    monkeypatch.setattr(dtr.uia, "resolve_target_at",
+                        lambda *_a, **_k: ({"box": BASE}, "OK_INTERPOLATED"))
+    def frames(candidate=("p001",)):
+        return [{
+            "media_ms": ms, "scene_id": "scene_001", "cut_barrier": False,
+            "used_fallback": False, "time_authority": "ACTUAL_MEDIA_PTS",
+            "players": [{"local_track_id": "p001", "box": dict(BASE),
+                         "association_state": "VERIFIED_LOCAL"}],
+            "global_target": {
+                "status": "VERIFIED" if i in (0, 2) else "HYPOTHESES",
+                "reason": "OK_EXACT" if i in (0, 2) else "NON_PROOF_IDENTITY_CONTINUITY",
+                "local_track_id": "p001" if i in (0, 2) else None,
+                "candidate_local_track_ids": ["p001"] if i in (0, 2) else list(candidate),
+                "proof_eligible": i in (0, 2),
+            },
+        } for i, ms in enumerate((1000, 1100, 1200))]
+
+    valid = frames()
+    dtr._verify_bracketed_dense_target(valid, {})
+    assert valid[1]["global_target"]["reason"] == "DENSE_TWO_ANCHOR_CONTINUITY"
+    binding = tg._global_target_binding({}, valid, 1100, "p001")
+    assert binding["global_target_id"] == "GLOBAL_TARGET"
+
+    for change in (lambda f: f[1].update(cut_barrier=True),
+                   lambda f: f[1]["global_target"].update(candidate_local_track_ids=["p001", "p002"]),
+                   lambda f: f[1]["players"][0].update(association_state="HYPOTHESES"),
+                   lambda f: f[2]["global_target"].update(local_track_id="p002"),
+                   lambda f: f[2].update(media_ms=1300)):
+        blocked = frames()
+        change(blocked)
+        dtr._verify_bracketed_dense_target(blocked, {})
+        assert blocked[1]["global_target"]["status"] == "HYPOTHESES"
+
+    monkeypatch.setattr(dtr.uia, "resolve_target_at",
+                        lambda *_a, **_k: (None, "UNRESOLVED_IDENTITY"))
+    blocked = frames()
+    dtr._verify_bracketed_dense_target(blocked, {})
+    assert blocked[1]["global_target"]["status"] == "HYPOTHESES"
 
 
 def _frame(ms, *, cut=False, scene_id="scene_001"):
@@ -181,3 +223,60 @@ def test_a209_zero_media_time_is_a_real_previous_timestamp():
     # last_ms=0 as falsy would incorrectly produce zero residual movement.
     assert abs(predicted["x"] - (BASE["x"] + 0.04)) < 1e-9
     assert dtr._last_ms(track, 40) == 0
+
+
+def test_dense_detector_empty_output_does_not_abort_recall_window():
+    class EmptyNet:
+        def setInput(self, _blob):
+            pass
+
+        def forward(self):
+            return np.empty((1, 84, 0), dtype=np.float32)
+
+    class Detector:
+        ok = True
+        net = EmptyNet()
+
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    assert dtr._detect_dense_people_and_ball(Detector(), frame, True) == ([], [], [])
+
+
+def test_dense_detector_invalid_output_reports_shape_instead_of_index_error():
+    class InvalidNet:
+        def setInput(self, _blob):
+            pass
+
+        def forward(self):
+            return np.ones((2, 3, 4), dtype=np.float32)
+
+    class Detector:
+        ok = True
+        net = InvalidNet()
+
+    import pytest
+    with pytest.raises(ValueError, match="DENSE_DETECTOR_OUTPUT_SHAPE"):
+        dtr._detect_dense_people_and_ball(
+            Detector(), np.zeros((100, 100, 3), dtype=np.uint8)
+        )
+
+
+def test_empty_target_hypotheses_leave_recall_window_unresolved_not_crashed(monkeypatch):
+    # Regression for staging windows 0–8 s and 34–47 s: proof-level geometry
+    # may exist while the dense detector has no matching body in this frame.
+    monkeypatch.setattr(
+        dtr.uia, "resolve_target_at",
+        lambda *_a, **_k: ({"box": dict(BASE), "proof_eligible": True}, "OK_EXACT"),
+    )
+    result = dtr.refine_window(
+        [_frame(1000), _frame(1040)], _graph(), {}, "scene_001",
+        detector_fn=_detector_sequence([([], []), ([], [])]),
+    )
+    assert result["status"] == "ok"
+    assert len(result["frames"]) == 2
+    for frame in result["frames"]:
+        target = frame["global_target"]
+        assert target["status"] == "UNRESOLVED"
+        assert target["reason"] == "DENSE_TARGET_BODY_NOT_RESOLVED"
+        assert target["local_track_id"] is None
+        assert target["candidate_local_track_ids"] == []
+        assert target["proof_eligible"] is False
