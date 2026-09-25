@@ -216,3 +216,25 @@ def test_dense_detector_invalid_output_reports_shape_instead_of_index_error():
         dtr._detect_dense_people_and_ball(
             Detector(), np.zeros((100, 100, 3), dtype=np.uint8)
         )
+
+
+def test_empty_target_hypotheses_leave_recall_window_unresolved_not_crashed(monkeypatch):
+    # Regression for staging windows 0–8 s and 34–47 s: proof-level geometry
+    # may exist while the dense detector has no matching body in this frame.
+    monkeypatch.setattr(
+        dtr.uia, "resolve_target_at",
+        lambda *_a, **_k: ({"box": dict(BASE), "proof_eligible": True}, "OK_EXACT"),
+    )
+    result = dtr.refine_window(
+        [_frame(1000), _frame(1040)], _graph(), {}, "scene_001",
+        detector_fn=_detector_sequence([([], []), ([], [])]),
+    )
+    assert result["status"] == "ok"
+    assert len(result["frames"]) == 2
+    for frame in result["frames"]:
+        target = frame["global_target"]
+        assert target["status"] == "UNRESOLVED"
+        assert target["reason"] == "DENSE_TARGET_BODY_NOT_RESOLVED"
+        assert target["local_track_id"] is None
+        assert target["candidate_local_track_ids"] == []
+        assert target["proof_eligible"] is False

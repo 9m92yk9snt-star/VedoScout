@@ -364,8 +364,10 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
     ]
     union = set().union(*candidate_sets) if candidate_sets else set()
     unique_geometry = bool(
-        len(hypotheses) == 1
-        or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+        hypotheses and (
+            len(hypotheses) == 1
+            or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+        )
     )
     if (
         resolved.get("proof_eligible") is True
