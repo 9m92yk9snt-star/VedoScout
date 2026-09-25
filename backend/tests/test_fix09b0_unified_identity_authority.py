@@ -70,9 +70,9 @@ def test_b05_user_tap_is_absolute_authority_during_source_conflict():
         anchors=[{"t": 5.0, "box": {"x": .1, "y": .2, "w": .1, "h": .2}}])
     pins = [p for p in a["target_points"] if p["tap_authority"]]
     assert pins
-    assert all(p["primary_source"] == "FIX04" for p in pins)
+    assert all(p["primary_source"] == "USER_TAP" for p in pins)
     assert all(p["state"] == "PINNED" and p["proof_eligible"] for p in pins)
-    assert any(len(p["hypotheses"]) == 2 for p in pins)
+    assert pins[0]["box"]["x"] == .1
 
 
 def test_b06_predicted_occlusion_is_never_proof_eligible():
@@ -238,3 +238,36 @@ def test_b20_direct_tap_survives_barrier_without_creating_false_continuity():
     assert [p["t"] for p in tr["points"]] == [1.0]
     assert tr["points"][0]["authority_source"] == "PINNED"
     assert tr["segments"] == []
+
+
+def test_b21_selected_box_overrides_wrong_tracker_exactly_inside_barrier():
+    selected = {"x": .4, "y": .3, "w": .1, "h": .2}
+    a = uia.build_unified_identity_authority(
+        f4((1.0, .1, .3, .1, .2, .9), (1.2, .1, .3, .1, .2, .9)),
+        tl(ap(1000, .1, .3), ap(1200, .1, .3), unresolved=[{
+            "scene_id": "scene_001", "start_ms": 950, "end_ms": 1250,
+            "reason": "REID_UNRESOLVED",
+        }]), anchors=[{"t": 1.0, "box": selected}])
+    exact, why = uia.resolve_target_at(a, 1000, proof_required=True)
+    assert why == "OK_EXACT" and exact["box"] == selected
+    assert exact["primary_source"] == "USER_TAP"
+    assert uia.resolve_target_at(a, 1200, proof_required=True) == (None, "UNRESOLVED_IDENTITY")
+    assert [p["t"] for p in uia.to_production_track(a)["points"]] == [1.0]
+
+
+def test_b22_selected_box_respects_time_offset_and_does_not_prove_neighbor():
+    selected = {"x": .4, "y": .3, "w": .1, "h": .2}
+    a = uia.build_unified_identity_authority(
+        None, tl(unresolved=[{"scene_id": "scene_001", "start_ms": 1450,
+                             "end_ms": 1550, "reason": "REID_UNRESOLVED"}]),
+        anchors=[{"t": 1.0, "box": selected}], anchor_time_offset=.5)
+    assert uia.resolve_target_at(a, 1500, proof_required=True)[0]["box"] == selected
+    assert uia.resolve_target_at(a, 1516, proof_required=True)[0] is None
+
+
+def test_b23_selected_box_does_not_pin_different_body_near_tap():
+    a = uia.build_unified_identity_authority(
+        f4((1.2, .1, .3, .1, .2, .9)), tl(ap(1200, .1, .3)),
+        anchors=[{"t": 1.0, "box": {"x": .4, "y": .3, "w": .1, "h": .2}}])
+    near, why = uia.resolve_target_at(a, 1200, proof_required=True)
+    assert why == "OK_EXACT" and near["tap_authority"] is False

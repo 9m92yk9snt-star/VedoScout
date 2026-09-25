@@ -101,8 +101,34 @@ def _tap_times(anchors, anchor_time_offset) -> list[int]:
     return sorted(set(out))
 
 
+def _tap_rows(anchors, anchor_time_offset, scenes) -> list[dict]:
+    """Preserve the box the user actually selected at the selected media time."""
+    out = []
+    off = float(anchor_time_offset or 0.0)
+    for anchor in anchors or []:
+        if (not isinstance(anchor, dict) or not _is_num(anchor.get("t"))
+                or not _valid_box(anchor.get("box"))):
+            continue
+        ms = int(round((float(anchor["t"]) + off) * 1000.0))
+        out.append({"media_ms": ms, "scene_id": _scene_for_ms(scenes, ms),
+                    "box": _box(anchor["box"])})
+    return out
+
+
 def _near_tap(ms, taps) -> bool:
     return any(abs(ms - t) <= TAP_AUTHORITY_MS for t in taps)
+
+
+def _near_matching_tap(ms, box, tap_rows, taps, scene_id=None) -> bool:
+    # Legacy time-only anchors keep their old behavior. With a selected box,
+    # only geometry on that same body inherits the bounded tap authority.
+    if any(abs(ms - t) <= TAP_AUTHORITY_MS
+           and not any(row["media_ms"] == t for row in tap_rows) for t in taps):
+        return True
+    return any(abs(ms - row["media_ms"]) <= TAP_AUTHORITY_MS
+               and (scene_id is None or row["scene_id"] is None
+                    or row["scene_id"] == scene_id)
+               and boxes_agree(box, row["box"]) for row in tap_rows)
 
 
 def _timeline_rows(identity_timeline) -> list[dict]:
@@ -211,7 +237,7 @@ def _unresolved(ms, scene_id, hypotheses, reason="SOURCE_CONFLICT"):
 
 def _dedupe_points(points):
     """Keep the strongest canonical row when two rows land on the same media ms."""
-    rank = {"PINNED": 6, "FUSED": 5, "GLOBAL": 4, "LOCAL": 3,
+    rank = {"USER_TAP": 7, "PINNED": 6, "FUSED": 5, "GLOBAL": 4, "LOCAL": 3,
             "PREDICTED": 2, "UNRESOLVED": 1}
     by_ms = {}
     for p in points:
@@ -256,6 +282,7 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     tl = identity_timeline if isinstance(identity_timeline, dict) else {}
     scenes = deepcopy(tl.get("scenes") or [])
     taps = _tap_times(anchors, anchor_time_offset)
+    tap_rows = _tap_rows(anchors, anchor_time_offset, scenes)
     arows = _timeline_rows(tl)
     frows = _fix04_rows(fix04_track, scenes)
     points = []
@@ -263,7 +290,8 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     # FIX09A rows carry the whole-video scene-aware identity spine.
     for a in arows:
         f = _nearest(frows, a["media_ms"])
-        near_pin = _near_tap(a["media_ms"], taps)
+        near_pin = _near_matching_tap(a["media_ms"], f["box"] if f else a["box"],
+                                     tap_rows, taps, a.get("scene_id"))
         if a["predicted"]:
             # Prediction remains useful continuity even if FIX04 is absent.
             points.append(_canonical(
@@ -301,7 +329,8 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     # event-contact geometry without pretending to provide whole-video identity.
     for f in frows:
         a = _nearest(arows, f["media_ms"])
-        near_pin = _near_tap(f["media_ms"], taps)
+        near_pin = _near_matching_tap(f["media_ms"], f["box"], tap_rows, taps,
+                                     f.get("scene_id"))
         ff = dict(f)
         ff["state"] = "PINNED" if near_pin else "VISIBLE"
         if a is None:
@@ -326,6 +355,15 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
             points.append(_unresolved(
                 f["media_ms"], f.get("scene_id"),
                 [_hyp("FIX04", f), _hyp("FIX09A", a)]))
+
+    # A timestamp alone cannot identify the selected body: a nearby tracker
+    # row can belong to a different player. The selected box is authoritative
+    # at the tap itself; it never makes adjacent frames proof-eligible.
+    for tap in tap_rows:
+        points.append(_canonical(
+            "USER_TAP", tap, strength="USER_TAP", sources=["USER_TAP"],
+            tap_authority=True, proof_eligible=True,
+            hypotheses=[_hyp("USER_TAP", tap)], reason="USER_SELECTED_BOX"))
 
     points = _dedupe_points(points)
     accepted = [p for p in points if p.get("box") is not None and p.get("state") != "UNRESOLVED"]
