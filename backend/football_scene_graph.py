@@ -432,6 +432,7 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
     provisional = assemble_scene_graph(valid_obs, unified_authority or {})
     frames = provisional.get("frames") or []
     target_samples = []
+    samples_by_scene = {}
     for o, fr in zip(valid_obs, frames):
         if int(round(float(o["media_ms"]))) != int(fr.get("media_ms", -1)):
             continue
@@ -443,7 +444,9 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
                        if isinstance(p, dict) and p.get("local_track_id") == tid), None)
         det = _detection_for_player(o, player)
         if det and _valid_chroma(det.get("kit_chroma")):
-            target_samples.append(_chroma(det["kit_chroma"]))
+            sample = _chroma(det["kit_chroma"])
+            target_samples.append(sample)
+            samples_by_scene.setdefault(str(fr.get("scene_id") or "unknown"), []).append(sample)
 
     all_samples = [
         _chroma(d["kit_chroma"])
@@ -452,6 +455,19 @@ def apply_team_authority(observations, unified_authority, model_factory=None) ->
     ]
     base["target_samples"] = len(target_samples)
     base["kit_samples"] = len(all_samples)
+    # Persist only bounded aggregate diagnostics, never raw frames or colour
+    # samples. This distinguishes unstable evidence in one scene from a
+    # cross-scene kit/lighting change without turning either into a team label.
+    base["target_scene_spreads"] = []
+    for scene, samples in sorted(samples_by_scene.items())[:80]:
+        center = _median_chroma(samples)
+        base["target_scene_spreads"].append({
+            "scene_id": scene,
+            "target_samples": len(samples),
+            "median_spread": round(_median([
+                _chroma_distance(sample, center) for sample in samples
+            ]), 4),
+        })
     if len(target_samples) < TEAM_MIN_TARGET_SAMPLES:
         return {**base, "reason": "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"}
     if len(all_samples) < TEAM_MIN_KIT_SAMPLES:

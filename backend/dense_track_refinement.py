@@ -247,7 +247,22 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
         img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True
     )
     detector.net.setInput(blob)
-    out = detector.net.forward()[0].T
+    raw = np.asarray(detector.net.forward())
+    # OpenCV can return an empty prediction tensor on a valid decoded frame.
+    # Treat that as no detections; never let a detector shape abort the whole
+    # physical-recall window with an opaque IndexError.
+    if raw.size == 0:
+        return ([], [], []) if include_a7_support else ([], [])
+    if raw.ndim == 3 and raw.shape[0] == 1:
+        raw = raw[0]
+    if raw.ndim != 2:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    # YOLO exports use either (channels, predictions) or its transpose.
+    if (raw.shape[0] >= 5 and raw.shape[0] < raw.shape[1]) or raw.shape[1] < 5:
+        raw = raw.T
+    if raw.shape[1] < 5:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    out = raw
     cls = out[:, 4:].argmax(1)
     conf = out[:, 4:].max(1)
     def collect(cid, threshold):
@@ -259,7 +274,10 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
             scores.append(float(score))
         idx = cv2.dnn.NMSBoxes(boxes, scores, float(threshold), cv_detect.NMS_T)
         rows = []
-        for i in np.array(idx).flatten() if len(idx) else []:
+        for i in np.asarray(idx if idx is not None else [], dtype=int).reshape(-1):
+            i = int(i)
+            if i < 0 or i >= len(boxes):
+                raise ValueError(f"DENSE_DETECTOR_NMS_INDEX:{i}/{len(boxes)}")
             x, y, bw, bh = boxes[i]
             rows.append({
                 "box": {

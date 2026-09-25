@@ -741,7 +741,32 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
             })
         applied.append(proposal["proposal_id"])
 
-    canonical["events"] = _dedupe_events(events)
+    # A semantic GOAL/ASSIST chain can have internally consistent timestamps
+    # while attributing the teammate's strike to the target. Once FIX10B is
+    # authoritative, scoring needs a matching verified physical proposal.
+    # Keep unmatched claims visible for review, but never publish them as
+    # verified target goals/assists or count them in the report.
+    scoring_unresolved = []
+    verified_events = []
+    for event in events:
+        if (event.get("canonical_event_type") in {"GOAL", "ASSIST"}
+                and event.get("reconciliation_authority") != "FIX10B_PHYSICAL_RECONCILIATION"):
+            scoring_unresolved.append({
+                "event_id": event.get("event_id"),
+                "scene_id": event.get("scene_id"),
+                "canonical_ms": event.get("canonical_ms"),
+                "claimed_event_type": event.get("canonical_event_type"),
+                "reason": "SCORING_PHYSICAL_PROOF_MISSING",
+            })
+        else:
+            verified_events.append(event)
+    canonical["events"] = _dedupe_events(verified_events)
+    canonical["unresolved"] = list(canonical.get("unresolved") or []) + scoring_unresolved
+    if scoring_unresolved and not canonical["events"]:
+        canonical["status"] = "unresolved"
+    metrics = deepcopy(canonical.get("metrics") or {})
+    metrics["observations_unresolved"] = int(metrics.get("observations_unresolved") or 0) + len(scoring_unresolved)
+    canonical["metrics"] = metrics
     canonical["version"] = f"FIX10B.{VERSION}"
     canonical["global_target_id"] = GLOBAL_TARGET_ID
     canonical["timebase"] = "canonical_media_ms"
@@ -753,6 +778,7 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
         "proposals_contradictory": len(contradictory),
         "applied_proposal_ids": applied,
         "changes": changes,
+        "scoring_claims_unresolved": len(scoring_unresolved),
         "physical_status": (physical_result or {}).get("status") if isinstance(physical_result, dict) else None,
     }
     return _recount(canonical)

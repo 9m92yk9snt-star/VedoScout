@@ -309,3 +309,18 @@ def test_b116_weakly_separated_kit_clusters_fail_closed():
     assert diag["status"] == "unresolved"
     assert diag["reason"] == "TEAM_CLUSTERS_NOT_SEPARABLE"
     assert not any(d.get("team") for o in observations for d in o["players"])
+
+
+def test_team_anchor_reports_scene_spread_without_labelling_unstable_kit():
+    observations = _team_observations(12)
+    observations[6]["cut"] = True
+    for o in observations[6:]:
+        o["players"][0]["kit_chroma"] = [90.0, 100.0]
+    auth = authority([(o["media_ms"], TARGET) for o in observations])
+    diag = fsg.apply_team_authority(observations, auth,
+                                    model_factory=lambda anchor: _FixedTeamModel(anchor))
+    assert diag["status"] == "unresolved"
+    assert diag["reason"] == "UNSTABLE_TARGET_KIT_ANCHOR"
+    assert len(diag["target_scene_spreads"]) == 2
+    assert all(row["median_spread"] == 0 for row in diag["target_scene_spreads"])
+    assert not any(d.get("team") for o in observations for d in o["players"])

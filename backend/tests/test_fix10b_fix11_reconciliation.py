@@ -156,6 +156,21 @@ def test_fix11_verified_keeper_save_can_create_missing_canonical_shot():
     assert out["events"][0]["proof"]["save_proof"]["save_evidence"]["status"] == "VERIFIED"
 
 
+def test_fix11_semantic_scoring_claim_without_physical_proof_stays_unresolved():
+    semantic = _empty_canonical()
+    semantic["events"] = [
+        {"event_id": "model_goal", "scene_id": "scene_1", "canonical_ms": 49200,
+         "canonical_event_type": "GOAL", "canonical_action_type": "SHOT"},
+        {"event_id": "model_assist", "scene_id": "scene_1", "canonical_ms": 43000,
+         "canonical_event_type": "ASSIST", "canonical_action_type": "PASS"},
+    ]
+    out = f10b.reconcile_canonical_events(semantic, {"status": "partial", "traces": []})
+    assert out["metrics"]["goals"] == out["metrics"]["assists"] == 0
+    assert not out["events"]
+    assert {row["reason"] for row in out["unresolved"]} == {"SCORING_PHYSICAL_PROOF_MISSING"}
+    assert out["reconciliation"]["scoring_claims_unresolved"] == 2
+
+
 def _assist_trace(*, concurrent=False):
     target_touch = _touch(1000, "p001", target=True)
     receiver = _touch(1500, "p010", jersey="10")
@@ -192,6 +207,22 @@ def test_fix11_assist_survives_verified_teammate_local_track_split():
     assert assist["scorer_track_id"] == "p099"
     assert assist["receiver_actor_stitch"]["status"] == "VERIFIED_STITCH"
     assert assist["receiver_actor_stitch"]["jersey_number"] == "10"
+
+
+def test_fix11_physical_assist_corrects_semantic_target_goal_claim():
+    semantic = _empty_canonical()
+    semantic["events"] = [{
+        "event_id": "wrong_scorer", "scene_id": "scene_1", "canonical_ms": 1000,
+        "canonical_event_type": "GOAL", "canonical_action_type": "SHOT",
+        "proof": {"evidence_ms": [1000]},
+    }]
+    out = f10b.reconcile_canonical_events(semantic, {
+        "status": "ok", "traces": [_assist_trace()],
+    })
+    assert out["metrics"]["goals"] == 0
+    assert out["metrics"]["assists"] == 1
+    assert out["events"][0]["fix10b_previous_classification"]["canonical_event_type"] == "GOAL"
+    assert out["events"][0]["canonical_event_type"] == "ASSIST"
 
 
 def test_fix11_track_stitch_fails_closed_when_two_ids_are_visible_together():

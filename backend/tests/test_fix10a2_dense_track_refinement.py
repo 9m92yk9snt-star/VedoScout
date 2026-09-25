@@ -181,3 +181,38 @@ def test_a209_zero_media_time_is_a_real_previous_timestamp():
     # last_ms=0 as falsy would incorrectly produce zero residual movement.
     assert abs(predicted["x"] - (BASE["x"] + 0.04)) < 1e-9
     assert dtr._last_ms(track, 40) == 0
+
+
+def test_dense_detector_empty_output_does_not_abort_recall_window():
+    class EmptyNet:
+        def setInput(self, _blob):
+            pass
+
+        def forward(self):
+            return np.empty((1, 84, 0), dtype=np.float32)
+
+    class Detector:
+        ok = True
+        net = EmptyNet()
+
+    frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    assert dtr._detect_dense_people_and_ball(Detector(), frame, True) == ([], [], [])
+
+
+def test_dense_detector_invalid_output_reports_shape_instead_of_index_error():
+    class InvalidNet:
+        def setInput(self, _blob):
+            pass
+
+        def forward(self):
+            return np.ones((2, 3, 4), dtype=np.float32)
+
+    class Detector:
+        ok = True
+        net = InvalidNet()
+
+    import pytest
+    with pytest.raises(ValueError, match="DENSE_DETECTOR_OUTPUT_SHAPE"):
+        dtr._detect_dense_people_and_ball(
+            Detector(), np.zeros((100, 100, 3), dtype=np.uint8)
+        )
