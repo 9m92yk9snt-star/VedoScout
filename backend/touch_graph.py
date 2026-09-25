@@ -85,6 +85,19 @@ def _global_target_binding(identity_authority, dense_frames, media_ms, track_id)
     ):
         return {"global_target_id": None, "status": "UNRESOLVED",
                 "reason": "DENSE_TARGET_MAPPING_NOT_VERIFIED"}
+    if dense_target.get("reason") == "DENSE_TWO_ANCHOR_CONTINUITY":
+        # The dense refiner checked both exact canonical proofs and every
+        # intervening source frame. Recheck the canonical identity barrier at
+        # the touch time; interpolation by itself never establishes proof.
+        _, why = uia.resolve_target_at(
+            identity_authority if isinstance(identity_authority, dict) else {},
+            int(media_ms), max_interp_ms=TARGET_NEAR_MS,
+        )
+        if why == "OK_INTERPOLATED":
+            return {"global_target_id": uia.GLOBAL_TARGET_ID,
+                    "status": "VERIFIED", "reason": dense_target["reason"]}
+        return {"global_target_id": None, "status": "UNRESOLVED",
+                "reason": why or "GLOBAL_TARGET_AUTHORITY_NOT_PROOF_ELIGIBLE"}
     resolved, why = uia.resolve_target_at(
         identity_authority if isinstance(identity_authority, dict) else {},
         int(media_ms), proof_required=True, max_interp_ms=TARGET_NEAR_MS,

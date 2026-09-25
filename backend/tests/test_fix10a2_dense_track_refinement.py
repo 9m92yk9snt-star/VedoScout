@@ -11,9 +11,51 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 import dense_track_refinement as dtr  # noqa: E402
+import touch_graph as tg  # noqa: E402
 
 
 BASE = {"x": 0.10, "y": 0.20, "w": 0.10, "h": 0.30}
+
+
+def test_two_exact_proofs_verify_only_unambiguous_dense_body(monkeypatch):
+    monkeypatch.setattr(dtr.uia, "resolve_target_at",
+                        lambda *_a, **_k: ({"box": BASE}, "OK_INTERPOLATED"))
+    def frames(candidate=("p001",)):
+        return [{
+            "media_ms": ms, "scene_id": "scene_001", "cut_barrier": False,
+            "used_fallback": False, "time_authority": "ACTUAL_MEDIA_PTS",
+            "players": [{"local_track_id": "p001", "box": dict(BASE),
+                         "association_state": "VERIFIED_LOCAL"}],
+            "global_target": {
+                "status": "VERIFIED" if i in (0, 2) else "HYPOTHESES",
+                "reason": "OK_EXACT" if i in (0, 2) else "NON_PROOF_IDENTITY_CONTINUITY",
+                "local_track_id": "p001" if i in (0, 2) else None,
+                "candidate_local_track_ids": ["p001"] if i in (0, 2) else list(candidate),
+                "proof_eligible": i in (0, 2),
+            },
+        } for i, ms in enumerate((1000, 1100, 1200))]
+
+    valid = frames()
+    dtr._verify_bracketed_dense_target(valid, {})
+    assert valid[1]["global_target"]["reason"] == "DENSE_TWO_ANCHOR_CONTINUITY"
+    binding = tg._global_target_binding({}, valid, 1100, "p001")
+    assert binding["global_target_id"] == "GLOBAL_TARGET"
+
+    for change in (lambda f: f[1].update(cut_barrier=True),
+                   lambda f: f[1]["global_target"].update(candidate_local_track_ids=["p001", "p002"]),
+                   lambda f: f[1]["players"][0].update(association_state="HYPOTHESES"),
+                   lambda f: f[2]["global_target"].update(local_track_id="p002"),
+                   lambda f: f[2].update(media_ms=1300)):
+        blocked = frames()
+        change(blocked)
+        dtr._verify_bracketed_dense_target(blocked, {})
+        assert blocked[1]["global_target"]["status"] == "HYPOTHESES"
+
+    monkeypatch.setattr(dtr.uia, "resolve_target_at",
+                        lambda *_a, **_k: (None, "UNRESOLVED_IDENTITY"))
+    blocked = frames()
+    dtr._verify_bracketed_dense_target(blocked, {})
+    assert blocked[1]["global_target"]["status"] == "HYPOTHESES"
 
 
 def _frame(ms, *, cut=False, scene_id="scene_001"):
