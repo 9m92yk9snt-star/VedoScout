@@ -265,13 +265,26 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
     out = raw
     cls = out[:, 4:].argmax(1)
     conf = out[:, 4:].max(1)
-    def collect(cid, threshold):
-        keep = (cls == cid) & (conf > float(threshold))
+    def collect(cid, threshold, *, require_top_class=True):
+        class_col = 4 + int(cid)
+        if class_col >= out.shape[1]:
+            return []
+        class_conf = out[:, class_col]
+        scores_all = conf if require_top_class else class_conf
+        keep = scores_all > float(threshold)
+        if require_top_class:
+            keep &= cls == cid
         boxes, scores = [], []
-        for row, score in zip(out[keep], conf[keep]):
+        top_classes = []
+        top_scores = []
+        for row, score, top_class, top_score in zip(
+            out[keep], scores_all[keep], cls[keep], conf[keep]
+        ):
             cx, cy, bw, bh = row[:4]
             boxes.append([int(cx - bw / 2), int(cy - bh / 2), int(bw), int(bh)])
             scores.append(float(score))
+            top_classes.append(int(top_class))
+            top_scores.append(float(top_score))
         idx = cv2.dnn.NMSBoxes(boxes, scores, float(threshold), cv_detect.NMS_T)
         rows = []
         for i in np.asarray(idx if idx is not None else [], dtype=int).reshape(-1):
@@ -279,7 +292,7 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
             if i < 0 or i >= len(boxes):
                 raise ValueError(f"DENSE_DETECTOR_NMS_INDEX:{i}/{len(boxes)}")
             x, y, bw, bh = boxes[i]
-            rows.append({
+            result = {
                 "box": {
                     "x": max(0.0, min(1.0, x / (W * scale))),
                     "y": max(0.0, min(1.0, y / (H * scale))),
@@ -287,16 +300,32 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
                     "h": max(1e-4, min(1.0, bh / (H * scale))),
                 },
                 "confidence": scores[i],
-            })
+            }
+            if not require_top_class:
+                result.update({
+                    "class_specific_support": True,
+                    "top_class_id": top_classes[i],
+                    "top_class_confidence": top_scores[i],
+                })
+            rows.append(result)
         return sorted(rows, key=lambda r: float(r.get("confidence") or 0.0), reverse=True)
 
     people = collect(0, float(cv_detect.CONF_T))
     balls = collect(32, float(DENSE_BALL_CONF_T))
     if not include_a7_support:
         return people, balls
-    support = collect(32, float(A7_BALL_SUPPORT_CONF_T))[:A7_BALL_SUPPORT_MAX]
+    # A7 is a support-only search channel, so read the sports-ball class score
+    # itself even when another class narrowly wins argmax.  This does not lower
+    # A3's ball floor and cannot create contact/event truth by itself.
+    support = collect(
+        32, float(A7_BALL_SUPPORT_CONF_T), require_top_class=False
+    )[:A7_BALL_SUPPORT_MAX]
     for row in support:
-        row["support_only"] = float(row.get("confidence") or 0.0) < float(DENSE_BALL_CONF_T)
+        row["a3_eligible"] = bool(
+            row.get("top_class_id") == 32
+            and float(row.get("confidence") or 0.0) >= float(DENSE_BALL_CONF_T)
+        )
+        row["support_only"] = not row["a3_eligible"]
         row["proof_eligible"] = False
     return people, balls, support
 
@@ -315,6 +344,12 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             "proof_eligible": False,
         }
     rb = resolved["box"]
+    authority_evidence = {
+        "authority_box": deepcopy(rb),
+        "authority_reason": why,
+        "authority_tap": resolved.get("tap_authority") is True,
+        "authority_primary_source": resolved.get("primary_source"),
+    }
     ranked = []
     for p in players:
         if not isinstance(p, dict) or not _valid_box(p.get("box")):
@@ -351,6 +386,7 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             "body_team": winner.get("team"),
             "body_team_confidence": winner.get("team_confidence"),
             "body_team_source": winner.get("team_source"),
+            **authority_evidence,
         }
 
     # Target-only collapse of detector duplicates. This is permitted only when
@@ -393,6 +429,7 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             "body_team_source": winner.get("team_source"),
             "body_association_state": "VERIFIED_TARGET_HYPOTHESIS_COLLAPSE",
             "collapsed_hypothesis_count": len(hypotheses),
+            **authority_evidence,
         }
     ids = sorted(union) if union else []
     return {

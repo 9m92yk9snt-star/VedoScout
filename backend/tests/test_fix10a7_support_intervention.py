@@ -2,6 +2,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import numpy as np
+import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -176,7 +177,36 @@ def test_a7s09_dense_support_floor_does_not_lower_a3_ball_floor():
     assert dtr.A7_BALL_SUPPORT_CONF_T == .001
 
 
-def test_a7s10_injected_two_tuple_detector_contract_still_works():
+def test_a7s10_support_reads_ball_score_when_another_class_narrowly_wins():
+    class CompetingClassNet:
+        def setInput(self, _blob):
+            pass
+
+        def forward(self):
+            raw = np.zeros((1, 84, 1), dtype=np.float32)
+            raw[0, 0:4, 0] = [320, 320, 20, 20]
+            raw[0, 4 + 32, 0] = .002
+            raw[0, 4 + 38, 0] = .004
+            return raw
+
+    class Detector:
+        ok = True
+        net = CompetingClassNet()
+
+    frame = np.zeros((640, 640, 3), dtype=np.uint8)
+    _people, a3_balls, support = dtr._detect_dense_people_and_ball(
+        Detector(), frame, include_a7_support=True
+    )
+    assert a3_balls == []
+    assert len(support) == 1
+    assert support[0]["confidence"] == pytest.approx(.002)
+    assert support[0]["top_class_id"] == 38
+    assert support[0]["class_specific_support"] is True
+    assert support[0]["support_only"] is True
+    assert support[0]["proof_eligible"] is False
+
+
+def test_a7s11_injected_two_tuple_detector_contract_still_works():
     dense = [{"media_ms": 1000, "scene_id": "s1", "frame_bgr": np.zeros((32,32,3), dtype=np.uint8),
               "time_authority": "ACTUAL_MEDIA_PTS", "used_fallback": False}]
     out = dtr.refine_window(dense, {}, {}, "s1", detector_fn=lambda _frame: ([], []))

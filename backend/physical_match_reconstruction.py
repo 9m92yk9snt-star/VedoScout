@@ -188,7 +188,10 @@ def reconstruct_physical_match(
             touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)
 
             stage = "contact_role_resolution"
-            touches = contact_role_resolver.apply_contact_roles(touches, contact_result)
+            touches = contact_role_resolver.apply_contact_roles(
+                touches, contact_result,
+                dense_frames=dense_frames, ball_trajectory=trajectory,
+            )
 
             stage = "jersey_request_selection"
             requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)

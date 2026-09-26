@@ -8,6 +8,7 @@ is accepted as input.
 """
 from __future__ import annotations
 
+import math
 from copy import deepcopy
 
 import ball_contact_engine as bce
@@ -17,6 +18,21 @@ VERSION = 1
 ROLE_RELEASE = "RELEASE"
 ROLE_RECEIVE_CONTROL = "RECEIVE_CONTROL"
 ROLE_UNRESOLVED = "UNRESOLVED"
+
+# A4 judges possession immediately around a contact. A real pass can remain
+# inside that radius for the first adjacent sample and only become physically
+# unambiguous a few frames later. Review a short, bounded tail without
+# weakening A4's detector/contact gates. The strong-distance gate is stricter
+# than ordinary possession: the ball must clear the possession radius by two
+# existing ambiguity margins on multiple measured frames.
+DELAYED_SEPARATION_WINDOW_MS = 420
+DELAYED_CONTACT_CLUSTER_MS = 160
+DELAYED_RECONTACT_GUARD_MS = 500
+DELAYED_MIN_MEASURED = 4
+DELAYED_MIN_STRONG = 3
+DELAYED_STRONG_DISTANCE_H = bce.POSSESSION_MAX_H + 2.0 * bce.POSSESSION_MARGIN_H
+DELAYED_MIN_GAIN_H = 2.0 * bce.POSSESSION_MARGIN_H
+DELAYED_MONOTONIC_TOL_H = bce.POSSESSION_MARGIN_H / 2.0
 
 
 def _num(value) -> bool:
@@ -44,6 +60,187 @@ def _unresolved(reason: str, evidence: dict | None = None) -> dict:
         "reason": reason,
         "evidence": deepcopy(evidence) if isinstance(evidence, dict) else {},
     }
+
+
+def _valid_box(box) -> bool:
+    return (
+        isinstance(box, dict)
+        and all(_num(box.get(k)) for k in ("x", "y", "w", "h"))
+        and float(box["w"]) > 0.0
+        and float(box["h"]) > 0.0
+    )
+
+
+def _player_by_id(frame: dict, track_id: str):
+    for player in frame.get("players") or []:
+        if not isinstance(player, dict):
+            continue
+        if (
+            player.get("local_track_id") == track_id
+            and player.get("association_state") == "VERIFIED_LOCAL"
+            and _valid_box(player.get("box"))
+        ):
+            return player
+    return None
+
+
+def _target_compatible(frame: dict, track_id: str) -> bool:
+    """Keep delayed evidence on the same selected-player hypothesis."""
+    target = frame.get("global_target") if isinstance(frame.get("global_target"), dict) else {}
+    status = str(target.get("status") or "")
+    if status == "VERIFIED":
+        return target.get("local_track_id") == track_id
+    if status == "HYPOTHESES":
+        return track_id in (target.get("candidate_local_track_ids") or [])
+    return False
+
+
+def _trajectory_rows(ball_trajectory):
+    if isinstance(ball_trajectory, list):
+        return [row for row in ball_trajectory if isinstance(row, dict)]
+    if isinstance(ball_trajectory, dict):
+        return [
+            row for row in (ball_trajectory.get("points") or ball_trajectory.get("trajectory") or [])
+            if isinstance(row, dict)
+        ]
+    return []
+
+
+def _touch_end_ms(touch: dict) -> int:
+    value = touch.get("end_ms") if _num(touch.get("end_ms")) else touch.get("media_ms")
+    return int(round(float(value or 0)))
+
+
+def _contact_cluster_end(touch: dict, touches) -> int:
+    """Extend across immediately adjacent same-actor occlusion fragments."""
+    actor = touch.get("player_track_id")
+    scene = touch.get("scene_id")
+    start = int(round(float(touch.get("media_ms") or 0)))
+    end = _touch_end_ms(touch)
+    rows = sorted(
+        [
+            row for row in (touches or [])
+            if isinstance(row, dict)
+            and row.get("player_track_id") == actor
+            and row.get("scene_id") == scene
+            and _num(row.get("media_ms"))
+            and int(round(float(row["media_ms"]))) >= start
+        ],
+        key=lambda row: int(round(float(row["media_ms"]))),
+    )
+    for row in rows:
+        row_start = int(round(float(row["media_ms"])))
+        if row_start > end + DELAYED_CONTACT_CLUSTER_MS:
+            break
+        end = max(end, _touch_end_ms(row))
+    return end
+
+
+def _has_quick_recontact(touch: dict, touches, cluster_end_ms: int) -> bool:
+    actor = touch.get("player_track_id")
+    scene = touch.get("scene_id")
+    for row in touches or []:
+        if not isinstance(row, dict) or row is touch:
+            continue
+        if row.get("player_track_id") != actor or row.get("scene_id") != scene:
+            continue
+        if not _num(row.get("media_ms")):
+            continue
+        row_ms = int(round(float(row["media_ms"])))
+        if cluster_end_ms < row_ms <= cluster_end_ms + DELAYED_RECONTACT_GUARD_MS:
+            return True
+    return False
+
+
+def _delayed_separation_role(touch: dict, touches, dense_frames, ball_trajectory):
+    """Prove a selected-player release from a short measured post-contact tail.
+
+    This is deliberately target-only: it closes a timing blind spot for the
+    user-selected player's action without multiplying non-target strike/model
+    candidates. Raw support proposals and predicted ball rows are excluded.
+    """
+    if not (
+        touch.get("global_target_id") == "GLOBAL_TARGET"
+        and isinstance(touch.get("global_target_resolution"), dict)
+        and touch["global_target_resolution"].get("status") == "VERIFIED"
+        and float(touch.get("trajectory_change") or 0.0) >= float(bce.TRAJECTORY_SIGNAL_MIN)
+    ):
+        return None
+    geometry = touch.get("contact_geometry") if isinstance(touch.get("contact_geometry"), dict) else {}
+    base_distance = geometry.get("distance_h")
+    if not _num(base_distance) or float(base_distance) > float(bce.POSSESSION_MAX_H):
+        return None
+
+    actor = touch.get("player_track_id")
+    scene = touch.get("scene_id")
+    cluster_end = _contact_cluster_end(touch, touches)
+    if _has_quick_recontact(touch, touches, cluster_end):
+        return None
+
+    frame_by_ms = {
+        int(round(float(frame["media_ms"]))): frame
+        for frame in (dense_frames or [])
+        if isinstance(frame, dict) and _num(frame.get("media_ms"))
+    }
+    samples = []
+    for row in _trajectory_rows(ball_trajectory):
+        if not _num(row.get("media_ms")):
+            continue
+        media_ms = int(round(float(row["media_ms"])))
+        if media_ms <= cluster_end or media_ms > cluster_end + DELAYED_SEPARATION_WINDOW_MS:
+            continue
+        if (
+            row.get("state") != "MEASURED"
+            or row.get("proof_eligible") is not True
+            or row.get("scene_id", scene) != scene
+            or not _valid_box(row.get("box"))
+        ):
+            continue
+        frame = frame_by_ms.get(media_ms)
+        if not isinstance(frame, dict) or frame.get("scene_id") != scene:
+            continue
+        if frame.get("cut_barrier") is True or frame.get("used_fallback") is True:
+            continue
+        player = _player_by_id(frame, actor)
+        if player is None or not _target_compatible(frame, actor):
+            continue
+        pbox, bbox = player["box"], row["box"]
+        foot_x = float(pbox["x"]) + float(pbox["w"]) / 2.0
+        foot_y = float(pbox["y"]) + float(pbox["h"])
+        ball_x = float(bbox["x"]) + float(bbox["w"]) / 2.0
+        ball_y = float(bbox["y"]) + float(bbox["h"]) / 2.0
+        distance_h = math.hypot(ball_x - foot_x, ball_y - foot_y) / float(pbox["h"])
+        samples.append((media_ms, distance_h))
+
+    if len(samples) < DELAYED_MIN_MEASURED:
+        return None
+    strong = [sample for sample in samples if sample[1] >= DELAYED_STRONG_DISTANCE_H]
+    if len(strong) < DELAYED_MIN_STRONG:
+        return None
+    max_distance = max(distance for _ms, distance in samples)
+    if max_distance - float(base_distance) < DELAYED_MIN_GAIN_H:
+        return None
+    reversals = sum(
+        later + DELAYED_MONOTONIC_TOL_H < earlier
+        for (_a_ms, earlier), (_b_ms, later) in zip(samples, samples[1:])
+    )
+    if reversals > 1:
+        return None
+
+    evidence = {
+        "actor_track_id": actor,
+        "cluster_end_ms": cluster_end,
+        "first_measured_ms": samples[0][0],
+        "last_measured_ms": samples[-1][0],
+        "measured_samples": len(samples),
+        "strong_separation_samples": len(strong),
+        "contact_distance_h": round(float(base_distance), 4),
+        "max_distance_h": round(max_distance, 4),
+        "separation_gain_h": round(max_distance - float(base_distance), 4),
+        "strong_distance_gate_h": round(float(DELAYED_STRONG_DISTANCE_H), 4),
+        "reversals": reversals,
+    }
+    return _verified_role(ROLE_RELEASE, "A4_DELAYED_MEASURED_SEPARATION", evidence)
 
 
 def _source_contacts(contact_result: dict | None) -> dict[str, dict]:
@@ -87,7 +284,48 @@ def _step3_role_from_contact(row: dict) -> dict:
         return _unresolved("STEP3_SOURCE_CONTACT_NOT_PROOF_ELIGIBLE")
 
     mode = str(row.get("recovery_mode") or "")
-    if mode not in {"PRE_ANCHORED_SUPPORT_FLOW", "POST_GAP_MEASURED_REACQUISITION"}:
+    if mode == "EXACT_TARGET_BODY_FLOW_RELEASE":
+        recovery_evidence = (
+            row.get("recovery_evidence")
+            if isinstance(row.get("recovery_evidence"), dict) else {}
+        )
+        possession = (
+            recovery_evidence.get("release_possession_evidence")
+            if isinstance(recovery_evidence.get("release_possession_evidence"), dict) else {}
+        )
+        trajectory = (
+            recovery_evidence.get("release_trajectory_evidence")
+            if isinstance(recovery_evidence.get("release_trajectory_evidence"), dict) else {}
+        )
+        evidence = {
+            "recovery_mode": mode,
+            "release_evidence_ms": recovery_evidence.get("release_evidence_ms"),
+            "possession_kind": possession.get("kind"),
+            "possession_score": possession.get("score"),
+            "trajectory_score": trajectory.get("score"),
+            "body_flow_status": recovery_evidence.get("body_flow_status"),
+            "ball_flow_status": recovery_evidence.get("ball_flow_status"),
+            "all_ball_rows_measured_proof_eligible": recovery_evidence.get(
+                "all_ball_rows_measured_proof_eligible"
+            ),
+        }
+        if (
+            possession.get("kind") == "RELEASE"
+            and _num(possession.get("score"))
+            and float(possession["score"]) >= float(bce.POSSESSION_SIGNAL_MIN)
+            and _num(trajectory.get("score"))
+            and float(trajectory["score"]) >= float(bce.TRAJECTORY_SIGNAL_MIN)
+            and recovery_evidence.get("body_flow_status") == "VERIFIED_PATH"
+            and recovery_evidence.get("ball_flow_status") == "VERIFIED_PATH"
+            and recovery_evidence.get("all_ball_rows_measured_proof_eligible") is True
+        ):
+            return _verified_role(ROLE_RELEASE, "EXACT_TARGET_BODY_FLOW_RELEASE", evidence)
+        return _unresolved("EXACT_TARGET_BODY_FLOW_RELEASE_INCOMPLETE", evidence)
+    if mode not in {
+        "PRE_ANCHORED_SUPPORT_FLOW",
+        "POST_GAP_MEASURED_REACQUISITION",
+        "EXACT_TARGET_SUPPORT_PATH",
+    }:
         return _unresolved("STEP3_RECOVERY_MODE_UNSUPPORTED", {"recovery_mode": mode or None})
 
     separation = row.get("separation_gain_h")
@@ -187,17 +425,26 @@ def resolve_touch_role(touch: dict | None, source_by_id: dict[str, dict] | None 
     )
 
 
-def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None) -> dict:
+def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None, *,
+                        dense_frames=None, ball_trajectory=None) -> dict:
     """Attach fail-closed contact roles to a copied Touch Graph."""
     graph = deepcopy(touch_graph) if isinstance(touch_graph, dict) else {"touches": []}
     source_by_id = _source_contacts(contact_result)
-    reviewed = verified_release = verified_control = unresolved = 0
-    for touch in graph.get("touches") or []:
+    graph_touches = graph.get("touches") or []
+    reviewed = verified_release = verified_control = unresolved = delayed_release = 0
+    for touch in graph_touches:
         if not isinstance(touch, dict):
             continue
         role = resolve_touch_role(touch, source_by_id)
         if role is None:
             continue
+        if role.get("status") == "VERIFIED" and role.get("role") == ROLE_RECEIVE_CONTROL:
+            delayed = _delayed_separation_role(
+                touch, graph_touches, dense_frames or [], ball_trajectory or []
+            )
+            if delayed is not None:
+                role = delayed
+                delayed_release += 1
         touch["contact_role"] = role
         reviewed += 1
         if role.get("status") == "VERIFIED" and role.get("role") == ROLE_RELEASE:
@@ -213,6 +460,7 @@ def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None) -
             "verified_release_roles": verified_release,
             "verified_receive_control_roles": verified_control,
             "unresolved_contact_roles": unresolved,
+            "delayed_separation_releases": delayed_release,
         })
     graph["contact_role_version"] = VERSION
     return graph

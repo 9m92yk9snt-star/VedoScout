@@ -254,3 +254,189 @@ def test_s3_11_support_candidates_remain_support_only_and_inputs_are_unchanged()
     raw = frames[4]["a7_ball_support_candidates"][0]
     assert raw["support_only"] is True
     assert raw["proof_eligible"] is False
+
+
+def _exact_tap_fixture(*, a3_reacquisition=True, authority_tap=True, competitor=False):
+    selected = {"x": .40, "y": .40, "w": .20, "h": .30}
+    anchor_actor = _player("p001", x=.45, y=.40, w=.20, h=.30)
+    middle_actor = _player("p001", x=.38, y=.40, w=.20, h=.30)
+    final_actor = _player("p001", x=.30, y=.40, w=.20, h=.30)
+    players = [anchor_actor]
+    if competitor:
+        players.append(_player("p002", x=.46, y=.40, w=.20, h=.30))
+    seed = _support(.55, .68, .004)
+    middle = _support(.57, .66, .008)
+    final = _support(.59, .64, .08)
+    if a3_reacquisition:
+        final.update({"support_only": False, "a3_eligible": True})
+    frames = [
+        _frame(1000, players, [seed]),
+        _frame(1033, [middle_actor], [middle]),
+        _frame(1067, [final_actor], [final]),
+    ]
+    frames[0]["global_target"] = {
+        "status": "VERIFIED",
+        "reason": "OK_EXACT",
+        "local_track_id": "p001",
+        "candidate_local_track_ids": ["p001"],
+        "proof_eligible": True,
+        "authority_box": selected,
+        "authority_tap": authority_tap,
+        "authority_primary_source": "USER_TAP",
+    }
+    return frames
+
+
+def test_s3_12_exact_target_weak_ball_needs_flow_and_a3_reacquisition():
+    out = s3.recover_short_occlusion_contacts(
+        _exact_tap_fixture(), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert out["status"] == "VERIFIED"
+    assert out["metrics"]["exact_target_support_verified"] == 1
+    row = out["verified"][0]
+    assert row["media_ms"] == 1000
+    assert row["player_track_id"] == "p001"
+    assert row["player_actor_key"] == "GLOBAL_TARGET"
+    assert row["recovery_mode"] == "EXACT_TARGET_SUPPORT_PATH"
+    assert row["proof_eligible"] is True
+    assert row["recovery_evidence"]["raw_support_proof_eligible"] is False
+    assert row["recovery_evidence"]["a3_reacquisition_ms"] == 1067
+    assert row["separation_gain_h"] >= s3.EXACT_TAP_MIN_SEPARATION_GAIN_H
+
+
+def test_s3_13_exact_target_single_weak_proposal_never_proves_contact():
+    out = s3.recover_short_occlusion_contacts(
+        _exact_tap_fixture(a3_reacquisition=False), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert out["verified"] == []
+
+
+def test_s3_14_non_tap_exact_identity_cannot_seed_support_recovery():
+    out = s3.recover_short_occlusion_contacts(
+        _exact_tap_fixture(authority_tap=False), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert out["verified"] == []
+
+
+def test_s3_15_competing_lower_body_actor_blocks_exact_target_recovery():
+    out = s3.recover_short_occlusion_contacts(
+        _exact_tap_fixture(competitor=True), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert out["verified"] == []
+    assert any(
+        row["reason"] == "EXACT_TARGET_SUPPORT_COMPETING_LOWER_BODY_ACTOR"
+        for row in out["unresolved"]
+    )
+
+
+def _exact_tap_measured_release_fixture(*, release_kind="RELEASE", competitor=False):
+    selected = {"x": .40, "y": .40, "w": .20, "h": .30}
+    actor = _player("p001", x=.45, y=.40, w=.20, h=.30)
+    anchor_players = [actor]
+    if competitor:
+        anchor_players.append(_player("p002", x=.45, y=.40, w=.20, h=.30))
+    frames = [
+        _frame(1000, anchor_players),
+        _frame(1033, [actor]),
+        _frame(1067, [actor]),
+    ]
+    frames[0]["global_target"] = {
+        "status": "VERIFIED",
+        "reason": "OK_EXACT",
+        "local_track_id": "p001",
+        "candidate_local_track_ids": ["p001"],
+        "proof_eligible": True,
+        "authority_box": selected,
+        "authority_tap": True,
+        "authority_primary_source": "USER_TAP",
+    }
+    anchor_ball = _measured(1000, .55, .68)
+    release_ball = _measured(1067, .59, .64)
+    contacts = _empty_contacts()
+    contacts["rejected"] = [
+        {
+            "contact_id": "anchor_contact",
+            "media_ms": 1000,
+            "scene_id": "s1",
+            "player_track_id": "p001",
+            "player_association_state": "VERIFIED_LOCAL",
+            "ball_before": _measured(967, .53, .70),
+            "ball_at_contact": anchor_ball,
+            "ball_after": _measured(1033, .57, .66),
+            "contact_geometry": {"distance_h": .18, "score": .78},
+            "possession_evidence": {"kind": "CONTROL_TOUCH", "score": .8},
+            "trajectory_evidence": {"score": .20},
+            "temporal_continuity": 1.0,
+            "rejection_reasons": [],
+        },
+        {
+            "contact_id": "release_contact",
+            "media_ms": 1067,
+            "scene_id": "s1",
+            "player_track_id": "p001",
+            "player_association_state": "VERIFIED_LOCAL",
+            "ball_before": _measured(1033, .57, .66),
+            "ball_at_contact": release_ball,
+            "ball_after": _measured(1100, .63, .61),
+            "contact_geometry": {"distance_h": .62, "score": .45},
+            "possession_evidence": {"kind": release_kind, "score": 1.0},
+            "trajectory_evidence": {"score": .8},
+            "temporal_continuity": 1.0,
+            "rejection_reasons": ["CONTACT_GEOMETRY_WEAK"],
+        },
+    ]
+    contacts["contacts"] = copy.deepcopy(contacts["rejected"])
+    return frames, contacts
+
+
+def test_s3_16_exact_tap_body_and_ball_flow_can_bridge_measured_release():
+    frames, contacts = _exact_tap_measured_release_fixture()
+    before = copy.deepcopy((frames, contacts))
+
+    out = s3.recover_short_occlusion_contacts(
+        frames, [], contacts,
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+
+    assert (frames, contacts) == before
+    assert out["status"] == "VERIFIED"
+    assert out["metrics"]["exact_target_body_flow_releases"] == 1
+    row = out["verified"][0]
+    assert row["media_ms"] == 1000
+    assert row["player_track_id"] == "p001"
+    assert row["recovery_mode"] == "EXACT_TARGET_BODY_FLOW_RELEASE"
+    assert row["recovery_evidence"]["release_evidence_ms"] == 1067
+    assert row["recovery_evidence"]["body_flow_status"] == "VERIFIED_PATH"
+    assert row["recovery_evidence"]["ball_flow_status"] == "VERIFIED_PATH"
+
+
+def test_s3_17_exact_tap_body_flow_requires_independent_a4_release_transition():
+    frames, contacts = _exact_tap_measured_release_fixture(release_kind="CONTROL_TOUCH")
+    out = s3.recover_short_occlusion_contacts(
+        frames, [], contacts,
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert not any(
+        row.get("recovery_mode") == "EXACT_TARGET_BODY_FLOW_RELEASE"
+        for row in out["verified"]
+    )
+
+
+def test_s3_18_exact_tap_body_flow_rejects_competing_contact_actor():
+    frames, contacts = _exact_tap_measured_release_fixture(competitor=True)
+    out = s3.recover_short_occlusion_contacts(
+        frames, [], contacts,
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert not any(
+        row.get("recovery_mode") == "EXACT_TARGET_BODY_FLOW_RELEASE"
+        for row in out["verified"]
+    )
+    assert any(
+        row.get("reason") == "EXACT_TARGET_MEASURED_COMPETING_LOWER_BODY_ACTOR"
+        for row in out["unresolved"]
+    )

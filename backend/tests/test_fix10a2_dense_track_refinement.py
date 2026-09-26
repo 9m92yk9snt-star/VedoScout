@@ -106,6 +106,32 @@ def _identity_unresolved(monkeypatch):
     monkeypatch.setattr(dtr.uia, "resolve_target_at", lambda *_a, **_k: (None, "UNRESOLVED"))
 
 
+def test_exact_tap_keeps_selected_authority_box_separate_from_detected_body(monkeypatch):
+    selected = {"x": .08, "y": .18, "w": .14, "h": .35}
+    monkeypatch.setattr(
+        dtr.uia,
+        "resolve_target_at",
+        lambda *_a, **_k: ({
+            "box": selected,
+            "proof_eligible": True,
+            "tap_authority": True,
+            "primary_source": "USER_TAP",
+        }, "OK_EXACT"),
+    )
+    target = dtr._resolve_dense_target({}, 1000, [{
+        "local_track_id": "p001",
+        "box": dict(BASE),
+        "confidence": .9,
+        "association_state": "VERIFIED_LOCAL",
+    }])
+    assert target["status"] == "VERIFIED"
+    assert target["local_track_id"] == "p001"
+    assert target["body_box"] == BASE
+    assert target["authority_box"] == selected
+    assert target["authority_tap"] is True
+    assert target["authority_primary_source"] == "USER_TAP"
+
+
 def test_a201_scene_local_id_survives_safe_camera_pan(monkeypatch):
     _identity_unresolved(monkeypatch)
     shifted = {**BASE, "x": BASE["x"] + 0.05}
