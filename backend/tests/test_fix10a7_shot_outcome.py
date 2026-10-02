@@ -174,3 +174,116 @@ def test_a707_verified_keeper_deflection_can_create_save_evidence_without_canoni
     assert result["save_evidence"]["status"] == "VERIFIED"
     assert result["physical_outcome"] == "GOALKEEPER_SAVE_EVIDENCE"
     assert result["canonical_event_type"] is None
+
+
+def test_a708_strike_carries_the_release_owned_active_ball_anchor():
+    touch = _touch(1000, "p015", kinds=["RELEASE"])
+    touch.update({
+        "global_target_id": "GLOBAL_TARGET",
+        "proof_eligible": True,
+        "contact_role": {"status": "VERIFIED", "role": "RELEASE"},
+        "ball_after": {
+            "media_ms": 1040,
+            "state": "MEASURED_REACQUISITION",
+            "box": {"x": .48, "y": .44, "w": .02, "h": .02},
+            "confidence": .08,
+            "proof_eligible": True,
+            "time_authority": "ACTUAL_MEDIA_PTS",
+            "used_fallback": False,
+        },
+    })
+    strikes = soe.find_strike_releases({"touches": [touch]}, [])
+    assert len(strikes) == 1
+    anchor = strikes[0]["active_ball_anchor"]
+    assert anchor["media_ms"] == 1040
+    assert anchor["source"] == "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+    assert anchor["remote_spare_ball_used"] is False
+
+
+def test_a709_non_proof_release_ball_cannot_become_owned_anchor():
+    touch = _touch(1000, "p015", kinds=["RELEASE"])
+    touch.update({
+        "contact_role": {"status": "VERIFIED", "role": "RELEASE"},
+        "ball_after": {
+            "media_ms": 1040, "state": "MEASURED",
+            "box": {"x": .48, "y": .44, "w": .02, "h": .02},
+            "proof_eligible": False,
+            "time_authority": "ACTUAL_MEDIA_PTS", "used_fallback": False,
+        },
+    })
+    strikes = soe.find_strike_releases({"touches": [touch]}, [])
+    assert len(strikes) == 1
+    assert strikes[0]["active_ball_anchor"] is None
+
+
+def test_a709b_non_canonical_time_cannot_become_owned_release_anchor():
+    touch = _touch(1000, "p015", kinds=["RELEASE"])
+    touch.update({
+        "contact_role": {"status": "VERIFIED", "role": "RELEASE"},
+        "ball_after": {
+            "media_ms": 1040, "state": "MEASURED",
+            "box": {"x": .48, "y": .44, "w": .02, "h": .02},
+            "proof_eligible": True,
+            "time_authority": "SYNTHETIC_FRAME_INDEX", "used_fallback": False,
+        },
+    })
+    strikes = soe.find_strike_releases({"touches": [touch]}, [])
+    assert len(strikes) == 1
+    assert strikes[0]["active_ball_anchor"] is None
+
+
+def test_a710_verified_controlled_finish_becomes_bounded_goal_review_contact():
+    touch = _touch(1500, "p010", change=.58, after="p010", kinds=["CONTROL_TOUCH"])
+    touch.update({
+        "contact_role": {
+            "status": "VERIFIED", "role": "RECEIVE_CONTROL",
+            "proof_eligible": True,
+        },
+        "ball_at_contact": {
+            "media_ms": 1500, "state": "MEASURED",
+            "box": {"x": .62, "y": .55, "w": .03, "h": .02},
+            "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+            "used_fallback": False,
+        },
+        "ball_after": {
+            "media_ms": 1533, "state": "MEASURED",
+            "box": {"x": .65, "y": .54, "w": .03, "h": .02},
+            "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+            "used_fallback": False,
+        },
+    })
+
+    contacts = soe.find_scoring_control_contacts({"touches": [touch]})
+
+    assert len(contacts) == 1
+    assert contacts[0]["status"] == "VERIFIED_PHYSICAL_SCORING_CONTACT"
+    assert contacts[0]["active_ball_anchor_source"] == "VERIFIED_SCORING_CONTROL_BALL_AFTER"
+    assert contacts[0]["remote_spare_ball_used"] is False
+
+
+def test_a711_predicted_or_weak_control_never_becomes_scoring_contact():
+    touch = _touch(1500, "p010", change=.58, after="p010", kinds=["CONTROL_TOUCH"])
+    touch.update({
+        "contact_role": {
+            "status": "VERIFIED", "role": "RECEIVE_CONTROL",
+            "proof_eligible": True,
+        },
+        "ball_at_contact": {
+            "media_ms": 1500, "state": "PREDICTED_SHORT_GAP",
+            "box": {"x": .62, "y": .55, "w": .03, "h": .02},
+            "proof_eligible": False, "time_authority": "ACTUAL_MEDIA_PTS",
+            "used_fallback": False,
+        },
+        "ball_after": {
+            "media_ms": 1533, "state": "MEASURED",
+            "box": {"x": .65, "y": .54, "w": .03, "h": .02},
+            "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+            "used_fallback": False,
+        },
+    })
+    assert soe.find_scoring_control_contacts({"touches": [touch]}) == []
+
+    touch["ball_at_contact"]["state"] = "MEASURED"
+    touch["ball_at_contact"]["proof_eligible"] = True
+    touch["trajectory_change"] = .20
+    assert soe.find_scoring_control_contacts({"touches": [touch]}) == []

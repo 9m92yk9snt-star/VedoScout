@@ -19,7 +19,10 @@ import json
 import logging
 from pathlib import Path
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+try:  # Optional production provider; deterministic callers must still import.
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+except ImportError:  # pragma: no cover - availability is deployment-specific
+    LlmChat = UserMessage = ImageContent = None
 
 logger = logging.getLogger(__name__)
 

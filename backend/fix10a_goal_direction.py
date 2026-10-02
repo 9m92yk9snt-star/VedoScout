@@ -19,7 +19,10 @@ from pathlib import Path
 import cv2
 
 import video_timebase
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+try:  # Supporting vision is optional; the physical engine must still import.
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+except ImportError:  # pragma: no cover - availability is deployment-specific
+    LlmChat = UserMessage = ImageContent = None
 
 VERSION = 1
 VERIFY_PROVIDER = "openai"

@@ -30,6 +30,9 @@ from copy import deepcopy
 
 VERSION = 1
 GLOBAL_TARGET_ID = "GLOBAL_TARGET"
+JERSEY_HANDOFF_MAX_TAP_GAP_MS = 6000
+JERSEY_HANDOFF_LOCAL_VOTE_RADIUS_MS = 1200
+JERSEY_HANDOFF_NEAREST_VOTE_MAX_MS = 350
 
 FUSE_TOL_MS = 140
 TAP_AUTHORITY_MS = 650
@@ -41,6 +44,16 @@ PRODUCTION_SEGMENT_GAP_S = 0.35
 
 def _is_num(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _normalise_jersey_number(value):
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip()
+    if not text.isdigit():
+        return None
+    number = int(text)
+    return str(number) if 0 <= number <= 99 else None
 
 
 def _valid_box(b) -> bool:
@@ -101,8 +114,34 @@ def _tap_times(anchors, anchor_time_offset) -> list[int]:
     return sorted(set(out))
 
 
+def _tap_rows(anchors, anchor_time_offset, scenes) -> list[dict]:
+    """Preserve the box the user actually selected at the selected media time."""
+    out = []
+    off = float(anchor_time_offset or 0.0)
+    for anchor in anchors or []:
+        if (not isinstance(anchor, dict) or not _is_num(anchor.get("t"))
+                or not _valid_box(anchor.get("box"))):
+            continue
+        ms = int(round((float(anchor["t"]) + off) * 1000.0))
+        out.append({"media_ms": ms, "scene_id": _scene_for_ms(scenes, ms),
+                    "box": _box(anchor["box"])})
+    return out
+
+
 def _near_tap(ms, taps) -> bool:
     return any(abs(ms - t) <= TAP_AUTHORITY_MS for t in taps)
+
+
+def _near_matching_tap(ms, box, tap_rows, taps, scene_id=None) -> bool:
+    # Legacy time-only anchors keep their old behavior. With a selected box,
+    # only geometry on that same body inherits the bounded tap authority.
+    if any(abs(ms - t) <= TAP_AUTHORITY_MS
+           and not any(row["media_ms"] == t for row in tap_rows) for t in taps):
+        return True
+    return any(abs(ms - row["media_ms"]) <= TAP_AUTHORITY_MS
+               and (scene_id is None or row["scene_id"] is None
+                    or row["scene_id"] == scene_id)
+               and boxes_agree(box, row["box"]) for row in tap_rows)
 
 
 def _timeline_rows(identity_timeline) -> list[dict]:
@@ -191,6 +230,246 @@ def _canonical(source, row, *, strength, sources, tap_authority=False,
     }
 
 
+def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
+                                  touch_graph: dict | None,
+                                  consensus_by_track: dict | None) -> dict:
+    """Bind a split local track to GLOBAL_TARGET through independent jersey proof.
+
+    This is a narrow re-identification handoff owned by the canonical identity
+    layer.  A user-stated number alone is never enough: the number must be read
+    consistently on at least two independent frames, be unique among involved
+    tracks, occur in the same scene and within a bounded interval of a direct
+    user tap, and must not conflict with an existing verified dense target.
+    """
+    authority = identity_authority if isinstance(identity_authority, dict) else {}
+    frames = [row for row in (dense_frames or [])
+              if isinstance(row, dict) and _is_num(row.get("media_ms"))]
+    graph = deepcopy(touch_graph) if isinstance(touch_graph, dict) else {"touches": []}
+    consensus = consensus_by_track if isinstance(consensus_by_track, dict) else {}
+    stated = _normalise_jersey_number(
+        (authority.get("identity_profile") or {}).get("stated_jersey_number")
+        if isinstance(authority.get("identity_profile"), dict) else None
+    )
+    diagnostic = {
+        "version": 1,
+        "status": "UNRESOLVED",
+        "reason": None,
+        "stated_jersey_number": stated,
+        "candidate_track_ids": [],
+        "bound_touch_ids": [],
+    }
+    if stated is None:
+        diagnostic["reason"] = "STATED_JERSEY_NUMBER_MISSING"
+        graph["jersey_identity_handoff"] = diagnostic
+        return graph
+
+    matching = []
+    for track, row in consensus.items():
+        if not isinstance(track, str) or not isinstance(row, dict):
+            continue
+        if (
+            row.get("status") == "VERIFIED"
+            and _normalise_jersey_number(row.get("number")) == stated
+            and int(row.get("agreeing_frames") or 0) >= 2
+            and _is_num(row.get("top_posterior"))
+            and float(row["top_posterior"]) >= 0.70
+        ):
+            matching.append(track)
+    matching = sorted(set(matching))
+    diagnostic["candidate_track_ids"] = matching
+    if not matching:
+        diagnostic["reason"] = "NO_UNIQUE_VERIFIED_JERSEY_MATCH"
+        graph["jersey_identity_handoff"] = diagnostic
+        return graph
+
+    taps = [
+        row for row in authority.get("target_points") or []
+        if isinstance(row, dict) and _is_num(row.get("media_ms"))
+        and row.get("tap_authority") is True
+        and row.get("proof_eligible") is True
+        and (
+            row.get("primary_source") == "USER_TAP"
+            or "USER_TAP" in (row.get("sources") or [])
+        )
+    ]
+    if not taps:
+        diagnostic["reason"] = "DIRECT_USER_TAP_MISSING"
+        graph["jersey_identity_handoff"] = diagnostic
+        return graph
+
+    def nearest_frame(media_ms):
+        if not frames:
+            return None
+        frame = min(frames, key=lambda row: abs(int(row["media_ms"]) - int(media_ms)))
+        return frame if abs(int(frame["media_ms"]) - int(media_ms)) <= 100 else None
+
+    def tap_scene(tap):
+        if tap.get("scene_id") is not None:
+            return tap.get("scene_id")
+        frame = nearest_frame(int(tap["media_ms"]))
+        return frame.get("scene_id") if isinstance(frame, dict) else None
+
+    def local_matching_votes(track_id, media_ms):
+        row = consensus.get(track_id) if isinstance(consensus.get(track_id), dict) else {}
+        return [
+            vote for vote in row.get("votes") or []
+            if isinstance(vote, dict)
+            and vote.get("readable") is True
+            and _normalise_jersey_number(vote.get("number")) == stated
+            and str(vote.get("confidence") or "low").lower() in {"high", "medium"}
+            and _is_num(vote.get("media_ms"))
+            and abs(int(round(float(vote["media_ms"]))) - int(media_ms))
+            <= JERSEY_HANDOFF_LOCAL_VOTE_RADIUS_MS
+        ]
+
+    def nearest_matching_vote_gap_ms(track_id, media_ms):
+        votes = local_matching_votes(track_id, media_ms)
+        return min(
+            (
+                abs(int(round(float(vote["media_ms"]))) - int(media_ms))
+                for vote in votes
+            ),
+            default=None,
+        )
+
+    for touch in graph.get("touches") or []:
+        track_id = touch.get("player_track_id") if isinstance(touch, dict) else None
+        if not (
+            isinstance(touch, dict)
+            and track_id in matching
+            and touch.get("status") == "VERIFIED"
+            and touch.get("proof_eligible") is True
+        ):
+            continue
+        value = (touch.get("representative_ms")
+                 if _is_num(touch.get("representative_ms")) else touch.get("media_ms"))
+        if not _is_num(value):
+            continue
+        media_ms = int(round(float(value)))
+        local_votes = local_matching_votes(track_id, media_ms)
+        nearest_vote_gap_ms = nearest_matching_vote_gap_ms(track_id, media_ms)
+        if (
+            len(local_votes) < 2
+            or nearest_vote_gap_ms is None
+            or nearest_vote_gap_ms > JERSEY_HANDOFF_NEAREST_VOTE_MAX_MS
+        ):
+            continue
+        scene = touch.get("scene_id")
+        nearby_taps = [
+            tap for tap in taps
+            if abs(media_ms - int(round(float(tap["media_ms"])))) <= JERSEY_HANDOFF_MAX_TAP_GAP_MS
+            and (scene is None or tap_scene(tap) is None or tap_scene(tap) == scene)
+        ]
+        if not nearby_taps:
+            continue
+        frame = nearest_frame(media_ms)
+        if not isinstance(frame, dict):
+            continue
+        bodies = [
+            player for player in frame.get("players") or []
+            if isinstance(player, dict)
+            and player.get("local_track_id") == track_id
+            and player.get("association_state") != "HYPOTHESES"
+            and _valid_box(player.get("box"))
+        ]
+        if len(bodies) != 1:
+            continue
+        candidate_body = bodies[0]
+        candidate_team = str(candidate_body.get("team") or "").lower()
+        candidate_team_conf = candidate_body.get("team_confidence")
+        candidate_team_reliable = bool(
+            candidate_team in {"target_team", "opponent"}
+            and _is_num(candidate_team_conf)
+            and float(candidate_team_conf) >= 0.70
+        )
+        # The dense two-kit model is independently anchored on the user's tap.
+        # A jersey number seen on a confidently opposing kit cannot re-identify
+        # the target, even when both teams happen to use that shirt number.
+        if candidate_team_reliable and candidate_team == "opponent":
+            continue
+        # Duplicate shirt numbers are common. Refuse only a *simultaneous*
+        # second body that independently has two matching time-local reads;
+        # stale votes on a tracker id that switched bodies do not veto a valid
+        # handoff forever.
+        competing = []
+        visible_ids = {
+            player.get("local_track_id") for player in frame.get("players") or []
+            if isinstance(player, dict)
+            and isinstance(player.get("local_track_id"), str)
+            and player.get("association_state") != "HYPOTHESES"
+        }
+        for other in matching:
+            other_votes = local_matching_votes(other, media_ms)
+            other_nearest_gap = nearest_matching_vote_gap_ms(other, media_ms)
+            if (
+                other == track_id
+                or other not in visible_ids
+                or len(other_votes) < 2
+                or other_nearest_gap is None
+                or other_nearest_gap > JERSEY_HANDOFF_NEAREST_VOTE_MAX_MS
+            ):
+                continue
+            other_bodies = [
+                player for player in frame.get("players") or []
+                if isinstance(player, dict)
+                and player.get("local_track_id") == other
+                and player.get("association_state") != "HYPOTHESES"
+                and _valid_box(player.get("box"))
+            ]
+            if len(other_bodies) == 1:
+                other_team = str(other_bodies[0].get("team") or "").lower()
+                other_conf = other_bodies[0].get("team_confidence")
+                if (
+                    other_team == "opponent"
+                    and _is_num(other_conf)
+                    and float(other_conf) >= 0.70
+                ):
+                    # Time-local jersey votes belong to the old body before a
+                    # tracker collision; current independent kit evidence shows
+                    # that this simultaneously visible body is not the target.
+                    continue
+            competing.append(other)
+        if competing:
+            continue
+        dense_target = frame.get("global_target") if isinstance(frame.get("global_target"), dict) else {}
+        if (
+            dense_target.get("status") == "VERIFIED"
+            and dense_target.get("proof_eligible") is True
+            and dense_target.get("local_track_id") != track_id
+        ):
+            continue
+        tap = min(nearby_taps, key=lambda row: abs(media_ms - int(row["media_ms"])))
+        touch["global_target_id"] = GLOBAL_TARGET_ID
+        touch["global_target_resolution"] = {
+            "global_target_id": GLOBAL_TARGET_ID,
+            "status": "VERIFIED",
+            "reason": "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP",
+            "stated_jersey_number": stated,
+            "verified_jersey_number": stated,
+            "agreeing_frames": int(consensus[track_id].get("agreeing_frames") or 0),
+            "time_local_agreeing_frames": len(local_votes),
+            "time_local_vote_radius_ms": JERSEY_HANDOFF_LOCAL_VOTE_RADIUS_MS,
+            "nearest_vote_gap_ms": nearest_vote_gap_ms,
+            "nearest_vote_max_ms": JERSEY_HANDOFF_NEAREST_VOTE_MAX_MS,
+            "tap_media_ms": int(tap["media_ms"]),
+            "touch_media_ms": media_ms,
+            "gap_ms": abs(media_ms - int(tap["media_ms"])),
+        }
+        diagnostic["bound_touch_ids"].append(touch.get("touch_id"))
+
+    diagnostic["bound_touch_ids"] = [x for x in diagnostic["bound_touch_ids"] if isinstance(x, str)]
+    if diagnostic["bound_touch_ids"]:
+        diagnostic["status"] = "VERIFIED"
+        diagnostic["reason"] = "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP"
+    else:
+        diagnostic["reason"] = (
+            "DUPLICATE_OR_STALE_VERIFIED_JERSEY_MATCH"
+            if len(matching) > 1 else "NO_PROOF_ELIGIBLE_TOUCH_WITHIN_TAP_BOUND"
+        )
+    graph["jersey_identity_handoff"] = diagnostic
+    return graph
+
+
 def _unresolved(ms, scene_id, hypotheses, reason="SOURCE_CONFLICT"):
     return {
         "media_ms": int(ms),
@@ -211,7 +490,7 @@ def _unresolved(ms, scene_id, hypotheses, reason="SOURCE_CONFLICT"):
 
 def _dedupe_points(points):
     """Keep the strongest canonical row when two rows land on the same media ms."""
-    rank = {"PINNED": 6, "FUSED": 5, "GLOBAL": 4, "LOCAL": 3,
+    rank = {"USER_TAP": 7, "PINNED": 6, "FUSED": 5, "GLOBAL": 4, "LOCAL": 3,
             "PREDICTED": 2, "UNRESOLVED": 1}
     by_ms = {}
     for p in points:
@@ -246,7 +525,8 @@ def _merge_conflict_intervals(points):
 
 def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
                                      anchors=None, anchor_time_offset=0.0,
-                                     identity_profile=None) -> dict:
+                                     identity_profile=None,
+                                     player_details=None) -> dict:
     """Build ONE production-facing GLOBAL_TARGET identity authority.
 
     No source may silently overrule another. A real disagreement outside the
@@ -256,6 +536,7 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     tl = identity_timeline if isinstance(identity_timeline, dict) else {}
     scenes = deepcopy(tl.get("scenes") or [])
     taps = _tap_times(anchors, anchor_time_offset)
+    tap_rows = _tap_rows(anchors, anchor_time_offset, scenes)
     arows = _timeline_rows(tl)
     frows = _fix04_rows(fix04_track, scenes)
     points = []
@@ -263,7 +544,8 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     # FIX09A rows carry the whole-video scene-aware identity spine.
     for a in arows:
         f = _nearest(frows, a["media_ms"])
-        near_pin = _near_tap(a["media_ms"], taps)
+        near_pin = _near_matching_tap(a["media_ms"], f["box"] if f else a["box"],
+                                     tap_rows, taps, a.get("scene_id"))
         if a["predicted"]:
             # Prediction remains useful continuity even if FIX04 is absent.
             points.append(_canonical(
@@ -301,7 +583,8 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     # event-contact geometry without pretending to provide whole-video identity.
     for f in frows:
         a = _nearest(arows, f["media_ms"])
-        near_pin = _near_tap(f["media_ms"], taps)
+        near_pin = _near_matching_tap(f["media_ms"], f["box"], tap_rows, taps,
+                                     f.get("scene_id"))
         ff = dict(f)
         ff["state"] = "PINNED" if near_pin else "VISIBLE"
         if a is None:
@@ -327,6 +610,15 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
                 f["media_ms"], f.get("scene_id"),
                 [_hyp("FIX04", f), _hyp("FIX09A", a)]))
 
+    # A timestamp alone cannot identify the selected body: a nearby tracker
+    # row can belong to a different player. The selected box is authoritative
+    # at the tap itself; it never makes adjacent frames proof-eligible.
+    for tap in tap_rows:
+        points.append(_canonical(
+            "USER_TAP", tap, strength="USER_TAP", sources=["USER_TAP"],
+            tap_authority=True, proof_eligible=True,
+            hypotheses=[_hyp("USER_TAP", tap)], reason="USER_SELECTED_BOX"))
+
     points = _dedupe_points(points)
     accepted = [p for p in points if p.get("box") is not None and p.get("state") != "UNRESOLVED"]
     proof = [p for p in accepted if p.get("proof_eligible")]
@@ -337,14 +629,19 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     conflict_intervals = _merge_conflict_intervals(points)
     status = "ok" if accepted else ("unresolved" if conflicts else "empty")
     profile_summary = None
-    if isinstance(identity_profile, dict):
+    if isinstance(identity_profile, dict) or isinstance(player_details, dict):
         # Keep only structured analysis metadata needed by later identity stages;
         # this layer never converts prose traits into target geometry.
+        profile = identity_profile if isinstance(identity_profile, dict) else {}
+        details = player_details if isinstance(player_details, dict) else {}
         profile_summary = {
-            "same_player": identity_profile.get("same_player"),
-            "confidence": identity_profile.get("confidence"),
-            "description": identity_profile.get("description") or identity_profile.get("identity_description"),
-            "jersey_number": identity_profile.get("jersey_number"),
+            "same_player": profile.get("same_player"),
+            "confidence": profile.get("confidence"),
+            "description": profile.get("description") or profile.get("identity_description"),
+            "jersey_number": profile.get("jersey_number"),
+            # User-entered report metadata is retained as a stated attribute,
+            # never silently upgraded into geometry or identity proof.
+            "stated_jersey_number": _normalise_jersey_number(details.get("jersey_number")),
         }
 
     return {

@@ -137,3 +137,29 @@ def test_a606_jersey_consensus_cannot_change_global_target_authority():
     assert out["window_evidence"][0]["global_target"] == original_target
     assert out["touch_graph"]["touches"][0]["global_target_id"] is None
     assert out["touch_graph"]["touches"][0]["jersey_posterior"]["number"] == "10"
+
+
+def test_a607_review_budget_orders_target_and_verified_releases_before_other_tracks():
+    frames = []
+    tracks = ("p001", "p050", "p099")
+    for media_ms in (1000, 1200, 1400):
+        frames.append({
+            "media_ms": media_ms,
+            "players": [
+                {"local_track_id": track,
+                 "box": {"x": .1 + index * .2, "y": .2, "w": .12, "h": .3},
+                 "association_state": "VERIFIED_LOCAL"}
+                for index, track in enumerate(tracks)
+            ],
+        })
+    graph = {"touches": [
+        {"player_track_id": "p050", "global_target_id": None},
+        {"player_track_id": "p099", "global_target_id": None,
+         "contact_role": {"status": "VERIFIED", "role": "RELEASE"}},
+        {"player_track_id": "p001", "global_target_id": "GLOBAL_TARGET"},
+    ]}
+    requests = jc.select_jersey_review_requests(frames, graph)
+    order = list(dict.fromkeys(row["track_id"] for row in requests))
+    assert order == ["p001", "p099", "p050"]
+    assert all(row["expected_jersey_number"] is None for row in requests)
+    assert {row["review_priority"] for row in requests if row["track_id"] == "p001"} == {0}

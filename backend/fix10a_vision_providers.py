@@ -23,7 +23,18 @@ import cv2
 
 import identity_verify
 import video_timebase
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+try:  # Supporting vision is optional and always fails closed when unavailable.
+    from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+except ImportError:  # pragma: no cover - availability is deployment-specific
+    LlmChat = None
+
+    class _UnavailableMessage:
+        """Lightweight payload used by injected test chats when the SDK is absent."""
+
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    UserMessage = ImageContent = _UnavailableMessage
 
 VERSION = 1
 VERIFY_PROVIDER = "openai"

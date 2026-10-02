@@ -27,6 +27,8 @@ def test_a701_full_body_intervention_does_not_need_a4_touch():
     assert out["player_track_id"]=="p002"
     assert out["source"]=="A7_INDEPENDENT_FULL_BODY_INTERVENTION"
     assert out["touch_graph_mutated"] is False
+    assert out["kind"]=="DEFLECTION_OR_PARRY_LIKE"
+    assert out["control_evidence"]["status"]=="UNRESOLVED"
 
 
 def test_a702_near_body_without_ball_consequence_is_not_intervention():
@@ -65,3 +67,20 @@ def test_a705_unknown_role_never_becomes_save():
     out=a7.apply_intervention_evidence(base,ev,{})
     assert out["physical_outcome"]=="PLAYER_INTERVENTION"
     assert out["save_evidence"]["status"]=="UNRESOLVED"
+
+
+def test_a706_sustained_same_player_retention_is_control_like():
+    body=_box(.46,.28,.12,.40)
+    frames=[_frame(ms,body) for ms in (1080,1120,1160,1280,1400)]
+    trajectory=[
+        _ball(1080,.43,.43),
+        _ball(1120,.50,.43),
+        _ball(1160,.505,.43),
+        _ball(1280,.51,.43),
+        _ball(1400,.515,.43),
+    ]
+    out=a7.detect_post_strike_intervention(_strike(),frames,trajectory)
+    assert out["status"]=="VERIFIED"
+    assert out["kind"]=="CATCH_OR_CONTROL_LIKE"
+    assert out["control_evidence"]["status"]=="VERIFIED"
+    assert out["control_evidence"]["retained_span_ms"] >= a7.CONTROL_MIN_SPAN_MS

@@ -182,3 +182,78 @@ def test_a507_touch_graph_has_no_goal_assist_or_canonical_event_authority(monkey
     touch = result["touches"][0]
     forbidden = {"goal", "assist", "scorer", "canonical_event_type"}
     assert forbidden.isdisjoint(touch)
+
+
+def test_a508_nearest_tap_frame_binds_only_after_exact_tap_recheck(monkeypatch):
+    frame = _dense(1016, target_track="p015", target_status="VERIFIED")
+    frame["global_target"].update({
+        "reason": "OK_NEAREST_TAP_FRAME",
+        "authority_media_ms": 1000,
+    })
+    monkeypatch.setattr(
+        tg.uia,
+        "resolve_target_at",
+        lambda *_a, **_k: ({
+            "proof_eligible": True,
+            "tap_authority": True,
+            "primary_source": "USER_TAP",
+            "sources": ["USER_TAP"],
+            "box": dict(P15),
+        }, "OK_EXACT"),
+    )
+    bound = tg._global_target_binding({}, [frame], 1016, "p015")
+    assert bound["global_target_id"] == "GLOBAL_TARGET"
+    assert bound["reason"] == "OK_NEAREST_TAP_FRAME"
+
+
+def _tap_continuity_contact(*, complete=True):
+    row = _contact(1200, "p015", kind="SHORT_OCCLUSION_CONTACT_RECOVERY")
+    row.update({
+        "player_actor_key": "GLOBAL_TARGET",
+        "recovery_mode": "TAP_CONTINUITY_SUPPORT_RELEASE",
+        "recovery_evidence": {
+            "mode": "TAP_CONTINUITY_SUPPORT_RELEASE",
+            "actor_key": "GLOBAL_TARGET",
+            "tap_authority_status": "VERIFIED",
+            "actor_continuity_status": "VERIFIED_PATH",
+            "ball_flow_status": "VERIFIED_PATH" if complete else "UNRESOLVED",
+            "a3_reacquisition_proof_eligible": True,
+            "remote_spare_ball_used": False,
+            "release_track_id": "p015",
+        },
+    })
+    return row
+
+
+def test_a509_complete_tap_continuity_contact_binds_global_target(monkeypatch):
+    monkeypatch.setattr(tg.uia, "resolve_target_at", lambda *_a, **_k: (None, "UNRESOLVED"))
+    result = tg.build_touch_graph(
+        {"contacts": [_tap_continuity_contact()]}, {}, [_dense(1200)]
+    )
+    touch = result["touches"][0]
+    assert touch["global_target_id"] == "GLOBAL_TARGET"
+    assert touch["global_target_resolution"]["reason"] == "TAP_CONTINUITY_PHYSICAL_HANDOFF"
+    assert touch["ball_after"]["media_ms"] == 1240
+
+
+def test_a510_incomplete_tap_continuity_contact_cannot_bind_target(monkeypatch):
+    monkeypatch.setattr(tg.uia, "resolve_target_at", lambda *_a, **_k: (None, "UNRESOLVED"))
+    result = tg.build_touch_graph(
+        {"contacts": [_tap_continuity_contact(complete=False)]}, {}, [_dense(1200)]
+    )
+    assert result["touches"][0]["global_target_id"] is None
+
+
+def test_a511_team_relation_aggregates_stable_frames_and_rejects_conflict():
+    frames = [_dense(ms) for ms in (900, 1000, 1100)]
+    stable = tg._team_relation(frames, 1000, "p010")
+    assert stable["status"] == "SUPPORTING"
+    assert stable["team"] == "target_team"
+    assert stable["sample_count"] == 3
+
+    for player in frames[-1]["players"]:
+        if player["local_track_id"] == "p010":
+            player["team"] = "opponent"
+    conflict = tg._team_relation(frames, 1000, "p010")
+    assert conflict["status"] == "UNRESOLVED"
+    assert conflict["reason"] == "CONFLICTING_DENSE_TEAM_LABELS"

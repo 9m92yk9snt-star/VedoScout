@@ -66,6 +66,7 @@ def _compact_physical_result(result: dict | None) -> dict:
         "windows": row.get("windows") or [],
         "trace_summaries": row.get("trace_summaries") or [],
         "unresolved_reasons": row.get("unresolved_reasons") or [],
+        "recall_coverage": row.get("recall_coverage") or {},
         "metrics": row.get("metrics") or {},
         "dense_traces_persisted_in_mongo": False,
         "mode": "production",

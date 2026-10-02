@@ -17,6 +17,8 @@ VERSION = 1
 TOUCH_MERGE_MS = 160
 DENSE_NEAR_MS = 100
 TARGET_NEAR_MS = 250
+TEAM_EVIDENCE_RADIUS_MS = 250
+TEAM_SINGLE_FRAME_MIN_CONFIDENCE = 0.85
 
 
 def _num(value) -> bool:
@@ -55,20 +57,57 @@ def _dense_player(frame, track_id):
 
 
 def _team_relation(dense_frames, media_ms, track_id):
-    frame = _nearest_dense_frame(dense_frames, media_ms)
-    player = _dense_player(frame, track_id)
-    if not isinstance(player, dict):
+    reference = _nearest_dense_frame(dense_frames, media_ms)
+    scene = reference.get("scene_id") if isinstance(reference, dict) else None
+    samples = []
+    for frame in dense_frames or []:
+        if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
+            continue
+        if abs(int(frame["media_ms"]) - int(media_ms)) > TEAM_EVIDENCE_RADIUS_MS:
+            continue
+        if scene is not None and frame.get("scene_id") != scene:
+            continue
+        player = _dense_player(frame, track_id)
+        if not isinstance(player, dict):
+            continue
+        team = player.get("team")
+        confidence = player.get("team_confidence")
+        if team in {"target_team", "opponent", "other"} and _num(confidence):
+            samples.append({
+                "media_ms": int(frame["media_ms"]),
+                "team": team,
+                "confidence": float(confidence),
+                "source": player.get("team_source"),
+            })
+    if not samples:
         return {"status": "UNRESOLVED", "team": None, "confidence": None, "source": None}
-    team = player.get("team")
-    confidence = player.get("team_confidence")
-    source = player.get("team_source")
-    if team not in {"target_team", "opponent", "other"} or not _num(confidence):
-        return {"status": "UNRESOLVED", "team": team, "confidence": confidence, "source": source}
+    teams = {row["team"] for row in samples}
+    if len(teams) != 1:
+        return {
+            "status": "UNRESOLVED", "team": None, "confidence": None,
+            "source": None, "reason": "CONFLICTING_DENSE_TEAM_LABELS",
+            "sample_count": len(samples),
+        }
+    team = next(iter(teams))
+    confidences = sorted(row["confidence"] for row in samples)
+    middle = len(confidences) // 2
+    confidence = (confidences[middle] if len(confidences) % 2
+                  else (confidences[middle - 1] + confidences[middle]) / 2.0)
+    if len(samples) == 1 and confidence < TEAM_SINGLE_FRAME_MIN_CONFIDENCE:
+        return {
+            "status": "UNRESOLVED", "team": team,
+            "confidence": round(confidence, 4), "source": samples[0]["source"],
+            "reason": "SINGLE_TEAM_SAMPLE_CONFIDENCE_INSUFFICIENT",
+            "sample_count": 1,
+        }
+    sources = sorted({str(row["source"]) for row in samples if row.get("source")})
     return {
         "status": "SUPPORTING",
         "team": team,
         "confidence": round(float(confidence), 4),
-        "source": source,
+        "source": sources[0] if len(sources) == 1 else "+".join(sources),
+        "sample_count": len(samples),
+        "evidence_ms": [row["media_ms"] for row in samples],
     }
 
 
@@ -85,6 +124,43 @@ def _global_target_binding(identity_authority, dense_frames, media_ms, track_id)
     ):
         return {"global_target_id": None, "status": "UNRESOLVED",
                 "reason": "DENSE_TARGET_MAPPING_NOT_VERIFIED"}
+    if dense_target.get("reason") == "OK_NEAREST_TAP_FRAME":
+        authority_ms = dense_target.get("authority_media_ms")
+        if not _num(authority_ms):
+            return {"global_target_id": None, "status": "UNRESOLVED",
+                    "reason": "NEAREST_TAP_AUTHORITY_TIME_MISSING"}
+        resolved, why = uia.resolve_target_at(
+            identity_authority if isinstance(identity_authority, dict) else {},
+            int(round(float(authority_ms))), proof_required=True,
+            max_interp_ms=TARGET_NEAR_MS,
+        )
+        if not (
+            why == "OK_EXACT"
+            and isinstance(resolved, dict)
+            and resolved.get("proof_eligible") is True
+            and resolved.get("tap_authority") is True
+            and (
+                resolved.get("primary_source") == "USER_TAP"
+                or "USER_TAP" in (resolved.get("sources") or [])
+            )
+        ):
+            return {"global_target_id": None, "status": "UNRESOLVED",
+                    "reason": why or "NEAREST_TAP_AUTHORITY_NOT_PROOF_ELIGIBLE"}
+        return {"global_target_id": uia.GLOBAL_TARGET_ID,
+                "status": "VERIFIED", "reason": dense_target["reason"]}
+    if dense_target.get("reason") == "DENSE_TWO_ANCHOR_CONTINUITY":
+        # The dense refiner checked both exact canonical proofs and every
+        # intervening source frame. Recheck the canonical identity barrier at
+        # the touch time; interpolation by itself never establishes proof.
+        _, why = uia.resolve_target_at(
+            identity_authority if isinstance(identity_authority, dict) else {},
+            int(media_ms), max_interp_ms=TARGET_NEAR_MS,
+        )
+        if why == "OK_INTERPOLATED":
+            return {"global_target_id": uia.GLOBAL_TARGET_ID,
+                    "status": "VERIFIED", "reason": dense_target["reason"]}
+        return {"global_target_id": None, "status": "UNRESOLVED",
+                "reason": why or "GLOBAL_TARGET_AUTHORITY_NOT_PROOF_ELIGIBLE"}
     resolved, why = uia.resolve_target_at(
         identity_authority if isinstance(identity_authority, dict) else {},
         int(media_ms), proof_required=True, max_interp_ms=TARGET_NEAR_MS,
@@ -93,6 +169,36 @@ def _global_target_binding(identity_authority, dense_frames, media_ms, track_id)
         return {"global_target_id": None, "status": "UNRESOLVED",
                 "reason": why or "GLOBAL_TARGET_AUTHORITY_NOT_PROOF_ELIGIBLE"}
     return {"global_target_id": uia.GLOBAL_TARGET_ID, "status": "VERIFIED", "reason": why}
+
+
+def _recovered_global_target_binding(group, track_id):
+    """Validate the narrow tap-continuity proof carried by Step 3 contacts."""
+    rows = [row for row in (group or []) if isinstance(row, dict)]
+    if not rows or not isinstance(track_id, str):
+        return None
+    for row in rows:
+        evidence = row.get("recovery_evidence") if isinstance(row.get("recovery_evidence"), dict) else {}
+        if not (
+            row.get("status") == "VERIFIED"
+            and row.get("proof_eligible") is True
+            and row.get("player_track_id") == track_id
+            and row.get("player_actor_key") == "GLOBAL_TARGET"
+            and row.get("recovery_mode") == "TAP_CONTINUITY_SUPPORT_RELEASE"
+            and evidence.get("mode") == "TAP_CONTINUITY_SUPPORT_RELEASE"
+            and evidence.get("actor_key") == "GLOBAL_TARGET"
+            and evidence.get("tap_authority_status") == "VERIFIED"
+            and evidence.get("actor_continuity_status") == "VERIFIED_PATH"
+            and evidence.get("ball_flow_status") == "VERIFIED_PATH"
+            and evidence.get("a3_reacquisition_proof_eligible") is True
+            and evidence.get("remote_spare_ball_used") is False
+            and evidence.get("release_track_id") == track_id
+        ):
+            return None
+    return {
+        "global_target_id": uia.GLOBAL_TARGET_ID,
+        "status": "VERIFIED",
+        "reason": "TAP_CONTINUITY_PHYSICAL_HANDOFF",
+    }
 
 
 def _merge_group(group: list[dict], identity_authority, dense_frames) -> dict:
@@ -109,6 +215,10 @@ def _merge_group(group: list[dict], identity_authority, dense_frames) -> dict:
     )
     representative_ms = int(round(sum(int(row["media_ms"]) for row in group) / len(group)))
     identity = _global_target_binding(identity_authority, dense_frames, representative_ms, track_id)
+    if identity.get("status") != "VERIFIED":
+        recovered_identity = _recovered_global_target_binding(group, track_id)
+        if recovered_identity is not None:
+            identity = recovered_identity
     team = _team_relation(dense_frames, representative_ms, track_id)
     possession_kinds = [
         str((row.get("possession_evidence") or {}).get("kind") or "UNRESOLVED")
@@ -151,6 +261,10 @@ def _merge_group(group: list[dict], identity_authority, dense_frames) -> dict:
         "visibility": visibility,
         "foot": "UNKNOWN",
         "ball_before": deepcopy(first.get("ball_before")),
+        "ball_at_contact": deepcopy(max(
+            group,
+            key=lambda row: float((row.get("contact_geometry") or {}).get("score") or 0.0),
+        ).get("ball_at_contact")),
         "ball_after": deepcopy(last.get("ball_after")),
         "contact_geometry": deepcopy(max(
             group,
@@ -164,6 +278,18 @@ def _merge_group(group: list[dict], identity_authority, dense_frames) -> dict:
         "proof_eligible": bool(status == "VERIFIED" and all(row.get("proof_eligible") is True for row in group)),
         "contradictions": contradictions,
         "source_contact_ids": [row.get("contact_id") for row in group if row.get("contact_id")],
+        "player_actor_key": (
+            "GLOBAL_TARGET"
+            if group and all(row.get("player_actor_key") == "GLOBAL_TARGET" for row in group)
+            else f"LOCAL:{track_id}" if track_id else None
+        ),
+        "recovery_modes": list(dict.fromkeys(
+            row.get("recovery_mode") for row in group if row.get("recovery_mode")
+        )),
+        "recovery_evidence": [
+            deepcopy(row.get("recovery_evidence")) for row in group
+            if isinstance(row.get("recovery_evidence"), dict)
+        ],
         "frame_contact_count": len(group),
     }
 

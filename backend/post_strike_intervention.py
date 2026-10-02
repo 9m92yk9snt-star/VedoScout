@@ -22,6 +22,17 @@ TRAJECTORY_SIGNAL_MIN = 0.28
 SPEED_DROP_MIN = 0.18
 CONTINUITY_MAX_MS = 180
 
+# A single post-impact slowdown is not possession.  Control/catch is asserted
+# only when the same concrete player retains the measured ball for a meaningful
+# interval and the ball remains slow on more than one measured step.  This
+# distinction matters for passes that merely deflect off a defender or keeper.
+CONTROL_CONFIRM_WINDOW_MS = 650
+CONTROL_MAX_SAMPLE_GAP_MS = 180
+CONTROL_MIN_SAMPLES = 3
+CONTROL_MIN_SPAN_MS = 240
+CONTROL_MAX_SPEED_NORM_S = 0.35
+CONTROL_MIN_LOW_SPEED_STEPS = 2
+
 # A7 support-only fallback.  These proposals never enter A3/A4/A5 truth.
 SUPPORT_MAX_POST_STRIKE_MS = 1800
 SUPPORT_MAX_GAP_MS = 220
@@ -144,12 +155,106 @@ def _track_present(frames, track_id, media_ms, scene_id):
     return False
 
 
+def _track_body_near_ball(frames, track_id, ball, scene_id, *, pose_aware=False):
+    """Return True only for one concrete track/body at the measured ball time."""
+    frame = _frame_near(frames, int(ball["media_ms"]), scene_id)
+    if frame is None or frame.get("cut_barrier") is True:
+        return False
+    hit_test = _pose_aware_body_hit if pose_aware else _body_hit
+    matches = [
+        player for player in (frame.get("players") or [])
+        if isinstance(player, dict)
+        and player.get("local_track_id") == track_id
+        and player.get("association_state") != "HYPOTHESES"
+        and _valid_box(player.get("box"))
+        and hit_test(player["box"], ball["box"])
+    ]
+    return len(matches) == 1
+
+
+def _control_summary(samples, *, impact_ms):
+    """Prove sustained possession-like retention from ordered ball samples."""
+    ordered = sorted(
+        [row for row in (samples or []) if isinstance(row, dict) and _num(row.get("media_ms"))],
+        key=lambda row: int(row["media_ms"]),
+    )
+    retained = []
+    for row in ordered:
+        media_ms = int(row["media_ms"])
+        if media_ms < int(impact_ms):
+            continue
+        if retained and media_ms - int(retained[-1]["media_ms"]) > CONTROL_MAX_SAMPLE_GAP_MS:
+            break
+        retained.append(row)
+
+    speeds = []
+    for left, right in zip(retained, retained[1:]):
+        velocity = _velocity(left, right)
+        if velocity is not None:
+            speeds.append(math.hypot(*velocity))
+    span_ms = (
+        int(retained[-1]["media_ms"]) - int(retained[0]["media_ms"])
+        if len(retained) >= 2 else 0
+    )
+    low_speed_steps = sum(speed <= CONTROL_MAX_SPEED_NORM_S for speed in speeds)
+    verified = bool(
+        len(retained) >= CONTROL_MIN_SAMPLES
+        and span_ms >= CONTROL_MIN_SPAN_MS
+        and low_speed_steps >= CONTROL_MIN_LOW_SPEED_STEPS
+    )
+    return {
+        "status": "VERIFIED" if verified else "UNRESOLVED",
+        "reason": (
+            "SAME_PLAYER_RETAINS_SLOW_BALL_ACROSS_MEASURED_INTERVAL"
+            if verified else "SUSTAINED_CONTROL_NOT_PROVEN"
+        ),
+        "impact_ms": int(impact_ms),
+        "retained_sample_ms": [int(row["media_ms"]) for row in retained],
+        "retained_sample_count": len(retained),
+        "retained_span_ms": span_ms,
+        "low_speed_step_count": low_speed_steps,
+        "measured_step_count": len(speeds),
+        "max_control_speed_norm_s": CONTROL_MAX_SPEED_NORM_S,
+    }
+
+
+def _direct_control_evidence(rows, impact_index, dense_frames, track_id, scene_id):
+    impact_ms = int(rows[impact_index]["media_ms"])
+    retained = []
+    for row in rows[impact_index:]:
+        media_ms = int(row["media_ms"])
+        if media_ms > impact_ms + CONTROL_CONFIRM_WINDOW_MS:
+            break
+        if not _track_body_near_ball(dense_frames, track_id, row, scene_id):
+            if retained:
+                break
+            continue
+        retained.append(row)
+    return _control_summary(retained, impact_ms=impact_ms)
+
+
 def _support_anchor(ball_trajectory, strike):
     """Return a proof-eligible A3 measurement anchoring the support path."""
     if not isinstance(strike, dict) or not _num(strike.get("media_ms")):
         return None
     strike_ms = int(strike["media_ms"])
     scene = strike.get("scene_id")
+    owned = strike.get("active_ball_anchor")
+    if owned is not None:
+        if not (
+            isinstance(owned, dict)
+            and _num(owned.get("media_ms"))
+            and strike_ms <= int(owned["media_ms"]) <= strike_ms + FRAME_NEAR_MS
+            and owned.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+            and _valid_box(owned.get("box"))
+            and owned.get("time_authority") == "ACTUAL_MEDIA_PTS"
+            and owned.get("used_fallback") is not True
+            and owned.get("proof_eligible") is True
+            and owned.get("source") == "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+            and owned.get("remote_spare_ball_used") is False
+        ):
+            return None
+        return deepcopy(owned)
     rows = [
         row for row in (ball_trajectory or [])
         if isinstance(row, dict) and _num(row.get("media_ms"))
@@ -306,6 +411,7 @@ def _build_support_paths(strike, dense_frames, ball_trajectory):
         "status": "VERIFIED_PATH",
         "reason": "A7_SUPPORT_UNIQUE_ANCHORED_PATH",
         "anchor": anchor_node,
+        "anchor_source": anchor.get("source") or "A3_TRAJECTORY_NEAR_STRIKE",
         "path": best,
         "path_score": round(_support_path_quality(best), 4),
     }
@@ -417,6 +523,24 @@ def _support_clusters(strike, dense_frames, support_path):
     return verified
 
 
+def _support_control_evidence(cluster):
+    hits = sorted(cluster.get("hits") or [], key=lambda row: int(row["media_ms"]))
+    consequences = [
+        row for row in hits
+        if float((row.get("trajectory_change") or {}).get("score") or 0.0) >= TRAJECTORY_SIGNAL_MIN
+        or row.get("speed_drop") is True
+    ]
+    impact_ms = int(consequences[0]["media_ms"]) if consequences else int(cluster["strongest"]["media_ms"])
+    samples = [
+        {
+            "media_ms": int(row["media_ms"]),
+            "box": deepcopy(row["ball_box"]),
+        }
+        for row in hits
+    ]
+    return _control_summary(samples, impact_ms=impact_ms)
+
+
 def _detect_support_intervention(strike, dense_frames, ball_trajectory):
     path_result = _build_support_paths(strike, dense_frames, ball_trajectory)
     if path_result.get("status") != "VERIFIED_PATH":
@@ -440,10 +564,12 @@ def _detect_support_intervention(strike, dense_frames, ball_trajectory):
     cluster = clusters[0]
     strongest = cluster["strongest"]
     dynamics = strongest["trajectory_change"]
+    control = _support_control_evidence(cluster)
     kind = "CATCH_OR_CONTROL_LIKE" if (
         strongest.get("speed_drop") is True
         and dynamics.get("speed_after") is not None
         and float(dynamics["speed_after"]) <= 0.22
+        and control.get("status") == "VERIFIED"
     ) else "DEFLECTION_OR_PARRY_LIKE"
     return {
         "version": VERSION,
@@ -455,6 +581,7 @@ def _detect_support_intervention(strike, dense_frames, ball_trajectory):
         "player_box": deepcopy(strongest["player_box"]),
         "ball_box": deepcopy(strongest["ball_box"]),
         "trajectory_change": deepcopy(dynamics),
+        "control_evidence": control,
         # Raw support proposals are never proof-eligible individually.  The
         # aggregate is eligible only because it is anchored to a proof-eligible
         # A3 strike measurement, unique, multi-frame, actual-PTS, and has a
@@ -464,6 +591,8 @@ def _detect_support_intervention(strike, dense_frames, ball_trajectory):
         "support_hit_ms": [int(row["media_ms"]) for row in cluster["hits"]],
         "support_hit_count": len(cluster["hits"]),
         "support_path_score": path_result.get("path_score"),
+        "active_ball_anchor_source": path_result.get("anchor_source"),
+        "remote_spare_ball_used": False,
         "source": "A7_SUPPORT_ONLY_FULL_BODY_INTERVENTION",
         "touch_graph_mutated": False,
     }
@@ -510,7 +639,14 @@ def detect_post_strike_intervention(strike, dense_frames, ball_trajectory):
                 unresolved.append({"media_ms": int(ball["media_ms"]), "reason": "INTERVENING_BODY_AMBIGUOUS"})
             continue
         player = hits[0]
-        kind = "CATCH_OR_CONTROL_LIKE" if speed_drop and dynamics["speed_after"] <= 0.22 else "DEFLECTION_OR_PARRY_LIKE"
+        control = _direct_control_evidence(
+            rows, i, dense_frames, player["local_track_id"], scene
+        )
+        kind = "CATCH_OR_CONTROL_LIKE" if (
+            speed_drop
+            and dynamics["speed_after"] <= 0.22
+            and control.get("status") == "VERIFIED"
+        ) else "DEFLECTION_OR_PARRY_LIKE"
         return {
             "version": VERSION,
             "status": "VERIFIED",
@@ -521,6 +657,7 @@ def detect_post_strike_intervention(strike, dense_frames, ball_trajectory):
             "player_box": deepcopy(player["box"]),
             "ball_box": deepcopy(ball["box"]),
             "trajectory_change": dynamics,
+            "control_evidence": control,
             "proof_eligible": bool(ball.get("proof_eligible") is True),
             "source": "A7_INDEPENDENT_FULL_BODY_INTERVENTION",
             "touch_graph_mutated": False,
