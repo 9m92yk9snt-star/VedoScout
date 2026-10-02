@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import copy
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -29,12 +30,34 @@ def test_pw01_role_provider_result_reaches_a7_without_canonical_output(monkeypat
         pmr.jersey_consensus, "apply_jersey_consensus",
         lambda frames, touches, _votes: {"window_evidence": frames, "touch_graph": touches, "consensus_by_track": {}},
     )
-    strike = {"strike_id": "s", "media_ms": 1000, "scene_id": "s1", "player_track_id": "p015"}
+    strike = {
+        "strike_id": "s", "media_ms": 1000, "scene_id": "s1", "player_track_id": "p015",
+        "active_ball_anchor": {
+            "media_ms": 1010, "state": "MEASURED_REACQUISITION",
+            "box": {"x": .5, "y": .5, "w": .02, "h": .02},
+            "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+            "used_fallback": False,
+        },
+    }
     monkeypatch.setattr(pmr.shot_outcome_engine, "find_strike_releases", lambda *_a: [strike])
     captured = {}
+    shot_trajectory = [{"media_ms": 1010, "state": "MEASURED", "box": strike["active_ball_anchor"]["box"]}]
+    monkeypatch.setattr(
+        pmr.ball_trajectory, "reconstruct_ball_trajectory_from_release_anchor",
+        lambda *_a: copy.deepcopy(shot_trajectory),
+    )
 
-    def fake_outcome(_strike, _trajectory, _touches, **kwargs):
+    def fake_intervention(_strike, _frames, trajectory):
+        captured["intervention_trajectory"] = trajectory
+        return {"status": "NONE", "proof_eligible": False}
+
+    monkeypatch.setattr(
+        pmr.post_strike_intervention, "detect_post_strike_intervention", fake_intervention
+    )
+
+    def fake_outcome(_strike, trajectory, _touches, **kwargs):
         captured.update(kwargs)
+        captured["outcome_trajectory"] = trajectory
         return {"physical_outcome": "PLAYER_INTERVENTION", "goal_plane_crossing": {"status": "UNRESOLVED"}}
 
     monkeypatch.setattr(pmr.shot_outcome_engine, "reconstruct_post_strike_outcome", fake_outcome)
@@ -45,11 +68,25 @@ def test_pw01_role_provider_result_reaches_a7_without_canonical_output(monkeypat
         assert strikes[0]["strike_id"] == "s"
         return {"p001": {"status": "VERIFIED", "role": "GOALKEEPER", "reason": "pixels"}}
 
+    def fake_direction(outcome, trajectory, *_a):
+        captured["direction_trajectory"] = trajectory
+        return outcome
+
+    def fake_ball_proof(outcome, trajectory, *_a):
+        captured["proof_trajectory"] = trajectory
+        return outcome
+
+    monkeypatch.setattr(pmr.fix10a_goal_direction, "apply_direction_gate", fake_direction)
+    monkeypatch.setattr(pmr.fix10a_ball_proof_gate, "apply_ball_proof_gate", fake_ball_proof)
     out = pmr.reconstruct_physical_match(
         "video.mp4", {"analysis_windows": []}, {"sequences": []}, {}, {},
         role_evidence_provider=role_provider,
     )
     assert captured["role_evidence"]["p001"]["role"] == "GOALKEEPER"
+    assert captured["intervention_trajectory"] == shot_trajectory
+    assert captured["outcome_trajectory"] == shot_trajectory
+    assert captured["direction_trajectory"] == shot_trajectory
+    assert captured["proof_trajectory"] == shot_trajectory
     assert out["windows"][0]["role_evidence_tracks"] == 1
     assert "canonical_events" not in out
     assert "verified_stats" not in out
