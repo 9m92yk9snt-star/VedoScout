@@ -509,3 +509,95 @@ def test_fix11_49448_release_without_verified_goal_chain_is_not_an_assist():
     out = f10b.reconcile_canonical_events(semantic, physical([tr]))
     assert out["metrics"]["assists"] == 0
     assert not out["events"]
+
+
+def test_fix11_unresolved_semantic_shot_uses_unique_target_release_but_keeps_unknown_outcome():
+    target = strike(23616, "p083", target=True)
+    tr = trace(
+        [touch(23616, "p083", target=True)],
+        [target],
+        [outcome(target, goal=False)],
+    )
+    bundle = canonical([])
+    bundle["unresolved"] = [{
+        "action_id": "shot_23133",
+        "scene_id": "scene_007",
+        "kind": "SHOT",
+        "start_ms": 23067,
+        "contact_ms": 23133,
+        "end_ms": 24500,
+        "actor_resolution": {
+            "status": "UNRESOLVED",
+            "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+        },
+    }]
+
+    out = f10b.reconcile_canonical_events(bundle, physical([tr]))
+
+    assert len(out["events"]) == 1
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "SHOT"
+    assert event["canonical_outcome"] == "UNKNOWN"
+    assert event["causal_verified"] is False
+    assert event["proof"]["causal_verified"] is False
+    assert event["actor_local_track_id"] == "p083"
+    assert event["canonical_ms"] == 23616
+    assert event["identity_resolution"] == "FIX10A_VERIFIED_GLOBAL_TARGET_PHYSICAL_RELEASE"
+    assert event["source_action_ids"] == ["shot_23133"]
+    assert out["metrics"]["shots"] == 1
+    assert out["metrics"]["goals"] == 0
+    assert out["metrics"]["assists"] == 0
+    assert not any(row.get("action_id") == "shot_23133" for row in out["unresolved"])
+
+
+def test_fix11_unresolved_shot_does_not_use_other_player_release_as_target_identity():
+    other = strike(23616, "p083", target=False)
+    tr = trace(
+        [touch(23616, "p083", target=False)],
+        [other],
+        [outcome(other, goal=False)],
+    )
+    bundle = canonical([])
+    bundle["unresolved"] = [{
+        "action_id": "shot_23133",
+        "scene_id": "scene_007",
+        "kind": "SHOT",
+        "start_ms": 23067,
+        "contact_ms": 23133,
+        "end_ms": 24500,
+        "actor_resolution": {
+            "status": "UNRESOLVED",
+            "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+        },
+    }]
+
+    out = f10b.reconcile_canonical_events(bundle, physical([tr]))
+    assert not out["events"]
+    assert out["metrics"]["shots"] == 0
+
+
+def test_fix11_unresolved_shot_requires_one_unique_target_release():
+    first = strike(23616, "p083", target=True)
+    second = strike(23250, "p084", target=True)
+    tr = trace(
+        [touch(23616, "p083", target=True), touch(23250, "p084", target=True)],
+        [first, second],
+        [outcome(first, goal=False), outcome(second, goal=False)],
+    )
+    bundle = canonical([])
+    bundle["unresolved"] = [{
+        "action_id": "ambiguous_shot",
+        "scene_id": "scene_007",
+        "kind": "SHOT",
+        "start_ms": 23067,
+        "contact_ms": 23133,
+        "end_ms": 24500,
+        "actor_resolution": {
+            "status": "UNRESOLVED",
+            "reason": "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE",
+        },
+    }]
+
+    out = f10b.reconcile_canonical_events(bundle, physical([tr]))
+    assert not out["events"]
+    assert out["metrics"]["shots"] == 0
