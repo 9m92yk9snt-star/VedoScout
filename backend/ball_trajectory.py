@@ -23,6 +23,9 @@ DORMANT_MAX_RESIDUAL_NORM = 0.18
 DORMANT_PLAYER_SUPPORT_H = 0.32
 DORMANT_PLAYER_SUPPORTED_SCALE_MIN = 0.25
 HYPOTHESIS_DECAY = 0.88
+RELEASE_REACQUIRE_MAX_JUMP_NORM = 0.25
+RELEASE_REACQUIRE_MIN_CONFIDENCE = 0.04
+RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS = 80
 
 
 def _num(value) -> bool:
@@ -406,3 +409,131 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
         })
 
     return trajectory_features(rows)
+
+
+def reconstruct_ball_trajectory_from_release_anchor(
+    dense_frames, anchor: dict, scene_id: str | None = None,
+    max_duration_ms: int = 3000,
+) -> list[dict]:
+    """Re-track one shot from its independently verified post-contact ball.
+
+    The global trajectory may have stayed attached to a competing ball. A
+    verified release anchor can seed a separate, shot-local path, but it cannot
+    by itself bridge a detector jump: a player-supported jump must be confirmed
+    by a second nearby, actual-PTS ball observation before either point becomes
+    measured path evidence. No path is carried across a cut or scene boundary.
+    """
+    if not (
+        isinstance(anchor, dict)
+        and _num(anchor.get("media_ms"))
+        and anchor.get("proof_eligible") is True
+        and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
+        and anchor.get("used_fallback") is not True
+        and anchor.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+        and _valid_box(anchor.get("box"))
+    ):
+        return []
+
+    seed_ms = int(anchor["media_ms"])
+    rows = [{
+        "media_ms": seed_ms, "scene_id": scene_id, "state": "MEASURED",
+        "box": _box(anchor["box"]),
+        "confidence": float(anchor.get("confidence") or 0.0),
+        "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False, "cut_barrier": False,
+        "provenance": "VERIFIED_RELEASE_CONTACT_BALL_AFTER", "candidates": [],
+    }]
+    last = rows[0]
+    pending = None
+    jump_supported = False
+
+    for frame in sorted(
+        (f for f in dense_frames or [] if isinstance(f, dict) and _num(f.get("media_ms"))
+         and int(f["media_ms"]) > seed_ms), key=lambda f: int(f["media_ms"]),
+    ):
+        ms = int(frame["media_ms"])
+        if ms - seed_ms > max(0, int(max_duration_ms)):
+            break
+        frame_scene = frame.get("scene_id")
+        if frame.get("cut_barrier") is True or frame.get("cut") is True:
+            break
+        if scene_id is not None and frame_scene not in {None, scene_id}:
+            break
+        if frame.get("used_fallback") is True or frame.get("time_authority") not in {None, "ACTUAL_MEDIA_PTS"}:
+            continue
+        if pending and ms - pending["media_ms"] > RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS:
+            pending = None
+            continue
+        candidates = []
+        for candidate in frame.get("ball_candidates") or []:
+            if not isinstance(candidate, dict) or not _valid_box(candidate.get("box")):
+                continue
+            confidence = float(candidate.get("confidence") or 0.0)
+            if confidence < RELEASE_REACQUIRE_MIN_CONFIDENCE:
+                continue
+            candidates.append({"box": _box(candidate["box"]), "confidence": confidence})
+        if not candidates:
+            continue
+
+        previous = pending if pending else last
+        dt = (ms - int(previous["media_ms"])) / 1000.0
+        if dt <= 0:
+            continue
+        px, py = _center(previous["box"])
+        ranked = sorted(
+            ((math.hypot(_center(c["box"])[0] - px, _center(c["box"])[1] - py), c)
+             for c in candidates), key=lambda pair: pair[0],
+        )
+        nearest_dist, nearest = ranked[0]
+        next_dist = ranked[1][0] if len(ranked) > 1 else float("inf")
+        ordinary_limit = BASE_JUMP_NORM + MAX_SPEED_NORM_S * dt
+
+        if pending:
+            if nearest_dist > ordinary_limit or next_dist - nearest_dist < SCORE_MARGIN:
+                pending = None
+                continue
+            first = pending
+            rows.append({
+                "media_ms": first["media_ms"], "scene_id": scene_id,
+                "state": "MEASURED", "box": first["box"],
+                "confidence": first["confidence"], "proof_eligible": True,
+                "time_authority": "ACTUAL_MEDIA_PTS", "used_fallback": False,
+                "cut_barrier": False,
+                "provenance": "RELEASE_ANCHOR_REACQUISITION_CONFIRMED", "candidates": [],
+            })
+            row = {
+                "media_ms": ms, "scene_id": scene_id, "state": "MEASURED",
+                "box": nearest["box"], "confidence": nearest["confidence"],
+                "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+                "used_fallback": False, "cut_barrier": False,
+                "provenance": "RELEASE_ANCHOR_REACQUISITION_CONFIRMED", "candidates": [],
+            }
+            rows.append(row)
+            last, pending, jump_supported = row, None, True
+            continue
+
+        if nearest_dist <= ordinary_limit:
+            if next_dist - nearest_dist < SCORE_MARGIN:
+                continue
+            row = {
+                "media_ms": ms, "scene_id": scene_id, "state": "MEASURED",
+                "box": nearest["box"], "confidence": nearest["confidence"],
+                "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+                "used_fallback": False, "cut_barrier": False,
+                "provenance": "RELEASE_ANCHORED_DENSE_TRAJECTORY", "candidates": [],
+            }
+            rows.append(row)
+            last = row
+            continue
+
+        # Permit a discontinuous recovery only as a pending hypothesis near a
+        # verified local player's foot. It becomes usable after confirmation.
+        if (
+            not jump_supported and nearest_dist <= RELEASE_REACQUIRE_MAX_JUMP_NORM
+            and next_dist - nearest_dist >= SCORE_MARGIN
+            and _nearest_player_foot_h(nearest["box"], frame.get("players") or []) is not None
+            and _nearest_player_foot_h(nearest["box"], frame.get("players") or []) <= DORMANT_PLAYER_SUPPORT_H
+        ):
+            pending = {"media_ms": ms, "box": nearest["box"], "confidence": nearest["confidence"]}
+
+    return rows
