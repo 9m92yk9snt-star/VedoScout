@@ -29,7 +29,7 @@
     "frontend": "100% on all requested checks: /methodology page, Landing footer link, Lukas report trial-readiness card+headline+scores+items, banner methodology link, banner regression, 4 attribute section regressions, PDF download trigger, admin tab navigation. Zero pageerrors."
   },
   "test_credentials": "premium@elitescout.com / Premium@2026 and admin@elitescout.com / Admin@2026!Elite — both working.",
-  "seed_data_creation": "No new seed data. Reused existing Lukas A. premium demo report id=vedoscout-main. PDF was regenerated server-side on download (cache was cleared per main agent note).",
+  "seed_data_creation": "No new seed data. Reused existing Lukas A. premium demo report id=64f59196-a520-4ba4-a0f9-de96df8802ef. PDF was regenerated server-side on download (cache was cleared per main agent note).",
   "retest_needed": false,
   "should_main_agent_self_test": true,
   "context_for_next_testing_agent": "Session-1 credibility upgrade ships clean. trial_readiness object is now a permanent top-level field on premium reports and PDFs include both the new Trial-Readiness page and Methodology appendix. Aliases are insertion-order safe in trial_readiness.json — DO NOT alphabetise that dict or the central-midfielder generic 'midfielder' token will start swallowing attacking/defensive midfielders again. Recharts ResponsiveContainer -1×-1 initial-paint warning (iter-5) still present but harmless.",

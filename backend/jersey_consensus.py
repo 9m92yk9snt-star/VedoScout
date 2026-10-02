@@ -59,11 +59,42 @@ def _involved_tracks(touch_graph: dict | None) -> list[str]:
     return out
 
 
+def _track_priority(touch_graph: dict | None) -> dict[str, tuple[int, int]]:
+    """Rank materially involved tracks before the provider's bounded budget.
+
+    The vision provider intentionally caps reads per report/window.  Ordering by
+    lexical local-track id meant a late-created scoring track could receive only
+    one crop while unrelated control touches consumed the budget.  Physical
+    target ownership and a VERIFIED release are deterministic relevance signals;
+    neither reveals an expected jersey number to the reader.
+    """
+    graph = touch_graph if isinstance(touch_graph, dict) else {}
+    priority: dict[str, tuple[int, int]] = {}
+    for order, touch in enumerate(graph.get("touches") or []):
+        if not isinstance(touch, dict):
+            continue
+        track = touch.get("player_track_id")
+        if not isinstance(track, str) or not track:
+            continue
+        role = touch.get("contact_role") if isinstance(touch.get("contact_role"), dict) else {}
+        if touch.get("global_target_id") == "GLOBAL_TARGET":
+            rank = 0
+        elif role.get("status") == "VERIFIED" and role.get("role") == "RELEASE":
+            rank = 1
+        else:
+            rank = 2
+        candidate = (rank, order)
+        if track not in priority or candidate < priority[track]:
+            priority[track] = candidate
+    return priority
+
+
 def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> list[dict]:
     """Choose 3–5 clear/larger, temporally separated crops per involved track."""
     involved = set(_involved_tracks(touch_graph))
     if not involved:
         return []
+    priority = _track_priority(touch_graph)
     candidates: dict[str, list[dict]] = {track: [] for track in involved}
     for frame in window_evidence or []:
         if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
@@ -92,7 +123,11 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
             })
 
     requests = []
-    for track in sorted(involved):
+    ordered_tracks = sorted(
+        involved,
+        key=lambda track: (*priority.get(track, (3, 10**9)), track),
+    )
+    for track in ordered_tracks:
         ranked = sorted(
             candidates.get(track) or [],
             key=lambda row: (-float(row["area"]), int(row["media_ms"])),
@@ -115,6 +150,7 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
                 "media_ms": int(row["media_ms"]),
                 "box": deepcopy(row["box"]),
                 "selection_rank": index + 1,
+                "review_priority": priority.get(track, (3, 10**9))[0],
                 "expected_jersey_number": None,
             })
     return requests

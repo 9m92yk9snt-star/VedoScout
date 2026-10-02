@@ -37,10 +37,10 @@
       "wordmark_only_no_logo_mark": true,
       "hero_player_name_contains_GRANT_E2E": true,
       "top_strength_img_srcs": [
-        "https://vedoscout-main.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_00.jpg",
-        "https://vedoscout-main.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_01.jpg",
-        "https://vedoscout-main.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_02.jpg",
-        "https://vedoscout-main.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_03.jpg"
+        "https://scout-ai-pro-1.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_00.jpg",
+        "https://scout-ai-pro-1.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_01.jpg",
+        "https://scout-ai-pro-1.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_02.jpg",
+        "https://scout-ai-pro-1.preview.emergentagent.com/api/media/reports/62ca3ed0-81e2-4710-a20e-165e1d7f2372/frames/frame_03.jpg"
       ],
       "console_errors": 0,
       "score_gauge_shows_9_0_not_8_0": "spec description said 8.0/10 but live data has 9.0/10 — this is genuine AI data, not a V2 bug (evaluation logic intentionally unchanged)."

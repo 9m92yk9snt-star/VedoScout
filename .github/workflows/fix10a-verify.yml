@@ -1,26 +1,23 @@
-name: FIX10A verification
+name: Production verification
 
-on:
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 permissions:
   contents: read
 
 jobs:
-  fix10a-unit:
+  fix10_unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install FIX10A test dependencies
+      - name: Install focused test dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 python-dotenv==1.2.2
-      - name: Provide CI-only no-network Emergent import stubs
+      - name: Provide no-network Emergent LLM stub
         shell: bash
         run: |
           set -euo pipefail
@@ -31,29 +28,33 @@ jobs:
           class _Payload:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
           class UserMessage(_Payload):
               pass
-
           class ImageContent(_Payload):
               pass
-
           class FileContentWithMimeType(_Payload):
               pass
-
           class LlmChat:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def with_model(self, provider, model):
                   self.provider = provider
                   self.model = model
                   return self
-
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
-      - name: Compile changed backend modules
+      - name: Verify FIX10 has no shadow execution path
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend/fix10a_shadow_runtime.py
+          if grep -E 'fix10a_shadow_runtime|FIX10A_SHADOW_ENABLED|FIX10B_CANONICAL_ENABLED|spawn_shadow' \
+            backend/server.py backend/fix10a_runtime.py backend/fix10b_runtime.py; then
+            echo 'Obsolete FIX10 shadow execution reference found'
+            exit 1
+          fi
+      - name: Compile production FIX10 path
         env:
           PYTHONPATH: /tmp/ci_stubs:backend
         run: |
@@ -71,31 +72,21 @@ jobs:
             backend/open_observation_compat.py \
             backend/fix10a_vision_providers.py \
             backend/fix10a_goal_direction.py \
-            backend/fix10a_shadow_runtime.py \
+            backend/fix10a_runtime.py \
+            backend/fix10b_reconciliation.py \
+            backend/fix10b_runtime.py \
             backend/golden_fixture_validator.py \
             backend/run_real_video_golden.py \
             backend/football_sequence_intelligence.py \
             backend/identity_verify.py \
             backend/server.py
-      - name: Run FIX10A regression family
+      - name: Run FIX10 production regressions
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py
-      - name: Package exact FIX10A runtime for private Golden diagnostics
-        uses: actions/upload-artifact@v4
-        with:
-          name: fix10a-live-runtime
-          path: |
-            backend/*.py
-            backend/models/yolov8n.onnx
-            backend/requirements.txt
-            backend/tests/fixtures/real_video/almin_test07_v1.json
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py
 
-  existing-backend-regression-attempt:
+  backend_regression:
     runs-on: ubuntu-latest
     services:
       mongo:
@@ -107,14 +98,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install project requirements available outside Emergent runtime
+      - name: Install backend requirements available outside Emergent runtime
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
           grep -v '^emergentintegrations==' backend/requirements.txt > /tmp/requirements-ci.txt
           python -m pip install -r /tmp/requirements-ci.txt
-      - name: Provide CI-only no-network Emergent import stubs
+      - name: Provide no-network Emergent stubs
         shell: bash
         run: |
           set -euo pipefail
@@ -128,28 +119,21 @@ jobs:
           class _Payload:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def model_dump(self):
                   return dict(self.__dict__)
-
           class UserMessage(_Payload):
               pass
-
           class ImageContent(_Payload):
               pass
-
           class FileContentWithMimeType(_Payload):
               pass
-
           class LlmChat:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def with_model(self, provider, model):
                   self.provider = provider
                   self.model = model
                   return self
-
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
@@ -157,30 +141,23 @@ jobs:
           class _Payload:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               def model_dump(self):
                   return dict(self.__dict__)
-
           class CheckoutSessionResponse(_Payload):
               pass
-
           class CheckoutStatusResponse(_Payload):
               pass
-
           class CheckoutSessionRequest(_Payload):
               pass
-
           class StripeCheckout:
               def __init__(self, **kwargs):
                   self.__dict__.update(kwargs)
-
               async def create_checkout_session(self, *_args, **_kwargs):
                   raise RuntimeError("CI Emergent stub: payment call forbidden")
-
               async def get_checkout_status(self, *_args, **_kwargs):
                   raise RuntimeError("CI Emergent stub: payment call forbidden")
           PY
-      - name: Reproduce Emergent /app layout for chronological tests
+      - name: Reproduce Emergent app layout
         shell: bash
         run: |
           set -euo pipefail
@@ -191,7 +168,7 @@ jobs:
           if [ ! -f frontend/.env ]; then
             printf '%s\n' 'REACT_APP_BACKEND_URL=http://127.0.0.1:8000' > frontend/.env
           fi
-      - name: Run historical chronological regression contract
+      - name: Run historical backend regression contract
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
@@ -203,10 +180,28 @@ jobs:
           ADMIN_EMAIL: ci@example.com
           ADMIN_PASSWORD: ci-password
           REACT_APP_BACKEND_URL: http://127.0.0.1:8000
-          FIX10A_SHADOW_ENABLED: '0'
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' | sort)
+          mapfile -t FIX_FILES < <(find tests -maxdepth 1 -type f -name 'test_fix*.py' ! -name 'test_fix10a*.py' ! -name 'test_fix10b*.py' | sort)
           test "${#FIX_FILES[@]}" -gt 0
           pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
+
+  frontend_build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          npm install --global yarn@1.22.22
+          yarn install --non-interactive
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          CI: 'false'
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8000
+        run: yarn build

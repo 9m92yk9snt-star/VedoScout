@@ -18,7 +18,7 @@
     "status_polls_401_after_click": 0,
     "ready_toast_seen_within_6min": false,
     "ready_toast_note": "Analysis still on Step 2/5 at end of 6-min watch window; not tested to completion — environmental webm-surrogate limitation from iter60, NOT a code bug.",
-    "final_dashboard_url": "https://vedoscout-main.preview.emergentagent.com/dashboard"
+    "final_dashboard_url": "https://scout-ai-pro-1.preview.emergentagent.com/dashboard"
   },
   "test_report_links": [
     "/app/test_reports/iter61_after_click.png",

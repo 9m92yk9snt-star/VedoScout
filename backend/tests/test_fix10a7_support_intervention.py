@@ -2,6 +2,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import numpy as np
+import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -80,6 +81,8 @@ def test_a7s01_multiframe_support_can_verify_independent_intervention():
     assert out["proof_eligible"] is True
     assert out["touch_graph_mutated"] is False
     assert out["source"] == "A7_SUPPORT_ONLY_FULL_BODY_INTERVENTION"
+    assert out["kind"] == "DEFLECTION_OR_PARRY_LIKE"
+    assert out["control_evidence"]["status"] == "UNRESOLVED"
 
 
 def test_a7s02_single_frame_body_nearness_cannot_verify():
@@ -176,10 +179,102 @@ def test_a7s09_dense_support_floor_does_not_lower_a3_ball_floor():
     assert dtr.A7_BALL_SUPPORT_CONF_T == .001
 
 
-def test_a7s10_injected_two_tuple_detector_contract_still_works():
+def test_a7s10_support_reads_ball_score_when_another_class_narrowly_wins():
+    class CompetingClassNet:
+        def setInput(self, _blob):
+            pass
+
+        def forward(self):
+            raw = np.zeros((1, 84, 1), dtype=np.float32)
+            raw[0, 0:4, 0] = [320, 320, 20, 20]
+            raw[0, 4 + 32, 0] = .002
+            raw[0, 4 + 38, 0] = .004
+            return raw
+
+    class Detector:
+        ok = True
+        net = CompetingClassNet()
+
+    frame = np.zeros((640, 640, 3), dtype=np.uint8)
+    _people, a3_balls, support = dtr._detect_dense_people_and_ball(
+        Detector(), frame, include_a7_support=True
+    )
+    assert a3_balls == []
+    assert len(support) == 1
+    assert support[0]["confidence"] == pytest.approx(.002)
+    assert support[0]["top_class_id"] == 38
+    assert support[0]["class_specific_support"] is True
+    assert support[0]["support_only"] is True
+    assert support[0]["proof_eligible"] is False
+
+
+def test_a7s11_injected_two_tuple_detector_contract_still_works():
     dense = [{"media_ms": 1000, "scene_id": "s1", "frame_bgr": np.zeros((32,32,3), dtype=np.uint8),
               "time_authority": "ACTUAL_MEDIA_PTS", "used_fallback": False}]
     out = dtr.refine_window(dense, {}, {}, "s1", detector_fn=lambda _frame: ([], []))
     assert out["status"] == "ok"
     assert out["frames"][0]["ball_candidates"] == []
     assert out["frames"][0]["a7_ball_support_candidates"] == []
+
+
+def test_a7s12_release_owned_anchor_wins_over_remote_global_ball():
+    strike = _strike()
+    strike["active_ball_anchor"] = {
+        "media_ms": 1000,
+        "state": "MEASURED_REACQUISITION",
+        "box": _box(.20, .40),
+        "confidence": .08,
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+        "proof_eligible": True,
+        "source": "VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+        "remote_spare_ball_used": False,
+    }
+    remote = _anchor()
+    remote[0]["box"] = _box(.80, .20)
+    path = a7._build_support_paths(strike, _verified_support_sequence(), remote)
+    assert path["status"] == "VERIFIED_PATH"
+    assert path["anchor"]["box"] == strike["active_ball_anchor"]["box"]
+    assert path["anchor_source"] == "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+
+    intervention = a7.detect_post_strike_intervention(
+        strike, _verified_support_sequence(), remote
+    )
+    assert intervention["status"] == "VERIFIED"
+    assert intervention["active_ball_anchor_source"] == "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+    assert intervention["remote_spare_ball_used"] is False
+
+
+def test_a7s13_invalid_owned_anchor_does_not_fall_back_to_remote_ball():
+    strike = _strike()
+    strike["active_ball_anchor"] = {
+        "media_ms": 1000,
+        "state": "MEASURED_REACQUISITION",
+        "box": _box(.20, .40),
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+        "proof_eligible": False,
+        "source": "VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+        "remote_spare_ball_used": False,
+    }
+    path = a7._build_support_paths(strike, _verified_support_sequence(), _anchor())
+    assert path["status"] == "UNRESOLVED"
+    assert path["reason"] == "A7_SUPPORT_NO_PROOF_ELIGIBLE_STRIKE_ANCHOR"
+
+
+def test_a7s14_sustained_slow_support_retention_is_control_like():
+    body = _player()
+    frames = [
+        _frame(1040, [_support(.24)]),
+        _frame(1075, [_support(.31)]),
+        _frame(1120, [_support(.43)], [body]),
+        _frame(1296, [_support(.431)], [body]),
+        _frame(1460, [_support(.432)], [body]),
+        _frame(1620, [_support(.46)]),
+        _frame(1780, [_support(.50)]),
+    ]
+    out = a7.detect_post_strike_intervention(_strike(), frames, _anchor())
+    assert out["status"] == "VERIFIED"
+    assert out["kind"] == "CATCH_OR_CONTROL_LIKE"
+    assert out["control_evidence"]["status"] == "VERIFIED"
+    assert out["control_evidence"]["retained_span_ms"] >= a7.CONTROL_MIN_SPAN_MS

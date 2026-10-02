@@ -29,9 +29,14 @@ TARGET_MATCH_IOU_MIN = 0.14
 TARGET_MATCH_CENTER_H = 0.75
 TARGET_MATCH_AMBIG_MARGIN = 0.16
 TARGET_NEAR_MS = 250
+# A user tap is recorded in canonical media time while decoded frames land on
+# the nearest actual PTS.  Treat only the nearest frame-sized delta as the same
+# observation; this does not extend tap authority through time.
+TAP_FRAME_NEAR_MS = 25
 DENSE_BALL_CONF_T = 0.03
 A7_BALL_SUPPORT_CONF_T = 0.001
 A7_BALL_SUPPORT_MAX = 12
+DENSE_TEAM_TAP_CONTINUITY_MS = 1200
 
 
 def _num(value) -> bool:
@@ -247,21 +252,52 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
         img, 1 / 255.0, (cv_detect.INPUT, cv_detect.INPUT), swapRB=True
     )
     detector.net.setInput(blob)
-    out = detector.net.forward()[0].T
+    raw = np.asarray(detector.net.forward())
+    # OpenCV can return an empty prediction tensor on a valid decoded frame.
+    # Treat that as no detections; never let a detector shape abort the whole
+    # physical-recall window with an opaque IndexError.
+    if raw.size == 0:
+        return ([], [], []) if include_a7_support else ([], [])
+    if raw.ndim == 3 and raw.shape[0] == 1:
+        raw = raw[0]
+    if raw.ndim != 2:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    # YOLO exports use either (channels, predictions) or its transpose.
+    if (raw.shape[0] >= 5 and raw.shape[0] < raw.shape[1]) or raw.shape[1] < 5:
+        raw = raw.T
+    if raw.shape[1] < 5:
+        raise ValueError(f"DENSE_DETECTOR_OUTPUT_SHAPE:{raw.shape}")
+    out = raw
     cls = out[:, 4:].argmax(1)
     conf = out[:, 4:].max(1)
-    def collect(cid, threshold):
-        keep = (cls == cid) & (conf > float(threshold))
+    def collect(cid, threshold, *, require_top_class=True):
+        class_col = 4 + int(cid)
+        if class_col >= out.shape[1]:
+            return []
+        class_conf = out[:, class_col]
+        scores_all = conf if require_top_class else class_conf
+        keep = scores_all > float(threshold)
+        if require_top_class:
+            keep &= cls == cid
         boxes, scores = [], []
-        for row, score in zip(out[keep], conf[keep]):
+        top_classes = []
+        top_scores = []
+        for row, score, top_class, top_score in zip(
+            out[keep], scores_all[keep], cls[keep], conf[keep]
+        ):
             cx, cy, bw, bh = row[:4]
             boxes.append([int(cx - bw / 2), int(cy - bh / 2), int(bw), int(bh)])
             scores.append(float(score))
+            top_classes.append(int(top_class))
+            top_scores.append(float(top_score))
         idx = cv2.dnn.NMSBoxes(boxes, scores, float(threshold), cv_detect.NMS_T)
         rows = []
-        for i in np.array(idx).flatten() if len(idx) else []:
+        for i in np.asarray(idx if idx is not None else [], dtype=int).reshape(-1):
+            i = int(i)
+            if i < 0 or i >= len(boxes):
+                raise ValueError(f"DENSE_DETECTOR_NMS_INDEX:{i}/{len(boxes)}")
             x, y, bw, bh = boxes[i]
-            rows.append({
+            result = {
                 "box": {
                     "x": max(0.0, min(1.0, x / (W * scale))),
                     "y": max(0.0, min(1.0, y / (H * scale))),
@@ -269,27 +305,164 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
                     "h": max(1e-4, min(1.0, bh / (H * scale))),
                 },
                 "confidence": scores[i],
-            })
+            }
+            if not require_top_class:
+                result.update({
+                    "class_specific_support": True,
+                    "top_class_id": top_classes[i],
+                    "top_class_confidence": top_scores[i],
+                })
+            rows.append(result)
         return sorted(rows, key=lambda r: float(r.get("confidence") or 0.0), reverse=True)
 
     people = collect(0, float(cv_detect.CONF_T))
+    fsg._annotate_kit_chroma(frame_bgr, people)
     balls = collect(32, float(DENSE_BALL_CONF_T))
     if not include_a7_support:
         return people, balls
-    support = collect(32, float(A7_BALL_SUPPORT_CONF_T))[:A7_BALL_SUPPORT_MAX]
+    # A7 is a support-only search channel, so read the sports-ball class score
+    # itself even when another class narrowly wins argmax.  This does not lower
+    # A3's ball floor and cannot create contact/event truth by itself.
+    support = collect(
+        32, float(A7_BALL_SUPPORT_CONF_T), require_top_class=False
+    )[:A7_BALL_SUPPORT_MAX]
     for row in support:
-        row["support_only"] = float(row.get("confidence") or 0.0) < float(DENSE_BALL_CONF_T)
+        row["a3_eligible"] = bool(
+            row.get("top_class_id") == 32
+            and float(row.get("confidence") or 0.0) >= float(DENSE_BALL_CONF_T)
+        )
+        row["support_only"] = not row["a3_eligible"]
         row["proof_eligible"] = False
     return people, balls, support
 
 
-def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list[dict]) -> dict:
-    resolved, why = uia.resolve_target_at(
-        identity_authority if isinstance(identity_authority, dict) else {},
-        int(media_ms),
-        proof_required=False,
-        max_interp_ms=TARGET_NEAR_MS,
+def _dense_target_kit_samples(frames):
+    """Collect kit chroma only along a direct-tap body's contiguous local track."""
+    rows = sorted(
+        [frame for frame in (frames or [])
+         if isinstance(frame, dict) and _num(frame.get("media_ms"))],
+        key=lambda frame: int(frame["media_ms"]),
     )
+    samples = []
+    seen = set()
+    anchors = [
+        (index, frame) for index, frame in enumerate(rows)
+        if (frame.get("global_target") or {}).get("status") == "VERIFIED"
+        and (frame.get("global_target") or {}).get("proof_eligible") is True
+        and (frame.get("global_target") or {}).get("reason") in {
+            "OK_EXACT", "OK_NEAREST_TAP_FRAME"
+        }
+        and (frame.get("global_target") or {}).get("authority_tap") is True
+    ]
+    for index, anchor in anchors:
+        target = anchor.get("global_target") or {}
+        track_id = target.get("local_track_id")
+        if not isinstance(track_id, str):
+            continue
+        anchor_ms = int(anchor["media_ms"])
+        scene = anchor.get("scene_id")
+        for direction in (1, -1):
+            cursor = index if direction == 1 else index - 1
+            while 0 <= cursor < len(rows):
+                frame = rows[cursor]
+                delta = abs(int(frame["media_ms"]) - anchor_ms)
+                if delta > DENSE_TEAM_TAP_CONTINUITY_MS:
+                    break
+                if (
+                    frame.get("scene_id") != scene
+                    or frame.get("cut_barrier") is True
+                    or frame.get("used_fallback") is True
+                    or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                ):
+                    break
+                bodies = [
+                    player for player in frame.get("players") or []
+                    if isinstance(player, dict)
+                    and player.get("local_track_id") == track_id
+                    and player.get("association_state") != "HYPOTHESES"
+                    and fsg._valid_chroma(player.get("kit_chroma"))
+                ]
+                if len(bodies) != 1:
+                    break
+                key = (str(scene), int(frame["media_ms"]), track_id)
+                if key not in seen:
+                    seen.add(key)
+                    samples.append(deepcopy(bodies[0]["kit_chroma"]))
+                cursor += direction
+    return samples
+
+
+def _apply_dense_team_labels(frames):
+    samples = _dense_target_kit_samples(frames)
+    diagnostic = fsg.apply_dense_team_authority(frames, samples)
+    if diagnostic.get("status") == "ok":
+        for frame in frames or []:
+            target = frame.get("global_target") if isinstance(frame, dict) else None
+            if not isinstance(target, dict) or target.get("status") != "VERIFIED":
+                continue
+            player = next((
+                row for row in frame.get("players") or []
+                if isinstance(row, dict)
+                and row.get("local_track_id") == target.get("local_track_id")
+            ), None)
+            if isinstance(player, dict):
+                target["body_team"] = player.get("team")
+                target["body_team_confidence"] = player.get("team_confidence")
+                target["body_team_source"] = player.get("team_source")
+    return diagnostic
+
+
+def _nearest_tap_point(identity_authority: dict, media_ms: int):
+    """Return one direct user-tap row on its nearest decoded PTS.
+
+    The selected box remains the authority geometry.  Competing equidistant
+    taps fail closed, although ordinary reports space taps many seconds apart.
+    """
+    authority = identity_authority if isinstance(identity_authority, dict) else {}
+    rows = []
+    for row in authority.get("target_points") or []:
+        if not (
+            isinstance(row, dict)
+            and _num(row.get("media_ms"))
+            and abs(int(round(float(row["media_ms"]))) - int(media_ms)) <= TAP_FRAME_NEAR_MS
+            and row.get("tap_authority") is True
+            and row.get("proof_eligible") is True
+            and _valid_box(row.get("box"))
+            and (
+                row.get("primary_source") == "USER_TAP"
+                or "USER_TAP" in (row.get("sources") or [])
+            )
+        ):
+            continue
+        rows.append(row)
+    if not rows:
+        return None
+    rows.sort(key=lambda row: abs(int(round(float(row["media_ms"]))) - int(media_ms)))
+    best_delta = abs(int(round(float(rows[0]["media_ms"]))) - int(media_ms))
+    tied = [
+        row for row in rows
+        if abs(int(round(float(row["media_ms"]))) - int(media_ms)) == best_delta
+    ]
+    if len(tied) != 1:
+        return None
+    return deepcopy(tied[0])
+
+
+def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list[dict], *,
+                          allow_nearest_tap=True, tap_override=None) -> dict:
+    authority = identity_authority if isinstance(identity_authority, dict) else {}
+    resolved = deepcopy(tap_override) if isinstance(tap_override, dict) else (
+        _nearest_tap_point(authority, int(media_ms)) if allow_nearest_tap else None
+    )
+    if resolved is not None:
+        why = "OK_NEAREST_TAP_FRAME"
+    else:
+        resolved, why = uia.resolve_target_at(
+            authority,
+            int(media_ms),
+            proof_required=False,
+            max_interp_ms=TARGET_NEAR_MS,
+        )
     if not isinstance(resolved, dict) or not _valid_box(resolved.get("box")):
         return {
             "status": "UNRESOLVED", "reason": why,
@@ -297,6 +470,17 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             "proof_eligible": False,
         }
     rb = resolved["box"]
+    authority_evidence = {
+        "authority_box": deepcopy(rb),
+        "authority_reason": why,
+        "authority_tap": resolved.get("tap_authority") is True,
+        "authority_primary_source": resolved.get("primary_source"),
+        "authority_media_ms": resolved.get("media_ms"),
+        "authority_frame_delta_ms": (
+            int(media_ms) - int(round(float(resolved["media_ms"])))
+            if _num(resolved.get("media_ms")) else None
+        ),
+    }
     ranked = []
     for p in players:
         if not isinstance(p, dict) or not _valid_box(p.get("box")):
@@ -333,6 +517,7 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             "body_team": winner.get("team"),
             "body_team_confidence": winner.get("team_confidence"),
             "body_team_source": winner.get("team_source"),
+            **authority_evidence,
         }
 
     # Target-only collapse of detector duplicates. This is permitted only when
@@ -346,8 +531,10 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
     ]
     union = set().union(*candidate_sets) if candidate_sets else set()
     unique_geometry = bool(
-        len(hypotheses) == 1
-        or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+        hypotheses and (
+            len(hypotheses) == 1
+            or float(hypotheses[0]["score"]) - float(hypotheses[1]["score"]) >= TARGET_MATCH_AMBIG_MARGIN
+        )
     )
     if (
         resolved.get("proof_eligible") is True
@@ -373,6 +560,7 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             "body_team_source": winner.get("team_source"),
             "body_association_state": "VERIFIED_TARGET_HYPOTHESIS_COLLAPSE",
             "collapsed_hypothesis_count": len(hypotheses),
+            **authority_evidence,
         }
     ids = sorted(union) if union else []
     return {
@@ -382,6 +570,92 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
         "candidate_local_track_ids": ids,
         "proof_eligible": False,
     }
+
+
+def _apply_nearest_tap_frames(frames, authority):
+    """Map each direct user tap to exactly one nearest decoded source frame."""
+    rows = [frame for frame in (frames or []) if isinstance(frame, dict) and _num(frame.get("media_ms"))]
+    taps = [
+        point for point in (authority or {}).get("target_points") or []
+        if isinstance(point, dict)
+        and _num(point.get("media_ms"))
+        and point.get("tap_authority") is True
+        and point.get("proof_eligible") is True
+        and _valid_box(point.get("box"))
+        and (
+            point.get("primary_source") == "USER_TAP"
+            or "USER_TAP" in (point.get("sources") or [])
+        )
+    ]
+    for tap in taps:
+        tap_ms = int(round(float(tap["media_ms"])))
+        candidates = [
+            frame for frame in rows
+            if abs(int(frame["media_ms"]) - tap_ms) <= TAP_FRAME_NEAR_MS
+        ]
+        if not candidates:
+            continue
+        candidates.sort(key=lambda frame: abs(int(frame["media_ms"]) - tap_ms))
+        best_delta = abs(int(candidates[0]["media_ms"]) - tap_ms)
+        if sum(abs(int(frame["media_ms"]) - tap_ms) == best_delta for frame in candidates) != 1:
+            continue
+        frame = candidates[0]
+        frame["global_target"] = _resolve_dense_target(
+            authority, int(frame["media_ms"]), frame.get("players") or [],
+            allow_nearest_tap=False, tap_override=tap,
+        )
+
+def _verify_bracketed_dense_target(frames, authority):
+    """Verify continuous local body between two independent exact target proofs.
+
+    The existing authority stays untouched. A cut, missing frame, competing
+    body, predicted/ambiguous local association, or identity barrier prevents
+    promotion for the entire interval.
+    """
+    exact = [i for i, frame in enumerate(frames)
+             if (frame.get("global_target") or {}).get("status") == "VERIFIED"
+             and (frame.get("global_target") or {}).get("reason") in {
+                 "OK_EXACT", "OK_NEAREST_TAP_FRAME"
+             }
+             and frame.get("used_fallback") is not True]
+    for left, right in zip(exact, exact[1:]):
+        start, end = frames[left], frames[right]
+        track = (start.get("global_target") or {}).get("local_track_id")
+        if (not track or track != (end.get("global_target") or {}).get("local_track_id")
+                or start.get("scene_id") != end.get("scene_id")
+                or int(end["media_ms"]) - int(start["media_ms"]) > TARGET_NEAR_MS
+                or right == left + 1):
+            continue
+        middle = frames[left + 1:right]
+        if any(f.get("cut_barrier") or f.get("used_fallback")
+               or f.get("scene_id") != start.get("scene_id")
+               or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
+               or (f.get("global_target") or {}).get("reason") != "NON_PROOF_IDENTITY_CONTINUITY"
+               or (f.get("global_target") or {}).get("candidate_local_track_ids") != [track]
+               or len([p for p in f.get("players") or []
+                       if p.get("local_track_id") == track
+                       and p.get("association_state") == "VERIFIED_LOCAL"]) != 1
+               for f in middle):
+            continue
+        # The canonical resolver enforces unresolved intervals and scene cuts.
+        # Its interpolation is only a geometry cross-check; independent dense
+        # tracking across every source frame supplies the additional proof.
+        if any(uia.resolve_target_at(authority, int(f["media_ms"]),
+                                     max_interp_ms=TARGET_NEAR_MS)[1] != "OK_INTERPOLATED"
+               for f in middle):
+            continue
+        for f in middle:
+            player = next(p for p in f["players"] if p.get("local_track_id") == track)
+            f["global_target"] = {
+                "status": "VERIFIED", "reason": "DENSE_TWO_ANCHOR_CONTINUITY",
+                "local_track_id": track, "candidate_local_track_ids": [track],
+                "proof_eligible": True, "body_box": deepcopy(player["box"]),
+                "body_confidence": player.get("confidence"),
+                "body_team": player.get("team"),
+                "body_team_confidence": player.get("team_confidence"),
+                "body_team_source": player.get("team_source"),
+            }
+
 
 def refine_window(dense_frames, scene_graph: dict | None, identity_authority: dict | None,
                   scene_id: str, detector_fn=None, camera_estimator=None) -> dict:
@@ -512,6 +786,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 tr["team"] = det.get("team")
                 tr["team_confidence"] = det.get("team_confidence")
                 tr["team_source"] = det.get("team_source")
+            if fsg._valid_chroma(det.get("kit_chroma")):
+                tr["kit_chroma"] = deepcopy(det["kit_chroma"])
             used_tracks.add(ti); used_dets.add(di)
             players_out.append({
                 "local_track_id": tr["local_track_id"],
@@ -524,6 +800,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "team": tr.get("team"),
                 "team_confidence": tr.get("team_confidence"),
                 "team_source": tr.get("team_source"),
+                "kit_chroma": deepcopy(det.get("kit_chroma"))
+                if fsg._valid_chroma(det.get("kit_chroma")) else None,
             })
 
         # Preserve the motion-predicted geometry behind unresolved hypotheses.
@@ -556,6 +834,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "team": det.get("team"),
                 "team_confidence": det.get("team_confidence"),
                 "team_source": det.get("team_source"),
+                "kit_chroma": deepcopy(det.get("kit_chroma"))
+                if fsg._valid_chroma(det.get("kit_chroma")) else None,
             })
             used_dets.add(di)
 
@@ -573,6 +853,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "team": det.get("team"),
                 "team_confidence": det.get("team_confidence"),
                 "team_source": det.get("team_source"),
+                "kit_chroma": deepcopy(det.get("kit_chroma"))
+                if fsg._valid_chroma(det.get("kit_chroma")) else None,
             }
             live.append(tr)
             players_out.append({
@@ -586,12 +868,16 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "team": tr.get("team"),
                 "team_confidence": tr.get("team_confidence"),
                 "team_source": tr.get("team_source"),
+                "kit_chroma": deepcopy(det.get("kit_chroma"))
+                if fsg._valid_chroma(det.get("kit_chroma")) else None,
             })
 
         # Expire only by time; unresolved/ambiguous bodies do not rewrite the
         # last accepted geometry of an existing track.
         live = [tr for tr in live if media_ms - _last_ms(tr, media_ms) <= TRACK_MAX_GAP_MS]
-        target_map = _resolve_dense_target(identity_authority or {}, media_ms, players_out)
+        target_map = _resolve_dense_target(
+            identity_authority or {}, media_ms, players_out, allow_nearest_tap=False
+        )
         output_frames.append({
             "media_ms": media_ms,
             "scene_id": active_scene,
@@ -606,11 +892,15 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         })
         prev_gray = gray
 
+    _apply_nearest_tap_frames(output_frames, identity_authority or {})
+    _verify_bracketed_dense_target(output_frames, identity_authority or {})
+    team_authority = _apply_dense_team_labels(output_frames)
     return {
         "version": VERSION,
         "status": "ok" if output_frames else "empty",
         "scene_id": scene,
         "frames": output_frames,
+        "team_authority": team_authority,
         "metrics": {
             "frames": len(output_frames),
             "players": sum(len(f.get("players") or []) for f in output_frames),
@@ -619,6 +909,11 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             ),
             "target_hypothesis_frames": sum(
                 (f.get("global_target") or {}).get("status") == "HYPOTHESES" for f in output_frames
+            ),
+            "team_labeled_players": sum(
+                player.get("team") is not None
+                for frame in output_frames for player in (frame.get("players") or [])
+                if isinstance(player, dict)
             ),
         },
     }

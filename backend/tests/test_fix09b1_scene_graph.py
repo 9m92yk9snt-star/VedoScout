@@ -309,3 +309,74 @@ def test_b116_weakly_separated_kit_clusters_fail_closed():
     assert diag["status"] == "unresolved"
     assert diag["reason"] == "TEAM_CLUSTERS_NOT_SEPARABLE"
     assert not any(d.get("team") for o in observations for d in o["players"])
+
+
+def test_team_anchor_reports_scene_spread_and_labels_only_stable_scenes():
+    observations = _team_observations(20)
+    observations[10]["cut"] = True
+    for o in observations[10:]:
+        o["players"][0]["kit_chroma"] = [90.0, 100.0]
+        o["players"][1]["kit_chroma"] = [91.0, 99.0]
+    auth = authority([(o["media_ms"], TARGET) for o in observations])
+    diag = fsg.apply_team_authority(observations, auth,
+                                    model_factory=lambda anchor: _FixedTeamModel(
+                                        anchor, centers=(anchor, (170.0, 180.0))))
+    assert diag["status"] == "partial"
+    assert diag["reason"] == "UNSTABLE_TARGET_KIT_ANCHOR"
+    assert len(diag["target_scene_spreads"]) == 2
+    assert all(row["median_spread"] == 0 for row in diag["target_scene_spreads"])
+    assert diag["labeled_detections"] > 0
+    assert all(d.get("team") == "target_team" for o in observations for d in o["players"][:2])
+
+
+def test_scene_local_kit_calibration_does_not_label_scene_without_target_proof():
+    observations = _team_observations(30)
+    observations[10]["cut"] = True
+    observations[20]["cut"] = True
+    for o in observations[10:20]:
+        o["players"][0]["kit_chroma"] = [90.0, 100.0]
+        o["players"][1]["kit_chroma"] = [91.0, 99.0]
+    auth = authority([(o["media_ms"], TARGET) for o in observations[:20]])
+    diag = fsg.apply_team_authority(
+        observations, auth,
+        model_factory=lambda anchor: _FixedTeamModel(anchor, centers=(anchor, (170.0, 180.0))),
+    )
+    assert diag["status"] == "partial"
+    assert diag["labeled_detections"] > 0
+    assert all(d.get("team") is None for o in observations[20:] for d in o["players"])
+    assert diag["scene_models"][2]["reason"] == "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"
+
+
+def test_dense_tap_team_authority_labels_stable_local_window_only_after_strict_fit():
+    frames = [{
+        "media_ms": index * 40,
+        "players": [
+            {"local_track_id": "p001", "kit_chroma": [45.0, 55.0]},
+            {"local_track_id": "p010", "kit_chroma": [47.0, 54.0]},
+            {"local_track_id": "p020", "kit_chroma": [170.0, 180.0]},
+        ],
+    } for index in range(10)]
+    diag = fsg.apply_dense_team_authority(
+        frames,
+        [[45.0, 55.0], [46.0, 55.0], [45.0, 54.0]],
+        model_factory=lambda anchor: _FixedTeamModel(anchor),
+    )
+    assert diag["status"] == "ok"
+    assert all(frame["players"][0]["team"] == "target_team" for frame in frames)
+    assert all(frame["players"][1]["team"] == "target_team" for frame in frames)
+    assert all(frame["players"][2]["team"] == "opponent" for frame in frames)
+    assert all(player["team_source"] == fsg.DENSE_TEAM_SOURCE
+               for frame in frames for player in frame["players"])
+
+
+def test_dense_tap_team_authority_keeps_existing_labels_when_anchor_is_insufficient():
+    frames = [{
+        "media_ms": 0,
+        "players": [{
+            "local_track_id": "p001", "kit_chroma": [45.0, 55.0],
+            "team": "target_team", "team_confidence": .9, "team_source": "EXISTING",
+        }],
+    }]
+    diag = fsg.apply_dense_team_authority(frames, [[45.0, 55.0]])
+    assert diag["status"] == "unresolved"
+    assert frames[0]["players"][0]["team_source"] == "EXISTING"
