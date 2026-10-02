@@ -25,6 +25,7 @@ DIRECT_RECEIVE_MAX_MS = 2400
 DIRECT_SHOT_MAX_MS = 4200
 DIRECT_GOAL_MAX_MS = 5200
 CANONICAL_MATCH_MS = 900
+UNRESOLVED_SHOT_RELEASE_MATCH_MS = 700
 TEAM_CONFIDENCE_MIN = 0.70
 PASS_ACTIONS = {"PASS", "CROSS", "KEY_PASS"}
 
@@ -1042,6 +1043,87 @@ def collect_proposals(physical_result: dict | None) -> list[dict]:
     return deduped
 
 
+def _unresolved_shot_release_proposals(canonical_bundle, physical_result) -> list[dict]:
+    """Preserve a physically verified target shot when only its result is unknown.
+
+    The semantic lane may identify a SHOT but fail actor resolution because it
+    has no usable actor box. A verified GLOBAL_TARGET release inside that same
+    short action interval can establish the actor and contact. It cannot prove
+    a save or goal, so the resulting shot keeps an UNKNOWN outcome. This helper
+    never repairs PASS/ASSIST/GOAL claims and requires one unambiguous target
+    release in the bounded contact window.
+    """
+    bundle = canonical_bundle if isinstance(canonical_bundle, dict) else {}
+    physical = physical_result if isinstance(physical_result, dict) else {}
+    candidates_by_key = {}
+    for trace in physical.get("traces") or []:
+        if not isinstance(trace, dict):
+            continue
+        scene = str((trace.get("window") or {}).get("scene_id") or "scene_unknown")
+        outcomes = _outcomes_by_strike(trace)
+        for strike in _strikes(trace):
+            ms = _ms(strike)
+            if (ms is not None and strike.get("global_target_id") == GLOBAL_TARGET_ID
+                    and _verified_release(strike)):
+                strike_outcome = outcomes.get(strike.get("strike_id"))
+                if _verified_goal(strike_outcome) or _verified_save(strike_outcome):
+                    continue
+                key = (
+                    scene, int(ms),
+                    str(strike.get("strike_id") or strike.get("player_track_id") or ""),
+                )
+                candidates_by_key.setdefault(key, (scene, int(ms), strike, trace))
+    candidates = list(candidates_by_key.values())
+
+    proposals = []
+    for action in bundle.get("unresolved") or []:
+        if not isinstance(action, dict) or action.get("kind") != "SHOT":
+            continue
+        resolution = action.get("actor_resolution")
+        if not (isinstance(resolution, dict)
+                and resolution.get("status") == "UNRESOLVED"
+                and resolution.get("reason") == "INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE"):
+            continue
+        contact = _ms({"media_ms": action.get("contact_ms")})
+        start = _ms({"media_ms": action.get("start_ms")})
+        end = _ms({"media_ms": action.get("end_ms")})
+        scene = str(action.get("scene_id") or "scene_unknown")
+        if contact is None or start is None or end is None or end < start:
+            continue
+        matches = [row for row in candidates
+                   if row[0] == scene and start <= row[1] <= end
+                   and abs(row[1] - contact) <= UNRESOLVED_SHOT_RELEASE_MATCH_MS]
+        if len(matches) != 1:
+            continue
+        _, release_ms, strike, trace = matches[0]
+        proposals.append({
+            "proposal_id": _proposal_id(
+                "SHOT", scene, release_ms, strike.get("player_track_id")),
+            "kind": "SHOT",
+            "scene_id": scene,
+            "target_contact_ms": release_ms,
+            "target_track_id": strike.get("player_track_id"),
+            "scorer_track_id": strike.get("player_track_id"),
+            "receiver_track_id": None,
+            "receiver_ms": None,
+            "teammate_shot_ms": None,
+            "goal_outcome_ms": None,
+            "physical_outcome_ms": release_ms,
+            "canonical_outcome": "UNKNOWN",
+            "causal_verified": False,
+            "source_trace_id": trace.get("trace_id"),
+            "source_touch_id": strike.get("touch_id"),
+            "source_strike_id": strike.get("strike_id"),
+            "source_unresolved_action_id": action.get("action_id"),
+            "goal_proof": {},
+            "save_proof": {"status": "UNRESOLVED",
+                            "reason": "NO_VERIFIED_TERMINAL_OUTCOME"},
+            "proof_eligible": True,
+            "reason": "VERIFIED_TARGET_RELEASE_MATCHED_TO_UNRESOLVED_SHOT",
+        })
+    return proposals
+
+
 def _event_match(events, proposal):
     scene = proposal.get("scene_id")
     target_ms = int(proposal["target_contact_ms"])
@@ -1077,6 +1159,7 @@ def _physical_proof(proposal) -> dict:
         "source_trace_id": proposal.get("source_trace_id"),
         "source_touch_id": proposal.get("source_touch_id"),
         "source_strike_id": proposal.get("source_strike_id"),
+        "source_unresolved_action_id": proposal.get("source_unresolved_action_id"),
         "target_contact_kind": proposal.get("target_contact_kind"),
         "evidence_ms": [int(x) for x in evidence_ms if _num(x)],
         "goal_proof": deepcopy(proposal.get("goal_proof") or {}),
@@ -1117,7 +1200,7 @@ def _synth_event(proposal) -> dict:
         "contact_visibility": "PHYSICALLY_VERIFIED",
         "outcome_ms": outcome_ms,
         "proof_eligible": True,
-        "causal_verified": True,
+        "causal_verified": proposal.get("causal_verified", True),
         "receiver_team_evidence": deepcopy(proposal.get("receiver_team_evidence") or {}),
         "receiver_actor_stitch": deepcopy(proposal.get("receiver_actor_stitch") or {}),
         "deflection_proof": deepcopy(proposal.get("deflection_proof") or {}),
@@ -1130,7 +1213,10 @@ def _synth_event(proposal) -> dict:
         "scene_id": scene,
         "sequence_id": None,
         "source_sequence_ids": [],
-        "source_action_ids": [],
+        "source_action_ids": (
+            [proposal["source_unresolved_action_id"]]
+            if proposal.get("source_unresolved_action_id") else []
+        ),
         "start_ms": contact,
         "contact_ms": contact,
         "end_ms": outcome_ms,
@@ -1142,7 +1228,7 @@ def _synth_event(proposal) -> dict:
             else str(proposal.get("canonical_outcome") or "UNKNOWN") if kind == "SHOT"
             else "TEAMMATE_GOAL"
         ),
-        "causal_verified": True,
+        "causal_verified": proposal.get("causal_verified", True),
         "resolution_reason": proposal.get("reason"),
         "actor_local_track_id": proposal.get("target_track_id"),
         "identity_resolution": (
@@ -1182,7 +1268,7 @@ def _apply_proposal(event: dict, proposal: dict) -> dict:
             out["canonical_action_type"] = "PASS"
         out["canonical_outcome"] = "TEAMMATE_GOAL"
         out["receiver_team_resolution"] = deepcopy(proposal.get("receiver_team_evidence") or {})
-    out["causal_verified"] = True
+    out["causal_verified"] = proposal.get("causal_verified", True)
     out["resolution_reason"] = proposal.get("reason")
     out["actor_local_track_id"] = proposal.get("target_track_id") or out.get("actor_local_track_id")
     out["global_target_id"] = GLOBAL_TARGET_ID
@@ -1198,7 +1284,7 @@ def _apply_proposal(event: dict, proposal: dict) -> dict:
     }
     proof = deepcopy(out.get("proof") or {})
     proof["proof_eligible"] = True
-    proof["causal_verified"] = True
+    proof["causal_verified"] = proposal.get("causal_verified", True)
     proof["outcome_ms"] = (
         proposal.get("physical_outcome_ms")
         if _num(proposal.get("physical_outcome_ms"))
@@ -1267,6 +1353,7 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
     }
     events = [deepcopy(e) for e in canonical.get("events") or [] if isinstance(e, dict)]
     proposals = collect_proposals(physical_result)
+    proposals.extend(_unresolved_shot_release_proposals(canonical, physical_result))
     changes = []
 
     # If the same target contact has both a GOAL and an ASSIST proposal, the
@@ -1280,10 +1367,32 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
                 contradictory.update({left["proposal_id"], right["proposal_id"]})
 
     applied = []
+    resolved_unresolved_action_ids = set()
     for proposal in proposals:
         if proposal["proposal_id"] in contradictory or proposal.get("proof_eligible") is not True:
             continue
-        match = _event_match(events, proposal)
+        unresolved_action_id = proposal.get("source_unresolved_action_id")
+        if unresolved_action_id:
+            # This low-authority recovery may only enrich an existing SHOT;
+            # it must not relabel a nearby PASS, GOAL, or ASSIST.
+            nearby_scoring = [
+                e for e in events
+                if e.get("scene_id") == proposal.get("scene_id")
+                and e.get("canonical_event_type") in {"GOAL", "ASSIST", "SHOT"}
+                and _num(e.get("canonical_ms"))
+                and abs(int(e["canonical_ms"]) - int(proposal["target_contact_ms"])) <= 220
+            ]
+            if nearby_scoring and not any(
+                e.get("canonical_event_type") == "SHOT" for e in nearby_scoring
+            ):
+                continue
+            match = min(
+                (e for e in nearby_scoring if e.get("canonical_event_type") == "SHOT"),
+                key=lambda e: abs(int(e["canonical_ms"]) - int(proposal["target_contact_ms"])),
+                default=None,
+            )
+        else:
+            match = _event_match(events, proposal)
         if match is None:
             new_event = _synth_event(proposal)
             events.append(new_event)
@@ -1301,6 +1410,8 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
                 "from": before.get("canonical_event_type"), "to": proposal["kind"],
             })
         applied.append(proposal["proposal_id"])
+        if unresolved_action_id:
+            resolved_unresolved_action_ids.add(str(unresolved_action_id))
 
     # A semantic GOAL/ASSIST chain can have internally consistent timestamps
     # while attributing the teammate's strike to the target. Once FIX10B is
@@ -1322,11 +1433,19 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
         else:
             verified_events.append(event)
     canonical["events"] = _dedupe_events(verified_events)
-    canonical["unresolved"] = list(canonical.get("unresolved") or []) + scoring_unresolved
+    canonical["unresolved"] = [
+        row for row in canonical.get("unresolved") or []
+        if not (isinstance(row, dict)
+                and str(row.get("action_id") or "") in resolved_unresolved_action_ids)
+    ] + scoring_unresolved
     if scoring_unresolved and not canonical["events"]:
         canonical["status"] = "unresolved"
     metrics = deepcopy(canonical.get("metrics") or {})
-    metrics["observations_unresolved"] = int(metrics.get("observations_unresolved") or 0) + len(scoring_unresolved)
+    metrics["observations_unresolved"] = max(
+        0,
+        int(metrics.get("observations_unresolved") or 0)
+        - len(resolved_unresolved_action_ids),
+    ) + len(scoring_unresolved)
     canonical["metrics"] = metrics
     canonical["version"] = f"FIX10B.{VERSION}"
     canonical["global_target_id"] = GLOBAL_TARGET_ID
@@ -1340,6 +1459,7 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
         "applied_proposal_ids": applied,
         "changes": changes,
         "scoring_claims_unresolved": len(scoring_unresolved),
+        "shot_events_recovered_with_unknown_outcome": len(resolved_unresolved_action_ids),
         "physical_status": (physical_result or {}).get("status") if isinstance(physical_result, dict) else None,
     }
     return _recount(canonical)
