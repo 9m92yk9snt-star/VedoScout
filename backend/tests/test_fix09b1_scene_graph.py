@@ -345,3 +345,38 @@ def test_scene_local_kit_calibration_does_not_label_scene_without_target_proof()
     assert diag["labeled_detections"] > 0
     assert all(d.get("team") is None for o in observations[20:] for d in o["players"])
     assert diag["scene_models"][2]["reason"] == "INSUFFICIENT_VERIFIED_TARGET_KIT_SAMPLES"
+
+
+def test_dense_tap_team_authority_labels_stable_local_window_only_after_strict_fit():
+    frames = [{
+        "media_ms": index * 40,
+        "players": [
+            {"local_track_id": "p001", "kit_chroma": [45.0, 55.0]},
+            {"local_track_id": "p010", "kit_chroma": [47.0, 54.0]},
+            {"local_track_id": "p020", "kit_chroma": [170.0, 180.0]},
+        ],
+    } for index in range(10)]
+    diag = fsg.apply_dense_team_authority(
+        frames,
+        [[45.0, 55.0], [46.0, 55.0], [45.0, 54.0]],
+        model_factory=lambda anchor: _FixedTeamModel(anchor),
+    )
+    assert diag["status"] == "ok"
+    assert all(frame["players"][0]["team"] == "target_team" for frame in frames)
+    assert all(frame["players"][1]["team"] == "target_team" for frame in frames)
+    assert all(frame["players"][2]["team"] == "opponent" for frame in frames)
+    assert all(player["team_source"] == fsg.DENSE_TEAM_SOURCE
+               for frame in frames for player in frame["players"])
+
+
+def test_dense_tap_team_authority_keeps_existing_labels_when_anchor_is_insufficient():
+    frames = [{
+        "media_ms": 0,
+        "players": [{
+            "local_track_id": "p001", "kit_chroma": [45.0, 55.0],
+            "team": "target_team", "team_confidence": .9, "team_source": "EXISTING",
+        }],
+    }]
+    diag = fsg.apply_dense_team_authority(frames, [[45.0, 55.0]])
+    assert diag["status"] == "unresolved"
+    assert frames[0]["players"][0]["team_source"] == "EXISTING"

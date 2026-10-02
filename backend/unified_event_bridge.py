@@ -184,7 +184,8 @@ def build_safe_event_track(authority: dict | None) -> dict:
 
 
 def build_identity_bundle(fix04_track=None, identity_timeline=None, anchors=None,
-                          anchor_time_offset=0.0, identity_profile=None) -> dict:
+                          anchor_time_offset=0.0, identity_profile=None,
+                          player_details=None) -> dict:
     """Build the canonical identity authority and its safe FIX08 adapter once."""
     authority = uia.build_unified_identity_authority(
         fix04_track=fix04_track,
@@ -192,6 +193,7 @@ def build_identity_bundle(fix04_track=None, identity_timeline=None, anchors=None
         anchors=anchors,
         anchor_time_offset=anchor_time_offset,
         identity_profile=identity_profile,
+        player_details=player_details,
     )
     return {
         "version": VERSION,

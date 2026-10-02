@@ -271,3 +271,104 @@ def test_b23_selected_box_does_not_pin_different_body_near_tap():
         anchors=[{"t": 1.0, "box": {"x": .4, "y": .3, "w": .1, "h": .2}}])
     near, why = uia.resolve_target_at(a, 1200, proof_required=True)
     assert why == "OK_EXACT" and near["tap_authority"] is False
+
+
+def test_b24_player_details_jersey_is_retained_only_as_stated_attribute():
+    a = uia.build_unified_identity_authority(
+        None, tl(ap(1000, .2, .3)), player_details={"jersey_number": "15"}
+    )
+    assert a["identity_profile"]["stated_jersey_number"] == "15"
+    assert a["identity_profile"]["jersey_number"] is None
+    assert a["target_points"][0]["primary_source"] == "FIX09A"
+
+
+def _jersey_handoff_fixture(*, duplicate=False, conflict=False):
+    authority = uia.build_unified_identity_authority(
+        None,
+        tl(scenes=[{"scene_id": "scene_001", "start_ms": 0, "end_ms": 8000}]),
+        anchors=[{"t": 1.0, "box": {"x": .1, "y": .2, "w": .1, "h": .3}}],
+        player_details={"jersey_number": "15"},
+    )
+    dense_target = {
+        "status": "VERIFIED" if conflict else "UNRESOLVED",
+        "proof_eligible": bool(conflict),
+        "local_track_id": "p777" if conflict else None,
+    }
+    frames = [{
+        "media_ms": 4800, "scene_id": "scene_001",
+        "players": [{
+            "local_track_id": "p069", "association_state": "VERIFIED_LOCAL",
+            "box": {"x": .4, "y": .2, "w": .1, "h": .3},
+        }] + ([{
+            "local_track_id": "p070", "association_state": "VERIFIED_LOCAL",
+            "box": {"x": .7, "y": .2, "w": .1, "h": .3},
+        }] if duplicate else []),
+        "global_target": dense_target,
+    }]
+    graph = {"touches": [{
+        "touch_id": "goal_release", "media_ms": 4800, "representative_ms": 4800,
+        "scene_id": "scene_001", "player_track_id": "p069",
+        "global_target_id": None, "status": "VERIFIED", "proof_eligible": True,
+    }]}
+    verified = {
+        "status": "VERIFIED", "number": "15", "agreeing_frames": 3,
+        "top_posterior": .96,
+        "votes": [
+            {"media_ms": 4300, "readable": True, "number": "15", "confidence": "high"},
+            {"media_ms": 4700, "readable": True, "number": "15", "confidence": "high"},
+            {"media_ms": 4900, "readable": True, "number": "15", "confidence": "high"},
+        ],
+    }
+    consensus = {"p069": verified}
+    if duplicate:
+        consensus["p070"] = dict(verified)
+    return authority, frames, graph, consensus
+
+
+def test_b25_unique_multiframe_jersey_match_can_reidentify_split_target_track():
+    authority, frames, graph, consensus = _jersey_handoff_fixture()
+    out = uia.apply_verified_jersey_handoff(authority, frames, graph, consensus)
+    touch = out["touches"][0]
+    assert touch["global_target_id"] == "GLOBAL_TARGET"
+    assert touch["global_target_resolution"]["reason"] == "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP"
+    assert out["jersey_identity_handoff"]["status"] == "VERIFIED"
+    assert graph["touches"][0]["global_target_id"] is None
+
+
+def test_b26_jersey_handoff_fails_closed_on_duplicate_number_or_identity_conflict():
+    for kwargs, reason in (
+        ({"duplicate": True}, "DUPLICATE_OR_STALE_VERIFIED_JERSEY_MATCH"),
+        ({"conflict": True}, "NO_PROOF_ELIGIBLE_TOUCH_WITHIN_TAP_BOUND"),
+    ):
+        authority, frames, graph, consensus = _jersey_handoff_fixture(**kwargs)
+        out = uia.apply_verified_jersey_handoff(authority, frames, graph, consensus)
+        assert out["touches"][0]["global_target_id"] is None
+        assert out["jersey_identity_handoff"]["reason"] == reason
+
+
+def test_b27_opponent_kit_filters_stale_duplicate_jersey_track_after_collision():
+    authority, frames, graph, consensus = _jersey_handoff_fixture(duplicate=True)
+    frames[0]["players"][0].update({"team": "target_team", "team_confidence": .94})
+    frames[0]["players"][1].update({"team": "opponent", "team_confidence": .93})
+    out = uia.apply_verified_jersey_handoff(authority, frames, graph, consensus)
+    assert out["touches"][0]["global_target_id"] == "GLOBAL_TARGET"
+    assert out["jersey_identity_handoff"]["status"] == "VERIFIED"
+
+
+def test_b28_verified_opponent_kit_cannot_become_target_from_number_alone():
+    authority, frames, graph, consensus = _jersey_handoff_fixture()
+    frames[0]["players"][0].update({"team": "opponent", "team_confidence": .93})
+    out = uia.apply_verified_jersey_handoff(authority, frames, graph, consensus)
+    assert out["touches"][0]["global_target_id"] is None
+    assert out["jersey_identity_handoff"]["status"] == "UNRESOLVED"
+
+
+def test_b29_stale_jersey_votes_cannot_bind_a_track_after_body_switch():
+    authority, frames, graph, consensus = _jersey_handoff_fixture()
+    consensus["p069"]["votes"] = [
+        {"media_ms": 3600, "readable": True, "number": "15", "confidence": "high"},
+        {"media_ms": 3800, "readable": True, "number": "15", "confidence": "high"},
+    ]
+    out = uia.apply_verified_jersey_handoff(authority, frames, graph, consensus)
+    assert out["touches"][0]["global_target_id"] is None
+    assert out["jersey_identity_handoff"]["status"] == "UNRESOLVED"

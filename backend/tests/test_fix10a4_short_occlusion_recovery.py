@@ -440,3 +440,89 @@ def test_s3_18_exact_tap_body_flow_rejects_competing_contact_actor():
         row.get("reason") == "EXACT_TARGET_MEASURED_COMPETING_LOWER_BODY_ACTOR"
         for row in out["unresolved"]
     )
+
+
+def _tap_continuity_release_fixture(*, competing_body=False, competing_ball=False):
+    def actor(ms):
+        left = {1000: .45, 1033: .43, 1067: .41, 1100: .39,
+                1133: .38, 1166: .34, 1200: .30}[ms]
+        return _player("p001", x=left, y=.40, w=.20, h=.30)
+
+    frames = []
+    for ms in (1000, 1033, 1067, 1100, 1133, 1166, 1200):
+        players = [actor(ms)]
+        if competing_body and ms == 1067:
+            players.append(_player("p002", x=.415, y=.40, w=.20, h=.30))
+        support = []
+        if ms == 1133:
+            support = [_support(.55, .68, .004)]
+            if competing_ball:
+                support.append(_support(.48, .67, .004))
+        elif ms == 1166:
+            support = [_support(.57, .66, .008)]
+        elif ms == 1200:
+            support = [_support(.59, .64, .08)]
+            support[0].update({"support_only": False, "a3_eligible": True})
+        # A high-confidence spare ball is deliberately remote from the tapped
+        # body and must never substitute for the continuous release path.
+        support.append({
+            **_support(.05, .55, .20),
+            "support_only": False,
+            "a3_eligible": True,
+        })
+        frames.append(_frame(ms, players, support))
+
+    frames[0]["global_target"] = {
+        "status": "VERIFIED",
+        "reason": "OK_NEAREST_TAP_FRAME",
+        "local_track_id": "p001",
+        "candidate_local_track_ids": ["p001"],
+        "proof_eligible": True,
+        "authority_box": {"x": .40, "y": .40, "w": .20, "h": .30},
+        "authority_tap": True,
+        "authority_primary_source": "USER_TAP",
+        "authority_media_ms": 984,
+    }
+    return frames
+
+
+def test_s3_19_nearest_tap_continuity_recovers_only_the_active_release_ball():
+    out = s3.recover_short_occlusion_contacts(
+        _tap_continuity_release_fixture(), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+
+    rows = [row for row in out["verified"]
+            if row.get("recovery_mode") == "TAP_CONTINUITY_SUPPORT_RELEASE"]
+    assert len(rows) == 1
+    row = rows[0]
+    evidence = row["recovery_evidence"]
+    assert row["media_ms"] == 1133
+    assert row["player_track_id"] == "p001"
+    assert row["player_actor_key"] == "GLOBAL_TARGET"
+    assert row["ball_after"]["media_ms"] == 1200
+    assert row["ball_after"]["box"]["x"] > .50
+    assert evidence["tap_anchor_ms"] == 1000
+    assert evidence["actor_continuity_status"] == "VERIFIED_PATH"
+    assert evidence["ball_flow_status"] == "VERIFIED_PATH"
+    assert evidence["flow_detector_match_count"] >= s3.FLOW_MIN_NODES - 1
+    assert evidence["a3_reacquisition_proof_eligible"] is True
+    assert evidence["remote_spare_ball_used"] is False
+
+
+def test_s3_20_competing_body_breaks_tap_continuity_fail_closed():
+    out = s3.recover_short_occlusion_contacts(
+        _tap_continuity_release_fixture(competing_body=True), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert not any(row.get("recovery_mode") == "TAP_CONTINUITY_SUPPORT_RELEASE"
+                   for row in out["verified"])
+
+
+def test_s3_21_competing_release_ball_path_fails_closed():
+    out = s3.recover_short_occlusion_contacts(
+        _tap_continuity_release_fixture(competing_ball=True), [], _empty_contacts(),
+        video_path="synthetic.mp4", flow_frame_provider=_flow_provider(),
+    )
+    assert not any(row.get("recovery_mode") == "TAP_CONTINUITY_SUPPORT_RELEASE"
+                   for row in out["verified"])

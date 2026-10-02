@@ -178,3 +178,136 @@ def test_a906_inputs_are_not_mutated(monkeypatch):
     originals = copy.deepcopy((plan, analysis, graph, authority))
     pmr.reconstruct_physical_match("video.mp4", plan, analysis, graph, authority)
     assert (plan, analysis, graph, authority) == originals
+
+
+def _goal_review_strike(ms, track, touch_id, *, target=False, scene="scene_001"):
+    return {
+        "strike_id": f"strike_{touch_id}",
+        "touch_id": touch_id,
+        "media_ms": ms,
+        "scene_id": scene,
+        "player_track_id": track,
+        "global_target_id": pmr.GLOBAL_TARGET_ID if target else None,
+        "status": "VERIFIED_PHYSICAL_RELEASE",
+        "proof_eligible": True,
+    }
+
+
+def _goal_review_touch(ms, track, touch_id, team, confidence):
+    return {
+        "touch_id": touch_id,
+        "media_ms": ms,
+        "representative_ms": ms,
+        "scene_id": "scene_001",
+        "player_track_id": track,
+        "status": "VERIFIED",
+        "proof_eligible": True,
+        "team_relation": {
+            "status": "SUPPORTING",
+            "team": team,
+            "confidence": confidence,
+        },
+    }
+
+
+def test_a907_goal_review_eligibility_is_limited_to_target_scoring_chain():
+    target = _goal_review_strike(1000, "p015", "t1", target=True)
+    teammate = _goal_review_strike(2200, "p010", "t2")
+    opponent = _goal_review_strike(2300, "p020", "t3")
+    late_teammate = _goal_review_strike(7000, "p011", "t4")
+    graph = {"touches": [
+        _goal_review_touch(1000, "p015", "t1", "target_team", .95),
+        _goal_review_touch(2200, "p010", "t2", "target_team", .81),
+        _goal_review_touch(2300, "p020", "t3", "opponent", .93),
+        _goal_review_touch(7000, "p011", "t4", "target_team", .90),
+    ]}
+    strikes = [target, teammate, opponent, late_teammate]
+
+    assert pmr._goal_review_eligibility(target, strikes, graph)["eligible"] is True
+    teammate_result = pmr._goal_review_eligibility(teammate, strikes, graph)
+    assert teammate_result["eligible"] is True
+    assert teammate_result["reason"] == "VERIFIED_TARGET_TEAM_RELEASE_AFTER_TARGET_PASS"
+    assert pmr._goal_review_eligibility(opponent, strikes, graph) == {
+        "eligible": False,
+        "reason": "DOWNSTREAM_RELEASE_TARGET_TEAM_UNVERIFIED",
+        "team_status": "SUPPORTING",
+        "team": "opponent",
+        "team_confidence": .93,
+    }
+    assert pmr._goal_review_eligibility(late_teammate, strikes, graph)["reason"] == (
+        "NO_PRIOR_TARGET_RELEASE_IN_CAUSAL_HORIZON"
+    )
+
+
+def test_a908_only_causally_eligible_strikes_consume_goal_provider(monkeypatch):
+    _patch_window(monkeypatch)
+    target = _goal_review_strike(1000, "p015", "t1", target=True)
+    teammate = _goal_review_strike(1100, "p010", "t2")
+    opponent = _goal_review_strike(1150, "p020", "t3")
+    graph = {"touches": [
+        _goal_review_touch(1000, "p015", "t1", "target_team", .95),
+        _goal_review_touch(1100, "p010", "t2", "target_team", .81),
+        _goal_review_touch(1150, "p020", "t3", "opponent", .93),
+    ]}
+    monkeypatch.setattr(pmr.touch_graph, "build_touch_graph", lambda *_a: copy.deepcopy(graph))
+    monkeypatch.setattr(pmr.contact_role_resolver, "apply_contact_roles", lambda touches, *_a, **_k: touches)
+    monkeypatch.setattr(pmr.jersey_consensus, "select_jersey_review_requests", lambda *_a: [])
+    monkeypatch.setattr(
+        pmr.jersey_consensus,
+        "apply_jersey_consensus",
+        lambda frames, touches, _votes: {
+            "window_evidence": frames,
+            "touch_graph": touches,
+            "consensus_by_track": {},
+        },
+    )
+    monkeypatch.setattr(
+        pmr.unified_identity_authority,
+        "apply_verified_jersey_handoff",
+        lambda _authority, _frames, touches, _consensus: touches,
+    )
+    monkeypatch.setattr(
+        pmr.shot_outcome_engine,
+        "find_strike_releases",
+        lambda *_a: copy.deepcopy([target, teammate, opponent]),
+    )
+    monkeypatch.setattr(
+        pmr.post_strike_intervention,
+        "detect_post_strike_intervention",
+        lambda *_a: {"status": "NONE", "proof_eligible": False},
+    )
+    monkeypatch.setattr(
+        pmr.shot_outcome_engine,
+        "reconstruct_post_strike_outcome",
+        lambda strike, *_a, goal_geometry=None, **_k: {
+            "status": "ok",
+            "strike_id": strike["strike_id"],
+            "physical_outcome": "UNRESOLVED",
+            "goal_plane_crossing": {"status": "UNRESOLVED"},
+            "goal_geometry_evidence": copy.deepcopy(goal_geometry),
+        },
+    )
+    monkeypatch.setattr(
+        pmr.post_strike_intervention,
+        "apply_intervention_evidence",
+        lambda outcome, *_a: outcome,
+    )
+    monkeypatch.setattr(pmr.fix10a_goal_direction, "apply_direction_gate", lambda outcome, *_a: outcome)
+    monkeypatch.setattr(pmr.fix10a_ball_proof_gate, "apply_ball_proof_gate", lambda outcome, *_a: outcome)
+    reviewed = []
+
+    def goal_provider(_window, strike):
+        reviewed.append(strike["strike_id"])
+        return {"status": "UNRESOLVED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"}
+
+    plan, analysis, scene_graph, authority = _base_inputs()
+    out = pmr.reconstruct_physical_match(
+        "video.mp4", plan, analysis, scene_graph, authority,
+        goal_geometry_provider=goal_provider,
+    )
+
+    assert reviewed == ["strike_t1", "strike_t2"]
+    assert out["metrics"]["goal_reviews_requested"] == 2
+    assert out["metrics"]["goal_reviews_skipped"] == 1
+    skipped = out["traces"][0]["outcome_evidence"][2]
+    assert skipped["goal_geometry_evidence"]["reason"] == "GOAL_REVIEW_NOT_CAUSALLY_ELIGIBLE"

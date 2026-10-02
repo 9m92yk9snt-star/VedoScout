@@ -95,6 +95,25 @@ def _target_compatible(frame: dict, track_id: str) -> bool:
     return False
 
 
+def _verified_jersey_reid_player(touch: dict, player: dict) -> bool:
+    """Recheck the identity layer's bounded jersey handoff on a dense body."""
+    resolution = (
+        touch.get("global_target_resolution")
+        if isinstance(touch.get("global_target_resolution"), dict) else {}
+    )
+    posterior = (
+        player.get("jersey_posterior")
+        if isinstance(player.get("jersey_posterior"), dict) else {}
+    )
+    return bool(
+        resolution.get("status") == "VERIFIED"
+        and resolution.get("reason") == "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP"
+        and posterior.get("status") == "VERIFIED"
+        and str(posterior.get("number")) == str(resolution.get("verified_jersey_number"))
+        and int(posterior.get("agreeing_frames") or 0) >= 2
+    )
+
+
 def _trajectory_rows(ball_trajectory):
     if isinstance(ball_trajectory, list):
         return [row for row in ball_trajectory if isinstance(row, dict)]
@@ -202,7 +221,10 @@ def _delayed_separation_role(touch: dict, touches, dense_frames, ball_trajectory
         if frame.get("cut_barrier") is True or frame.get("used_fallback") is True:
             continue
         player = _player_by_id(frame, actor)
-        if player is None or not _target_compatible(frame, actor):
+        if player is None or not (
+            _target_compatible(frame, actor)
+            or _verified_jersey_reid_player(touch, player)
+        ):
             continue
         pbox, bbox = player["box"], row["box"]
         foot_x = float(pbox["x"]) + float(pbox["w"]) / 2.0
@@ -284,6 +306,44 @@ def _step3_role_from_contact(row: dict) -> dict:
         return _unresolved("STEP3_SOURCE_CONTACT_NOT_PROOF_ELIGIBLE")
 
     mode = str(row.get("recovery_mode") or "")
+    if mode == "TAP_CONTINUITY_SUPPORT_RELEASE":
+        recovery_evidence = (
+            row.get("recovery_evidence")
+            if isinstance(row.get("recovery_evidence"), dict) else {}
+        )
+        separation = row.get("separation_gain_h")
+        geometry = row.get("contact_geometry") if isinstance(row.get("contact_geometry"), dict) else {}
+        trajectory = row.get("trajectory_evidence") if isinstance(row.get("trajectory_evidence"), dict) else {}
+        evidence = {
+            "recovery_mode": mode,
+            "tap_anchor_ms": recovery_evidence.get("tap_anchor_ms"),
+            "release_evidence_ms": recovery_evidence.get("release_evidence_ms"),
+            "tap_authority_status": recovery_evidence.get("tap_authority_status"),
+            "actor_continuity_status": recovery_evidence.get("actor_continuity_status"),
+            "ball_flow_status": recovery_evidence.get("ball_flow_status"),
+            "a3_reacquisition_ms": recovery_evidence.get("a3_reacquisition_ms"),
+            "a3_reacquisition_proof_eligible": recovery_evidence.get(
+                "a3_reacquisition_proof_eligible"
+            ),
+            "remote_spare_ball_used": recovery_evidence.get("remote_spare_ball_used"),
+            "separation_gain_h": separation,
+            "contact_distance_h": geometry.get("distance_h"),
+            "trajectory_score": trajectory.get("score"),
+        }
+        if (
+            recovery_evidence.get("tap_authority_status") == "VERIFIED"
+            and recovery_evidence.get("actor_continuity_status") == "VERIFIED_PATH"
+            and recovery_evidence.get("ball_flow_status") == "VERIFIED_PATH"
+            and recovery_evidence.get("a3_reacquisition_proof_eligible") is True
+            and recovery_evidence.get("remote_spare_ball_used") is False
+            and _num(separation) and float(separation) >= float(bce.POSSESSION_MARGIN_H)
+            and _num(geometry.get("distance_h"))
+            and float(geometry["distance_h"]) <= float(bce.CONTACT_MAX_H)
+            and _num(trajectory.get("score"))
+            and float(trajectory["score"]) >= float(recovery.TRAJECTORY_SIGNAL_MIN)
+        ):
+            return _verified_role(ROLE_RELEASE, "TAP_CONTINUITY_SUPPORT_RELEASE", evidence)
+        return _unresolved("TAP_CONTINUITY_SUPPORT_RELEASE_INCOMPLETE", evidence)
     if mode == "EXACT_TARGET_BODY_FLOW_RELEASE":
         recovery_evidence = (
             row.get("recovery_evidence")
@@ -418,7 +478,12 @@ def resolve_touch_role(touch: dict | None, source_by_id: dict[str, dict] | None 
             "source_contact_ids": ids,
             "source_roles": deepcopy(roles),
         }
-        return _verified_role(role, "STEP3_AGGREGATED_CONTACT_ROLE", merged)
+        source = (
+            "TAP_CONTINUITY_SUPPORT_RELEASE"
+            if roles and all(row.get("source") == "TAP_CONTINUITY_SUPPORT_RELEASE" for row in roles)
+            else "STEP3_AGGREGATED_CONTACT_ROLE"
+        )
+        return _verified_role(role, source, merged)
     return _unresolved(
         "STEP3_SOURCE_ROLE_CONFLICT_OR_UNRESOLVED",
         {"source_contact_ids": ids, "source_roles": deepcopy(roles)},

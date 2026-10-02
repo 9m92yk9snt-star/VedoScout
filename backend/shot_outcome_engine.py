@@ -18,6 +18,8 @@ import fix10a_occluded_goal
 VERSION = 1
 MAX_POST_STRIKE_MS = 3000
 MIN_RELEASE_TRAJECTORY_CHANGE = 0.20
+MIN_SCORING_CONTROL_TRAJECTORY_CHANGE = 0.35
+SCORING_CONTROL_CLUSTER_MS = 400
 INTERVENTION_MIN_TRAJECTORY_CHANGE = 0.25
 STOP_SPEED_NORM_S = 0.22
 AWAY_DOT_MIN = 0.05
@@ -90,6 +92,38 @@ def _measured_near(rows, media_ms, side=0, max_ms=220):
     return min(candidates, key=lambda r: abs(int(r["media_ms"]) - int(media_ms)), default=None)
 
 
+def _active_ball_anchor_from_touch(touch, strike_ms):
+    """Prefer the ball physically attached to this release over global noise."""
+    row = touch.get("ball_after") if isinstance(touch, dict) else None
+    if not (
+        isinstance(row, dict)
+        and _num(row.get("media_ms"))
+        and int(strike_ms) <= int(row["media_ms"]) <= int(strike_ms) + 300
+        and row.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+        and row.get("proof_eligible") is True
+        and row.get("time_authority") == "ACTUAL_MEDIA_PTS"
+        and row.get("used_fallback") is not True
+        and _valid_box(row.get("box"))
+    ):
+        return None
+    out = deepcopy(row)
+    out["source"] = "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+    out["remote_spare_ball_used"] = False
+    return out
+
+
+def _measured_touch_ball(row):
+    return bool(
+        isinstance(row, dict)
+        and _num(row.get("media_ms"))
+        and row.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+        and row.get("proof_eligible") is True
+        and row.get("time_authority") == "ACTUAL_MEDIA_PTS"
+        and row.get("used_fallback") is not True
+        and _valid_box(row.get("box"))
+    )
+
+
 def find_strike_releases(touch_graph: dict | None, ball_trajectory=None) -> list[dict]:
     """Find physically meaningful release/strike candidates, not semantic SHOTs."""
     graph = touch_graph if isinstance(touch_graph, dict) else {}
@@ -124,6 +158,7 @@ def find_strike_releases(touch_graph: dict | None, ball_trajectory=None) -> list
         cur = _measured_near(rows, ms, side=0)
         after = _measured_near(rows, ms, side=1)
         post_velocity = _velocity_between(cur, after) if cur and after else None
+        active_anchor = _active_ball_anchor_from_touch(touch, ms)
         out.append({
             "strike_id": _strike_id(touch.get("touch_id"), ms),
             "touch_id": touch.get("touch_id"),
@@ -137,8 +172,96 @@ def find_strike_releases(touch_graph: dict | None, ball_trajectory=None) -> list
             "post_speed": _speed(post_velocity),
             "trajectory_change": change,
             "proof_eligible": bool(touch.get("proof_eligible")),
+            "contact_role": deepcopy(contact_role),
+            "active_ball_anchor": active_anchor,
+            "active_ball_anchor_source": (
+                active_anchor.get("source") if isinstance(active_anchor, dict) else None
+            ),
+            "remote_spare_ball_used": False if active_anchor is not None else None,
         })
     return out
+
+
+def find_scoring_control_contacts(touch_graph: dict | None) -> list[dict]:
+    """Expose bounded, verified control touches for goal review.
+
+    A goal can be finished by a controlled tap or a dribble across the plane;
+    requiring every scorer contact to be classified as ``RELEASE`` silently
+    loses that valid case.  This remains a candidate only: it needs an actual
+    target-owned causal chain plus an independently verified goal crossing in
+    later stages.  Predicted balls, weak trajectory changes and duplicate
+    contacts from the same short control cluster are excluded.
+    """
+    graph = touch_graph if isinstance(touch_graph, dict) else {}
+    candidates = []
+    for touch in graph.get("touches") or []:
+        if not (
+            isinstance(touch, dict)
+            and touch.get("status") == "VERIFIED"
+            and touch.get("proof_eligible") is True
+            and isinstance(touch.get("player_track_id"), str)
+            and _num(touch.get("representative_ms") if _num(touch.get("representative_ms")) else touch.get("media_ms"))
+        ):
+            continue
+        role = touch.get("contact_role") if isinstance(touch.get("contact_role"), dict) else {}
+        if not (
+            role.get("status") == "VERIFIED"
+            and role.get("proof_eligible") is True
+            and role.get("role") == "RECEIVE_CONTROL"
+            and float(touch.get("trajectory_change") or 0.0) >= MIN_SCORING_CONTROL_TRAJECTORY_CHANGE
+            and _measured_touch_ball(touch.get("ball_at_contact"))
+            and _measured_touch_ball(touch.get("ball_after"))
+        ):
+            continue
+        media_ms = int(
+            touch.get("representative_ms")
+            if _num(touch.get("representative_ms"))
+            else touch["media_ms"]
+        )
+        ball_at = touch["ball_at_contact"]
+        ball_after = touch["ball_after"]
+        if not (media_ms <= int(ball_after["media_ms"]) <= media_ms + 300):
+            continue
+        post_velocity = _velocity_between(ball_at, ball_after)
+        anchor = deepcopy(ball_after)
+        anchor["source"] = "VERIFIED_SCORING_CONTROL_BALL_AFTER"
+        anchor["remote_spare_ball_used"] = False
+        candidates.append({
+            "strike_id": _strike_id(touch.get("touch_id"), media_ms),
+            "touch_id": touch.get("touch_id"),
+            "media_ms": media_ms,
+            "scene_id": touch.get("scene_id"),
+            "player_track_id": touch.get("player_track_id"),
+            "global_target_id": touch.get("global_target_id"),
+            "status": "VERIFIED_PHYSICAL_SCORING_CONTACT",
+            "semantic_action": None,
+            "post_velocity": post_velocity,
+            "post_speed": _speed(post_velocity),
+            "trajectory_change": float(touch.get("trajectory_change") or 0.0),
+            "proof_eligible": True,
+            "contact_role": deepcopy(role),
+            "active_ball_anchor": anchor,
+            "active_ball_anchor_source": anchor["source"],
+            "remote_spare_ball_used": False,
+        })
+
+    candidates.sort(key=lambda row: (int(row["media_ms"]), str(row["player_track_id"])))
+    deduped = []
+    for row in candidates:
+        duplicate_index = next((
+            index for index, old in enumerate(deduped)
+            if old.get("scene_id") == row.get("scene_id")
+            and old.get("player_track_id") == row.get("player_track_id")
+            and int(row["media_ms"]) - int(old["media_ms"]) <= SCORING_CONTROL_CLUSTER_MS
+        ), None)
+        if duplicate_index is None:
+            deduped.append(row)
+            continue
+        if float(row.get("trajectory_change") or 0.0) > float(
+            deduped[duplicate_index].get("trajectory_change") or 0.0
+        ):
+            deduped[duplicate_index] = row
+    return deduped
 
 
 def _segment_intersection(a, b, c, d):

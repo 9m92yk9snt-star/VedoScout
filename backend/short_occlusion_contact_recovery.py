@@ -19,6 +19,10 @@ Four fail-closed paths are supported:
 * EXACT_TARGET_BODY_FLOW_RELEASE: an exact user tap and ordinary measured ball
   contact are bridged to an A4 release only when body and ball each pass independent
   forward/backward flow plus same-track and no-competitor checks.
+* TAP_CONTINUITY_SUPPORT_RELEASE: the exact tapped body is followed over every
+  actual-PTS frame through only unique geometric local-id handoffs; a later weak
+  lower-body ball proposal still needs optical-flow continuity and an ordinary
+  A3-eligible measured re-acquisition before it can become a release.
 
 No semantic SHOT/GOAL/SAVE label, jersey number, or fixture truth is consumed.
 """
@@ -75,6 +79,15 @@ EXACT_TAP_SEED_CLUSTER_NORM = 0.035
 EXACT_TAP_MIN_SEPARATION_GAIN_H = 0.16
 EXACT_TAP_AMBIGUITY_SCORE_MARGIN = 0.08
 EXACT_TAP_DIVERGENCE_NORM = 0.07
+
+# A tap may prove the identity of one continuously observed body for a short
+# contact window even when the scene-local tracker changes ids at a crossover.
+# Geometry must be unique on every frame and no more than a few bounded local-id
+# handoffs are allowed; this never rewrites the dense identity timeline.
+TAP_CONTINUITY_MAX_MS = 420
+TAP_CONTINUITY_MIN_RELEASE_MS = 120
+TAP_CONTINUITY_AMBIG_MARGIN_H = 0.18
+TAP_CONTINUITY_MAX_HANDOFFS = 4
 
 # Strong physical consequence; proximity alone can never satisfy this gate.
 TRAJECTORY_SIGNAL_MIN = 0.45
@@ -552,7 +565,7 @@ def _exact_tap_target_actor(frame):
     if not (
         target.get("status") == "VERIFIED"
         and target.get("proof_eligible") is True
-        and target.get("reason") == "OK_EXACT"
+        and target.get("reason") in {"OK_EXACT", "OK_NEAREST_TAP_FRAME"}
         and target.get("authority_tap") is True
         and target.get("authority_primary_source") == "USER_TAP"
         and _valid_box(target.get("authority_box"))
@@ -785,6 +798,362 @@ def _exact_track_continuity(frames, anchor_frame, track_id, end_frame):
         "dense_frame_count": len(nodes),
         "nodes": nodes,
     }
+
+
+def _tap_body_candidates(frame):
+    """Return concrete or singleton-hypothesis bodies for tap continuity."""
+    rows = []
+    if not isinstance(frame, dict):
+        return rows
+    target = frame.get("global_target") if isinstance(frame.get("global_target"), dict) else {}
+    forced_track = (
+        target.get("local_track_id")
+        if target.get("status") == "VERIFIED"
+        and target.get("proof_eligible") is True
+        and isinstance(target.get("local_track_id"), str)
+        else None
+    )
+    for player in frame.get("players") or []:
+        if not isinstance(player, dict) or not _valid_box(player.get("box")):
+            continue
+        direct = player.get("local_track_id") if isinstance(player.get("local_track_id"), str) else None
+        candidate_ids = {
+            value for value in (player.get("candidate_local_track_ids") or [])
+            if isinstance(value, str)
+        }
+        actor_id = direct or (next(iter(candidate_ids)) if len(candidate_ids) == 1 else None)
+        if actor_id is None or (forced_track is not None and actor_id != forced_track):
+            continue
+        row = deepcopy(player)
+        row["local_track_id"] = actor_id
+        row["tap_continuity_from_hypothesis"] = direct is None
+        rows.append(row)
+    if forced_track is not None and not rows:
+        synthetic = bce._player_by_id(frame, forced_track)
+        if synthetic is not None:
+            rows.append(deepcopy(synthetic))
+    return rows
+
+
+def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
+    """Follow one tapped physical body without trusting mutable local ids.
+
+    Every source frame must provide a unique geometry-continuous body. Singleton
+    local-id hypotheses may participate, but close competing geometries fail
+    closed. This is physical continuity evidence scoped to the recovery only.
+    """
+    if not (
+        isinstance(anchor_frame, dict) and isinstance(anchor_actor, dict)
+        and isinstance(end_frame, dict)
+        and _num(anchor_frame.get("media_ms")) and _num(end_frame.get("media_ms"))
+        and isinstance(anchor_actor.get("local_track_id"), str)
+        and _valid_box(anchor_actor.get("detected_box") or anchor_actor.get("box"))
+    ):
+        return None, {"ok": False, "reason": "TAP_CONTINUITY_INPUT_INVALID"}
+    start_ms, end_ms = int(anchor_frame["media_ms"]), int(end_frame["media_ms"])
+    if end_ms < start_ms or end_ms - start_ms > TAP_CONTINUITY_MAX_MS:
+        return None, {"ok": False, "reason": "TAP_CONTINUITY_TIME_EXCEEDED"}
+    scene_id = anchor_frame.get("scene_id")
+    chain = sorted([
+        frame for frame in (frames or [])
+        if isinstance(frame, dict) and _num(frame.get("media_ms"))
+        and start_ms < int(frame["media_ms"]) <= end_ms
+    ], key=lambda frame: int(frame["media_ms"]))
+    previous = deepcopy(anchor_actor)
+    previous["box"] = deepcopy(anchor_actor.get("detected_box") or anchor_actor["box"])
+    previous_ms = start_ms
+    current_id = previous["local_track_id"]
+    handoffs = []
+    nodes = [{
+        "media_ms": start_ms,
+        "local_track_id": current_id,
+        "association_state": previous.get("association_state"),
+        "box": deepcopy(previous["box"]),
+        "source": "EXACT_USER_TAP_BODY",
+    }]
+    for frame in chain:
+        media_ms = int(frame["media_ms"])
+        if (
+            frame.get("cut_barrier") is True
+            or frame.get("used_fallback") is True
+            or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"
+            or frame.get("scene_id") != scene_id
+        ):
+            return None, {"ok": False, "reason": "TAP_CONTINUITY_BARRIER",
+                          "failed_media_ms": media_ms}
+        ranked = []
+        for candidate in _tap_body_candidates(frame):
+            if _team_conflict_for_tap(previous, candidate):
+                continue
+            geometry = bce._boxes_actor_continuous(
+                previous["box"], candidate["box"], media_ms - previous_ms
+            )
+            if geometry.get("ok") is True:
+                ranked.append((float(geometry.get("center_distance_h") or 0.0), candidate, geometry))
+        ranked.sort(key=lambda item: item[0])
+        if not ranked:
+            return None, {"ok": False, "reason": "TAP_CONTINUITY_BODY_NOT_RESOLVED",
+                          "failed_media_ms": media_ms}
+        if len(ranked) > 1 and ranked[1][0] - ranked[0][0] < TAP_CONTINUITY_AMBIG_MARGIN_H:
+            return None, {
+                "ok": False,
+                "reason": "TAP_CONTINUITY_COMPETING_BODIES",
+                "failed_media_ms": media_ms,
+                "candidate_track_ids": [row[1].get("local_track_id") for row in ranked[:3]],
+                "center_distance_h": [round(row[0], 4) for row in ranked[:3]],
+            }
+        _distance, chosen, geometry = ranked[0]
+        chosen_id = chosen["local_track_id"]
+        if chosen_id != current_id:
+            handoffs.append({
+                "media_ms": media_ms,
+                "from_track_id": current_id,
+                "to_track_id": chosen_id,
+                "reason": "UNIQUE_BODY_GEOMETRY_LOCAL_TRACK_HANDOFF",
+                "center_distance_h": geometry.get("center_distance_h"),
+            })
+            if len(handoffs) > TAP_CONTINUITY_MAX_HANDOFFS:
+                return None, {"ok": False, "reason": "TAP_CONTINUITY_TOO_MANY_HANDOFFS",
+                              "failed_media_ms": media_ms}
+        nodes.append({
+            "media_ms": media_ms,
+            "local_track_id": chosen_id,
+            "association_state": chosen.get("association_state"),
+            "from_singleton_hypothesis": bool(chosen.get("tap_continuity_from_hypothesis")),
+            "box": deepcopy(chosen["box"]),
+            "center_distance_h": geometry.get("center_distance_h"),
+            "source": "UNIQUE_DENSE_BODY_GEOMETRY",
+        })
+        previous = deepcopy(chosen)
+        previous_ms = media_ms
+        current_id = chosen_id
+    return previous, {
+        "ok": True,
+        "status": "VERIFIED_PATH",
+        "reason": "EXACT_TAP_UNIQUE_DENSE_BODY_CONTINUITY",
+        "actor_key": bce.GLOBAL_TARGET_ACTOR_KEY,
+        "anchor_track_id": anchor_actor["local_track_id"],
+        "resolved_track_id": current_id,
+        "dt_ms": end_ms - start_ms,
+        "dense_frame_count": len(nodes),
+        "handoff_count": len(handoffs),
+        "handoffs": handoffs,
+        "nodes": nodes,
+    }
+
+
+def _team_conflict_for_tap(a, b):
+    """Use only strong team contradictions; missing kit evidence is neutral."""
+    if not (isinstance(a, dict) and isinstance(b, dict)):
+        return False
+    ta, tb = a.get("team"), b.get("team")
+    ca, cb = a.get("team_confidence"), b.get("team_confidence")
+    return bool(
+        ta not in {None, "", "UNKNOWN"} and tb not in {None, "", "UNKNOWN"}
+        and _num(ca) and _num(cb) and float(ca) >= .70 and float(cb) >= .70
+        and ta != tb
+    )
+
+
+def _tap_release_competitors(frame, actor, ball_box):
+    """Find materially distinct lower bodies that could own the same ball."""
+    rows = []
+    actor_box = actor.get("box") if isinstance(actor, dict) else None
+    for player in frame.get("players") or []:
+        if not isinstance(player, dict) or not _valid_box(player.get("box")):
+            continue
+        if _valid_box(actor_box):
+            pcx, pcy = _center(player["box"]); acx, acy = _center(actor_box)
+            if math.hypot(pcx - acx, pcy - acy) <= EXACT_TAP_SEED_CLUSTER_NORM:
+                continue
+        geometry = _lower_geometry(player["box"], ball_box)
+        if float(geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H):
+            rows.append({
+                "local_track_id": player.get("local_track_id"),
+                "candidate_local_track_ids": deepcopy(player.get("candidate_local_track_ids") or []),
+                "association_state": player.get("association_state"),
+                "distance_h": geometry.get("distance_h"),
+            })
+    return rows
+
+
+def _tap_continuity_support_recoveries(frames, contact_result, video_path,
+                                       flow_frame_provider=None):
+    """Recover a release after a tap without letting a remote ball substitute."""
+    verified, unresolved = [], []
+    for anchor_frame in frames or []:
+        anchor_actor = _exact_tap_target_actor(anchor_frame)
+        if anchor_actor is None:
+            continue
+        anchor_ms = int(anchor_frame["media_ms"])
+        candidates = []
+        release_frames = [
+            frame for frame in (frames or [])
+            if isinstance(frame, dict) and _num(frame.get("media_ms"))
+            and anchor_ms + TAP_CONTINUITY_MIN_RELEASE_MS <= int(frame["media_ms"])
+            <= anchor_ms + TAP_CONTINUITY_MAX_MS
+        ]
+        for release_frame in release_frames:
+            actor, actor_path = _tap_actor_continuity(
+                frames, anchor_frame, anchor_actor, release_frame
+            )
+            if actor is None:
+                continue
+            seed_rows = []
+            for seed in release_frame.get("a7_ball_support_candidates") or []:
+                if not (
+                    isinstance(seed, dict)
+                    and seed.get("support_only") is True
+                    and seed.get("proof_eligible") is not True
+                    and _valid_box(seed.get("box"))
+                ):
+                    continue
+                geometry = _lower_geometry(actor["box"], seed["box"])
+                if float(geometry.get("distance_h") or 999.0) > float(bce.CONTACT_MAX_H):
+                    continue
+                competitors = _tap_release_competitors(release_frame, actor, seed["box"])
+                if competitors:
+                    continue
+                seed_rows.append((seed, geometry))
+            # Distinct weak proposals near the same body are ambiguity, not a
+            # confidence contest. Near-identical detector duplicates collapse.
+            clustered = []
+            for seed, geometry in sorted(
+                seed_rows, key=lambda item: float(item[0].get("confidence") or 0.0), reverse=True
+            ):
+                cx, cy = _center(seed["box"])
+                if any(math.hypot(cx - row[0], cy - row[1]) <= EXACT_TAP_SEED_CLUSTER_NORM
+                       for row in clustered):
+                    continue
+                clustered.append((cx, cy, seed, geometry))
+            if len(clustered) != 1:
+                continue
+            _cx, _cy, seed, geometry = clustered[0]
+            release_ms = int(release_frame["media_ms"])
+            flow = _track_support_with_flow(
+                video_path, release_ms, seed["box"],
+                flow_frame_provider=flow_frame_provider,
+            )
+            if flow.get("status") != "VERIFIED_PATH":
+                continue
+            detector_paths = _support_detector_paths(frames, release_frame, seed)
+            for detector_path in detector_paths:
+                flow_matches = _flow_path_match_count(
+                    flow.get("nodes") or [], detector_path.get("nodes") or []
+                )
+                if flow_matches < FLOW_MIN_NODES - 1:
+                    continue
+                strong = next((
+                    node for node in detector_path["nodes"][1:]
+                    if node.get("a3_eligible") is True
+                ), None)
+                if strong is None:
+                    continue
+                strong_frame = _frame_near(frames, int(strong["media_ms"]), max_ms=25)
+                final_actor, final_path = _tap_actor_continuity(
+                    frames, anchor_frame, anchor_actor, strong_frame
+                )
+                if final_actor is None:
+                    continue
+                separation = _separation_gain_h(
+                    actor["box"], seed["box"], final_actor["box"], strong["box"]
+                )
+                if separation is None or separation < EXACT_TAP_MIN_SEPARATION_GAIN_H:
+                    continue
+                anchor = {
+                    "media_ms": release_ms,
+                    "state": "SUPPORT_ONLY_TAP_CONTINUITY",
+                    "box": deepcopy(seed["box"]),
+                    "confidence": seed.get("confidence"),
+                    "proof_eligible": False,
+                    "time_authority": release_frame.get("time_authority"),
+                    "used_fallback": bool(release_frame.get("used_fallback")),
+                    "provenance": "EXACT_TAP_BODY_CONTINUITY_PLUS_SUPPORT_BALL",
+                }
+                after = {
+                    **deepcopy(strong),
+                    "state": "MEASURED_REACQUISITION",
+                    "proof_eligible": True,
+                    "provenance": "A3_ELIGIBLE_SPORTS_BALL_REACQUISITION",
+                }
+                change = _exact_tap_path_evidence(anchor, after, separation)
+                if float(change.get("score") or 0.0) < TRAJECTORY_SIGNAL_MIN:
+                    continue
+                evidence = {
+                    "version": VERSION,
+                    "mode": "TAP_CONTINUITY_SUPPORT_RELEASE",
+                    "scene_id": release_frame.get("scene_id"),
+                    "tap_anchor_ms": anchor_ms,
+                    "release_evidence_ms": release_ms,
+                    "selected_body_source": "USER_TAP",
+                    "selected_body_box": deepcopy(anchor_actor.get("box")),
+                    "tap_authority_status": "VERIFIED",
+                    "actor_continuity_status": "VERIFIED_PATH",
+                    "actor_key": bce.GLOBAL_TARGET_ACTOR_KEY,
+                    "actor_continuity_chain": [deepcopy(actor_path), deepcopy(final_path)],
+                    "release_track_id": actor.get("local_track_id"),
+                    "release_body_box": deepcopy(actor.get("box")),
+                    "raw_support_proof_eligible": False,
+                    "support_seed_confidence": seed.get("confidence"),
+                    "ball_flow_status": flow.get("status"),
+                    "flow_nodes": deepcopy(flow.get("nodes") or []),
+                    "flow_detector_match_count": flow_matches,
+                    "detector_path_nodes": deepcopy(detector_path.get("nodes") or []),
+                    "a3_reacquisition_ms": int(strong["media_ms"]),
+                    "a3_reacquisition_confidence": strong.get("confidence"),
+                    "a3_reacquisition_proof_eligible": True,
+                    "remote_spare_ball_used": False,
+                    "trajectory_change": deepcopy(change),
+                    "separation_gain_h": round(float(separation), 4),
+                    "fixture_truth_used": False,
+                }
+                score = (
+                    .30 * float(geometry.get("score") or 0.0)
+                    + .30 * float(change.get("score") or 0.0)
+                    + .20 * min(1.0, float(separation) / .50)
+                    + .20 * min(1.0, flow_matches / max(1, FLOW_MIN_NODES - 1))
+                )
+                candidates.append({
+                    "score": score,
+                    "actor": actor,
+                    "anchor": anchor,
+                    "after": after,
+                    "geometry": geometry,
+                    "change": change,
+                    "separation": separation,
+                    "evidence": evidence,
+                })
+        if not candidates:
+            continue
+        candidates.sort(key=lambda row: float(row["score"]), reverse=True)
+        best = candidates[0]
+        if len(candidates) > 1:
+            second = candidates[1]
+            ac, bc = _center(best["after"]["box"]), _center(second["after"]["box"])
+            if (
+                math.hypot(ac[0] - bc[0], ac[1] - bc[1]) >= EXACT_TAP_DIVERGENCE_NORM
+                and float(best["score"]) - float(second["score"])
+                <= EXACT_TAP_AMBIGUITY_SCORE_MARGIN
+            ):
+                unresolved.append({
+                    "media_ms": anchor_ms,
+                    "reason": "COMPETING_TAP_CONTINUITY_BALL_PATHS",
+                    "mode": "TAP_CONTINUITY_SUPPORT_RELEASE",
+                })
+                continue
+        verified.append(_make_contact(
+            mode="TAP_CONTINUITY_SUPPORT_RELEASE",
+            anchor=best["anchor"],
+            actor=best["actor"],
+            geometry=best["geometry"],
+            before_row=None,
+            after_row=best["after"],
+            trajectory_change=best["change"],
+            gap_ms=int(best["after"]["media_ms"]) - int(best["anchor"]["media_ms"]),
+            separation_gain_h=best["separation"],
+            recovery_evidence=best["evidence"],
+        ))
+    return verified, unresolved
 
 
 def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame_provider=None):
@@ -1393,12 +1762,18 @@ def recover_short_occlusion_contacts(dense_frames, ball_trajectory, contact_resu
     ], key=lambda r: int(r["media_ms"]))
     exact_verified, exact_unresolved = ([], [])
     exact_measured_verified, exact_measured_unresolved = ([], [])
+    tap_continuity_verified, tap_continuity_unresolved = ([], [])
     if video_path or flow_frame_provider is not None:
         exact_verified, exact_unresolved = _exact_tap_support_recoveries(
             frames, contact_result or {}, str(video_path or ""), flow_frame_provider
         )
         exact_measured_verified, exact_measured_unresolved = (
             _exact_tap_measured_release_recoveries(
+                frames, contact_result or {}, str(video_path or ""), flow_frame_provider
+            )
+        )
+        tap_continuity_verified, tap_continuity_unresolved = (
+            _tap_continuity_support_recoveries(
                 frames, contact_result or {}, str(video_path or ""), flow_frame_provider
             )
         )
@@ -1415,7 +1790,10 @@ def recover_short_occlusion_contacts(dense_frames, ball_trajectory, contact_resu
         )
 
     combined = sorted(
-        [*measured_verified, *exact_verified, *exact_measured_verified, *flow_verified],
+        [
+            *measured_verified, *exact_verified, *exact_measured_verified,
+            *tap_continuity_verified, *flow_verified,
+        ],
         key=lambda row: int(row["media_ms"]),
     )
     # Never create two Step-3 contacts for the same actor/moment. Prefer the mode
@@ -1436,12 +1814,13 @@ def recover_short_occlusion_contacts(dense_frames, ball_trajectory, contact_resu
             "EXACT_TARGET_SUPPORT_PATH": 2,
             "POST_GAP_MEASURED_REACQUISITION": 3,
             "EXACT_TARGET_BODY_FLOW_RELEASE": 4,
+            "TAP_CONTINUITY_SUPPORT_RELEASE": 5,
         }
         if preference.get(row.get("recovery_mode"), 0) > preference.get(prior.get("recovery_mode"), 0):
             deduped[duplicate_index] = row
     unresolved = [
         *measured_unresolved, *exact_unresolved,
-        *exact_measured_unresolved, *flow_unresolved,
+        *exact_measured_unresolved, *tap_continuity_unresolved, *flow_unresolved,
     ]
     unresolved_reason = (
         "INSUFFICIENT_PROOF_MEASURED_TRAJECTORY"
@@ -1460,6 +1839,9 @@ def recover_short_occlusion_contacts(dense_frames, ball_trajectory, contact_resu
             "exact_target_support_verified": sum(r.get("recovery_mode") == "EXACT_TARGET_SUPPORT_PATH" for r in deduped),
             "exact_target_body_flow_releases": sum(
                 r.get("recovery_mode") == "EXACT_TARGET_BODY_FLOW_RELEASE" for r in deduped
+            ),
+            "tap_continuity_support_releases": sum(
+                r.get("recovery_mode") == "TAP_CONTINUITY_SUPPORT_RELEASE" for r in deduped
             ),
             "unresolved_candidates": len(unresolved),
         },

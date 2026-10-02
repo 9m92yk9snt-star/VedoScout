@@ -132,6 +132,59 @@ def test_exact_tap_keeps_selected_authority_box_separate_from_detected_body(monk
     assert target["authority_primary_source"] == "USER_TAP"
 
 
+def test_nearest_actual_pts_inherits_only_direct_user_tap_observation():
+    selected = {"x": .08, "y": .18, "w": .14, "h": .35}
+    authority = {
+        "target_points": [{
+            "media_ms": 1000,
+            "box": selected,
+            "state": "PINNED",
+            "proof_eligible": True,
+            "tap_authority": True,
+            "primary_source": "USER_TAP",
+            "sources": ["USER_TAP"],
+        }],
+    }
+    player = {
+        "local_track_id": "p001",
+        "box": dict(BASE),
+        "confidence": .9,
+        "association_state": "VERIFIED_LOCAL",
+    }
+    near = dtr._resolve_dense_target(authority, 1016, [player])
+    assert near["status"] == "VERIFIED"
+    assert near["reason"] == "OK_NEAREST_TAP_FRAME"
+    assert near["authority_media_ms"] == 1000
+    assert near["authority_frame_delta_ms"] == 16
+    assert near["authority_box"] == selected
+
+    far = dtr._resolve_dense_target(authority, 1033, [player])
+    assert far["status"] != "VERIFIED"
+
+
+def test_refinement_assigns_a_tap_to_only_one_nearest_pts(monkeypatch):
+    selected = {"x": .08, "y": .18, "w": .14, "h": .35}
+    authority = {"target_points": [{
+        "media_ms": 1000,
+        "box": selected,
+        "state": "PINNED",
+        "proof_eligible": True,
+        "tap_authority": True,
+        "primary_source": "USER_TAP",
+        "sources": ["USER_TAP"],
+    }]}
+    rows = [
+        {"media_ms": ms, "players": [{
+            "local_track_id": "p001", "box": dict(BASE),
+            "association_state": "VERIFIED_LOCAL", "confidence": .9,
+        }], "global_target": {"status": "UNRESOLVED"}}
+        for ms in (983, 999, 1016)
+    ]
+    dtr._apply_nearest_tap_frames(rows, authority)
+    matched = [row for row in rows if row["global_target"].get("reason") == "OK_NEAREST_TAP_FRAME"]
+    assert [row["media_ms"] for row in matched] == [999]
+
+
 def test_a201_scene_local_id_survives_safe_camera_pan(monkeypatch):
     _identity_unresolved(monkeypatch)
     shifted = {**BASE, "x": BASE["x"] + 0.05}
@@ -306,3 +359,27 @@ def test_empty_target_hypotheses_leave_recall_window_unresolved_not_crashed(monk
         assert target["local_track_id"] is None
         assert target["candidate_local_track_ids"] == []
         assert target["proof_eligible"] is False
+
+
+def test_dense_team_anchor_samples_follow_only_contiguous_direct_tap_track():
+    frames = []
+    for index, ms in enumerate((1000, 1040, 1080, 1120)):
+        frames.append({
+            "media_ms": ms, "scene_id": "scene_001", "cut_barrier": False,
+            "used_fallback": False, "time_authority": "ACTUAL_MEDIA_PTS",
+            "global_target": {
+                "status": "VERIFIED" if index == 0 else "UNRESOLVED",
+                "proof_eligible": index == 0,
+                "reason": "OK_NEAREST_TAP_FRAME" if index == 0 else "UNRESOLVED",
+                "authority_tap": index == 0,
+                "local_track_id": "p001" if index == 0 else None,
+            },
+            "players": [{
+                "local_track_id": "p001", "association_state": "VERIFIED_LOCAL",
+                "box": dict(BASE), "kit_chroma": [45.0 + index, 55.0],
+            }],
+        })
+    samples = dtr._dense_target_kit_samples(frames)
+    assert samples == [[45.0, 55.0], [46.0, 55.0], [47.0, 55.0], [48.0, 55.0]]
+    frames[2]["cut_barrier"] = True
+    assert dtr._dense_target_kit_samples(frames) == [[45.0, 55.0], [46.0, 55.0]]

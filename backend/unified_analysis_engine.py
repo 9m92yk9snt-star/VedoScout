@@ -286,6 +286,7 @@ def prepare_analysis(
         anchors=deepcopy(anchors) if isinstance(anchors, list) else [],
         anchor_time_offset=float(anchor_time_offset or 0.0),
         identity_profile=deepcopy(identity_profile) if isinstance(identity_profile, dict) else {},
+        player_details=deepcopy(player_details) if isinstance(player_details, dict) else {},
     )
     authority = bundle.get("authority") or {}
     scene_graph = football_scene_graph.build_scene_graph(str(video_path), authority)

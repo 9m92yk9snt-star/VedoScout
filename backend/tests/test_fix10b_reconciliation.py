@@ -242,3 +242,251 @@ def test_fix10b08_target_goal_and_assist_same_contact_conflict_fails_closed():
     assert out["events"][0]["canonical_event_type"] == "SHOT"
     assert out["reconciliation"]["proposals_contradictory"] == 2
     assert out["reconciliation"]["proposals_applied"] == 0
+
+
+def test_fix10b09_target_recontact_breaks_early_dribble_release_assist_chain():
+    target = strike(1000, "p001", target=True)
+    scorer = strike(2200, "p003")
+    tr = trace(
+        [
+            touch(1000, "p001", target=True),
+            touch(1300, "p001", target=True),
+            touch(1500, "p003"),
+        ],
+        [target, scorer],
+        [outcome(target, goal=False), outcome(scorer, goal=True, crossing_ms=2600)],
+    )
+    proposals = f10b.proposals_from_trace(tr)
+    assert not any(row["kind"] == "ASSIST" for row in proposals)
+
+
+def test_fix10b10_target_reid_track_is_not_mistaken_for_teammate_receiver():
+    target = strike(1000, "p001", target=True)
+    scorer = strike(2200, "p003")
+    tr = trace(
+        [
+            touch(1000, "p001", target=True),
+            touch(1500, "p099", target=True),
+            touch(1800, "p003"),
+        ],
+        [target, scorer],
+        [outcome(target, goal=False), outcome(scorer, goal=True, crossing_ms=2600)],
+    )
+    proposals = f10b.proposals_from_trace(tr)
+    assert not any(row["kind"] == "ASSIST" for row in proposals)
+
+
+def _deflected_assist_trace(*, control=False, remote_x=.10, target_also_goal=False):
+    target = strike(1000, "p001", target=True)
+    target["active_ball_anchor"] = {
+        "media_ms": 1080,
+        "state": "MEASURED",
+        "box": {"x": .47, "y": .60, "w": .02, "h": .02},
+        "proof_eligible": True,
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+        "source": "VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+        "remote_spare_ball_used": False,
+    }
+    scorer = strike(2200, "p003")
+    target_touch = touch(1000, "p001", target=True)
+    remote = touch(2000, "p009", team="opponent")
+    remote["ball_at_contact"] = {
+        "media_ms": 2000,
+        "state": "MEASURED",
+        "box": {"x": remote_x, "y": .60, "w": .02, "h": .02},
+        "proof_eligible": True,
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+    }
+    scorer_touch = touch(2200, "p003", team=None, confidence=0)
+    scorer_touch["team_relation"] = {
+        "status": "UNRESOLVED", "team": None, "confidence": None,
+        "reason": "CONFLICTING_DENSE_TEAM_LABELS",
+    }
+    scorer_touch["contact_geometry"] = {
+        "actor_box_used": {"x": .48, "y": .30, "w": .10, "h": .30},
+    }
+    scorer_touch["ball_at_contact"] = {
+        "media_ms": 2200,
+        "state": "MEASURED",
+        "box": {"x": .51, "y": .60, "w": .02, "h": .02},
+        "proof_eligible": True,
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+    }
+    target_outcome = outcome(target, goal=target_also_goal, crossing_ms=2600)
+    target_outcome["intervention"] = {
+        "status": "VERIFIED",
+        "proof_eligible": True,
+        "player_track_id": "p002",
+        "media_ms": 1500,
+        "kind": "DEFLECTION_OR_PARRY_LIKE",
+        "player_box": {"x": .46, "y": .30, "w": .12, "h": .30},
+        "ball_box": {"x": .49, "y": .60, "w": .02, "h": .02},
+        "control_evidence": {
+            "status": "VERIFIED" if control else "UNRESOLVED",
+            "reason": "SAME_PLAYER_RETAINS_SLOW_BALL_ACROSS_MEASURED_INTERVAL" if control else "SUSTAINED_CONTROL_NOT_PROVEN",
+        },
+    }
+    frames = []
+    for ms in (1540, 1620, 1700):
+        frames.append({
+            "media_ms": ms, "scene_id": "scene_007", "cut_barrier": False,
+            "players": [{
+                "local_track_id": "p002", "association_state": "VERIFIED_LOCAL",
+                "box": {"x": .46, "y": .30, "w": .12, "h": .30},
+                "team": "opponent", "team_confidence": .94,
+                "team_source": "KIT_CHROMA_DENSE_TAP_CLUSTER",
+            }],
+        })
+    for ms in (2185, 2200, 2250):
+        frames.append({
+            "media_ms": ms, "scene_id": "scene_007", "cut_barrier": False,
+            "players": [{
+                "local_track_id": "p003", "association_state": "VERIFIED_LOCAL",
+                "box": {"x": .48, "y": .30, "w": .10, "h": .30},
+                "team": "target_team", "team_confidence": .95,
+                "team_source": "KIT_CHROMA_DENSE_TAP_CLUSTER",
+            }],
+        })
+    tr = trace(
+        [target_touch, remote, scorer_touch],
+        [target, scorer],
+        [target_outcome, outcome(scorer, goal=True, crossing_ms=2600)],
+    )
+    tr["decoded_frames"] = frames
+    return tr
+
+
+def test_fix10b11_opponent_deflection_without_control_preserves_assist():
+    tr = _deflected_assist_trace()
+    proposals = f10b.proposals_from_trace(tr)
+    assists = [row for row in proposals if row["kind"] == "ASSIST"]
+    assert len(assists) == 1
+    proof = assists[0]["deflection_proof"]
+    assert proof["active_ball_lineage"]["status"] == "VERIFIED"
+    assert len(proof["active_ball_lineage"]["ignored_remote_ball_touches"]) == 1
+    assert assists[0]["scorer_track_id"] == "p003"
+
+
+def test_fix10b12_sustained_defender_control_breaks_deflected_assist():
+    proposals = f10b.proposals_from_trace(_deflected_assist_trace(control=True))
+    assert not any(row["kind"] == "ASSIST" for row in proposals)
+
+
+def test_fix10b13_intervening_touch_on_active_lineage_fails_closed():
+    proposals = f10b.proposals_from_trace(_deflected_assist_trace(remote_x=.50))
+    assert not any(row["kind"] == "ASSIST" for row in proposals)
+
+
+def test_fix10b14_later_teammate_scoring_release_owns_goal_not_target_pass():
+    tr = _deflected_assist_trace(target_also_goal=True)
+    out = f10b.reconcile_canonical_events(
+        canonical([canonical_event("GOAL", "SHOT", 1000)]), physical([tr])
+    )
+    assert len(out["events"]) == 1
+    assert out["events"][0]["canonical_event_type"] == "ASSIST"
+    assert out["metrics"]["goals"] == 0
+    assert out["metrics"]["assists"] == 1
+    assert out["reconciliation"]["proposals_contradictory"] == 0
+
+
+def _with_visual_defender_proof(*, narrow_actor=False, active_save=True):
+    tr = _deflected_assist_trace(target_also_goal=True)
+    scorer = tr["strike_evidence"][1]
+    scorer["status"] = "VERIFIED_PHYSICAL_SCORING_CONTACT"
+    target_outcome = tr["outcome_evidence"][0]
+    intervention = target_outcome["intervention"]
+    intervention["player_box"] = (
+        {"x": .46, "y": .30, "w": .08, "h": .30}
+        if narrow_actor else
+        {"x": .43, "y": .42, "w": .20, "h": .15}
+    )
+    for frame in tr["decoded_frames"]:
+        if 1500 <= int(frame["media_ms"]) <= 1800:
+            frame["players"][0]["team"] = "target_team"
+            frame["players"][0]["team_confidence"] = .94
+            frame["players"][0]["box"] = dict(intervention["player_box"])
+    target_outcome["goal_geometry_evidence"] = {
+        "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
+        "reaction_support_evidence": {
+            "goal_mouth_defender_ball_contact": {
+                "status": "OBSERVED_CONTACT", "confidence": "high", "tracked": True,
+            },
+            "goal_mouth_defender_response": {
+                "status": "ACTIVE_SAVE_ATTEMPT" if active_save else "OTHER",
+                "confidence": "high", "tracked": True,
+            },
+        },
+    }
+    return tr
+
+
+def test_fix10b15_controlled_teammate_finish_can_own_deflected_goal():
+    proposals = f10b.proposals_from_trace(_with_visual_defender_proof())
+    assists = [row for row in proposals if row["kind"] == "ASSIST"]
+    assert len(assists) == 1
+    assert assists[0]["teammate_shot_ms"] == 2200
+    assert assists[0]["reason"] == (
+        "TARGET_RELEASE_OPPONENT_DEFLECTION_WITHOUT_CONTROL_TO_TEAMMATE_GOAL"
+    )
+    evidence = assists[0]["deflection_proof"]["intervention_team_evidence"]
+    assert evidence["source"] == "INDEPENDENT_VISUAL_GOAL_MOUTH_DEFENDER_CONTACT"
+    assert evidence["association_ambiguous"] is True
+
+
+def test_fix10b16_visual_contact_without_active_save_attempt_fails_closed():
+    proposals = f10b.proposals_from_trace(
+        _with_visual_defender_proof(active_save=False)
+    )
+    assert not any(row["kind"] == "ASSIST" for row in proposals)
+
+
+def test_fix10b17_visual_defender_cannot_override_clear_narrow_teammate_body():
+    proposals = f10b.proposals_from_trace(
+        _with_visual_defender_proof(narrow_actor=True)
+    )
+    assert not any(row["kind"] == "ASSIST" for row in proposals)
+
+
+def test_fix10b18_earlier_control_touch_cannot_steal_later_players_goal():
+    target = strike(1000, "p001", target=True)
+    target["status"] = "VERIFIED_PHYSICAL_SCORING_CONTACT"
+    scorer = strike(1700, "p007")
+    shared_crossing = 2300
+    tr = trace(
+        [touch(1000, "p001", target=True), touch(1700, "p007")],
+        [target, scorer],
+        [
+            outcome(target, goal=True, crossing_ms=shared_crossing),
+            outcome(scorer, goal=True, crossing_ms=shared_crossing),
+        ],
+    )
+    proposals = f10b.proposals_from_trace(tr)
+    assert not any(
+        row["kind"] == "GOAL" and row["target_track_id"] == "p001"
+        for row in proposals
+    )
+
+
+def test_fix10b19_target_control_contact_can_own_goal_without_later_release():
+    target = strike(3000, "p001", target=True)
+    target["status"] = "VERIFIED_PHYSICAL_SCORING_CONTACT"
+    tr = trace(
+        [touch(3000, "p001", target=True)],
+        [target],
+        [outcome(target, goal=True, crossing_ms=3500)],
+    )
+    proposals = f10b.proposals_from_trace(tr)
+    goals = [row for row in proposals if row["kind"] == "GOAL"]
+    assert len(goals) == 1
+    assert goals[0]["target_contact_kind"] == "SCORING_CONTROL_CONTACT"
+    assert goals[0]["reason"] == (
+        "TARGET_SCORING_CONTROL_CONTACT_PLUS_VERIFIED_GOAL_PLANE_CROSSING"
+    )
+    event = f10b.reconcile_canonical_events(canonical([]), physical([tr]))["events"][0]
+    assert event["identity_resolution"] == "FIX10A_VERIFIED_GLOBAL_TARGET_SCORING_CONTACT"
+    assert event["proof"]["fix10b_physical"]["target_contact_kind"] == (
+        "SCORING_CONTROL_CONTACT"
+    )

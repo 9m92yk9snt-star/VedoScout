@@ -26,11 +26,159 @@ import post_strike_intervention
 import shot_outcome_engine
 import short_occlusion_contact_recovery
 import touch_graph
+import unified_identity_authority
 
 VERSION = 1
 SOURCE_ROLE = "CANONICAL_WEB_VIDEO"
 MAX_ERROR_MESSAGE_CHARS = 400
 MAX_TRACEBACK_CHARS = 5000
+GLOBAL_TARGET_ID = "GLOBAL_TARGET"
+GOAL_REVIEW_CAUSAL_MAX_MS = 5200
+GOAL_REVIEW_TEAM_CONFIDENCE_MIN = 0.70
+
+
+def _num(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _strike_is_verified_release(strike):
+    return bool(
+        isinstance(strike, dict)
+        and strike.get("status") == "VERIFIED_PHYSICAL_RELEASE"
+        and strike.get("proof_eligible") is True
+        and isinstance(strike.get("player_track_id"), str)
+        and _num(strike.get("media_ms"))
+    )
+
+
+def _strike_is_goal_review_contact(strike):
+    return bool(
+        isinstance(strike, dict)
+        and strike.get("status") in {
+            "VERIFIED_PHYSICAL_RELEASE",
+            "VERIFIED_PHYSICAL_SCORING_CONTACT",
+        }
+        and strike.get("proof_eligible") is True
+        and isinstance(strike.get("player_track_id"), str)
+        and _num(strike.get("media_ms"))
+    )
+
+
+def _touch_for_strike(strike, touch_graph):
+    touch_id = strike.get("touch_id") if isinstance(strike, dict) else None
+    if not isinstance(touch_id, str):
+        return None
+    graph = touch_graph if isinstance(touch_graph, dict) else {}
+    return next(
+        (
+            touch for touch in graph.get("touches") or []
+            if isinstance(touch, dict) and touch.get("touch_id") == touch_id
+        ),
+        None,
+    )
+
+
+def _verified_target_team_touch(touch):
+    relation = (
+        touch.get("team_relation")
+        if isinstance(touch, dict) and isinstance(touch.get("team_relation"), dict)
+        else {}
+    )
+    confidence = relation.get("confidence")
+    return bool(
+        isinstance(touch, dict)
+        and touch.get("status") == "VERIFIED"
+        and touch.get("proof_eligible") is True
+        and relation.get("status") == "SUPPORTING"
+        and relation.get("team") == "target_team"
+        and _num(confidence)
+        and float(confidence) >= GOAL_REVIEW_TEAM_CONFIDENCE_MIN
+    )
+
+
+def _goal_review_eligibility(strike, strikes, touch_graph):
+    """Bound expensive goal review to a target-owned scoring chain.
+
+    The goal provider is supporting vision, not a full-video event detector.
+    Reviewing every physical contact both wastes its report budget and lets an
+    unrelated opponent action starve later target evidence. A review is
+    therefore allowed only for a verified target scoring contact, or for a verified
+    target-team release within the direct-assist horizon of a prior verified
+    target release in the same scene. Missing team/identity proof fails closed.
+    """
+    if not _strike_is_goal_review_contact(strike):
+        return {
+            "eligible": False,
+            "reason": "CONTACT_NOT_VERIFIED_PROOF_ELIGIBLE_FOR_GOAL_REVIEW",
+        }
+    strike_ms = int(strike["media_ms"])
+    scene = strike.get("scene_id")
+    if strike.get("global_target_id") == GLOBAL_TARGET_ID:
+        contact_kind = (
+            "SCORING_CONTACT"
+            if strike.get("status") == "VERIFIED_PHYSICAL_SCORING_CONTACT"
+            else "RELEASE"
+        )
+        return {
+            "eligible": True,
+            "reason": f"VERIFIED_GLOBAL_TARGET_{contact_kind}",
+            "target_release_ms": strike_ms,
+        }
+
+    prior_target_releases = [
+        row for row in strikes or []
+        if _strike_is_verified_release(row)
+        and row.get("global_target_id") == GLOBAL_TARGET_ID
+        and row.get("scene_id") == scene
+        and int(row["media_ms"]) < strike_ms
+        and strike_ms - int(row["media_ms"]) <= GOAL_REVIEW_CAUSAL_MAX_MS
+    ]
+    if not prior_target_releases:
+        return {
+            "eligible": False,
+            "reason": "NO_PRIOR_TARGET_RELEASE_IN_CAUSAL_HORIZON",
+        }
+    scoring_touch = _touch_for_strike(strike, touch_graph)
+    if not _verified_target_team_touch(scoring_touch):
+        relation = (
+            scoring_touch.get("team_relation")
+            if isinstance(scoring_touch, dict)
+            and isinstance(scoring_touch.get("team_relation"), dict)
+            else {}
+        )
+        return {
+            "eligible": False,
+            "reason": "DOWNSTREAM_RELEASE_TARGET_TEAM_UNVERIFIED",
+            "team_status": relation.get("status"),
+            "team": relation.get("team"),
+            "team_confidence": relation.get("confidence"),
+        }
+    target_release = max(prior_target_releases, key=lambda row: int(row["media_ms"]))
+    relation = scoring_touch.get("team_relation") or {}
+    return {
+        "eligible": True,
+        "reason": "VERIFIED_TARGET_TEAM_RELEASE_AFTER_TARGET_PASS",
+        "target_release_ms": int(target_release["media_ms"]),
+        "elapsed_ms": strike_ms - int(target_release["media_ms"]),
+        "team_confidence": float(relation["confidence"]),
+    }
+
+
+def _skipped_goal_review(eligibility):
+    return {
+        "status": "UNRESOLVED",
+        "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
+        "line_by_ms": [],
+        "field_side_status": "UNRESOLVED",
+        "field_side_by_ms": [],
+        "reason": "GOAL_REVIEW_NOT_CAUSALLY_ELIGIBLE",
+        "eligibility": deepcopy(eligibility) if isinstance(eligibility, dict) else {},
+        "visual_crossing_audit": {
+            "status": "UNRESOLVED",
+            "confidence": "low",
+            "reason": "GOAL_REVIEW_NOT_CAUSALLY_ELIGIBLE",
+        },
+    }
 
 
 def _safe_provider(provider, *args, default=None):
@@ -208,8 +356,49 @@ def reconstruct_physical_match(
             dense_with_jersey = jersey_result.get("window_evidence") or dense_frames
             touch_with_jersey = jersey_result.get("touch_graph") or touches
 
+            stage = "verified_jersey_identity_handoff"
+            touch_with_jersey = unified_identity_authority.apply_verified_jersey_handoff(
+                authority,
+                dense_with_jersey,
+                touch_with_jersey,
+                jersey_result.get("consensus_by_track") or {},
+            )
+            # Re-evaluate delayed release roles after a safe local-track re-ID;
+            # physical role truth itself remains independent of jersey evidence.
+            touch_with_jersey = contact_role_resolver.apply_contact_roles(
+                touch_with_jersey, contact_result,
+                dense_frames=dense_with_jersey, ball_trajectory=trajectory,
+            )
+            jersey_result["touch_graph"] = deepcopy(touch_with_jersey)
+            jersey_result["identity_handoff"] = deepcopy(
+                touch_with_jersey.get("jersey_identity_handoff") or {}
+            )
+
             stage = "strike_detection"
-            strikes = shot_outcome_engine.find_strike_releases(touch_with_jersey, trajectory)
+            release_strikes = shot_outcome_engine.find_strike_releases(
+                touch_with_jersey, trajectory
+            )
+            scoring_contacts = shot_outcome_engine.find_scoring_control_contacts(
+                touch_with_jersey
+            )
+            all_goal_contacts = sorted(
+                [*release_strikes, *scoring_contacts],
+                key=lambda row: (int(row.get("media_ms") or 0), str(row.get("strike_id") or "")),
+            )
+            # Control contacts are admitted only when the same causal gate that
+            # protects the goal-review budget can already bind them to the
+            # analysed player's scoring chain. Releases remain available for
+            # physical non-goal outcomes such as saves.
+            scoring_contacts = [
+                row for row in scoring_contacts
+                if _goal_review_eligibility(
+                    row, all_goal_contacts, touch_with_jersey
+                ).get("eligible") is True
+            ]
+            strikes = sorted(
+                [*release_strikes, *scoring_contacts],
+                key=lambda row: (int(row.get("media_ms") or 0), str(row.get("strike_id") or "")),
+            )
 
             stage = "intervention_detection"
             a7_interventions = [
@@ -234,11 +423,22 @@ def reconstruct_physical_match(
                 window_roles.update(deepcopy(role_evidence))
 
             outcomes = []
+            goal_reviews_requested = 0
+            goal_reviews_skipped = 0
             for strike, a7 in zip(strikes, a7_interventions):
-                stage = "goal_geometry_provider"
-                goal_geometry = _safe_provider(
-                    goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
+                stage = "goal_review_eligibility"
+                eligibility = _goal_review_eligibility(
+                    strike, strikes, touch_with_jersey
                 )
+                if eligibility.get("eligible") is True:
+                    stage = "goal_geometry_provider"
+                    goal_geometry = _safe_provider(
+                        goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
+                    )
+                    goal_reviews_requested += 1
+                else:
+                    goal_geometry = _skipped_goal_review(eligibility)
+                    goal_reviews_skipped += 1
 
                 stage = "shot_outcome_reconstruction"
                 outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
@@ -256,6 +456,7 @@ def reconstruct_physical_match(
 
                 stage = "ball_proof_gate"
                 outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, trajectory)
+                outcome["goal_review_eligibility"] = deepcopy(eligibility)
                 outcomes.append(outcome)
 
             stage = "window_unresolved_summary"
@@ -296,8 +497,12 @@ def reconstruct_physical_match(
                 "jersey_requests": len(requests),
                 "role_evidence_tracks": len(window_roles),
                 "strikes": len(strikes),
+                "release_strikes": len(release_strikes),
+                "scoring_control_contacts": len(scoring_contacts),
                 "a7_verified_interventions": a7_verified,
                 "outcomes": len(outcomes),
+                "goal_reviews_requested": goal_reviews_requested,
+                "goal_reviews_skipped": goal_reviews_skipped,
                 "unresolved_reasons": unresolved,
             })
         except Exception as exc:
@@ -375,6 +580,18 @@ def reconstruct_physical_match(
             ),
             "touches": sum(int(x.get("touches") or 0) for x in window_rows),
             "physical_strikes": sum(int(x.get("strikes") or 0) for x in window_rows),
+            "physical_release_strikes": sum(
+                int(x.get("release_strikes") or 0) for x in window_rows
+            ),
+            "scoring_control_contacts": sum(
+                int(x.get("scoring_control_contacts") or 0) for x in window_rows
+            ),
+            "goal_reviews_requested": sum(
+                int(x.get("goal_reviews_requested") or 0) for x in window_rows
+            ),
+            "goal_reviews_skipped": sum(
+                int(x.get("goal_reviews_skipped") or 0) for x in window_rows
+            ),
             "a7_verified_interventions": sum(int(x.get("a7_verified_interventions") or 0) for x in window_rows),
         },
         # Explicitly absent by contract: canonical_events, event_ledger,

@@ -81,6 +81,8 @@ def test_a7s01_multiframe_support_can_verify_independent_intervention():
     assert out["proof_eligible"] is True
     assert out["touch_graph_mutated"] is False
     assert out["source"] == "A7_SUPPORT_ONLY_FULL_BODY_INTERVENTION"
+    assert out["kind"] == "DEFLECTION_OR_PARRY_LIKE"
+    assert out["control_evidence"]["status"] == "UNRESOLVED"
 
 
 def test_a7s02_single_frame_body_nearness_cannot_verify():
@@ -213,3 +215,66 @@ def test_a7s11_injected_two_tuple_detector_contract_still_works():
     assert out["status"] == "ok"
     assert out["frames"][0]["ball_candidates"] == []
     assert out["frames"][0]["a7_ball_support_candidates"] == []
+
+
+def test_a7s12_release_owned_anchor_wins_over_remote_global_ball():
+    strike = _strike()
+    strike["active_ball_anchor"] = {
+        "media_ms": 1000,
+        "state": "MEASURED_REACQUISITION",
+        "box": _box(.20, .40),
+        "confidence": .08,
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+        "proof_eligible": True,
+        "source": "VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+        "remote_spare_ball_used": False,
+    }
+    remote = _anchor()
+    remote[0]["box"] = _box(.80, .20)
+    path = a7._build_support_paths(strike, _verified_support_sequence(), remote)
+    assert path["status"] == "VERIFIED_PATH"
+    assert path["anchor"]["box"] == strike["active_ball_anchor"]["box"]
+    assert path["anchor_source"] == "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+
+    intervention = a7.detect_post_strike_intervention(
+        strike, _verified_support_sequence(), remote
+    )
+    assert intervention["status"] == "VERIFIED"
+    assert intervention["active_ball_anchor_source"] == "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+    assert intervention["remote_spare_ball_used"] is False
+
+
+def test_a7s13_invalid_owned_anchor_does_not_fall_back_to_remote_ball():
+    strike = _strike()
+    strike["active_ball_anchor"] = {
+        "media_ms": 1000,
+        "state": "MEASURED_REACQUISITION",
+        "box": _box(.20, .40),
+        "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False,
+        "proof_eligible": False,
+        "source": "VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+        "remote_spare_ball_used": False,
+    }
+    path = a7._build_support_paths(strike, _verified_support_sequence(), _anchor())
+    assert path["status"] == "UNRESOLVED"
+    assert path["reason"] == "A7_SUPPORT_NO_PROOF_ELIGIBLE_STRIKE_ANCHOR"
+
+
+def test_a7s14_sustained_slow_support_retention_is_control_like():
+    body = _player()
+    frames = [
+        _frame(1040, [_support(.24)]),
+        _frame(1075, [_support(.31)]),
+        _frame(1120, [_support(.43)], [body]),
+        _frame(1296, [_support(.431)], [body]),
+        _frame(1460, [_support(.432)], [body]),
+        _frame(1620, [_support(.46)]),
+        _frame(1780, [_support(.50)]),
+    ]
+    out = a7.detect_post_strike_intervention(_strike(), frames, _anchor())
+    assert out["status"] == "VERIFIED"
+    assert out["kind"] == "CATCH_OR_CONTROL_LIKE"
+    assert out["control_evidence"]["status"] == "VERIFIED"
+    assert out["control_evidence"]["retained_span_ms"] >= a7.CONTROL_MIN_SPAN_MS
