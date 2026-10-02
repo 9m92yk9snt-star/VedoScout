@@ -490,3 +490,22 @@ def test_fix10b19_target_control_contact_can_own_goal_without_later_release():
     assert event["proof"]["fix10b_physical"]["target_contact_kind"] == (
         "SCORING_CONTROL_CONTACT"
     )
+
+
+def test_fix11_49448_release_without_verified_goal_chain_is_not_an_assist():
+    candidate = strike(49448, "p001", target=True)
+    tr = trace(
+        [touch(49448, "p001", target=True)],
+        [candidate],
+        [],
+    )
+    assert not any(row["kind"] == "ASSIST" for row in f10b.proposals_from_trace(tr))
+
+    semantic = canonical([{
+        "event_id": "unsupported_assist_49448", "scene_id": "scene_1",
+        "canonical_ms": 49448, "canonical_event_type": "ASSIST",
+        "canonical_action_type": "PASS", "proof": {"evidence_ms": [49448]},
+    }])
+    out = f10b.reconcile_canonical_events(semantic, physical([tr]))
+    assert out["metrics"]["assists"] == 0
+    assert not out["events"]
