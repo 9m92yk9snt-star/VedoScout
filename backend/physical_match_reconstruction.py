@@ -400,12 +400,31 @@ def reconstruct_physical_match(
                 key=lambda row: (int(row.get("media_ms") or 0), str(row.get("strike_id") or "")),
             )
 
+            # A verified ball-after-contact anchor is the identity seed for
+            # this strike. Reconstruct one bounded path from it and pass that
+            # same path through intervention, outcome, direction, and proof
+            # gates. Falling back to the window-global path after a valid seed
+            # would silently reattach this strike to a competing ball.
+            shot_trajectories = []
+            for strike in strikes:
+                anchor = strike.get("active_ball_anchor") if isinstance(strike, dict) else None
+                anchored_path = ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
+                    dense_with_jersey, anchor, strike.get("scene_id")
+                )
+                uses_anchor = bool(anchored_path)
+                selected_path = anchored_path if uses_anchor else trajectory
+                shot_trajectories.append({
+                    "rows": selected_path,
+                    "source": "VERIFIED_RELEASE_ANCHOR" if uses_anchor else "WINDOW_GLOBAL_TRAJECTORY",
+                    "seed_ms": int(anchor["media_ms"]) if uses_anchor else None,
+                })
+
             stage = "intervention_detection"
             a7_interventions = [
                 post_strike_intervention.detect_post_strike_intervention(
-                    strike, dense_with_jersey, trajectory
+                    strike, dense_with_jersey, shot_track["rows"]
                 )
-                for strike in strikes
+                for strike, shot_track in zip(strikes, shot_trajectories)
             ]
             a7_verified = sum(
                 isinstance(row, dict) and row.get("status") == "VERIFIED"
@@ -425,7 +444,7 @@ def reconstruct_physical_match(
             outcomes = []
             goal_reviews_requested = 0
             goal_reviews_skipped = 0
-            for strike, a7 in zip(strikes, a7_interventions):
+            for strike, a7, shot_track in zip(strikes, a7_interventions, shot_trajectories):
                 stage = "goal_review_eligibility"
                 eligibility = _goal_review_eligibility(
                     strike, strikes, touch_with_jersey
@@ -442,9 +461,22 @@ def reconstruct_physical_match(
 
                 stage = "shot_outcome_reconstruction"
                 outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
-                    strike, trajectory, touch_with_jersey,
+                    strike, shot_track["rows"], touch_with_jersey,
                     goal_geometry=goal_geometry, role_evidence=window_roles,
                 )
+                outcome["ball_trajectory_source"] = shot_track["source"]
+                outcome["ball_trajectory_seed_ms"] = shot_track["seed_ms"]
+                outcome["ball_trajectory_points"] = [
+                    {
+                        "media_ms": int(row["media_ms"]),
+                        "state": row.get("state"),
+                        "box": deepcopy(row.get("box")),
+                        "proof_eligible": row.get("proof_eligible") is True,
+                        "provenance": row.get("provenance"),
+                    }
+                    for row in shot_track["rows"]
+                    if isinstance(row, dict) and row.get("state") == "MEASURED"
+                ]
 
                 stage = "intervention_apply"
                 outcome = post_strike_intervention.apply_intervention_evidence(
@@ -452,10 +484,14 @@ def reconstruct_physical_match(
                 )
 
                 stage = "goal_direction_gate"
-                outcome = fix10a_goal_direction.apply_direction_gate(outcome, trajectory, goal_geometry)
+                outcome = fix10a_goal_direction.apply_direction_gate(
+                    outcome, shot_track["rows"], goal_geometry
+                )
 
                 stage = "ball_proof_gate"
-                outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, trajectory)
+                outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(
+                    outcome, shot_track["rows"]
+                )
                 outcome["goal_review_eligibility"] = deepcopy(eligibility)
                 outcomes.append(outcome)
 
