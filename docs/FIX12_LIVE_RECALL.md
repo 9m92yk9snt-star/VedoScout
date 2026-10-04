@@ -125,3 +125,56 @@ unit regressions pass.
 Preserve uncertainty when evidence is insufficient. Further identity recovery
 must be based on independent body/jersey evidence rather than expected event
 times, spatial proximity or changing another player's identity.
+
+## Production manifest obtained on 2026-10-04
+
+The initial investigation above used historical R2 variants. Read-only MongoView
+access now confirms the production manifest's **15 exact trace objects**. Only
+**one** of those objects matches an uncompressed trace SHA-256 in the initial
+29-file ZIP. The latest private evidence ZIP is
+`5df7c569-live-authoritative-traces.zip`, SHA-256
+`2f6b7e371ac9eb9a8b30b523b330f4e2708aa988ca756af4c1b8c8625ea2a0f7`.
+All 15 original gzip lengths and uncompressed SHA-256 values match the live
+manifest. It also includes visible canonical/scoring fields captured through
+MongoView, not a complete report JSON export. Raw user artifacts remain private
+and are not committed to this repository.
+
+The authoritative traces have 56 physical strikes/outcomes and eight target
+strikes. Local reconciliation of these saved outcomes still produces zero
+proposals. Live Mongo confirms FIX10B ran in production, `no_change`, with zero
+proposals/applied/contradictory proposals. The live canonical bundle has eight
+accepted events and eight unresolved observations, including SHOT candidates at
+28.132 and 36.132 seconds rather than the reference shot/goal times. It has no
+verified goals/assists. Missing event candidates cannot be recovered by a
+report-display change alone.
+
+### Execution completion versus evidence completion
+
+Previously `verification_complete` only meant that planned recall windows ran
+without reconstruction exceptions. Scoring scan then published
+`SEMANTIC_AND_PHYSICAL_COMPLETE`, even with missing target identity and outcomes.
+The new side-effect-free coverage assessment exposes missing target-frame
+identity, unresolved target/eligible teammate outcomes, downstream team barriers,
+and missing target outcomes. Opponent-only unresolved outcomes do not create a
+target scoring gap. An assessment without decoded frames is `NOT_ASSESSED`.
+
+`physical_recall_execution_complete` retains the old execution signal.
+`physical_recall_verification_complete` additionally requires complete assessed
+evidence, and `coverage_status` becomes
+`SEMANTIC_COMPLETE_PHYSICAL_EVIDENCE_PARTIAL` when semantic execution completed
+but physical proof is incomplete. Canonical counts/proof thresholds do not
+change. Consumers of the former verification flag must use the new execution
+flag if they only need job completion; unknown evidence must not become a claim
+that no goals/assists occurred. A COMPLETE assessment is a diagnostic of the
+supplied sampled evidence, not a guarantee of full-video detection recall.
+
+On the exact 15 live traces this assessment reports 5,468 decoded-frame
+observations, 4,849 identity-gap observations and 11 unresolved target-chain
+outcomes. Windows overlap: these are observations, not unique video frames,
+missed-event counts, or a measured recall percentage. No new goals, saves or
+assists are inferred from these numbers.
+
+This status correction does **not** fix the five event-detection acceptance
+failures. Next work remains bounded identity recovery, temporally supported
+occluded contact and complete receiver-to-goal lineage, followed by independent
+outcome review on the unchanged original video/taps before any deploy.
