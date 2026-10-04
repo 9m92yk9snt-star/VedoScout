@@ -69,7 +69,7 @@ outcome evidence has not been silently upgraded or rewritten.
 
 The full local identity replay on the original video and recovered taps still
 has `reid_failed` in the shot scene and a target gap in the goal scene. Track
-changes also remove an earlier unsupported cut re-identification. These are
+changes also alter an earlier cut re-identification result. These are
 unresolved acceptance failures, not completed fixes. Local tests cannot replace
 the missing independent identity and goal/save evidence.
 
