@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   Users, FileVideo, FileCheck2, BadgeDollarSign, Save, Unlock, Trash2, Loader2,
   ShieldCheck, UserPlus, X, Crown, UserCheck, Eye, EyeOff, Mail, MailOpen, Inbox,
-  Share2, Twitter, Facebook, Linkedin, Instagram, Layout, RefreshCcw, Radar,
+  Share2, Twitter, Facebook, Linkedin, Instagram, Layout, RefreshCcw, Radar, Download,
 } from "lucide-react";
 import ScoutQueue from "@/components/ScoutQueue";
 import BlogAdmin from "@/components/BlogAdmin";
@@ -104,6 +104,7 @@ export default function AdminPage() {
   const [stripeSyncWarning, setStripeSyncWarning] = useState(null);
 
   const [loading, setLoading] = useState(true);
+  const [exportingReportId, setExportingReportId] = useState(null);
 
   // Social links (admin-editable)
   const DEFAULT_SOCIAL = {
@@ -347,6 +348,32 @@ export default function AdminPage() {
       load();
     } catch (err) {
       toast.error("Delete failed");
+    }
+  };
+
+  const handleEvidenceExport = async (id) => {
+    setExportingReportId(id);
+    try {
+      const response = await api.get(`/admin/reports/${id}/evidence-export`, {
+        responseType: "blob", timeout: 180000,
+      });
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${id}-evidence.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      toast.success("Evidence export downloaded. Check missing_data.json for unavailable evidence.");
+    } catch (err) {
+      let detail = "Could not download evidence export";
+      if (err?.response?.data instanceof Blob) {
+        try { detail = JSON.parse(await err.response.data.text()).detail || detail; } catch (_) { /* Keep safe default. */ }
+      }
+      toast.error(detail);
+    } finally {
+      setExportingReportId(null);
     }
   };
 
@@ -603,6 +630,16 @@ export default function AdminPage() {
                               >
                                 <Eye className="w-4 h-4" />
                               </Link>
+                              <button
+                                onClick={() => handleEvidenceExport(r.id)}
+                                disabled={exportingReportId !== null}
+                                data-testid={`admin-export-evidence-${r.id}`}
+                                aria-label="Download analysis evidence ZIP"
+                                title="Download analysis evidence ZIP"
+                                className="text-volt hover:bg-volt hover:text-white p-2 transition-colors disabled:opacity-50"
+                              >
+                                {exportingReportId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                              </button>
                               {!(r.is_paid || r.manually_unlocked) && (
                                 <button
                                   onClick={() => handleUnlock(r.id)}

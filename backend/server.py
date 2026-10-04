@@ -17035,4 +17035,12 @@ async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
 
 # Register the API router LAST so it includes every @api_router route defined above
 # (including scout-access + players-database endpoints in Fase 2).
+from report_evidence_export import R2Reader
+from report_export_routes import create_report_export_router
+
+api_router.include_router(create_report_export_router(
+    db=db, upload_dir=UPLOAD_DIR, source_root=ROOT_DIR.parent,
+    admin_dependency=get_current_admin, object_reader=R2Reader(r2_storage),
+))
+
 app.include_router(api_router)
