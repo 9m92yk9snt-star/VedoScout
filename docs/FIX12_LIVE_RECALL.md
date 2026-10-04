@@ -41,6 +41,19 @@ establish that the full video now produces the expected scoring events.
 6. Random k-means starts changed team availability for identical live inputs.
    Fit deterministic starts on both chroma axes and the principal axis, choosing
    the lowest compactness. No process-wide random seed is set in production.
+7. A fully masked embedding zone fell back to the entire crop, reintroducing
+   occluder/background pixels as identity features. Keep explicit zone support;
+   unavailable zones contribute no similarity, including pooled/relaxed views.
+8. Broad identity tracking discarded camera zoom/rotation and used only the
+   frame-centre translation. Compose the full similarity transforms across
+   misses and transform the last measured rectangle once. An unavailable or
+   malformed camera transform cannot masquerade as a static camera. Composing
+   transforms also prevents repeated axis-aligned envelope inflation under
+   rotation and its inverse.
+9. Geometry association ignored a sustained clean kit conflict and could switch
+   onto a nearer opponent. A consistent three-sample kit history spanning at
+   least 400 ms can reject a clean opposing-kit candidate. Unknown/overlapped
+   readings cannot reject it; same-kit evidence never establishes identity.
 
 No identity, whole-ball crossing, goalkeeper/save or assist proof thresholds
 were lowered. Production code has no fixture event times or special video ID.
@@ -53,7 +66,7 @@ clustering with different process RNG seeds. The small kit fixture contains
 only anonymous Lab color pairs: no video, user data, tokens or report payload.
 
 Historical regression: `tests/test_fix*.py` plus
-`tests/test_unified_analysis_engine.py`: **925 passed**, five existing
+`tests/test_unified_analysis_engine.py`: **938 passed**, five existing
 deprecation warnings. Tests use the CI no-network Emergent stubs and placeholder
 configuration; this is not an LLM validation. Local runtime: Python 3.12.14,
 OpenCV 5.0.0, NumPy 2.5.3. CI uses its pinned dependencies independently.
@@ -67,11 +80,20 @@ goal review after the verified target release at **56,148 ms**:
 This demonstrates removal of a review blocker, not an accepted assist. Existing
 outcome evidence has not been silently upgraded or rewritten.
 
-The full local identity replay on the original video and recovered taps still
-has `reid_failed` in the shot scene and a target gap in the goal scene. Track
-changes also alter an earlier cut re-identification result. These are
-unresolved acceptance failures, not completed fixes. Local tests cannot replace
-the missing independent identity and goal/save evidence.
+The fresh full local identity replay at the unchanged production default of
+5 Hz, using the original video and recovered taps, still has `reid_failed` in
+the shot scene and `ambiguous_duel` around the goal (29,899–32,932 ms). The non-scoring
+49.44-second scene also becomes unresolved; this is a recall limitation, not
+proof of the required negative scoring result. These are unresolved acceptance
+failures. Local tests cannot replace independent identity and goal/save evidence.
+
+An exploratory 10 Hz replay initially produced a falsely reassuring target
+point: direct image inspection showed the blue opponent in the goal sequence.
+After the kit-conflict association correction, inspection at 30,915 ms showed
+the white #15 instead. The shot scene remained unresolved. This is diagnostic
+evidence for the association defect, not end-to-end PASS. Production sampling
+has not been increased: count-based evidence gates need a separate temporal
+independence review before any rate change.
 
 ## Remaining end-to-end acceptance
 
@@ -84,7 +106,7 @@ unit regressions pass.
 | Reference time | Required canonical result | Current new full-run verification |
 | --- | --- | --- |
 | 23.68 s | target shot, saved | Pending; identity replay still unresolved |
-| 30.83 s | target goal | Pending; identity replay still has a gap |
+| 30.83 s | target goal | Pending; default-rate identity replay remains ambiguous |
 | 43.19 s | target assist with proven teammate goal | Pending independent outcome review |
 | 49.44 s | no target assist | Must remain rejected in the new run |
 | 56.44 s | target assist with proven teammate goal | Review blocker improved; assist still unverified |
