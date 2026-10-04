@@ -1089,3 +1089,15 @@ def test_structural_compare_with_production():
     assert cmp_["timeline_points"] == len(target_pts(tl))
     assert cmp_["compared"] > 0
     assert cmp_["agreement_rate"] is not None and cmp_["agreement_rate"] >= 0.9
+def test_scene_tracker_prefers_nearest_camera_compensated_nonoverlapping_body():
+    import player_identity_timeline as pit
+
+    observations = [
+        {"media_ms": 0, "detections": [{"box": (0, 0, 10, 40)}]},
+        {"media_ms": 200, "cam_dx": 5,
+         "detections": [{"box": (17, 0, 10, 40)}, {"box": (30, 0, 10, 40)}]},
+    ]
+    tracks, _ = pit._scene_mot(observations, [0, 1])
+    original = next(track for track in tracks if track.tid == 1)
+    assert original.samples[-1]["box"] == (17, 0, 10, 40)
+    assert original.vel == (60.0, 0.0)

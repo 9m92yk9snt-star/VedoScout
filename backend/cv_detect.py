@@ -239,10 +239,27 @@ class TeamModel:
 
     def _fit(self):
         data = np.float32(self.samples)
-        _, _, centers = cv2.kmeans(
-            data, 2, None,
-            (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.5),
-            5, cv2.KMEANS_PP_CENTERS)
+        if len(data) < 2:
+            return
+        # Random k-means starts made identical windows lose or regain team
+        # authority depending on other jobs' RNG use. Use deterministic starts
+        # on both chroma axes and the principal axis, retaining the best fit.
+        _, _, axes = np.linalg.svd(data - data.mean(axis=0), full_matrices=False)
+        starts = [np.array([1.0, 0.0]), np.array([0.0, 1.0]), axes[0]]
+        fits = []
+        for axis in starts:
+            projection = data @ axis
+            seeds = data[[int(np.argmin(projection)), int(np.argmax(projection))]]
+            labels = np.argmin(((data[:, None] - seeds) ** 2).sum(axis=2), axis=1)
+            if len(np.unique(labels)) < 2:
+                continue
+            compactness, _, fitted = cv2.kmeans(
+                data, 2, labels.astype(np.int32).reshape(-1, 1),
+                (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.5),
+                1, cv2.KMEANS_USE_INITIAL_LABELS)
+            ordered = np.array(sorted(tuple(float(v) for v in c) for c in fitted), dtype=np.float32)
+            fits.append((float(compactness), ordered))
+        centers = min(fits, key=lambda fit: fit[0])[1] if fits else np.stack((data[0], data[0]))
         self.centers = centers
         if self.anchor is not None:
             d = [np.hypot(c[0] - self.anchor[0], c[1] - self.anchor[1]) for c in centers]

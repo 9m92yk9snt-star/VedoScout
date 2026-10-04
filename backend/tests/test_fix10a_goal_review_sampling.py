@@ -42,9 +42,22 @@ def test_goal_review_sampling_is_dense_immediately_after_release_and_dedupes_act
     )
 
     requested = captured["requested"]
+    assert len(requested) <= providers.MAX_GOAL_FRAMES
+    assert requested[-1] == 33500  # retain the end of the post-release horizon
+    assert 33100 in requested
     early = [ms for ms in requested if 30900 <= ms <= 31100]
     assert early == [30900, 30950, 31000, 31050, 31100]
     actual = captured["actual_times"]
     assert len(actual) == len(set(actual))
     assert actual.count(30967) == 1
     assert result["status"] == "UNRESOLVED"
+
+
+def test_small_review_budget_keeps_release_and_terminal_context_within_window():
+    assert providers._goal_review_times(1000, 4000, 2) == [1000, 3600]
+    bounded = providers._goal_review_times(1000, 1700, 8)
+    assert bounded[0] == 850
+    assert bounded[-1] == 1650
+    assert len(bounded) <= 8
+    assert providers._goal_review_times(0, 4000, 12).count(0) == 1
+    assert providers._goal_review_times(1000, 4000, 0) == []

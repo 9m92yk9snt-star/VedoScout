@@ -276,7 +276,9 @@ def _scene_mot(obs, idxs):
                     dist = math.hypot(dx_ - cx, dy_ - cy)
                     if dist <= 0.9 * max(p[3], b[3]):
                         pairs.append((0.0, -dist, tr, di))
-        pairs.sort(key=lambda q: (-q[0], q[1]))
+        # Fallback pairs store NEGATIVE distance: descending preference must
+        # pick the nearest body, not the most distant in the admissible band.
+        pairs.sort(key=lambda q: (-q[0], -q[1]))
         used_t, used_d = set(), set()
         for v, nd, tr, di in pairs:
             if tr.tid in used_t or di in used_d:

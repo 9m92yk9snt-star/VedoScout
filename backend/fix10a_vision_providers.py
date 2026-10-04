@@ -59,6 +59,27 @@ def _num(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _goal_review_times(strike_ms: int, end_ms: int, budget: int):
+    """Keep release, terminal context and dense early frames within the budget."""
+    offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
+    candidates = sorted({max(0, strike_ms + offset) for offset in offsets
+                         if strike_ms + offset <= end_ms + 100})
+    if not candidates or budget <= 0:
+        return []
+    # A chronological head slice loses the terminal outcome. Prioritize both
+    # ends, then early crossing detail and the remaining late-flight context.
+    priority = [strike_ms, candidates[-1], max(0, strike_ms - 150)]
+    priority.extend(strike_ms + offset for offset in (50, 100, 150, 200))
+    priority.extend(reversed(candidates))
+    selected = []
+    for ms in priority:
+        if ms in candidates and ms not in selected:
+            selected.append(ms)
+        if len(selected) >= budget:
+            break
+    return sorted(selected)
+
+
 def _valid_box(box) -> bool:
     if not isinstance(box, dict):
         return False
@@ -837,11 +858,7 @@ class ShadowVisionProviders:
         # Dense around the first post-release second so a body occlusion at
         # the goal line is actually sampled; later frames preserve reaction
         # context.  The provider call remains bounded by MAX_GOAL_FRAMES.
-        offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
-        requested = [
-            max(0, strike_ms + offset) for offset in offsets
-            if strike_ms + offset <= end_ms + 100
-        ][:MAX_GOAL_FRAMES]
+        requested = _goal_review_times(strike_ms, end_ms, MAX_GOAL_FRAMES)
         cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested))
         if cache_key in self._goal_cache:
             return self._goal_cache[cache_key]
