@@ -18,6 +18,8 @@ import math
 import os
 from pathlib import Path
 import sys
+import time
+from types import SimpleNamespace
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -44,7 +46,7 @@ def function_namespace(filename):
         elif isinstance(node, ast.Assign) and all(
                 isinstance(target, ast.Name) and target.id.isupper() for target in node.targets):
             body.append(node)
-    namespace = {"deepcopy": deepcopy, "os": os, "math": math, "json": json,
+    namespace = {"deepcopy": deepcopy, "os": os, "math": math, "json": json, "time": time,
                  "Path": Path, "__file__": str(BACKEND / filename)}
     exec(compile(ast.fix_missing_locations(ast.Module(body=body, type_ignores=[])),
                  str(BACKEND / filename), "exec"), namespace)
@@ -86,8 +88,8 @@ def controls():
     unresolved = recall._graph_trigger(frame, None)
     hypothesis = recall._graph_trigger({**frame, "global_target": {
         **frame["global_target"], "status": "HYPOTHESES"}}, None)
-    assert unresolved[0] is False and hypothesis[0] is True
-    rows.append({"case": "recall_graph_lane_is_identity_dependent",
+    assert unresolved[0] is True and hypothesis[0] is True
+    rows.append({"case": "explicit_uncertain_identity_candidate_can_open_replay",
                  "unresolved": unresolved, "hypothesis": hypothesis})
 
     box = {"x": .1, "y": .2, "w": .1, "h": .3}
@@ -125,10 +127,11 @@ def controls():
     result["sequence_analysis"]["coverage_complete"] = False
     assert not ready(result)
     runtime = load_function("fix10a_runtime.py", "run", {
-        "logger": logging.getLogger("gate-audit"), "VERSION": 2})
+        "logger": logging.getLogger("gate-audit"), "VERSION": 2,
+        "unified_analysis_engine": SimpleNamespace(**function_namespace("unified_analysis_engine.py"))})
     skip = asyncio.run(runtime(report_id="synthetic", video_path="unused", unified_result=result, db=None))
     assert skip["status"] == "skipped"
-    rows.append({"case": "partial_sequence_contract_skips_physical_runtime",
+    rows.append({"case": "partial_sequence_without_safe_plan_skips_physical_runtime",
                  "empty_complete_can_be_ready": True, "partial_runtime": skip["reason"]})
 
     # A positive whole-ball control proves these final gates can accept real

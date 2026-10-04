@@ -8,7 +8,9 @@ ni nye adfærdskontroller og genberegning af alle 56 live-reviewbeslutninger.
 `CONTACT_TIME_NOT_EXACT_PROOF` ved 23.68/30.83 s skyldes i de gemte kandidater
 predicted/non-proof bold, selv med korrekt `ACTUAL_MEDIA_PTS`; reasonen
 beviser ikke en tidsbasefejl. Retnings-/boldslutgates ændrer ingen af de 56
-gemte udfald. Produktrettelser afventer fortsat afsluttet audit/validering.
+gemte udfald. De efterfølgende kodeændringer er beskrevet i
+[FIX12-rettelser og validering](FIX12_ANALYSIS_PIPELINE_FIXES.md).
+Nedenstående reproduktioner beskriver audit-baselinen før disse ændringer.
 
 ## Konklusion og afgrænsning
 

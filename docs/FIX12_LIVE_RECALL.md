@@ -1,5 +1,9 @@
 # FIX12 live recall investigation and corrections
 
+The later orchestration/review/coverage changes are documented in
+[FIX12_ANALYSIS_PIPELINE_FIXES.md](FIX12_ANALYSIS_PIPELINE_FIXES.md).
+Real-video acceptance of all five reference actions remains required.
+
 This change fixes reproducible tracking and review defects. It does **not**
 establish that the full video now produces the expected scoring events.
 

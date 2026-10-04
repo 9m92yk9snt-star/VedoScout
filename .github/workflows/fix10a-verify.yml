@@ -199,6 +199,10 @@ jobs:
         run: |
           npm install --global yarn@1.22.22
           yarn install --non-interactive
+      - name: Verify analysis polling and incomplete evidence display
+        run: |
+          node frontend/scripts/audit-analysis-poll.cjs
+          node frontend/scripts/check-report-coverage.cjs
       - name: Build frontend
         working-directory: frontend
         env:

@@ -1,8 +1,8 @@
-"""Read-only reproductions of analysis orchestration gaps, without server startup.
+"""Read-only regression checks for analysis orchestration fixes, without server startup.
 
 Execute selected functions from the actual source against synthetic boundaries.
 No Mongo connection, video decoding, model call, upload, or production mutation.
-These reproduce control flow; they are not end-to-end or video acceptance tests.
+These verify control flow; they are not end-to-end or video acceptance tests.
 """
 from __future__ import annotations
 
@@ -15,10 +15,14 @@ import logging
 from pathlib import Path
 import sys
 import time
+import uuid
+import threading
 from types import SimpleNamespace
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
+import analysis_jobs  # noqa: E402
+import unified_analysis_engine  # noqa: E402
 import fix10b_runtime  # noqa: E402
 import verified_stats  # noqa: E402
 
@@ -33,6 +37,24 @@ def load_function(filename, name, namespace):
     module = ast.fix_missing_locations(ast.Module(body=[future, node], type_ignores=[]))
     exec(compile(module, str(BACKEND / filename), "exec"), namespace)
     return namespace[name]
+
+
+def matches(doc, query):
+    for key, value in query.items():
+        if key == "$and":
+            if not all(matches(doc, q) for q in value): return False
+        elif key == "$or":
+            if not any(matches(doc, q) for q in value): return False
+        elif isinstance(value, dict):
+            actual = doc.get(key)
+            for op, expected in value.items():
+                if op == "$in" and actual not in expected: return False
+                if op == "$nin" and actual in expected: return False
+                if op == "$exists" and (key in doc) != expected: return False
+                if op == "$lt" and (actual is None or actual >= expected): return False
+                if op == "$gt" and (actual is None or actual <= expected): return False
+        elif doc.get(key) != value: return False
+    return True
 
 
 class Reports:
@@ -53,10 +75,7 @@ class Reports:
         return snapshot
 
     def find(self, query, *args):
-        eligible = self.doc.get("full_report_status") in query["full_report_status"]["$in"]
-        if "$or" in query:
-            cutoff = query["$or"][0]["full_report_started_at"]["$lt"]
-            eligible = eligible and self.doc["full_report_started_at"] < cutoff
+        eligible = matches(self.doc, query)
 
         async def rows():
             if eligible:
@@ -64,9 +83,17 @@ class Reports:
         return rows()
 
     async def update_one(self, query, update):
+        if not matches(self.doc, query):
+            return SimpleNamespace(matched_count=0, modified_count=0)
         self.writes.append((deepcopy(query), deepcopy(update)))
         self.doc.update(update.get("$set") or {})
-        return SimpleNamespace(modified_count=1)
+        for key, value in (update.get("$inc") or {}).items():
+            self.doc[key] = self.doc.get(key, 0) + value
+        return SimpleNamespace(matched_count=1, modified_count=1)
+
+    async def find_one_and_update(self, query, update, **kwargs):
+        result = await self.update_one(query, update)
+        return deepcopy(self.doc) if result.matched_count else None
 
 
 async def watchdog_case(retries):
@@ -86,6 +113,7 @@ async def watchdog_case(retries):
 
     fn = load_function("server.py", "_sweep_stuck_full_reports", {
         "datetime": datetime, "timezone": timezone, "timedelta": timedelta,
+        "analysis_jobs": analysis_jobs, "uuid": uuid,
         "FULL_REPORT_STALL_SECONDS": 1200, "FULL_REPORT_MAX_RETRIES": 2,
         "db": SimpleNamespace(reports=reports), "logger": logging.getLogger("audit"),
         "asyncio": SimpleNamespace(create_task=create_task), "_full_report_with_heartbeat": job,
@@ -104,7 +132,7 @@ async def parallel_request_case():
 
     fn = load_function("server.py", "generate_full_report", {
         "db": SimpleNamespace(reports=reports), "_ensure_report_video_local": video,
-        "generate_full_report_task": object(), "now_iso": lambda: "synthetic-time",
+        "_full_report_with_heartbeat": object(), "analysis_jobs": analysis_jobs,
     })
     queues = [SimpleNamespace(tasks=[], add_task=None) for _ in range(2)]
     for queue in queues:
@@ -141,7 +169,7 @@ def ready_case():
 
 
 def provider_case():
-    fn = load_function("physical_match_reconstruction.py", "_safe_provider", {})
+    fn = load_function("physical_match_reconstruction.py", "_safe_provider", {"time": time})
 
     def fail(*args):
         raise RuntimeError("synthetic reader failure")
@@ -159,6 +187,9 @@ async def storage_failure_case():
 
     fn = load_function("fix10a_runtime.py", "run", {
         "VERSION": 2, "_utc_now": lambda: "synthetic-time", "time": time,
+        "threading": threading,
+        "unified_analysis_engine": unified_analysis_engine,
+        "_compact_physical_result": lambda r: r,
         "asyncio": asyncio, "logger": logging.getLogger("audit"),
         "_persist_fix10a_fields": persist, "support_vision_enabled": lambda: False,
         "physical_match_reconstruction": SimpleNamespace(reconstruct_physical_match=lambda *args, **kwargs: {
@@ -184,14 +215,15 @@ async def main():
         "support_provider_failure": provider_case(),
         "trace_storage_failure": await storage_failure_case(),
     }
-    assert result["active_watchdog"]["jobs_scheduled"] == 1
-    assert result["active_watchdog_at_retry_limit"]["result_status"] == "failed"
-    assert result["parallel_generate_requests"]["queued_jobs"] == 2
-    assert result["pipeline_stage"]["returned_stage"] is None
-    assert result["partial_evidence_stats"]["displayed_stat_line"] == "0 goals · 0 assists · 0 shots"
+    assert result["active_watchdog"]["jobs_scheduled"] == 0
+    assert result["active_watchdog_at_retry_limit"]["result_status"] == "generating"
+    assert result["parallel_generate_requests"]["queued_jobs"] == 1
+    assert result["pipeline_stage"]["returned_stage"] == "transcode_start"
+    assert result["partial_evidence_stats"]["displayed_stat_line"] is None
+    assert result["partial_evidence_stats"]["stats_available"] is False
     assert result["empty_canonical_readiness"]["zero_accepted_events_ready"] is True
     assert result["support_provider_failure"]["reader_exception_result"] is None
-    assert result["trace_storage_failure"]["candidate_returned"] is False
+    assert result["trace_storage_failure"]["candidate_returned"] is True
     print(json.dumps(result, indent=2))
 
 

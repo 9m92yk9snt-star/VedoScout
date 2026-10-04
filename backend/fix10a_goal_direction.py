@@ -28,6 +28,7 @@ VERSION = 1
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
 MAX_GOAL_REVIEWS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "16"))
+MAX_GOAL_CLARIFICATIONS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT", "4"))
 MIN_FIELD_SIDE_FRAMES = 2
 GEOMETRY_NEAR_MS = 500
 BALL_ROW_NEAR_MS = 80
@@ -183,36 +184,49 @@ class GoalDirectionProvider:
             MAX_GOAL_REVIEWS_PER_REPORT if max_reviews is None else max_reviews
         ))
         self.calls = 0
+        self.clarification_calls = 0
+        self.max_clarifications = max(0, MAX_GOAL_CLARIFICATIONS_PER_REPORT)
         self._cache = {}
 
     def __call__(self, window: dict, strike: dict):
         if self.base_provider is None:
             return None
         strike_ms = int(strike.get("media_ms")) if isinstance(strike, dict) and _num(strike.get("media_ms")) else None
-        window_id = str(window.get("dense_window_id") or "") if isinstance(window, dict) else ""
-        cache_key = (window_id, strike_ms)
+        scene_id = str((strike or {}).get("scene_id") or (window or {}).get("scene_id") or "")
+        # Geometry is about the same physical ball at a media instant, not a
+        # window-local track ID. Overlap must not spend another review budget.
+        start_ms = max(int((window or {}).get("start_ms") or 0), (strike_ms or 0) - 150)
+        end_ms = min(int((window or {}).get("end_ms") or (strike_ms or 0) + 2600), (strike_ms or 0) + 2600)
+        cache_key = (scene_id or str((window or {}).get("dense_window_id") or ""), strike_ms, start_ms, end_ms)
         if cache_key in self._cache:
             return self._cache[cache_key]
-        if self.calls >= self.max_reviews:
+        clarification = (strike or {}).get("_review_lane") == "CLARIFICATION"
+        exhausted = (self.clarification_calls >= self.max_clarifications if clarification
+                     else self.calls >= self.max_reviews)
+        budget_reason = "GOAL_CLARIFICATION_BUDGET_EXHAUSTED" if clarification else "GOAL_REVIEW_BUDGET_EXHAUSTED"
+        if exhausted:
             result = {
                 "status": "UNRESOLVED",
                 "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
                 "line_by_ms": [],
                 "field_side_status": "UNRESOLVED",
                 "field_side_by_ms": [],
-                "reason": "GOAL_REVIEW_BUDGET_EXHAUSTED",
+                "reason": budget_reason,
                 "visual_crossing_audit": {
                     "status": "UNRESOLVED", "confidence": "low",
-                    "reason": "GOAL_REVIEW_BUDGET_EXHAUSTED",
+                    "reason": budget_reason,
                 },
             }
-            self._cache[cache_key] = result
             return result
-        self.calls += 1
+        if clarification:
+            self.clarification_calls += 1
+        else:
+            self.calls += 1
         try:
             base = self.base_provider(window, strike)
         except Exception:
-            base = None
+            base = {"status": "UNRESOLVED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
+                    "reason": "goal_geometry_reader_error", "line_by_ms": []}
         if not isinstance(base, dict):
             self._cache[cache_key] = base
             return base

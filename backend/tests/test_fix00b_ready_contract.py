@@ -326,7 +326,7 @@ def test_watchdog_query_covers_new_states(monkeypatch):
     monkeypatch.setattr(server, "db", SimpleNamespace(reports=fake))
     asyncio.run(server._sweep_stuck_full_reports(include_fresh=True))
     q = fake.last_find_query
-    assert set(q["full_report_status"]["$in"]) == {"generating", "verifying", "finalizing"}
+    assert set(q["full_report_status"]["$in"]) == {"generating", "verifying", "finalizing", "awaiting_confirmation"}
 
 
 # ── TEST 9 supplement: no early ready write inside the pipeline body ─────

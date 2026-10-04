@@ -1,5 +1,9 @@
 # Gates i analyseforløbet: formål, rækkefølge og live-blokeringer
 
+Status efter audit: [implementerede FIX12-rettelser](FIX12_ANALYSIS_PIPELINE_FIXES.md).
+Denne gateoversigt bevarer de historiske live-fund; de tilhørende scripts
+kontrollerer nu rettelserne i det aktuelle checkout.
+
 Undersøgt 4. oktober 2026 UTC / 5. oktober dansk tid. Supplerer
 [pipeline-auditten](ANALYSIS_PIPELINE_AUDIT.md). Ingen produktrettelser,
 merge/deploy, nye modelkald eller produktionswrites i denne udvidelse.

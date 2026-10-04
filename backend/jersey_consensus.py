@@ -13,7 +13,6 @@ VERSION = 1
 MIN_TEMPORAL_SEPARATION_MS = 120
 MIN_BOX_AREA = 0.008
 MAX_REVIEW_FRAMES = 5
-MIN_REVIEW_FRAMES = 3
 VERIFY_MIN_AGREEING_FRAMES = 2
 VERIFY_MIN_POSTERIOR = 0.70
 VERIFY_MIN_MARGIN = 0.25
@@ -90,7 +89,7 @@ def _track_priority(touch_graph: dict | None) -> dict[str, tuple[int, int]]:
 
 
 def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> list[dict]:
-    """Choose 3–5 clear/larger, temporally separated crops per involved track."""
+    """Choose up to five clear, temporally separated crops per involved track."""
     involved = set(_involved_tracks(touch_graph))
     if not involved:
         return []
@@ -140,8 +139,8 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
             chosen.append(row)
             if len(chosen) >= MAX_REVIEW_FRAMES:
                 break
-        # Fewer than three clear frames is allowed as supporting evidence; the
-        # deterministic consensus will simply refuse VERIFIED status.
+        # One clear frame is supporting evidence; verification requires at
+        # least two independent agreeing frames, regardless of crop reuse.
         chosen.sort(key=lambda row: int(row["media_ms"]))
         for index, row in enumerate(chosen):
             requests.append({
@@ -174,7 +173,19 @@ def aggregate_jersey_votes(votes) -> dict:
             "weight": _CONF_WEIGHT[confidence] if number is not None else 0.0,
             "reason": str(vote.get("reason") or "")[:160],
         })
-    readable = [v for v in cleaned if v["readable"] and v["number"] is not None]
+    by_frame = {}
+    for vote in cleaned:
+        if vote["readable"] and vote["number"] is not None and vote["media_ms"] is not None:
+            by_frame.setdefault(vote["media_ms"], []).append(vote)
+    readable = []
+    for media_ms, rows in sorted(by_frame.items()):
+        # Re-reading/caching the same pixels is not independent evidence.
+        # Conflicting reads of one frame cannot verify either number.
+        if len({row["number"] for row in rows}) != 1:
+            continue
+        if readable and media_ms - readable[-1]["media_ms"] < MIN_TEMPORAL_SEPARATION_MS:
+            continue
+        readable.append(max(rows, key=lambda row: row["weight"]))
     if not readable:
         return {
             "version": VERSION, "status": "UNKNOWN", "number": None,
@@ -216,6 +227,7 @@ def aggregate_jersey_votes(votes) -> dict:
         "number": top_number if verified else None,
         "leading_number": top_number,
         "posterior": {k: round(v, 4) for k, v in ordered},
+        "confidence_method": "weighted_frame_support_not_calibrated_probability",
         "top_posterior": round(top_prob, 4),
         "margin": round(margin, 4),
         "agreeing_frames": agreeing,

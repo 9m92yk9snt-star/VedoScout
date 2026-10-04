@@ -534,7 +534,10 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             if continuity < CONTINUITY_SIGNAL_MIN:
                 rejection_reasons.append("PLAYER_TEMPORAL_CONTINUITY_WEAK")
             if not exact_time:
-                rejection_reasons.append("CONTACT_TIME_NOT_EXACT_PROOF")
+                if ball.get("time_authority") != "ACTUAL_MEDIA_PTS" or cur_frame.get("used_fallback") is True:
+                    rejection_reasons.append("CONTACT_TIME_NOT_ACTUAL_MEDIA_PTS")
+                if ball.get("proof_eligible") is not True:
+                    rejection_reasons.append("CONTACT_BALL_NOT_PROOF_ELIGIBLE")
             if not association_safe:
                 rejection_reasons.append("PLAYER_ASSOCIATION_UNRESOLVED")
             qualifies_verified = bool(

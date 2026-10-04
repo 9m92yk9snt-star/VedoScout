@@ -95,11 +95,13 @@ def _graph_trigger(frame: dict, previous: dict | None) -> tuple[bool, list[str]]
     if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
         return False, []
     target = frame.get("global_target") if isinstance(frame.get("global_target"), dict) else {}
-    if str(target.get("status") or "UNRESOLVED") not in {"VERIFIED", "HYPOTHESES"}:
+    if str(target.get("status") or "UNRESOLVED") not in {"VERIFIED", "HYPOTHESES", "UNRESOLVED"}:
         return False, []
     ids = _target_ids(frame)
     if not ids:
         return False, []
+    # An explicit identity candidate may open a diagnostic replay even before
+    # identity is proved. Replay never changes GLOBAL_TARGET or accepts events.
 
     reasons = []
     possession = frame.get("possession") if isinstance(frame.get("possession"), dict) else {}

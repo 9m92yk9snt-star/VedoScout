@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import time
+import threading
 from pathlib import Path
 
 import event_trace
@@ -20,6 +21,7 @@ import fix10a_goal_direction
 import fix10a_vision_providers
 import fix10b_runtime
 import physical_match_reconstruction
+import unified_analysis_engine
 
 logger = logging.getLogger("elite-scout")
 
@@ -68,6 +70,7 @@ def _compact_physical_result(result: dict | None) -> dict:
         "unresolved_reasons": row.get("unresolved_reasons") or [],
         "recall_coverage": row.get("recall_coverage") or {},
         "metrics": row.get("metrics") or {},
+        "audit_storage_complete": row.get("audit_storage_complete"),
         "dense_traces_persisted_in_mongo": False,
         "mode": "production",
         "canonical_authority": False,
@@ -138,7 +141,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
         if isinstance(result.get("sequence_analysis"), dict)
         else {}
     )
-    if result.get("status") != "ok" or sequence.get("coverage_complete") is not True:
+    if not (result.get("status") == "ok" and sequence.get("coverage_complete") is True
+            or unified_analysis_engine.can_run_physical(result)):
         logger.info(
             "[fix10a] %s: production SKIP reason=UNIFIED_RESULT_NOT_PRODUCTION_READY",
             report_id,
@@ -163,6 +167,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
         "fix10a_error": None,
         "fix10a_canonical_authority": False,
         "fix10a_reconciliation_authority": "FIX10B",
+        "fix10a_trace_manifest": [],
+        "fix10a_completed_windows": 0,
     })
     logger.info("[fix10a] %s: production START", report_id)
 
@@ -205,28 +211,78 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                     "role_provider": bool(role_evidence_provider),
                 })
 
-        physical = await asyncio.to_thread(
-            physical_match_reconstruction.reconstruct_physical_match,
-            str(video_path),
-            result.get("sequence_plan") or {},
-            sequence,
-            result.get("scene_graph") or {},
-            result.get("identity_authority") or {},
-            jersey_vote_provider,
-            source_video=source_video or {},
-            goal_geometry_provider=goal_geometry_provider,
-            role_evidence=role_evidence or {},
-            role_evidence_provider=role_evidence_provider,
-        )
-
-        fix10b_candidate = fix10b_runtime.build_candidate(result, physical)
-
         manifests = []
-        for trace in physical.get("traces") or []:
-            if isinstance(trace, dict):
-                manifests.append(
-                    await _persist_trace(report_id, trace, r2_storage, local_dir)
-                )
+        storage_errors = []
+        pending = []
+        emitted = set()
+        accepting = threading.Event()
+        accepting.set()
+        loop = asyncio.get_running_loop()
+
+        async def publish_trace(trace):
+            manifest = None
+            try:
+                manifest = await _persist_trace(report_id, trace, r2_storage, local_dir)
+            except Exception as exc:
+                error = {"trace_id": trace.get("trace_id"), "error_type": type(exc).__name__}
+                storage_errors.append(error)
+                logger.exception("[fix10a] %s: trace storage failed; preserving reconstructed evidence", report_id)
+                if local_dir is not None:
+                    try:
+                        manifest = await _persist_trace(report_id, trace, None, local_dir)
+                        manifest["durable_storage_failed"] = True
+                    except Exception as local_exc:
+                        error["local_error_type"] = type(local_exc).__name__
+            if manifest is not None:
+                manifests.append(manifest)
+                if db is not None:
+                    try:
+                        await db.reports.update_one({"id": report_id}, {
+                            "$push": {"fix10a_trace_manifest": manifest},
+                            "$max": {"fix10a_completed_windows": len(manifests)},
+                        })
+                    except Exception as exc:
+                        storage_errors.append({"trace_id": trace.get("trace_id"),
+                                               "error_type": type(exc).__name__, "stage": "manifest_persistence"})
+
+        def completed_trace(trace):
+            if not accepting.is_set():
+                return
+            emitted.add(trace.get("trace_id"))
+            # Never block the CV worker waiting for an upload on the same
+            # executor: otherwise concurrent runs could exhaust its threads.
+            pending.append(asyncio.run_coroutine_threadsafe(publish_trace(trace), loop))
+
+        try:
+            physical = await asyncio.to_thread(
+                physical_match_reconstruction.reconstruct_physical_match,
+                str(video_path), result.get("sequence_plan") or {}, sequence,
+                result.get("scene_graph") or {}, result.get("identity_authority") or {}, jersey_vote_provider,
+                source_video=source_video or {}, goal_geometry_provider=goal_geometry_provider,
+                role_evidence=role_evidence or {}, role_evidence_provider=role_evidence_provider,
+                trace_callback=completed_trace,
+            )
+            await asyncio.gather(*(asyncio.wrap_future(future) for future in pending))
+            # Compatibility for injected/older reconstructors that return
+            # traces without invoking the incremental callback.
+            for trace in physical.get("traces") or []:
+                if isinstance(trace, dict) and trace.get("trace_id") not in emitted:
+                    await publish_trace(trace)
+        finally:
+            accepting.clear()
+            for future in pending:
+                if not future.done():
+                    future.cancel()
+
+        unpersisted = [m for m in manifests if m.get("storage") == "unpersisted"]
+        storage_errors.extend({"trace_id": m.get("trace_id"), "error_type": "StorageUnavailable"}
+                              for m in unpersisted)
+        physical["audit_storage_complete"] = not storage_errors
+        if storage_errors:
+            physical["status"] = "partial"
+        # Storage degradation changes coverage, never discards a completed
+        # candidate or silently claims that all audit artifacts were delivered.
+        fix10b_candidate = fix10b_runtime.build_candidate(result, physical)
 
         compact = _compact_physical_result(physical)
         status = str(physical.get("status") or "unknown")
@@ -240,6 +296,10 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
             "fix10a_elapsed_seconds": elapsed,
             "fix10a_physical_summary": compact,
             "fix10a_trace_manifest": manifests,
+            "fix10a_completed_windows": len(manifests),
+            "fix10a_trace_storage_status": "partial" if storage_errors else "ok",
+            "fix10a_trace_storage_errors": storage_errors,
+            "fix10a_sequence_contract_complete": sequence.get("coverage_complete") is True,
             "fix10a_supporting_vision": support_mode,
             "fix10a_fix10b_summary": fix10b_candidate.get("summary") or {},
             "fix10a_error": None,

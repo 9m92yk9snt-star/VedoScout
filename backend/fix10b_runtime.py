@@ -17,7 +17,8 @@ import scoring_evidence_coverage
 VERSION = 2
 
 
-def _scoring_scan(canonical: dict, sequence_analysis: dict, physical_result: dict | None = None) -> dict:
+def _scoring_scan(canonical: dict, sequence_analysis: dict, physical_result: dict | None = None,
+                  scene_graph: dict | None = None) -> dict:
     unresolved = [
         u for u in (canonical or {}).get("unresolved") or [] if isinstance(u, dict)
     ]
@@ -38,7 +39,7 @@ def _scoring_scan(canonical: dict, sequence_analysis: dict, physical_result: dic
     semantic_complete = (sequence_analysis or {}).get("coverage_complete") is True
     physical_scan_complete = recall.get("scan_complete") is True
     physical_execution_complete = recall.get("verification_complete") is True
-    evidence_coverage = scoring_evidence_coverage.assess(physical_result)
+    evidence_coverage = scoring_evidence_coverage.assess(physical_result, scene_graph)
     physical_verification_complete = bool(
         physical_execution_complete and evidence_coverage["complete"]
     )
@@ -120,7 +121,7 @@ def reconcile_unified_result(
     )
     timeline = canonical_output_authority.project_timeline(canonical)
     evidence = canonical_output_authority.build_event_native_evidence(canonical)
-    scoring = _scoring_scan(canonical, sequence, physical_result)
+    scoring = _scoring_scan(canonical, sequence, physical_result, source.get("scene_graph"))
 
     metrics = deepcopy(source.get("metrics") or {})
     cmetrics = (
