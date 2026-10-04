@@ -3,6 +3,13 @@
 Undersøgt 4. oktober 2026. Live-rapport:
 `5df7c569-b6af-4f93-8b2a-c8c134baf2a6`, spiller #15.
 
+Udvidet med [gate- og modelaudit](ANALYSIS_GATES_AUDIT.md): 40 gatefamilier,
+ni nye adfærdskontroller og genberegning af alle 56 live-reviewbeslutninger.
+`CONTACT_TIME_NOT_EXACT_PROOF` ved 23.68/30.83 s skyldes i de gemte kandidater
+predicted/non-proof bold, selv med korrekt `ACTUAL_MEDIA_PTS`; reasonen
+beviser ikke en tidsbasefejl. Retnings-/boldslutgates ændrer ingen af de 56
+gemte udfald. Produktrettelser afventer fortsat afsluttet audit/validering.
+
 ## Konklusion og afgrænsning
 
 FIX10A, FIX10B og FIX11 blev brugt i den konkrete live-rapport. Der findes
