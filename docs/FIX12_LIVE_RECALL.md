@@ -66,7 +66,7 @@ clustering with different process RNG seeds. The small kit fixture contains
 only anonymous Lab color pairs: no video, user data, tokens or report payload.
 
 Historical regression: `tests/test_fix*.py` plus
-`tests/test_unified_analysis_engine.py`: **938 passed**, five existing
+`tests/test_unified_analysis_engine.py`: **939 passed**, five existing
 deprecation warnings. Tests use the CI no-network Emergent stubs and placeholder
 configuration; this is not an LLM validation. Local runtime: Python 3.12.14,
 OpenCV 5.0.0, NumPy 2.5.3. CI uses its pinned dependencies independently.
@@ -82,9 +82,9 @@ outcome evidence has not been silently upgraded or rewritten.
 
 The fresh full local identity replay at the unchanged production default of
 5 Hz, using the original video and recovered taps, still has `reid_failed` in
-the shot scene and `ambiguous_duel` around the goal (29,899–32,932 ms). The non-scoring
-49.44-second scene also becomes unresolved; this is a recall limitation, not
-proof of the required negative scoring result. These are unresolved acceptance
+the shot scene and `ambiguous_duel` around the goal (29,899–32,932 ms). The
+49.44-second assist scene also becomes unresolved; this is a recall limitation.
+These are unresolved acceptance
 failures. Local tests cannot replace independent identity and goal/save evidence.
 
 An exploratory 10 Hz replay initially produced a falsely reassuring target
@@ -97,6 +97,17 @@ independence review before any rate change.
 
 ## Remaining end-to-end acceptance
 
+The user's clarification on 2026-10-04 supersedes the earlier negative assist
+expectation at 49.44 s. The reference chain there is **#7 -> #15 receives and
+turns -> #15 passes to #10 -> #10 scores**. Expected totals are **one target
+goal, one saved target shot and three target assists**. The player numbers and
+chain are user-supplied reference annotations, not newly verified model outputs.
+An assist to #15 must not also be counted as a goal scored by #15.
+The synthetic reconciliation regression covers an incoming pass followed by
+the target's receive/turn/pass and a verified teammate goal at this reference
+time. The no-goal-evidence rejection test remains generic; neither test
+establishes the live video's missing proof or changes detection thresholds.
+
 Use the original video and recovered taps on this branch with the project's
 actual model integration. No real model credentials were available locally.
 Run all readers and canonical reconciliation afresh; replaying old outcomes
@@ -108,7 +119,7 @@ unit regressions pass.
 | 23.68 s | target shot, saved | Pending; identity replay still unresolved |
 | 30.83 s | target goal | Pending; default-rate identity replay remains ambiguous |
 | 43.19 s | target assist with proven teammate goal | Pending independent outcome review |
-| 49.44 s | no target assist | Must remain rejected in the new run |
+| 49.44 s | target assist: #7 -> #15 -> #10 goal | Pending; identity and complete scoring chain unresolved |
 | 56.44 s | target assist with proven teammate goal | Review blocker improved; assist still unverified |
 
 Preserve uncertainty when evidence is insufficient. Further identity recovery
