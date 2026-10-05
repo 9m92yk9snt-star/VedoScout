@@ -70,6 +70,8 @@ def _compact_physical_result(result: dict | None) -> dict:
         "trace_summaries": row.get("trace_summaries") or [],
         "unresolved_reasons": row.get("unresolved_reasons") or [],
         "recall_coverage": row.get("recall_coverage") or {},
+        "action_inspection_plan": row.get("action_inspection_plan") or {},
+        "goal_review_plan": row.get("goal_review_plan") or {},
         "metrics": row.get("metrics") or {},
         "audit_storage_complete": row.get("audit_storage_complete"),
         "dense_traces_persisted_in_mongo": False,
@@ -129,7 +131,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
               db, r2_storage=None, source_video: dict | None = None,
               local_dir=None, jersey_vote_provider=None,
               goal_geometry_provider=None, role_evidence=None,
-              role_evidence_provider=None, vision_api_key: str | None = None) -> dict:
+              role_evidence_provider=None, action_evidence_provider=None,
+              vision_api_key: str | None = None) -> dict:
     """Run production FIX10A and return a proof-gated FIX10B candidate.
 
     The call is awaited by the main report pipeline. If reconstruction fails,
@@ -180,6 +183,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
             "goal_provider": bool(goal_geometry_provider),
             "goal_direction_provider": False,
             "role_provider": bool(role_evidence_provider),
+            "action_provider": bool(action_evidence_provider),
         }
         if support_vision_enabled():
             api_key = str(vision_api_key or os.environ.get("EMERGENT_LLM_KEY") or "")
@@ -201,6 +205,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                     )
                 if role_evidence_provider is None:
                     role_evidence_provider = bundle.role_evidence_provider
+                if action_evidence_provider is None:
+                    action_evidence_provider = getattr(bundle, "action_evidence_provider", None)
                 support_mode.update({
                     "enabled": True,
                     "jersey_provider": bool(jersey_vote_provider),
@@ -210,6 +216,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                         fix10a_goal_direction.GoalDirectionProvider,
                     ),
                     "role_provider": bool(role_evidence_provider),
+                    "action_provider": bool(action_evidence_provider),
                 })
 
         manifests = []
@@ -276,6 +283,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                 result.get("scene_graph") or {}, result.get("identity_authority") or {}, jersey_vote_provider,
                 source_video=source_video or {}, goal_geometry_provider=goal_geometry_provider,
                 role_evidence=role_evidence or {}, role_evidence_provider=role_evidence_provider,
+                action_evidence_provider=action_evidence_provider,
                 trace_callback=completed_trace,
             )
             await asyncio.gather(*(asyncio.wrap_future(future) for future in pending))

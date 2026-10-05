@@ -1,9 +1,13 @@
-"""Offline regression replay of saved evidence. No DB, storage writes or models.
+"""Read-only regression replay of saved evidence; never connects to a database.
 
 Runs physical contacts/identity/roles and canonical reconciliation from the
 exported observations. Optional --video-detail decodes the same hash-verified
 video and adds ground-band ball detections; it does not run a new model service.
 Missing saved support observations remain missing, never replaced by stubs.
+--support-vision explicitly enables fresh pixel/jersey/role/goal reviews using
+EMERGENT_LLM_KEY already in the operator's environment. No credentials are read
+from the ZIP and no production report is rewritten. --output-dir checkpoints
+the new traces, canonical document, corrected report and a checksummed ZIP.
 """
 import argparse
 from copy import deepcopy
@@ -13,6 +17,7 @@ from pathlib import Path
 import sys
 import tempfile
 import zipfile
+import os
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import ball_trajectory
@@ -31,9 +36,18 @@ import shot_outcome_engine
 import touch_graph
 import unified_identity_authority
 import verified_stats
+import action_evidence_review
+import fix10a_vision_providers
+import physical_match_reconstruction as pmr
+import video_timebase
 
 
-def replay(path, video_detail=False):
+def replay(path, video_detail=False, support_vision=False, output_dir=None):
+    api_key = os.environ.get("EMERGENT_LLM_KEY", "") if support_vision else ""
+    if support_vision and not api_key:
+        raise RuntimeError("--support-vision requires EMERGENT_LLM_KEY already in the process environment")
+    if support_vision and fix10a_vision_providers.LlmChat is None:
+        raise RuntimeError("The supporting vision SDK is unavailable")
     z = zipfile.ZipFile(path)
     for row in z.read("SHA256SUMS").decode().splitlines():
         digest, name = row.split(None, 1)
@@ -43,30 +57,47 @@ def replay(path, video_detail=False):
     authority = report["unified_identity_authority"]
     traces = [json.loads(z.read(name)) for name in z.namelist() if name.startswith("traces/") and name.endswith(".json")]
     physical, requests = {"traces": [], "status": "ok"}, []
+    inspection_plan = action_evidence_review.build_plan([t["window"] for t in traces], report["football_sequence_analysis"])
+    bundle = goal_provider = None
     detail_frames = 0
     with tempfile.TemporaryDirectory(prefix="evidence-replay-") as directory:
         cap = detector = None
-        if video_detail:
+        if video_detail or support_vision:
             import cv2
             import cv_detect
             cv2.setNumThreads(2)
             video_name = next(name for name in z.namelist() if name.startswith("video/") and name.endswith(".mp4"))
             video_path = Path(directory) / "source.mp4"
             video_path.write_bytes(z.read(video_name))
-            cap = cv2.VideoCapture(str(video_path))
-            detector = cv_detect.PersonDetector()
-            if not detector.ok:
-                raise RuntimeError("Local person/ball detector unavailable")
+            if support_vision:
+                bundle = fix10a_vision_providers.build_shadow_providers(api_key, f"readonly-{report['id']}", str(video_path))
+                goal_provider = fix10a_goal_direction.wrap_goal_geometry_provider(
+                    bundle.goal_geometry_provider, api_key, f"readonly-{report['id']}", str(video_path))
+            if video_detail:
+                cap = cv2.VideoCapture(str(video_path))
+                detector = cv_detect.PersonDetector()
+                if not detector.ok:
+                    raise RuntimeError("Local person/ball detector unavailable")
         try:
             for original in traces:
                 frames = deepcopy(original["decoded_frames"])
+                inspections, inspection_requests = [], []
+                if bundle is not None:
+                    for job in inspection_plan["jobs"]:
+                        if job["dense_window_id"] != original["window"]["dense_window_id"] or not job["selected"]:
+                            continue
+                        observed = bundle.action_evidence_provider(str(video_path), job, frames)
+                        applied = action_evidence_review.apply_observations(frames, observed, job["inspection_id"])
+                        frames = applied["frames"]
+                        inspection_requests.extend(applied["jersey_requests"])
+                        inspections.append({**job, **observed, "added_ball_candidates": applied["added_ball_candidates"],
+                                            "binding_rejections": applied["binding_rejections"]})
                 if cap is not None:
                     for f in frames:
                         if f.get("ball_candidates"):
                             continue
-                        cap.set(cv2.CAP_PROP_POS_MSEC, f["media_ms"])
-                        ok, image = cap.read()
-                        if not ok:
+                        ok, image, actual_s = video_timebase.read_frame_at(cap, f["media_ms"] / 1000, fps=cap.get(cv2.CAP_PROP_FPS))
+                        if not ok or int(round(actual_s * 1000)) != f["media_ms"]:
                             continue
                         _people, balls = dense_track_refinement._detect_dense_people_and_ball(detector, image)
                         detailed = [b for b in balls if b.get("source") == "NATIVE_GROUND_BAND_DETECTOR"]
@@ -86,6 +117,10 @@ def replay(path, video_detail=False):
                 graph = touch_graph.build_touch_graph(contacts, authority, frames)
                 votes = {tid: row.get("votes") or [] for tid, row in original["jersey_consensus"].items()
                          if isinstance(row, dict)}
+                if bundle is not None:
+                    fresh = bundle.jersey_vote_provider(str(video_path), inspection_requests)
+                    for track, rows in fresh.items():
+                        votes[track] = [*(votes.get(track) or []), *rows]
                 jersey = jersey_consensus.apply_jersey_consensus(frames, graph, votes)
                 frames, graph = jersey["window_evidence"], jersey["touch_graph"]
                 graph = unified_identity_authority.apply_verified_jersey_handoff(authority, frames, graph, jersey["consensus_by_track"])
@@ -94,16 +129,17 @@ def replay(path, video_detail=False):
                 graph = contact_role_resolver.apply_contact_roles(graph, contacts, dense_frames=frames, ball_trajectory=trajectory)
                 strikes = [*shot_outcome_engine.find_strike_releases(graph, trajectory),
                            *shot_outcome_engine.find_scoring_control_contacts(graph)]
+                tracks = {s["strike_id"]: ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
+                    frames, s.get("active_ball_anchor"), s.get("scene_id")) or trajectory for s in strikes}
+                interventions = {s["strike_id"]: post_strike_intervention.detect_post_strike_intervention(
+                    s, frames, tracks[s["strike_id"]]) for s in strikes}
+                fresh_roles = bundle.role_evidence_provider(str(video_path), original["window"], strikes, graph, frames,
+                    list(interventions.values())) if bundle is not None else {}
                 outcomes = []
                 for strike in strikes:
                     window = original["window"]
-                    import physical_match_reconstruction as pmr
                     review = pmr._goal_clarification_eligibility(strike, strikes, graph, window)
-                    if review.get("eligible"):
-                        requests.append({"window": window, "strike": strike, "review": review})
-                    anchored = ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
-                        frames, strike.get("active_ball_anchor"), strike.get("scene_id"))
-                    trajectory_used = anchored or trajectory
+                    trajectory_used = tracks[strike["strike_id"]]
                     old = min(original["outcome_evidence"], key=lambda o: abs(o["media_ms"] - strike["media_ms"]), default=None)
                     same_contact = bool(old and abs(old["media_ms"] - strike["media_ms"]) <= 50
                                         and old.get("strike_actor_track_id") == strike.get("player_track_id"))
@@ -111,17 +147,53 @@ def replay(path, video_detail=False):
                     roles = {}
                     if same_contact and old.get("intervention_role", {}).get("status") == "VERIFIED":
                         roles[old.get("intervention", {}).get("player_track_id")] = old["intervention_role"]
-                    a7 = post_strike_intervention.detect_post_strike_intervention(strike, frames, trajectory_used)
+                    a7 = interventions[strike["strike_id"]]
+                    roles.update(fresh_roles)
+                    if review.get("eligible"):
+                        requests.append({"window": window, "strike": strike, "review": review, "touch_graph": graph,
+                                         "track": trajectory_used, "roles": roles, "intervention": a7,
+                                         "trace_id": original["trace_id"], "outcome_index": len(outcomes)})
                     outcome = shot_outcome_engine.reconstruct_post_strike_outcome(strike, trajectory_used, graph,
                                                                                  goal_geometry=geometry, role_evidence=roles)
                     outcome = post_strike_intervention.apply_intervention_evidence(outcome, a7, roles)
                     outcome = fix10a_goal_direction.apply_direction_gate(outcome, trajectory_used, geometry)
                     outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, trajectory_used)
                     outcome["goal_review_eligibility"] = pmr._goal_review_eligibility(strike, strikes, graph)
+                    outcome["goal_review_decision"] = review
                     outcomes.append(outcome)
                 physical["traces"].append({**original, "decoded_frames": frames, "touch_graph": graph,
                                             "contacts": contacts, "ball_trajectory": trajectory,
+                                            "action_inspections": inspections,
+                                            "jersey_model_audits": jersey.get("model_audits_by_track") or {},
                                             "strike_evidence": strikes, "outcome_evidence": outcomes})
+                physical["traces"][-1]["provider_adapter_errors"] = sorted(set(
+                    [*(original.get("provider_adapter_errors") or []), *pmr._adapter_diagnostics([inspections, fresh_roles])]))
+                if output_dir is not None:
+                    checkpoint = Path(output_dir)
+                    checkpoint.mkdir(parents=True, exist_ok=True)
+                    (checkpoint / "physical_replay.json").write_text(json.dumps(physical, indent=2))
+            ordered = goal_review_scheduler.ordered_requests(requests, report["football_sequence_analysis"])
+            if goal_provider is not None:
+                by_id = {t["trace_id"]: t for t in physical["traces"]}
+                for rank, job in enumerate(ordered):
+                    geometry = goal_provider(job["window"], job["strike"])
+                    outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
+                        job["strike"], job["track"], job["touch_graph"], goal_geometry=geometry, role_evidence=job["roles"])
+                    outcome = post_strike_intervention.apply_intervention_evidence(outcome, job["intervention"], job["roles"])
+                    outcome = fix10a_goal_direction.apply_direction_gate(outcome, job["track"], geometry)
+                    outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, job["track"])
+                    outcome["goal_review_decision"] = {**job["review"], "report_priority_rank": rank}
+                    outcome["goal_review_eligibility"] = pmr._goal_review_eligibility(job["strike"],
+                        by_id[job["trace_id"]]["strike_evidence"], job["touch_graph"])
+                    by_id[job["trace_id"]]["outcome_evidence"][job["outcome_index"]] = outcome
+                    trace = by_id[job["trace_id"]]
+                    trace["provider_adapter_errors"] = sorted(set([*trace["provider_adapter_errors"], *pmr._adapter_diagnostics(geometry)]))
+                    if output_dir is not None:
+                        (Path(output_dir) / "physical_replay.json").write_text(json.dumps(physical, indent=2))
+            if output_dir is not None:
+                checkpoint = Path(output_dir)
+                checkpoint.mkdir(parents=True, exist_ok=True)
+                (checkpoint / "physical_replay.json").write_text(json.dumps(physical, indent=2))
         finally:
             if cap is not None:
                 cap.release()
@@ -130,10 +202,28 @@ def replay(path, video_detail=False):
               "identity_authority": authority, "scene_graph": report["football_scene_graph"]}
     updated = fix10b_runtime.reconcile_unified_result(source, physical)
     canonical = updated["canonical_events"]
-    repaired = report_fact_authority.apply(report["full_report"], canonical)
-    ordered = goal_review_scheduler.ordered_requests(requests, source["sequence_analysis"])
-    selected_clarifications = [j for j in ordered if j["review"]["lane"] == "CLARIFICATION"][:4]
-    return {"report_id": report["id"], "model_service_calls": 0, "db_writes": 0,
+    coverage = deepcopy(updated["scoring_scan"]["physical_evidence_coverage"])
+    if not report["football_scene_graph"].get("frames"):
+        coverage.update(status="PARTIAL", complete=False)
+        coverage["reasons"] = [*coverage["reasons"], "SOURCE_SCENE_GRAPH_FRAMES_NOT_EXPORTED"]
+    scan = {**updated["scoring_scan"], "physical_evidence_coverage": coverage,
+            "physical_recall_verification_complete": coverage["complete"]}
+    report_input = {**report["full_report"], "canonical_events": canonical,
+                    "analysis_authority": {"output": "FIX09C"}, "_scoring_scan": scan}
+    repaired = verified_stats.apply_verified_stats_authority(report_input)
+    unique = set()
+    selected_clarifications = []
+    for job in ordered:
+        key = job["review"]["physical_review_id"]
+        if job["review"]["lane"] == "CLARIFICATION" and key not in unique:
+            unique.add(key)
+            if len(selected_clarifications) < fix10a_goal_direction.MAX_GOAL_CLARIFICATIONS_PER_REPORT:
+                selected_clarifications.append(job)
+    attempts = {"action_inspections": getattr(bundle, "inspection_calls", 0), "jersey_reads": getattr(bundle, "jersey_calls", 0),
+                "role_reads": getattr(bundle, "role_calls", 0), "goal_reads": getattr(bundle, "goal_calls", 0),
+                "field_side_reads": getattr(goal_provider, "field_side_calls", 0)}
+    result = {"report_id": report["id"], "model_request_attempts": sum(attempts.values()), "db_writes": 0,
+            "support_vision_enabled": support_vision, "support_review_attempts": attempts,
             "native_detail_frames_added": detail_frames,
             "before_counts": report["canonical_events"]["counts"], "after_counts": canonical["counts"],
             "identity_feedback": canonical.get("dense_identity_feedback"),
@@ -142,13 +232,38 @@ def replay(path, video_detail=False):
             "clarifications_selected": [{"scene": j["window"]["scene_id"], "media_ms": j["strike"]["media_ms"]} for j in selected_clarifications],
             "report_fact_authority": repaired["report_fact_authority"],
             "shooting_score_after": repaired.get("technical", {}).get("shooting", {}).get("score"),
-            "coverage": updated["scoring_scan"]["physical_evidence_coverage"],
-            "limitation": "Saved observations only. Newly scheduled support reviews have not been executed. Original weak Step-3 detector proposals are absent."}
+            "coverage": coverage,
+            "inspection_plan": inspection_plan,
+            "replay_backend_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                      for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},
+            "limitation": ("Fresh supporting reviews requested against the exported video; inspect reader statuses and proof before accepting events. "
+                           if support_vision else "Saved observations only. Newly scheduled support reviews have not been executed. ")
+                          + "Original weak Step-3 detector proposals are absent. Replay does not certify full-video completeness."}
+    if output_dir is not None:
+        directory = Path(output_dir)
+        for name, value in [("replay_summary.json", result), ("reviewed_canonical.json", canonical), ("reviewed_full_report.json", repaired)]:
+            (directory / name).write_text(json.dumps(value, indent=2))
+        payloads = {name: (directory / name).read_bytes() for name in
+                    ("physical_replay.json", "replay_summary.json", "reviewed_canonical.json", "reviewed_full_report.json")}
+        payloads["source_reference.json"] = json.dumps({"report_id": report["id"],
+            "source_zip_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+            "video_sha256": (report.get("analysis_run_manifest") or {}).get("source_video_sha256"), "db_writes": 0}).encode()
+        payloads["manifest.json"] = json.dumps({"kind": "READ_ONLY_EVIDENCE_REPLAY", "report_id": report["id"],
+            "db_writes": 0, "files": {name: {"sha256": hashlib.sha256(data).hexdigest(), "size_bytes": len(data)}
+                                       for name, data in payloads.items()}}).encode()
+        checksums = "".join(f"{hashlib.sha256(data).hexdigest()}  {name}\n" for name, data in sorted(payloads.items()))
+        with zipfile.ZipFile(directory / "reviewed-evidence.zip", "w", zipfile.ZIP_DEFLATED) as output:
+            for name, data in payloads.items():
+                output.writestr(name, data)
+            output.writestr("SHA256SUMS", checksums)
+    return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("zip_path", type=Path)
     parser.add_argument("--video-detail", action="store_true")
+    parser.add_argument("--support-vision", action="store_true", help="Use the operator's environment key for fresh bounded reviews; never writes to a DB")
+    parser.add_argument("--output-dir", type=Path, help="Write review checkpoints and a checksummed evidence ZIP to this private directory")
     args = parser.parse_args()
-    print(json.dumps(replay(args.zip_path, args.video_detail), indent=2))
+    print(json.dumps(replay(args.zip_path, args.video_detail, args.support_vision, args.output_dir), indent=2))

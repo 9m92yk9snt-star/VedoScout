@@ -195,6 +195,9 @@ def apply_ball_proof_gate(outcome: dict, ball_trajectory) -> dict:
         direction_gate = row.get("direction_gate") if isinstance(row.get("direction_gate"), dict) else {}
         valid = bool(
             segment.get("source") == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"
+            and (audit.get("active_ball_link") is None or (
+                (audit.get("active_ball_link") or {}).get("status") == "VERIFIED"
+                and _num(audit["active_ball_link"].get("media_ms")) and audit["active_ball_link"]["media_ms"] <= from_ms))
             and segment.get("same_ball_continuity") is True
             and audit.get("proof_ready") is True
             and audit.get("same_ball_continuity") is True

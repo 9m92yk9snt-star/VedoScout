@@ -227,12 +227,14 @@ def test_checksum_tampering_is_detected(case):
 
 def test_source_is_current_allowlisted_and_never_includes_environment(case):
     (case[2] / "backend" / "video_timebase.py").write_text("# current source\n")
+    (case[2] / "backend" / "action_evidence_review.py").write_text("# bounded inspection source\n")
     (case[2] / "backend" / ".env").write_text("PASSWORD=TOPSECRET")
     (case[2] / "backend" / "server.py").write_text(
         'ADMIN_PASSWORD="TOPSECRET"\nasync def generate_full_report_task(report_id):\n    return report_id\n')
     build(case)
     with zipfile.ZipFile(case[3]) as archive:
         assert "source/current/video_timebase.py" in archive.namelist()
+        assert "source/current/action_evidence_review.py" in archive.namelist()
         assert "generate_full_report_task" in archive.read("source/current/server_analysis_functions.txt").decode()
         assert not any(n.endswith(".env") for n in archive.namelist())
         assert all(b"TOPSECRET" not in archive.read(n) for n in archive.namelist())
