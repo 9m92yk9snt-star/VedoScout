@@ -30,7 +30,7 @@ MAX_MODEL_CALLS = 2000
 MAX_AUDIT_BYTES = 64 * 1024 * 1024
 CHUNK = 1024 * 1024
 CONFIG_KEYS = ("IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIMELINE_HZ",
-               "FIX10A_SUPPORT_VISION_ENABLED", "CV_SHADOW_ENABLED", "FIX13_MAX_ACTION_REVIEWS",
+               "FIX10A_SUPPORT_VISION_ENABLED", "CV_SHADOW_ENABLED", "FIX13_MAX_ACTION_REVIEWS", "FIX13_MAX_FEEDBACK_REVIEWS",
                "FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT",
                "FIX10A_SUPPORT_VISION_MODEL", "FIX10A_MAX_JERSEY_READS", "FIX10A_MAX_ROLE_TRACKS",
                "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES")
@@ -43,7 +43,7 @@ SOURCE_MODULES = (
     "physical_match_reconstruction.py", "dense_replay.py", "event_trace.py",
     "ball_trajectory.py", "ball_contact_engine.py", "touch_graph.py",
     "shot_outcome_engine.py", "evidence_authority.py", "full_video_event_recall.py",
-    "action_evidence_review.py", "cross_window_evidence.py", "goal_review_scheduler.py", "contact_role_resolver.py",
+    "action_evidence_review.py", "cross_window_evidence.py", "evidence_feedback.py", "goal_review_scheduler.py", "contact_role_resolver.py",
     "dense_identity_continuity.py", "dense_event_reconciliation.py", "report_fact_authority.py",
     "verified_stats.py", "fix10a_vision_providers.py", "fix10a_goal_direction.py",
     "fix10a_ball_proof_gate.py", "short_occlusion_contact_recovery.py", "post_strike_intervention.py",

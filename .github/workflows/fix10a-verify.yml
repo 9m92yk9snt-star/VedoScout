@@ -85,6 +85,7 @@ jobs:
             backend/physical_match_reconstruction.py \
             backend/action_evidence_review.py \
             backend/cross_window_evidence.py \
+            backend/evidence_feedback.py \
             backend/goal_review_scheduler.py \
             backend/scripts/replay_report_evidence.py \
             backend/open_observation_compat.py \

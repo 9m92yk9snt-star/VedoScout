@@ -8,6 +8,33 @@ claim filter even though no goal had passed the physical proof path.
 
 ## Changes
 
+- After the first physical/outcome pass, select one bounded feedback round
+  from unresolved target outcomes, contacts, missing target ball paths and
+  identity/contact gaps. Narrow the pixel search to at most 350 ms before and
+  700 ms after an observed gap, stopping at cuts, scene/time discontinuities
+  and fallback frames. Select at most one gap per window, distribute priority
+  ties across time, reject identical model frame inputs, and defer excess jobs.
+  Prioritize a missing ball path near a verified target touch; then contact
+  gaps and unresolved verified releases. A receive/control outcome cannot
+  consume the strongest release priority. Existing observation times focus
+  the search among physical gaps, while their event labels remain unused.
+  No human reference times, expected outcomes or target number enter selection.
+  Default feedback budget: four additional pixel reviews, at most 12 images
+  each; `FIX13_MAX_FEEDBACK_REVIEWS=0` disables it and the configurable cap is
+  eight. The original 16-review discovery allowance is preserved. This reserve
+  adds model cost when used; deferred gaps are still unresolved.
+  Reuse the original measured frames instead of re-running dense tracking,
+  then rerun the original ball/contact/jersey/role/outcome gates. Preserve
+  original verified Step-3 contacts and jersey votes with their provenance;
+  duplicate jersey reads at one timestamp cannot count as independent proof.
+  Identical role crops reuse the prior response. Existing goal and clarification
+  budgets cover both rounds without being reset. A recovered pass also reopens
+  the causal gate for an existing downstream recipient in another window.
+  Feedback results cannot open a third round. Failed windows retain their first
+  pass; successful reruns preserve first-pass contacts/outcomes, raw reader
+  audits, old errors and before/after gap counts. Canonical reconciliation runs
+  after these physical results; the retry itself owns no event or score truth.
+
 - Build a shared physical context across overlapping windows before assist
   reconciliation and downstream goal-review scheduling. A join requires the
   same scene, at least two matching actual decoded times spanning 50 ms,

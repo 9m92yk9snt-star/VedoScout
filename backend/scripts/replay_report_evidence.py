@@ -43,6 +43,7 @@ import video_timebase
 
 
 def replay(path, video_detail=False, support_vision=False, output_dir=None):
+    video_path = None
     api_key = os.environ.get("EMERGENT_LLM_KEY", "") if support_vision else ""
     if support_vision and not api_key:
         raise RuntimeError("--support-vision requires EMERGENT_LLM_KEY already in the process environment")
@@ -192,6 +193,17 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                     trace["provider_adapter_errors"] = sorted(set([*trace["provider_adapter_errors"], *pmr._adapter_diagnostics(geometry)]))
                     if output_dir is not None:
                         (Path(output_dir) / "physical_replay.json").write_text(json.dumps(physical, indent=2))
+            physical["traces"], _, feedback_plan = pmr.run_feedback_round(
+                physical["traces"], str(video_path or ""), {}, report["football_sequence_analysis"],
+                report["football_scene_graph"], authority,
+                action_evidence_provider=bundle.action_evidence_provider if bundle is not None else None,
+                jersey_vote_provider=bundle.jersey_vote_provider if bundle is not None else None,
+                role_evidence_provider=bundle.role_evidence_provider if bundle is not None else None,
+                goal_geometry_provider=goal_provider, review_jobs=[{**j, "shot_track": {
+                    "rows": j["track"], "source": "SAVED_REPLAY_TRAJECTORY", "seed_ms": None}} for j in requests])
+            physical["evidence_feedback_plan"] = feedback_plan
+            _, cross_window_context = pmr._apply_cross_window_review_context([], physical["traces"])
+            physical["cross_window_evidence"] = cross_window_context
             if output_dir is not None:
                 checkpoint = Path(output_dir)
                 checkpoint.mkdir(parents=True, exist_ok=True)
@@ -242,6 +254,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
             "coverage": coverage,
             "inspection_plan": inspection_plan,
             "cross_window_evidence": cross_window_context,
+            "evidence_feedback_plan": feedback_plan,
             "replay_backend_sha256": {
                 **{p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                    for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},

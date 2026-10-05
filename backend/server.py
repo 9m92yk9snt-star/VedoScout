@@ -9091,6 +9091,8 @@ async def generate_full_report_task(report_id: str) -> None:
             "goal_reviews_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_REVIEWS_PER_REPORT,
             "goal_clarifications_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_CLARIFICATIONS_PER_REPORT,
             "action_inspections_per_report": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_REVIEWS,
+            "feedback_inspections_per_report": fix10a_runtime.fix10a_vision_providers.evidence_feedback.MAX_FEEDBACK_REVIEWS,
+            "feedback_rounds": 1,
             "action_inspection_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_FRAMES,
             "action_native_neighbor_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES,
         })

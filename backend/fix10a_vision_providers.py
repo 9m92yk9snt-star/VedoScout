@@ -27,6 +27,7 @@ import cv2
 import identity_verify
 import video_timebase
 import action_evidence_review
+import evidence_feedback
 import goal_review_scheduler
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
@@ -879,9 +880,11 @@ class ShadowVisionProviders:
         self.session_prefix = str(session_prefix or "fix10a")
         self._goal_cache = {}
         self._jersey_cache = {}
+        self._role_cache = {}
         self.jersey_calls = 0
         self._inspection_cache = {}
         self.inspection_calls = 0
+        self.feedback_inspection_calls = 0
         self.role_calls = 0
         self.goal_calls = 0
 
@@ -892,7 +895,10 @@ class ShadowVisionProviders:
         cache_key = (str(video_path), job["inspection_id"], tuple(requested))
         if cache_key in self._inspection_cache:
             return deepcopy(self._inspection_cache[cache_key])
-        if self.inspection_calls >= action_evidence_review.MAX_ACTION_REVIEWS:
+        feedback = job.get("phase") == "FEEDBACK"
+        exhausted = self.feedback_inspection_calls >= evidence_feedback.MAX_FEEDBACK_REVIEWS if feedback else \
+            self.inspection_calls - self.feedback_inspection_calls >= action_evidence_review.MAX_ACTION_REVIEWS
+        if exhausted:
             return {"status": "DEFERRED", "reason": "ACTION_INSPECTION_BUDGET_EXHAUSTED", "frames": []}
         if not self.api_key:
             return {"status": "UNAVAILABLE", "reason": "action_pixel_reader_unavailable", "frames": []}
@@ -913,6 +919,7 @@ class ShadowVisionProviders:
             if len(paths) < 2:
                 return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
             self.inspection_calls += 1
+            self.feedback_inspection_calls += int(feedback)
             review = asyncio.run(read_action_pixel_evidence(
                 self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times))
         import dense_track_refinement
@@ -1064,6 +1071,10 @@ class ShadowVisionProviders:
                 if not got:
                     continue
                 actual_ms, frame = got
+                cache_key = (str(video_path), int(actual_ms), tuple(round(float(row["box"][k]), 5) for k in ("x", "y", "w", "h")))
+                if cache_key in self._role_cache:
+                    raw_votes.setdefault(row["track_id"], []).append(deepcopy(self._role_cache[cache_key]))
+                    continue
                 crop = _crop(frame, row["box"], pad_x=0.18, pad_y=0.10)
                 tight = root / f"role_tight_{index:03d}.jpg"
                 context = root / f"role_context_{index:03d}.jpg"
@@ -1074,20 +1085,21 @@ class ShadowVisionProviders:
                     f"{self.session_prefix}-role-{index}",
                     str(tight), str(context),
                 ))
-                job_meta.append((row["track_id"], int(actual_ms)))
+                job_meta.append((row["track_id"], int(actual_ms), cache_key))
             if not jobs:
-                return {}
+                return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
             self.role_calls += len(jobs)
             try:
                 results = asyncio.run(_bounded_gather(jobs, limit=2))
             except Exception:
                 results = [{"role": "UNKNOWN", "confidence": "low",
                             "reason": "role_reader_error"} for _ in job_meta]
-            for (track, actual_ms), result in zip(job_meta, results):
+            for (track, actual_ms, cache_key), result in zip(job_meta, results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "role": "UNKNOWN", "confidence": "low", "reason": "reader_unavailable"
                 }
                 vote["media_ms"] = int(actual_ms)
+                self._role_cache[cache_key] = deepcopy(vote)
                 raw_votes.setdefault(track, []).append(vote)
         return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
 
