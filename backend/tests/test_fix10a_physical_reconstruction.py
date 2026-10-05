@@ -114,6 +114,18 @@ def test_a901_pipeline_builds_physical_touch_chain_without_canonical_events(monk
     assert "verified_stats" not in out
 
 
+def test_completed_trace_callback_failure_preserves_reconstructed_evidence(monkeypatch):
+    _patch_window(monkeypatch)
+    monkeypatch.setattr(pmr.shot_outcome_engine, "find_strike_releases", lambda *_a: [])
+    plan, analysis, graph, authority = _base_inputs()
+    def fail(_trace):
+        raise RuntimeError("synthetic delivery failure")
+    out = pmr.reconstruct_physical_match("video.mp4", plan, analysis, graph, authority, trace_callback=fail)
+    assert out["status"] == "ok" and out["metrics"]["touches"] == 1
+    assert out["traces"][0]["incremental_storage_error_type"] == "RuntimeError"
+    assert out["windows"][0]["status"] == "ok"
+
+
 def test_a902_close_10_12_analogue_keeps_nearby_12_at_zero_touches(monkeypatch):
     _patch_window(monkeypatch, frames=[_frame()], contact=_contact_result(
         accepted=[_accepted_contact("p010")], metrics={"accepted": 1}

@@ -100,7 +100,8 @@ def _physical(trace=True):
 
 
 def _persisted_states(db):
-    return [call[1]["$set"].get("fix10a_status") for call in db.reports.calls]
+    return [call[1]["$set"]["fix10a_status"] for call in db.reports.calls
+            if "fix10a_status" in call[1].get("$set", {})]
 
 
 def test_fix10a_production01_has_no_shadow_scheduler_or_shadow_flag():

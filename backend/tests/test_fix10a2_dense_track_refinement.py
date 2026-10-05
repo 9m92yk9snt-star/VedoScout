@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import math
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -304,6 +305,49 @@ def test_a209_zero_media_time_is_a_real_previous_timestamp():
     assert dtr._last_ms(track, 40) == 0
 
 
+def test_constant_motion_keeps_actor_id_after_a_bounded_sampling_gap():
+    boxes = [{**BASE, "x": x} for x in (.1, .3, .5, .9)]
+    identity = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    result = dtr.refine_window(
+        [_frame(ms) for ms in (1000, 1100, 1200, 1400)],
+        _graph(), {}, "scene_001",
+        detector_fn=_detector_sequence([[_det(box)] for box in boxes]),
+        camera_estimator=lambda *_args: (identity, 20),
+    )
+    assert [frame["players"][0]["local_track_id"]
+            for frame in result["frames"]] == ["p001"] * 4
+    assert all(frame["players"][0]["association_state"] == "VERIFIED_LOCAL"
+               for frame in result["frames"])
+
+
+def test_constant_motion_tracks_camera_pan_separately_from_player_velocity():
+    boxes = [{**BASE, "x": x} for x in (.1, .3, .5, .9)]
+    camera_steps = iter((2.0, 2.0, 4.0))
+    def camera(*_args):
+        return np.array([[1.0, 0.0, next(camera_steps)], [0.0, 1.0, 0.0]]), 20
+
+    result = dtr.refine_window(
+        [_frame(ms) for ms in (1000, 1100, 1200, 1400)],
+        _graph(), {}, "scene_001",
+        detector_fn=_detector_sequence([[_det(box)] for box in boxes]),
+        camera_estimator=camera,
+    )
+    assert [frame["players"][0]["local_track_id"]
+            for frame in result["frames"]] == ["p001"] * 4
+
+
+def test_camera_motion_accumulates_across_bounded_detector_misses():
+    boxes = [{**BASE, "x": x} for x in (.1, .3, .9)]
+    matrix = np.array([[1., 0., 20.], [0., 1., 0.]])
+    result = dtr.refine_window(
+        [_frame(ms) for ms in (1000, 1100, 1200, 1300, 1400)],
+        _graph(), {}, "scene_001",
+        detector_fn=_detector_sequence([[_det(boxes[0])], [_det(boxes[1])], [], [], [_det(boxes[2])]]),
+        camera_estimator=lambda *_args: (matrix, 20),
+    )
+    assert result["frames"][-1]["players"][0]["local_track_id"] == "p001"
+
+
 def test_dense_detector_empty_output_does_not_abort_recall_window():
     class EmptyNet:
         def setInput(self, _blob):
@@ -372,6 +416,9 @@ def test_dense_team_anchor_samples_follow_only_contiguous_direct_tap_track():
                 "proof_eligible": index == 0,
                 "reason": "OK_NEAREST_TAP_FRAME" if index == 0 else "UNRESOLVED",
                 "authority_tap": index == 0,
+                "authority_primary_source": "USER_TAP",
+                "authority_reason": "OK_NEAREST_TAP_FRAME",
+                "authority_media_ms": 1000,
                 "local_track_id": "p001" if index == 0 else None,
             },
             "players": [{
@@ -383,3 +430,87 @@ def test_dense_team_anchor_samples_follow_only_contiguous_direct_tap_track():
     assert samples == [[45.0, 55.0], [46.0, 55.0], [47.0, 55.0], [48.0, 55.0]]
     frames[2]["cut_barrier"] = True
     assert dtr._dense_target_kit_samples(frames) == [[45.0, 55.0], [46.0, 55.0]]
+    frames[0]["global_target"]["authority_primary_source"] = "FIX04"
+    assert dtr._dense_target_kit_samples(frames) == []
+    frames[0]["global_target"].update(
+        authority_primary_source="USER_TAP",
+        reason="PROOF_TARGET_SINGLE_CANDIDATE_HYPOTHESIS_COLLAPSE")
+    assert dtr._dense_target_kit_samples(frames) == [[45.0, 55.0], [46.0, 55.0]]
+
+
+def _changing_light_team_frames():
+    frames = []
+    for start, chroma in ((1000, 20.0), (3000, 90.0)):
+        for index in range(10):
+            tapped = index == 4
+            frames.append({
+                "media_ms": start + index * 40, "scene_id": "scene_001",
+                "cut_barrier": False, "used_fallback": False,
+                "time_authority": "ACTUAL_MEDIA_PTS",
+                "global_target": {
+                    "status": "VERIFIED" if tapped else "UNRESOLVED",
+                    "proof_eligible": tapped, "authority_tap": tapped,
+                    "authority_primary_source": "USER_TAP",
+                    "authority_reason": "OK_EXACT",
+                    "authority_media_ms": start + index * 40,
+                    "reason": "OK_EXACT" if tapped else "TARGET_GAP",
+                    "local_track_id": "p001" if tapped else None,
+                },
+                "players": [{
+                    "local_track_id": f"p{actor:03d}",
+                    "association_state": "VERIFIED_LOCAL", "box": dict(BASE),
+                    "kit_chroma": [chroma + (25.0 if actor > 3 else 0.0), 20.0],
+                } for actor in range(1, 6)],
+            })
+    return frames
+
+
+def test_dense_team_models_are_local_when_pooled_tap_colors_are_inconsistent():
+    frames = _changing_light_team_frames()
+    targets_before = deepcopy([f["global_target"] for f in frames])
+    diagnostic = dtr._apply_dense_team_labels(frames)
+    assert diagnostic["status"] == "partial"
+    assert diagnostic["pooled_status"] == "unresolved"
+    assert len(diagnostic["local_models"]) == 2
+    for frame in frames:
+        assert frame["players"][1]["team"] == "target_team"
+        assert frame["players"][4]["team"] == "opponent"
+    # Team inference cannot create target attribution in an identity gap.
+    for before, frame in zip(targets_before, frames):
+        for key in ("status", "proof_eligible", "local_track_id", "reason"):
+            assert frame["global_target"][key] == before[key]
+
+
+def test_local_team_fallback_keeps_sample_and_cut_barriers():
+    frames = _changing_light_team_frames()
+    frames[3]["cut_barrier"] = True
+    for frame in frames[6:10]:
+        frame["used_fallback"] = True
+    for frame in frames[10:]:
+        frame["global_target"]["authority_tap"] = False
+    diagnostic = dtr._apply_dense_team_labels(frames)
+    assert diagnostic["status"] == "unresolved"
+    assert all("team" not in p for frame in frames for p in frame["players"])
+
+
+def test_overlapping_local_team_models_must_agree_before_publishing(monkeypatch):
+    frames = _changing_light_team_frames()[:10]
+    frames[5]["global_target"] = deepcopy(frames[4]["global_target"])
+    frames[5]["global_target"]["authority_media_ms"] = frames[5]["media_ms"]
+    calls = []
+
+    def fit(rows, samples):
+        calls.append(len(samples))
+        if len(calls) == 1:
+            return {"status": "unresolved", "reason": "TARGET_KIT_CLUSTER_INCONSISTENT"}
+        for row in rows:
+            for player in row["players"]:
+                player.update(team="target_team" if len(calls) == 2 else "opponent",
+                              team_confidence=.9, team_source=dtr.fsg.DENSE_TEAM_SOURCE)
+        return {"status": "ok"}
+
+    monkeypatch.setattr(dtr.fsg, "apply_dense_team_authority", fit)
+    diagnostic = dtr._apply_dense_team_labels(frames)
+    assert diagnostic["status"] == "unresolved"
+    assert diagnostic["conflicting_detections"] == 50
+    assert all("team" not in p for frame in frames for p in frame["players"])
