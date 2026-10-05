@@ -99,6 +99,7 @@ def test_qualified_goal_supports_grade_but_other_players_actions_do_not():
     result = facts.apply(report, {"events": [event()]})
     assert result["technical"]["shooting"]["score"] == 9
     assert result["technical"]["shooting"]["evidence"][0]["canonical_event_ids"] == ["evt"]
+    assert result["technical"]["shooting"]["evidence"][0]["event_id"] == "evt"
     assert len(result["video_comments"]) == 1
     rejected = facts.apply(report, {"events": [{**event(), "proof": {"proof_eligible": False}}]})
     assert rejected["technical"]["shooting"]["score"] is None
@@ -158,6 +159,15 @@ def test_unrelated_verified_action_cannot_support_a_shooting_grade():
     report["technical"]["shooting"]["evidence"][0]["what"] = "Excellent technique."
     result = facts.apply(report, {"events": [event(kind="PRESS")]})
     assert result["technical"]["shooting"]["score"] is None
+
+
+def test_ambiguous_evidence_timestamp_cannot_choose_a_neighboring_event():
+    result = facts.apply(full_report(), {"events": [event(), {**event(ms=30500), "event_id": "other"}]})
+    assert result["technical"]["shooting"]["score"] is None
+    report = full_report()
+    report["technical"]["shooting"]["evidence"][0]["event_id"] = "evt"
+    result = facts.apply(report, {"events": [event(), {**event(ms=30500), "event_id": "other"}]})
+    assert result["technical"]["shooting"]["score"] == 9
 
 
 def test_portrait_ground_detail_remaps_ball_without_changing_person_identity():

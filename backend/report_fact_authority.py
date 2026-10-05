@@ -114,9 +114,11 @@ def apply(full, canonical):
                 if not isinstance(row, dict):
                     continue
                 matches = _matching(events, row)
-                if matches and _skill_supports(name, matches) and _supports(str(row.get("what") or ""), matches):
+                if len(matches) == 1 and _skill_supports(name, matches) and _supports(str(row.get("what") or ""), matches):
                     qualified = deepcopy(row)
                     qualified["canonical_event_ids"] = [e["event_id"] for e in matches if e.get("event_id")]
+                    if matches[0].get("event_id"):
+                        qualified["event_id"] = matches[0]["event_id"]
                     qualified["identity_verified"] = True
                     supported.append(qualified)
                 else:

@@ -55,9 +55,18 @@ The saved-observation replay increased verified dense observations from 475 to
 accepted actions from six to seven. It still verified no shots, goals or assists.
 The fictional scoring prose and unsupported shooting grade were withheld.
 This proves specific boundary fixes, not recovery of the user's five actions.
+The original-video detail pass added ball proposals to 1,624 frame observations
+and reduced target ball gaps from 978 to 665. Its accepted scoring counts also
+remained unchanged. More detector proposals alone did not repair scoring.
 Newly scheduled visual reviews are not executed in this offline replay, and the
 original weak Step-3 detector proposals were not exported. Full recovery must be
 validated against newly produced physical/model evidence before claiming success.
+
+The remaining evidence breaks include a model action described as a pass where
+the user identified a saved shot, a jersey-verified target contact classified as
+receive/control without a verified release, an absent assist chain, and crowded
+contacts with uncertain body ownership or split tracks. These must be resolved
+by physical/visual evidence; lowering outcome or identity gates would hide them.
 
 No production report is rewritten by this change. This is a code review branch;
 deployment and a new analysis are separate operations.
