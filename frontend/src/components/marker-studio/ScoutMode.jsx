@@ -31,7 +31,7 @@ import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 import { createPortal } from "react-dom";
 import { X, Check, RotateCcw, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { detectSceneCuts, distributeHints } from "./sceneDetect";
-import { seekPresentedFrame } from "./videoFrameAuthority.cjs";
+import videoFrameAuthority from "./videoFrameAuthority.cjs";
 
 const TARGET_HINTS = 10;
 const MIN_REQUIRED = 3;
@@ -52,7 +52,7 @@ const SCOUT_INSIGHTS = [
 
 // ── Pure helpers ────────────────────────────────────────────────────
 
-const seekTo = seekPresentedFrame;
+const seekTo = videoFrameAuthority.seekPresentedFrame;
 
 function captureFrame(videoEl) {
   if (!videoEl || !videoEl.videoWidth) return null;
