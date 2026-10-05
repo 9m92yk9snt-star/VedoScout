@@ -37,6 +37,30 @@ class _R2:
         return "https://storage.example/" + key
 
 
+async def test_pending_and_complete_trace_share_one_authoritative_manifest(monkeypatch, tmp_path):
+    import gzip
+    import json
+    monkeypatch.setenv(fxr.SUPPORT_VISION_FLAG, "0")
+    def reconstruct(*_args, trace_callback, **_kwargs):
+        physical = _physical()
+        trace = physical["traces"][0]
+        trace["goal_review_phase"] = "pending"
+        trace_callback(trace)
+        trace["goal_review_phase"] = "complete"
+        trace["unresolved_reasons"] = ["GOAL_PLANE_CROSSING_UNRESOLVED"]
+        trace_callback(trace)
+        return physical
+    monkeypatch.setattr(fxr.physical_match_reconstruction, "reconstruct_physical_match", reconstruct)
+    db, r2 = _DB(), _R2()
+    result = await fxr.run(report_id="two-phase", video_path="video.mp4",
+                          unified_result=_unified(), db=db, r2_storage=r2, local_dir=tmp_path)
+    assert len(result["fix10a_trace_manifest"]) == 1
+    assert [json.loads(gzip.decompress(row[1]))["goal_review_phase"] for row in r2.uploads] == ["pending", "complete"]
+    pushed = [update for _, update in db.reports.calls if "$push" in update]
+    assert len(pushed) == 1
+    assert json.loads(gzip.decompress(r2.uploads[-1][1]))["unresolved_reasons"] == ["GOAL_PLANE_CROSSING_UNRESOLVED"]
+
+
 def _unified(ready=True):
     return {
         "status": "ok" if ready else "partial_coverage",

@@ -232,7 +232,7 @@ def _default_detector():
     return detector
 
 
-def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False):
+def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False, *, _detail_pass=False):
     """FIX10A dense detector with isolated A7 support proposals.
 
     Person detection keeps the production threshold.  A3 receives only sports-
@@ -318,6 +318,27 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
     people = collect(0, float(cv_detect.CONF_T))
     fsg._annotate_kit_chroma(frame_bgr, people)
     balls = collect(32, float(DENSE_BALL_CONF_T))
+    # Portrait padding shrinks the pitch into ~360 detector columns. Only when
+    # the ball is missing, inspect the visible players' ground band at native
+    # detail. These are detector proposals with the SAME class/confidence gate;
+    # downstream same-ball/contact proof remains mandatory.
+    if not _detail_pass and not balls and H > 1.5 * W and people:
+        heights = sorted(p["box"]["h"] for p in people)
+        median = heights[len(heights) // 2]
+        field_players = [p for p in people if p["box"]["h"] <= median * 1.8]
+        feet = [p["box"]["y"] + p["box"]["h"] for p in field_players]
+        y0 = max(0, int((min(feet) - .08) * H))
+        y1 = min(H, int((max(feet) + .08) * H))
+        if 0 < y1 - y0 <= .45 * H:
+            _people, detailed = _detect_dense_people_and_ball(
+                detector, frame_bgr[y0:y1, :], _detail_pass=True)
+            for candidate in detailed:
+                box = candidate["box"]
+                box["y"] = (y0 + box["y"] * (y1 - y0)) / H
+                box["h"] *= (y1 - y0) / H
+                if box["w"] <= .08 and box["h"] <= .04:
+                    candidate["source"] = "NATIVE_GROUND_BAND_DETECTOR"
+                    balls.append(candidate)
     if not include_a7_support:
         return people, balls
     # A7 is a support-only search channel, so read the sports-ball class score

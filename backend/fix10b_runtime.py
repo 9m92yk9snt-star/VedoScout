@@ -13,6 +13,7 @@ from copy import deepcopy
 import canonical_output_authority
 import fix10b_reconciliation
 import scoring_evidence_coverage
+import dense_event_reconciliation
 
 VERSION = 2
 
@@ -111,6 +112,8 @@ def reconcile_unified_result(
         else {}
     )
 
+    canonical_before = dense_event_reconciliation.recover(
+        canonical_before, sequence, physical_result or {}, source.get("identity_authority") or {})
     canonical = fix10b_reconciliation.reconcile_canonical_events(
         canonical_before,
         physical_result if isinstance(physical_result, dict) else {},

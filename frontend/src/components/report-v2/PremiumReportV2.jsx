@@ -413,7 +413,7 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
 
           {/* Row 2b — match stats / age comparison */}
           <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-2" : ""}`}>
-            <MatchStatsCard matchStats={d.matchStats} />
+            <MatchStatsCard matchStats={d.matchStats} coverageNote={d.matchStatsCoverage} />
             <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
           </div>
 

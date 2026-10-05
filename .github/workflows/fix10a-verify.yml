@@ -98,7 +98,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py
 
   backend_regression:
     runs-on: ubuntu-latest
