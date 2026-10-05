@@ -31,6 +31,7 @@ import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 import { createPortal } from "react-dom";
 import { X, Check, RotateCcw, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { detectSceneCuts, distributeHints } from "./sceneDetect";
+import videoFrameAuthority from "./videoFrameAuthority.cjs";
 
 const TARGET_HINTS = 10;
 const MIN_REQUIRED = 3;
@@ -51,29 +52,7 @@ const SCOUT_INSIGHTS = [
 
 // ── Pure helpers ────────────────────────────────────────────────────
 
-function seekTo(videoEl, t) {
-  return new Promise((resolve) => {
-    if (!videoEl) return resolve();
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      videoEl.removeEventListener("seeked", onSeeked);
-      let painted = false;
-      const paintDone = () => { if (!painted) { painted = true; resolve(); } };
-      if (typeof videoEl.requestVideoFrameCallback === "function") {
-        try { videoEl.requestVideoFrameCallback(paintDone); } catch { /* noop */ }
-      } else {
-        requestAnimationFrame(() => requestAnimationFrame(paintDone));
-      }
-      setTimeout(paintDone, 400);
-    };
-    const onSeeked = () => finish();
-    videoEl.addEventListener("seeked", onSeeked);
-    try { videoEl.currentTime = t; } catch { finish(); }
-    setTimeout(finish, 1500);
-  });
-}
+const seekTo = videoFrameAuthority.seekPresentedFrame;
 
 function captureFrame(videoEl) {
   if (!videoEl || !videoEl.videoWidth) return null;
@@ -119,6 +98,10 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
   const [verifyT, setVerifyT] = useState(0);
   const [verifyIntroSeen, setVerifyIntroSeen] = useState(false);
   const [verifyDone, setVerifyDone] = useState(false);
+  const verifyFrameRef = useRef({ ready: false, mediaTime: null });
+  const draftFrameRef = useRef(null);
+  const [verifyFrameReady, setVerifyFrameReady] = useState(false);
+  const [verifyFrameError, setVerifyFrameError] = useState(false);
 
   /* Marking phase state */
   // queue: ordered list of hint indices to present.  When user skips a
@@ -281,8 +264,8 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
       for (let i = 0; i < hs.length; i++) {
         if (cancelled) return;
         try {
-          await seekTo(v, hs[i]);
-          captured.push({ t: hs[i], jpegDataUrl: captureFrame(v) });
+          const frame = await seekTo(v, hs[i]);
+          captured.push({ t: frame.mediaTime, jpegDataUrl: captureFrame(v) });
         } catch {
           captured.push({ t: hs[i], jpegDataUrl: null });
         }
@@ -315,7 +298,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     if (!v || !hints.length) return;
     const t = hints[currentHintIdx];
     if (t != null && Math.abs(v.currentTime - t) > 0.15) {
-      try { v.currentTime = t; } catch { /* noop */ }
+      seekTo(v, t).catch(() => {});
     }
     // Reset zoom/pan/draft for the new frame
     setZoom(1);
@@ -326,6 +309,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
   /* ── Tap on the stage to set the marker (MARKING + VERIFY phases) ── */
   const handleStageTap = useCallback((e) => {
     if (phase !== "MARKING" && phase !== "VERIFY") return;
+    if (phase === "VERIFY" && (!verifyFrameRef.current.ready || videoRef.current?.seeking)) return;
     if (phase === "MARKING" && currentHintIdx == null) return;
     const stage = stageRef.current;
     const v = videoRef.current;
@@ -354,6 +338,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     const fx = inX / renderedW;
     const fy = inY / renderedH;
     const w = 0.06, h = 0.18;
+    draftFrameRef.current = phase === "VERIFY" ? verifyFrameRef.current.mediaTime : null;
     setDraftBox({
       x: Math.max(0, Math.min(1 - w, fx - w / 2)),
       y: Math.max(0, Math.min(1 - h, fy - h * 0.42)),
@@ -456,7 +441,8 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
 
   const handleConfirmMark = useCallback(() => {
     if (!draftBox || currentHintIdx == null) return;
-    const hintT = hints[currentHintIdx];
+    const hintT = frameCache[currentHintIdx]?.t;
+    if (!Number.isFinite(hintT)) return;
     setMarks((prev) => ({
       ...prev,
       [currentHintIdx]: {
@@ -471,7 +457,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     setLockFlash(true);
     setTimeout(() => setLockFlash(false), 900);
     setTimeout(advance, 350); // brief "locked" beat so user sees confirmation
-  }, [draftBox, currentHintIdx, hints, advance]);
+  }, [draftBox, currentHintIdx, frameCache, advance]);
 
   const handleSkipFrame = useCallback(() => {
     if (currentHintIdx == null) return;
@@ -493,6 +479,25 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
   }, [confirmedCount]);
 
   /* ── VERIFY: manual 3-tap verification with free scrubbing ───── */
+  const prepareVerifyFrame = useCallback(async (t) => {
+    const v = videoRef.current;
+    const request = { ready: false, mediaTime: null };
+    verifyFrameRef.current = request;
+    draftFrameRef.current = null;
+    setVerifyFrameReady(false);
+    setVerifyFrameError(false);
+    setDraftBox(null);
+    try {
+      const frame = await seekTo(v, t);
+      if (verifyFrameRef.current !== request) return;
+      verifyFrameRef.current = { ready: true, mediaTime: frame.mediaTime };
+      setVerifyT(frame.mediaTime);
+      setVerifyFrameReady(true);
+    } catch {
+      if (verifyFrameRef.current === request) setVerifyFrameError(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (phase !== "VERIFY") return;
     const v = videoRef.current;
@@ -500,30 +505,30 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setDraftBox(null);
-    setVerifyT(v?.currentTime || 0);
-  }, [phase]);
+    prepareVerifyFrame(v?.currentTime || 0);
+    return () => { verifyFrameRef.current = { ready: false, mediaTime: null }; };
+  }, [phase, prepareVerifyFrame]);
 
   const handleVerifyScrub = useCallback((val) => {
     const v = videoRef.current;
     if (!v) return;
     const dur = vidDur || v.duration || 0;
     const t = Math.max(0, Math.min(dur, val));
-    try { v.currentTime = t; } catch { /* noop */ }
     setVerifyT(t);
-    setDraftBox(null);
-  }, [vidDur]);
+    prepareVerifyFrame(t);
+  }, [vidDur, prepareVerifyFrame]);
 
   const handleVerifyConfirm = useCallback(() => {
-    if (!draftBox) return;
-    const v = videoRef.current;
-    const t = v ? v.currentTime : verifyT;
+    if (!draftBox || !verifyFrameRef.current.ready || videoRef.current?.seeking) return;
+    const t = draftFrameRef.current;
+    if (!Number.isFinite(t) || t !== verifyFrameRef.current.mediaTime) return;
     setVerifyMarks((prev) => [...prev, { t, box: { ...draftBox } }]);
     setDraftBox(null);
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setLockFlash(true);
     setTimeout(() => setLockFlash(false), 700);
-  }, [draftBox, verifyT]);
+  }, [draftBox]);
 
   useEffect(() => {
     if (phase !== "VERIFY") return;
@@ -600,6 +605,7 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
         ref={stageRef}
         className="relative flex-1 bg-black overflow-hidden flex items-center justify-center"
         data-testid="scout-stage"
+        aria-busy={phase === "VERIFY" && !verifyFrameReady}
         onClick={(phase === "MARKING" || phase === "VERIFY") && !draftBox ? handleStageTap : undefined}
         onMouseMove={handleBoxPointerMove}
         onMouseUp={handleBoxPointerUp}
@@ -681,10 +687,15 @@ export default function ScoutMode({ open, onCancel, onConfirm, videoUrl, duratio
         )}
 
         {/* VERIFY overlay — manual 3-tap player verification */}
+        {phase === "VERIFY" && !verifyFrameReady && (
+          <div role="status" className="absolute top-3 left-3 rounded bg-black/80 px-3 py-2 text-sm text-white pointer-events-none">
+            {verifyFrameError ? "Frame unavailable — move the slider to try again." : "Loading frame…"}
+          </div>
+        )}
         {phase === "VERIFY" && (
           <VerifyOverlay
             count={verifyMarks.length}
-            hasDraft={!!draftBox}
+            hasDraft={!!draftBox && verifyFrameReady}
             duration={vidDur || videoRef.current?.duration || 0}
             t={verifyT}
             done={verifyDone}

@@ -224,10 +224,14 @@ async def read_visible_jersey_number(
         msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=_b64(path))])
         resp = await asyncio.wait_for(chat.send_message(msg), timeout=60)
         text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
+        import hashlib
+        audit = {"provider": VERIFY_PROVIDER, "model": VERIFY_MODEL, "raw_response": text[:50000],
+                 "response_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                 "input_sha256": hashlib.sha256(prompt.encode() + path.read_bytes()).hexdigest()}
         data = _extract_json(text)
         if not data:
             return {"readable": False, "number": None, "confidence": "low",
-                    "reason": "invalid_json"}
+                    "reason": "jersey_reader_invalid_json", "model_review_audit": audit}
         confidence = str(data.get("confidence") or "low").lower()
         if confidence not in {"high", "medium", "low"}:
             confidence = "low"
@@ -246,12 +250,13 @@ async def read_visible_jersey_number(
             "readable": readable,
             "number": number if readable else None,
             "confidence": confidence,
+            "model_review_audit": audit,
             "reason": str(data.get("reason") or ("readable" if readable else "not_readable"))[:160],
         }
     except Exception as e:
-        logger.warning(f"jersey number read inconclusive ({session_id}): {e}")
+        logger.warning("jersey number read inconclusive (%s): %s", session_id, type(e).__name__)
         return {"readable": False, "number": None, "confidence": "low",
-                "reason": "reader_error"}
+                "reason": "reader_error", "error_type": type(e).__name__}
 
 
 async def build_identity_profile(

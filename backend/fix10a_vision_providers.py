@@ -15,6 +15,8 @@ from copy import deepcopy
 import asyncio
 import base64
 import json
+import hashlib
+import inspect
 import math
 import os
 import tempfile
@@ -24,6 +26,9 @@ import cv2
 
 import identity_verify
 import video_timebase
+import action_evidence_review
+import evidence_feedback
+import goal_review_scheduler
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -88,7 +93,7 @@ def _valid_box(box) -> bool:
         x, y, w, h = (float(box[k]) for k in ("x", "y", "w", "h"))
     except (KeyError, TypeError, ValueError):
         return False
-    return -0.05 <= x <= 1.05 and -0.05 <= y <= 1.05 and 0 < w <= 1.1 and 0 < h <= 1.1
+    return all(math.isfinite(v) for v in (x, y, w, h)) and -0.05 <= x <= 1.05 and -0.05 <= y <= 1.05 and 0 < w <= 1.1 and 0 < h <= 1.1
 
 
 def _extract_json(text: str) -> dict | None:
@@ -105,6 +110,13 @@ def _extract_json(text: str) -> dict | None:
 
 def _b64(path: str | Path) -> str:
     return base64.b64encode(Path(path).read_bytes()).decode()
+
+
+def _model_audit(raw, prompt, paths, times=None):
+    return {"provider": VERIFY_PROVIDER, "model": VERIFY_MODEL, "raw_response": str(raw)[:50000],
+            "response_sha256": hashlib.sha256(str(raw).encode()).hexdigest(),
+            "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest(),
+            "media_ms": list(times or [])}
 
 
 def _read_frames(video_path: str, requested_ms) -> dict[int, tuple[int, object]]:
@@ -202,6 +214,7 @@ async def read_visible_player_role(api_key: str, session_id: str,
         if confidence == "low":
             role = "UNKNOWN"
         return {"role": role, "confidence": confidence,
+                "model_review_audit": _model_audit(text, prompt, [tight, context]),
                 "reason": str(data.get("reason") or "role_unresolved")[:180]}
     except Exception:
         return {"role": "UNKNOWN", "confidence": "low", "reason": "role_reader_error"}
@@ -223,6 +236,7 @@ def aggregate_role_votes(votes) -> dict:
             "role": role,
             "confidence": confidence,
             "reason": str(vote.get("reason") or "")[:180],
+            "model_review_audit": deepcopy(vote.get("model_review_audit")),
         })
     by_frame = {}
     for vote in cleaned:
@@ -272,7 +286,7 @@ def aggregate_role_votes(votes) -> dict:
 
 
 async def read_goal_scene_evidence(api_key: str, session_id: str,
-                                   frame_paths: list[str], media_ms: list[int]) -> dict:
+                                   frame_paths: list[str], media_ms: list[int], ball_reference=None) -> dict:
     """Independent multi-frame goal geometry, ball/occlusion and reaction audit.
 
     Reactions are deliberately returned as support-only observations.  They do
@@ -369,6 +383,12 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             text=prompt,
             file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs],
         )
+        if isinstance(ball_reference, dict) and _valid_box(ball_reference.get("box")):
+            prompt += ("\nThe physically measured active ball reference is " + json.dumps(ball_reference, sort_keys=True)
+                       + ". Include this reference frame in ball_evidence and assess crossings only AFTER this reference. "
+                         "Follow ONLY this ball from this image onward. If its visible continuation is ambiguous or a "
+                         "different ball reaches the goal, same_ball_continuity must be false. This reference supplies no expected result.")
+            msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs])
         resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
         text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
         data = _extract_json(text) or {}
@@ -656,6 +676,7 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
 
         return {
             "geometry_status": "VERIFIED" if geometry_verified else "UNRESOLVED",
+            "model_review_audit": _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs]),
             "frames": cleaned_frames,
             "crossing": crossing,
             "crossing_confidence": crossing_conf,
@@ -758,6 +779,99 @@ def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[
     return requests
 
 
+async def read_action_pixel_evidence(api_key, session_id, paths, media_ms):
+    """Locate visible pixels for independent re-detection/crop review only."""
+    import hashlib
+    if not api_key or LlmChat is None:
+        return {"status": "UNAVAILABLE", "reason": "action_pixel_reader_unavailable", "frames": []}
+    timeline = ", ".join(f"image {i + 1}={ms}ms" for i, ms in enumerate(media_ms))
+    prompt = (
+        f"Chronological football images: {timeline}. Inspect visible pixels only. "
+        "No selected player, jersey number, action label or expected result is supplied. "
+        "Locate the visible football (not spare balls, field markings, socks or guessed hidden positions). "
+        "If you cannot distinguish the active ball, return no ball boxes for that image. "
+        "Also locate player bodies whose jersey digits are clearly exposed and could be inspected in a tight crop. "
+        "Do not read or guess the digits; a separate crop reader does that. Do not infer identity, a pass, a shot, "
+        "a goal, an assist, ball ownership or an outcome. Coordinates are normalized 0..1 from the full image top-left. "
+        'Return only {"frames":[{"idx":1,"balls":[{"box":{"x":0,"y":0,"w":0.01,"h":0.01},'
+        '"confidence":"high"|"medium"|"low"}],"jersey_bodies":[{"box":{"x":0,"y":0,"w":0.1,"h":0.2},'
+        '"confidence":"high"|"medium"|"low"}]}]} . Empty lists are valid.'
+    )
+    try:
+        chat = LlmChat(api_key=api_key, session_id=session_id,
+                       system_message="Inspect visible pixel locations only. Return strict JSON.").with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        response = await asyncio.wait_for(chat.send_message(UserMessage(
+            text=prompt, file_contents=[ImageContent(image_base64=_b64(p)) for p in paths])), timeout=90)
+        raw = response if isinstance(response, str) else getattr(response, "text", None) or str(response)
+        parsed = _extract_json(raw)
+        valid = isinstance((parsed or {}).get("frames"), list)
+        return {"status": "COMPLETED" if valid else "INVALID_RESPONSE",
+                "reason": "PIXEL_PROPOSALS_ONLY" if valid else "action_pixel_reader_invalid_json",
+                "frames": parsed["frames"] if valid else [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
+                "raw_response": raw[:50000], "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
+                "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest()}
+    except Exception as exc:
+        return {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
+                "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER}
+
+
+def _native_ball_roi(detector, image, proposal):
+    """Return fresh class-32 proposals and the exact native search rectangle."""
+    if not _valid_box(proposal):
+        return [], None
+    proposal = {key: float(proposal[key]) for key in ("x", "y", "w", "h")}
+    if proposal["w"] > .08 or proposal["h"] > .04:
+        return [], None
+    import dense_track_refinement
+    height, width = image.shape[:2]
+    cx = (proposal["x"] + proposal["w"] / 2) * width
+    cy = (proposal["y"] + proposal["h"] / 2) * height
+    half_w, half_h = max(.09 * width, 4 * proposal["w"] * width), max(.045 * height, 4 * proposal["h"] * height)
+    x0, y0 = max(0, int(cx - half_w)), max(0, int(cy - half_h))
+    x1, y1 = min(width, int(cx + half_w)), min(height, int(cy + half_h))
+    if x1 - x0 < 16 or y1 - y0 < 16:
+        return [], None
+    _people, balls = dense_track_refinement._detect_dense_people_and_ball(
+        detector, image[y0:y1, x0:x1], _detail_pass=True)
+    accepted = []
+    for ball in balls:
+        box = ball["box"]
+        box = {"x": (x0 + box["x"] * (x1 - x0)) / width,
+               "y": (y0 + box["y"] * (y1 - y0)) / height,
+               "w": box["w"] * (x1 - x0) / width, "h": box["h"] * (y1 - y0) / height}
+        if (0 < box["w"] <= .08 and 0 < box["h"] <= .04
+                and math.isfinite(float(ball["confidence"]))
+                and ball["confidence"] >= dense_track_refinement.DENSE_BALL_CONF_T):
+            accepted.append({"box": box, "confidence": ball["confidence"]})
+    roi = {"x": x0 / width, "y": y0 / height, "w": (x1 - x0) / width, "h": (y1 - y0) / height}
+    return sorted(accepted, key=lambda b: -b["confidence"]), roi
+
+
+def corroborate_ball_pixels(detector, image, proposal):
+    """A model box is a search ROI; only native class-32 detection supplies a row."""
+    if not _valid_box(proposal):
+        return []
+    proposal = {key: float(proposal[key]) for key in ("x", "y", "w", "h")}
+    balls, _roi = _native_ball_roi(detector, image, proposal)
+    return [{**ball, "source": "NATIVE_REVIEW_ROI_DETECTOR", "pixel_corroborated": True,
+             "proposal_box": deepcopy(proposal)} for ball in balls
+            if goal_review_scheduler._iou(ball["box"], proposal) >= .20]
+
+
+def _active_ball_link(review, reference):
+    if not isinstance(reference, dict):
+        return {"status": "UNRESOLVED", "reason": "CONTACT_BALL_REFERENCE_UNAVAILABLE"}
+    matching = [r for r in (review or {}).get("ball_evidence") or [] if isinstance(r, dict)
+                and r.get("media_ms") == reference["media_ms"] and r.get("ball_visible") is True
+                and r.get("confidence") in {"high", "medium"}
+                and goal_review_scheduler._iou(r.get("ball_box"), reference["box"]) >= .20]
+    return {"status": "VERIFIED" if len(matching) == 1 else "UNRESOLVED",
+            "reason": "VISUAL_PATH_LINKED_TO_MEASURED_CONTACT_BALL" if len(matching) == 1
+                      else "REVIEWED_BALL_NOT_BOUND_TO_CONTACT",
+            "media_ms": reference["media_ms"], "measured_box": deepcopy(reference["box"]),
+            "visual_box": deepcopy(matching[0]["ball_box"]) if len(matching) == 1 else None}
+
+
 class ShadowVisionProviders:
     """Stateful/cached sync callbacks used inside the FIX10A worker thread."""
 
@@ -766,7 +880,112 @@ class ShadowVisionProviders:
         self.session_prefix = str(session_prefix or "fix10a")
         self._goal_cache = {}
         self._jersey_cache = {}
+        self._role_cache = {}
         self.jersey_calls = 0
+        self._inspection_cache = {}
+        self.inspection_calls = 0
+        self.feedback_inspection_calls = 0
+        self.role_calls = 0
+        self.goal_calls = 0
+
+    def action_evidence_provider(self, video_path, job, dense_frames):
+        requested = action_evidence_review.frame_times(job, dense_frames)
+        if len(requested) < 2:
+            return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_FRAMES_UNAVAILABLE", "frames": []}
+        cache_key = (str(video_path), job["inspection_id"], tuple(requested))
+        if cache_key in self._inspection_cache:
+            return deepcopy(self._inspection_cache[cache_key])
+        feedback = job.get("phase") == "FEEDBACK"
+        exhausted = self.feedback_inspection_calls >= evidence_feedback.MAX_FEEDBACK_REVIEWS if feedback else \
+            self.inspection_calls - self.feedback_inspection_calls >= action_evidence_review.MAX_ACTION_REVIEWS
+        if exhausted:
+            return {"status": "DEFERRED", "reason": "ACTION_INSPECTION_BUDGET_EXHAUSTED", "frames": []}
+        if not self.api_key:
+            return {"status": "UNAVAILABLE", "reason": "action_pixel_reader_unavailable", "frames": []}
+        decoded = _read_frames(video_path, requested)
+        images = {}
+        with tempfile.TemporaryDirectory(prefix="action_pixels_") as directory:
+            paths, times = [], []
+            for index, requested_ms in enumerate(requested):
+                got = decoded.get(requested_ms)
+                if not got or got[0] in images:
+                    continue
+                actual_ms, image = got
+                if not job["start_ms"] <= actual_ms <= job["end_ms"]:
+                    continue
+                path = Path(directory) / f"pixels_{index:03d}.jpg"
+                if _write_jpg(path, image):
+                    paths.append(str(path)); times.append(int(actual_ms)); images[int(actual_ms)] = image
+            if len(paths) < 2:
+                return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
+            self.inspection_calls += 1
+            self.feedback_inspection_calls += int(feedback)
+            review = asyncio.run(read_action_pixel_evidence(
+                self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times))
+        import dense_track_refinement
+        detector = dense_track_refinement._default_detector()
+        rows = []
+        seen_indices = set()
+        for row in (review.get("frames") or [])[:action_evidence_review.MAX_ACTION_FRAMES]:
+            if not isinstance(row, dict) or not isinstance(row.get("idx"), int) or isinstance(row.get("idx"), bool):
+                continue
+            index = row["idx"] - 1
+            if not 0 <= index < len(times) or index in seen_indices:
+                continue
+            seen_indices.add(index)
+            media_ms = times[index]
+            balls = []
+            proposals = row.get("balls") if isinstance(row.get("balls"), list) else []
+            for ball in proposals[:3]:
+                if isinstance(ball, dict) and ball.get("confidence") in {"high", "medium"}:
+                    balls.extend(corroborate_ball_pixels(detector, images[media_ms], ball.get("box")))
+            proposals = row.get("jersey_bodies") if isinstance(row.get("jersey_bodies"), list) else []
+            bodies = [p for p in proposals[:6] if isinstance(p, dict)
+                      and p.get("confidence") in {"high", "medium"} and _valid_box(p.get("box"))]
+            rows.append({"media_ms": media_ms, "scene_id": job["scene_id"],
+                         "ball_candidates": balls[:3], "jersey_bodies": bodies})
+        # A sparse search image cannot supply a velocity/contact chain. Use
+        # independently detected seed balls to search four adjacent actual
+        # frames; never copy the seed's box, number, or ownership to them.
+        neighbor_jobs = {}
+        for row in rows:
+            for ball in row["ball_candidates"]:
+                for ms in action_evidence_review.neighbor_times(row["media_ms"], dense_frames, job["scene_id"]):
+                    neighbor_jobs.setdefault(ms, []).append((row["media_ms"], ball["box"]))
+        neighbor_requested = sorted(neighbor_jobs)[:action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES]
+        missing_images = [ms for ms in neighbor_requested if ms not in images]
+        neighbor_decoded = _read_frames(video_path, missing_images) if missing_images else {}
+        for requested_ms, got in neighbor_decoded.items():
+            actual_ms, image = got
+            if actual_ms == requested_ms:
+                images[int(actual_ms)] = image
+        rows_by_time = {row["media_ms"]: row for row in rows}
+        roi_attempts = 0
+        neighbor_actual = []
+        for ms in neighbor_requested:
+            if ms not in images:
+                continue
+            neighbor_actual.append(ms)
+            row = rows_by_time.setdefault(ms, {"media_ms": ms, "scene_id": job["scene_id"],
+                                               "ball_candidates": [], "jersey_bodies": []})
+            for seed_ms, seed_box in sorted(neighbor_jobs[ms], key=lambda s: abs(ms - s[0]))[:3]:
+                roi_attempts += 1
+                native, roi = _native_ball_roi(detector, images[ms], seed_box)
+                for ball in native[:3]:
+                    if any(goal_review_scheduler._iou(ball["box"], old["box"]) >= .5 for old in row["ball_candidates"]):
+                        continue
+                    row["ball_candidates"].append({**ball, "source": "NATIVE_REVIEW_TEMPORAL_ROI_DETECTOR",
+                        "pixel_corroborated": True, "seed_media_ms": seed_ms, "seed_box": deepcopy(seed_box),
+                        "search_roi": roi})
+        rows = sorted(rows_by_time.values(), key=lambda row: row["media_ms"])
+        result = {**review, "frames": rows, "time_authority": "ACTUAL_MEDIA_PTS",
+                  "requested_media_ms": requested, "decoded_media_ms": times,
+                  "native_neighbor_requested_ms": neighbor_requested,
+                  "native_neighbor_decoded_ms": neighbor_actual,
+                  "native_neighbor_roi_attempts": roi_attempts,
+                  "canonical_authority": False, "ball_corroboration": "NATIVE_CLASS_32_DETECTOR"}
+        self._inspection_cache[cache_key] = deepcopy(result)
+        return result
 
     def jersey_vote_provider(self, video_path: str, requests) -> dict:
         candidates = [r for r in (requests or []) if isinstance(r, dict)]
@@ -852,6 +1071,10 @@ class ShadowVisionProviders:
                 if not got:
                     continue
                 actual_ms, frame = got
+                cache_key = (str(video_path), int(actual_ms), tuple(round(float(row["box"][k]), 5) for k in ("x", "y", "w", "h")))
+                if cache_key in self._role_cache:
+                    raw_votes.setdefault(row["track_id"], []).append(deepcopy(self._role_cache[cache_key]))
+                    continue
                 crop = _crop(frame, row["box"], pad_x=0.18, pad_y=0.10)
                 tight = root / f"role_tight_{index:03d}.jpg"
                 context = root / f"role_context_{index:03d}.jpg"
@@ -862,19 +1085,21 @@ class ShadowVisionProviders:
                     f"{self.session_prefix}-role-{index}",
                     str(tight), str(context),
                 ))
-                job_meta.append((row["track_id"], int(actual_ms)))
+                job_meta.append((row["track_id"], int(actual_ms), cache_key))
             if not jobs:
-                return {}
+                return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
+            self.role_calls += len(jobs)
             try:
                 results = asyncio.run(_bounded_gather(jobs, limit=2))
             except Exception:
                 results = [{"role": "UNKNOWN", "confidence": "low",
                             "reason": "role_reader_error"} for _ in job_meta]
-            for (track, actual_ms), result in zip(job_meta, results):
+            for (track, actual_ms, cache_key), result in zip(job_meta, results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "role": "UNKNOWN", "confidence": "low", "reason": "reader_unavailable"
                 }
                 vote["media_ms"] = int(actual_ms)
+                self._role_cache[cache_key] = deepcopy(vote)
                 raw_votes.setdefault(track, []).append(vote)
         return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
 
@@ -891,7 +1116,23 @@ class ShadowVisionProviders:
         # context.  The provider call remains bounded by MAX_GOAL_FRAMES.
         start_ms = int(window.get("start_ms") or 0)
         requested = _goal_review_times(strike_ms, end_ms, MAX_GOAL_FRAMES, start_ms=start_ms)
-        cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested))
+        anchor = strike.get("active_ball_anchor") or {}
+        anchor_valid = bool(_num(anchor.get("media_ms")) and _valid_box(anchor.get("box"))
+                            and anchor.get("proof_eligible") is True and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
+                            and not anchor.get("used_fallback") and anchor.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+                            and start_ms <= anchor["media_ms"] <= end_ms)
+        if anchor_valid and int(anchor["media_ms"]) not in requested and MAX_GOAL_FRAMES > 0:
+            if len(requested) >= MAX_GOAL_FRAMES:
+                removable = [ms for ms in requested if ms not in {strike_ms, requested[-1]}]
+                if removable:
+                    requested.remove(min(removable, key=lambda ms: abs(ms - anchor["media_ms"])))
+                else:
+                    requested.pop(0)
+            requested = sorted([*requested, int(anchor["media_ms"])])
+        requires_reference = bool(anchor or strike.get("status") in {"VERIFIED_PHYSICAL_RELEASE", "VERIFIED_PHYSICAL_SCORING_CONTACT"})
+        anchor_key = (int(anchor["media_ms"]), tuple(float(anchor["box"][k]) for k in ("x", "y", "w", "h"))) if anchor_valid else None
+        cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested),
+                     (requires_reference, anchor_key))
         if cache_key in self._goal_cache:
             return self._goal_cache[cache_key]
         frames = _read_frames(video_path, requested)
@@ -920,17 +1161,24 @@ class ShadowVisionProviders:
                 self._goal_cache[cache_key] = None
                 return None
             try:
+                self.goal_calls += 1
+                reference = {"idx": actual_times.index(int(anchor["media_ms"])) + 1,
+                             "media_ms": int(anchor["media_ms"]), "box": deepcopy(anchor["box"])} \
+                    if anchor_valid and int(anchor["media_ms"]) in actual_times else None
+                kwargs = {"ball_reference": reference} if "ball_reference" in inspect.signature(read_goal_scene_evidence).parameters else {}
                 review = asyncio.run(read_goal_scene_evidence(
                     self.api_key,
                     f"{self.session_prefix}-goal-{strike_ms}",
-                    paths, actual_times,
+                    paths, actual_times, **kwargs,
                 ))
             except Exception:
                 review = {}
         rows = review.get("frames") or [] if isinstance(review, dict) else []
+        link = _active_ball_link(review, reference) if requires_reference else None
         if not rows:
             result = {
                 "status": "UNRESOLVED",
+                "model_review_audit": (review or {}).get("model_review_audit"),
                 "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
                 "line_by_ms": [],
                 "visual_crossing_audit": {
@@ -954,6 +1202,8 @@ class ShadowVisionProviders:
                 }),
             }
             self._goal_cache[cache_key] = result
+            if requires_reference:
+                result["visual_crossing_audit"]["active_ball_link"] = link
             return result
         # Keep every accepted per-frame geometry row.  The legacy/static line is
         # the row nearest the middle of the post-release review and is retained
@@ -970,6 +1220,7 @@ class ShadowVisionProviders:
         )
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
+            "model_review_audit": (review or {}).get("model_review_audit"),
             "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
             "line": dict(nearest["line"]),
             "line_media_ms": int(nearest["media_ms"]),
@@ -1002,6 +1253,12 @@ class ShadowVisionProviders:
                 "reason": "REACTION_SUPPORT_INSUFFICIENT",
             }),
         }
+        if requires_reference:
+            result["visual_crossing_audit"]["active_ball_link"] = link
+            result["active_ball_reference"] = reference
+            if link["status"] != "VERIFIED":
+                result["visual_crossing_audit"].update(status="UNRESOLVED", proof_ready=False,
+                    reason=link["reason"], proof_reason=link["reason"], same_ball_continuity=False)
         self._goal_cache[cache_key] = result
         return result
 

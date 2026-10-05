@@ -398,6 +398,7 @@ def _visual_crossing_audit(goal_geometry):
         "field_side_before_media_ms": row.get("field_side_before_media_ms"),
         "beyond_line_media_ms": row.get("beyond_line_media_ms"),
         "structured_evidence": list(row.get("structured_evidence") or []),
+        "active_ball_link": deepcopy(row.get("active_ball_link")),
     }
 
 
@@ -425,6 +426,8 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
         return None
     if not _num(strike_ms):
         return None
+    if audit.get("active_ball_link") is not None and (audit["active_ball_link"] or {}).get("status") != "VERIFIED":
+        return None
     before_ms = audit.get("field_side_before_media_ms")
     crossing_ms = audit.get("first_crossing_media_ms")
     beyond_ms = audit.get("beyond_line_media_ms")
@@ -432,6 +435,9 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
         return None
     start = int(strike_ms)
     before_ms, crossing_ms, beyond_ms = int(before_ms), int(crossing_ms), int(beyond_ms)
+    link = audit.get("active_ball_link")
+    if isinstance(link, dict) and (not _num(link.get("media_ms")) or link["media_ms"] > before_ms):
+        return None
     if not (start <= before_ms < crossing_ms <= beyond_ms <= start + MAX_POST_STRIKE_MS):
         return None
     evidence_rows = [row for row in audit.get("structured_evidence") or [] if isinstance(row, dict)]

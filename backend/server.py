@@ -2956,8 +2956,8 @@ Produce a JSON object EXACTLY in this format:
 
 RULES FOR TOP-LEVEL "scores":
 - These are AGGREGATES. Average the observable sub-skills in each category.
-- If MOST sub-skills in a category are cannot_evaluate, score the category honestly low (3-5) and set scores_confidence to "low".
-- If the entire category is cannot_evaluate, still give a defensible integer (e.g. 5) but set scores_confidence to "low" and reflect this in evidence_quality_note.
+- If MOST sub-skills in a category are cannot_evaluate, set the category score to null and scores_confidence to "low"; insufficient evidence is not low performance.
+- If the entire category is cannot_evaluate, set its score to null and explain the missing evidence in evidence_quality_note. Never invent a default grade.
 
 RULES FOR "overall_benchmark":
 - The tier_label MUST match the AGE BRACKET RUBRIC above. Compare the overall_development score against the rubric for the player's age bracket.
@@ -8605,7 +8605,7 @@ def _collect_anchor_crop_paths(anchor_payload_list: list) -> tuple[list[str], li
 
 async def _compose_full_prompt(doc: dict, audio_events_full, anchor_payload_list: list,
                                crop_path_str, gt_track, gt_t_off,
-                               event_ledger_obj=None) -> str:
+                               event_ledger_obj=None, canonical_events=None) -> str:
     """EXISTING full-report prompt composition (precision priors + identity
     profile + identity memory + ground-truth positions), extracted verbatim so
     the normal pipeline and corrective-only recovery build the SAME prompt."""
@@ -8681,6 +8681,9 @@ async def _compose_full_prompt(doc: dict, audio_events_full, anchor_payload_list
             full_prompt += lb
     except Exception:
         pass
+    if isinstance(canonical_events, dict):
+        import report_fact_authority
+        full_prompt += report_fact_authority.prompt_block(canonical_events)
     return full_prompt
 
 
@@ -8879,7 +8882,7 @@ async def _corrective_only_recovery(report_id: str, doc: dict) -> None:
     ]
     full_prompt = await _compose_full_prompt(
         doc, audio_events_full, anchor_payload_list, crop_path_str, gt_track, gt_t_off,
-        event_ledger_obj=doc.get("event_ledger"))
+        event_ledger_obj=doc.get("event_ledger"), canonical_events=doc.get("canonical_events"))
     outcome = await _run_identity_corrective_pass(
         report_id, full_prompt=full_prompt, file_path=file_path, marker_path=marker_path,
         crop_path_str=crop_path_str, anchor_crops_full=anchor_crops_full,
@@ -9087,6 +9090,11 @@ async def generate_full_report_task(report_id: str) -> None:
             "vision_model": fix10a_runtime.fix10a_vision_providers.VERIFY_MODEL,
             "goal_reviews_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_REVIEWS_PER_REPORT,
             "goal_clarifications_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_CLARIFICATIONS_PER_REPORT,
+            "action_inspections_per_report": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_REVIEWS,
+            "feedback_inspections_per_report": fix10a_runtime.fix10a_vision_providers.evidence_feedback.MAX_FEEDBACK_REVIEWS,
+            "feedback_rounds": 1,
+            "action_inspection_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_FRAMES,
+            "action_native_neighbor_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES,
         })
         await db.reports.update_one({"id": report_id}, {"$set": {"analysis_run_manifest": run_manifest}})
         await _trace(report_id, "tracking_start")
@@ -9569,7 +9577,8 @@ async def generate_full_report_task(report_id: str) -> None:
         full_prompt = await _compose_full_prompt(
             doc, audio_events_full, anchor_payload_list, crop_path_str,
             _geometry_authority_track, gt_t_off,
-            event_ledger_obj=event_ledger_obj)
+            event_ledger_obj=event_ledger_obj,
+            canonical_events=_unified_result.get("canonical_events") if isinstance(_unified_result, dict) else None)
         # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
         full, _mm_done = await asyncio.gather(
             call_gemini_with_video(

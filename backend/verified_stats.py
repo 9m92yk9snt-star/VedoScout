@@ -502,7 +502,7 @@ def _num(tok) -> int | None:
 
 _CREATOR_RE = re.compile(rf"\b{_NUM_RE}[-\s]goal\s+creator\b", re.I)
 _GOAL_COUNT_RES = (
-    re.compile(rf"\b{_NUM_RE}\s+goals?\b", re.I),
+    re.compile(rf"\b{_NUM_RE}\s+(?:[a-z]+\s+){{0,4}}goals?\b", re.I),
     re.compile(rf"\b{_NUM_RE}[-\s]goal\b", re.I),
     re.compile(rf"\bscored\s+{_NUM_RE}\b", re.I),
 )
@@ -773,4 +773,15 @@ def apply_verified_stats_authority(full: dict) -> dict:
     build_verified_stats(full, scan)
     rebuild_match_stats(full)
     reconcile_verified_claims(full)
+    if isinstance(full.get("analysis_authority"), dict):
+        import report_fact_authority
+        full = report_fact_authority.apply(full, {"events": [
+            {**e, "proof_eligible": e.get("cross_verified") is True,
+             "canonical_ms": e.get("event_start_ms", ts_to_ms(e.get("timestamp"))),
+             "start_ms": e.get("event_start_ms", ts_to_ms(e.get("timestamp"))),
+             "end_ms": e.get("event_end_ms", ts_to_ms(e.get("timestamp"))),
+             "canonical_event_type": e.get("football_event_type", e.get("canonical_event_type")),
+             "canonical_outcome": e.get("football_outcome", e.get("canonical_result")),
+             "causal_verified": e.get("canonical_result") in {"SCORED", "TEAMMATE_SCORED"}}
+            for e in full.get("action_timeline") or [] if isinstance(e, dict)]})
     return full

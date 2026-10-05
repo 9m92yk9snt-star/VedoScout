@@ -83,6 +83,12 @@ jobs:
             backend/shot_outcome_engine.py \
             backend/event_trace.py \
             backend/physical_match_reconstruction.py \
+            backend/action_evidence_review.py \
+            backend/cross_window_evidence.py \
+            backend/evidence_feedback.py \
+            backend/goal_review_scheduler.py \
+            backend/scripts/replay_report_evidence.py \
+            backend/scripts/reference_action_review.py \
             backend/open_observation_compat.py \
             backend/fix10a_vision_providers.py \
             backend/fix10a_goal_direction.py \
@@ -98,7 +104,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py
 
   backend_regression:
     runs-on: ubuntu-latest
@@ -217,6 +223,7 @@ jobs:
         run: |
           node frontend/scripts/audit-analysis-poll.cjs
           node frontend/scripts/check-report-coverage.cjs
+          node frontend/scripts/check-video-frame-authority.cjs
       - name: Build frontend
         working-directory: frontend
         env:

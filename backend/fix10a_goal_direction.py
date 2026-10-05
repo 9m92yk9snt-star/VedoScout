@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import hashlib
 import math
 import os
 import tempfile
@@ -28,7 +29,7 @@ VERSION = 1
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
 MAX_GOAL_REVIEWS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "16"))
-MAX_GOAL_CLARIFICATIONS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT", "4"))
+MAX_GOAL_CLARIFICATIONS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT", "16"))
 MIN_FIELD_SIDE_FRAMES = 2
 GEOMETRY_NEAR_MS = 500
 BALL_ROW_NEAR_MS = 80
@@ -36,7 +37,7 @@ FIELD_SIDE_MIN_DISTANCE = 0.01
 
 
 def _num(value) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def _valid_box(box) -> bool:
@@ -163,6 +164,12 @@ async def read_field_side_evidence(api_key: str, session_id: str,
             })
         return {
             "status": "VERIFIED" if len(rows) >= MIN_FIELD_SIDE_FRAMES else "UNRESOLVED",
+            "model_review_audit": {
+                "provider": VERIFY_PROVIDER, "model": VERIFY_MODEL, "raw_response": text[:50000],
+                "media_ms": [ms for _, ms in pairs],
+                "response_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                "input_sha256": hashlib.sha256(prompt.encode() + b"".join(path.read_bytes() for path, _ in pairs)).hexdigest(),
+            },
             "rows": rows,
             "reason": "MULTI_FRAME_FIELD_SIDE_VISIBLE" if len(rows) >= MIN_FIELD_SIDE_FRAMES
                       else "FIELD_SIDE_VISIBILITY_INSUFFICIENT",
@@ -185,6 +192,7 @@ class GoalDirectionProvider:
         ))
         self.calls = 0
         self.clarification_calls = 0
+        self.field_side_calls = 0
         self.max_clarifications = max(0, MAX_GOAL_CLARIFICATIONS_PER_REPORT)
         self._cache = {}
 
@@ -192,14 +200,36 @@ class GoalDirectionProvider:
         if self.base_provider is None:
             return None
         strike_ms = int(strike.get("media_ms")) if isinstance(strike, dict) and _num(strike.get("media_ms")) else None
+        if strike_ms is None:
+            return None
         scene_id = str((strike or {}).get("scene_id") or (window or {}).get("scene_id") or "")
         # Geometry is about the same physical ball at a media instant, not a
         # window-local track ID. Overlap must not spend another review budget.
         start_ms = max(int((window or {}).get("start_ms") or 0), (strike_ms or 0) - 150)
         end_ms = min(int((window or {}).get("end_ms") or (strike_ms or 0) + 2600), (strike_ms or 0) + 2600)
-        cache_key = (scene_id or str((window or {}).get("dense_window_id") or ""), strike_ms, start_ms, end_ms)
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        context = strike.get("_review_context") or {}
+        if all(_num(context.get(k)) for k in ("start_ms", "end_ms", "media_ms")):
+            start_ms, end_ms = int(context["start_ms"]), int(context["end_ms"])
+            window = {**window, "start_ms": start_ms, "end_ms": end_ms}
+            strike = {**strike, "media_ms": int(context["media_ms"])}
+        anchor = strike.get("active_ball_anchor") or {}
+        ball_key = (int(anchor["media_ms"]), tuple(round(float(anchor["box"][k]), 5) for k in ("x", "y", "w", "h"))) \
+            if _num(anchor.get("media_ms")) and _valid_box(anchor.get("box")) else None
+        cache_key = (scene_id or str((window or {}).get("dense_window_id") or ""),
+                     strike.get("_review_episode_id") or (strike_ms, ball_key))
+        for saved_start, saved_end, saved in self._cache.get(cache_key, []):
+            if saved_start <= start_ms and saved_end >= end_ms:
+                result = deepcopy(saved)
+                if isinstance(result, dict):
+                    result["review_delivery"] = {"status": "REUSED", "start_ms": saved_start,
+                                                 "end_ms": saved_end}
+                return result
+
+        def remember(value):
+            if isinstance(value, dict):
+                value["review_delivery"] = {"status": "EXECUTED", "start_ms": start_ms, "end_ms": end_ms}
+            self._cache.setdefault(cache_key, []).append((start_ms, end_ms, deepcopy(value)))
+            return value
         clarification = (strike or {}).get("_review_lane") == "CLARIFICATION"
         exhausted = (self.clarification_calls >= self.max_clarifications if clarification
                      else self.calls >= self.max_reviews)
@@ -228,8 +258,7 @@ class GoalDirectionProvider:
             base = {"status": "UNRESOLVED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
                     "reason": "goal_geometry_reader_error", "line_by_ms": []}
         if not isinstance(base, dict):
-            self._cache[cache_key] = base
-            return base
+            return remember(base)
         result = dict(base)
         lines = [
             row for row in result.get("line_by_ms") or []
@@ -241,14 +270,12 @@ class GoalDirectionProvider:
         ):
             result["field_side_status"] = "UNRESOLVED"
             result["field_side_by_ms"] = []
-            self._cache[cache_key] = result
-            return result
+            return remember(result)
         frames = _read_frames(self.video_path, [row["media_ms"] for row in lines])
         if len(frames) < MIN_FIELD_SIDE_FRAMES:
             result["field_side_status"] = "UNRESOLVED"
             result["field_side_by_ms"] = []
-            self._cache[cache_key] = result
-            return result
+            return remember(result)
         with tempfile.TemporaryDirectory(prefix="fix10a_field_side_") as temp:
             root = Path(temp)
             paths, actual_ms = [], []
@@ -260,6 +287,7 @@ class GoalDirectionProvider:
                 evidence = {"status": "UNRESOLVED", "rows": [], "reason": "frame_write_failed"}
             else:
                 try:
+                    self.field_side_calls += 1
                     evidence = asyncio.run(read_field_side_evidence(
                         self.api_key,
                         f"{self.session_prefix}-field-side-{strike_ms}",
@@ -271,9 +299,9 @@ class GoalDirectionProvider:
         result["field_side_status"] = str(evidence.get("status") or "UNRESOLVED")
         result["field_side_by_ms"] = list(evidence.get("rows") or [])
         result["field_side_source"] = "INDEPENDENT_PLAYABLE_PITCH_REVIEW"
+        result["field_side_model_audit"] = evidence.get("model_review_audit")
         result["field_side_reason"] = str(evidence.get("reason") or "field_side_unresolved")[:180]
-        self._cache[cache_key] = result
-        return result
+        return remember(result)
 
 
 def wrap_goal_geometry_provider(base_provider, api_key: str | None,

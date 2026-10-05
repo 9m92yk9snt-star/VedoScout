@@ -269,4 +269,9 @@ def apply_jersey_consensus(window_evidence, touch_graph: dict | None,
         "window_evidence": frames,
         "touch_graph": graph,
         "consensus_by_track": consensus,
+        # Store raw responses once per trace/track, not in every dense body
+        # posterior. Otherwise frame replication can exceed export size limits.
+        "model_audits_by_track": {track: [deepcopy(v["model_review_audit"]) for v in votes
+                                         if isinstance(v, dict) and isinstance(v.get("model_review_audit"), dict)]
+                                  for track, votes in raw_votes.items() if isinstance(track, str)},
     }

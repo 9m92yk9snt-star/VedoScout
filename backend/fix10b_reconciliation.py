@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import math
 from copy import deepcopy
+import cross_window_evidence
 
 VERSION = 1
 GLOBAL_TARGET_ID = "GLOBAL_TARGET"
@@ -1024,9 +1025,22 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
 def collect_proposals(physical_result: dict | None) -> list[dict]:
     physical = physical_result if isinstance(physical_result, dict) else {}
     rows = []
-    for trace in physical.get("traces") or []:
+    for trace in cross_window_evidence.build(physical)["contexts"]:
         if isinstance(trace, dict):
-            rows.extend(proposals_from_trace(trace))
+            proposals = proposals_from_trace(trace)
+            if trace.get("source_trace_ids"):
+                for proposal in proposals:
+                    if proposal["kind"] == "ASSIST":
+                        involved = [s for s in trace["strike_evidence"] if (
+                            s.get("media_ms") == proposal.get("target_contact_ms") and s.get("player_track_id") == proposal.get("target_track_id")) or (
+                            s.get("media_ms") == proposal.get("teammate_shot_ms") and s.get("player_track_id") == proposal.get("scorer_track_id"))]
+                        if len({s.get("native_source_trace_id") for s in involved}) > 1 and not all(s.get("cross_window_ball_anchor_eligible") for s in involved):
+                            continue
+                    proposal["source_trace_ids"] = trace["source_trace_ids"]
+                    proposal["cross_window_links"] = trace["cross_window_links"]
+                    rows.append(proposal)
+            else:
+                rows.extend(proposals)
     # Overlapping FIX10A windows can contain the same real chain. Keep one
     # deterministic proposal per kind/scene/target/scorer within a tight bound.
     deduped = []
@@ -1157,6 +1171,8 @@ def _physical_proof(proposal) -> dict:
         "source": "FIX10B_PHYSICAL_RECONCILIATION",
         "proposal_id": proposal.get("proposal_id"),
         "source_trace_id": proposal.get("source_trace_id"),
+        "source_trace_ids": deepcopy(proposal.get("source_trace_ids") or []),
+        "cross_window_links": deepcopy(proposal.get("cross_window_links") or []),
         "source_touch_id": proposal.get("source_touch_id"),
         "source_strike_id": proposal.get("source_strike_id"),
         "source_unresolved_action_id": proposal.get("source_unresolved_action_id"),

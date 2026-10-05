@@ -1,0 +1,7 @@
+[
+  {"case_id": "saved_shot", "reference_ms": 23680, "expected_type": "SHOT", "expected_outcome": "SAVED", "tolerance_ms": 1000},
+  {"case_id": "target_goal", "reference_ms": 30830, "expected_type": "GOAL", "expected_outcome": "GOAL", "tolerance_ms": 1000},
+  {"case_id": "assist_1", "reference_ms": 43190, "expected_type": "ASSIST", "expected_outcome": "TEAMMATE_GOAL", "tolerance_ms": 1000},
+  {"case_id": "assist_2", "reference_ms": 49440, "expected_type": "ASSIST", "expected_outcome": "TEAMMATE_GOAL", "tolerance_ms": 1000},
+  {"case_id": "assist_3", "reference_ms": 56440, "expected_type": "ASSIST", "expected_outcome": "TEAMMATE_GOAL", "tolerance_ms": 1000}
+]

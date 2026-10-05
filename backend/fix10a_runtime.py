@@ -14,6 +14,7 @@ import os
 import re
 import time
 import threading
+from copy import deepcopy
 from pathlib import Path
 
 import event_trace
@@ -69,6 +70,10 @@ def _compact_physical_result(result: dict | None) -> dict:
         "trace_summaries": row.get("trace_summaries") or [],
         "unresolved_reasons": row.get("unresolved_reasons") or [],
         "recall_coverage": row.get("recall_coverage") or {},
+        "action_inspection_plan": row.get("action_inspection_plan") or {},
+        "evidence_feedback_plan": row.get("evidence_feedback_plan") or {},
+        "goal_review_plan": row.get("goal_review_plan") or {},
+        "cross_window_evidence": row.get("cross_window_evidence") or {},
         "metrics": row.get("metrics") or {},
         "audit_storage_complete": row.get("audit_storage_complete"),
         "dense_traces_persisted_in_mongo": False,
@@ -128,7 +133,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
               db, r2_storage=None, source_video: dict | None = None,
               local_dir=None, jersey_vote_provider=None,
               goal_geometry_provider=None, role_evidence=None,
-              role_evidence_provider=None, vision_api_key: str | None = None) -> dict:
+              role_evidence_provider=None, action_evidence_provider=None,
+              vision_api_key: str | None = None) -> dict:
     """Run production FIX10A and return a proof-gated FIX10B candidate.
 
     The call is awaited by the main report pipeline. If reconstruction fails,
@@ -179,6 +185,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
             "goal_provider": bool(goal_geometry_provider),
             "goal_direction_provider": False,
             "role_provider": bool(role_evidence_provider),
+            "action_provider": bool(action_evidence_provider),
         }
         if support_vision_enabled():
             api_key = str(vision_api_key or os.environ.get("EMERGENT_LLM_KEY") or "")
@@ -200,6 +207,8 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                     )
                 if role_evidence_provider is None:
                     role_evidence_provider = bundle.role_evidence_provider
+                if action_evidence_provider is None:
+                    action_evidence_provider = getattr(bundle, "action_evidence_provider", None)
                 support_mode.update({
                     "enabled": True,
                     "jersey_provider": bool(jersey_vote_provider),
@@ -209,6 +218,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                         fix10a_goal_direction.GoalDirectionProvider,
                     ),
                     "role_provider": bool(role_evidence_provider),
+                    "action_provider": bool(action_evidence_provider),
                 })
 
         manifests = []
@@ -218,8 +228,9 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
         accepting = threading.Event()
         accepting.set()
         loop = asyncio.get_running_loop()
+        publication_lock = asyncio.Lock()
 
-        async def publish_trace(trace):
+        async def _publish_trace(trace):
             manifest = None
             try:
                 manifest = await _persist_trace(report_id, trace, r2_storage, local_dir)
@@ -234,16 +245,30 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                     except Exception as local_exc:
                         error["local_error_type"] = type(local_exc).__name__
             if manifest is not None:
-                manifests.append(manifest)
+                existing = next((i for i, m in enumerate(manifests)
+                                 if m.get("trace_id") == manifest.get("trace_id")), None)
+                if existing is None:
+                    manifests.append(manifest)
+                else:
+                    manifests[existing] = manifest
                 if db is not None:
                     try:
+                        manifest_update = ({"$push": {"fix10a_trace_manifest": manifest}}
+                                           if existing is None else
+                                           {"$set": {"fix10a_trace_manifest": deepcopy(manifests)}})
                         await db.reports.update_one({"id": report_id}, {
-                            "$push": {"fix10a_trace_manifest": manifest},
+                            **manifest_update,
                             "$max": {"fix10a_completed_windows": len(manifests)},
                         })
                     except Exception as exc:
                         storage_errors.append({"trace_id": trace.get("trace_id"),
                                                "error_type": type(exc).__name__, "stage": "manifest_persistence"})
+
+        async def publish_trace(trace):
+            # Preserve pending→complete publication order; a slow upload may
+            # never overwrite the newer final manifest with preliminary proof.
+            async with publication_lock:
+                await _publish_trace(trace)
 
         def completed_trace(trace):
             if not accepting.is_set():
@@ -251,7 +276,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
             emitted.add(trace.get("trace_id"))
             # Never block the CV worker waiting for an upload on the same
             # executor: otherwise concurrent runs could exhaust its threads.
-            pending.append(asyncio.run_coroutine_threadsafe(publish_trace(trace), loop))
+            pending.append(asyncio.run_coroutine_threadsafe(publish_trace(deepcopy(trace)), loop))
 
         try:
             physical = await asyncio.to_thread(
@@ -260,6 +285,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                 result.get("scene_graph") or {}, result.get("identity_authority") or {}, jersey_vote_provider,
                 source_video=source_video or {}, goal_geometry_provider=goal_geometry_provider,
                 role_evidence=role_evidence or {}, role_evidence_provider=role_evidence_provider,
+                action_evidence_provider=action_evidence_provider,
                 trace_callback=completed_trace,
             )
             await asyncio.gather(*(asyncio.wrap_future(future) for future in pending))

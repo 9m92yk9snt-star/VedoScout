@@ -311,7 +311,12 @@ export function deriveV2(report) {
   // ---- Scout outlook ----
   const so = full.scout_outlook || {};
   const nextTier = NEXT_TIER[obTier] || obTier;
-  const scoutOutlook = {
+  const scoutOutlook = full.report_fact_authority?.status === "REVIEW_REQUIRED" && typeof full.scores?.overall_development !== "number" ? {
+    currentLabel: "Insufficient verified evidence", currentDots: 0,
+    potentialLabel: "Not assessed", potentialDots: 0,
+    readiness: "Not assessed", longTerm: "Not assessed",
+    longTermNote: "Further verified match evidence is needed for this assessment.",
+  } : {
     currentLabel: so.current_level_label || ob.tier_label || TIER_LABELS[obTier] || "—",
     currentDots: so.current_level_dots || TIER_DOTS[obTier] || 3,
     potentialLabel: so.potential_level_label || TIER_LABELS[nextTier] || "—",

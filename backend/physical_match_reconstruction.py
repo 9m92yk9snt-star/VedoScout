@@ -9,6 +9,8 @@ reconciliation belongs to FIX10B and the existing B3 authority.
 from __future__ import annotations
 
 from copy import deepcopy
+import cross_window_evidence
+import evidence_feedback
 import inspect
 import traceback
 import time
@@ -28,6 +30,9 @@ import shot_outcome_engine
 import short_occlusion_contact_recovery
 import touch_graph
 import unified_identity_authority
+import dense_identity_continuity
+import goal_review_scheduler
+import action_evidence_review
 
 VERSION = 1
 SOURCE_ROLE = "CANONICAL_WEB_VIDEO"
@@ -233,7 +238,7 @@ def _adapter_diagnostics(value):
     """Readers can catch SDK failures themselves; keep those outcomes explicit."""
     if isinstance(value, dict):
         errors = [str(value.get(key) or "").lower() for key in ("reason", "field_side_reason", "proof_reason")]
-        errors = [reason for reason in errors if "reader_error" in reason or "reader_unavailable" in reason]
+        errors = [reason for reason in errors if "reader_error" in reason or "reader_unavailable" in reason or "reader_invalid" in reason]
         if errors:
             return errors
         return [reason for item in value.values() for reason in _adapter_diagnostics(item)]
@@ -286,6 +291,36 @@ def _window_unresolved_reasons(contact_result, jersey_result, outcomes):
     return list(dict.fromkeys(reasons))
 
 
+def _apply_cross_window_review_context(jobs, traces):
+    """Use measured overlap to give downstream reviews their prior pass context."""
+    graph = cross_window_evidence.build({"traces": traces})
+    scopes = {}
+    for context in graph["contexts"]:
+        if not context.get("source_trace_ids"):
+            continue
+        for strike in context["strike_evidence"]:
+            if strike.get("cross_window_ball_anchor_eligible"):
+                scopes[(strike["native_source_trace_id"], strike["native_source_strike_id"])] = (context, strike)
+    result = []
+    for original in jobs:
+        job = dict(original)
+        key = (job["window"].get("dense_window_id"), job["strike"].get("strike_id"))
+        linked = scopes.get(key)
+        if linked:
+            context, strike = linked
+            qualified = [s for s in context["strike_evidence"] if s.get("cross_window_ball_anchor_eligible")]
+            eligibility = _goal_review_eligibility(strike, qualified, context["touch_graph"])
+            if eligibility.get("eligible"):
+                job["eligibility"] = {**eligibility, "source_trace_ids": context["source_trace_ids"],
+                                      "cross_window_links": context["cross_window_links"]}
+                job["review"] = {**job["eligibility"], "lane": "VERIFIED_CHAIN"}
+                job["window"] = {**job["window"], "end_ms": context["window"]["end_ms"]}
+        result.append(job)
+    return result, {"links": graph["links"], "rejected": graph["rejected"],
+                    "contexts": [{"trace_id": c["trace_id"], "source_trace_ids": c["source_trace_ids"]}
+                                 for c in graph["contexts"] if c.get("source_trace_ids")]}
+
+
 def _source_meta(source_video, video_path):
     src = deepcopy(source_video) if isinstance(source_video, dict) else {}
     src.setdefault("role", SOURCE_ROLE)
@@ -311,6 +346,88 @@ def _window_error(exc: Exception, stage: str) -> dict:
     }
 
 
+def _review_outcome(job, geometry, previous):
+    track = job["shot_track"]
+    outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
+        job["strike"], track["rows"], job["touch_graph"],
+        goal_geometry=geometry, role_evidence=job["roles"])
+    outcome["goal_review_decision"] = deepcopy(job["review"])
+    outcome["ball_trajectory_source"] = track["source"]
+    outcome["ball_trajectory_seed_ms"] = track["seed_ms"]
+    outcome["ball_trajectory_points"] = deepcopy(previous.get("ball_trajectory_points") or [])
+    outcome = post_strike_intervention.apply_intervention_evidence(outcome, job["intervention"], job["roles"])
+    outcome = fix10a_goal_direction.apply_direction_gate(outcome, track["rows"], geometry)
+    outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, track["rows"])
+    outcome["goal_review_eligibility"] = deepcopy(job["eligibility"])
+    return outcome
+
+
+def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, scene_graph,
+                       identity_authority, *, action_evidence_provider=None,
+                       jersey_vote_provider=None, goal_geometry_provider=None,
+                       role_evidence_provider=None, role_evidence=None, source_video=None, review_jobs=None,
+                       feedback_trace_ids=None):
+    """Re-enter the original physical gates once using preserved measured frames."""
+    feedback = evidence_feedback.build_plan([t for t in traces if feedback_trace_ids is None
+        or t["trace_id"] in feedback_trace_ids], analysis=sequence_analysis)
+    feedback["executed_windows"] = 0
+    feedback["configured"] = action_evidence_provider is not None
+    selected = [j for j in feedback["jobs"] if j["selected"]]
+    if not selected or action_evidence_provider is None:
+        return traces, [], feedback
+    by_id = {t["trace_id"]: t for t in traces}
+    wanted = {j["dense_window_id"] for j in selected}
+    context = {"traces": {tid: by_id[tid] for tid in wanted}, "jobs": selected,
+               "support_traces": [t for t in traces if t["trace_id"] not in wanted]}
+    rerun = reconstruct_physical_match(
+        video_path, sequence_plan, sequence_analysis, scene_graph, identity_authority,
+        jersey_vote_provider=jersey_vote_provider, goal_geometry_provider=goal_geometry_provider,
+        role_evidence_provider=role_evidence_provider, action_evidence_provider=action_evidence_provider,
+        role_evidence=role_evidence, source_video=source_video, _feedback_context=context)
+    replacements = {}
+    for new in rerun["traces"]:
+        old = by_id[new["trace_id"]]
+        new["evidence_feedback"] = {"round": 1, "before": evidence_feedback.gaps(old),
+                                    "after": evidence_feedback.gaps(new), "canonical_authority": False}
+        new["first_pass_evidence"] = {k: deepcopy(old.get(k)) for k in (
+            "contacts", "touch_graph", "strike_evidence", "outcome_evidence", "unresolved_reasons")}
+        new["action_inspections"] = deepcopy(old.get("action_inspections") or []) + new["action_inspections"]
+        new["provider_diagnostics"] = deepcopy(old.get("provider_diagnostics") or []) + new["provider_diagnostics"]
+        new["provider_adapter_errors"] = sorted(set((old.get("provider_adapter_errors") or []) + new["provider_adapter_errors"]))
+        for track, audits in (old.get("jersey_model_audits") or {}).items():
+            new["jersey_model_audits"].setdefault(track, []).extend(deepcopy(audits))
+        replacements[new["trace_id"]] = new
+    feedback["executed_windows"] = len(replacements)
+    feedback["results"] = [{"trace_id": t["trace_id"], **t["evidence_feedback"]} for t in replacements.values()]
+    feedback["failed_windows"] = [r for r in rerun["windows"] if r.get("status") == "error"]
+    merged = [replacements.get(t["trace_id"], t) for t in traces]
+    current = {t["trace_id"]: t for t in merged}
+    # A recovered pass must also re-open an existing downstream review in a
+    # different window. Reprocessing only the pass window would leave the
+    # recipient blocked by its first-pass eligibility decision.
+    remaining = [j for j in review_jobs or [] if j["window"]["dense_window_id"] not in replacements]
+    revised, _ = _apply_cross_window_review_context(remaining, merged)
+    unlocked = [new for old, new in zip(remaining, revised)
+                if new["eligibility"].get("eligible") and not old["eligibility"].get("eligible")]
+    feedback["downstream_reviews_unlocked"] = len(unlocked)
+    for job in goal_review_scheduler.ordered_requests(unlocked, sequence_analysis):
+        tr = current[job["window"]["dense_window_id"]]
+        previous = tr["outcome_evidence"][job["outcome_index"]]
+        tr.setdefault("feedback_prior_outcomes", []).append(deepcopy(previous))
+        try:
+            geometry = _safe_provider(goal_geometry_provider, deepcopy(job["window"]), deepcopy(job["strike"]),
+                default=None, diagnostics=tr["provider_diagnostics"], name="goal_geometry_feedback")
+            tr["outcome_evidence"][job["outcome_index"]] = _review_outcome(job, geometry, previous)
+            tr["provider_adapter_errors"] = sorted(set(tr["provider_adapter_errors"] + _adapter_diagnostics(geometry)))
+        except Exception as exc:
+            tr["provider_diagnostics"].append({"provider": "goal_geometry_feedback", "status": "ERROR", "error_type": type(exc).__name__})
+        tr["unresolved_reasons"] = [r for r in tr.get("unresolved_reasons") or [] if r not in {
+            "GOAL_PLANE_CROSSING_UNRESOLVED", "POST_STRIKE_OUTCOME_UNRESOLVED"}]
+        tr["unresolved_reasons"].extend(r for r in _window_unresolved_reasons({}, {}, tr["outcome_evidence"])
+            if r in {"GOAL_PLANE_CROSSING_UNRESOLVED", "POST_STRIKE_OUTCOME_UNRESOLVED"})
+    return merged, rerun["windows"], feedback
+
+
 def reconstruct_physical_match(
     video_path: str,
     sequence_plan: dict | None,
@@ -323,10 +440,12 @@ def reconstruct_physical_match(
     goal_geometry_provider=None,
     role_evidence: dict | None = None,
     role_evidence_provider=None,
+    action_evidence_provider=None,
     detector_fn=None,
     camera_estimator=None,
     dense_frame_provider=None,
     trace_callback=None,
+    _feedback_context=None,
 ) -> dict:
     """Build bounded physical evidence without changing canonical truth."""
     plan = deepcopy(sequence_plan) if isinstance(sequence_plan, dict) else {}
@@ -340,18 +459,26 @@ def reconstruct_physical_match(
         semantic_windows,
         recall_windows,
     )
+    inspection_plan = action_evidence_review.build_plan(windows, analysis)
+    if _feedback_context is not None:
+        windows = [deepcopy(t["window"]) for t in _feedback_context["traces"].values()]
+        inspection_plan = {"jobs": deepcopy(_feedback_context["jobs"])}
     source = _source_meta(source_video, video_path)
     traces = []
     summaries = []
     window_rows = []
     unresolved_all = []
+    review_jobs = []
 
     for window in windows:
         stage = "window_setup"
         try:
             provider_diagnostics = []
             stage = "dense_replay"
-            if dense_frame_provider is None:
+            previous = (_feedback_context or {}).get("traces", {}).get(window["dense_window_id"])
+            if previous is not None:
+                dense_iter = []
+            elif dense_frame_provider is None:
                 dense_iter = dense_replay.iter_dense_frames(
                     str(video_path), int(window["start_ms"]), int(window["end_ms"])
                 )
@@ -361,11 +488,39 @@ def reconstruct_physical_match(
                 )
 
             stage = "dense_track_refinement"
-            refined = dense_track_refinement.refine_window(
+            refined = {"frames": deepcopy(previous["decoded_frames"])} if previous is not None else dense_track_refinement.refine_window(
                 dense_iter, graph, authority, str(window.get("scene_id") or ""),
                 detector_fn=detector_fn, camera_estimator=camera_estimator,
             )
             dense_frames = list(refined.get("frames") or []) if isinstance(refined, dict) else []
+            dense_frames = dense_identity_continuity.apply(dense_frames)["frames"]
+
+            # Inspection admission precedes physical/identity proof. Pixel
+            # proposals do not become contacts or target identity directly:
+            # ball locations need a fresh native detector match, and jersey
+            # crops still use the separate multi-frame number authority.
+            stage = "action_pixel_inspection"
+            inspection_rows, inspection_requests = [], []
+            for job in inspection_plan["jobs"]:
+                if job["dense_window_id"] != window["dense_window_id"]:
+                    continue
+                if not job["selected"]:
+                    inspection_rows.append({**job, "status": "DEFERRED", "reason": "ACTION_INSPECTION_BUDGET_EXHAUSTED"})
+                    continue
+                if action_evidence_provider is None:
+                    inspection_rows.append({**job, "status": "NOT_CONFIGURED"})
+                    continue
+                observation = _safe_provider(
+                    action_evidence_provider, str(video_path), deepcopy(job), deepcopy(dense_frames),
+                    default={"status": "ERROR", "reason": "action_pixel_reader_error", "frames": []},
+                    diagnostics=provider_diagnostics, name="action_pixels")
+                observation = observation if isinstance(observation, dict) else {"status": "NO_EVIDENCE", "frames": []}
+                applied = action_evidence_review.apply_observations(dense_frames, observation, job["inspection_id"])
+                dense_frames = applied["frames"]
+                inspection_requests.extend(applied["jersey_requests"])
+                inspection_rows.append({**job, **observation, "added_ball_candidates": applied["added_ball_candidates"],
+                                        "binding_rejections": applied["binding_rejections"],
+                                        "independent_jersey_crops": len(applied["jersey_requests"])})
 
             stage = "ball_trajectory"
             trajectory = ball_trajectory.reconstruct_ball_trajectory(dense_frames)
@@ -385,6 +540,15 @@ def reconstruct_physical_match(
             contact_result = short_occlusion_contact_recovery.apply_recovered_contacts(
                 contact_result, step3_recovery
             )
+            if previous is not None:
+                # Step-3 input pixels may not exist in an exported replay.
+                # Retain independently verified original contacts, with their
+                # original provenance, rather than inventing new support.
+                ids = {c.get("contact_id") for c in contact_result.get("contacts") or []}
+                for c in (previous.get("contacts") or {}).get("accepted") or []:
+                    if c.get("proof_eligible") is True and str(c.get("contact_id") or "").startswith("touchcand_step3_") and c.get("contact_id") not in ids:
+                        contact_result.setdefault("accepted", []).append(deepcopy(c))
+                        contact_result.setdefault("contacts", []).append(deepcopy(c))
 
             stage = "touch_graph"
             touches = touch_graph.build_touch_graph(contact_result, authority, dense_frames)
@@ -396,7 +560,7 @@ def reconstruct_physical_match(
             )
 
             stage = "jersey_request_selection"
-            requests = jersey_consensus.select_jersey_review_requests(dense_frames, touches)
+            requests = inspection_requests + jersey_consensus.select_jersey_review_requests(dense_frames, touches)
 
             stage = "jersey_provider"
             votes_by_track = _safe_provider(
@@ -405,6 +569,10 @@ def reconstruct_physical_match(
             )
             if not isinstance(votes_by_track, dict):
                 votes_by_track = {}
+            if previous is not None:
+                for track, row in (previous.get("jersey_consensus") or {}).items():
+                    if isinstance(row, dict):
+                        votes_by_track[track] = deepcopy(row.get("votes") or []) + votes_by_track.get(track, [])
 
             stage = "jersey_consensus"
             jersey_result = jersey_consensus.apply_jersey_consensus(dense_frames, touches, votes_by_track)
@@ -418,6 +586,9 @@ def reconstruct_physical_match(
                 touch_with_jersey,
                 jersey_result.get("consensus_by_track") or {},
             )
+            shared_identity = dense_identity_continuity.apply(dense_with_jersey, touch_with_jersey)
+            dense_with_jersey = shared_identity["frames"]
+            touch_with_jersey = shared_identity["touch_graph"]
             # Re-evaluate delayed release roles after a safe local-track re-ID;
             # physical role truth itself remains independent of jersey evidence.
             touch_with_jersey = contact_role_resolver.apply_contact_roles(
@@ -508,13 +679,20 @@ def reconstruct_physical_match(
                 )
                 review = _goal_clarification_eligibility(strike, strikes, touch_with_jersey, window)
                 if review.get("eligible") is True:
-                    stage = "goal_geometry_provider"
+                    stage = "goal_review_scheduling"
                     request_strike = deepcopy(strike)
                     request_strike["_review_lane"] = review["lane"]
-                    goal_geometry = _safe_provider(
-                        goal_geometry_provider, deepcopy(window), request_strike, default=None,
-                        diagnostics=provider_diagnostics, name="goal_geometry",
-                    )
+                    # All physical windows are inspected before the bounded
+                    # provider budget is spent. Preliminary traces remain
+                    # durable while the later global review phase is running.
+                    goal_geometry = {"status": "UNRESOLVED", "reason": "GOAL_REVIEW_PENDING"}
+                    review_jobs.append({
+                        "window": window, "strike": request_strike, "review": review,
+                        "eligibility": eligibility, "shot_track": shot_track,
+                        "touch_graph": touch_with_jersey, "roles": window_roles,
+                        "intervention": a7, "outcome_index": len(outcomes),
+                        "diagnostics": provider_diagnostics,
+                    })
                     goal_reviews_requested += 1
                     goal_clarifications_requested += int(review["lane"] == "CLARIFICATION")
                 else:
@@ -565,7 +743,7 @@ def reconstruct_physical_match(
 
             stage = "event_trace"
             trace = event_trace.build_event_trace(
-                trace_id=trace_id, source_video=source, window=window,
+                trace_id=trace_id, source_video=previous.get("source_video") if previous is not None else source, window=window,
                 dense_frames=dense_with_jersey, ball_trajectory=trajectory,
                 contact_result=contact_result, touch_graph=touch_with_jersey,
                 jersey_consensus=jersey_result, strike_evidence=strikes,
@@ -575,7 +753,12 @@ def reconstruct_physical_match(
             adapter_errors = _adapter_diagnostics([votes_by_track, window_roles,
                                                   [o.get("goal_geometry_evidence") for o in outcomes]])
             trace["provider_diagnostics"] = provider_diagnostics
-            trace["provider_adapter_errors"] = sorted(set(adapter_errors))
+            trace["action_inspections"] = inspection_rows
+            trace["jersey_model_audits"] = jersey_result.get("model_audits_by_track") or {}
+            trace["provider_adapter_errors"] = sorted(set(adapter_errors + _adapter_diagnostics(inspection_rows)))
+            trace["goal_review_phase"] = "pending" if any(
+                o.get("goal_geometry_evidence", {}).get("reason") == "GOAL_REVIEW_PENDING"
+                for o in outcomes) else "complete"
 
             stage = "trace_summary"
             summary = event_trace.compact_trace_summary(trace)
@@ -605,6 +788,10 @@ def reconstruct_physical_match(
                 ),
                 "touches": len(touch_with_jersey.get("touches") or []),
                 "jersey_requests": len(requests),
+                "action_inspections": len(inspection_rows),
+                "inspection_ball_candidates": sum(r.get("added_ball_candidates", 0) for r in inspection_rows),
+                "inspection_native_neighbor_frames": sum(len(r.get("native_neighbor_decoded_ms") or []) for r in inspection_rows),
+                "inspection_native_roi_attempts": sum(r.get("native_neighbor_roi_attempts", 0) for r in inspection_rows),
                 "role_evidence_tracks": len(window_roles),
                 "strikes": len(strikes),
                 "release_strikes": len(release_strikes),
@@ -634,6 +821,83 @@ def reconstruct_physical_match(
                 **diagnostic,
             })
 
+    traces_by_window = {t["trace_id"]: t for t in traces}
+    review_jobs = [job for job in review_jobs
+                   if job["window"].get("dense_window_id") in traces_by_window]
+    review_jobs, cross_window_context = _apply_cross_window_review_context(
+        review_jobs, traces + (_feedback_context or {}).get("support_traces", []))
+    scheduled_jobs = goal_review_scheduler.ordered_requests(review_jobs, analysis)
+    for rank, job in enumerate(scheduled_jobs):
+        trace = traces_by_window[job["window"]["dense_window_id"]]
+        try:
+            geometry = _safe_provider(
+                goal_geometry_provider, deepcopy(job["window"]), deepcopy(job["strike"]),
+                default=None, diagnostics=trace["provider_diagnostics"], name="goal_geometry")
+            previous = trace["outcome_evidence"][job["outcome_index"]]
+            outcome = _review_outcome(job, geometry, previous)
+            outcome["goal_review_decision"]["report_priority_rank"] = rank
+            trace["outcome_evidence"][job["outcome_index"]] = outcome
+        except Exception as exc:
+            # One malformed review must not discard unrelated windows. Keep
+            # its pending, unresolved outcome and expose the exact audit gap.
+            trace["provider_diagnostics"].append({
+                "provider": "goal_geometry", "status": "ERROR",
+                "error_type": type(exc).__name__, "report_priority_rank": rank,
+                "media_ms": job["strike"].get("media_ms"),
+            })
+            trace["unresolved_reasons"].append("GOAL_REVIEW_EXECUTION_ERROR")
+    # Replace pending diagnostics and publish the final version of each trace.
+    # The runtime upserts by trace ID so the manifest has one authoritative row.
+    for trace in traces:
+        if trace.get("goal_review_phase") != "pending":
+            continue
+        trace["goal_review_phase"] = "complete"
+        trace["provider_adapter_errors"] = sorted(set(
+            (trace.get("provider_adapter_errors") or []) + _adapter_diagnostics(
+                [trace.get("action_inspections"),
+                 [o.get("goal_geometry_evidence") for o in trace["outcome_evidence"]]])))
+        trace["unresolved_reasons"] = [reason for reason in trace["unresolved_reasons"]
+                                       if reason not in {"GOAL_PLANE_CROSSING_UNRESOLVED", "POST_STRIKE_OUTCOME_UNRESOLVED"}]
+        trace["unresolved_reasons"].extend(reason for reason in _window_unresolved_reasons(
+            {}, {}, trace["outcome_evidence"]) if reason in {
+                "GOAL_PLANE_CROSSING_UNRESOLVED", "POST_STRIKE_OUTCOME_UNRESOLVED"})
+        if trace_callback is not None:
+            try:
+                trace_callback(trace)
+            except Exception as exc:
+                trace["incremental_storage_error_type"] = type(exc).__name__
+    feedback_plan = {"rounds": 0, "executed_windows": 0}
+    if _feedback_context is None:
+        traces, feedback_rows, feedback_plan = run_feedback_round(
+            traces, str(video_path), plan, analysis, graph, authority,
+            action_evidence_provider=action_evidence_provider, jersey_vote_provider=jersey_vote_provider,
+            goal_geometry_provider=goal_geometry_provider, role_evidence_provider=role_evidence_provider,
+            role_evidence=role_evidence, source_video=source, review_jobs=review_jobs)
+        feedback_by_id = {r["dense_window_id"]: r for r in feedback_rows if r.get("status") == "ok"}
+        window_rows = [feedback_by_id.get(r["dense_window_id"], r) for r in window_rows]
+        traces_by_window = {t["trace_id"]: t for t in traces}
+        _, cross_window_context = _apply_cross_window_review_context([], traces)
+        if trace_callback is not None:
+            for trace in traces:
+                if not trace.get("evidence_feedback") and not trace.get("feedback_prior_outcomes"):
+                    continue
+                try:
+                    trace_callback(trace)
+                except Exception as exc:
+                    trace["incremental_storage_error_type"] = type(exc).__name__
+    summaries = [event_trace.compact_trace_summary(trace) for trace in traces]
+    for row in window_rows:
+        trace = traces_by_window.get(row.get("dense_window_id"))
+        if trace:
+            inspections = trace.get("action_inspections") or []
+            row["action_inspections"] = len(inspections)
+            row["inspection_ball_candidates"] = sum(r.get("added_ball_candidates", 0) for r in inspections)
+            row["inspection_native_neighbor_frames"] = sum(len(r.get("native_neighbor_decoded_ms") or []) for r in inspections)
+            row["inspection_native_roi_attempts"] = sum(r.get("native_neighbor_roi_attempts", 0) for r in inspections)
+            row["provider_diagnostics"] = deepcopy(trace["provider_diagnostics"])
+            row["provider_adapter_errors"] = deepcopy(trace["provider_adapter_errors"])
+            row["unresolved_reasons"] = deepcopy(trace["unresolved_reasons"])
+    unresolved_all = [reason for row in window_rows for reason in row.get("unresolved_reasons") or []]
     ok_windows = sum(row.get("status") == "ok" for row in window_rows)
     status = (
         "no_critical_windows" if not windows
@@ -661,6 +925,17 @@ def reconstruct_physical_match(
         "windows": window_rows,
         "trace_summaries": summaries,
         "traces": traces,
+        "action_inspection_plan": inspection_plan,
+        "evidence_feedback_plan": feedback_plan,
+        "cross_window_evidence": cross_window_context,
+        "goal_review_plan": {
+            "requests": len(scheduled_jobs),
+            "unique_contacts": len({j["review"]["physical_review_id"] for j in scheduled_jobs}),
+            "review_budget": getattr(goal_geometry_provider, "max_reviews", None),
+            "clarification_budget": getattr(goal_geometry_provider, "max_clarifications", None),
+            "reviews_executed": getattr(goal_geometry_provider, "calls", None),
+            "clarifications_executed": getattr(goal_geometry_provider, "clarification_calls", None),
+        },
         "unresolved_reasons": list(dict.fromkeys(unresolved_all)),
         "recall_coverage": {
             "version": full_video_event_recall.VERSION,
@@ -688,6 +963,9 @@ def reconstruct_physical_match(
             "windows_failed_by_stage": failed_by_stage,
             "traces": len(traces),
             "accepted_contacts": sum(int(x.get("accepted_contacts") or 0) for x in window_rows),
+            "inspection_ball_candidates": sum(int(x.get("inspection_ball_candidates") or 0) for x in window_rows),
+            "inspection_native_neighbor_frames": sum(int(x.get("inspection_native_neighbor_frames") or 0) for x in window_rows),
+            "inspection_native_roi_attempts": sum(int(x.get("inspection_native_roi_attempts") or 0) for x in window_rows),
             "step3_recovered_contacts": sum(
                 int(x.get("step3_recovered_contacts") or 0) for x in window_rows
             ),

@@ -1,12 +1,38 @@
 # Gates i analyseforløbet: formål, rækkefølge og live-blokeringer
 
-Status efter audit: [implementerede FIX12-rettelser](FIX12_ANALYSIS_PIPELINE_FIXES.md).
-Denne gateoversigt bevarer de historiske live-fund; de tilhørende scripts
-kontrollerer nu rettelserne i det aktuelle checkout.
+Status 5. oktober 2026: [FIX12-rettelser](FIX12_ANALYSIS_PIPELINE_FIXES.md) og
+[FIX13: fælles evidens og nye afklaringsveje](FIX13_SHARED_EVIDENCE.md).
+Tabellen med G01–G40 nedenfor bevarer det historiske auditgrundlag. FIX-numre
+betegner kodeændringer; de svarer ikke til antallet af aktive gates.
+
+## Aktuelle rettelser i PR #24
+
+Den nyere live-eksport `361e3bb7…` viser en særskilt fejl: fire afklaringer blev
+brugt tidligt, mens 105 gemte beslutninger derefter angiver udtømt
+afklaringsbudget. Det er en anden kørsel end de 56 historiske udfald nedenfor.
+En vellykket backendkørsel og flere identificerede frames dokumenterer stadig
+ikke de fem manglende aktioner.
+
+| Trin | Aktuel ændring | Krav, som stadig beskytter slutresultatet |
+|---|---|---|
+| G19–G20: adgang til fysisk undersøgelse | Ufuldstændigt semantisk output kan stadig åbne sikre, afgrænsede fysiske vinduer | Decode, faktisk medietid og tids-/scenebarrierer |
+| Før G22–G29: kontakt-/kropsafklaring | Et rapportbudget fordeler pixelreviews på scener og tidsområder. OTHER, DUEL og løb kan åbne review uden verificeret kontakt eller identitet | Modellen leverer kun søgesteder. Boldforslag kræver ny detektorlæsning i originalpixels; nummercrops kræver én entydig målt krop og separat konsensus |
+| G21/G28: fælles identitet | Verificerede taps/jersey-handoff kan deles langs samme lokale krop inden for de dokumenterede korte tidsgrænser | Ingen hop mellem konkurrerende kroppe; usikre kontakter bliver ikke verificeret af identitet alene |
+| G30/G32: udfaldsreview | 16 separate afklaringer; fordel også inden for lange scener. Vælg længste kontekst før cache af samme fysiske kontakt | Forskellige bolde/kroppe deler ikke review. Resultatet testes separat for hver kontakt og dens tilskrivning |
+| G33–G37: registrering | Ingen sænkning af mål-/assistkrav | Samme bold, retning, hele bolden, keeper ved SAVE, kontakt, target, modtager og direkte kausal kæde |
+| G38–G39: rapport | Tekst/karakterer bindes til entydige kvalificerede kanoniske events; taps venter på faktisk vist videoframe | Manglende bevis giver ufuldstændigt/ikke vurderbart, aldrig opdigtede mål eller sikre nultotaler |
+
+Reviewvalg, udsættelse, fejl, rå pixelsvar, hashes og genbrug gemmes i traces og
+rapportens eksport. Den nye genkørsels-CLI kan bestille nye reviews fra den
+gemte video uden Mongo eller ændring af produktionsrapporten. De nye modelkald
+er ikke kørt i det lokale reviewmiljø, som ikke har en modelnøgle.
+
+## Historisk auditgrundlag
 
 Undersøgt 4. oktober 2026 UTC / 5. oktober dansk tid. Supplerer
 [pipeline-auditten](ANALYSIS_PIPELINE_AUDIT.md). Ingen produktrettelser,
-merge/deploy, nye modelkald eller produktionswrites i denne udvidelse.
+merge/deploy, nye modelkald eller produktionswrites i den oprindelige audit.
+De efterfølgende kodeændringer beskrives ovenfor.
 
 ## Hovedkonklusion
 
