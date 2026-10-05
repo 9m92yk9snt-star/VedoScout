@@ -45,7 +45,8 @@ The output filename must be new; existing files are not overwritten. Inherited
 environment variables take precedence over `.env`, so check that the process
 already has the **live** `MONGO_URL` and `DB_NAME`. Never paste them into a chat.
 
-The CLI performs exactly one `reports.find_one({"id": report_id})`. It does
+The CLI performs exactly one `reports.find_one({"id": report_id})`, then reads
+`analysis_runs` and `analysis_model_calls` with the selected `report_id`. It does
 not read users, credentials or payments collections. Any sharing/download link
 for the ZIP must be supplied through the operator's existing authenticated
 file delivery mechanism. The exporter does not publish the ZIP to R2, create
@@ -71,6 +72,8 @@ requests receive 429. No export log is added to MongoDB.
 | `report.json` | The entire persisted report snapshot, with credential fields, bearer values and signed URL queries redacted. |
 | `anchors.json` | Both raw original tap fields and processed anchors, without retapping or converting times. |
 | `canonical.json` | Stored canonical events, event ledger, scoring scan, preview and full report. |
+| `analysis_runs.json` | Available run snapshots for this report, including stored outputs and configuration. |
+| `analysis_model_calls/*.json` | Available raw model responses and call metadata for this report, plus an index. |
 | `traces/*.json` | Referenced FIX10A traces, decompressed and checked against the persisted JSON SHA-256 when present. |
 | `video/*` | Available canonical and original referenced bytes, streamed into the archive. |
 | `video_metadata.json` | Saved references/time-offset fields and ffprobe metadata on the exact exported bytes when ffprobe is available. |
@@ -99,6 +102,12 @@ and the stored analysis timebase remain authoritative.
 
 Per-file output is limited to 128 MiB; total payload to 512 MiB. Trace JSON
 expansion is limited to 64 MiB and at most 200 trace references. Missing/capped
+audit reads are listed explicitly: each collection is read one document per
+batch and retained up to 64 MiB or 2,000 records. Additional records, unavailable
+collections and partial read failures appear in `missing_data.json`. Admin
+requests acquire the single export slot before loading audits, and audit reads
+have a ten-second timeout. Mongo queries, record filtering and credential
+redaction remain report-scoped; no user/payment collections are read. Missing/capped
 optional artifacts are listed explicitly. A required metadata failure aborts
 the export rather than returning a misleading success.
 
