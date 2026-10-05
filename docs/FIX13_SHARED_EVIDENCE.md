@@ -142,6 +142,58 @@ Model requests/errors are recorded as attempts, never as successful proofs.
 The fresh model path is wired/tested with injected readers; no live model
 credential is available in the local review workspace.
 
+### Five-action reference run
+
+To measure recovery of the five human reference situations in report
+`361e3bb7-5270-4aec-89e1-678017f75094`, use its original evidence ZIP, including
+the video, in the operator's existing model-enabled environment:
+
+```sh
+PYTHONPATH=backend python backend/scripts/replay_report_evidence.py /path/to/report-evidence.zip \
+  --support-vision \
+  --cases-json docs/examples/five_action_reference_cases.json \
+  --output-dir /tmp/scout-five-actions
+```
+
+Replace `/path/to/report-evidence.zip` with the actual exported file. Use the
+existing `EMERGENT_LLM_KEY` in the process environment; never paste credentials
+in chat. No deployment, Mongo access, production writes, new upload or full
+tracking pass is required. The exported video must match the analysis source
+hash. The reference file is used by this offline driver only, never by the
+production analysis pipeline.
+
+| Reference | Acceptance criterion |
+| --- | --- |
+| 23.68 s | Target shot saved |
+| 30.83 s | Target goal |
+| 43.19 s | Target assist to teammate goal |
+| 49.44 s | Target assist to teammate goal |
+| 56.44 s | Target assist to teammate goal |
+
+Each reference opens its own time-only pixel inspection in an existing scene
+window, within the existing 16-review discovery budget. Only timestamps and
+scenes enter review scheduling. Case names, expected types and expected outcomes
+are never supplied to readers or copied into canonical events. The bounded
+feedback round remains capped at four extra inspections by default; its scope
+is limited to the selected reference windows. Other saved windows remain
+available for measured overlap joins and downstream recipient context.
+
+`reference_review.json` and `reviewed-evidence.zip` report PASS or NOT_VERIFIED
+for every case, its inspection status, matched canonical event, nearby physical
+contacts/touches/releases/outcomes and missing-proof reasons. Matching requires
+the target identity, verified causal chain and eligible FIX10B physical proof,
+in the same scene and within the configured reference tolerance. One event
+cannot satisfy two cases. The expected answer is an acceptance criterion,
+never proof. An inspected situation without qualified canonical evidence fails.
+The process exits **2** if any case remains unverified, after saving results.
+Without `--support-vision`, this runs a baseline against saved observations and
+makes zero model-service requests; it does not perform the missing reviews.
+
+Do not accept general feature coverage, a selected inspection job or green unit
+tests as five recovered actions. Require five qualified canonical matches in
+the fresh result and inspect their source proof. An error/unavailable reader or
+an unresolved identity, release or outcome remains a recorded failed case.
+
 The saved-observation replay increased verified dense observations from 475 to
 1,496 (overlapping windows count observations, not unique video frames), and
 accepted actions from six to seven. It still verified no shots, goals or assists.

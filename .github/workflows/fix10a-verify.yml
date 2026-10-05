@@ -88,6 +88,7 @@ jobs:
             backend/evidence_feedback.py \
             backend/goal_review_scheduler.py \
             backend/scripts/replay_report_evidence.py \
+            backend/scripts/reference_action_review.py \
             backend/open_observation_compat.py \
             backend/fix10a_vision_providers.py \
             backend/fix10a_goal_direction.py \

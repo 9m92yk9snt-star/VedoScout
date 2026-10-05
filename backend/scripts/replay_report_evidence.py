@@ -40,9 +40,10 @@ import action_evidence_review
 import fix10a_vision_providers
 import physical_match_reconstruction as pmr
 import video_timebase
+from scripts import reference_action_review
 
 
-def replay(path, video_detail=False, support_vision=False, output_dir=None):
+def replay(path, video_detail=False, support_vision=False, output_dir=None, reference_cases=None):
     video_path = None
     api_key = os.environ.get("EMERGENT_LLM_KEY", "") if support_vision else ""
     if support_vision and not api_key:
@@ -59,6 +60,11 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
     traces = [json.loads(z.read(name)) for name in z.namelist() if name.startswith("traces/") and name.endswith(".json")]
     physical, requests = {"traces": [], "status": "ok"}, []
     inspection_plan = action_evidence_review.build_plan([t["window"] for t in traces], report["football_sequence_analysis"])
+    if reference_cases is not None:
+        reference_cases = reference_action_review.validate_cases(reference_cases)
+        inspection_plan = reference_action_review.build_plan(traces, reference_cases)
+    reference_sources = {j["dense_window_id"] for j in inspection_plan["jobs"]} if reference_cases is not None else None
+    review_analysis = reference_action_review.search_hints(inspection_plan) if reference_cases is not None else report["football_sequence_analysis"]
     bundle = goal_provider = None
     detail_frames = 0
     with tempfile.TemporaryDirectory(prefix="evidence-replay-") as directory:
@@ -70,6 +76,9 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
             video_name = next(name for name in z.namelist() if name.startswith("video/") and name.endswith(".mp4"))
             video_path = Path(directory) / "source.mp4"
             video_path.write_bytes(z.read(video_name))
+            expected_hash = (report.get("analysis_run_manifest") or {}).get("source_video_sha256")
+            if expected_hash and hashlib.sha256(video_path.read_bytes()).hexdigest() != expected_hash:
+                raise ValueError("Exported video does not match the analysis source hash")
             if support_vision:
                 bundle = fix10a_vision_providers.build_shadow_providers(api_key, f"readonly-{report['id']}", str(video_path))
                 goal_provider = fix10a_goal_direction.wrap_goal_geometry_provider(
@@ -81,6 +90,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                     raise RuntimeError("Local person/ball detector unavailable")
         try:
             for original in traces:
+                review_this_window = reference_sources is None or original["trace_id"] in reference_sources
                 frames = deepcopy(original["decoded_frames"])
                 inspections, inspection_requests = [], []
                 if bundle is not None:
@@ -118,7 +128,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                 graph = touch_graph.build_touch_graph(contacts, authority, frames)
                 votes = {tid: row.get("votes") or [] for tid, row in original["jersey_consensus"].items()
                          if isinstance(row, dict)}
-                if bundle is not None:
+                if bundle is not None and inspection_requests:
                     fresh = bundle.jersey_vote_provider(str(video_path), inspection_requests)
                     for track, rows in fresh.items():
                         votes[track] = [*(votes.get(track) or []), *rows]
@@ -135,7 +145,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                 interventions = {s["strike_id"]: post_strike_intervention.detect_post_strike_intervention(
                     s, frames, tracks[s["strike_id"]]) for s in strikes}
                 fresh_roles = bundle.role_evidence_provider(str(video_path), original["window"], strikes, graph, frames,
-                    list(interventions.values())) if bundle is not None else {}
+                    list(interventions.values())) if bundle is not None and review_this_window else {}
                 outcomes = []
                 for strike in strikes:
                     window = original["window"]
@@ -150,8 +160,12 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                         roles[old.get("intervention", {}).get("player_track_id")] = old["intervention_role"]
                     a7 = interventions[strike["strike_id"]]
                     roles.update(fresh_roles)
-                    if review.get("eligible"):
+                    relevant = reference_cases is None or any(j["scene_id"] == strike.get("scene_id")
+                        and j["center_ms"] - 750 <= strike["media_ms"] <= j["center_ms"] + pmr.GOAL_REVIEW_CAUSAL_MAX_MS
+                        for j in inspection_plan["jobs"])
+                    if review.get("eligible") and relevant:
                         requests.append({"window": window, "strike": strike, "review": review, "touch_graph": graph,
+                                         "eligibility": pmr._goal_review_eligibility(strike, strikes, graph),
                                          "track": trajectory_used, "roles": roles, "intervention": a7,
                                          "trace_id": original["trace_id"], "outcome_index": len(outcomes)})
                     outcome = shot_outcome_engine.reconstruct_post_strike_outcome(strike, trajectory_used, graph,
@@ -175,7 +189,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                     (checkpoint / "physical_replay.json").write_text(json.dumps(physical, indent=2))
             requests, cross_window_context = pmr._apply_cross_window_review_context(requests, physical["traces"])
             physical["cross_window_evidence"] = cross_window_context
-            ordered = goal_review_scheduler.ordered_requests(requests, report["football_sequence_analysis"])
+            ordered = goal_review_scheduler.ordered_requests(requests, review_analysis)
             if goal_provider is not None:
                 by_id = {t["trace_id"]: t for t in physical["traces"]}
                 for rank, job in enumerate(ordered):
@@ -194,13 +208,14 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                     if output_dir is not None:
                         (Path(output_dir) / "physical_replay.json").write_text(json.dumps(physical, indent=2))
             physical["traces"], _, feedback_plan = pmr.run_feedback_round(
-                physical["traces"], str(video_path or ""), {}, report["football_sequence_analysis"],
+                physical["traces"], str(video_path or ""), {}, review_analysis,
                 report["football_scene_graph"], authority,
                 action_evidence_provider=bundle.action_evidence_provider if bundle is not None else None,
                 jersey_vote_provider=bundle.jersey_vote_provider if bundle is not None else None,
                 role_evidence_provider=bundle.role_evidence_provider if bundle is not None else None,
                 goal_geometry_provider=goal_provider, review_jobs=[{**j, "shot_track": {
-                    "rows": j["track"], "source": "SAVED_REPLAY_TRAJECTORY", "seed_ms": None}} for j in requests])
+                    "rows": j["track"], "source": "SAVED_REPLAY_TRAJECTORY", "seed_ms": None}} for j in requests],
+                feedback_trace_ids=reference_sources)
             physical["evidence_feedback_plan"] = feedback_plan
             _, cross_window_context = pmr._apply_cross_window_review_context([], physical["traces"])
             physical["cross_window_evidence"] = cross_window_context
@@ -259,12 +274,16 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                 **{p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                    for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},
                 "scripts/replay_report_evidence.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                "scripts/reference_action_review.py": hashlib.sha256(Path(reference_action_review.__file__).read_bytes()).hexdigest(),
             },
             "limitation": ("Fresh supporting reviews requested against the exported video; inspect reader statuses and proof before accepting events. "
                            if support_vision else "Saved observations only. Newly scheduled support reviews have not been executed. ")
                           + "Original weak Step-3 detector proposals are absent. Replay does not certify full-video completeness."}
+    if reference_cases is not None:
+        result["reference_review"] = reference_action_review.assess(reference_cases, canonical, physical, inspection_plan)
     if output_dir is not None:
         directory = Path(output_dir)
+        directory.mkdir(parents=True, exist_ok=True)
         for name, value in [("replay_summary.json", result), ("reviewed_canonical.json", canonical), ("reviewed_full_report.json", repaired)]:
             (directory / name).write_text(json.dumps(value, indent=2))
         payloads = {name: (directory / name).read_bytes() for name in
@@ -272,6 +291,10 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
         payloads["source_reference.json"] = json.dumps({"report_id": report["id"],
             "source_zip_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
             "video_sha256": (report.get("analysis_run_manifest") or {}).get("source_video_sha256"), "db_writes": 0}).encode()
+        if reference_cases is not None:
+            payloads["reference_review.json"] = json.dumps(result["reference_review"], indent=2).encode()
+            payloads["operator_reference_cases.json"] = json.dumps(reference_cases, indent=2).encode()
+            (directory / "reference_review.json").write_bytes(payloads["reference_review.json"])
         payloads["manifest.json"] = json.dumps({"kind": "READ_ONLY_EVIDENCE_REPLAY", "report_id": report["id"],
             "db_writes": 0, "files": {name: {"sha256": hashlib.sha256(data).hexdigest(), "size_bytes": len(data)}
                                        for name, data in payloads.items()}}).encode()
@@ -289,5 +312,10 @@ if __name__ == "__main__":
     parser.add_argument("--video-detail", action="store_true")
     parser.add_argument("--support-vision", action="store_true", help="Use the operator's environment key for fresh bounded reviews; never writes to a DB")
     parser.add_argument("--output-dir", type=Path, help="Write review checkpoints and a checksummed evidence ZIP to this private directory")
+    parser.add_argument("--cases-json", type=Path, help="Offline reference times and acceptance criteria; expected outcomes are never sent to readers")
     args = parser.parse_args()
-    print(json.dumps(replay(args.zip_path, args.video_detail, args.support_vision, args.output_dir), indent=2))
+    cases = json.loads(args.cases_json.read_text()) if args.cases_json else None
+    result = replay(args.zip_path, args.video_detail, args.support_vision, args.output_dir, cases)
+    print(json.dumps(result, indent=2))
+    if cases is not None and not result["reference_review"]["all_verified"]:
+        raise SystemExit(2)

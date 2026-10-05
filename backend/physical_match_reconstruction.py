@@ -365,9 +365,11 @@ def _review_outcome(job, geometry, previous):
 def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, scene_graph,
                        identity_authority, *, action_evidence_provider=None,
                        jersey_vote_provider=None, goal_geometry_provider=None,
-                       role_evidence_provider=None, role_evidence=None, source_video=None, review_jobs=None):
+                       role_evidence_provider=None, role_evidence=None, source_video=None, review_jobs=None,
+                       feedback_trace_ids=None):
     """Re-enter the original physical gates once using preserved measured frames."""
-    feedback = evidence_feedback.build_plan(traces, analysis=sequence_analysis)
+    feedback = evidence_feedback.build_plan([t for t in traces if feedback_trace_ids is None
+        or t["trace_id"] in feedback_trace_ids], analysis=sequence_analysis)
     feedback["executed_windows"] = 0
     feedback["configured"] = action_evidence_provider is not None
     selected = [j for j in feedback["jobs"] if j["selected"]]
