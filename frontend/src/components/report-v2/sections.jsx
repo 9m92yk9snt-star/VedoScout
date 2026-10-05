@@ -30,11 +30,12 @@ export const V2Title = ({ icon: Icon, children, tone = "green", right = null }) 
 
 /* ── ROW 2 ─────────────────────────────────────────────── */
 
-export function MatchStatsCard({ matchStats }) {
+export function MatchStatsCard({ matchStats, coverageNote }) {
   if (!matchStats) return null;
   return (
     <V2Card testid="v2-match-stats-card">
       <V2Title icon={BarChart3}>Key Stats From This Match</V2Title>
+      {coverageNote && <p role="status" data-testid="stats-coverage-note" className="text-[12px] leading-relaxed text-[#8A6D3B] mb-3">{coverageNote}</p>}
       {matchStats.map((s, i) => (
         <div key={i} className={`flex items-center gap-3 py-[9px] ${i < matchStats.length - 1 ? "border-b border-[#EFEADB]" : ""}`}>
           <div className="text-[10.5px] font-bold tracking-[0.09em] uppercase text-[#5B695E] w-[145px] shrink-0">{s.label}</div>

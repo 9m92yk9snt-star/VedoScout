@@ -19,6 +19,7 @@ this engine owns the analysis state and deterministic truth transformation.
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 
 import canonical_event_resolver
 import canonical_output_authority
@@ -340,6 +341,10 @@ def _scoring_scan(canonical: dict, sequence_analysis: dict) -> dict:
     return {
         "performed": (sequence_analysis or {}).get("coverage_complete") is True,
         "authority": "FIX09B_CANONICAL_EVENTS",
+        # A complete semantic response is not an exhaustive physical scan.
+        "coverage_complete": False,
+        "coverage_status": "SEMANTIC_COMPLETE_PHYSICAL_NOT_ASSESSED"
+        if (sequence_analysis or {}).get("coverage_complete") is True else "PARTIAL",
         "verified_goals": int((canonical or {}).get("metrics", {}).get("goals") or 0),
         "verified_assists": int((canonical or {}).get("metrics", {}).get("assists") or 0),
         "unresolved_goal_attempts": goal_unresolved,
@@ -437,6 +442,34 @@ def is_production_ready(result: dict | None) -> bool:
         and int((r.get("metrics") or {}).get("sequence_windows") or 0) > 0
         and canonical.get("status") in {"ok", "empty", "unresolved"}
     )
+
+
+def can_run_physical(result: dict | None) -> bool:
+    """Allow safe planned physical work despite a partial semantic response.
+
+    No completeness is promoted. A missing model window must not disable the
+    independent CV/recall lane. Unprepared/legacy or malformed plans cannot
+    enter through this compatibility check.
+    """
+    if is_production_ready(result):
+        return True
+    row = result if isinstance(result, dict) else {}
+    canonical = row.get("canonical_events") if isinstance(row.get("canonical_events"), dict) else {}
+    plan = row.get("sequence_plan") if isinstance(row.get("sequence_plan"), dict) else {}
+    windows = plan.get("analysis_windows") or []
+    if row.get("status") != "partial_coverage" or canonical.get("status") not in {"ok", "empty", "unresolved"}:
+        return False
+    if not windows:
+        return False
+    for window in windows:
+        if not isinstance(window, dict) or not isinstance(window.get("scene_id"), str) or not window["scene_id"]:
+            return False
+        start, end = window.get("start_ms"), window.get("end_ms")
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in (start, end)):
+            return False
+        if start < 0 or end <= start:
+            return False
+    return True
 
 
 def apply_result_to_report(full: dict, result: dict | None) -> dict:

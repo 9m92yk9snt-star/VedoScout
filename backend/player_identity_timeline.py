@@ -129,13 +129,14 @@ def _center(b):
 
 
 class _Track:
-    __slots__ = ("tid", "samples", "vel", "cam_acc", "misses", "miss_preds")
+    __slots__ = ("tid", "samples", "vel", "camera_box", "camera_transform", "misses", "miss_preds")
 
     def __init__(self, tid):
         self.tid = tid
         self.samples = []       # {"i","ms","box","emb","team","overlap","gap_before"}
         self.vel = (0.0, 0.0)   # camera-compensated px/s
-        self.cam_acc = [0.0, 0.0]
+        self.camera_box = None  # last measured body transformed through camera steps
+        self.camera_transform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
         self.misses = 0
         self.miss_preds = {}    # obs_i -> (ms, predicted box) while unseen
 
@@ -239,6 +240,57 @@ def _split_scenes(obs):
     return raw
 
 
+def _camera_step(observation):
+    if "cam_mode" in observation and observation["cam_mode"] not in ("affine", "translation"):
+        return None
+    matrix = observation.get("cam_affine")
+    if matrix is None:
+        matrix = [[1.0, 0.0, observation.get("cam_dx") or 0.0],
+                  [0.0, 1.0, observation.get("cam_dy") or 0.0]]
+    if not (isinstance(matrix, (list, tuple)) and len(matrix) == 2
+            and all(isinstance(row, (list, tuple)) and len(row) == 3 for row in matrix)):
+        return None
+    if not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+               and math.isfinite(v) for row in matrix for v in row):
+        return None
+    a, b, _ = matrix[0]
+    c, d, _ = matrix[1]
+    sx, sy = math.hypot(a, c), math.hypot(b, d)
+    if (a * d - b * c <= 0 or not SCALE_STEP[0] <= sx <= SCALE_STEP[1]
+            or abs(sx - sy) > 1e-3 or abs(a * b + c * d) > 1e-3):
+        return None
+    return matrix
+
+
+def _camera_box(box, matrix):
+    x, y, w, h = box
+    corners = [(x, y), (x + w, y), (x, y + h), (x + w, y + h)]
+    xs = [matrix[0][0] * px + matrix[0][1] * py + matrix[0][2] for px, py in corners]
+    ys = [matrix[1][0] * px + matrix[1][1] * py + matrix[1][2] for px, py in corners]
+    return (min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys))
+
+
+def _compose_camera(step, previous):
+    return [[sum(step[r][k] * previous[k][c] for k in range(2))
+             + (step[r][2] if c == 2 else 0.0)
+             for c in range(3)] for r in range(2)]
+
+
+def _stable_track_kit(tr):
+    """A bounded clean kit history may veto geometry, never prove identity."""
+    if not tr.samples:
+        return None
+    latest_ms = tr.samples[-1]["ms"]
+    recent = [s for s in tr.samples if latest_ms - 1000 <= s["ms"] <= latest_ms]
+    clean = [s for s in recent if _usable(s)]
+    if len(clean) < 3 or clean[-1]["ms"] - clean[0]["ms"] < 400:
+        return None
+    labels = [s.get("team") for s in clean]
+    if labels[0] in ("target_team", "opponent") and all(t == labels[0] for t in labels):
+        return labels[0]
+    return None
+
+
 def _scene_mot(obs, idxs):
     """Greedy camera-compensated IoU tracker, scene-local ids from 1."""
     all_tracks, live = [], []
@@ -247,23 +299,46 @@ def _scene_mot(obs, idxs):
     for i in idxs:
         o = obs[i]
         ms = int(o["media_ms"])
-        cdx = float(o.get("cam_dx") or 0.0)
-        cdy = float(o.get("cam_dy") or 0.0)
+        camera = _camera_step(o)
         dets = list(o.get("detections") or [])
         preds = {}
         for tr in live:
-            tr.cam_acc[0] += cdx
-            tr.cam_acc[1] += cdy
             last = tr.samples[-1]
             gap_s = max(0.0, (ms - last["ms"]) / 1000.0)
-            preds[tr.tid] = (last["box"][0] + tr.cam_acc[0] + tr.vel[0] * gap_s,
-                             last["box"][1] + tr.cam_acc[1] + tr.vel[1] * gap_s,
-                             last["box"][2], last["box"][3])
+            if camera is None or tr.camera_box is None:
+                tr.camera_box = None  # no guessing across an invalid camera step
+                continue
+            # A camera zoom/rotation moves bodies differently at different
+            # image positions; one frame-centre translation cannot model it.
+            tr.camera_transform = _compose_camera(camera, tr.camera_transform)
+            # Transform the original measured rectangle once. Repeatedly
+            # rotating its axis-aligned envelope inflates the box on every miss.
+            tr.camera_box = _camera_box(last["box"], tr.camera_transform)
+            vx, vy = tr.vel
+            tr.vel = (camera[0][0] * vx + camera[0][1] * vy,
+                      camera[1][0] * vx + camera[1][1] * vy)
+            cb = tr.camera_box
+            preds[tr.tid] = (cb[0] + tr.vel[0] * gap_s,
+                             cb[1] + tr.vel[1] * gap_s, cb[2], cb[3])
         pairs = []
         for tr in live:
+            if tr.tid not in preds:
+                continue
             p = preds[tr.tid]
+            stable_kit = _stable_track_kit(tr)
             for di, d in enumerate(dets):
                 b = d["box"]
+                candidate_kit = d.get("team")
+                # A clean opposing kit cannot inherit a sustained track merely
+                # by being closer after a duel. Unknown/overlapped kit readings
+                # cannot veto a match, and matching kit never selects a target.
+                if (stable_kit and candidate_kit in ("target_team", "opponent")
+                        and candidate_kit != stable_kit
+                        and isinstance(d.get("emb"), dict)
+                        and d["emb"].get("owned") is not False
+                        and not any(_iou(b, other["box"]) > OVERLAP_IOU
+                                    for oi, other in enumerate(dets) if oi != di)):
+                    continue
                 hr = b[3] / max(1e-6, p[3])
                 if hr < SCALE_STEP[0] or hr > SCALE_STEP[1]:
                     continue  # zoom-implausible per step — never matched
@@ -276,7 +351,9 @@ def _scene_mot(obs, idxs):
                     dist = math.hypot(dx_ - cx, dy_ - cy)
                     if dist <= 0.9 * max(p[3], b[3]):
                         pairs.append((0.0, -dist, tr, di))
-        pairs.sort(key=lambda q: (-q[0], q[1]))
+        # Fallback pairs store NEGATIVE distance: descending preference must
+        # pick the nearest body, not the most distant in the admissible band.
+        pairs.sort(key=lambda q: (-q[0], -q[1]))
         used_t, used_d = set(), set()
         for v, nd, tr, di in pairs:
             if tr.tid in used_t or di in used_d:
@@ -286,11 +363,11 @@ def _scene_mot(obs, idxs):
             d = dets[di]
             prev = tr.samples[-1]
             gap_s = max(1e-6, (ms - prev["ms"]) / 1000.0)
-            c0, c1 = _center(prev["box"]), _center(d["box"])
-            tr.vel = ((c1[0] - c0[0] - tr.cam_acc[0]) / gap_s,
-                      (c1[1] - c0[1] - tr.cam_acc[1]) / gap_s)
+            c0, c1 = _center(tr.camera_box), _center(d["box"])
+            tr.vel = ((c1[0] - c0[0]) / gap_s, (c1[1] - c0[1]) / gap_s)
             gap_before = tr.misses
-            tr.cam_acc = [0.0, 0.0]
+            tr.camera_box = tuple(d["box"])
+            tr.camera_transform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
             tr.misses = 0
             tr.samples.append({"i": i, "ms": ms, "box": tuple(d["box"]),
                                "emb": d.get("emb"), "team": d.get("team"),
@@ -298,12 +375,14 @@ def _scene_mot(obs, idxs):
         for tr in live:
             if tr.tid not in used_t:
                 tr.misses += 1
-                tr.miss_preds[i] = (ms, preds[tr.tid])
+                if tr.tid in preds:
+                    tr.miss_preds[i] = (ms, preds[tr.tid])
         live = [tr for tr in live if tr.misses <= MAX_MISSES]
         for di, d in enumerate(dets):
             if di in used_d:
                 continue
             tr = _Track(next_tid)
+            tr.camera_box = tuple(d["box"])
             next_tid += 1
             tr.samples.append({"i": i, "ms": ms, "box": tuple(d["box"]),
                                "emb": d.get("emb"), "team": d.get("team"),
@@ -1512,6 +1591,11 @@ def build_identity_timeline(video_path: str, doc: dict):
             # hard cut: big global diff the camera model cannot explain
             cut = (diff > CUT_DIFF and cam.mode != "affine") or diff > CUT_DIFF_HARD
             cam_dx, cam_dy = (0.0, 0.0) if cut else (cam.dx, cam.dy)
+            cam_affine = None
+            if not cut and cam.mode == "affine" and cam.M is not None:
+                cam_affine = cam.M.copy()
+                cam_affine[:, 2] *= sw / 160.0  # tiny-image transform → observation pixels
+                cam_affine = cam_affine.tolist()
             sig = cv2.resize(tiny, (8, 8), interpolation=cv2.INTER_AREA).flatten().tolist()
 
             boxes = []
@@ -1535,7 +1619,8 @@ def build_identity_timeline(video_path: str, doc: dict):
                 dets.append({"box": b, "emb": emb, "team": team.classify(ch)})
             observations.append({
                 "media_ms": int(round(t * 1000)), "cut": cut,
-                "cam_dx": cam_dx, "cam_dy": cam_dy, "sig": sig,
+                "cam_dx": cam_dx, "cam_dy": cam_dy, "cam_affine": cam_affine,
+                "cam_mode": cam.mode, "sig": sig,
                 "width": sw, "height": sh, "detections": dets,
             })
 

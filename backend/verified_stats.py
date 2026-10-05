@@ -284,6 +284,23 @@ _COUNT_KEYS = ("goals", "assists", "shots", "shots_on_target", "key_passes",
                "interceptions", "recoveries")
 
 
+def scoring_totals_available(scan):
+    """Execution is not completeness. Preserve explicit legacy scan contracts."""
+    if not isinstance(scan, dict) or scan.get("performed") is not True:
+        return False
+    if scan.get("incomplete_scoring_coverage") is True:
+        return False
+    if "physical_recall_verification_complete" in scan:
+        return scan["physical_recall_verification_complete"] is True
+    if "coverage_complete" in scan:
+        return scan["coverage_complete"] is True
+    if "coverage_status" in scan:
+        return scan["coverage_status"] in {
+            "SEMANTIC_AND_PHYSICAL_COMPLETE", "PHYSICAL_COMPLETE_SEMANTIC_INCOMPLETE", "COMPLETE"}
+    # Old FIX07 scans used performed only, including a valid empty full scan.
+    return True
+
+
 def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
     """PART 7-10 — deterministic canonical counts over surviving cross-verified
     events. One event_id contributes at most once per statistic; malformed
@@ -368,20 +385,28 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
            if n["passes_attempted"] > 0 else None)
     scan = scan if isinstance(scan, dict) else {}
     performed = scan.get("performed") is True
+    complete = scoring_totals_available(scan)
     vs = {
         "version": VERIFIED_STATS_VERSION,
         "source": "cross_verified_events",
         "available": True,
-        "goals_assists_available": performed,
+        "goals_assists_available": complete,
+        "observed_counts": dict(n),
+        "coverage_status": "COMPLETE" if complete else "PARTIAL" if performed else "UNAVAILABLE",
+        "coverage_note": (None if complete else
+                          "Counts show verified actions only. Evidence gaps mean video totals may be incomplete."),
         "scoring_scan": {
             "performed": performed,
-            "verified_goals": n["goals"] if performed else None,
-            "verified_assists": n["assists"] if performed else None,
+            "complete": complete,
+            "coverage_status": scan.get("coverage_status"),
+            "physical_evidence_coverage": scan.get("physical_evidence_coverage"),
+            "verified_goals": n["goals"] if complete else None,
+            "verified_assists": n["assists"] if complete else None,
             "unresolved_goal_attempts": int(scan.get("unresolved_goal_attempts") or 0),
             "unresolved_assist_candidates": int(scan.get("unresolved_assist_candidates") or 0),
         },
         "stats_completeness": {
-            "goals_assists": "full_video_scoring_scan" if performed else "unavailable",
+            "goals_assists": "full_video_scoring_scan" if complete else "verified_observations_only" if performed else "unavailable",
             "other_actions": "verified_timeline_events",
         },
         "total_actions": n["total_actions"],
@@ -393,7 +418,7 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
     }
     for k in _COUNT_KEYS:
         vs[k] = n[k]
-    if not performed:
+    if not complete:
         # C08 — without a valid completed scan there is NO authoritative
         # goal/assist total (not even zero). Other canonical stats remain.
         vs["goals"] = None
@@ -403,7 +428,7 @@ def build_verified_stats(full: dict, scan: dict | None = None) -> dict:
     def _plural(cnt, word):
         return f"{cnt} {word}{'' if cnt == 1 else 's'}"
 
-    if performed:
+    if complete:
         full["verified_stat_line"] = " · ".join([
             _plural(n["goals"], "goal"), _plural(n["assists"], "assist"),
             _plural(n["shots"], "shot")])
@@ -447,6 +472,10 @@ def rebuild_match_stats(full: dict) -> None:
         "runs": vs["runs"],
         "minutes_analysed": minutes,
         "source": "verified_events",
+        "coverage_status": vs.get("coverage_status"),
+        "coverage_note": vs.get("coverage_note"),
+        "observed_goals": (vs.get("observed_counts") or {}).get("goals"),
+        "observed_assists": (vs.get("observed_counts") or {}).get("assists"),
     }
     if vs.get("goals_assists_available") is True:
         # C08 — goal/assist totals exist ONLY behind a valid completed scan

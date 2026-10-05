@@ -1912,10 +1912,21 @@ export default function ReportPage() {
   // watchdog), so we patiently poll up to 20 min before giving up.
   const pollFullReportReady = async () => {
     const start = Date.now();
-    const HARD_TIMEOUT_MS = 20 * 60 * 1000;
+    const HARD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+    const NO_PROGRESS_TIMEOUT_MS = 20 * 60 * 1000;
+    let lastProgress = start;
+    let heartbeat = null;
     while (Date.now() - start < HARD_TIMEOUT_MS) {
       try {
         const { data } = await api.get(`/reports/${id}/status`);
+        if (data?.last_progress_at && data.last_progress_at !== heartbeat) {
+          heartbeat = data.last_progress_at;
+          const serverTime = Date.parse(heartbeat);
+          // A stale persisted timestamp is not a new liveness signal.
+          if (Number.isFinite(serverTime) && Date.now() - serverTime < NO_PROGRESS_TIMEOUT_MS) {
+            lastProgress = Date.now();
+          }
+        }
         if (data?.doubt_status === "awaiting" && data?.doubt_moments?.length) {
           setDoubtInfo({ moments: data.doubt_moments });
         } else if (data?.doubt_status && data.doubt_status !== "awaiting") {
@@ -1923,10 +1934,18 @@ export default function ReportPage() {
         }
         if (isFullReportReady(data)) return data;
         if (data?.full_report_status === "failed") {
-          throw new Error(data?.full_report_error || "Full report generation failed");
+          const failure = new Error(data?.full_report_error || "Full report generation failed");
+          failure.analysisTerminal = true;
+          throw failure;
+        }
+        if (Date.now() - lastProgress >= NO_PROGRESS_TIMEOUT_MS) {
+          const stalled = new Error("Analysis has not reported progress for 20 minutes. Please refresh to check recovery.");
+          stalled.analysisTerminal = true;
+          throw stalled;
         }
       } catch (e) {
-        if (e?.response?.status === 404) throw e;
+        const status = e?.response?.status;
+        if (e?.analysisTerminal || (status >= 400 && status < 500 && status !== 408 && status !== 429)) throw e;
         // transient network blips — keep polling
       }
       await new Promise((r) => setTimeout(r, 4500));
