@@ -225,6 +225,11 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
     result = {"report_id": report["id"], "model_request_attempts": sum(attempts.values()), "db_writes": 0,
             "support_vision_enabled": support_vision, "support_review_attempts": attempts,
             "native_detail_frames_added": detail_frames,
+            "native_inspection": {
+                "added_ball_proposals": sum(r.get("added_ball_candidates", 0) for t in physical["traces"] for r in t.get("action_inspections") or []),
+                "neighbor_frame_observations": sum(len(r.get("native_neighbor_decoded_ms") or []) for t in physical["traces"] for r in t.get("action_inspections") or []),
+                "neighbor_roi_attempts": sum(r.get("native_neighbor_roi_attempts", 0) for t in physical["traces"] for r in t.get("action_inspections") or []),
+            },
             "before_counts": report["canonical_events"]["counts"], "after_counts": canonical["counts"],
             "identity_feedback": canonical.get("dense_identity_feedback"),
             "verified_frames_before": sum(f.get("global_target", {}).get("proof_eligible") is True for t in traces for f in t["decoded_frames"]),
@@ -234,8 +239,11 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
             "shooting_score_after": repaired.get("technical", {}).get("shooting", {}).get("score"),
             "coverage": coverage,
             "inspection_plan": inspection_plan,
-            "replay_backend_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                                      for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},
+            "replay_backend_sha256": {
+                **{p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},
+                "scripts/replay_report_evidence.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            },
             "limitation": ("Fresh supporting reviews requested against the exported video; inspect reader statuses and proof before accepting events. "
                            if support_vision else "Saved observations only. Newly scheduled support reviews have not been executed. ")
                           + "Original weak Step-3 detector proposals are absent. Replay does not certify full-video completeness."}

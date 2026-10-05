@@ -814,13 +814,13 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms):
                 "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER}
 
 
-def corroborate_ball_pixels(detector, image, proposal):
-    """A model box is a search ROI; only native class-32 detection supplies a row."""
+def _native_ball_roi(detector, image, proposal):
+    """Return fresh class-32 proposals and the exact native search rectangle."""
     if not _valid_box(proposal):
-        return []
+        return [], None
     proposal = {key: float(proposal[key]) for key in ("x", "y", "w", "h")}
     if proposal["w"] > .08 or proposal["h"] > .04:
-        return []
+        return [], None
     import dense_track_refinement
     height, width = image.shape[:2]
     cx = (proposal["x"] + proposal["w"] / 2) * width
@@ -829,7 +829,7 @@ def corroborate_ball_pixels(detector, image, proposal):
     x0, y0 = max(0, int(cx - half_w)), max(0, int(cy - half_h))
     x1, y1 = min(width, int(cx + half_w)), min(height, int(cy + half_h))
     if x1 - x0 < 16 or y1 - y0 < 16:
-        return []
+        return [], None
     _people, balls = dense_track_refinement._detect_dense_people_and_ball(
         detector, image[y0:y1, x0:x1], _detail_pass=True)
     accepted = []
@@ -838,11 +838,23 @@ def corroborate_ball_pixels(detector, image, proposal):
         box = {"x": (x0 + box["x"] * (x1 - x0)) / width,
                "y": (y0 + box["y"] * (y1 - y0)) / height,
                "w": box["w"] * (x1 - x0) / width, "h": box["h"] * (y1 - y0) / height}
-        if box["w"] <= .08 and box["h"] <= .04 and goal_review_scheduler._iou(box, proposal) >= .20:
-            accepted.append({"box": box, "confidence": ball["confidence"],
-                             "source": "NATIVE_REVIEW_ROI_DETECTOR", "pixel_corroborated": True,
-                             "proposal_box": deepcopy(proposal)})
-    return accepted
+        if (0 < box["w"] <= .08 and 0 < box["h"] <= .04
+                and math.isfinite(float(ball["confidence"]))
+                and ball["confidence"] >= dense_track_refinement.DENSE_BALL_CONF_T):
+            accepted.append({"box": box, "confidence": ball["confidence"]})
+    roi = {"x": x0 / width, "y": y0 / height, "w": (x1 - x0) / width, "h": (y1 - y0) / height}
+    return sorted(accepted, key=lambda b: -b["confidence"]), roi
+
+
+def corroborate_ball_pixels(detector, image, proposal):
+    """A model box is a search ROI; only native class-32 detection supplies a row."""
+    if not _valid_box(proposal):
+        return []
+    proposal = {key: float(proposal[key]) for key in ("x", "y", "w", "h")}
+    balls, _roi = _native_ball_roi(detector, image, proposal)
+    return [{**ball, "source": "NATIVE_REVIEW_ROI_DETECTOR", "pixel_corroborated": True,
+             "proposal_box": deepcopy(proposal)} for ball in balls
+            if goal_review_scheduler._iou(ball["box"], proposal) >= .20]
 
 
 def _active_ball_link(review, reference):
@@ -886,7 +898,6 @@ class ShadowVisionProviders:
             return {"status": "UNAVAILABLE", "reason": "action_pixel_reader_unavailable", "frames": []}
         decoded = _read_frames(video_path, requested)
         images = {}
-        self.inspection_calls += 1
         with tempfile.TemporaryDirectory(prefix="action_pixels_") as directory:
             paths, times = [], []
             for index, requested_ms in enumerate(requested):
@@ -901,6 +912,7 @@ class ShadowVisionProviders:
                     paths.append(str(path)); times.append(int(actual_ms)); images[int(actual_ms)] = image
             if len(paths) < 2:
                 return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
+            self.inspection_calls += 1
             review = asyncio.run(read_action_pixel_evidence(
                 self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times))
         import dense_track_refinement
@@ -924,9 +936,46 @@ class ShadowVisionProviders:
             bodies = [p for p in proposals[:6] if isinstance(p, dict)
                       and p.get("confidence") in {"high", "medium"} and _valid_box(p.get("box"))]
             rows.append({"media_ms": media_ms, "scene_id": job["scene_id"],
-                         "ball_candidates": balls, "jersey_bodies": bodies})
+                         "ball_candidates": balls[:3], "jersey_bodies": bodies})
+        # A sparse search image cannot supply a velocity/contact chain. Use
+        # independently detected seed balls to search four adjacent actual
+        # frames; never copy the seed's box, number, or ownership to them.
+        neighbor_jobs = {}
+        for row in rows:
+            for ball in row["ball_candidates"]:
+                for ms in action_evidence_review.neighbor_times(row["media_ms"], dense_frames, job["scene_id"]):
+                    neighbor_jobs.setdefault(ms, []).append((row["media_ms"], ball["box"]))
+        neighbor_requested = sorted(neighbor_jobs)[:action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES]
+        missing_images = [ms for ms in neighbor_requested if ms not in images]
+        neighbor_decoded = _read_frames(video_path, missing_images) if missing_images else {}
+        for requested_ms, got in neighbor_decoded.items():
+            actual_ms, image = got
+            if actual_ms == requested_ms:
+                images[int(actual_ms)] = image
+        rows_by_time = {row["media_ms"]: row for row in rows}
+        roi_attempts = 0
+        neighbor_actual = []
+        for ms in neighbor_requested:
+            if ms not in images:
+                continue
+            neighbor_actual.append(ms)
+            row = rows_by_time.setdefault(ms, {"media_ms": ms, "scene_id": job["scene_id"],
+                                               "ball_candidates": [], "jersey_bodies": []})
+            for seed_ms, seed_box in sorted(neighbor_jobs[ms], key=lambda s: abs(ms - s[0]))[:3]:
+                roi_attempts += 1
+                native, roi = _native_ball_roi(detector, images[ms], seed_box)
+                for ball in native[:3]:
+                    if any(goal_review_scheduler._iou(ball["box"], old["box"]) >= .5 for old in row["ball_candidates"]):
+                        continue
+                    row["ball_candidates"].append({**ball, "source": "NATIVE_REVIEW_TEMPORAL_ROI_DETECTOR",
+                        "pixel_corroborated": True, "seed_media_ms": seed_ms, "seed_box": deepcopy(seed_box),
+                        "search_roi": roi})
+        rows = sorted(rows_by_time.values(), key=lambda row: row["media_ms"])
         result = {**review, "frames": rows, "time_authority": "ACTUAL_MEDIA_PTS",
                   "requested_media_ms": requested, "decoded_media_ms": times,
+                  "native_neighbor_requested_ms": neighbor_requested,
+                  "native_neighbor_decoded_ms": neighbor_actual,
+                  "native_neighbor_roi_attempts": roi_attempts,
                   "canonical_authority": False, "ball_corroboration": "NATIVE_CLASS_32_DETECTOR"}
         self._inspection_cache[cache_key] = deepcopy(result)
         return result

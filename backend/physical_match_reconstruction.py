@@ -656,6 +656,8 @@ def reconstruct_physical_match(
                 "jersey_requests": len(requests),
                 "action_inspections": len(inspection_rows),
                 "inspection_ball_candidates": sum(r.get("added_ball_candidates", 0) for r in inspection_rows),
+                "inspection_native_neighbor_frames": sum(len(r.get("native_neighbor_decoded_ms") or []) for r in inspection_rows),
+                "inspection_native_roi_attempts": sum(r.get("native_neighbor_roi_attempts", 0) for r in inspection_rows),
                 "role_evidence_tracks": len(window_roles),
                 "strikes": len(strikes),
                 "release_strikes": len(release_strikes),
@@ -810,6 +812,9 @@ def reconstruct_physical_match(
             "windows_failed_by_stage": failed_by_stage,
             "traces": len(traces),
             "accepted_contacts": sum(int(x.get("accepted_contacts") or 0) for x in window_rows),
+            "inspection_ball_candidates": sum(int(x.get("inspection_ball_candidates") or 0) for x in window_rows),
+            "inspection_native_neighbor_frames": sum(int(x.get("inspection_native_neighbor_frames") or 0) for x in window_rows),
+            "inspection_native_roi_attempts": sum(int(x.get("inspection_native_roi_attempts") or 0) for x in window_rows),
             "step3_recovered_contacts": sum(
                 int(x.get("step3_recovered_contacts") or 0) for x in window_rows
             ),

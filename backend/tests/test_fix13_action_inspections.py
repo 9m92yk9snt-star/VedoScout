@@ -72,6 +72,25 @@ def test_invalid_times_are_rejected_and_contact_sampling_keeps_early_and_termina
     assert not inspection.frame_times(job, [{**frame(1100), "used_fallback": True}])
 
 
+def test_unproved_contact_time_cannot_leave_half_second_holes_in_search_images():
+    job = {"scene_id": "scene", "start_ms": 800, "end_ms": 3700, "center_ms": 1100, "has_contact_time": True}
+    selected = inspection.frame_times(job, [frame(ms) for ms in range(800, 3701, 10)])
+    assert len(selected) == 12 and selected[0] == 800 and selected[-1] == 3700
+    assert 1100 in selected and 1150 in selected
+    assert max(b - a for a, b in zip(selected, selected[1:])) < 500
+
+
+@pytest.mark.parametrize("barrier", ["cut_barrier", "used_fallback", "different_scene", "missing_pts"])
+def test_native_neighbor_search_cannot_cross_a_barrier(barrier):
+    frames = [frame(ms) for ms in range(900, 1101, 10)]
+    middle = next(f for f in frames if f["media_ms"] == 1040)
+    if barrier == "different_scene": middle["scene_id"] = "other"
+    elif barrier == "missing_pts": middle["time_authority"] = "REQUESTED_TIME"
+    else: middle[barrier] = True
+    assert all(ms < 1040 for ms in inspection.neighbor_times(1000, frames, "scene"))
+    assert not inspection.neighbor_times(1000, [frame(1000), frame(1100)], "scene")
+
+
 def observed(ball=None, body=BODY, ms=1000):
     return {"frames": [{"media_ms": ms, "scene_id": "scene", "ball_candidates": [ball] if ball else [],
                         "jersey_bodies": [{"box": deepcopy(body)}], "goal": True, "player_number": "15"}]}
@@ -100,6 +119,73 @@ def test_new_detector_pixel_rows_are_proposals_and_keep_identity_unchanged():
     assert out["jersey_requests"][0]["expected_jersey_number"] is None
     assert not inspection.apply_observations(original, observed(corroborated(), ms=1017), "inspection")["added_ball_candidates"]
     assert not inspection.apply_observations([{**frame(), "cut_barrier": True}], observed(corroborated()), "inspection")["added_ball_candidates"]
+
+
+def temporal_ball():
+    return {"box": {**BALL, "x": BALL["x"] + .06}, "confidence": .8,
+            "source": "NATIVE_REVIEW_TEMPORAL_ROI_DETECTOR", "pixel_corroborated": True,
+            "seed_media_ms": 1000, "seed_box": deepcopy(BALL),
+            "search_roi": {"x": .15, "y": .4, "w": .3, "h": .2}}
+
+
+def test_fresh_neighbor_detection_can_move_without_copying_seed_box_or_identity():
+    rows = [frame(), frame(1050)]
+    observations = observed(corroborated())
+    observations["frames"].append({"media_ms": 1050, "scene_id": "scene", "ball_candidates": [temporal_ball()]})
+    applied = inspection.apply_observations(rows, observations, "native")
+    assert applied["added_ball_candidates"] == 2
+    assert applied["frames"][1]["ball_candidates"][0]["box"]["x"] != BALL["x"]
+    assert applied["frames"][1]["global_target"] == rows[1]["global_target"]
+    assert not rows[1]["ball_candidates"]
+
+
+@pytest.mark.parametrize("change", [{"seed_media_ms": 800}, {"seed_box": {**BALL, "x": .8}},
+                                   {"pixel_corroborated": False}, {"confidence": .001},
+                                   {"search_roi": {"x": .8, "y": .8, "w": .01, "h": .01}}])
+def test_neighbor_detection_still_requires_a_real_seed_native_pixels_and_local_roi(change):
+    observations = observed(corroborated())
+    observations["frames"].append({"media_ms": 1050, "scene_id": "scene", "ball_candidates": [{**temporal_ball(), **change}]})
+    applied = inspection.apply_observations([frame(), frame(1050)], observations, "native")
+    assert applied["added_ball_candidates"] == 1
+    assert not applied["frames"][1]["ball_candidates"]
+    observations["frames"][0]["ball_candidates"][0]["pixel_corroborated"] = False
+    assert inspection.apply_observations([frame(), frame(1050)], observations, "native")["added_ball_candidates"] == 0
+
+
+def test_native_neighbors_do_not_add_model_images_and_reject_misaligned_decodes(monkeypatch):
+    captured = []
+    def decode(_video, times):
+        return {ms: (ms + 17 if ms == 1100 else ms, np.zeros((64, 64, 3), np.uint8)) for ms in times}
+    async def read(_key, _session, paths, times):
+        captured.append(list(times))
+        return {"status": "COMPLETED", "frames": [{"idx": 1, "balls": [{"confidence": "high", "box": BALL}]}]}
+    monkeypatch.setattr(inspection, "frame_times", lambda *_: [1000, 2000])
+    monkeypatch.setattr(vision, "_read_frames", decode)
+    monkeypatch.setattr(vision, "_write_jpg", lambda path, _image: path.write_bytes(b"frame"))
+    monkeypatch.setattr(vision, "read_action_pixel_evidence", read)
+    monkeypatch.setattr(vision, "corroborate_ball_pixels", lambda *_: [corroborated()])
+    monkeypatch.setattr(vision, "_native_ball_roi", lambda *_: ([{"box": temporal_ball()["box"], "confidence": .8}], temporal_ball()["search_roi"]))
+    import dense_track_refinement
+    monkeypatch.setattr(dense_track_refinement, "_default_detector", lambda: object())
+    bundle = vision.ShadowVisionProviders("key", "native")
+    job = {"inspection_id": "job", "scene_id": "scene", "start_ms": 800, "end_ms": 2200}
+    frames = [frame(ms) for ms in (900, 950, 1000, 1050, 1100, 2000)]
+    result = bundle.action_evidence_provider("unused", job, frames)
+    assert captured == [[1000, 2000]] and bundle.inspection_calls == 1
+    assert 1100 not in result["native_neighbor_decoded_ms"]
+    assert result["native_neighbor_roi_attempts"] <= 3 * inspection.MAX_NATIVE_NEIGHBOR_FRAMES
+    assert len(result["native_neighbor_requested_ms"]) <= inspection.MAX_NATIVE_NEIGHBOR_FRAMES
+    assert inspection.apply_observations(frames, result, "job")["added_ball_candidates"] == 4
+    again = bundle.action_evidence_provider("unused", job, frames)
+    assert again == result and len(captured) == 1
+
+
+def test_decode_failure_is_not_counted_as_a_model_request(monkeypatch):
+    monkeypatch.setattr(inspection, "frame_times", lambda *_: [1000, 2000])
+    monkeypatch.setattr(vision, "_read_frames", lambda *_: {})
+    bundle = vision.ShadowVisionProviders("key", "decode")
+    result = bundle.action_evidence_provider("unused", {"inspection_id": "job", "start_ms": 800, "end_ms": 2200}, [])
+    assert result["reason"] == "ACTION_INSPECTION_DECODE_INSUFFICIENT" and bundle.inspection_calls == 0
 
 
 def test_raw_number_audit_is_preserved_once_without_replicating_into_dense_frames():

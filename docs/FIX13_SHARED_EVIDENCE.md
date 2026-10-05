@@ -28,6 +28,15 @@ claim filter even though no goal had passed the physical proof path.
   must match one measured, unambiguous body and still use the independent
   number reader and existing temporal consensus. No model event/identity label
   is copied into the physical graph. Invalid/cut/fallback frames stay excluded.
+  Search images cover the entire interval, because the semantic contact time
+  is still unproved. Do not borrow the known-release outcome sampler here.
+  Once a ball is independently detected in a search image, inspect four native
+  neighboring frames within 120 ms. Each neighbor requires fresh class-32
+  detector evidence, an exact exported media timestamp, an intact frame path
+  and the measured seed/search-ROI provenance. No seed box, body identity or
+  ownership is copied. Cuts, fallback frames, scene changes and gaps over 80 ms
+  stop this search. Cap each inspection at 48 neighboring frames and three ROIs
+  per neighboring frame; the model still receives at most 12 images.
 - Schedule goal reviews across scenes and time within each scene. Select the
   widest available context before spending budget on overlapping ball/body
   contacts. Local track IDs are never compared across windows; distinct balls
@@ -102,6 +111,18 @@ remained unchanged. More detector proposals alone did not repair scoring.
 Newly scheduled visual reviews are not executed in this offline replay, and the
 original weak Step-3 detector proposals were not exported. Full recovery must be
 validated against newly produced physical/model evidence before claiming success.
+
+A further bounded native-pixel experiment used a saved detector seed at 30.849 s,
+not a new model answer or presumed goal. The detector found the ball at 30.799 s
+and 30.815 s where the original full-frame observations were empty. Testing the
+new four-neighbor provider path added one previously absent ball proposal, but
+the contact still resolved to RECEIVE_CONTROL. This is evidence of a concrete
+observation gap and a safe way to inspect it; it is not proof of the goal. The
+balanced search sampler reduced maximum image spacing in the five reference
+areas to 300–333 ms, with the nearest image to the 23.68 s reference improving
+from 219 ms away to 31 ms away. Native neighbor frames are extra detector inputs,
+not extra paid vision images. Their actual decode times and ROI attempts are
+recorded separately from model-service attempts.
 
 The remaining evidence breaks include a model action described as a pass where
 the user identified a saved shot, a jersey-verified target contact classified as

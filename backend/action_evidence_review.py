@@ -16,6 +16,8 @@ import goal_review_scheduler as scheduler
 MAX_ACTION_REVIEWS = max(0, int(os.environ.get("FIX13_MAX_ACTION_REVIEWS", "16")))
 MAX_ACTION_FRAMES = 12
 MAX_FRAME_ALIGNMENT_MS = 20
+NATIVE_NEIGHBOR_RADIUS_MS = 120
+MAX_NATIVE_NEIGHBOR_FRAMES = 48
 
 
 def _num(value):
@@ -109,15 +111,48 @@ def frame_times(job, frames):
                         and job["start_ms"] <= f["media_ms"] <= job["end_ms"]})
     if len(available) <= MAX_ACTION_FRAMES:
         return available
+    # Contact times are unproved search hints here. Cover the whole interval
+    # instead of borrowing outcome sampling that concentrates on a known kick.
+    center = min(available, key=lambda ms: abs(ms - job["center_ms"]))
+    selected = {available[0], available[-1], center}
     if job.get("has_contact_time"):
-        from fix10a_vision_providers import _goal_review_times
-        wanted = _goal_review_times(job["center_ms"], job["end_ms"], MAX_ACTION_FRAMES, start_ms=job["start_ms"])
-        return sorted({min(available, key=lambda ms: abs(ms - t)) for t in wanted})
-    selected = {min(available, key=lambda ms: abs(ms - job["center_ms"]))}
-    for index in range(MAX_ACTION_FRAMES - 1):
-        wanted = available[0] + index * (available[-1] - available[0]) / (MAX_ACTION_FRAMES - 2)
-        selected.add(min(available, key=lambda ms: abs(ms - wanted)))
+        selected.update(min(available, key=lambda ms: abs(ms - (center + offset))) for offset in (-50, 50))
+    while len(selected) < MAX_ACTION_FRAMES:
+        selected.add(max((ms for ms in available if ms not in selected),
+                         key=lambda ms: (min(abs(ms - old) for old in selected), -ms)))
     return sorted(selected)
+
+
+def neighbor_times(seed_ms, frames, scene_id):
+    """Four native search frames around a measured seed; never cross a barrier."""
+    if not _num(seed_ms):
+        return []
+    nearby = sorted([f for f in frames if _num(f.get("media_ms"))
+                     and abs(f["media_ms"] - seed_ms) <= NATIVE_NEIGHBOR_RADIUS_MS], key=lambda f: f["media_ms"])
+    seed = next((f for f in nearby if f["media_ms"] == seed_ms), None)
+    def valid(row):
+        return row.get("scene_id") == scene_id and not row.get("cut_barrier") and not row.get("used_fallback") \
+            and row.get("time_authority") == "ACTUAL_MEDIA_PTS"
+    if seed is None or not valid(seed):
+        return []
+    available = []
+    for frame in nearby:
+        ms = frame["media_ms"]
+        path = [f for f in nearby if min(seed_ms, ms) <= f["media_ms"] <= max(seed_ms, ms)]
+        if ms != seed_ms and all(valid(f) for f in path) and all(
+                b["media_ms"] - a["media_ms"] <= 80 for a, b in zip(path, path[1:])):
+            available.append(ms)
+    return sorted({min(available, key=lambda ms: abs(ms - (seed_ms + offset)))
+                   for offset in (-100, -50, 50, 100)}) if available else []
+
+
+def _native_ball(ball):
+    import dense_track_refinement
+    box = ball.get("box") or {}
+    return bool(ball.get("pixel_corroborated") is True and _num(ball.get("confidence"))
+                and ball["confidence"] >= dense_track_refinement.DENSE_BALL_CONF_T
+                and all(_num(box.get(k)) for k in ("x", "y", "w", "h"))
+                and 0 < box["w"] <= .08 and 0 < box["h"] <= .04)
 
 
 def bind_body(frame, box):
@@ -139,6 +174,12 @@ def apply_observations(frames, observations, inspection_id):
     result, requests = deepcopy(frames), []
     rejected = defaultdict(int)
     added = 0
+    seeds = [(row, ball) for row in (observations or {}).get("frames") or [] for ball in row.get("ball_candidates") or []
+             if ball.get("source") == "NATIVE_REVIEW_ROI_DETECTOR" and _native_ball(ball)
+             and scheduler._iou(ball.get("box"), ball.get("proposal_box")) >= .20
+             and any(f.get("media_ms") == row.get("media_ms") and f.get("scene_id") == row.get("scene_id")
+                     and not f.get("used_fallback") and not f.get("cut_barrier")
+                     and f.get("time_authority") == "ACTUAL_MEDIA_PTS" for f in result)]
     for row in (observations or {}).get("frames") or []:
         if not _num(row.get("media_ms")):
             continue
@@ -151,6 +192,23 @@ def apply_observations(frames, observations, inspection_id):
             rejected["ACTUAL_FRAME_NOT_PRESENT"] += 1
             continue
         for ball in row.get("ball_candidates") or []:
+            if ball.get("source") == "NATIVE_REVIEW_TEMPORAL_ROI_DETECTOR":
+                seed_ms, seed_box, roi = ball.get("seed_media_ms"), ball.get("seed_box"), ball.get("search_roi") or {}
+                box = ball.get("box") or {}
+                linked = any(seed.get("media_ms") == seed_ms and seed.get("scene_id") == row.get("scene_id")
+                             and scheduler._iou(seed_ball.get("box"), seed_box) >= .75 for seed, seed_ball in seeds)
+                inside = bool(all(_num(b.get(k)) for b in (box, roi) for k in ("x", "y", "w", "h"))
+                              and roi["w"] > 0 and roi["h"] > 0
+                              and roi["x"] <= box["x"] + box["w"] / 2 <= roi["x"] + roi["w"]
+                              and roi["y"] <= box["y"] + box["h"] / 2 <= roi["y"] + roi["h"])
+                if not (_native_ball(ball) and linked and inside
+                        and frame["media_ms"] in neighbor_times(seed_ms, result, row.get("scene_id"))):
+                    rejected["TEMPORAL_NATIVE_SEED_OR_FRAME_INVALID"] += 1
+                    continue
+                if not any(scheduler._iou(box, old.get("box")) >= .5 for old in frame.get("ball_candidates") or []):
+                    frame.setdefault("ball_candidates", []).append(deepcopy(ball))
+                    added += 1
+                continue
             if (ball.get("source") != "NATIVE_REVIEW_ROI_DETECTOR" or ball.get("pixel_corroborated") is not True
                     or not _num(ball.get("confidence"))
                     or scheduler._iou(ball.get("box"), ball.get("proposal_box")) < .20):

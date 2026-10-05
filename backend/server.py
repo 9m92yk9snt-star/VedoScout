@@ -9092,6 +9092,7 @@ async def generate_full_report_task(report_id: str) -> None:
             "goal_clarifications_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_CLARIFICATIONS_PER_REPORT,
             "action_inspections_per_report": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_REVIEWS,
             "action_inspection_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_FRAMES,
+            "action_native_neighbor_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES,
         })
         await db.reports.update_one({"id": report_id}, {"$set": {"analysis_run_manifest": run_manifest}})
         await _trace(report_id, "tracking_start")
