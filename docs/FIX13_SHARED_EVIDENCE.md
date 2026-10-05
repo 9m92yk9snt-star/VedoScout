@@ -8,6 +8,21 @@ claim filter even though no goal had passed the physical proof path.
 
 ## Changes
 
+- Build a shared physical context across overlapping windows before assist
+  reconciliation and downstream goal-review scheduling. A join requires the
+  same scene, at least two matching actual decoded times spanning 50 ms,
+  unambiguous measured body boxes, and matching measured active-ball boxes.
+  Local track names and model event labels cannot establish a join. Cuts,
+  fallback timestamps, competing bodies, target/team conflicts and conflicting
+  known source hashes reject the connection. Body aliases are one-to-one;
+  contacts and strikes retain source-specific identifiers and originals remain
+  unchanged. Cross-window assists additionally require each release anchor to
+  connect to the overlap through a measured ball path with gaps at most 80 ms.
+  Downstream reviews can use that verified prior pass and compete in the
+  verified-chain budget; their original ball, ownership and final goal gates
+  still apply. Source windows, accepted links and rejection reasons are exported.
+  This joins available evidence; it cannot fill an unobserved ball path.
+
 - Share an independently verified tap/jersey identity along the same local body
   for at most 1,200 ms, with actual media timestamps and adjacent frames at most
   80 ms apart. Cuts, ambiguous associations, conflicting verified targets and

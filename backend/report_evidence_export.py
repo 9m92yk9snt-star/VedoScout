@@ -43,7 +43,7 @@ SOURCE_MODULES = (
     "physical_match_reconstruction.py", "dense_replay.py", "event_trace.py",
     "ball_trajectory.py", "ball_contact_engine.py", "touch_graph.py",
     "shot_outcome_engine.py", "evidence_authority.py", "full_video_event_recall.py",
-    "action_evidence_review.py", "goal_review_scheduler.py", "contact_role_resolver.py",
+    "action_evidence_review.py", "cross_window_evidence.py", "goal_review_scheduler.py", "contact_role_resolver.py",
     "dense_identity_continuity.py", "dense_event_reconciliation.py", "report_fact_authority.py",
     "verified_stats.py", "fix10a_vision_providers.py", "fix10a_goal_direction.py",
     "fix10a_ball_proof_gate.py", "short_occlusion_contact_recovery.py", "post_strike_intervention.py",

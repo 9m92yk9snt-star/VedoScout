@@ -172,6 +172,8 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
                     checkpoint = Path(output_dir)
                     checkpoint.mkdir(parents=True, exist_ok=True)
                     (checkpoint / "physical_replay.json").write_text(json.dumps(physical, indent=2))
+            requests, cross_window_context = pmr._apply_cross_window_review_context(requests, physical["traces"])
+            physical["cross_window_evidence"] = cross_window_context
             ordered = goal_review_scheduler.ordered_requests(requests, report["football_sequence_analysis"])
             if goal_provider is not None:
                 by_id = {t["trace_id"]: t for t in physical["traces"]}
@@ -239,6 +241,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None):
             "shooting_score_after": repaired.get("technical", {}).get("shooting", {}).get("score"),
             "coverage": coverage,
             "inspection_plan": inspection_plan,
+            "cross_window_evidence": cross_window_context,
             "replay_backend_sha256": {
                 **{p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                    for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},

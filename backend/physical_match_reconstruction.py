@@ -9,6 +9,7 @@ reconciliation belongs to FIX10B and the existing B3 authority.
 from __future__ import annotations
 
 from copy import deepcopy
+import cross_window_evidence
 import inspect
 import traceback
 import time
@@ -287,6 +288,36 @@ def _window_unresolved_reasons(contact_result, jersey_result, outcomes):
         if crossing.get("status") == "UNRESOLVED":
             reasons.append("GOAL_PLANE_CROSSING_UNRESOLVED")
     return list(dict.fromkeys(reasons))
+
+
+def _apply_cross_window_review_context(jobs, traces):
+    """Use measured overlap to give downstream reviews their prior pass context."""
+    graph = cross_window_evidence.build({"traces": traces})
+    scopes = {}
+    for context in graph["contexts"]:
+        if not context.get("source_trace_ids"):
+            continue
+        for strike in context["strike_evidence"]:
+            if strike.get("cross_window_ball_anchor_eligible"):
+                scopes[(strike["native_source_trace_id"], strike["native_source_strike_id"])] = (context, strike)
+    result = []
+    for original in jobs:
+        job = dict(original)
+        key = (job["window"].get("dense_window_id"), job["strike"].get("strike_id"))
+        linked = scopes.get(key)
+        if linked:
+            context, strike = linked
+            qualified = [s for s in context["strike_evidence"] if s.get("cross_window_ball_anchor_eligible")]
+            eligibility = _goal_review_eligibility(strike, qualified, context["touch_graph"])
+            if eligibility.get("eligible"):
+                job["eligibility"] = {**eligibility, "source_trace_ids": context["source_trace_ids"],
+                                      "cross_window_links": context["cross_window_links"]}
+                job["review"] = {**job["eligibility"], "lane": "VERIFIED_CHAIN"}
+                job["window"] = {**job["window"], "end_ms": context["window"]["end_ms"]}
+        result.append(job)
+    return result, {"links": graph["links"], "rejected": graph["rejected"],
+                    "contexts": [{"trace_id": c["trace_id"], "source_trace_ids": c["source_trace_ids"]}
+                                 for c in graph["contexts"] if c.get("source_trace_ids")]}
 
 
 def _source_meta(source_video, video_path):
@@ -690,6 +721,7 @@ def reconstruct_physical_match(
     traces_by_window = {t["trace_id"]: t for t in traces}
     review_jobs = [job for job in review_jobs
                    if job["window"].get("dense_window_id") in traces_by_window]
+    review_jobs, cross_window_context = _apply_cross_window_review_context(review_jobs, traces)
     scheduled_jobs = goal_review_scheduler.ordered_requests(review_jobs, analysis)
     for rank, job in enumerate(scheduled_jobs):
         trace = traces_by_window[job["window"]["dense_window_id"]]
@@ -777,6 +809,7 @@ def reconstruct_physical_match(
         "trace_summaries": summaries,
         "traces": traces,
         "action_inspection_plan": inspection_plan,
+        "cross_window_evidence": cross_window_context,
         "goal_review_plan": {
             "requests": len(scheduled_jobs),
             "unique_contacts": len({j["review"]["physical_review_id"] for j in scheduled_jobs}),

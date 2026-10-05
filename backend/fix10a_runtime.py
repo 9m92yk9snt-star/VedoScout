@@ -72,6 +72,7 @@ def _compact_physical_result(result: dict | None) -> dict:
         "recall_coverage": row.get("recall_coverage") or {},
         "action_inspection_plan": row.get("action_inspection_plan") or {},
         "goal_review_plan": row.get("goal_review_plan") or {},
+        "cross_window_evidence": row.get("cross_window_evidence") or {},
         "metrics": row.get("metrics") or {},
         "audit_storage_complete": row.get("audit_storage_complete"),
         "dense_traces_persisted_in_mongo": False,
