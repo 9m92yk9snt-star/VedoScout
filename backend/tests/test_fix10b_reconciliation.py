@@ -492,23 +492,50 @@ def test_fix10b19_target_control_contact_can_own_goal_without_later_release():
     )
 
 
-def test_fix11_49448_release_without_verified_goal_chain_is_not_an_assist():
-    candidate = strike(49448, "p001", target=True)
+def test_release_without_verified_goal_chain_is_not_promoted_to_assist():
+    candidate = strike(1000, "p001", target=True)
     tr = trace(
-        [touch(49448, "p001", target=True)],
+        [touch(1000, "p001", target=True)],
         [candidate],
         [],
     )
     assert not any(row["kind"] == "ASSIST" for row in f10b.proposals_from_trace(tr))
 
     semantic = canonical([{
-        "event_id": "unsupported_assist_49448", "scene_id": "scene_1",
-        "canonical_ms": 49448, "canonical_event_type": "ASSIST",
-        "canonical_action_type": "PASS", "proof": {"evidence_ms": [49448]},
+        "event_id": "unsupported_assist", "scene_id": "scene_1",
+        "canonical_ms": 1000, "canonical_event_type": "ASSIST",
+        "canonical_action_type": "PASS", "proof": {"evidence_ms": [1000]},
     }])
     out = f10b.reconcile_canonical_events(semantic, physical([tr]))
     assert out["metrics"]["assists"] == 0
     assert not out["events"]
+
+
+def test_receive_turn_pass_to_scoring_teammate_can_be_assist_at_49448():
+    """Synthetic complete proof; not a claim that the live video is solved.
+
+    The incoming pass is before the target's decisive release. It must not
+    break the direct assist, and the teammate's goal belongs to the teammate.
+    """
+    incoming = strike(48100, "p007")
+    target_pass = strike(49448, "p015", target=True)
+    scorer = strike(50630, "p010")
+    tr = trace(
+        [touch(48100, "p007"), touch(49000, "p015", target=True),
+         touch(49448, "p015", target=True), touch(50100, "p010")],
+        [incoming, target_pass, scorer],
+        [outcome(incoming, goal=False), outcome(target_pass, goal=False),
+         outcome(scorer, goal=True, crossing_ms=51250)],
+    )
+    tr["window"].update(start_ms=48000, end_ms=53000)
+    out = f10b.reconcile_canonical_events(canonical([]), physical([tr]))
+    assert out["metrics"]["assists"] == 1
+    assert out["metrics"]["goals"] == 0
+    assert len(out["events"]) == 1
+    event = out["events"][0]
+    assert event["canonical_event_type"] == "ASSIST"
+    assert event["canonical_ms"] == 49448
+    assert event["actor_local_track_id"] == "p015"
 
 
 def test_fix11_unresolved_semantic_shot_uses_unique_target_release_but_keeps_unknown_outcome():

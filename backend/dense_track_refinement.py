@@ -336,7 +336,20 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False)
     return people, balls, support
 
 
-def _dense_target_kit_samples(frames):
+def _is_direct_tap_target(frame):
+    target = frame.get("global_target") or {}
+    return bool(
+        target.get("status") == "VERIFIED"
+        and target.get("proof_eligible") is True
+        and target.get("authority_tap") is True
+        and target.get("authority_primary_source") == "USER_TAP"
+        and target.get("authority_reason") in {"OK_EXACT", "OK_NEAREST_TAP_FRAME"}
+        and _num(target.get("authority_media_ms"))
+        and abs(int(frame["media_ms"]) - int(target["authority_media_ms"])) <= TAP_FRAME_NEAR_MS
+    )
+
+
+def _dense_target_kit_samples(frames, *, authority_ms=None):
     """Collect kit chroma only along a direct-tap body's contiguous local track."""
     rows = sorted(
         [frame for frame in (frames or [])
@@ -347,12 +360,8 @@ def _dense_target_kit_samples(frames):
     seen = set()
     anchors = [
         (index, frame) for index, frame in enumerate(rows)
-        if (frame.get("global_target") or {}).get("status") == "VERIFIED"
-        and (frame.get("global_target") or {}).get("proof_eligible") is True
-        and (frame.get("global_target") or {}).get("reason") in {
-            "OK_EXACT", "OK_NEAREST_TAP_FRAME"
-        }
-        and (frame.get("global_target") or {}).get("authority_tap") is True
+        if _is_direct_tap_target(frame)
+        and (authority_ms is None or int(frame["media_ms"]) == authority_ms)
     ]
     for index, anchor in anchors:
         target = anchor.get("global_target") or {}
@@ -395,7 +404,67 @@ def _dense_target_kit_samples(frames):
 def _apply_dense_team_labels(frames):
     samples = _dense_target_kit_samples(frames)
     diagnostic = fsg.apply_dense_team_authority(frames, samples)
-    if diagnostic.get("status") == "ok":
+    if diagnostic.get("status") != "ok":
+        # Different tap episodes can have different lighting or body crops.
+        # A failed pooled model must not erase independently proven local kits.
+        # Fit each bounded direct-tap episode under the SAME team gates, then
+        # publish only labels on which all successful overlapping models agree.
+        indexed = sorted(((i, f) for i, f in enumerate(frames or [])
+                          if isinstance(f, dict) and _num(f.get("media_ms"))),
+                         key=lambda row: int(row[1]["media_ms"]))
+        proposals, models = {}, []
+        for anchor_index, (_, anchor) in enumerate(indexed):
+            ms = int(anchor["media_ms"])
+            if not _is_direct_tap_target(anchor):
+                continue
+            region = []
+            for direction in (1, -1):
+                cursor = anchor_index if direction == 1 else anchor_index - 1
+                while 0 <= cursor < len(indexed):
+                    original_index, frame = indexed[cursor]
+                    if (abs(int(frame["media_ms"]) - ms) > DENSE_TEAM_TAP_CONTINUITY_MS
+                            or frame.get("scene_id") != anchor.get("scene_id")
+                            or frame.get("cut_barrier") is True
+                            or frame.get("used_fallback") is True
+                            or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"):
+                        break
+                    region.append((original_index, deepcopy(frame)))
+                    cursor += direction
+            local_rows = [row for _, row in region]
+            for row in local_rows:
+                for player in row.get("players") or []:
+                    if not isinstance(player, dict):
+                        continue
+                    if player.get("team_source") == fsg.DENSE_TEAM_SOURCE:
+                        for key in ("team", "team_confidence", "team_source"):
+                            player.pop(key, None)
+            local_samples = _dense_target_kit_samples(local_rows, authority_ms=ms)
+            model = fsg.apply_dense_team_authority(local_rows, local_samples)
+            models.append({**model, "authority_media_ms": ms,
+                           "scene_id": anchor.get("scene_id")})
+            if model.get("status") != "ok":
+                continue
+            for original_index, frame in region:
+                for player_index, player in enumerate(frame.get("players") or []):
+                    if not isinstance(player, dict):
+                        continue
+                    if player.get("team_source") == fsg.DENSE_TEAM_SOURCE:
+                        proposals.setdefault((original_index, player_index), []).append(player)
+        applied, conflicts = 0, 0
+        for (frame_index, player_index), votes in proposals.items():
+            if len({vote["team"] for vote in votes}) != 1:
+                conflicts += 1
+                continue
+            player = frames[frame_index]["players"][player_index]
+            player.update(team=votes[0]["team"],
+                          team_confidence=min(vote["team_confidence"] for vote in votes),
+                          team_source=fsg.DENSE_TEAM_SOURCE)
+            applied += 1
+        diagnostic = {**diagnostic, "pooled_status": diagnostic["status"],
+                      "local_models": models, "conflicting_detections": conflicts,
+                      "labeled_detections": applied,
+                      "status": "partial" if applied else "unresolved"}
+    if diagnostic.get("status") in {"ok", "partial"}:
         for frame in frames or []:
             target = frame.get("global_target") if isinstance(frame, dict) else None
             if not isinstance(target, dict) or target.get("status") != "VERIFIED":
@@ -731,15 +800,24 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 camera_state = "AFFINE_VERIFIED"
 
         predictions = {}
+        camera_boxes = {}
         if matrix is not None:
             for ti, tr in enumerate(live):
                 if media_ms - _last_ms(tr, media_ms) > TRACK_MAX_GAP_MS:
                     continue
-                tb = transform_box_affine(tr.get("box"), matrix, (w, h))
+                # Camera matrices are between successive decoded frames, even
+                # when a player detection is missing. Keep their accumulated
+                # effect separately from the last measured body and velocity.
+                tb = transform_box_affine(tr.get("camera_box", tr.get("box")), matrix, (w, h))
+                tr["camera_box"] = tb
                 if tb is not None:
                     pred = _residual_predict(tr, tb, media_ms)
                     if _valid_box(pred):
                         predictions[ti] = pred
+                        camera_boxes[ti] = tb
+        else:
+            for tr in live:
+                tr["camera_box"] = None  # an unknown camera step breaks continuity
 
         # Candidate scores per existing track.  Near-equal alternatives remain
         # unbound hypotheses instead of being decided by detector/list order.
@@ -777,10 +855,13 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             if pred is None:
                 continue
             dt = max(1e-3, (media_ms - _last_ms(tr, media_ms)) / 1000.0)
-            pcx, pcy = _center(pred); dcx, dcy = _center(det["box"])
+            # Measure player motion from the camera-transformed last box.
+            # Prediction error would subtract the previous velocity again.
+            pcx, pcy = _center(camera_boxes[ti]); dcx, dcy = _center(det["box"])
             tr["vx"] = (dcx - pcx) / dt
             tr["vy"] = (dcy - pcy) / dt
             tr["box"] = _box(det["box"])
+            tr["camera_box"] = _box(det["box"])
             tr["last_ms"] = media_ms
             if det.get("team") is not None:
                 tr["team"] = det.get("team")

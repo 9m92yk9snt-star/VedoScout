@@ -366,7 +366,7 @@ export function PremiumMobileCategories({
       has: !!d.matchStats || d.ageComparison?.length > 0 || report.progression?.categories?.length > 0,
       body: () => (
         <>
-          <MatchStatsCard matchStats={d.matchStats} />
+          <MatchStatsCard matchStats={d.matchStats} coverageNote={d.matchStatsCoverage} />
           <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />
           {report.progression?.categories?.length > 0 ? (
             <ProgressCard prog={report.progression} />

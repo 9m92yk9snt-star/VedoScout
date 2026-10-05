@@ -29,6 +29,7 @@ import r2_storage
 import video_timebase
 import fix10a_runtime
 import fix10b_runtime
+import analysis_jobs
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -140,7 +141,7 @@ logger = logging.getLogger("elite-scout")
 # ---- DB ----
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ["DB_NAME"]]
+db = analysis_jobs.FencedDatabase(client[os.environ["DB_NAME"]])
 
 # ---- Constants ----
 EMERGENT_LLM_KEY = os.environ["EMERGENT_LLM_KEY"]
@@ -1821,7 +1822,7 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
     if not report_id:
         return comments
 
-    frames_dir = UPLOAD_DIR / "frames" / str(report_id)
+    frames_dir = _analysis_frames_dir(report_id)
     frames_dir.mkdir(parents=True, exist_ok=True)
 
     video_filename = report_doc.get("video_filename")
@@ -1996,7 +1997,7 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                                 k: float(actual_box[k]) for k in ("x", "y", "w", "h")
                             }
             if ok:
-                out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
+                out["frame_url"] = f"/api/uploads/{out_path.relative_to(UPLOAD_DIR).as_posix()}"
                 out["frame_time_ms"] = int(
                     out.get("evidence_time_ms")
                     if canonical_native else ems)
@@ -2046,7 +2047,7 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
                 _make_placeholder_frame(ts, c.get("comment", ""), out_path)
                 ph_marker.touch()
         out = dict(c)
-        out["frame_url"] = f"/api/uploads/frames/{report_id}/{out_path.name}"
+        out["frame_url"] = f"/api/uploads/{out_path.relative_to(UPLOAD_DIR).as_posix()}"
         if ph_marker.exists():
             out["frame_placeholder"] = True
         if frame_meta:
@@ -3439,11 +3440,11 @@ async def call_gemini_with_video(
         api_key=EMERGENT_LLM_KEY,
         session_id=session_id,
         system_message=(
-            "You are an experienced football scout writing in a confident, definitive "
-            "voice — never hedge. ALWAYS respond with valid JSON only. When you describe "
-            "the locked player you observed something — state it as fact. If you cannot "
-            "see them in a moment, write OFF-CAMERA instead. Never describe a different "
-            "player."
+            "You are an experienced football scout. ALWAYS respond with valid JSON only. "
+            "State visible actions precisely. Preserve uncertainty when identity, ball "
+            "contact or the outcome is unclear; a missing observation is not a zero total. "
+            "If the locked player is not visible, write OFF-CAMERA. Never describe a "
+            "different player or invent proof to satisfy the response schema."
         ),
     ).with_model("gemini", "gemini-2.5-pro")
 
@@ -3497,7 +3498,9 @@ async def call_gemini_with_video(
         # NOTE: `seed` is NOT supported for gemini through the LLM proxy
         # (verified Aug 5 2026 — UnsupportedParamsError) — do not re-add it.
         chat.extra_params = {**(chat.extra_params or {}), "timeout": timeout_s, "temperature": 0.0}
-        response = await asyncio.wait_for(chat.send_message(user_message), timeout=timeout_s + 30)
+        response = await analysis_jobs.model_call(
+            getattr(db, "analysis_model_calls", None), chat, user_message, session_id=session_id,
+            video_path=video_path, prompt=prompt, timeout_s=timeout_s + 30)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video timeout (session={session_id}, video={video_path})")
         raise HTTPException(status_code=504, detail="AI analysis timed out. Please try again with a shorter clip.")
@@ -3588,7 +3591,9 @@ async def call_gemini_with_video(
             logger.warning(f"could not set retry flag for {_report_id}: {e}")
 
     try:
-        retry_response = await asyncio.wait_for(retry_chat.send_message(retry_message), timeout=timeout_s + 30)
+        retry_response = await analysis_jobs.model_call(
+            getattr(db, "analysis_model_calls", None), retry_chat, retry_message, session_id=f"{session_id}-retry",
+            video_path=video_path, prompt=strict_prompt, timeout_s=timeout_s + 30)
     except asyncio.TimeoutError:
         logger.error(f"call_gemini_with_video retry timeout (session={session_id})")
         if _report_id:
@@ -4027,33 +4032,35 @@ async def run_content_gate(report_id: str, clip_path: Path, marker_path: Optiona
             marker_path=str(marker_path) if marker_path and marker_path.exists() else None,
         )
         # Basic sanity defaults
-        gate.setdefault("is_football", True)
-        gate.setdefault("quality", "good")
-        gate.setdefault("player_visible", "clear")
+        gate.setdefault("is_football", None)
+        gate.setdefault("quality", "unknown")
+        gate.setdefault("player_visible", "unknown")
         gate.setdefault("content_type", "other")
         gate.setdefault("games_detected", 1)
         gate.setdefault("camera_distance", "medium")
         gate.setdefault("issues", [])
         gate.setdefault("rejection_reason", None)
+        gate["assessment_status"] = "assessed"
         return gate
     except Exception as e:
         logger.warning(f"Content gate failed, falling back to permissive: {e}")
         return {
-            "is_football": True,
+            "is_football": None,
             "content_type": "other",
-            "quality": "good",
-            "player_visible": "clear",
+            "quality": "unknown",
+            "player_visible": "unknown",
             "games_detected": 1,
             "camera_distance": "medium",
             "issues": [],
             "rejection_reason": None,
             "gate_error": True,
+            "assessment_status": "error",
         }
 
 
 def gate_rejection_message(gate: dict) -> Optional[str]:
     """Return a user-facing rejection message if the gate result requires rejection. Otherwise None."""
-    if not gate.get("is_football", True):
+    if gate.get("is_football") is False:
         return (
             gate.get("rejection_reason")
             or "This video doesn't look like football. Please upload a clip of a match, training, drill, or freestyle work with a football."
@@ -5819,8 +5826,13 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         # reconnecting" state instead of looking frozen on slow production CPUs.
         "last_progress_at": doc.get("last_progress_at"),
         "full_report_retries": int(doc.get("full_report_retries") or 0),
+        "full_report_run_id": doc.get("full_report_run_id"),
+        "full_pipeline_stage": doc.get("full_pipeline_stage"),
+        "physical_windows_completed": doc.get("fix10a_completed_windows"),
+        "analysis_coverage": (doc.get("unified_scoring_scan") or {}).get("coverage_status"),
         "pipeline_stage": (
-            (doc.get("pipeline_trace") or [{}])[-1].get("stage")
+            ((doc.get("pipeline_trace") or [{}])[-1].get("stage")
+             or (doc.get("pipeline_trace") or [{}])[-1].get("s"))
             if isinstance((doc.get("pipeline_trace") or [{}])[-1], dict) else None
         ),
     }
@@ -5882,38 +5894,87 @@ async def _await_with_heartbeat(report_id: str, awaitable, interval: int = 45):
             return task.result()
 
 
-async def _full_report_with_heartbeat(report_id: str) -> None:
-    """Liveness stamper around the FULL report generation so the frontend can
-    tell SLOW (pod alive, still working) from DEAD (pod restarted): stamps
-    `last_progress_at` every 45s for the entire duration of the pipeline."""
+async def _full_report_with_heartbeat(report_id: str, lease=None) -> None:
+    """One leased execution path for paid upload, manual start and recovery."""
+    lease = lease or await analysis_jobs.claim(db.reports, report_id)
+    if lease is None:
+        return
+    token = analysis_jobs.CURRENT_RUN.set(lease)
+    job = stamper = None
+
     async def _stamp():
         while True:
             await asyncio.sleep(45)
-            try:
-                await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat()})
-            except Exception:
-                pass
-    stamper = asyncio.create_task(_stamp())
+            await analysis_jobs.heartbeat(db.reports, lease)
+
     try:
-        await generate_full_report_task(report_id)
+        await analysis_jobs.heartbeat(db.reports, lease)
+        await _trace(report_id, "full_start")
+        job = asyncio.create_task(generate_full_report_task(report_id))
+        stamper = asyncio.create_task(_stamp())
+        done, _ = await asyncio.wait({job, stamper}, return_when=asyncio.FIRST_COMPLETED,
+                                     timeout=FULL_REPORT_MAX_RUN_SECONDS)
+        if not done:
+            await _trace(report_id, "full_run_timeout")
+            await db.reports.update_one({"id": report_id}, {"$set": {
+                "full_report_status": "failed",
+                "full_report_error": "Analysis exceeded its time limit. Please retry; your source video is preserved."}})
+            return
+        if stamper in done:
+            stamper.result()  # lost lease / heartbeat failure stops the owner
+        await job
+    except analysis_jobs.LeaseLost:
+        logger.warning("[analysis-run] %s/%s superseded; publication stopped", report_id, lease.run_id)
     finally:
-        stamper.cancel()
+        for task in (job, stamper):
+            if task is not None and not task.done():
+                task.cancel()
+        await asyncio.gather(*(t for t in (job, stamper) if t is not None), return_exceptions=True)
+        analysis_jobs.CURRENT_RUN.reset(token)
+        # Expire only this owner. A takeover's heartbeat/status cannot be reset.
+        try:
+            result = await db.reports.update_one(
+                {"id": report_id, "full_report_run_id": lease.run_id},
+                {"$set": {"full_report_lease_expires_at": now_iso(), "full_report_run_finished_at": now_iso()}},
+            )
+            await db.analysis_runs.update_one(
+                {"run_id": lease.run_id},
+                {"$set": {"report_id": report_id, "finished_at": now_iso(),
+                          "owner_state": "released" if result.matched_count else "superseded"}}, upsert=True)
+        except Exception:
+            logger.exception("[analysis-run] %s/%s final audit/release failed", report_id, lease.run_id)
 
 
 async def _trace(report_id: str, stage: str) -> None:
-    """Append a pipeline-stage marker to the report doc (capped at 50 entries).
-    Read-only diagnostics — the LAST entry tells exactly where a production
-    pipeline died. Best-effort, never raises."""
+    """Persist a stage and its run owner (last 100 entries); best-effort."""
     try:
+        lease = analysis_jobs.CURRENT_RUN.get()
+        item = {"stage": stage, "s": stage, "at": now_iso()}
+        if lease:
+            item["run_id"] = lease.run_id
+        trace_key = "full_pipeline_trace" if lease else "pipeline_trace"
+        update = {"$push": {trace_key: {"$each": [item], "$slice": -100}}}
+        if lease:
+            update["$set"] = {"full_pipeline_stage": stage}
         await db.reports.update_one(
             {"id": report_id},
-            {"$push": {"pipeline_trace": {
-                "$each": [{"s": stage, "at": datetime.now(timezone.utc).isoformat()}],
-                "$slice": -50,
-            }}},
+            update,
         )
+        if lease:
+            await db.analysis_runs.update_one(
+                {"run_id": lease.run_id},
+                {"$set": {"report_id": report_id, "last_stage": stage, "last_stage_at": item["at"]},
+                 "$push": {"stages": {"$each": [item], "$slice": -100}}},
+                upsert=True,
+            )
     except Exception:
         pass
+
+
+def _analysis_frames_dir(report_id):
+    path = UPLOAD_DIR / "frames" / str(report_id)
+    lease = analysis_jobs.CURRENT_RUN.get()
+    return path / lease.run_id if lease else path
 
 
 def _build_primary_anchor_payload(report_id: str, marker_timestamp, primary_box,
@@ -6400,15 +6461,16 @@ async def analyze_preview_task(report_id: str):
         if is_paid_upload:
             logger.info(f"[content-gate] skipped for paid upload report={report_id} consumed={doc.get('eligibility_consumed')}")
             gate = {
-                "is_football": True,
+                "is_football": None,
                 "content_type": "match",
-                "quality": "good",
-                "player_visible": "clear",
+                "quality": "unknown",
+                "player_visible": "unknown",
                 "games_detected": 1,
                 "camera_distance": "medium",
                 "issues": [],
                 "rejection_reason": None,
                 "gate_skipped_paid": True,
+                "assessment_status": "skipped_paid",
             }
         else:
             gate = await _await_with_heartbeat(
@@ -7357,13 +7419,15 @@ async def generate_full_report(report_id: str, background: BackgroundTasks, user
     if not local_or_r2 or not local_or_r2.exists():
         raise HTTPException(status_code=404, detail="Video file missing")
 
-    # Mark as queued + clear any previous error and kick off the bg task.
-    await db.reports.update_one(
-        {"id": report_id},
-        {"$set": {"full_report_status": "generating", "full_report_error": None}},
-    )
-    background.add_task(generate_full_report_task, report_id)
-    return {"status": "generating", "report_id": report_id, "full_report_status": "generating"}
+    lease = await analysis_jobs.claim(db.reports, report_id)
+    if lease is None:
+        fresh = await db.reports.find_one({"id": report_id}) or {}
+        return {"status": "already_generating", "report_id": report_id,
+                "full_report_status": fresh.get("full_report_status"),
+                "full_report_run_id": fresh.get("full_report_run_id")}
+    background.add_task(_full_report_with_heartbeat, report_id, lease)
+    return {"status": "generating", "report_id": report_id,
+            "full_report_status": "generating", "full_report_run_id": lease.run_id}
 
 
 class VideoSharePayload(BaseModel):
@@ -7471,7 +7535,7 @@ async def _verify_doubt_taps(report_id: str, file_path: Path, confirmations: lis
     kept = []
     for c in confirmations:
         box = c.get("box") or {}
-        crop_path = UPLOAD_DIR / f"{report_id}-doubtchk-{c.get('idx')}.jpg"
+        crop_path = UPLOAD_DIR / f"{report_id}-doubtchk-{c.get('idx')}-{uuid.uuid4().hex}.jpg"
 
         def _crop():
             cap = cv2.VideoCapture(str(file_path))
@@ -7520,7 +7584,9 @@ async def _run_doubt_confirmation(
     ground-truth seeds. Timeout/skip → original track (old behaviour)."""
     enriched = []
     for i, dmom in enumerate(doubt_moments[:3]):
-        fname = f"{report_id}-doubt-{i + 1}.jpg"
+        lease = analysis_jobs.CURRENT_RUN.get()
+        suffix = f"-{lease.run_id}" if lease else ""
+        fname = f"{report_id}{suffix}-doubt-{i + 1}.jpg"
         out_path = UPLOAD_DIR / fname
         if not await asyncio.to_thread(_extract_video_frame, Path(file_path), float(dmom["t"]), out_path):
             continue
@@ -8162,7 +8228,7 @@ async def _generate_tele_clips(report_id: str, doc: dict, frames_dir, enriched: 
             float(sec - win["w0"]), float(win["w1"] - sec), risky_windows,
         )
         if res and res.get("ok"):
-            c["tele_clip_url"] = f"/api/uploads/frames/{report_id}/{out.name}"
+            c["tele_clip_url"] = f"/api/uploads/{out.relative_to(UPLOAD_DIR).as_posix()}"
             c["tele_clip_coverage"] = res.get("coverage")
             # THE MOMENT activation in the proof player = event_start - clip_start
             c["tele_clip_start"] = res.get("start")
@@ -8184,7 +8250,7 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
     doc = await db.reports.find_one({"id": report_id})
     if not doc or not (doc.get("full_report") or {}).get("video_comments"):
         return None
-    frames_dir = UPLOAD_DIR / "frames" / str(report_id)
+    frames_dir = _analysis_frames_dir(report_id)
     shutil.rmtree(frames_dir, ignore_errors=True)  # drop any cached placeholders
     enriched = await asyncio.to_thread(ensure_video_frames, doc, str(video_path))
     # Layer A — GPT-vision identity gate before the frames are published.
@@ -8229,7 +8295,8 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
                 p = frames_dir / Path(fu).name
                 if p.exists() and p.stat().st_size > 0 and not p.with_suffix(".ph").exists():
                     try:
-                        key = f"reports/{report_id}/frames/{p.name}"
+                        lease = analysis_jobs.CURRENT_RUN.get()
+                        key = f"reports/{report_id}/frames/{lease.run_id + '/' if lease else ''}{p.name}"
                         c["frame_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "image/jpeg")
                     except Exception as e:
                         logger.warning(f"R2 flush frame failed {report_id}/{p.name}: {e}")
@@ -8238,7 +8305,8 @@ async def _persist_video_frames(report_id: str, video_path) -> Optional[dict]:
                 p = frames_dir / Path(cu).name
                 if p.exists() and p.stat().st_size > 0:
                     try:
-                        key = f"reports/{report_id}/frames/{p.name}"
+                        lease = analysis_jobs.CURRENT_RUN.get()
+                        key = f"reports/{report_id}/frames/{lease.run_id + '/' if lease else ''}{p.name}"
                         c["tele_clip_url"] = await asyncio.to_thread(r2_storage.upload_file, key, p, "video/mp4")
                     except Exception as e:
                         logger.warning(f"R2 flush clip failed {report_id}/{p.name}: {e}")
@@ -8467,7 +8535,7 @@ async def _trusted_fastest_moment(
             return t, v, "tap"
         if ai_checks < 2 and ref_crops and video_path and Path(video_path).exists():
             ai_checks += 1
-            frame = UPLOAD_DIR / f".fast-{report_id}-{t:.1f}.jpg"
+            frame = UPLOAD_DIR / f".fast-{report_id}-{t:.1f}-{uuid.uuid4().hex}.jpg"
             try:
                 ok = await asyncio.to_thread(extract_frame_at, Path(video_path), t, frame)
                 if ok:
@@ -8921,6 +8989,7 @@ async def _finalize_full_report(report_id: str, file_path, persist_frames: bool 
     except Exception:
         logger.exception(f"Failed to queue agent_review for {report_id}")
     # THE authoritative READY transition — the only write of "ready" in the run.
+    await _trace(report_id, "full_ready")
     await db.reports.update_one(
         {"id": report_id},
         {"$set": {"full_report_status": "ready", "full_report_error": None}},
@@ -8995,7 +9064,9 @@ async def generate_full_report_task(report_id: str) -> None:
                 # FIX 00B — internal checkpoints reset for the new analysis run.
                 "identity_gate_done": False,
                 "identity_regen_required": False,
-            }},
+            }, "$unset": {k: "" for k in doc if k.startswith(("fix10a_", "fix10b_", "unified_", "football_sequence_"))
+                           or k in {"canonical_events", "event_ledger", "football_scene_graph", "event_discovery_raw",
+                                    "identity_timeline", "identity_timeline_compare"}}},
         )
         file_path = await _ensure_report_video_local(report_id)
         if not file_path or not file_path.exists():
@@ -9008,6 +9079,17 @@ async def generate_full_report_task(report_id: str) -> None:
 
         marker_path, crop_path_str = _report_media_paths(doc)
         anchor_payload_list = doc.get("anchors") or []
+        run_manifest = await asyncio.to_thread(analysis_jobs.manifest, file_path, anchor_payload_list, {
+            "identity_timeline_enabled": player_identity_timeline.TIMELINE_ENABLED,
+            "identity_timeline_hz": player_identity_timeline.HZ,
+            "support_vision_enabled": fix10a_runtime.support_vision_enabled(),
+            "semantic_model": "gemini-2.5-pro",
+            "vision_model": fix10a_runtime.fix10a_vision_providers.VERIFY_MODEL,
+            "goal_reviews_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_REVIEWS_PER_REPORT,
+            "goal_clarifications_per_report": fix10a_runtime.fix10a_goal_direction.MAX_GOAL_CLARIFICATIONS_PER_REPORT,
+        })
+        await db.reports.update_one({"id": report_id}, {"$set": {"analysis_run_manifest": run_manifest}})
+        await _trace(report_id, "tracking_start")
         anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
 
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
@@ -9065,12 +9147,14 @@ async def generate_full_report_task(report_id: str) -> None:
         _unified_result = None
         if player_identity_timeline.TIMELINE_ENABLED and valid_anchors:
             try:
+                await _trace(report_id, "identity_timeline_start")
                 _idtl = await asyncio.to_thread(
                     player_identity_timeline.build_identity_timeline,
                     str(file_path),
                     {"anchors": valid_anchors, "anchor_time_offset": gt_t_off},
                 )
                 _idtl_cmp = player_identity_timeline.compare_with_production(_idtl, gt_track)
+                await _trace(report_id, "identity_timeline_complete")
                 await db.reports.update_one(
                     {"id": report_id},
                     {"$set": {"identity_timeline":
@@ -9085,10 +9169,12 @@ async def generate_full_report_task(report_id: str) -> None:
                 )
             except Exception:
                 logger.exception(f"[fix09a] identity timeline failed for {report_id}")
+                await _trace(report_id, "identity_timeline_error")
                 _idtl = {}
 
         try:
             if valid_anchors and isinstance(_idtl, dict) and _idtl.get("status") == "ok":
+                await _trace(report_id, "unified_preparation_start")
                 _unified_prepared = await asyncio.to_thread(
                     unified_analysis_engine.prepare_analysis,
                     video_path=str(file_path),
@@ -9099,6 +9185,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     identity_profile=doc.get("identity_profile") or {},
                     player_details=doc.get("player_details") or {},
                 )
+                await _trace(report_id, "unified_preparation_complete")
                 logger.info(
                     f"[fix09b] {report_id}: prepared status={_unified_prepared.get('status')} "
                     f"identity_points={_unified_prepared.get('metrics', {}).get('identity_points')} "
@@ -9129,7 +9216,9 @@ async def generate_full_report_task(report_id: str) -> None:
                 }
                 _unified_candidate = None
                 _sequence_merged = {}
+                _sequence_provider_error = None
                 for _attempt_no in range(2):
+                    await _trace(report_id, "sequence_model_start" if _attempt_no == 0 else "sequence_model_retry")
                     sequence_prompt = str(_sequence_request.get("analysis_prompt") or "")
                     try:
                         _idp = doc.get("identity_profile")
@@ -9147,7 +9236,7 @@ async def generate_full_report_task(report_id: str) -> None:
                             sequence_prompt += _gtb
                     except Exception:
                         pass
-                    sequence_raw = await call_gemini_with_video(
+                    sequence_raw, _sequence_provider_error = await analysis_jobs.optional_observation(call_gemini_with_video(
                         session_id=(
                             f"sequence-{report_id}" if _attempt_no == 0
                             else f"sequence-retry-{report_id}"
@@ -9158,12 +9247,17 @@ async def generate_full_report_task(report_id: str) -> None:
                         crop_path=crop_path_str,
                         anchor_crops=anchor_crops_full if anchor_crops_full else None,
                         timeout_s=420.0,
-                    )
+                    ))
                     _sequence_attempts.append(sequence_raw)
+                    await _trace(report_id, "sequence_model_error" if _sequence_provider_error else "sequence_model_complete")
                     _sequence_merged = unified_analysis_engine.merge_model_attempts(
                         _sequence_attempts)
                     _unified_candidate = unified_analysis_engine.finalise_analysis(
                         _sequence_merged, _unified_prepared)
+                    if _sequence_provider_error:
+                        # No repeated semantic spend after a provider failure.
+                        # Safe prepared windows still enter the physical lane.
+                        break
                     if unified_analysis_engine.is_production_ready(_unified_candidate):
                         _unified_result = _unified_candidate
                         break
@@ -9184,6 +9278,8 @@ async def generate_full_report_task(report_id: str) -> None:
                 _seq_analysis = (
                     (_unified_candidate or {}).get("sequence_analysis") or {}
                 )
+                if _unified_result is None and unified_analysis_engine.can_run_physical(_unified_candidate):
+                    _unified_result = _unified_candidate
                 _unified_diagnostics = {
                     "prepared_status": _unified_prepared.get("status"),
                     "result_status": (_unified_candidate or {}).get("status"),
@@ -9195,6 +9291,7 @@ async def generate_full_report_task(report_id: str) -> None:
                         _seq_analysis.get("missing_sequence_ids") or []),
                     "action_count_mismatch_ids": list(
                         _seq_analysis.get("action_count_mismatch_ids") or []),
+                    "model_error_type": _sequence_provider_error,
                 }
                 if _unified_result is not None:
                     event_ledger_obj = _unified_result.get("event_ledger")
@@ -9212,11 +9309,11 @@ async def generate_full_report_task(report_id: str) -> None:
                     }
                     _payload["football_sequence_raw"] = _response_summary
                     _payload["event_discovery_raw"] = _response_summary
+                    _payload["unified_analysis_diagnostics"] = _unified_diagnostics
                     await db.reports.update_one(
                         {"id": report_id},
                         {"$set": _payload,
-                         "$unset": {"unified_analysis_diagnostics": "",
-                                    "unified_event_track": ""}},
+                         "$unset": {"unified_event_track": ""}},
                     )
                     logger.info(
                         f"[fix09b] {report_id}: canonical events="
@@ -9230,6 +9327,7 @@ async def generate_full_report_task(report_id: str) -> None:
                     # contributes physical evidence and FIX10B is the proof-gated
                     # canonical reconciliation authority.
                     try:
+                        await _trace(report_id, "physical_reconstruction_start")
                         _fix10a_result = await fix10a_runtime.run(
                             report_id=report_id,
                             video_path=str(file_path),
@@ -9239,6 +9337,9 @@ async def generate_full_report_task(report_id: str) -> None:
                             source_video={
                                 "role": "CANONICAL_WEB_VIDEO",
                                 "fingerprint": doc.get("fingerprint") or {},
+                                "sha256": run_manifest.get("source_video_sha256"),
+                                "analysis_run_id": (analysis_jobs.CURRENT_RUN.get().run_id
+                                                    if analysis_jobs.CURRENT_RUN.get() else None),
                             },
                             local_dir=UPLOAD_DIR / ".fix10a_traces",
                         )
@@ -9246,12 +9347,14 @@ async def generate_full_report_task(report_id: str) -> None:
                             (_fix10a_result or {}).get("_fix10b_candidate")
                             if isinstance(_fix10a_result, dict) else None
                         )
+                        await _trace(report_id, "physical_reconstruction_complete")
                         if (
                             isinstance(_fix10b_candidate, dict)
                             and _fix10b_candidate.get("enabled") is True
                             and isinstance(_fix10b_candidate.get("unified_result"), dict)
                         ):
                             _unified_result = _fix10b_candidate["unified_result"]
+                            await _trace(report_id, "canonical_reconciliation")
                             event_ledger_obj = _unified_result.get("event_ledger")
                             _fix10b_summary = dict(_fix10b_candidate.get("summary") or {})
                             _payload = unified_analysis_engine.persistence_payload(_unified_result)
@@ -9294,6 +9397,7 @@ async def generate_full_report_task(report_id: str) -> None:
         # fabricating an empty report. Successful FIX09B runs never use FIX04 as
         # the final event authority.
         if _unified_result is None:
+            await _trace(report_id, "legacy_fallback")
             _fallback_unset = {
                 "canonical_events": "",
                 "football_scene_graph": "",
@@ -9562,7 +9666,9 @@ async def generate_full_report_task(report_id: str) -> None:
         # FIX 00B correction — a TOP-LEVEL persist failure means finalization
         # did NOT complete: propagate into the failure contract (no ready).
         # Individual asset failures stay fail-open INSIDE _persist_video_frames.
+        await _trace(report_id, "evidence_assets_start")
         identity_stats = await _persist_video_frames(report_id, file_path)
+        await _trace(report_id, "evidence_assets_complete")
         # ── IDENTITY GATE — one corrective re-analysis when GPT-vision rejects
         # most evidence frames (Gemini most likely switched player mid-video).
         # Shared helper: the SAME corrective algorithm as corrective-only recovery.
@@ -9602,6 +9708,7 @@ async def generate_full_report_task(report_id: str) -> None:
         await _finalize_full_report(report_id, file_path, persist_frames=False)
     except Exception as e:
         logger.exception(f"generate_full_report_task failed for {report_id}")
+        await _trace(report_id, "full_failed")
         # Persist a friendly failure marker so the frontend can surface "Try again".
         try:
             await db.reports.update_one(
@@ -16237,27 +16344,20 @@ app.add_middleware(
 # in-process asyncio task, so a worker restart (hot reload, deploy, pod cycle)
 # kills it mid-flight and the doc stays `full_report_status="generating"`
 # forever — the premium building dashboard then spins at 98% with no recovery.
-FULL_REPORT_STALL_SECONDS = 20 * 60   # a legit generation can take ~10 min
+FULL_REPORT_STALL_SECONDS = 20 * 60   # Inactivity limit, not total analysis duration.
+FULL_REPORT_MAX_RUN_SECONDS = 2 * 60 * 60  # Heartbeats cannot keep a hung run alive forever.
 FULL_REPORT_MAX_RETRIES = 2
 
 
 async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
-    """Requeue orphaned/stalled full-report generations. At startup ANY doc
-    still in an in-flight state (generating/verifying/finalizing) is orphaned
-    by definition (include_fresh=True); the periodic sweep only touches docs
-    whose `full_report_started_at` is older
-    than FULL_REPORT_STALL_SECONDS. Bounded by FULL_REPORT_MAX_RETRIES, after
-    which the doc flips to 'failed' so the UI can offer a retry."""
+    """Recover expired owners only, even at startup in a multi-worker deploy.
+
+    include_fresh remains API-compatible; a new pod is never entitled to take
+    a healthy lease owned by another pod. Admission and expiry are atomic.
+    """
     now = datetime.now(timezone.utc)
-    _inflight = ["generating", "verifying", "finalizing"]
-    query: dict = {"full_report_status": {"$in": _inflight}}
-    if not include_fresh:
-        cutoff = (now - timedelta(seconds=FULL_REPORT_STALL_SECONDS)).isoformat()
-        query["$or"] = [
-            {"full_report_started_at": {"$lt": cutoff}},
-            {"full_report_started_at": {"$in": [None, ""]}},
-            {"full_report_started_at": {"$exists": False}},
-        ]
+    query = {"full_report_status": {"$in": list(analysis_jobs.IN_FLIGHT)},
+             **analysis_jobs.expired_query(now, FULL_REPORT_STALL_SECONDS)}
     requeued = 0
     async for d in db.reports.find(query, {"id": 1, "full_report_retries": 1}):
         rid = d.get("id")
@@ -16266,22 +16366,23 @@ async def _sweep_stuck_full_reports(include_fresh: bool = False) -> int:
         retries = int(d.get("full_report_retries") or 0)
         if retries >= FULL_REPORT_MAX_RETRIES:
             await db.reports.update_one(
-                {"id": rid, "full_report_status": {"$in": _inflight}},
+                {"id": rid, **query},
                 {"$set": {
                     "full_report_status": "failed",
                     "full_report_error": "Generation was interrupted repeatedly — tap retry, nothing is lost.",
+                    "full_report_run_id": uuid.uuid4().hex,
+                    "full_pipeline_stage": "retry_limit_failed",
                 }},
             )
             logger.error(f"[full-report-watchdog] {rid} exceeded {FULL_REPORT_MAX_RETRIES} retries → failed")
             continue
-        await db.reports.update_one(
-            {"id": rid},
-            {"$set": {
-                "full_report_retries": retries + 1,
-                "full_report_started_at": now.isoformat(),
-            }},
+        lease = await analysis_jobs.claim(
+            db.reports, rid, recover=True, stall_seconds=FULL_REPORT_STALL_SECONDS,
+            max_retries=FULL_REPORT_MAX_RETRIES,
         )
-        asyncio.create_task(_full_report_with_heartbeat(rid))
+        if lease is None:
+            continue
+        asyncio.create_task(_full_report_with_heartbeat(rid, lease))
         requeued += 1
         logger.warning(f"[full-report-watchdog] requeued generation for {rid} (attempt {retries + 1})")
     return requeued
@@ -16360,6 +16461,14 @@ async def on_startup():
         await db.login_attempts.create_index("key", unique=True, background=True)
     except Exception:
         logger.exception("Security index creation failed (non-fatal)")
+
+    try:
+        await db.analysis_runs.create_index("run_id", unique=True)
+        await db.analysis_runs.create_index("report_id")
+        await db.analysis_model_calls.create_index("call_id", unique=True)
+        await db.analysis_model_calls.create_index("run_id")
+    except Exception:
+        logger.exception("Analysis audit index creation failed (non-fatal)")
 
     # Wallet buttons (Apple Pay / Google Pay) in embedded checkout — fire-and-forget.
     try:
@@ -17035,4 +17144,12 @@ async def admin_restore_scout(user_id: str, _=Depends(get_current_admin)):
 
 # Register the API router LAST so it includes every @api_router route defined above
 # (including scout-access + players-database endpoints in Fase 2).
+from report_evidence_export import R2Reader
+from report_export_routes import create_report_export_router
+
+api_router.include_router(create_report_export_router(
+    db=db, upload_dir=UPLOAD_DIR, source_root=ROOT_DIR.parent,
+    admin_dependency=get_current_admin, object_reader=R2Reader(r2_storage),
+))
+
 app.include_router(api_router)

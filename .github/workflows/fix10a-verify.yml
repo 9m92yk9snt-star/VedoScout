@@ -6,6 +6,20 @@ permissions:
   contents: read
 
 jobs:
+  report_evidence_export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install offline export test dependencies
+        run: python -m pip install pytest==9.0.3 fastapi==0.110.1 httpx==0.28.1 python-dotenv==1.2.2
+      - name: Compile export and server integration
+        run: python -m py_compile backend/report_evidence_export.py backend/report_export_routes.py backend/scripts/export_report_evidence.py backend/server.py
+      - name: Verify read-only export, checksums and admin access
+        run: pytest -q backend/tests/test_report_evidence_export.py
+
   fix10_unit:
     runs-on: ubuntu-latest
     steps:
@@ -199,6 +213,10 @@ jobs:
         run: |
           npm install --global yarn@1.22.22
           yarn install --non-interactive
+      - name: Verify analysis polling and incomplete evidence display
+        run: |
+          node frontend/scripts/audit-analysis-poll.cjs
+          node frontend/scripts/check-report-coverage.cjs
       - name: Build frontend
         working-directory: frontend
         env:

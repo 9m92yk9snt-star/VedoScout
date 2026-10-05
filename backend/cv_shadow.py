@@ -134,37 +134,63 @@ def _zone_embedding(small, box, pitch_l, occluders=None):
         cuts, scale = [0.0, 0.30, 0.72, 1.0], "medium"
     else:
         cuts, scale = [0.0, 0.5, 1.0], "far"
-    zones = []
+    zones, zone_support = [], []
     for a, b in zip(cuts, cuts[1:]):
         y0, y1 = int(a * h), max(int(b * h), int(a * h) + 1)
         z = lab[y0:y1].reshape(-1, 3)
         mm = mask[y0:y1].reshape(-1) > 0
-        zs = z[mm] if mm.sum() >= 10 else z
-        zones.append(np.concatenate([zs.mean(0), zs.std(0)]))
-    return {"scale": scale, "zones": zones, "aspect": h / max(1, w),
+        supported = bool(mm.sum() >= 10)
+        zone_support.append(supported)
+        # A hidden head/torso zone has no identity evidence. Falling back to
+        # the whole rectangle reintroduces the occluder/background pixels that
+        # the ownership mask deliberately removed.
+        zs = z[mm]
+        zones.append(np.concatenate([zs.mean(0), zs.std(0)])
+                     if supported else np.zeros(6, dtype=np.float32))
+    if not any(zone_support):
+        owned = False
+    return {"scale": scale, "zones": zones, "zone_support": zone_support,
+            "aspect": h / max(1, w),
             "merged": merged, "px_h": h, "owned": owned}
+
+
+def _pool_owned_zones(emb, count):
+    zones = emb["zones"]
+    support = emb.get("zone_support", [True] * len(zones))
+    if len(support) != len(zones):
+        return [], []
+    if len(zones) == count:
+        return zones, support
+    pooled, visible = [], []
+    step = len(zones) / count
+    for i in range(count):
+        lo, hi = int(i * step), max(int((i + 1) * step), int(i * step) + 1)
+        # Coarser views cannot make an unavailable fine zone readable.
+        valid = all(support[lo:hi])
+        visible.append(valid)
+        pooled.append(np.mean(zones[lo:hi], axis=0) if valid else np.zeros(6))
+    return pooled, visible
 
 
 def _sim(a, b) -> float:
     """Similarity between two embeddings, comparable across scales by pooling
     onto the coarser zone layout. Tolerance-scaled Lab distance → [0,1]."""
-    if not a or not b:
+    if not a or not b or a.get("owned") is False or b.get("owned") is False:
         return 0.0
     za, zb = a["zones"], b["zones"]
     n = min(len(za), len(zb))
 
-    def pool(zs, k):
-        if len(zs) == k:
-            return zs
-        out, step = [], len(zs) / k
-        for i in range(k):
-            seg = zs[int(i * step):max(int((i + 1) * step), int(i * step) + 1)]
-            out.append(np.mean(seg, axis=0))
-        return out
-
-    za, zb = pool(za, n), pool(zb, n)
+    if n == 0:
+        return 0.0
+    za, sa = _pool_owned_zones(a, n)
+    zb, sb = _pool_owned_zones(b, n)
+    if not za or not zb:
+        return 0.0
     ds = []
-    for x, y in zip(za, zb):
+    for x, y, va, vb in zip(za, zb, sa, sb):
+        if not va or not vb:
+            ds.append(0.0)  # missing evidence cannot manufacture perfect similarity
+            continue
         d = np.abs(x - y) / _TOL
         ds.append(float(np.clip(1.0 - d.mean(), 0.0, 1.0)))
     asp = 1.0 - min(0.5, abs(a["aspect"] - b["aspect"]) / 4.0)
@@ -380,14 +406,26 @@ def _sim_relaxed(emb, refs) -> float:
     aspect penalty. A bent/fallen target keeps its colours even when the
     vertical zone layout scrambles — used ONLY to avoid false alarms, never
     to raise confidence."""
-    if not emb or not refs:
+    if not emb or not refs or emb.get("owned") is False:
         return 0.0
-    pooled = np.mean(emb["zones"], axis=0)
+    zones, support = _pool_owned_zones(emb, len(emb["zones"])) if emb.get("zones") else ([], [])
+    visible = [z for z, valid in zip(zones, support) if valid]
+    if not visible:
+        return 0.0
+    pooled = np.mean(visible, axis=0)
     best = 0.0
     for r in refs:
-        rp = np.mean(r["emb"]["zones"], axis=0)
+        ref = r["emb"]
+        if ref.get("owned") is False or not ref.get("zones"):
+            continue
+        rz, rs = _pool_owned_zones(ref, len(ref["zones"]))
+        rv = [z for z, valid in zip(rz, rs) if valid]
+        if not rv:
+            continue
+        rp = np.mean(rv, axis=0)
         d = np.abs(pooled - rp) / _TOL
-        best = max(best, float(np.clip(1.0 - d.mean(), 0.0, 1.0)))
+        coverage = min(len(visible) / len(zones), len(rv) / len(rz))
+        best = max(best, coverage * float(np.clip(1.0 - d.mean(), 0.0, 1.0)))
     return best
 
 

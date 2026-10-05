@@ -96,7 +96,9 @@ async def verify_frame_identity(
         if start < 0 or end <= start:
             return "error"
         data = json.loads(text[start:end + 1])
-        match = bool(data.get("match"))
+        if not isinstance(data.get("match"), bool):
+            return "error"
+        match = data["match"]
         conf = str(data.get("confidence", "")).lower()
         logger.info(f"[identity] {session_id}: match={match} conf={conf} why={str(data.get('why'))[:120]}")
         # STRICT policy: only a confident positive match may keep an image.
@@ -162,7 +164,9 @@ async def verify_ring_placement(
         data = _extract_json(text)
         if not data:
             return "error"
-        correct = bool(data.get("correct"))
+        if not isinstance(data.get("correct"), bool):
+            return "error"
+        correct = data["correct"]
         conf = str(data.get("confidence", "")).lower()
         logger.info(f"[ring] {session_id}: correct={correct} conf={conf} why={str(data.get('why'))[:120]}")
         if correct:
@@ -461,7 +465,9 @@ async def verify_preview_summary(
         data = _extract_json(text)
         if not data:
             return None
-        ok = bool(data.get("describes_target"))
+        if not isinstance(data.get("describes_target"), bool):
+            return None
+        ok = data["describes_target"]
         conf = str(data.get("confidence", "")).lower()
         logger.info(
             f"[preview-identity] {session_id}: describes_target={ok} conf={conf} "

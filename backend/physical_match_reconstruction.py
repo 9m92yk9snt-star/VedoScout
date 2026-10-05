@@ -11,6 +11,7 @@ from __future__ import annotations
 from copy import deepcopy
 import inspect
 import traceback
+import time
 
 import ball_contact_engine
 import ball_trajectory
@@ -181,22 +182,74 @@ def _skipped_goal_review(eligibility):
     }
 
 
-def _safe_provider(provider, *args, default=None):
+def _goal_clarification_eligibility(strike, strikes, touch_graph, window):
+    """Review physical outcomes before uncertain target/team attribution.
+
+    This is permission to inspect pixels, never permission to register a target
+    event. Verified opponents are excluded; publication still uses FIX10B.
+    """
+    ownership = _goal_review_eligibility(strike, strikes, touch_graph)
+    if ownership.get("eligible") is True:
+        return {**ownership, "lane": "VERIFIED_CHAIN"}
+    if not _strike_is_goal_review_contact(strike):
+        return {**ownership, "lane": "NONE"}
+    touch = _touch_for_strike(strike, touch_graph) or {}
+    relation = touch.get("team_relation") or {}
+    confidence = relation.get("confidence")
+    if (relation.get("team") == "opponent" and _num(confidence)
+            and float(confidence) >= GOAL_REVIEW_TEAM_CONFIDENCE_MIN):
+        return {"eligible": False, "lane": "NONE", "reason": "VERIFIED_OPPONENT_REVIEW_EXCLUDED"}
+    if ownership.get("reason") == "DOWNSTREAM_RELEASE_TARGET_TEAM_UNVERIFIED":
+        return {"eligible": True, "lane": "CLARIFICATION", "reason": "TARGET_PASS_DOWNSTREAM_TEAM_UNRESOLVED"}
+    # Both window sources are target-relevant, constructed before outcome
+    # classification. No expected goal/assist label is sent to the reader.
+    if window.get("recall_window") or window.get("source_sequence_ids") or window.get("source_action_ids"):
+        return {"eligible": True, "lane": "CLARIFICATION", "reason": "TARGET_WINDOW_OWNER_UNRESOLVED"}
+    return {**ownership, "lane": "NONE"}
+
+
+def _safe_provider(provider, *args, default=None, diagnostics=None, name="provider"):
+    started = time.monotonic()
+    record = {"provider": name}
     if provider is None:
-        return default
-    try:
-        return provider(*args)
-    except Exception:
-        return default
+        record.update(status="UNAVAILABLE", reason="PROVIDER_NOT_CONFIGURED")
+        value = default
+    else:
+        try:
+            value = provider(*args)
+            record.update(status="NO_EVIDENCE" if value is None else "COMPLETED")
+        except Exception as exc:
+            value = default
+            # Exception text may contain credentials/transport URLs. Preserve
+            # operational error type without copying that text to the report.
+            record.update(status="ERROR", reason="PROVIDER_EXCEPTION", error_type=type(exc).__name__)
+    record["elapsed_seconds"] = round(max(0.0, time.monotonic() - started), 3)
+    if diagnostics is not None:
+        diagnostics.append(record)
+    return value
+
+
+def _adapter_diagnostics(value):
+    """Readers can catch SDK failures themselves; keep those outcomes explicit."""
+    if isinstance(value, dict):
+        errors = [str(value.get(key) or "").lower() for key in ("reason", "field_side_reason", "proof_reason")]
+        errors = [reason for reason in errors if "reader_error" in reason or "reader_unavailable" in reason]
+        if errors:
+            return errors
+        return [reason for item in value.values() for reason in _adapter_diagnostics(item)]
+    if isinstance(value, list):
+        return [reason for item in value for reason in _adapter_diagnostics(item)]
+    return []
 
 
 def _safe_role_provider(provider, video_path, window, strikes, touch_graph,
-                        window_evidence, interventions, default=None):
+                        window_evidence, interventions, default=None, diagnostics=None):
     """Call new six-argument role providers without breaking old injections."""
     if provider is None:
-        return default
+        return _safe_provider(None, default=default, diagnostics=diagnostics, name="intervention_role")
     args5 = (video_path, window, strikes, touch_graph, window_evidence)
-    try:
+
+    def call():
         signature = inspect.signature(provider)
         parameters = list(signature.parameters.values())
         accepts_varargs = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in parameters)
@@ -207,8 +260,7 @@ def _safe_role_provider(provider, video_path, window, strikes, touch_graph,
         if accepts_varargs or len(positional) >= 6:
             return provider(*args5, interventions)
         return provider(*args5)
-    except Exception:
-        return default
+    return _safe_provider(call, default=default, diagnostics=diagnostics, name="intervention_role")
 
 
 def _window_unresolved_reasons(contact_result, jersey_result, outcomes):
@@ -274,6 +326,7 @@ def reconstruct_physical_match(
     detector_fn=None,
     camera_estimator=None,
     dense_frame_provider=None,
+    trace_callback=None,
 ) -> dict:
     """Build bounded physical evidence without changing canonical truth."""
     plan = deepcopy(sequence_plan) if isinstance(sequence_plan, dict) else {}
@@ -296,6 +349,7 @@ def reconstruct_physical_match(
     for window in windows:
         stage = "window_setup"
         try:
+            provider_diagnostics = []
             stage = "dense_replay"
             if dense_frame_provider is None:
                 dense_iter = dense_replay.iter_dense_frames(
@@ -346,7 +400,8 @@ def reconstruct_physical_match(
 
             stage = "jersey_provider"
             votes_by_track = _safe_provider(
-                jersey_vote_provider, str(video_path), deepcopy(requests), default={}
+                jersey_vote_provider, str(video_path), deepcopy(requests), default={},
+                diagnostics=provider_diagnostics, name="jersey",
             )
             if not isinstance(votes_by_track, dict):
                 votes_by_track = {}
@@ -391,8 +446,8 @@ def reconstruct_physical_match(
             # physical non-goal outcomes such as saves.
             scoring_contacts = [
                 row for row in scoring_contacts
-                if _goal_review_eligibility(
-                    row, all_goal_contacts, touch_with_jersey
+                if _goal_clarification_eligibility(
+                    row, all_goal_contacts, touch_with_jersey, window
                 ).get("eligible") is True
             ]
             strikes = sorted(
@@ -436,6 +491,7 @@ def reconstruct_physical_match(
                 role_evidence_provider, str(video_path), deepcopy(window), deepcopy(strikes),
                 deepcopy(touch_with_jersey), deepcopy(dense_with_jersey),
                 deepcopy(a7_interventions), default={},
+                diagnostics=provider_diagnostics,
             )
             window_roles = deepcopy(provider_roles) if isinstance(provider_roles, dict) else {}
             if isinstance(role_evidence, dict):
@@ -444,17 +500,23 @@ def reconstruct_physical_match(
             outcomes = []
             goal_reviews_requested = 0
             goal_reviews_skipped = 0
+            goal_clarifications_requested = 0
             for strike, a7, shot_track in zip(strikes, a7_interventions, shot_trajectories):
                 stage = "goal_review_eligibility"
                 eligibility = _goal_review_eligibility(
                     strike, strikes, touch_with_jersey
                 )
-                if eligibility.get("eligible") is True:
+                review = _goal_clarification_eligibility(strike, strikes, touch_with_jersey, window)
+                if review.get("eligible") is True:
                     stage = "goal_geometry_provider"
+                    request_strike = deepcopy(strike)
+                    request_strike["_review_lane"] = review["lane"]
                     goal_geometry = _safe_provider(
-                        goal_geometry_provider, deepcopy(window), deepcopy(strike), default=None
+                        goal_geometry_provider, deepcopy(window), request_strike, default=None,
+                        diagnostics=provider_diagnostics, name="goal_geometry",
                     )
                     goal_reviews_requested += 1
+                    goal_clarifications_requested += int(review["lane"] == "CLARIFICATION")
                 else:
                     goal_geometry = _skipped_goal_review(eligibility)
                     goal_reviews_skipped += 1
@@ -464,6 +526,7 @@ def reconstruct_physical_match(
                     strike, shot_track["rows"], touch_with_jersey,
                     goal_geometry=goal_geometry, role_evidence=window_roles,
                 )
+                outcome["goal_review_decision"] = review
                 outcome["ball_trajectory_source"] = shot_track["source"]
                 outcome["ball_trajectory_seed_ms"] = shot_track["seed_ms"]
                 outcome["ball_trajectory_points"] = [
@@ -509,11 +572,22 @@ def reconstruct_physical_match(
                 outcome_evidence=outcomes, sequence_analysis=analysis,
                 contradictions=[], unresolved_reasons=unresolved,
             )
+            adapter_errors = _adapter_diagnostics([votes_by_track, window_roles,
+                                                  [o.get("goal_geometry_evidence") for o in outcomes]])
+            trace["provider_diagnostics"] = provider_diagnostics
+            trace["provider_adapter_errors"] = sorted(set(adapter_errors))
 
             stage = "trace_summary"
             summary = event_trace.compact_trace_summary(trace)
             traces.append(trace)
             summaries.append(summary)
+            if trace_callback is not None:
+                try:
+                    trace_callback(trace)
+                except Exception as exc:
+                    # An audit delivery problem cannot invalidate physical
+                    # evidence that has already been reconstructed.
+                    trace["incremental_storage_error_type"] = type(exc).__name__
             window_rows.append({
                 "dense_window_id": trace_id,
                 "scene_id": window.get("scene_id"),
@@ -539,6 +613,9 @@ def reconstruct_physical_match(
                 "outcomes": len(outcomes),
                 "goal_reviews_requested": goal_reviews_requested,
                 "goal_reviews_skipped": goal_reviews_skipped,
+                "goal_clarifications_requested": goal_clarifications_requested,
+                "provider_diagnostics": provider_diagnostics,
+                "provider_adapter_errors": sorted(set(adapter_errors)),
                 "unresolved_reasons": unresolved,
             })
         except Exception as exc:

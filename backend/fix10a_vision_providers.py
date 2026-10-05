@@ -10,6 +10,7 @@ SAVED labels, canonical events, stats or proof state.  Every reader is
 fail-closed: missing/ambiguous pixels return unresolved evidence.
 """
 from __future__ import annotations
+from copy import deepcopy
 
 import asyncio
 import base64
@@ -57,6 +58,27 @@ _CONF_WEIGHT = {"high": 1.0, "medium": 0.60, "low": 0.25}
 
 def _num(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _goal_review_times(strike_ms: int, end_ms: int, budget: int, start_ms: int = 0):
+    """Keep release, terminal context and dense early frames within the budget."""
+    offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
+    candidates = sorted({max(0, strike_ms + offset) for offset in offsets
+                         if start_ms <= strike_ms + offset <= end_ms})
+    if not candidates or budget <= 0:
+        return []
+    # A chronological head slice loses the terminal outcome. Prioritize both
+    # ends, then early crossing detail and the remaining late-flight context.
+    priority = [strike_ms, candidates[-1], max(0, strike_ms - 150)]
+    priority.extend(strike_ms + offset for offset in (50, 100, 150, 200))
+    priority.extend(reversed(candidates))
+    selected = []
+    for ms in priority:
+        if ms in candidates and ms not in selected:
+            selected.append(ms)
+        if len(selected) >= budget:
+            break
+    return sorted(selected)
 
 
 def _valid_box(box) -> bool:
@@ -202,7 +224,17 @@ def aggregate_role_votes(votes) -> dict:
             "confidence": confidence,
             "reason": str(vote.get("reason") or "")[:180],
         })
-    usable = [v for v in cleaned if v["role"] in {"GOALKEEPER", "OUTFIELD"}]
+    by_frame = {}
+    for vote in cleaned:
+        if vote["role"] in {"GOALKEEPER", "OUTFIELD"} and vote["media_ms"] is not None:
+            by_frame.setdefault(vote["media_ms"], []).append(vote)
+    usable = []
+    for media_ms, rows in sorted(by_frame.items()):
+        if len({row["role"] for row in rows}) != 1:
+            continue
+        if usable and media_ms - usable[-1]["media_ms"] < ROLE_MIN_SEPARATION_MS:
+            continue
+        usable.append(max(rows, key=lambda row: _CONF_WEIGHT[row["confidence"]]))
     if not usable:
         return {"version": VERSION, "status": "UNRESOLVED", "role": None,
                 "posterior": {}, "agreeing_frames": 0, "votes": cleaned,
@@ -231,6 +263,7 @@ def aggregate_role_votes(votes) -> dict:
         "role": top_role if verified else None,
         "leading_role": top_role,
         "posterior": {k: round(v, 4) for k, v in ordered},
+        "confidence_method": "weighted_frame_support_not_calibrated_probability",
         "agreeing_frames": agreeing,
         "margin": round(margin, 4),
         "votes": cleaned,
@@ -732,11 +765,20 @@ class ShadowVisionProviders:
         self.api_key = str(api_key or "")
         self.session_prefix = str(session_prefix or "fix10a")
         self._goal_cache = {}
+        self._jersey_cache = {}
+        self.jersey_calls = 0
 
     def jersey_vote_provider(self, video_path: str, requests) -> dict:
-        rows = [r for r in (requests or []) if isinstance(r, dict)][:MAX_JERSEY_REQUESTS]
-        if not self.api_key or not rows:
+        candidates = [r for r in (requests or []) if isinstance(r, dict)]
+        candidates.sort(key=lambda r: (int(r.get("selection_rank") or 1) > 2,
+                                       int(r.get("review_priority") or 0),
+                                       int(r.get("selection_rank") or 1)))
+        rows = candidates[:MAX_JERSEY_REQUESTS]
+        if not rows:
             return {}
+        if not self.api_key:
+            return {str(row.get("track_id")): [{"readable": False, "number": None,
+                     "reason": "reader_unavailable", "confidence": "low"}] for row in rows}
         frames = _read_frames(video_path, [r.get("media_ms") for r in rows])
         votes_by_track = {}
         with tempfile.TemporaryDirectory(prefix="fix10a_jersey_") as temp:
@@ -753,6 +795,12 @@ class ShadowVisionProviders:
                 if not got:
                     continue
                 actual_ms, frame = got
+                cache_key = (int(actual_ms), tuple(round(float(box[k]), 5) for k in ("x", "y", "w", "h")))
+                if cache_key in self._jersey_cache:
+                    vote = deepcopy(self._jersey_cache[cache_key])
+                    vote.update(media_ms=int(actual_ms), request_id=row.get("request_id"), reused=True)
+                    votes_by_track.setdefault(track, []).append(vote)
+                    continue
                 crop = _crop(frame, box)
                 path = root / f"jersey_{index:03d}.jpg"
                 if crop is None or not _write_jpg(path, crop):
@@ -762,18 +810,21 @@ class ShadowVisionProviders:
                     f"{self.session_prefix}-jersey-{index}",
                     str(path),
                 ))
-                job_meta.append((track, actual_ms, row.get("request_id")))
+                job_meta.append((track, actual_ms, row.get("request_id"), cache_key))
             if not jobs:
-                return {}
+                return votes_by_track
+            self.jersey_calls += len(jobs)
             try:
                 results = asyncio.run(_bounded_gather(jobs, limit=3))
             except Exception:
-                return {}
-            for (track, actual_ms, request_id), result in zip(job_meta, results):
+                results = [{"readable": False, "number": None, "confidence": "low",
+                            "reason": "reader_error"} for _ in job_meta]
+            for (track, actual_ms, request_id, cache_key), result in zip(job_meta, results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "readable": False, "number": None, "confidence": "low", "reason": "reader_unavailable"
                 }
                 vote.update({"media_ms": int(actual_ms), "request_id": request_id})
+                self._jersey_cache[cache_key] = deepcopy(vote)
                 # Expected jersey number is deliberately never passed to the reader.
                 votes_by_track.setdefault(track, []).append(vote)
         return votes_by_track
@@ -817,7 +868,8 @@ class ShadowVisionProviders:
             try:
                 results = asyncio.run(_bounded_gather(jobs, limit=2))
             except Exception:
-                return {}
+                results = [{"role": "UNKNOWN", "confidence": "low",
+                            "reason": "role_reader_error"} for _ in job_meta]
             for (track, actual_ms), result in zip(job_meta, results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "role": "UNKNOWN", "confidence": "low", "reason": "reader_unavailable"
@@ -837,11 +889,8 @@ class ShadowVisionProviders:
         # Dense around the first post-release second so a body occlusion at
         # the goal line is actually sampled; later frames preserve reaction
         # context.  The provider call remains bounded by MAX_GOAL_FRAMES.
-        offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
-        requested = [
-            max(0, strike_ms + offset) for offset in offsets
-            if strike_ms + offset <= end_ms + 100
-        ][:MAX_GOAL_FRAMES]
+        start_ms = int(window.get("start_ms") or 0)
+        requested = _goal_review_times(strike_ms, end_ms, MAX_GOAL_FRAMES, start_ms=start_ms)
         cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested))
         if cache_key in self._goal_cache:
             return self._goal_cache[cache_key]
@@ -859,6 +908,8 @@ class ShadowVisionProviders:
                     continue
                 actual_ms, frame = got
                 actual_ms = int(actual_ms)
+                if actual_ms < start_ms or actual_ms > end_ms:
+                    continue
                 if actual_ms in seen_actual_ms:
                     continue
                 path = root / f"goal_{index:03d}.jpg"

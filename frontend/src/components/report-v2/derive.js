@@ -323,7 +323,11 @@ export function deriveV2(report) {
 
   // ---- Match stats ----
   const ms = full.match_stats || null;
+  const matchStatsCoverage = ms?.coverage_note || full.verified_stats?.coverage_note || null;
+  const scoringComplete = ms?.coverage_status === "COMPLETE";
   const matchStats = ms ? [
+    { label: scoringComplete ? "Goals" : "Verified Goals", value: ms.goals ?? ms.observed_goals, pct: 0 },
+    { label: scoringComplete ? "Assists" : "Verified Assists", value: ms.assists ?? ms.observed_assists, pct: 0 },
     { label: "Total Actions", value: ms.total_actions, pct: Math.min(100, ((ms.total_actions || 0) / 80) * 100) },
     { label: "Successful Dribbles", value: ms.successful_dribbles, pct: Math.min(100, ((ms.successful_dribbles || 0) / 12) * 100) },
     { label: "Key Passes", value: ms.key_passes, pct: Math.min(100, ((ms.key_passes || 0) / 8) * 100) },
@@ -434,7 +438,7 @@ export function deriveV2(report) {
     positionAbbr: POSITION_ABBR[pd.position] || pd.position || "—",
     topStrengths, devPriorities, ageComparison, snapshot, snapshotMoments, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
-    matchStats, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
+    matchStats, matchStatsCoverage, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
     parentMetrics, growYourGame, parentCorner, crossVerification,
   };
 }

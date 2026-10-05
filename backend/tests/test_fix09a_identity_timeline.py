@@ -1089,3 +1089,114 @@ def test_structural_compare_with_production():
     assert cmp_["timeline_points"] == len(target_pts(tl))
     assert cmp_["compared"] > 0
     assert cmp_["agreement_rate"] is not None and cmp_["agreement_rate"] >= 0.9
+def test_scene_tracker_prefers_nearest_camera_compensated_nonoverlapping_body():
+    import player_identity_timeline as pit
+
+    observations = [
+        {"media_ms": 0, "detections": [{"box": (0, 0, 10, 40)}]},
+        {"media_ms": 200, "cam_dx": 5,
+         "detections": [{"box": (17, 0, 10, 40)}, {"box": (30, 0, 10, 40)}]},
+    ]
+    tracks, _ = pit._scene_mot(observations, [0, 1])
+    original = next(track for track in tracks if track.tid == 1)
+    assert original.samples[-1]["box"] == (17, 0, 10, 40)
+    assert original.vel == (60.0, 0.0)
+
+
+def test_scene_tracker_applies_zoom_to_player_position_and_size():
+    observations = [
+        {"media_ms": 0, "detections": [{"box": (100, 300, 20, 40)}]},
+        {"media_ms": 200, "cam_dx": 25, "cam_dy": 25,
+         "cam_affine": [[1.5, 0, 0], [0, 1.5, 0]],
+         "detections": [{"box": (125, 325, 20, 40)}, {"box": (150, 450, 30, 60)}]},
+    ]
+    tracks, _ = pit._scene_mot(observations, [0, 1])
+    original = next(track for track in tracks if track.tid == 1)
+    assert original.samples[-1]["box"] == (150, 450, 30, 60)
+    assert original.vel == (0.0, 0.0)
+
+
+def test_scene_tracker_accumulates_affine_camera_geometry_during_misses():
+    matrix = [[1.1, 0, 0], [0, 1.1, 0]]
+    observations = [
+        {"media_ms": 0, "detections": [{"box": (100, 300, 20, 40)}]},
+        {"media_ms": 200, "cam_affine": matrix, "detections": []},
+        {"media_ms": 400, "cam_affine": matrix, "detections": []},
+        {"media_ms": 600, "cam_affine": matrix,
+         "detections": [{"box": (133.1, 399.3, 26.62, 53.24)}]},
+    ]
+    tracks, _ = pit._scene_mot(observations, [0, 1, 2, 3])
+    original = next(track for track in tracks if track.tid == 1)
+    assert len(original.samples) == 2
+    assert abs(original.vel[0]) < 1e-10
+    assert abs(original.vel[1]) < 1e-10
+
+
+def test_invalid_camera_affine_cannot_be_replaced_by_raw_translation():
+    observations = [
+        {"media_ms": 0, "detections": [{"box": (100, 300, 20, 40)}]},
+        {"media_ms": 200, "cam_affine": [[float("nan"), 0, 0], [0, 1, 0]],
+         "detections": [{"box": (100, 300, 20, 40)}]},
+    ]
+    tracks, _ = pit._scene_mot(observations, [0, 1])
+    assert len(next(track for track in tracks if track.tid == 1).samples) == 1
+
+
+def test_mot_kit_conflict_prevents_switch_to_closer_opponent():
+    # Similarity intentionally matches: camera/geometry alone prefers the blue
+    # body, but sustained clean kit evidence says it cannot continue this track.
+    o = [obs(k * STEP, [det(100 + 10*k, 100, team="target_team")])
+         for k in range(3)]
+    o.append(obs(3 * STEP, [det(130, 100, team="opponent"),
+                            det(170, 100, team="target_team")]))
+    tracks, _ = pit._scene_mot(o, list(range(len(o))))
+    pinned = next(t for t in tracks if t.tid == 1)
+    assert pinned.samples[-1]["box"][0] == 170
+
+
+def test_mot_same_kit_remains_ambiguous_and_kit_does_not_seed_identity():
+    o = [obs(k * STEP, [det(100, 100, team="target_team", ident="mate")])
+         for k in range(5)]
+    # Kit consistency is only a geometry candidate filter, never target proof.
+    tl = run(o)
+    assert not target_pts(tl)
+
+
+def test_mot_one_noisy_kit_sample_does_not_establish_a_conflict():
+    o = [obs(0, [det(100, 100, team="target_team")]),
+         obs(200, [det(110, 100, team="opponent")])]
+    tracks, _ = pit._scene_mot(o, [0, 1])
+    assert len(tracks) == 1
+    assert len(tracks[0].samples) == 2
+
+
+def test_unknown_camera_step_cannot_masquerade_as_static_camera():
+    o = [obs(0, [det(100, 100)]), obs(200, [det(100, 100)])]
+    o[1]["cam_mode"] = "none"
+    tracks, _ = pit._scene_mot(o, [0, 1])
+    assert len(tracks) == 2
+    assert all(len(t.samples) == 1 for t in tracks)
+
+
+def test_overlapped_opposing_kit_cannot_veto_track_continuity():
+    o = [obs(k * STEP, [det(100, 100, team="target_team")]) for k in range(3)]
+    o.append(obs(3 * STEP, [det(100, 100, team="opponent"),
+                            det(110, 100, team="target_team")]))
+    tracks, _ = pit._scene_mot(o, [0, 1, 2, 3])
+    pinned = next(t for t in tracks if t.tid == 1)
+    assert pinned.samples[-1]["box"][0] == 100
+    assert pinned.samples[-1]["overlap"] is True
+
+
+def test_inverse_camera_rotation_during_misses_does_not_inflate_body_box():
+    import math
+    c, s = math.cos(.2), math.sin(.2)
+    rotate = [[c, -s, 0], [s, c, 0]]
+    inverse = [[c, s, 0], [-s, c, 0]]
+    o = [{"media_ms": 0, "detections": [{"box": (100, 300, 20, 40)}]},
+         {"media_ms": 200, "cam_affine": rotate, "detections": []},
+         {"media_ms": 400, "cam_affine": inverse, "detections": []}]
+    tracks, _ = pit._scene_mot(o, [0, 1, 2])
+    prediction = tracks[0].miss_preds[2][1]
+    assert all(abs(v - expected) < 1e-9
+               for v, expected in zip(prediction, (100, 300, 20, 40)))
