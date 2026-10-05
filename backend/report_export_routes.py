@@ -10,17 +10,27 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from report_evidence_export import build_export, validate_report_id, MAX_MODEL_CALLS
+from report_evidence_export import (build_export, validate_report_id, MAX_MODEL_CALLS,
+                                    MAX_AUDIT_BYTES, AuditRecords)
 
 
-async def _collect_run_audit(collection, report_id, *, limit):
+async def _collect_run_audit(collection, report_id, *, limit, max_bytes=MAX_AUDIT_BYTES):
     """Read-only, report-scoped audit records; never cross-report, never raises."""
     if collection is None:
         return None
+    records = AuditRecords()
+    cursor = None
     try:
-        return await collection.find({"report_id": report_id}, {"_id": 0}).to_list(length=limit)
-    except Exception:
-        return None
+        cursor = collection.find({"report_id": report_id}, {"_id": 0}).batch_size(1).limit(limit + 1)
+        async for record in cursor:
+            if not records.retain(record, limit=limit, max_bytes=max_bytes):
+                break
+    except Exception as exc:
+        records.omissions.append(f"audit_read_failed:{type(exc).__name__}")
+    finally:
+        if cursor is not None:
+            await cursor.close()
+    return records
 
 
 class PrivateExportResponse(FileResponse):
@@ -51,8 +61,6 @@ def create_report_export_router(*, db, upload_dir, source_root, admin_dependency
         doc = await db.reports.find_one({"id": report_id}, {"_id": 0})
         if doc is None:
             raise HTTPException(404, "Report not found")
-        run_records = await _collect_run_audit(getattr(db, "analysis_runs", None), report_id, limit=MAX_MODEL_CALLS)
-        model_call_records = await _collect_run_audit(getattr(db, "analysis_model_calls", None), report_id, limit=MAX_MODEL_CALLS)
         try:
             await asyncio.wait_for(busy.acquire(), timeout=0.1)
         except asyncio.TimeoutError:
@@ -60,6 +68,10 @@ def create_report_export_router(*, db, upload_dir, source_root, admin_dependency
         private = None
         response_ready = False
         try:
+            run_records = await asyncio.wait_for(_collect_run_audit(
+                getattr(db, "analysis_runs", None), report_id, limit=MAX_MODEL_CALLS), 10)
+            model_call_records = await asyncio.wait_for(_collect_run_audit(
+                getattr(db, "analysis_model_calls", None), report_id, limit=MAX_MODEL_CALLS), 10)
             private = Path(tempfile.mkdtemp(prefix="scout-admin-export-"))
             os.chmod(private, 0o700)
             output = private / f"{report_id}-evidence.zip"

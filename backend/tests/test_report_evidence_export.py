@@ -319,7 +319,7 @@ def test_cli_uses_one_snapshot_and_no_server_import(case, monkeypatch, capsys):
 
         def find(self, query, projection):
             calls.append(("find", self.name, query, projection))
-            return SimpleNamespace(limit=lambda _n: [])
+            return Cursor([])
 
     database = SimpleNamespace(reports=Collection("reports"),
                               analysis_runs=Collection("analysis_runs"),
@@ -385,5 +385,132 @@ def test_run_audit_collections_scoped_to_report_and_exclude_foreign(case):
 def test_run_audit_absent_when_not_provided(case):
     build(case)
     missing = {entry["item"] for entry in read(case, "missing_data.json")}
-    assert "analysis_runs" not in missing
-    assert "analysis_model_calls" not in missing
+    assert "analysis_runs" in missing
+    assert "analysis_model_calls" in missing
+
+
+class Cursor:
+    def __init__(self, rows, *, fail_after=None):
+        self.rows = rows
+        self.cap = len(rows)
+        self.reads = 0
+        self.closed = False
+        self.fail_after = fail_after
+
+    def batch_size(self, size):
+        assert size == 1
+        return self
+
+    def limit(self, cap):
+        self.cap = cap
+        return self
+
+    def __iter__(self):
+        for row in self.rows[:self.cap]:
+            if self.reads == self.fail_after:
+                raise RuntimeError("Bearer TOPSECRET")
+            self.reads += 1
+            yield row
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.mark.parametrize("max_bytes,limit,expected,reason", [
+    (100, 20, 1, "audit_memory_limit"),
+    (10000, 2, 2, "audit_record_count_limit"),
+])
+def test_audit_reads_stop_before_materializing_large_result(case, max_bytes, limit, expected, reason):
+    rows = [{"report_id": case[0]["id"], "raw_response": "x" * 40}] * 20
+    cursor = Cursor(rows)
+    collection = SimpleNamespace(find=lambda query, projection: cursor)
+    records = ex.collect_audit_records(collection, case[0]["id"], limit=limit, max_bytes=max_bytes)
+    assert len(records) == expected
+    assert cursor.reads == expected + 1
+    assert cursor.closed
+    build(case, run_records=[], model_call_records=records)
+    assert any(reason in r["reason"] for r in read(case, "missing_data.json"))
+    assert not read(case, "manifest.json")["complete"]
+    ex.verify_export(case[3])
+
+
+def test_partial_audit_read_failure_retains_evidence_and_reports_safe_error(case):
+    rows = [{"report_id": case[0]["id"], "raw_response": "first"}] * 3
+    cursor = Cursor(rows, fail_after=1)
+    records = ex.collect_audit_records(SimpleNamespace(find=lambda *_: cursor), case[0]["id"])
+    assert len(records) == 1 and cursor.closed
+    build(case, model_call_records=records)
+    assert read(case, "analysis_model_calls/000.json")["raw_response"] == "first"
+    missing = read(case, "missing_data.json")
+    assert any(r["reason"] == "audit_read_failed:RuntimeError" for r in missing)
+    assert "TOPSECRET" not in json.dumps(missing)
+
+
+@pytest.mark.asyncio
+async def test_async_audit_reader_scopes_bounds_and_closes(case):
+    from report_export_routes import _collect_run_audit
+
+    class AsyncCursor(Cursor):
+        async def close(self):
+            self.closed = True
+
+        def __aiter__(self):
+            async def rows():
+                for row in self:
+                    yield row
+            return rows()
+
+    cursor = AsyncCursor([{"report_id": case[0]["id"], "raw_response": "x" * 40}] * 20)
+
+    def find(query, projection):
+        assert query == {"report_id": case[0]["id"]}
+        assert projection == {"_id": 0}
+        return cursor
+
+    records = await _collect_run_audit(SimpleNamespace(find=find), case[0]["id"], limit=20, max_bytes=100)
+    assert len(records) == 1 and cursor.reads == 2 and cursor.closed
+    assert "audit_memory_limit" in records.omissions[0]
+
+
+@pytest.mark.asyncio
+async def test_busy_export_rejects_before_loading_audits(case, monkeypatch):
+    import threading
+    import httpx
+    from fastapi import FastAPI
+    import report_export_routes as routes
+
+    started, release = threading.Event(), threading.Event()
+    original = routes.build_export
+    audit_reads = []
+
+    def blocked(*args, **kwargs):
+        started.set()
+        assert release.wait(3)
+        return original(*args, **kwargs)
+
+    async def collect(_collection, _report_id, **_kwargs):
+        audit_reads.append(_report_id)
+        return []
+
+    class Reports:
+        async def find_one(self, *_args):
+            return copy.deepcopy(case[0])
+
+    async def allow():
+        return {"role": "admin"}
+
+    monkeypatch.setattr(routes, "build_export", blocked)
+    monkeypatch.setattr(routes, "_collect_run_audit", collect)
+    app = FastAPI()
+    app.include_router(routes.create_report_export_router(db=SimpleNamespace(reports=Reports()),
+        upload_dir=case[1], source_root=case[2], admin_dependency=allow))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        first = asyncio.create_task(client.get("/admin/reports/report-123/evidence-export"))
+        try:
+            assert await asyncio.to_thread(started.wait, 2)
+            assert (await client.get("/admin/reports/report-123/evidence-export")).status_code == 429
+            assert len(audit_reads) == 2
+        finally:
+            release.set()
+            response = await first
+        assert response.status_code == 200

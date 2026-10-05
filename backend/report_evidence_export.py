@@ -27,6 +27,7 @@ MAX_TOTAL_BYTES = 512 * 1024 * 1024
 MAX_TRACE_JSON_BYTES = 64 * 1024 * 1024
 MAX_TRACES = 200
 MAX_MODEL_CALLS = 2000
+MAX_AUDIT_BYTES = 64 * 1024 * 1024
 CHUNK = 1024 * 1024
 CONFIG_KEYS = ("IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIMELINE_HZ",
                "FIX10A_SUPPORT_VISION_ENABLED", "CV_SHADOW_ENABLED")
@@ -48,6 +49,44 @@ SECRET_TEXT = re.compile(r"\b(Bearer\s+)[A-Za-z0-9._~+/=-]+", re.I)
 
 class ExportLimitError(ValueError):
     pass
+
+
+class AuditRecords(list):
+    """Bounded audit snapshot with explicit reasons for omitted evidence."""
+    def __init__(self):
+        super().__init__()
+        self.omissions = []
+        self.byte_count = 0
+
+    def retain(self, record, *, limit, max_bytes):
+        if len(self) >= limit:
+            self.omissions.append("audit_record_count_limit; remaining records omitted")
+            return False
+        size = len(json_bytes(record))
+        if self.byte_count + size > max_bytes:
+            self.omissions.append("audit_memory_limit; remaining records omitted")
+            return False
+        self.append(record)
+        self.byte_count += size
+        return True
+
+
+def collect_audit_records(collection, report_id, *, limit=MAX_MODEL_CALLS,
+                          max_bytes=MAX_AUDIT_BYTES):
+    """Read one Mongo document per batch; never materialize an unbounded list."""
+    records = AuditRecords()
+    cursor = None
+    try:
+        cursor = collection.find({"report_id": report_id}, {"_id": 0}).batch_size(1).limit(limit + 1)
+        for record in cursor:
+            if not records.retain(record, limit=limit, max_bytes=max_bytes):
+                break
+    except Exception as exc:
+        records.omissions.append(f"audit_read_failed:{type(exc).__name__}")
+    finally:
+        if cursor is not None:
+            cursor.close()
+    return records
 
 
 def validate_report_id(report_id):
@@ -255,7 +294,10 @@ def build_export(doc, output, *, upload_dir, source_root, environment="unspecifi
             def _scoped_audit(records, label):
                 # Strictly this report's own records; foreign report_id is dropped.
                 if records is None:
+                    absent(label, "audit_records_unavailable")
                     return None
+                for reason in getattr(records, "omissions", ()):
+                    absent(label, reason)
                 kept, foreign = [], 0
                 for record in records:
                     if not isinstance(record, dict):

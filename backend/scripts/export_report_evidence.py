@@ -15,7 +15,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from report_evidence_export import R2Reader, build_export, validate_report_id  # noqa: E402
+from report_evidence_export import R2Reader, build_export, validate_report_id, collect_audit_records  # noqa: E402
 
 
 def main():
@@ -43,11 +43,8 @@ def main():
     try:
         doc = client[db_name].reports.find_one({"id": args.report_id}, {"_id": 0})
         if doc is not None:
-            from report_evidence_export import MAX_MODEL_CALLS
-            run_records = list(client[db_name].analysis_runs.find(
-                {"report_id": args.report_id}, {"_id": 0}).limit(MAX_MODEL_CALLS))
-            model_call_records = list(client[db_name].analysis_model_calls.find(
-                {"report_id": args.report_id}, {"_id": 0}).limit(MAX_MODEL_CALLS))
+            run_records = collect_audit_records(client[db_name].analysis_runs, args.report_id)
+            model_call_records = collect_audit_records(client[db_name].analysis_model_calls, args.report_id)
     finally:
         client.close()
     if doc is None:
