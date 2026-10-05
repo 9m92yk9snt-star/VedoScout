@@ -28,6 +28,12 @@ claim filter even though no goal had passed the physical proof path.
   scoring claims are withheld; unavailable grades and aggregates are null.
   Partial coverage remains visible and does not establish zero goals/assists.
   Parent prose, comments and frontend outlook use the same evidence authority.
+- Anchor capture waits for the presented video frame and stores its media time.
+  Manual verification cannot accept a tap during a pending seek; the box keeps
+  the timestamp of the frame on which it was drawn. Overlapping seeks cancel
+  old requests, and a timeout cannot be treated as successful frame decoding.
+  This fixes a concrete race; it does not establish that the race caused any
+  particular tap in the original live run.
 
 ## Verification and limits
 

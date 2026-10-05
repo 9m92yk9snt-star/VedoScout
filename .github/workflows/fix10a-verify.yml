@@ -217,6 +217,7 @@ jobs:
         run: |
           node frontend/scripts/audit-analysis-poll.cjs
           node frontend/scripts/check-report-coverage.cjs
+          node frontend/scripts/check-video-frame-authority.cjs
       - name: Build frontend
         working-directory: frontend
         env:
