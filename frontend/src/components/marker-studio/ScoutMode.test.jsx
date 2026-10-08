@@ -182,6 +182,32 @@ test("uncertain preview cannot be approved and correction requires a new human t
   expect(screen.getByTestId("scout-progress-counter")).toHaveTextContent("0/10");
 });
 
+test("a cut immediately after the tap keeps the selection and explains the stop", async () => {
+  const requestTracking = jest.fn(async frames => frames.map((f, i) => ({ t: f.t, box: i ? null : { x: .46, y: .425, w: .08, h: .18 }, status: i ? "scene_cut" : "human_seed" })));
+  await boot({ requestTracking }); tap(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  await waitFor(() => expect(screen.getByTestId("scout-notice")).toHaveTextContent("The video cuts here"));
+  expect(screen.queryByTestId("scout-tracking-preview")).not.toBeInTheDocument();
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989");
+  expect(screen.getByTestId("scout-selection-preview")).toBeInTheDocument();
+  expect(screen.getByTestId("scout-confirm-mark")).toBeEnabled();
+  expect(screen.queryByTestId("scout-preview-correct-1")).not.toBeInTheDocument();
+});
+
+test("a later cut trims the preview and approval to real frames before the cut", async () => {
+  const requestTracking = jest.fn(async frames => frames.map((f, i) => ({ t: f.t, box: i < 3 ? { x: .46, y: .425, w: .08, h: .18 } : null, status: i < 3 ? "suggested" : "scene_cut" })));
+  const { onConfirm } = await boot({ requestTracking }); tap(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  await screen.findByTestId("scout-tracking-preview");
+  expect(screen.getByTestId("scout-notice")).toHaveTextContent("stops before a video cut");
+  expect(screen.getByTestId("scout-preview-correct-2")).toBeInTheDocument();
+  expect(screen.queryByTestId("scout-preview-correct-3")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("scout-preview-approve"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame")); fireEvent.click(screen.getByTestId("scout-confirm-mark"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame")); await mark(); await mark();
+  fireEvent.click(screen.getByTestId("scout-finish-early")); await checks(); fireEvent.click(screen.getByTestId("scout-submit"));
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  expect(onConfirm.mock.calls[0][0].anchors[0].tracking_check.end).toBeCloseTo(3.228);
+});
+
 test("mask responses from another frame cannot decorate the current tap", async () => {
   let resolveMask;
   const requestMask = jest.fn(() => new Promise(resolve => { resolveMask = resolve; }));

@@ -126,8 +126,8 @@ def _color_hist(hsv, box_px_gray, scale: float, mask=None):
     return hist
 
 
-def _color_sim(ref_hist, hsv, box_px_gray, scale: float) -> float | None:
-    cand = _color_hist(hsv, box_px_gray, scale)
+def _color_sim(ref_hist, hsv, box_px_gray, scale: float, mask=None) -> float | None:
+    cand = _color_hist(hsv, box_px_gray, scale, mask)
     if cand is None or ref_hist is None:
         return None
     return float(cv2.compareHist(ref_hist, cand, cv2.HISTCMP_CORREL))
@@ -212,7 +212,7 @@ def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy, seed_mask=None):
     return best
 
 
-def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, cam_acc, bw, bh, dt):
+def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, cam_acc, bw, bh, dt, seed_mask=None):
     """Run every safety gate on a matched candidate.
 
     Returns (verdict, cand_box, payload):
@@ -233,7 +233,11 @@ def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, c
     cand_box = [sx0 + ml[0], sy0 + ml[1], sx0 + ml[0] + tw, sy0 + ml[1] + th]
     ccx, ccy = (cand_box[0] + cand_box[2]) / 2.0, (cand_box[1] + cand_box[3]) / 2.0
     # colour veto (every candidate, provisional ones included)
-    csim = _color_sim(ref_hist, hsv, cand_box, scale)
+    # The same selected-pixel footprint must vote on both sides. Comparing a
+    # masked jersey reference to the whole candidate adds grass/opponent votes
+    # only to the candidate and can veto the correct player. This footprint is
+    # matching assistance; it is not a new ownership mask for that frame.
+    csim = _color_sim(ref_hist, hsv, cand_box, scale, seed_mask) if seed_mask is not None else _color_sim(ref_hist, hsv, cand_box, scale)
     if csim is not None and csim < COLOR_MIN:
         return "colour", None, None
     payload = {"mx": mx, "tw": tw, "th": th}
@@ -365,7 +369,7 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
         if best is not None and best[0] >= MATCH_MIN:
             v1, box1, pay1 = _judge_candidate(
                 best, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
-                lcx, lcy, cam_acc, bw, bh, dt)
+                lcx, lcy, cam_acc, bw, bh, dt, **kwargs)
         need_recovery = v1 in ("lost", "colour", "jump")
         if v1 == "accept":
             c1x, c1y = (box1[0] + box1[2]) / 2.0, (box1[1] + box1[3]) / 2.0
@@ -382,7 +386,7 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             if best2 is not None and best2[0] >= MATCH_MIN:
                 v2, box2, pay2 = _judge_candidate(
                     best2, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
-                    lcx, lcy, cam_acc, bw, bh, dt)
+                    lcx, lcy, cam_acc, bw, bh, dt, **kwargs)
                 # only a SOLID recovery match is a credible second hypothesis;
                 # junk-level background peaks must not veto a safe primary
                 solid2 = best2[0] >= tracking_geometry.CONTAM_MIN

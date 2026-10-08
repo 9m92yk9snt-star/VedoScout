@@ -6,7 +6,7 @@ import pytest
 
 from player_selection import selection_metadata, full_body_anchors, decode_mask, valid_mask, suggest_mask, tracking_preview, valid_image_shape
 from unified_identity_authority import build_unified_identity_authority
-from player_tracking import _masked_ncc, track_player
+from player_tracking import _masked_ncc, track_player, _color_hist, _color_sim, _judge_candidate, COLOR_MIN
 
 BOX = {"x": .3, "y": .2, "w": .2, "h": .4}
 
@@ -74,6 +74,30 @@ def test_masked_ncc_ignores_background_and_stays_finite():
     assert np.isfinite(_masked_ncc(np.zeros((40, 40), np.uint8), np.zeros_like(target), mask)).all()
 
 
+def test_masked_colour_gate_ignores_background_but_still_vetoes_wrong_kit():
+    # A loose selection contains a narrow player. Candidate background must
+    # not outvote that player's kit after the reference background was removed.
+    box = [20, 10, 60, 70]
+    mask = np.zeros((192, 96), np.uint8); mask[:, 43:53] = 255
+    def scene(kit, background):
+        bgr = np.full((80, 80, 3), background, np.uint8)
+        bgr[10:70, 37:43] = kit
+        return cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    reference = scene((30, 30, 225), (20, 110, 25))
+    correct = scene((30, 30, 225), (170, 45, 170))
+    wrong = scene((225, 30, 30), (170, 45, 170))
+    hist = _color_hist(reference, box, 1, mask)
+    assert _color_sim(hist, correct, box, 1) < COLOR_MIN
+    assert _color_sim(hist, correct, box, 1, mask) > .99
+    # Strong, unambiguous, stationary geometry still passes all production
+    # gates; changing only the selected kit must continue to veto the match.
+    response = np.zeros((5, 5), np.float32); response[2, 2] = .8
+    best = (.8, (2, 2), 40, 60, response, 18, 8)
+    arguments = (1, 40, 40, None, 0, 40, 40, [0, 0], 40, 60, .125)
+    assert _judge_candidate(best, hist, correct, *arguments, seed_mask=mask)[0] == "accept"
+    assert _judge_candidate(best, hist, wrong, *arguments, seed_mask=mask)[0] == "colour"
+
+
 def jpeg(array):
     out = io.BytesIO(); Image.fromarray(array).save(out, format="JPEG"); return out.getvalue()
 
@@ -94,6 +118,18 @@ def test_preview_cannot_accept_partial_nonmonotonic_or_long_sequence():
     for times, extras in (([0, .2, .4], {"visibility": "partial"}), ([0, .2, .1], {}), ([0, .2, 3], {})):
         with pytest.raises(ValueError):
             tracking_preview([image] * 3, times, {"box": BOX, **extras})
+
+
+@pytest.mark.parametrize("cut_index", [1, 3])
+def test_preview_distinguishes_scene_cut_from_uncertain_player(cut_index):
+    before = jpeg(np.full((240, 160, 3), 35, np.uint8))
+    after = jpeg(np.full((240, 160, 3), 220, np.uint8))
+    result = tracking_preview([before] * cut_index + [after] * (5 - cut_index),
+                              [0, .125, .25, .375, .5], {"box": BOX})
+    assert len(result["frames"]) == 5
+    assert result["frames"][0]["status"] == "human_seed"
+    assert all(f["status"] != "scene_cut" for f in result["frames"][:cut_index])
+    assert all(f["status"] == "scene_cut" and f["box"] is None for f in result["frames"][cut_index:])
 
 
 def test_decoded_image_dimensions_are_bounded_before_tracker_resizing():

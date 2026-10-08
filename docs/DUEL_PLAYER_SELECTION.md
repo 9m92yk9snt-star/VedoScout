@@ -24,6 +24,12 @@ video or whole-match accuracy validation. Missing boxes are uncertain and
 cannot be approved. Correction requires a new human tap; suggestions never
 become human anchors. The first normal marker JPEG is fully visible.
 
+Dense backend cut detection can find boundaries missed by the initial coarse
+scene samples. Frames at/after that cut return `scene_cut`, not a lost-player
+verdict. The editor keeps the selection and explains the cut when fewer than
+three pre-cut frames remain; otherwise it trims the loop, correction choices
+and approved interval to the pre-cut frames.
+
 Changing the rectangle invalidates its mask, links and tracking approval.
 Request cancellation prevents stale-frame results. Confirmation waits for the
 cutout request; failures permit the rectangular fallback. Optional controls
@@ -56,6 +62,10 @@ inputs. Clear linked observations independently seed/reacquire identity.
 Full-body masks supply weighted zero-mean NCC, masked colour histograms and
 owned identity embeddings; masked templates are never relearned from unsegmented
 frames. Wide crops retain separate scene context.
+The colour veto applies the same selected-pixel footprint to the reference and
+candidate. This avoids comparing a background-free kit to a grass-heavy whole
+candidate box. It is matching assistance, not a new ownership mask or proof.
+The existing colour, match, geometry and ambiguity thresholds are unchanged.
 
 The unified authority preserves exact partial observations without tap authority
 or action proof. Red points reject conflicting boxes within 140ms of that tap;
@@ -64,8 +74,8 @@ is interpolated into proof. Legacy anchors without hints retain their old path.
 
 ## Verification and known limits
 
-163 backend tests passed (selection/routes, tracking, ownership, timeline,
-authority/event bridge); all 50 frontend tests passed; 16 tap-policy and 12
+166 backend tests passed (selection/routes, tracking, ownership, timeline,
+authority/event bridge); all 52 frontend tests passed; 16 tap-policy and 12
 frame-authority cases passed. Production build succeeds with warnings in
 unchanged components. CI includes the isolated selection suite.
 
@@ -82,9 +92,18 @@ submission retain seven original selections (four normal including one partial,
 three checks). Zero page errors/model calls. Generic QA taps test plumbing,
 not recognition accuracy.
 
-In the tested ~19.18s sequence, the optical preview remained uncertain on four
-subsequent frames. Human correction worked; this is **not** evidence of improved
-automatic tracking on those frames. Some QA cutouts fell back to rectangles.
+Follow-up inspection of the actual captured JPEGs and tracker rejection trace
+corrects the initial diagnosis of the ~19.18s preview: a montage cut at 19.299s
+stopped tracking before any candidate search. It was not an occluded-player
+failure. Native Chromium now verifies the cut explanation and preserved tap.
+
+A separate same-scene check at 19.683–20.183s exposed the asymmetric colour
+comparison. With identical saved JPEGs/mask, zero of four later frames had a
+suggestion before the fix; two of four have suggestions after it. Visual review
+places those two boxes on the marked white #15 player; the other two remain
+uncertain. The real HTTP/browser rerun reproduces that result. This short sample
+is **not** a continuous track, a recall benchmark or whole-match validation.
+Some QA cutouts fell back to rectangles.
 Crowded-duel accuracy still needs representative annotated-video measurement.
 iPhone/Safari and live analysis are untested. No merge/deploy or production-data
 change. This does not prove recovery of the five missing football actions.

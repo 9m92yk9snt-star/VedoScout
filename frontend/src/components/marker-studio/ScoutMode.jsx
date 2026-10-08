@@ -433,8 +433,16 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
       if (samples.length < 3) throw new Error("Too close to a cut or the end. Use a clearer moment.");
       const result = await requestTracking(samples, captured, session.signal);
       if (session.signal.aborted) return;
-      setPreview({ frames: samples, results: result, draft: captured, baseFrame: base }); setPreviewIndex(0); resetView();
-      setNotice("Watch the box. This is a provisional tracking check, not verified match evidence.");
+      // Dense backend cut detection can find boundaries missed by the coarse
+      // initial scene samples. Never loop or link across a reported cut.
+      const cutIndex = result.findIndex(r => r.status === "scene_cut");
+      const end = cutIndex < 0 ? samples.length : cutIndex;
+      if (end < 3) {
+        setNotice("The video cuts here. Choose an earlier moment in this scene for a tracking check. Your selection is kept.");
+        return;
+      }
+      setPreview({ frames: samples.slice(0, end), results: result.slice(0, end), draft: captured, baseFrame: base }); setPreviewIndex(0); resetView();
+      setNotice(cutIndex < 0 ? "Watch the box. This is a provisional tracking check, not verified match evidence." : "This check stops before a video cut. Watch the box on your player.");
     } catch (e) { if (!session.signal.aborted) setNotice(e.message || "Tracking check unavailable. Your selection is kept."); }
     finally { if (!session.signal.aborted) setFrameBusy(false); }
   };

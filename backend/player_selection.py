@@ -206,10 +206,12 @@ def tracking_preview(images, times, anchor):
     seed = [b["x"] * width, b["y"] * height, (b["x"] + b["w"]) * width, (b["y"] + b["h"]) * height]
     points, doubts = {}, []
     mask = decode_mask(anchor.get("visible_mask"))
-    _run_direction(frames, 0, seed, points, +1, doubts, _cut_flags(frames), **({"seed_mask": mask} if mask is not None else {}))
+    cuts = _cut_flags(frames)
+    first_cut = next((i for i, cut in enumerate(cuts) if cut), len(frames))
+    _run_direction(frames, 0, seed, points, +1, doubts, cuts, **({"seed_mask": mask} if mask is not None else {}))
     result = [{"t": times[0], "box": b, "status": "human_seed"}]
-    for time in times[1:]:
+    for index, time in enumerate(times[1:], 1):
         p = points.get(round(time, 2))
         result.append({"t": time, "box": {k: p[k] for k in ("x", "y", "w", "h")} if p else None,
-                       "status": "suggested" if p else "uncertain"})
+                       "status": "scene_cut" if index >= first_cut else "suggested" if p else "uncertain"})
     return {"frames": result, "provisional": True}
