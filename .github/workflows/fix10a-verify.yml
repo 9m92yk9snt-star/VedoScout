@@ -222,7 +222,7 @@ jobs:
       - name: Verify duel hints, pixel ownership, routes and identity safety
         env:
           PYTHONPATH: backend:backend/tests
-        run: python -m pytest -q backend/tests/test_player_selection.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py
+        run: python -m pytest -q backend/tests/test_player_selection.py backend/tests/test_masked_pose_tracking.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py
 
   frontend_build:
     runs-on: ubuntu-latest

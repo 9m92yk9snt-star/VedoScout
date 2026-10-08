@@ -133,7 +133,7 @@ def _color_sim(ref_hist, hsv, box_px_gray, scale: float, mask=None) -> float | N
     return float(cv2.compareHist(ref_hist, cand, cv2.HISTCMP_CORREL))
 
 
-def _record(out: dict, t: float, cur, W: int, H: int, conf: float):
+def _record(out: dict, t: float, cur, W: int, H: int, conf: float, pose_degrees: float = 0.0):
     key = round(t, 2)
     rec = {
         "t": key,
@@ -141,6 +141,8 @@ def _record(out: dict, t: float, cur, W: int, H: int, conf: float):
         "w": round((cur[2] - cur[0]) / W, 4), "h": round((cur[3] - cur[1]) / H, 4),
         "conf": round(float(conf), 3),
     }
+    if pose_degrees:
+        rec.update(matching_method="masked_pose", pose_degrees=round(float(pose_degrees), 1))
     prev = out.get(key)
     if prev is None or rec["conf"] > prev["conf"]:
         out[key] = rec
@@ -182,12 +184,38 @@ def _masked_ncc(region, template, mask):
     return np.clip(np.divide(numerator, denominator, out=np.full_like(numerator, -1), where=denominator > 1e-4), -1, 1)
 
 
-def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy, seed_mask=None):
+def _pose_templates(template, mask):
+    """Bounded tilt hypotheses using only original, selected foreground pixels.
+
+    No current-frame pixels are learned. Premultiplied warping prevents the
+    background from bleeding into a tilted foreground template. Clipped
+    hypotheses must retain at least 90% of the original foreground support.
+    """
+    yield template, mask, 0.0
+    weight = (mask > 0).astype(np.float32)
+    ys, xs = np.nonzero(weight)
+    if len(xs) < 20:
+        return
+    height, width = template.shape
+    centre = (float(xs.mean()), float(ys.mean()))
+    for angle in (-15.0, -7.5, 7.5, 15.0):
+        transform = cv2.getRotationMatrix2D(centre, angle, 1.0)
+        alpha = cv2.warpAffine(weight, transform, (width, height))
+        owned = (alpha >= 0.5).astype(np.uint8) * 255
+        if int((owned > 0).sum()) < len(xs) * 0.9:
+            continue
+        pixels = cv2.warpAffine(template.astype(np.float32) * weight, transform, (width, height))
+        tilted = np.divide(pixels, alpha, out=np.zeros_like(pixels), where=alpha > 1e-6)
+        yield tilted.clip(0, 255).astype(np.uint8), owned, angle
+
+
+def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy, seed_mask=None, pose_search=False):
     """Bounded multi-scale NCC search around (pcx, pcy)."""
     H, W = g.shape[:2]
     sx0, sy0 = max(0, int(pcx - bw / 2.0 - gx)), max(0, int(pcy - bh / 2.0 - gy))
     sx1, sy1 = min(W, int(pcx + bw / 2.0 + gx)), min(H, int(pcy + bh / 2.0 + gy))
     region = g[sy0:sy1, sx0:sx1]
+    variants = list(_pose_templates(tmpl, seed_mask)) if pose_search and seed_mask is not None else None
     best = None
     unit = None
     for s in tracking_geometry.scale_candidates(bw, bh, bw0, bh0):
@@ -196,10 +224,24 @@ def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy, seed_mask=None):
         if region.shape[0] <= th or region.shape[1] <= tw:
             continue
         tm = tmpl if (tw, th) == (tmpl.shape[1], tmpl.shape[0]) else cv2.resize(tmpl, (tw, th))
-        res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED) if seed_mask is None else _masked_ncc(
-            region, tm, cv2.resize(seed_mask, (tw, th), interpolation=cv2.INTER_NEAREST))
-        _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
-        cand = (mx, ml, tw, th, res, sx0, sy0)
+        if variants is None:
+            res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED) if seed_mask is None else _masked_ncc(
+                region, tm, cv2.resize(seed_mask, (tw, th), interpolation=cv2.INTER_NEAREST))
+            _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+            cand = (mx, ml, tw, th, res, sx0, sy0)
+        else:
+            masks, responses = [], []
+            for source, owned, _angle in variants:
+                candidate_mask = cv2.resize(owned, (tw, th), interpolation=cv2.INTER_NEAREST)
+                masks.append(candidate_mask)
+                responses.append(_masked_ncc(region, cv2.resize(source, (tw, th)), candidate_mask))
+            stack = np.stack(responses)
+            # All orientations vote in one response map. A rival at another
+            # orientation must remain visible to ambiguity/crowding gates.
+            res = stack.max(axis=0)
+            _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
+            winner = int(stack[:, ml[1], ml[0]].argmax())
+            cand = (mx, ml, tw, th, res, sx0, sy0, masks[winner], variants[winner][2])
         if s == 1.0:
             unit = cand
         if best is None or mx > best[0]:
@@ -220,7 +262,9 @@ def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, c
       hold             — bounded direction-change candidate (provisional)
       ambiguous / contaminated / colour / jump — rejection reasons
     """
-    mx, ml, tw, th, res, sx0, sy0 = best
+    mx, ml, tw, th, res, sx0, sy0 = best[:7]
+    if len(best) > 7:
+        seed_mask = best[7]
     # same-kit crossover safety: a spatially distinct near-equal rival means
     # this frame is NOT authoritative geometry
     mx2, _ml2 = tracking_geometry.second_peak(res, ml, tw, th)
@@ -241,6 +285,8 @@ def _judge_candidate(best, ref_hist, hsv, scale, pcx, pcy, exp, dtp, lcx, lcy, c
     if csim is not None and csim < COLOR_MIN:
         return "colour", None, None
     payload = {"mx": mx, "tw": tw, "th": th}
+    if len(best) > 8:
+        payload["pose_degrees"] = best[8]
     # spatial ownership: prediction is assistance, not a hard identity prior
     if tracking_geometry.plausible_motion(ccx - pcx, ccy - pcy, bw, bh, dt):
         return "accept", cand_box, payload
@@ -382,7 +428,8 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             # bounded recovery — NOT a global search; all gates re-apply
             bcx, bcy = exp if exp is not None else (lcx + cam_acc[0], lcy + cam_acc[1])
             reach = 0.45 + tracking_geometry.BOOT_FRAC
-            best2 = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach, **kwargs)
+            recovery_kwargs = {**kwargs, "pose_search": True} if seed_mask is not None and ref_hist is not None and v1 == "lost" else kwargs
+            best2 = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach, **recovery_kwargs)
             if best2 is not None and best2[0] >= MATCH_MIN:
                 v2, box2, pay2 = _judge_candidate(
                     best2, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
@@ -499,7 +546,7 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             # template learning ONLY from solid accepted geometry — a weak
             # (possibly blended) match may be recorded but never learned
             tmpl = cand
-        _record(out, t, cur, W, H, mx)
+        _record(out, t, cur, W, H, mx, pose_degrees=payload.get("pose_degrees", 0.0))
 
 
 def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float = SPAN) -> dict:

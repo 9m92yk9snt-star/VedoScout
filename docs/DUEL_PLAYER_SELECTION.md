@@ -67,6 +67,17 @@ candidate. This avoids comparing a background-free kit to a grass-heavy whole
 candidate box. It is matching assistance, not a new ownership mask or proof.
 The existing colour, match, geometry and ambiguity thresholds are unchanged.
 
+When the normal masked match is lost, its existing bounded recovery search can
+also test small foreground tilts (-15, -7.5, 7.5, 15 degrees). This requires a
+usable torso-colour reference and an approved foreground mask. It does not
+retry rejected colour, overlap or ambiguity verdicts with a tilt.
+The hypotheses use only original selected pixels; premultiplied warping keeps
+unselected background out, and clipped hypotheses must retain 90% of support.
+All tilt responses share a maximum response map so rivals at other tilts remain
+visible to the existing ambiguity and crowding gates. Accepted recovery points
+record `matching_method=masked_pose` and `pose_degrees`. No fresh appearance is
+learned and no human tap or action evidence is manufactured.
+
 The unified authority preserves exact partial observations without tap authority
 or action proof. Red points reject conflicting boxes within 140ms of that tap;
 they never describe stationary opponents throughout a scene. No hidden interval
@@ -74,7 +85,7 @@ is interpolated into proof. Legacy anchors without hints retain their old path.
 
 ## Verification and known limits
 
-166 backend tests passed (selection/routes, tracking, ownership, timeline,
+177 backend tests passed (selection/routes, masked pose recovery, tracking, ownership, timeline,
 authority/event bridge); all 52 frontend tests passed; 16 tap-policy and 12
 frame-authority cases passed. Production build succeeds with warnings in
 unchanged components. CI includes the isolated selection suite.
@@ -99,10 +110,21 @@ failure. Native Chromium now verifies the cut explanation and preserved tap.
 
 A separate same-scene check at 19.683–20.183s exposed the asymmetric colour
 comparison. With identical saved JPEGs/mask, zero of four later frames had a
-suggestion before the fix; two of four have suggestions after it. Visual review
-places those two boxes on the marked white #15 player; the other two remain
-uncertain. The real HTTP/browser rerun reproduces that result. This short sample
-is **not** a continuous track, a recall benchmark or whole-match validation.
+suggestion before the fix; the colour correction restored two. The two remaining
+rigid matches scored 0.416 and 0.394 against the unchanged 0.45 match floor.
+Bounded foreground tilt recovery raises them to 0.508 and 0.520 and passes all
+other gates. All four subsequent frames now have suggestions. Visual inspection
+places all four boxes on the same white #15 player. The actual HTTP/mobile-browser
+rerun reproduces four of four, with approval enabled and cut handling preserved.
+
+The ordinary `track_player` path also uses recovery: a 2-second local decode
+around the same anchor returned nine points over 19.62–20.15s, including three
+annotated pose recoveries, in approximately 1.01s here. This is not a claim of
+tracking the entire 2-second window. No server/model services were called.
+Eleven synthetic pose tests exercise positive/negative tilts, backward tracking,
+selected-pixel invariance, clipping, wrong kit, differently tilted rivals,
+disappearance, missing torso reference and scene cuts. This short real sample
+is **not** a recall benchmark or whole-match validation.
 Some QA cutouts fell back to rectangles.
 Crowded-duel accuracy still needs representative annotated-video measurement.
 iPhone/Safari and live analysis are untested. No merge/deploy or production-data
