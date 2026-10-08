@@ -1349,7 +1349,7 @@ export default function UploadPage() {
               {markerBlob && markerPreviewUrl && (
                 <div className="mt-4 rounded-2xl bg-cream-base/70 border border-ink/8 p-3.5 flex items-center gap-4">
                   <div data-testid="upload-mark-preview" aria-label="Your selected player" className="w-[72px] h-[96px] rounded-xl overflow-hidden bg-black border border-ink/10 shrink-0">
-                    {markerBox ? <MarkedCropCanvas frameDataUrl={markerPreviewUrl} box={markerBox} width={144} height={192} className="w-full h-full" /> :
+                    {markerBox ? <MarkedCropCanvas frameDataUrl={markerPreviewUrl} box={markerBox} mask={markerAnchors?.[0]?.visible_mask} width={144} height={192} className="w-full h-full" /> :
                       <img src={markerPreviewUrl} alt="Player reference frame" className="w-full h-full object-contain" />}
                   </div>
                   <div className="min-w-0 flex-1">

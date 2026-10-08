@@ -256,6 +256,7 @@ def extract_player_fingerprint(
     marker_image_path: str | Path,
     box: dict,
     crop_save_path: str | Path | None = None,
+    visible_mask: dict | None = None,
 ) -> PlayerFingerprint:
     """Extract jersey/shorts colours and body proportions from the marked patch.
 
@@ -291,17 +292,25 @@ def extract_player_fingerprint(
         )
 
     ch, cw = crop.shape[:2]
+    from player_selection import decode_mask
+    owned = decode_mask(visible_mask)
+    if owned is not None:
+        owned = cv2.resize(owned, (cw, ch), interpolation=cv2.INTER_NEAREST) > 0
     # Jersey region — middle-upper third of the body (avoid head & arms outline noise)
     j_top = int(ch * 0.18)
     j_bot = int(ch * 0.55)
     jersey = crop[j_top:j_bot, int(cw * 0.20):int(cw * 0.80)]
     jersey_px = jersey.reshape(-1, 3) if jersey.size else np.empty((0, 3), dtype=np.uint8)
+    if owned is not None and jersey.size:
+        jersey_px = jersey[owned[j_top:j_bot, int(cw * 0.20):int(cw * 0.80)]]
 
     # Shorts region — lower 35% of the body
     s_top = int(ch * 0.60)
     s_bot = int(ch * 0.92)
     shorts = crop[s_top:s_bot, int(cw * 0.20):int(cw * 0.80)]
     shorts_px = shorts.reshape(-1, 3) if shorts.size else np.empty((0, 3), dtype=np.uint8)
+    if owned is not None and shorts.size:
+        shorts_px = shorts[owned[s_top:s_bot, int(cw * 0.20):int(cw * 0.80)]]
 
     jersey_rgb = _dominant_colour(jersey_px, k=3) if jersey_px.size else (136, 136, 136)
     shorts_rgb = _dominant_colour(shorts_px, k=3) if shorts_px.size else (136, 136, 136)
@@ -321,6 +330,10 @@ def extract_player_fingerprint(
             px1 = min(iw, int(x1 + bw * 0.55))
             py1 = min(ih, int(y1 + bh * 0.30))
             visual = img[py0:py1, px0:px1]
+            if owned is not None:
+                # Visual identity references use the approved visible pixels;
+                # the separate wide crop retains scene context when needed.
+                visual = np.where(owned[:, :, None], crop, np.array([13, 15, 10], dtype=np.uint8))
             if visual.size == 0:
                 visual = crop
             vh, vw = visual.shape[:2]
@@ -507,6 +520,7 @@ def build_anchor_ensemble_block(anchor_descriptions: list[dict]) -> str:
     The actual anchor crop images are attached separately as file_contents — this is the
     written instruction telling Gemini what those crops are.
     """
+    anchor_descriptions = [a for a in anchor_descriptions if a.get("visibility") != "partial"]
     if not anchor_descriptions:
         return ""
     rows = []

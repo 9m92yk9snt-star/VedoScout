@@ -1526,7 +1526,8 @@ def build_identity_timeline(video_path: str, doc: dict):
     t_start = time.time()
     cap = None
     try:
-        anchors = [a for a in (doc.get("anchors") or []) if isinstance(a, dict) and a.get("box")]
+        from player_selection import expanded_anchors
+        anchors = [a for a in expanded_anchors(doc.get("anchors")) if isinstance(a, dict) and a.get("box")]
         if not anchors:
             return {"version": VERSION, "status": "skipped", "reason": "no_anchors"}
         t_off = float(doc.get("anchor_time_offset") or 0.0)
@@ -1626,6 +1627,8 @@ def build_identity_timeline(video_path: str, doc: dict):
 
         taps = []
         for a in anchors:
+            if a.get("visibility") == "partial":
+                continue  # visible fragment must not pin a full detector body
             try:
                 taps.append({
                     "media_ms": int(round((float(a["t"]) + t_off) * 1000)),

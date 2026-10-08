@@ -1,5 +1,9 @@
 # Guided-only player selection
 
+The later duel/cutout extension is documented in
+[DUEL_PLAYER_SELECTION.md](DUEL_PLAYER_SELECTION.md). That extension supersedes
+the rectangular-only/backend-unchanged scope statements below for this branch.
+
 Base: GitHub main `99b75105fd76f95fedeabf4ea09252c8f79a4f68`, tree
 `f0dd5311f6041ca8bf1939af400fbb33cdb55a00`.
 

@@ -1,6 +1,29 @@
 /** One editor, one decoder, one contract: guided taps + three extra checks. */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ScoutMode from "./marker-studio/ScoutMode";
+import api from "../lib/api";
+import selection from "./marker-studio/selectionHints.cjs";
+
+async function requestMask(frame, draft, signal) {
+  const image = await fetch(frame.jpegDataUrl, { signal });
+  const body = new FormData();
+  body.append("frame", await image.blob(), "selection.jpg");
+  body.append("hints", JSON.stringify({ box: draft.box, target_point: draft.target_point, exclude_points: draft.exclude_points || [], include_points: draft.include_points || [] }));
+  const { data } = await api.post("/player-selection/mask", body, { signal, timeout: 12000 });
+  return data.status === "suggested" && selection.validMask(data.mask) ? data.mask : null;
+}
+
+async function requestTracking(frames, draft, signal) {
+  const body = new FormData();
+  for (const frame of frames) {
+    const image = await fetch(frame.jpegDataUrl, { signal });
+    body.append("frames", await image.blob(), "frame.jpg");
+  }
+  body.append("hints", JSON.stringify({ times: frames.map(f => f.t), anchor: { box: draft.box, ...selection.hints(draft) } }));
+  const { data } = await api.post("/player-selection/tracking-preview", body, { signal, timeout: 15000 });
+  if (!Array.isArray(data.frames) || data.frames.length !== frames.length) throw new Error("Invalid tracking check");
+  return data.frames;
+}
 
 export default function MarkerStudio({ open, videoUrl, videoFile, onConfirm, onCancel }) {
   const [localSource, setLocalSource] = useState(null);
@@ -49,6 +72,8 @@ export default function MarkerStudio({ open, videoUrl, videoFile, onConfirm, onC
       markerAnchors: anchors.map((a) => ({
         t: a.t, box: { ...a.box }, segment: a.segment ?? 0,
         ...(a.verify === true ? { verify: true } : {}),
+        ...selection.hints(a),
+        ...(a.continuity?.length ? { continuity: a.continuity } : {}),
       })),
       sceneCuts: sceneCuts || [],
       scoutMode: true,
@@ -64,5 +89,5 @@ export default function MarkerStudio({ open, videoUrl, videoFile, onConfirm, onC
   );
   // Closing ALWAYS exits the studio. No manual fallback, automatic anchors or
   // confidence-preview gate can appear before, after or underneath this editor.
-  return <ScoutMode key={source} open videoUrl={source} onCancel={onCancel} onConfirm={handleConfirm} />;
+  return <ScoutMode key={source} open videoUrl={source} onCancel={onCancel} onConfirm={handleConfirm} requestMask={requestMask} requestTracking={requestTracking} />;
 }

@@ -87,6 +87,113 @@ test("directly opens guided selection with one video and no legacy preview", asy
   expect(onCancel).toHaveBeenCalledTimes(1);
 });
 
+test("partial duel and negative point survive all the way to submitted anchors", async () => {
+  const { onConfirm } = await boot();
+  fireEvent.click(screen.getByTestId("scout-hidden-player"));
+  fireEvent.click(screen.getByTestId("scout-partial-player"));
+  tap();
+  fireEvent.click(screen.getByTestId("scout-exclude-opponent"));
+  fireEvent.click(screen.getByTestId("scout-stage"), { clientX: 230, clientY: 250 });
+  fireEvent.click(screen.getByTestId("scout-confirm-mark"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  await mark(); await mark(); await mark();
+  fireEvent.click(screen.getByTestId("scout-finish-early"));
+  await checks(); fireEvent.click(screen.getByTestId("scout-submit"));
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  const partial = onConfirm.mock.calls[0][0].anchors.find(a => a.visibility === "partial");
+  expect(partial.t).toBe(2.989);
+  expect(partial.target_point).toEqual({ x: .5, y: .5 });
+  expect(partial.exclude_points).toHaveLength(1);
+  expect(onConfirm.mock.calls[0][0].anchors[0].visibility).not.toBe("partial");
+});
+
+test("human nearby check preserves original partial time and does not cross scenes", async () => {
+  const { onConfirm } = await boot();
+  fireEvent.click(screen.getByTestId("scout-hidden-player"));
+  fireEvent.click(screen.getByTestId("scout-partial-player")); tap();
+  fireEvent.click(screen.getByTestId("scout-link-after"));
+  await waitFor(() => expect(Number(screen.getByTestId("scout-presented-frame").getAttribute("data-frame-time"))).toBeCloseTo(3.478));
+  fireEvent.load(screen.getByTestId("scout-presented-frame")); tap();
+  fireEvent.click(screen.getByTestId("scout-confirm-mark"));
+  await waitFor(() => expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  fireEvent.click(screen.getByTestId("scout-confirm-mark"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  await mark(); await mark(); await mark();
+  fireEvent.click(screen.getByTestId("scout-finish-early")); await checks();
+  fireEvent.click(screen.getByTestId("scout-submit"));
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  const partial = onConfirm.mock.calls[0][0].anchors.find(a => a.visibility === "partial");
+  expect(partial.continuity[0]).toMatchObject({ same_player: true, segment: 0 });
+  expect(partial.continuity[0].t).toBeCloseTo(3.478);
+});
+
+test("cancel nearby check restores selection without manufacturing a link", async () => {
+  await boot(); fireEvent.click(screen.getByTestId("scout-hidden-player"));
+  fireEvent.click(screen.getByTestId("scout-partial-player")); tap();
+  fireEvent.click(screen.getByTestId("scout-link-after"));
+  await screen.findByTestId("scout-cancel-link");
+  fireEvent.click(screen.getByTestId("scout-cancel-link"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989");
+  expect(screen.queryByText(/nearby identity check\(s\) saved/)).not.toBeInTheDocument();
+});
+
+test("explicit visible choice exits partial mode without trapping the user", async () => {
+  const { onConfirm } = await boot();
+  fireEvent.click(screen.getByTestId("scout-hidden-player")); fireEvent.click(screen.getByTestId("scout-partial-player")); tap();
+  fireEvent.click(screen.getByTestId("scout-hidden-player")); fireEvent.click(screen.getByText("Player visible — tap now", { exact: true }));
+  await mark(); await mark(); await mark();
+  fireEvent.click(screen.getByTestId("scout-finish-early")); await checks(); fireEvent.click(screen.getByTestId("scout-submit"));
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  expect(onConfirm.mock.calls[0][0].anchors.some(a => a.visibility === "partial")).toBe(false);
+});
+
+test("tracking preview uses captured PTS and stores only human approval", async () => {
+  const requestTracking = jest.fn(async frames => frames.map(f => ({ t: f.t, box: { x: .46, y: .425, w: .08, h: .18 }, status: "suggested" })));
+  const { onConfirm } = await boot({ requestTracking }); tap();
+  fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  await screen.findByTestId("scout-tracking-preview");
+  requestTracking.mock.calls[0][0].forEach((f, i) => expect(f.t).toBeCloseTo([2.989, 3.103, 3.228, 3.353, 3.478][i]));
+  fireEvent.click(screen.getByTestId("scout-preview-approve"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  fireEvent.click(screen.getByTestId("scout-confirm-mark"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame")); await mark(); await mark();
+  fireEvent.click(screen.getByTestId("scout-finish-early")); await checks();
+  fireEvent.click(screen.getByTestId("scout-submit"));
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
+  const a = onConfirm.mock.calls[0][0].anchors[0];
+  expect(a.tracking_check.status).toBe("user_confirmed");
+  expect(a).not.toHaveProperty("preview_points");
+  expect(onConfirm.mock.calls[0][0].anchors).toHaveLength(6);
+});
+
+test("uncertain preview cannot be approved and correction requires a new human tap", async () => {
+  const requestTracking = jest.fn(async frames => frames.map((f, i) => ({ t: f.t, box: i ? null : { x: .46, y: .425, w: .08, h: .18 }, status: i ? "uncertain" : "human_seed" })));
+  await boot({ requestTracking }); tap(); fireEvent.click(screen.getByTestId("scout-check-tracking"));
+  await screen.findByTestId("scout-tracking-preview");
+  expect(screen.getByTestId("scout-preview-approve")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("scout-preview-correct-1"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  expect(screen.queryByTestId("scout-confirm-mark")).not.toBeInTheDocument();
+  tap(); fireEvent.click(screen.getByTestId("scout-confirm-mark"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "2.989");
+  expect(screen.getByTestId("scout-progress-counter")).toHaveTextContent("0/10");
+});
+
+test("mask responses from another frame cannot decorate the current tap", async () => {
+  let resolveMask;
+  const requestMask = jest.fn(() => new Promise(resolve => { resolveMask = resolve; }));
+  await boot({ requestMask }); tap();
+  await waitFor(() => expect(requestMask).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByTestId("scout-frame-strip-1"));
+  fireEvent.load(screen.getByTestId("scout-presented-frame"));
+  await act(async () => resolveMask({ width: 96, height: 192, runs: [100, 50, 18282] }));
+  expect(screen.queryByTestId("scout-player-mask")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("scout-selection-preview")).not.toBeInTheDocument();
+});
+
 test("uses the cached displayed frame even when the decoder is at the end of the clip", async () => {
   const { onConfirm } = await boot();
   expect(screen.getByTestId("scout-video").currentTime).toBeCloseTo(56.989);

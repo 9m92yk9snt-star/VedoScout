@@ -3,13 +3,14 @@
  * moments, then three distinct extra checks. No detector guesses or hidden
  * manual editor. Every box stays bound to the exact displayed still frame.
  */
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, X, EyeOff, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import MarkedCropCanvas from "../MarkedCropCanvas";
 import { detectSceneCuts, distributeHints } from "./sceneDetect";
 import videoFrameAuthority from "./videoFrameAuthority.cjs";
 import policy from "./scoutTapPolicy.cjs";
+import selection from "./selectionHints.cjs";
 
 const { TARGET_TAPS, MIN_TAPS, VERIFY_TAPS, screenToVideo, tapBox, markingProgress,
   nearbyTime, verifyTime, distinctVerifyTime, buildPayload } = policy;
@@ -61,7 +62,7 @@ async function capturePresented(video, target, signal) {
   return { t: frame.mediaTime, jpegDataUrl, width: video.videoWidth, height: video.videoHeight };
 }
 
-export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
+export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, requestMask, requestTracking }) {
   const videoRef = useRef(null);
   const overlayRef = useRef(null);
   const stageRef = useRef(null);
@@ -90,6 +91,13 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
   const [draft, setDraft] = useState(null);
   const [frameBusy, setFrameBusy] = useState(false);
   const [hiddenHelp, setHiddenHelp] = useState(false);
+  const [partial, setPartial] = useState(false);
+  const [tapIntent, setTapIntent] = useState("target");
+  const [refine, setRefine] = useState(false);
+  const [link, setLink] = useState(null);
+  const [maskBusy, setMaskBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -106,7 +114,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
     setPhase("BOOTING");
     setError(""); setNotice(""); setFrames([]); setQueue([]); setPosition(0);
     setMarks({}); setVerifyMarks([]); setVerifyFrame(null); setLoadedImage(null); setDraft(null);
-    setFrameBusy(false); setSubmitting(false); setHiddenHelp(false);
+    setFrameBusy(false); setSubmitting(false); setHiddenHelp(false); setPartial(false); setTapIntent("target"); setLink(null); setPreview(null);
     setZoom(1); setPan({ x: 0, y: 0 });
     const video = videoRef.current;
     (async () => {
@@ -170,16 +178,40 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
   }, [open]);
 
   const current = queue[position];
-  const activeFrame = phase === "MARKING" ? frames[current] : verifyFrame;
+  const activeFrame = preview?.frames[previewIndex] || link?.frame || (phase === "MARKING" ? frames[current] : verifyFrame);
   const confirmedCount = Object.values(marks).filter(m => policy.validBox(m.box)).length;
-  const canTap = !!activeFrame && loadedImage === activeFrame.jpegDataUrl && !frameBusy && !submitting &&
+  const fullCount = Object.values(marks).filter(m => policy.validBox(m.box) && m.visibility !== "partial").length;
+  const canTap = !!activeFrame && loadedImage === activeFrame.jpegDataUrl && !frameBusy && !submitting && !preview &&
     (phase === "MARKING" || (phase === "VERIFY" && verifyMarks.length < VERIFY_TAPS));
   const hasDraft = canTap && draft?.frame === activeFrame;
+  const maskDataUrl = useMemo(() => selection.maskImage(draft?.visible_mask), [draft?.visible_mask]);
+  const maskKey = draft ? JSON.stringify([draft.box, draft.target_point, draft.exclude_points, draft.include_points]) : "";
+  useEffect(() => {
+    if (!requestMask || !draft?.target_point || !canTap || draft.visible_mask || draft.maskDeclined === maskKey) { setMaskBusy(false); return undefined; }
+    const controller = new AbortController();
+    const captured = draft;
+    setMaskBusy(true);
+    const timer = setTimeout(async () => {
+      try {
+        const mask = await requestMask(captured.frame, captured, controller.signal);
+        if (!controller.signal.aborted) {
+          setDraft(prev => prev?.frame === captured.frame && JSON.stringify([prev.box, prev.target_point, prev.exclude_points, prev.include_points]) === maskKey
+            ? { ...prev, visible_mask: mask || undefined } : prev);
+          if (!mask) setNotice("Cutout unavailable. Adjust the box or use a clearer moment.");
+        }
+      } catch {
+        if (!controller.signal.aborted) setNotice("Cutout unavailable. Your box can still be used.");
+      } finally { if (!controller.signal.aborted) setMaskBusy(false); }
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+    // Keyed only to the frame and human inputs, never to the returned mask.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestMask, maskKey, activeFrame, canTap]);
   const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, []);
 
   useEffect(() => {
     actionLock.current = false;
-    setDraft(null); setHiddenHelp(false); resetView();
+    setDraft(null); setHiddenHelp(false); setPartial(false); setTapIntent("target"); setRefine(false); setLink(null); setPreview(null); resetView();
   }, [phase, current, resetView]);
 
   const handleTap = useCallback(e => {
@@ -187,11 +219,28 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
     if (!canTap || hiddenHelp || e.target.closest("button, input, [data-marker-handle]")) return;
     const r = stageRef.current.getBoundingClientRect();
     const point = screenToVideo({ x: e.clientX, y: e.clientY }, r, activeFrame, zoom, pan);
-    if (point) setDraft({ box: tapBox(point), frame: activeFrame });
-  }, [canTap, hiddenHelp, activeFrame, zoom, pan]);
+    if (!point) return;
+    if (requestMask) setMaskBusy(true);
+    if (tapIntent === "include" && hasDraft) {
+      const b = draft.box, pad = .005;
+      const x = Math.max(0, Math.min(b.x, point.x - pad)), y = Math.max(0, Math.min(b.y, point.y - pad));
+      const right = Math.min(1, Math.max(b.x + b.w, point.x + pad)), bottom = Math.min(1, Math.max(b.y + b.h, point.y + pad));
+      setDraft(prev => ({ ...prev, box: { x, y, w: right - x, h: bottom - y }, include_points: [...(prev.include_points || []), point].slice(-4), visible_mask: undefined, continuity: undefined, tracking_check: undefined }));
+      setTapIntent("target"); setNotice("Visible body part added. Check the updated cutout.");
+    } else if (tapIntent === "exclude" && hasDraft) {
+      const inside = point.x >= draft.box.x && point.x <= draft.box.x + draft.box.w && point.y >= draft.box.y && point.y <= draft.box.y + draft.box.h;
+      setDraft(prev => ({ ...prev, exclude_points: [...(prev.exclude_points || []), point].slice(-4), visible_mask: undefined, tracking_check: undefined,
+        ...(inside ? { visibility: "partial", continuity: undefined } : {}) }));
+      if (inside) setPartial(true);
+      setTapIntent("target"); setNotice("Opponent marked in red. Check that the cutout keeps only your player.");
+    } else {
+      setDraft({ box: tapBox(point), frame: activeFrame, target_point: point,
+        ...(partial && !link ? { visibility: "partial" } : {}) });
+    }
+  }, [canTap, hiddenHelp, activeFrame, zoom, pan, tapIntent, hasDraft, partial, link, draft, requestMask]);
 
   const handlePointerDown = useCallback((e, mode = "stage") => {
-    if (!canTap || hiddenHelp || (e.button != null && e.button !== 0)) return;
+    if (!canTap || hiddenHelp || tapIntent !== "target" || (e.button != null && e.button !== 0)) return;
     if (e.target.closest("button, input")) return;
     if (mode !== "stage") e.stopPropagation();
     try { stageRef.current.setPointerCapture(e.pointerId); } catch { /* older devices */ }
@@ -208,7 +257,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
         pan: { ...pan }, zoom,
       };
     }
-  }, [canTap, hiddenHelp, pan, zoom, draft]);
+  }, [canTap, hiddenHelp, pan, zoom, draft, tapIntent]);
 
   const handlePointerMove = useCallback(e => {
     if (!pointers.current.has(e.pointerId) || !gesture.current) return;
@@ -235,14 +284,17 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
         y: clamp(g.pan.y + dy, -r.height * (zoom - 1) / 2, r.height * (zoom - 1) / 2),
       });
     } else if (g.box) {
+      if (requestMask) setMaskBusy(true);
       const scale = Math.min(r.width / activeFrame.width, r.height / activeFrame.height);
       const fx = dx / (activeFrame.width * scale * zoom), fy = dy / (activeFrame.height * scale * zoom);
       const b = { ...g.box };
       if (g.mode === "move") { b.x = clamp(b.x + fx, 0, 1 - b.w); b.y = clamp(b.y + fy, 0, 1 - b.h); }
       else { b.w = clamp(b.w + fx, 0.02, 1 - b.x); b.h = clamp(b.h + fy, 0.04, 1 - b.y); }
-      setDraft({ box: b, frame: activeFrame });
+      setDraft(prev => ({ ...prev, box: b, frame: activeFrame, visible_mask: undefined, continuity: undefined, tracking_check: undefined,
+        target_point: { x: clamp(prev.target_point?.x ?? b.x + b.w / 2, b.x + b.w * 0.01, b.x + b.w * 0.99),
+          y: clamp(prev.target_point?.y ?? b.y + b.h / 2, b.y + b.h * 0.01, b.y + b.h * 0.99) } }));
     }
-  }, [activeFrame, zoom]);
+  }, [activeFrame, zoom, requestMask]);
 
   const handlePointerUp = useCallback(e => {
     pointers.current.delete(e.pointerId);
@@ -252,17 +304,18 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
 
   const goNext = updated => {
     const progress = markingProgress(queue, current, updated);
-    setDraft(null); resetView(); setHiddenHelp(false);
+    setDraft(null); resetView(); setHiddenHelp(false); setPartial(false); setTapIntent("target");
     if (progress.verify) setPhase("VERIFY");
     else {
       setPosition(queue.indexOf(progress.next));
-      if (progress.needsVisible) setNotice("We need 3 visible moments. Choose a thumbnail, or use “Hidden” to move to a clearer frame.");
+      if (progress.needsVisible) setNotice("We need 3 visible moments with the full player. Use a clearer frame for the remaining selections.");
     }
   };
   const confirmMark = () => {
-    if (!hasDraft || actionLock.current) return;
+    if (!hasDraft || actionLock.current || link || maskBusy) return;
     actionLock.current = true;
-    const updated = { ...marks, [current]: { t: activeFrame.t, box: { ...draft.box } } };
+    const updated = { ...marks, [current]: { t: activeFrame.t, box: { ...draft.box }, ...selection.hints(draft),
+      ...(draft.continuity?.length ? { continuity: draft.continuity } : {}) } };
     setMarks(updated); setNotice("Selection saved."); goNext(updated);
     // A repeated edit may keep the same queue position; release on next render.
     queueMicrotask(() => { actionLock.current = false; });
@@ -299,7 +352,8 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
   }, [phase, verifyMarks.length, duration, loadVerify, resetView]);
 
   const confirmVerify = () => {
-    if (!hasDraft || actionLock.current || verifyMarks.length >= VERIFY_TAPS) return;
+    if (!hasDraft || actionLock.current || verifyMarks.length >= VERIFY_TAPS || maskBusy) return;
+    if (draft.visibility === "partial") { setNotice("Choose a fully visible moment for this extra check."); return; }
     if (!distinctVerifyTime(activeFrame.t, verifyMarks)) {
       setNotice("Choose a different moment for this check — at least half a second apart."); return;
     }
@@ -307,7 +361,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
     // Block the old check frame immediately, before the effect schedules the
     // next one. A fast second tap must not land on the previous check's pixels.
     if (verifyMarks.length + 1 < VERIFY_TAPS) { setVerifyFrame(null); setFrameBusy(true); }
-    setVerifyMarks(prev => [...prev, { t: activeFrame.t, box: { ...draft.box }, jpegDataUrl: activeFrame.jpegDataUrl }]);
+    setVerifyMarks(prev => [...prev, { t: activeFrame.t, box: { ...draft.box }, ...selection.hints(draft), jpegDataUrl: activeFrame.jpegDataUrl }]);
     setDraft(null); setHiddenHelp(false); setNotice("Extra check saved."); resetView();
     queueMicrotask(() => { actionLock.current = false; });
   };
@@ -335,6 +389,72 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
     } finally {
       if (!session.signal.aborted && frameRequestRef.current === request) setFrameBusy(false);
     }
+  };
+
+  const startLink = async direction => {
+    if (!hasDraft || frameBusy || link || maskBusy || phase !== "MARKING") return;
+    const next = nearbyTime(activeFrame.t, direction, duration, cuts);
+    if (next === null || Math.abs(next - activeFrame.t) < 0.02) { setNotice("No nearby frame in this scene. Try the other direction."); return; }
+    const session = sessionRef.current, base = { draft, frame: activeFrame };
+    setFrameBusy(true);
+    try {
+      const frame = await capturePresented(videoRef.current, next, session.signal);
+      if (session.signal.aborted) return;
+      if (cuts.filter(c => frame.t >= c).length !== cuts.filter(c => base.frame.t >= c).length) {
+        setNotice("That frame is across a scene cut. Choose another direction."); return;
+      }
+      setLink({ ...base, frame, baseFrame: base.frame }); setDraft(null); setPartial(false); setTapIntent("target"); resetView();
+      setNotice("Tap the SAME player in this nearby frame. Confirm only if he is clearly visible.");
+    } catch { if (!session.signal.aborted) setNotice("Could not open the nearby frame. Your selection is kept."); }
+    finally { if (!session.signal.aborted) setFrameBusy(false); }
+  };
+  const finishLink = accept => {
+    if (!link || frameBusy || maskBusy || (accept && !hasDraft)) return;
+    if (accept && draft.visibility === "partial") { setNotice("Choose a nearby frame where the same player is fully visible."); return; }
+    const linked = accept ? { t: activeFrame.t, box: { ...draft.box }, ...selection.hints(draft), same_player: true } : null;
+    const restored = { ...link.draft, ...(linked ? { continuity: [...(link.draft.continuity || []).filter(c => Math.abs(c.t - linked.t) > 0.02), linked].slice(-2) } : {}) };
+    setDraft(restored); setPartial(restored.visibility === "partial"); setLink(null); setTapIntent("target"); resetView();
+    setNotice(accept ? "Same player confirmed at both marked moments. Hidden frames remain uncertain." : "Nearby check cancelled. Your selection is kept.");
+  };
+
+  const startPreview = async () => {
+    if (!requestTracking || !hasDraft || draft.visibility === "partial" || maskBusy || link) return;
+    const session = sessionRef.current, captured = draft, base = activeFrame;
+    const segment = time => cuts.filter(c => time >= c).length;
+    const samples = [base];
+    setFrameBusy(true); setNotice("Preparing a short tracking check…");
+    try {
+      for (const delta of [0.125, 0.25, 0.375, 0.5]) {
+        if (base.t + delta >= duration - 0.04 || segment(base.t + delta) !== segment(base.t)) break;
+        const frame = await capturePresented(videoRef.current, base.t + delta, session.signal);
+        if (segment(frame.t) !== segment(base.t) || frame.t <= samples[samples.length - 1].t) break;
+        samples.push(frame);
+      }
+      if (samples.length < 3) throw new Error("Too close to a cut or the end. Use a clearer moment.");
+      const result = await requestTracking(samples, captured, session.signal);
+      if (session.signal.aborted) return;
+      setPreview({ frames: samples, results: result, draft: captured, baseFrame: base }); setPreviewIndex(0); resetView();
+      setNotice("Watch the box. This is a provisional tracking check, not verified match evidence.");
+    } catch (e) { if (!session.signal.aborted) setNotice(e.message || "Tracking check unavailable. Your selection is kept."); }
+    finally { if (!session.signal.aborted) setFrameBusy(false); }
+  };
+  useEffect(() => {
+    if (!preview) return undefined;
+    const timer = setInterval(() => setPreviewIndex(i => (i + 1) % preview.frames.length), 400);
+    return () => clearInterval(timer);
+  }, [preview]);
+  const finishPreview = approve => {
+    if (!preview) return;
+    setDraft({ ...preview.draft, ...(approve ? { tracking_check: { status: "user_confirmed", start: preview.frames[0].t, end: preview.frames[preview.frames.length - 1].t } } : {}) });
+    setPreview(null); resetView();
+    setNotice(approve ? "Short tracking check approved. Confirm your selection to save it." : "Check closed. Your selection is kept.");
+  };
+  const correctPreview = index => {
+    if (!preview || index === 0 || phase !== "MARKING") return;
+    const captured = preview;
+    setLink({ draft: captured.draft, frame: captured.frames[index], baseFrame: captured.baseFrame });
+    setPreview(null); setDraft(null); setPartial(false); setTapIntent("target"); resetView();
+    setNotice("Tap your actual player here, then confirm Same player. No suggested tracking box is saved as a human tap.");
   };
 
   const submit = async () => {
@@ -373,7 +493,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
         <div className="flex-none px-4 py-2.5 flex justify-between gap-2 items-center bg-white/5">
           <div>
             <p className="text-sm font-bold">{phase === "MARKING" ? "Tap your player in the clear moments" : done ? "Your selections are ready" : "3 extra checks across the clip"}</p>
-            <p className="text-[11px] text-white/60">{hasDraft ? "Drag or resize the box to fit your player." : "Pinch to zoom · drag to pan · tap to select"}</p>
+            <p className="text-[11px] text-white/60">{hasDraft ? "Drag or resize the box to fit your player." : partial ? "Tap only the visible part of your player." : "Pinch to zoom · drag to pan · tap to select"}</p>
           </div>
           <span data-testid={phase === "MARKING" ? "scout-progress-counter" : "scout-verify-counter"} className="text-[#CCFF00] text-xl font-black tabular-nums whitespace-nowrap">
             {phase === "MARKING" ? confirmedCount + "/" + queue.length : verifyMarks.length + "/3"}
@@ -396,7 +516,12 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
         {activeFrame && !frameBusy && (
           <span className="absolute top-2 left-3 bg-black/70 px-2 py-1 rounded-lg text-xs text-white/80 pointer-events-none">{fmt(activeFrame.t)}</span>
         )}
-        {hasDraft && rect.w > 0 && <DraftMarker box={draft.box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={handlePointerDown} />}
+        {hasDraft && rect.w > 0 && <DraftMarker box={draft.box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={handlePointerDown} maskDataUrl={maskDataUrl} excludeMode={tapIntent !== "target"} />}
+        {hasDraft && rect.w > 0 && <SelectionPoints points={draft.exclude_points || []} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} />}
+        {preview && rect.w > 0 && policy.validBox(preview.results[previewIndex]?.box) && <div style={{ pointerEvents: "none" }}>
+          <DraftMarker box={preview.results[previewIndex].box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={() => {}} excludeMode />
+        </div>}
+        {preview && <span role="status" className="absolute bottom-2 left-3 bg-black/80 rounded-lg px-2 py-1 text-xs">{preview.results[previewIndex]?.box ? "Suggested tracking" : "Uncertain — no trusted box"}</span>}
         {phase === "BOOTING" && (
           <div className="absolute inset-0 bg-ink flex flex-col items-center justify-center gap-4 px-8 text-center">
             <Loader2 className="animate-spin text-[#CCFF00]" size={42} />
@@ -417,7 +542,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
         {frameBusy && <div role="status" className="absolute inset-0 flex items-center justify-center bg-black/65 pointer-events-none"><Loader2 className="animate-spin text-[#CCFF00]" size={32} /></div>}
       </div>
 
-      {phase === "MARKING" && (
+      {phase === "MARKING" && !link && !preview && (
         <div data-testid="scout-frame-strip" className="flex-none flex gap-1.5 overflow-x-auto px-3 py-2 bg-ink" style={{ touchAction: "pan-x" }}>
           {queue.map((i, pos) => (
             <button key={i} type="button" disabled={frameBusy} data-testid={"scout-frame-strip-" + pos}
@@ -433,25 +558,58 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
       )}
       {(phase === "MARKING" || phase === "VERIFY") && (
         <footer className="flex-none px-3 pt-2 bg-ink border-t border-white/10 space-y-2"
-          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))" }}>
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))", maxHeight: "55dvh", overflowY: "auto" }}>
           {notice && <p role="status" data-testid="scout-notice" className="text-[12px] text-white/85">{notice}</p>}
+          {phase === "MARKING" && confirmedCount > fullCount && !hasDraft && !preview && !link && <p className="text-[11px] text-white/60">{fullCount} clear selections · {confirmedCount - fullCount} partial. Keep at least 3 clear selections for the identity reference.</p>}
+          {preview && <div data-testid="scout-tracking-preview" className="space-y-2">
+            <p className="text-sm font-bold">Does the box stay on your player?</p>
+            <div className="flex gap-2">
+              <button type="button" data-testid="scout-preview-approve" className={primary + " flex-1"}
+                disabled={preview.results.some(r => !policy.validBox(r.box))} onClick={() => finishPreview(true)}>Right player</button>
+              <button type="button" data-testid="scout-preview-close" className={button} onClick={() => finishPreview(false)}>Close</button>
+            </div>
+            {phase === "MARKING" && <div className="flex gap-1 flex-wrap">{preview.frames.slice(1).map((frame, i) =>
+              <button key={i} type="button" data-testid={"scout-preview-correct-" + (i + 1)} className={button} onClick={() => correctPreview(i + 1)}>Fix at +{(frame.t - preview.frames[0].t).toFixed(2)}s</button>)}</div>}
+          </div>}
           {hasDraft && (
             <div data-testid="scout-selection-preview" className="flex items-center gap-3">
               <div className="w-16 h-20 flex-none rounded-xl border-2 border-[#CCFF00] overflow-hidden">
-                <MarkedCropCanvas frameDataUrl={activeFrame.jpegDataUrl} box={draft.box} width={128} height={160} className="w-full h-full" />
+                <MarkedCropCanvas frameDataUrl={activeFrame.jpegDataUrl} box={draft.box} mask={draft.visible_mask} width={128} height={160} className="w-full h-full" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm text-[#CCFF00]">Your selected player</p>
-                <p className="text-[11px] text-white/60">Check the crop. Keep only your player inside the box.</p>
+                <p className="text-[11px] text-white/60">{maskBusy ? "Preparing cutout…" : draft.visible_mask ? "Check the suggested cutout before confirming." : "Check the crop. Keep only your player inside the box."}</p>
                 <div className="flex gap-2 mt-2">
                   <button type="button" data-testid="scout-retap" className={button} onClick={() => setDraft(null)}><RotateCcw size={15} className="inline mr-1" />Re-tap</button>
                   <button type="button" data-testid={phase === "MARKING" ? "scout-confirm-mark" : "scout-verify-confirm"} className={primary + " flex-1"}
-                    disabled={submitting || actionLock.current} onClick={phase === "MARKING" ? confirmMark : confirmVerify}><Check size={18} />Confirm</button>
+                    disabled={submitting || actionLock.current || maskBusy} onClick={link ? () => finishLink(true) : phase === "MARKING" ? confirmMark : confirmVerify}><Check size={18} />{link ? "Same player" : "Confirm"}</button>
                 </div>
               </div>
             </div>
           )}
-          {!hasDraft && phase === "VERIFY" && !done && (
+          {hasDraft && <div className="flex gap-2">
+            <button type="button" data-testid="scout-refine" className={button + " flex-1"} aria-expanded={refine} onClick={() => { setRefine(v => !v); setTapIntent("target"); }}>Adjust selection</button>
+            {requestTracking && draft.visibility !== "partial" && !link && <button type="button" data-testid="scout-check-tracking" className={button + " flex-1"}
+              disabled={maskBusy || frameBusy} onClick={startPreview}>Check tracking</button>}
+          </div>}
+          {hasDraft && (refine || draft.visibility === "partial") && <div className="flex gap-2 flex-wrap">
+            {requestMask && <button type="button" data-testid="scout-include-player" className={button} disabled={maskBusy} aria-pressed={tapIntent === "include"}
+              onClick={() => { setTapIntent(t => t === "include" ? "target" : "include"); setNotice("Tap a visible part of YOUR player that is missing from the cutout."); }}>Add player part</button>}
+            <button type="button" data-testid="scout-exclude-opponent" className={button} disabled={maskBusy} aria-pressed={tapIntent === "exclude"}
+              onClick={() => { setTapIntent(t => t === "exclude" ? "target" : "exclude"); setNotice("Tap the opponent — not your player. Red points exclude that person from this selection."); }}>Not my player</button>
+            {!!draft.exclude_points?.length && <button type="button" className={button} onClick={() => { setDraft(prev => ({ ...prev, exclude_points: [], visible_mask: undefined, tracking_check: undefined })); setTapIntent("target"); }}>Clear red points</button>}
+            {!!draft.visible_mask && <button type="button" className={button} onClick={() => { setMaskBusy(false); setDraft(prev => ({ ...prev, visible_mask: undefined, maskDeclined: maskKey, tracking_check: undefined })); }}>Use box instead</button>}
+          </div>}
+          {hasDraft && draft.visibility === "partial" && !link && <div className="rounded-xl border border-white/20 p-2 space-y-2">
+            <p className="text-[11px] text-white/75">Partly visible. Confirm the same player in a nearby clear frame:</p>
+            <div className="flex gap-2">
+              <button type="button" data-testid="scout-link-before" className={button + " flex-1"} disabled={maskBusy || frameBusy} onClick={() => startLink(-1)}>Before · −0.5s</button>
+              <button type="button" data-testid="scout-link-after" className={button + " flex-1"} disabled={maskBusy || frameBusy} onClick={() => startLink(1)}>After · +0.5s</button>
+            </div>
+            {!!draft.continuity?.length && <p className="text-[11px] text-[#CCFF00]">{draft.continuity.length} nearby identity check(s) saved</p>}
+          </div>}
+          {link && <button type="button" data-testid="scout-cancel-link" className={button + " w-full"} disabled={maskBusy || frameBusy} onClick={() => finishLink(false)}>Cancel nearby check</button>}
+          {!hasDraft && phase === "VERIFY" && !done && !preview && (
             <div className="flex items-center gap-2">
               <button type="button" aria-label="Previous second" data-testid="scout-verify-back1" className={button} onClick={() => loadVerify(verifyTarget - 1)}>−1s</button>
               <input type="range" aria-label="Choose a clear check moment" data-testid="scout-verify-scrub" min={0} max={Math.max(0, duration - 0.04)} step={0.04}
@@ -460,11 +618,11 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
               {!verifyFrame && !frameBusy && <button type="button" className={button} onClick={() => loadVerify(verifyTarget)}>Retry</button>}
             </div>
           )}
-          {!done && (
+          {!done && !link && !preview && (
             <div className="flex justify-between items-center gap-2">
               <button type="button" data-testid="scout-hidden-player" className={button + " flex items-center gap-1.5"} disabled={frameBusy}
                 aria-expanded={hiddenHelp} onClick={() => { setHiddenHelp(v => !v); setDraft(null); }}>
-                <EyeOff size={16} />Hidden?
+                <EyeOff size={16} />Hidden / duel?
               </button>
               <div className="flex items-center gap-1">
                 <button type="button" aria-label="Zoom out" data-testid="scout-zoom-out" className={button} disabled={zoom <= 1} onClick={() => { setZoom(z => Math.max(1, z / 1.4)); setPan({ x: 0, y: 0 }); }}><ZoomOut size={18} /></button>
@@ -476,17 +634,18 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
           {hiddenHelp && !done && (
             <div data-testid="scout-hidden-help" className="rounded-xl bg-white/5 border border-white/15 p-3 space-y-2">
               <p className="text-sm font-bold">Behind another player?</p>
-              <p className="text-[11px] text-white/70">Do not mark the player in front. Move to a nearby clear frame, then tap your player. If still hidden, skip this moment.</p>
+              <p className="text-[11px] text-white/70">Do not mark the player in front. If partly visible, tap only your player's visible body. If fully hidden, move to a clear frame or skip.</p>
+              {phase === "MARKING" && <button type="button" data-testid="scout-partial-player" className={primary + " w-full"} onClick={() => { setPartial(true); setHiddenHelp(false); setTapIntent("target"); setNotice("Tap the visible part of YOUR player. Adjust the box to include only visible body parts."); }}>Partly visible / in a duel</button>}
               <div className="flex gap-2">
                 <button type="button" data-testid="scout-nearby-earlier" disabled={frameBusy} className={button + " flex-1"} onClick={() => moveNearby(-1)}><ChevronLeft size={14} className="inline" />0.5s earlier</button>
                 <button type="button" data-testid="scout-nearby-later" disabled={frameBusy} className={button + " flex-1"} onClick={() => moveNearby(1)}>0.5s later<ChevronRight size={14} className="inline" /></button>
               </div>
               {phase === "MARKING" && <button type="button" data-testid="scout-skip-frame" disabled={frameBusy} className={button + " w-full"} onClick={skipMark}>Not visible — skip this moment</button>}
               {phase === "VERIFY" && <button type="button" className={button + " w-full"} onClick={() => { setHiddenHelp(false); loadVerify(clamp(verifyTarget + 2, 0, duration - 0.04)); }}>Try another check moment</button>}
-              <button type="button" className="w-full min-h-[44px] text-[#CCFF00] text-sm font-bold" onClick={() => setHiddenHelp(false)}>Player visible — tap now</button>
+              <button type="button" className="w-full min-h-[44px] text-[#CCFF00] text-sm font-bold" onClick={() => { setHiddenHelp(false); setPartial(false); setTapIntent("target"); }}>Player visible — tap now</button>
             </div>
           )}
-          {phase === "MARKING" && !hasDraft && !hiddenHelp && confirmedCount >= MIN_TAPS && (
+          {phase === "MARKING" && !hasDraft && !hiddenHelp && !link && !preview && fullCount >= MIN_TAPS && (
             <button type="button" data-testid="scout-finish-early" className={button + " w-full text-[#CCFF00]"} onClick={() => { setNotice(""); setPhase("VERIFY"); }}>Continue to 3 extra checks · {confirmedCount} selected</button>
           )}
           {done && (
@@ -507,7 +666,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm }) {
   );
 }
 
-function DraftMarker({ box, frame, rect, zoom, pan, onPointerDown }) {
+function DraftMarker({ box, frame, rect, zoom, pan, onPointerDown, maskDataUrl, excludeMode }) {
   const scale = Math.min(rect.w / frame.width, rect.h / frame.height);
   const rw = frame.width * scale, rh = frame.height * scale;
   const x = ((rect.w - rw) / 2 + box.x * rw - rect.w / 2) * zoom + rect.w / 2 + pan.x;
@@ -515,13 +674,23 @@ function DraftMarker({ box, frame, rect, zoom, pan, onPointerDown }) {
   const width = box.w * rw * zoom, height = box.h * rh * zoom;
   return (
     <>
+      {maskDataUrl && <div data-testid="scout-player-mask" style={{ position: "absolute", left: x, top: y, width, height, background: "rgba(204,255,0,0.35)",
+        maskImage: `url(${maskDataUrl})`, WebkitMaskImage: `url(${maskDataUrl})`, maskSize: "100% 100%", WebkitMaskSize: "100% 100%", pointerEvents: "none", zIndex: 9 }} />}
       <div data-testid="scout-draft-marker" data-marker-handle="move" onPointerDown={e => onPointerDown(e, "move")}
         style={{ position: "absolute", left: x, top: y, width, height, border: "3px solid #CCFF00", borderRadius: 8,
-          boxShadow: "0 0 0 100vmax rgba(0,0,0,0.32), 0 0 18px rgba(204,255,0,0.7)", cursor: "move", zIndex: 10, touchAction: "none" }} />
+          boxShadow: "0 0 0 100vmax rgba(0,0,0,0.32), 0 0 18px rgba(204,255,0,0.7)", cursor: "move", zIndex: 10, touchAction: "none", pointerEvents: excludeMode ? "none" : "auto" }} />
       <div role="presentation" data-testid="scout-draft-resize" data-marker-handle="resize" onPointerDown={e => onPointerDown(e, "resize")}
-        style={{ position: "absolute", left: x + width - 22, top: y + height - 22, width: 44, height: 44, zIndex: 11, cursor: "nwse-resize", touchAction: "none", display: "grid", placeItems: "center" }}>
+        style={{ position: "absolute", left: x + width - 22, top: y + height - 22, width: 44, height: 44, zIndex: 11, cursor: "nwse-resize", touchAction: "none", display: "grid", placeItems: "center", pointerEvents: excludeMode ? "none" : "auto" }}>
         <span style={{ width: 18, height: 18, borderRadius: 5, background: "#CCFF00", border: "2px solid #0A0F0D" }} />
       </div>
     </>
   );
+}
+
+function SelectionPoints({ points, frame, rect, zoom, pan }) {
+  const scale = Math.min(rect.w / frame.width, rect.h / frame.height), rw = frame.width * scale, rh = frame.height * scale;
+  return points.map((p, i) => <span key={i} aria-label="Excluded opponent point" style={{ position: "absolute",
+    left: ((rect.w - rw) / 2 + p.x * rw - rect.w / 2) * zoom + rect.w / 2 + pan.x - 6,
+    top: ((rect.h - rh) / 2 + p.y * rh - rect.h / 2) * zoom + rect.h / 2 + pan.y - 6,
+    width: 12, height: 12, borderRadius: "50%", background: "#ff6666", border: "2px solid white", pointerEvents: "none", zIndex: 12 }} />);
 }

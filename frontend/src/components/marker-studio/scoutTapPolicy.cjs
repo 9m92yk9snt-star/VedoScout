@@ -4,6 +4,7 @@ const MIN_TAPS = 3;
 const VERIFY_TAPS = 3;
 const VERIFY_SPACING = 0.5;
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
+const selection = require('./selectionHints.cjs');
 
 function validBox(box) {
   return !!box && ['x', 'y', 'w', 'h'].every(k => Number.isFinite(box[k])) &&
@@ -34,7 +35,8 @@ function markingProgress(queue, current, marks) {
     const after = pending.find(i => queue.indexOf(i) > queue.indexOf(current));
     return { next: after ?? pending[0], confirmed, verify: false };
   }
-  if (confirmed >= MIN_TAPS) return { next: null, confirmed, verify: true };
+  const full = queue.filter(i => validBox(marks[i]?.box) && marks[i]?.visibility !== 'partial').length;
+  if (full >= MIN_TAPS) return { next: null, confirmed, verify: true };
   return { next: queue.find(i => marks[i]?.skipped) ?? current, confirmed, verify: false, needsVisible: true };
 }
 
@@ -60,7 +62,7 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
     throw new Error('A player box is invalid. Please re-mark it.');
   }
   const entries = Object.entries(marks).filter(([, m]) => !m.skipped && validBox(m.box));
-  if (entries.length < MIN_TAPS || entries.length > TARGET_TAPS || verifyMarks.length !== VERIFY_TAPS) {
+  if (entries.filter(([, m]) => m.visibility !== 'partial').length < MIN_TAPS || entries.length > TARGET_TAPS || verifyMarks.length !== VERIFY_TAPS) {
     throw new Error('Complete at least 3 guided taps and 3 extra checks.');
   }
   const segment = time => cuts.filter(c => time >= c).length;
@@ -69,13 +71,15 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
     if (!frame?.jpegDataUrl || !Number.isFinite(frame.t) || frame.t < 0 || frame.t !== mark.t) {
       throw new Error('A tap no longer matches its displayed frame. Please re-mark it.');
     }
-    return { t: frame.t, box: { ...mark.box }, segment: segment(frame.t), frameIndex: Number(i) };
-  }).sort((a, b) => a.t - b.t);
+    return { t: frame.t, box: { ...mark.box }, ...selection.hints(mark),
+      ...(mark.continuity?.length ? { continuity: mark.continuity.map(c => ({ ...c, segment: segment(c.t) })) } : {}),
+      segment: segment(frame.t), frameIndex: Number(i) };
+  }).sort((a, b) => (a.visibility === 'partial') - (b.visibility === 'partial') || a.t - b.t);
   const checks = verifyMarks.map((m, i) => {
-    if (!validBox(m.box) || !m.jpegDataUrl || !distinctVerifyTime(m.t, verifyMarks.slice(0, i))) {
+    if (m.visibility === 'partial' || !validBox(m.box) || !m.jpegDataUrl || !distinctVerifyTime(m.t, verifyMarks.slice(0, i))) {
       throw new Error('Choose three different, clearly visible moments for the extra checks.');
     }
-    return { t: m.t, box: { ...m.box }, segment: segment(m.t), verify: true };
+    return { t: m.t, box: { ...m.box }, ...selection.hints(m), segment: segment(m.t), verify: true };
   });
   const markerImageDataUrl = frames[anchors[0].frameIndex].jpegDataUrl;
   return {

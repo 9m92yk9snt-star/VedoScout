@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import * as matchers from "@testing-library/jest-dom/matchers";
 expect.extend(matchers);
 import MarkerStudio from "./MarkerStudio";
+jest.mock("../lib/api", () => ({ post: jest.fn() }));
 
 const mockPayload = {
   anchors: [

@@ -104,7 +104,7 @@ def _crop(g, box_px):
     return g[y0:y1, x0:x1]
 
 
-def _color_hist(hsv, box_px_gray, scale: float):
+def _color_hist(hsv, box_px_gray, scale: float, mask=None):
     """H-S histogram of the jersey area (upper 60% of the box), on the
     half-res HSV frame. Returns None when the crop is too small to judge."""
     x0, y0, x1, y1 = [int(v * scale) for v in box_px_gray]
@@ -115,7 +115,13 @@ def _color_hist(hsv, box_px_gray, scale: float):
     if x1 - x0 < 4 or y1 - y0 < 4:
         return None
     roi = hsv[y0:y1, x0:x1]
-    hist = cv2.calcHist([roi], [0, 1], None, [30, 32], [0, 180, 0, 256])
+    owned = None
+    if mask is not None:
+        full_height = max(1, int((box_px_gray[3] - box_px_gray[1]) * scale))
+        owned = cv2.resize(mask, (roi.shape[1], full_height), interpolation=cv2.INTER_NEAREST)[:roi.shape[0]]
+        if int((owned > 0).sum()) < 10:
+            return None
+    hist = cv2.calcHist([roi], [0, 1], owned, [30, 32], [0, 180, 0, 256])
     cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
     return hist
 
@@ -160,7 +166,23 @@ _DOUBT_REASONS = {
 }
 
 
-def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy):
+def _masked_ncc(region, template, mask):
+    """Zero-mean NCC over selected pixels; background contributes no votes."""
+    weight = (mask > 0).astype(np.float32)
+    count = float(weight.sum())
+    if count < 20:
+        return np.full((region.shape[0] - template.shape[0] + 1, region.shape[1] - template.shape[1] + 1), -1, np.float32)
+    source, target = region.astype(np.float32), template.astype(np.float32)
+    centered = (target - float((target * weight).sum() / count)) * weight
+    energy = float((centered * centered).sum())
+    sums = cv2.matchTemplate(source, weight, cv2.TM_CCORR)
+    squares = cv2.matchTemplate(source * source, weight, cv2.TM_CCORR)
+    numerator = cv2.matchTemplate(source, centered, cv2.TM_CCORR)
+    denominator = np.sqrt(np.maximum(0, squares - sums * sums / count) * energy)
+    return np.clip(np.divide(numerator, denominator, out=np.full_like(numerator, -1), where=denominator > 1e-4), -1, 1)
+
+
+def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy, seed_mask=None):
     """Bounded multi-scale NCC search around (pcx, pcy)."""
     H, W = g.shape[:2]
     sx0, sy0 = max(0, int(pcx - bw / 2.0 - gx)), max(0, int(pcy - bh / 2.0 - gy))
@@ -174,7 +196,8 @@ def _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, gx, gy):
         if region.shape[0] <= th or region.shape[1] <= tw:
             continue
         tm = tmpl if (tw, th) == (tmpl.shape[1], tmpl.shape[0]) else cv2.resize(tmpl, (tw, th))
-        res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(region, tm, cv2.TM_CCOEFF_NORMED) if seed_mask is None else _masked_ncc(
+            region, tm, cv2.resize(seed_mask, (tw, th), interpolation=cv2.INTER_NEAREST))
         _mn, mx, _mnl, ml = cv2.minMaxLoc(res)
         cand = (mx, ml, tw, th, res, sx0, sy0)
         if s == 1.0:
@@ -260,17 +283,19 @@ def _provisional_from(v2, box2, pay2, prov_old, cam_acc, dtp, lcx, lcy, dt, t):
 
 
 def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: list | None = None,
-                   cuts: list | None = None):
+                   cuts: list | None = None, seed_mask=None):
     _t0, g0, hsv0, tiny0 = frames[i0]
     tmpl0 = _crop(g0, box_px)
     if tmpl0 is None:
         return
+    if seed_mask is not None:
+        seed_mask = cv2.resize(seed_mask, (tmpl0.shape[1], tmpl0.shape[0]), interpolation=cv2.INTER_NEAREST)
     tmpl = tmpl0
     bw0, bh0 = box_px[2] - box_px[0], box_px[3] - box_px[1]  # seed size = scale bounds
     bw, bh = float(bw0), float(bh0)
     H, W = g0.shape[:2]
     scale = hsv0.shape[1] / float(W)  # gray-px → colour-px
-    ref_hist = _color_hist(hsv0, box_px, scale)  # FIXED colour signature from the tap
+    ref_hist = _color_hist(hsv0, box_px, scale, seed_mask)  # FIXED selected-pixel signature
     steps = 0
     streak = 0        # unified budget: consecutive frames with NO accepted geometry
     tally: dict = {}  # rejection reasons inside the current streak (diagnostics)
@@ -326,7 +351,8 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
         # ── pass 1: narrow prediction-centred search (normal path) ──
         ex = min(abs(pdx) * 0.5 + abs(cam_acc[0]) * 0.25, bw * 0.6)
         ey = min(abs(pdy) * 0.5 + abs(cam_acc[1]) * 0.25, bh * 0.6)
-        best = _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, bw * 0.45 + ex, bh * 0.45 + ey)
+        kwargs = {"seed_mask": seed_mask} if seed_mask is not None else {}
+        best = _match_region(g, tmpl, bw, bh, bw0, bh0, pcx, pcy, bw * 0.45 + ex, bh * 0.45 + ey, **kwargs)
         # ── candidate evaluation with dual-hypothesis arbitration (C02):
         # prediction is geometry assistance — it must NEVER become identity
         # authority. An unsafe primary verdict (lost/colour/jump) allows ONE
@@ -352,7 +378,7 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             # bounded recovery — NOT a global search; all gates re-apply
             bcx, bcy = exp if exp is not None else (lcx + cam_acc[0], lcy + cam_acc[1])
             reach = 0.45 + tracking_geometry.BOOT_FRAC
-            best2 = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach)
+            best2 = _match_region(g, tmpl, bw, bh, bw0, bh0, bcx, bcy, bw * reach, bh * reach, **kwargs)
             if best2 is not None and best2[0] >= MATCH_MIN:
                 v2, box2, pay2 = _judge_candidate(
                     best2, ref_hist, hsv, scale, pcx, pcy, exp, dtp,
@@ -461,11 +487,11 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
             break
         if steps % 8 == 0:
             c0 = cv2.resize(cand, (tmpl0.shape[1], tmpl0.shape[0]))
-            drift = float(cv2.matchTemplate(c0, tmpl0, cv2.TM_CCOEFF_NORMED)[0][0])
+            drift = float((cv2.matchTemplate(c0, tmpl0, cv2.TM_CCOEFF_NORMED) if seed_mask is None else _masked_ncc(c0, tmpl0, seed_mask))[0][0])
             if drift < DRIFT_MIN:
                 _doubt(doubts, t, cur, W, H, "visual drift — tracker no longer certain")
                 break  # drifted away from the original tap content — stop honestly
-        if mx >= tracking_geometry.CONTAM_MIN:
+        if mx >= tracking_geometry.CONTAM_MIN and seed_mask is None:
             # template learning ONLY from solid accepted geometry — a weak
             # (possibly blended) match may be recorded but never learned
             tmpl = cand
@@ -475,9 +501,10 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
 def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float = SPAN) -> dict:
     """Track the tapped player around every tap. Returns
     {points: [{t,x,y,w,h,conf}...], segments: [[t0,t1]...], t_off, hz}."""
+    from player_selection import full_body_anchors, decode_mask
     seeds = [
-        (float(a["t"]) + float(t_off or 0.0), a["box"])
-        for a in (anchors or [])[:MAX_TRACKER_SEEDS]
+        (float(a["t"]) + float(t_off or 0.0), a["box"], decode_mask(a.get("visible_mask")))
+        for a in full_body_anchors((anchors or [])[:MAX_TRACKER_SEEDS])
         if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
     ]
     logger.info(f"[track] tracker_seed_count={len(seeds)} (anchors_received={len(anchors or [])})")
@@ -492,7 +519,7 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
     fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
     fps = fps if fps > 0 else None  # explicit last-resort fallback only
     try:
-        for t_seed, b in seeds:
+        for t_seed, b, mask in seeds:
             frames = _read_window(cap, t_seed - span, t_seed + span, step, fps)
             if len(frames) < 3:
                 continue
@@ -506,8 +533,9 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
             ]
             _record(points, frames[i0][0], box_px, W, H, 1.0)  # the tap itself
             cuts = _cut_flags(frames)
-            _run_direction(frames, i0, box_px, points, +1, doubts, cuts)
-            _run_direction(frames, i0, box_px, points, -1, doubts, cuts)
+            kwargs = {"seed_mask": mask} if mask is not None else {}
+            _run_direction(frames, i0, box_px, points, +1, doubts, cuts, **kwargs)
+            _run_direction(frames, i0, box_px, points, -1, doubts, cuts, **kwargs)
             del frames
     finally:
         cap.release()
@@ -520,7 +548,7 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
             segs.append([p["t"], p["t"]])
     segs = [[round(a, 2), round(b, 2)] for a, b in segs if b - a >= 0.3]
     # ── doubt moments: identity-risk stops NOT already covered by a user tap ──
-    seed_times = [t for t, _b in seeds]
+    seed_times = [t for t, _b, _mask in seeds]
     doubt_out: list = []
     for dmom in sorted(doubts, key=lambda d: d["t"]):
         if any(abs(dmom["t"] - st) <= 1.2 for st in seed_times):

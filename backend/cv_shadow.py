@@ -100,7 +100,7 @@ def _comp_mask_crop(small, box):
             (x0 + int(xs[0]), y0 + int(ys[0])))
 
 
-def _zone_embedding(small, box, pitch_l, occluders=None):
+def _zone_embedding(small, box, pitch_l, occluders=None, ownership_mask=None):
     """Multi-scale zone embedding over the ISOLATED person component only.
     Per zone: illumination-normalized Lab mean+std. Zones adapt to pixel size —
     a far player is never compared on details the camera cannot resolve.
@@ -113,6 +113,13 @@ def _zone_embedding(small, box, pitch_l, occluders=None):
     if h < 12 or w < 4:
         return None
     owned = None
+    if ownership_mask is not None:
+        # Same-frame human-confirmed mask takes precedence over a green-pitch
+        # component, which may merge two touching white kits in a duel.
+        mask = cv2.bitwise_and(mask, ownership_mask[gy:gy + h, gx:gx + w])
+        if int((mask > 0).sum()) < 30:
+            return None
+        owned = True
     if occluders:
         om = mask.copy()
         for oc in occluders:
@@ -285,6 +292,10 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
     refs, negatives = [], []
     for a in anchors:
         try:
+            from player_selection import decode_mask
+            human_mask = decode_mask(a.get("visible_mask"))
+            if a.get("visibility") == "partial":
+                continue  # torso/head zones cannot be inferred from a fragment
             t = float(a["t"]) + (t_off or 0.0)
             box = a["box"]
             # FIX 03 C02 — canonical random access: adaptive preroll + decode
@@ -305,6 +316,10 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
             roi_mask[ry0:ry1, rx0:rx1] = 255
             cand = _blobs(small, roi_mask, min_h=max(8, int(bh * 0.4)), max_h=int(bh * 1.6))
             cx0, cy0 = bx + bw / 2, by + bh / 2
+            excluded = a.get("exclude_points") or []
+            def human_excluded(c):
+                return any(c[0] <= p["x"] * sw <= c[0] + c[2] and c[1] <= p["y"] * sh <= c[1] + c[3]
+                           for p in excluded)
             # person detections inside the padded region (preferred refinement)
             det_in = []
             if detector is not None and detector.ok:
@@ -315,10 +330,16 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
                     if rx0 <= ccx <= rx1 and ry0 <= ccy <= ry1 and bh * 0.4 <= c[3] <= bh * 1.7:
                         det_in.append(c)
             if det_in:
-                rb = min(det_in, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0))
+                eligible = [c for c in det_in if not human_excluded(c)]
+                if not eligible and human_mask is None:
+                    continue
+                rb = min(eligible, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0)) if eligible else (bx, by, bw, bh)
                 refined_by = "detector"
             elif cand:
-                rb = min(cand, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0))
+                eligible = [c for c in cand if not human_excluded(c)]
+                if not eligible and human_mask is None:
+                    continue
+                rb = min(eligible, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0)) if eligible else (bx, by, bw, bh)
                 refined_by = "blob"
             else:
                 rb = (bx, by, bw, bh)  # fallback: trust the raw tap box
@@ -326,9 +347,17 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
             # visible-body awareness first: other people near the refined box —
             # they both drive the visibility score and are removed from the
             # embedding mask (Phase 4 feature ownership at tap references)
+            ownership = None
+            if human_mask is not None:
+                ownership = np.zeros((sh, sw), np.uint8)
+                mx1, my1 = min(sw, bx + bw), min(sh, by + bh)
+                ownership[by:my1, bx:mx1] = cv2.resize(human_mask, (mx1 - bx, my1 - by), interpolation=cv2.INTER_NEAREST)
+                rb = (bx, by, bw, bh)  # preserve exact mask-to-box registration
+                refined_by = "human_mask"
             others_near = [c for c in (det_in or cand) if c != rb]
             emb = _zone_embedding(small, rb, pl,
-                                  occluders=[c for c in others_near if _iou(c, rb) > 0.05])
+                                  occluders=[c for c in others_near if _iou(c, rb) > 0.05] if ownership is None else None,
+                                  ownership_mask=ownership)
             if not emb:
                 continue
             occ_frac = 0.0
@@ -336,7 +365,7 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
                 ix = max(0, min(rb[0] + rb[2], c[0] + c[2]) - max(rb[0], c[0]))
                 iy = max(0, min(rb[1] + rb[3], c[1] + c[3]) - max(rb[1], c[1]))
                 occ_frac = max(occ_frac, (ix * iy) / max(1.0, rb[2] * rb[3]))
-            visibility = round(1.0 - min(1.0, occ_frac), 3)
+            visibility = min(0.5 if a.get("visibility") == "partial" else 1.0, round(1.0 - min(1.0, occ_frac), 3))
             overlaps = sum(1 for c in others_near if _iou(c, rb) > 0.10)
             crop = small[rb[1]:rb[1] + rb[3], rb[0]:rb[0] + rb[2]]
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
@@ -351,10 +380,11 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
                          "box": rb, "refined": refined_by != "raw",
                          "refined_by": refined_by, "visibility": visibility,
                          "overlaps": overlaps, "merged": bool(emb.get("merged")),
-                         "chroma": cv_detect.torso_chroma(small, rb)})
+                         "chroma": cv_detect.torso_chroma(small, rb) if ownership is None else None,
+                         "human_mask": ownership is not None, "partial": a.get("visibility") == "partial"})
             # P10 negative gallery: OTHER people at the tap moment (same scene)
             for c in others_near:
-                if _iou(c, rb) > 0.3:
+                if _iou(c, rb) > 0.3 and not human_excluded(c):
                     continue
                 oe = _zone_embedding(small, c, pl)
                 if oe:
@@ -447,7 +477,8 @@ def run_shadow(report_id: str, video_path: str, doc: dict) -> Optional[dict]:
     t_start = time.time()
     cap = None
     try:
-        anchors = [a for a in (doc.get("anchors") or []) if isinstance(a, dict) and a.get("box")]
+        from player_selection import expanded_anchors
+        anchors = [a for a in expanded_anchors(doc.get("anchors")) if isinstance(a, dict) and a.get("box")]
         track_pts = [p for p in ((doc.get("player_track") or {}).get("points") or [])
                      if isinstance(p, dict) and isinstance(p.get("t"), (int, float))]
         if not anchors:
