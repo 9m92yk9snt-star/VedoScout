@@ -83,6 +83,7 @@ const server = http.createServer((request, response) => {
   // The production bundle must execute all three shared tap modules, not
   // import asset URLs. No tracking/recognition accuracy is asserted here.
   await page.getByTestId('upload-file-input').setInputFiles(clip);
+  await page.getByTestId('upload-mark-start').evaluate(element => element.scrollIntoView({block:'center', behavior:'instant'}));
   await page.getByTestId('upload-mark-start').click();
   await page.waitForFunction(() => {
     const stage = document.querySelector('[data-testid="scout-stage"]');
@@ -109,13 +110,15 @@ const server = http.createServer((request, response) => {
   await page.evaluate(() => {window.__waitTestOffset += 10*60*1000;sessionStorage.setItem('wait-test-offset',String(window.__waitTestOffset));});
   await page.waitForTimeout(1200);
   assert.equal(await page.getByTestId('analysis-waiting').getAttribute('data-phase'),'preparing');
-  assert.equal(await page.getByRole('progressbar').count(),0);
+  assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'),null);
+  assert((await page.getByTestId('analysis-finish-estimate').innerText()).includes('Estimate not available yet'));
   assert(!/sec left|90 sec|Identity locked/i.test(await page.getByTestId('analysis-waiting').innerText()));
   const beat = async () => {doc.last_progress_at = new Date(await page.evaluate(() => Date.now())).toISOString();};
   doc.analysis_status='ready';doc.progress_step=5;doc.preview={brief_summary:'Initial review'};await beat();
   await waitPhase('queued');
   assert.equal(requests.filter(r=>r.path.endsWith('/generate-full')).length,0,'new upload must not bypass server identity-profile preparation');
   doc.full_report_status='generating';doc.full_pipeline_stage='physical_reconstruction_start';await beat();
+  const estimateNow=await page.evaluate(()=>Date.now());doc.completion_estimate={status:'estimated',sample_count:12,calculated_at:new Date(estimateNow).toISOString(),earliest_at:new Date(estimateNow+4*60000).toISOString(),latest_at:new Date(estimateNow+7*60000).toISOString()};
   await waitPhase('analyzing');
   assert.equal(agentReviews,0,'waiting page must not invent a human-review stream');
   await page.getByRole('button',{name:'Next football tip'}).click();
@@ -140,15 +143,21 @@ const server = http.createServer((request, response) => {
   await page.getByTestId('analysis-server-status').filter({hasText:'Connection interrupted'}).waitFor({timeout:14000});
   assert.equal(await page.getByTestId('analysis-waiting').getAttribute('data-phase'),'analyzing');
   offline=false;await beat();
-  await page.getByRole('button',{name:'Back to dashboard'}).click(); await page.waitForURL('**/dashboard');
-  await page.getByTestId('bg-analysis-tracker').waitFor({timeout:14000});
-  assert(!(await page.getByTestId('bg-analysis-tracker').innerText()).includes('ready'));
-  await page.getByRole('button',{name:'Follow your analysis'}).click(); await page.waitForURL('**/report/selected');await waitPhase('analyzing');
+  await page.getByRole('button',{name:'Continue in background'}).click(); await page.waitForURL('**/dashboard');
+  await page.getByTestId('profile-analysis-selected').waitFor({timeout:14000});
+  assert.equal(await page.getByTestId('bg-analysis-tracker').count(),0);
+  assert(!(await page.getByTestId('profile-analysis-selected').innerText()).includes('Report ready'));
+  if(process.env.SCOUT_PROFILE_SCREENSHOT_PATH) await page.screenshot({path:process.env.SCOUT_PROFILE_SCREENSHOT_PATH,fullPage:false});
+  await page.getByRole('link',{name:'View analysis status'}).click(); await page.waitForURL('**/report/selected');await waitPhase('analyzing');
   doc.full_report_status='verifying';await beat();await waitPhase('verifying');
   doc.full_report={scores:{technical:5,tactical:5,physical:5,mentality:5},scout_view:{},action_timeline:[],video_comments:[]};
   doc.has_full_report=true;doc.full_report_status='finalizing';await beat();await waitPhase('finalizing');
   assert.equal(await page.getByTestId('premium-report-v2').count(),0,'partial report body stays withheld');
+  await page.getByRole('button',{name:'Continue in background'}).click();await page.waitForURL('**/dashboard');
+  await page.getByTestId('profile-analysis-selected').waitFor({timeout:14000});
   doc.full_report_status='ready';await beat();
+  await page.getByRole('link',{name:'Open report',exact:true}).waitFor({timeout:15000});
+  await page.getByRole('link',{name:'Open report',exact:true}).click();await page.waitForURL('**/report/selected');
   try {
     await page.getByTestId('premium-report-v2').waitFor({timeout:15000});
   } catch(error) {

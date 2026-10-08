@@ -76,7 +76,7 @@ export function getAnalysisView(data = {}, { phase, uploadPct, target } = {}) {
   const duringUpload = ["uploading", "saving"].includes(phase);
   const prepared = !duringUpload && (previewReady || ["generating", ...Object.keys(FULL_PHASES), "ready"].includes(st) || (previewStatus === "analyzing" && step >= 3));
   const analyzed = full ? ["verifying", "finalizing"].includes(st) || fullReady : previewReady;
-  const labels = full ? ["Prepare video", "Analyze play", "Check & save report"] : ["Prepare video", "Create preview"];
+  const labels = full ? ["Video received", "Reviewing play", "Final checks"] : ["Prepare video", "Create preview"];
   const states = full
     ? [prepared ? "done" : "active", analyzed ? "done" : prepared ? "active" : "pending", fullReady ? "done" : analyzed ? "active" : "pending"]
     : [prepared ? "done" : "active", previewReady ? "done" : prepared ? "active" : "pending"];
@@ -108,4 +108,20 @@ export function activityLabel(at, now = Date.now()) {
 export function assetUrl(src, base = "") {
   if (!src) return null;
   return /^(https?:|blob:|data:)/i.test(src) ? src : `${base}${src}`;
+}
+
+/** Deadline ranges are server-calibrated; the client clock only counts down. */
+export function completionLabel(data, now = Date.now()) {
+  const estimate = data?.completion_estimate;
+  const updated = Date.parse(estimate?.calculated_at);
+  const heartbeat = Date.parse(data?.last_progress_at);
+  if (Number.isFinite(heartbeat) && (heartbeat > now + 60000 || now - heartbeat > 120000)) return "Waiting for a status update";
+  if (!["estimated", "overdue"].includes(estimate?.status) || !Number.isFinite(updated)
+      || updated > now + 60000 || now - updated > 120000) return "Estimate not available yet";
+  const latest = Date.parse(estimate.latest_at), earliest = Date.parse(estimate.earliest_at);
+  if (!Number.isFinite(latest) || !Number.isFinite(earliest) || earliest > latest) return "Estimate not available yet";
+  if (estimate.status === "overdue" || latest <= now) return "Taking longer than estimated";
+  const low = Math.max(0, Math.ceil((earliest - now) / 60000));
+  const high = Math.ceil((latest - now) / 60000);
+  return low === 0 ? `Under ${high} min` : low === high ? `About ${high} min` : `About ${low}–${high} min`;
 }

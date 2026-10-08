@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import Navigation from "@/components/Navigation";
 import { MiniPitch } from "@/components/FootballAccents";
 import ReviewPrompt from "@/components/ReviewPrompt";
+import ProfileAnalysisStatus from "@/components/ProfileAnalysisStatus";
 import ProfileVisibilityCard from "@/components/profile/ProfileVisibilityCard";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
 import ReferralInviteCard from "@/components/ReferralInviteCard";
@@ -158,6 +159,7 @@ export default function DashboardPage() {
       <div className="pt-20 pb-16 px-6">
         <div className="max-w-7xl mx-auto">
           <DashboardHero user={user} tier={heroTier} />
+          {!loading && <ProfileAnalysisStatus reports={reports} followId={location.state?.followAnalysisId} />}
 
           {loading ? (
             <div className="text-center py-16">

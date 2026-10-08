@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, Clock, Film, Lightbulb, Pause, Play, RefreshCw } from "lucide-react";
-import { activityLabel, assetUrl, elapsedLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
+import { activityLabel, assetUrl, completionLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
 import "./AnalysisWaiting.css";
 
 const TIPS = [
@@ -72,12 +72,13 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
   const view = getAnalysisView(status, { phase, uploadPct });
   const pd = status.player_details || {};
   const player = pd.player_name || "Your player";
-  const elapsed = elapsedLabel(status.analysis_started_at || status.created_at || startedAt, now);
+  const finishEstimate = connectionError ? "Reconnecting to update estimate" : view.confirmation ? "Waiting for your player check" : completionLabel(status, now);
   const heartbeat = activityLabel(status.last_progress_at, now);
   const activityAt = Date.parse(status.last_progress_at);
   const activityFresh = Number.isFinite(activityAt) && activityAt <= now + 60_000 && now - activityAt <= 120_000;
   const image = assetUrl(status.poster_url || status.marker_url || status.display_crop_url || status.subject_crop_url, assetBase);
   const video = assetUrl(status.video_url, assetBase);
+  const portrait = assetUrl(status.display_crop_url || status.subject_crop_url || status.player_photo_url, assetBase);
   const taps = Number(status.taps_received ?? status.anchors?.length) || 0;
   const blocked = view.failed || !!error;
   const issue = error?.message || error || view.detail;
@@ -100,6 +101,7 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
               <>
                 {image ? <img src={image} alt="Frame from your uploaded video" onError={event => { event.currentTarget.style.display = "none"; }} /> : <div className="analysis-video-placeholder"><Film size={36} /><span>Your video</span></div>}
                 <div className="analysis-video-shade" />
+                {portrait && <img className="analysis-player-portrait" src={portrait} alt={`${player} player crop`} onError={event => { event.currentTarget.style.display = "none"; }} />}
                 <div className="analysis-video-info">
                   <span className="analysis-video-tag">YOUR UPLOADED VIDEO</span>
                   <strong>{player}</strong>
@@ -113,8 +115,9 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
           <div className="analysis-status-body">
             <div className="analysis-status-meta">
               <span className={`analysis-state-chip${blocked ? " analysis-state-chip-warning" : ""}`}><span aria-hidden="true" />{blocked ? "Attention needed" : view.complete ? "Complete" : view.confirmation ? "Player check" : "In progress"}</span>
-              {elapsed && <span className="analysis-elapsed"><Clock size={14} /> Elapsed {elapsed}</span>}
+
             </div>
+            {!uploading && !view.complete && !blocked && <div className="analysis-finish-estimate" data-testid="analysis-finish-estimate"><span><Clock size={15} /> Estimated time remaining</span><strong>{finishEstimate}</strong><small>Estimate for the complete report · updates as the review progresses</small></div>}
             <div role="status" aria-live="polite" aria-atomic="true" className="analysis-phase-description">
               <h2>{title}</h2>
               <p>{blocked ? issue : view.detail}</p>
@@ -125,7 +128,7 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
                 <div className="analysis-upload-progress" role="progressbar" aria-label="Video upload" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(view.uploadPercent)}>
                   <span style={{ width: `${view.uploadPercent}%` }} /><strong>{Math.round(view.uploadPercent)}% uploaded</strong>
                 </div>
-              ) : <div className="analysis-activity-bar" aria-hidden="true"><span /></div>
+              ) : <div className={`analysis-loading${view.confirmation ? " analysis-loading-paused" : ""}`} role="progressbar" aria-label="Analysis in progress" aria-valuetext={view.title}><div className="analysis-activity-bar"><span /></div><span className="analysis-loading-label">{view.confirmation ? "Player confirmation needed" : "Analysis in progress"}</span></div>
             )}
 
             <ol className="analysis-step-list" aria-label="Analysis stages">
@@ -143,8 +146,9 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
                 <span>{connectionError || heartbeat}</span>
               </div>
             )}
+            {!uploading && !view.complete && !blocked && onContinue && <div className="analysis-background-option"><button type="button" className="analysis-main-button" onClick={onContinue}>Continue in background <ArrowRight size={17} /></button><p>You can leave this page. Your analysis will continue. Follow its status from your profile.</p></div>}
             {status.retry_in_progress && !blocked && <p className="analysis-retry-note">The server is repeating the review. Your report is still in progress.</p>}
-            {!blocked && !view.complete && <p className="analysis-timing-note">Time varies with your video and the checks required. The report opens after the final checks.</p>}
+            {!blocked && !view.complete && <p className="analysis-timing-note">The finish estimate is based on comparable completed analyses when enough data is available. Final checks must finish before your report opens.</p>}
             {blocked && <div className="analysis-error-actions">
               {onCheckStatus && <button type="button" className="analysis-main-button" onClick={onCheckStatus}><RefreshCw size={16} /> Check status again</button>}
               {retryAvailable && <button type="button" className="analysis-secondary-button" onClick={onRetry}>Retry analysis</button>}
@@ -156,10 +160,7 @@ export default function AnalysisWaiting({ status = {}, phase, uploadPct, started
         {!view.complete && <FootballTips />}
       </div>
 
-      {!uploading && onContinue && <div className="analysis-background-option">
-        <div><strong>You don’t need to stay on this page.</strong><p>Follow this report again from your dashboard.</p></div>
-        <button type="button" onClick={onContinue}>Back to dashboard <ArrowRight size={16} /></button>
-      </div>}
+
     </div>
   );
 }

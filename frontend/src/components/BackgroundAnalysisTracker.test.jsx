@@ -7,7 +7,7 @@ import BackgroundAnalysisTracker from "./BackgroundAnalysisTracker";
 expect.extend(matchers);
 jest.mock("../lib/api", () => ({ __esModule: true, default: { get: jest.fn() } }));
 jest.mock("sonner", () => ({ toast: { success: jest.fn(), error: jest.fn() } }));
-let mockRoute = "/dashboard";
+let mockRoute = "/reports";
 const mockNavigate = jest.fn();
 // CRA's Jest predates Router 7's exports map. Only navigation hooks are
 // needed in this unit; the browser regression exercises the actual router.
@@ -19,7 +19,7 @@ beforeEach(() => {
   localStorage.setItem(KEY, JSON.stringify({ id: "selected", startedAt: Date.now() - 45 * 60_000, playerName: "Orman02" }));
 });
 afterEach(() => { cleanup(); localStorage.clear(); jest.useRealTimers(); });
-const mount = (route = "/dashboard") => { mockRoute = route; return render(<BackgroundAnalysisTracker />); };
+const mount = (route = "/reports") => { mockRoute = route; return render(<BackgroundAnalysisTracker />); };
 const flush = async () => { await act(async () => {}); };
 
 test("paid preview and finalization remain active; only saved ready full report notifies", async () => {
@@ -78,4 +78,10 @@ test("expired session stops polling with an accurate sign-in message", async () 
   mount(); await flush();
   expect(toast.error).toHaveBeenCalledWith("Sign in again to check your analysis.");
   expect(localStorage.getItem(KEY)).toBeNull();
+});
+
+test("profile dashboard owns status polling and suppresses the floating duplicate", async () => {
+  mount("/dashboard"); await flush();
+  expect(api.get).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("bg-analysis-tracker")).not.toBeInTheDocument();
 });

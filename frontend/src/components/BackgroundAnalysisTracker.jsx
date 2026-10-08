@@ -80,7 +80,7 @@ export default function BackgroundAnalysisTracker() {
   /* Poll loop */
   useEffect(() => {
     if (!active) return undefined;
-    if (location.pathname === `/report/${active.id}`) return undefined;
+    if (location.pathname === `/report/${active.id}` || location.pathname === "/dashboard") return undefined;
     let cancelled = false;
     let finished = false;
 
@@ -137,7 +137,7 @@ export default function BackgroundAnalysisTracker() {
      already shows progress there. Re-appears once they navigate away. */
   const onUploadPage = location.pathname === "/upload";
 
-  if (!active || dismissed || onUploadPage || location.pathname === `/report/${active.id}` || !status || getAnalysisView(status).complete || getAnalysisView(status).failed) {
+  if (!active || dismissed || onUploadPage || location.pathname === "/dashboard" || location.pathname === `/report/${active.id}` || !status || getAnalysisView(status).complete || getAnalysisView(status).failed) {
     return null;
   }
 

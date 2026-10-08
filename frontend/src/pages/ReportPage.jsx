@@ -18,7 +18,7 @@ import api, { ASSET_BASE } from "@/lib/api";
 import { trackFunnel } from "@/lib/analytics";
 import { useAuth } from "@/lib/auth-context";
 import {
-  Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles, IdCard,
+  CheckCircle2, Lock, Unlock, Download, Loader2, ChevronLeft, ShieldCheck, Star, AlertTriangle, Eye, Info, Check, Share2, Link2, Mail, Zap, Target, Crown, Sparkles, IdCard,
 } from "lucide-react";
 import ScoutReview from "@/components/ScoutReview";
 import CheckoutTransitionModal from "@/components/CheckoutTransitionModal";
@@ -2067,6 +2067,7 @@ export default function ReportPage() {
       <div className="min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
         <div className="pt-24 md:pt-28 px-4 md:px-8">
+          <div className="analysis-ready-note" role="status"><CheckCircle2 size={18} /> Your report is ready · Review complete</div>
           <div className="max-w-[1440px] mx-auto mb-4 flex flex-wrap items-center gap-3">
             <button
               onClick={() => navigate("/dashboard")}
