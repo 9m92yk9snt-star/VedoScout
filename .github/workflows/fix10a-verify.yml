@@ -207,6 +207,23 @@ jobs:
           test "${#FIX_FILES[@]}" -gt 0
           pytest --asyncio-mode=auto -q "${FIX_FILES[@]}" tests/test_unified_analysis_engine.py
 
+  player_selection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated selection test dependencies
+        run: python -m pip install pytest==9.0.3 pytest-asyncio==1.4.0 numpy==2.4.6 opencv-python-headless==4.13.0.92 pillow==12.2.0 python-dotenv==1.2.2 fastapi==0.110.1 httpx==0.28.1 python-multipart==0.0.30
+      - name: Verify duel hints, pixel ownership, routes and identity safety
+        env:
+          PYTHONPATH: backend:backend/tests
+        run: python -m pytest -q backend/tests/test_player_selection.py backend/tests/test_masked_pose_tracking.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py
+
   frontend_build:
     runs-on: ubuntu-latest
     steps:
@@ -224,6 +241,12 @@ jobs:
           node frontend/scripts/audit-analysis-poll.cjs
           node frontend/scripts/check-report-coverage.cjs
           node frontend/scripts/check-video-frame-authority.cjs
+          node frontend/scripts/check-scout-tap-policy.cjs
+      - name: Verify guided-only player selection and frame ownership
+        working-directory: frontend
+        env:
+          CI: 'true'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:

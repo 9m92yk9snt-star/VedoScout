@@ -10,7 +10,7 @@
  * for each, and compare consecutive histograms with chi-squared distance. A
  * value > THRESHOLD = scene cut.
  *
- * Cheap (~2-4 s on a 5-min 1080p clip). No model downloads. No external
+ * Bounded local sampling. No model downloads. No external
  * dependencies — uses native canvas + getImageData.
  *
  * Public API:
@@ -18,7 +18,9 @@
  *   distributeHints(duration, cuts, count = 10) → number[]
  */
 
-const DEFAULT_SAMPLES = 28;
+import videoFrameAuthority from "./videoFrameAuthority.cjs";
+
+const DEFAULT_SAMPLES = 12;
 const HIST_BINS = 8; // 8×8 = 64 bins per RGB channel collapsed
 const CHI_SQUARED_THRESHOLD = 0.42; // tuned for typical highlight reels
 
@@ -50,23 +52,15 @@ function chiSquared(a, b) {
     const den = (a[i] + b[i]) || 1e-6;
     s += num / den;
   }
-  return s / a.length;
+  // Three independent normalised channels each have a maximum distance of 2.
+  // Dividing by 24 bins made the maximum 0.25: the 0.42 cut threshold was
+  // unreachable even when two frames had entirely different colours.
+  return s / 6;
 }
 
-/** Seek and wait for `seeked`. */
-function seek(v, t) {
-  return new Promise((res) => {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      v.removeEventListener("seeked", finish);
-      res();
-    };
-    v.addEventListener("seeked", finish);
-    try { v.currentTime = t; } catch { finish(); }
-    setTimeout(finish, 700);
-  });
+/** Seek to a positively acknowledged presented frame. */
+function seek(v, t, signal) {
+  return videoFrameAuthority.seekPresentedFrame(v, t, { signal });
 }
 
 /**
@@ -79,7 +73,7 @@ function seek(v, t) {
  */
 export async function detectSceneCuts(videoEl, opts = {}) {
   const v = videoEl;
-  if (!v || v.readyState < 2 || !v.duration) return { cuts: [], samples: [] };
+  if (!v || v.readyState < 1 || !Number.isFinite(v.duration) || v.duration <= 0) return { cuts: [], samples: [] };
   const samples = opts.samples ?? DEFAULT_SAMPLES;
   const threshold = opts.threshold ?? CHI_SQUARED_THRESHOLD;
   const onProgress = opts.onProgress;
@@ -88,30 +82,40 @@ export async function detectSceneCuts(videoEl, opts = {}) {
   const N = Math.max(6, Math.min(60, samples));
   const dur = v.duration;
   const ts = [];
-  for (let i = 0; i < N; i++) ts.push((dur * i) / (N - 1));
+  for (let i = 0; i < N; i++) ts.push(Math.min(dur - 0.04, (dur * i) / (N - 1)));
 
   const w = 160, h = 90; // tiny downsample for speed
   const canvas = document.createElement("canvas");
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return { cuts: [], samples: [] };
 
   let prevHist = null;
+  let prevTime = null;
+  const sampled = [];
   const cuts = [];
   const wasPlaying = !v.paused;
   v.pause();
   for (let i = 0; i < ts.length; i++) {
     if (signal?.aborted) break;
-    try { await seek(v, ts[i]); } catch { continue; }
+    let frame;
+    try { frame = await seek(v, ts[i], signal); } catch {
+      prevHist = null;
+      onProgress?.((i + 1) / ts.length);
+      continue;
+    }
     try {
       ctx.drawImage(v, 0, 0, w, h);
     } catch { continue; }
-    const h1 = frameHistogram(ctx, w, h);
+    let h1;
+    try { h1 = frameHistogram(ctx, w, h); } catch { prevHist = null; continue; }
+    sampled.push(frame.mediaTime);
     if (prevHist) {
       const d = chiSquared(prevHist, h1);
       if (d > threshold && ts[i] > 1.0) {
         // Place the cut at the midpoint between the prev and current sample,
         // since the real cut is between them.
-        const midpoint = (ts[i - 1] + ts[i]) / 2;
+        const midpoint = (prevTime + frame.mediaTime) / 2;
         // Avoid clustering — at least 3 s apart
         if (!cuts.length || midpoint - cuts[cuts.length - 1] > 3.0) {
           cuts.push(Math.round(midpoint * 100) / 100);
@@ -119,10 +123,11 @@ export async function detectSceneCuts(videoEl, opts = {}) {
       }
     }
     prevHist = h1;
+    prevTime = frame.mediaTime;
     onProgress?.((i + 1) / ts.length);
   }
-  if (wasPlaying) v.play().catch(() => {});
-  return { cuts, samples: ts };
+  if (wasPlaying && !signal?.aborted) v.play().catch(() => {});
+  return { cuts, samples: sampled };
 }
 
 /**
@@ -134,30 +139,28 @@ export async function detectSceneCuts(videoEl, opts = {}) {
  * Always avoids the first/last 5 % of any segment (more likely to be transitions).
  */
 export function distributeHints(duration, cuts, count = 10) {
-  if (!duration || duration <= 0 || !count) return [];
-  const safeCuts = (cuts || []).filter((c) => c > 1 && c < duration - 1).sort((a, b) => a - b);
+  if (!Number.isFinite(duration) || duration <= 0 || !Number.isInteger(count) || count <= 0) return [];
+  const safeCuts = [...new Set((cuts || []).filter((c) => Number.isFinite(c) && c > 1 && c < duration - 1))].sort((a, b) => a - b);
   const boundaries = [0, ...safeCuts, duration];
   const segs = [];
   for (let i = 0; i < boundaries.length - 1; i++) {
     segs.push([boundaries[i], boundaries[i + 1]]);
   }
-  // Allocate hints proportional to segment duration, with a min-1 floor per segment
-  const totalDur = duration;
-  const allocs = segs.map(([a, b]) => Math.max(1, Math.round(((b - a) / totalDur) * count)));
-  // Adjust to exactly `count`
-  let sumAlloc = allocs.reduce((s, n) => s + n, 0);
-  while (sumAlloc > count) {
-    // remove from the largest segment first
-    let idx = 0;
-    for (let i = 1; i < allocs.length; i++) if (allocs[i] > allocs[idx]) idx = i;
-    if (allocs[idx] > 1) { allocs[idx] -= 1; sumAlloc -= 1; }
-    else break;
+  // More scenes than slots must still sample the WHOLE clip, not the first ten.
+  if (segs.length > count) {
+    if (count === 1) return [duration / 2];
+    return Array.from({ length: count }, (_, i) => {
+      const [a, b] = segs[Math.round(i * (segs.length - 1) / (count - 1))];
+      return Number(((a + b) / 2).toFixed(2));
+    });
   }
-  while (sumAlloc < count) {
-    let idx = 0;
-    for (let i = 1; i < allocs.length; i++) if ((segs[i][1] - segs[i][0]) > (segs[idx][1] - segs[idx][0])) idx = i;
-    allocs[idx] += 1; sumAlloc += 1;
-  }
+  // One slot per scene, then largest-remainder allocation by scene duration.
+  const remaining = count - segs.length;
+  const shares = segs.map(([a, b]) => (b - a) / duration * remaining);
+  const allocs = shares.map(s => 1 + Math.floor(s));
+  const order = shares.map((s, i) => ({ i, remainder: s - Math.floor(s) })).sort((a, b) => b.remainder - a.remainder);
+  const spare = count - allocs.reduce((sum, n) => sum + n, 0);
+  for (let i = 0; i < spare; i++) allocs[order[i].i] += 1;
   // Distribute timestamps within each segment with 5 % inset on each side
   const out = [];
   segs.forEach(([a, b], i) => {

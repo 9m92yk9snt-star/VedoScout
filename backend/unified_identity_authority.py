@@ -106,9 +106,10 @@ def _scene_for_ms(scenes, ms):
 
 
 def _tap_times(anchors, anchor_time_offset) -> list[int]:
+    from player_selection import full_body_anchors
     out = []
     off = float(anchor_time_offset or 0.0)
-    for a in anchors or []:
+    for a in full_body_anchors(anchors):
         if isinstance(a, dict) and _is_num(a.get("t")):
             out.append(int(round((float(a["t"]) + off) * 1000.0)))
     return sorted(set(out))
@@ -118,13 +119,15 @@ def _tap_rows(anchors, anchor_time_offset, scenes) -> list[dict]:
     """Preserve the box the user actually selected at the selected media time."""
     out = []
     off = float(anchor_time_offset or 0.0)
-    for anchor in anchors or []:
+    from player_selection import expanded_anchors
+    for anchor in expanded_anchors(anchors):
         if (not isinstance(anchor, dict) or not _is_num(anchor.get("t"))
                 or not _valid_box(anchor.get("box"))):
             continue
         ms = int(round((float(anchor["t"]) + off) * 1000.0))
         out.append({"media_ms": ms, "scene_id": _scene_for_ms(scenes, ms),
-                    "box": _box(anchor["box"])})
+                    "box": _box(anchor["box"]), "partial": anchor.get("visibility") == "partial",
+                    "exclude_points": anchor.get("exclude_points") or []})
     return out
 
 
@@ -138,7 +141,7 @@ def _near_matching_tap(ms, box, tap_rows, taps, scene_id=None) -> bool:
     if any(abs(ms - t) <= TAP_AUTHORITY_MS
            and not any(row["media_ms"] == t for row in tap_rows) for t in taps):
         return True
-    return any(abs(ms - row["media_ms"]) <= TAP_AUTHORITY_MS
+    return any(not row.get("partial") and abs(ms - row["media_ms"]) <= TAP_AUTHORITY_MS
                and (scene_id is None or row["scene_id"] is None
                     or row["scene_id"] == scene_id)
                and boxes_agree(box, row["box"]) for row in tap_rows)
@@ -490,7 +493,7 @@ def _unresolved(ms, scene_id, hypotheses, reason="SOURCE_CONFLICT"):
 
 def _dedupe_points(points):
     """Keep the strongest canonical row when two rows land on the same media ms."""
-    rank = {"USER_TAP": 7, "PINNED": 6, "FUSED": 5, "GLOBAL": 4, "LOCAL": 3,
+    rank = {"USER_TAP": 7, "PARTIAL": 6, "PINNED": 6, "FUSED": 5, "GLOBAL": 4, "LOCAL": 3,
             "PREDICTED": 2, "UNRESOLVED": 1}
     by_ms = {}
     for p in points:
@@ -540,6 +543,22 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     arows = _timeline_rows(tl)
     frows = _fix04_rows(fix04_track, scenes)
     points = []
+
+    def excluded(row):
+        # Human negatives are a same-moment constraint, never a stationary
+        # opponent position throughout the scene or the full ±4s tracking span.
+        box = row["box"]
+        return any(abs(row["media_ms"] - tap["media_ms"]) <= FUSE_TOL_MS
+                   and (row.get("scene_id") is None or tap.get("scene_id") is None or row["scene_id"] == tap["scene_id"])
+                   and any(box["x"] <= p["x"] <= box["x"] + box["w"] and box["y"] <= p["y"] <= box["y"] + box["h"] for p in tap["exclude_points"])
+                   for tap in tap_rows)
+
+    for source, rows in (("FIX04", frows), ("FIX09A", arows)):
+        for row in rows:
+            if excluded(row):
+                points.append(_unresolved(row["media_ms"], row.get("scene_id"), [_hyp(source, row)], reason="USER_EXCLUDED_OPPONENT"))
+    frows = [row for row in frows if not excluded(row)]
+    arows = [row for row in arows if not excluded(row)]
 
     # FIX09A rows carry the whole-video scene-aware identity spine.
     for a in arows:
@@ -614,12 +633,22 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     # row can belong to a different player. The selected box is authoritative
     # at the tap itself; it never makes adjacent frames proof-eligible.
     for tap in tap_rows:
-        points.append(_canonical(
+        selected = _canonical(
             "USER_TAP", tap, strength="USER_TAP", sources=["USER_TAP"],
-            tap_authority=True, proof_eligible=True,
-            hypotheses=[_hyp("USER_TAP", tap)], reason="USER_SELECTED_BOX"))
+            tap_authority=not tap.get("partial"), proof_eligible=not tap.get("partial"),
+            hypotheses=[_hyp("USER_TAP", tap)], reason="USER_PARTIAL_VISIBLE_BODY" if tap.get("partial") else "USER_SELECTED_BOX")
+        if tap.get("partial"):
+            selected["state"] = "PARTIAL"
+            selected["identity_strength"] = "PARTIAL"
+        points.append(selected)
 
     points = _dedupe_points(points)
+    for point in points:
+        if point.get("box") and any(tap.get("partial") and abs(point["media_ms"] - tap["media_ms"]) <= FUSE_TOL_MS
+                                    and boxes_agree(point["box"], tap["box"]) for tap in tap_rows):
+            point["proof_eligible"] = False
+            point["tap_authority"] = False
+            point["reason"] = "USER_PARTIAL_VISIBLE_BODY"
     accepted = [p for p in points if p.get("box") is not None and p.get("state") != "UNRESOLVED"]
     proof = [p for p in accepted if p.get("proof_eligible")]
     predicted = [p for p in accepted if p.get("predicted")]

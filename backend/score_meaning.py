@@ -66,7 +66,8 @@ def _fmt(text, name, age):
 def _verified_seconds(doc: dict) -> list:
     """Seconds where the tapped player's identity is 100% certain."""
     out = []
-    for a in doc.get("anchors") or []:
+    from player_selection import full_body_anchors
+    for a in full_body_anchors(doc.get("anchors")):
         t = a.get("t") if isinstance(a, dict) else None
         if isinstance(t, (int, float)):
             out.append(("anchor", float(t)))

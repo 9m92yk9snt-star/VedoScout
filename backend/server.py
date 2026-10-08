@@ -1856,8 +1856,9 @@ def ensure_video_frames(report_doc: dict, video_path_override=None) -> list:
     # Ground-truth anchors: the user's own taps (exact time + box) — the ONLY
     # 100% reliable identity source. Evidence frames snap to a tap moment when
     # one is within ANCHOR_SNAP_WINDOW seconds of the cited timestamp.
+    from player_selection import full_body_anchors
     anchors = [
-        a for a in (report_doc.get("anchors") or [])
+        a for a in full_body_anchors(report_doc.get("anchors"))
         if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
     ]
 
@@ -5977,6 +5978,71 @@ def _analysis_frames_dir(report_id):
     return path / lease.run_id if lease else path
 
 
+_selection_slots = asyncio.Semaphore(2)
+
+
+@api_router.post("/player-selection/tracking-preview")
+async def preview_player_selection_tracking(frames: list[UploadFile] = File(...), hints: str = Form(...),
+                                             user=Depends(get_current_user)):
+    from player_selection import tracking_preview, selection_metadata
+    if len(frames) > 5 or len(frames) < 3 or len(hints) > 100000:
+        raise HTTPException(400, "Invalid short tracking check")
+    images = []
+    for frame in frames:
+        data = await frame.read(2 * 1024 * 1024 + 1)
+        if len(data) > 2 * 1024 * 1024:
+            raise HTTPException(413, "Frame too large")
+        images.append(data)
+    try:
+        values = json.loads(hints)
+        anchor = values["anchor"]
+        times = values["times"]
+        if not isinstance(anchor, dict) or not isinstance(times, list):
+            raise ValueError("Invalid hints")
+        anchor = {"box": anchor.get("box"), **selection_metadata(anchor)}
+    except (ValueError, TypeError, KeyError):
+        raise HTTPException(400, "Invalid tracking hints")
+    if _selection_slots.locked():
+        raise HTTPException(503, "Tracking check busy. Retry shortly.")
+    async with _selection_slots:
+        try:
+            return await asyncio.to_thread(tracking_preview, images, times, anchor)
+        except (ValueError, OSError):
+            raise HTTPException(400, "Tracking check could not be read")
+        except Exception:
+            logger.warning("Player tracking preview unavailable", exc_info=True)
+            raise HTTPException(503, "Tracking check unavailable. Your taps are kept.")
+
+
+@api_router.post("/player-selection/mask")
+async def suggest_player_selection_mask(frame: UploadFile = File(...), hints: str = Form(...),
+                                        user=Depends(get_current_user)):
+    """Ephemeral bounded preview. No report writes, video uploads or LLM calls."""
+    from player_selection import suggest_mask
+    if len(hints) > 4096:
+        raise HTTPException(400, "Selection hints too large")
+    data = await frame.read(2 * 1024 * 1024 + 1)
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(413, "Frame too large")
+    try:
+        values = json.loads(hints)
+        if not isinstance(values, dict) or not isinstance(values.get("exclude_points", []), list) or not isinstance(values.get("include_points", []), list):
+            raise ValueError("Invalid selection hints")
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Invalid selection hints")
+    if _selection_slots.locked():
+        raise HTTPException(503, "Selection preview busy. Keep your box or retry.")
+    async with _selection_slots:
+        try:
+            return await asyncio.to_thread(suggest_mask, data, values.get("box"),
+                                           values.get("target_point"), values.get("exclude_points", []), values.get("include_points", []))
+        except (ValueError, OSError):
+            raise HTTPException(400, "Frame or selection could not be read")
+        except Exception:
+            logger.warning("Player cutout suggestion unavailable", exc_info=True)
+            return {"status": "unavailable", "reason": "segmentation_failed"}
+
+
 def _build_primary_anchor_payload(report_id: str, marker_timestamp, primary_box,
                                   first_anchor, fp, crop_filename) -> dict:
     """FIX 00A — anchor 1 (the marker tap) follows the same contract as
@@ -5984,6 +6050,7 @@ def _build_primary_anchor_payload(report_id: str, marker_timestamp, primary_box,
     persisted; fingerprint/crop fields are OPTIONAL enrichment added only when
     extraction succeeded. verify is never inferred from index."""
     a1 = first_anchor if isinstance(first_anchor, dict) else {}
+    from player_selection import selection_metadata
     box = a1.get("box") if isinstance(a1.get("box"), dict) and a1.get("box") else (primary_box or {})
     t1 = float(a1["t"]) if isinstance(a1.get("t"), (int, float)) else float(marker_timestamp or 0.0)
     payload = {
@@ -5997,6 +6064,7 @@ def _build_primary_anchor_payload(report_id: str, marker_timestamp, primary_box,
         ),
         **({"verify": True} if a1.get("verify") else {}),
         **({"segment": int(a1["segment"])} if isinstance(a1.get("segment"), (int, float)) else {}),
+        **selection_metadata(a1),
     }
     if fp is not None and crop_filename:
         payload.update({
@@ -6021,6 +6089,7 @@ async def _build_original_anchor_payloads(
     crop_paths: list[str] = []
     wide_paths: list[str] = []
     verify_paths: list[str] = []
+    from player_selection import selection_metadata
     for idx, a in enumerate(all_anchors[1:ORIGINAL_ANCHOR_LIMIT], start=2):
         if not isinstance(a, dict):
             continue
@@ -6038,7 +6107,11 @@ async def _build_original_anchor_payloads(
             "thumb_filename": a.get("thumb_filename"),
             **({"verify": True} if a.get("verify") else {}),
             **({"segment": int(a["segment"])} if isinstance(a.get("segment"), (int, float)) else {}),
+            **selection_metadata(a),
         }
+        if payload.get("visibility") == "partial":
+            payloads.append(payload)
+            continue  # no full-body fingerprint or unmasked LLM reference
         try:
             frame_filename = f"{report_id}-anchor-frame-{idx}.jpg"
             frame_path = UPLOAD_DIR / frame_filename
@@ -6050,6 +6123,7 @@ async def _build_original_anchor_payloads(
                     marker_image_path=str(frame_path),
                     box=box_anchor,
                     crop_save_path=str(crop_path_a),
+                    **({"visible_mask": payload["visible_mask"]} if payload.get("visible_mask") else {}),
                 )
                 wide_filename_a = f"{report_id}-anchor-{idx}-wide.jpg"
                 wide_path_a = UPLOAD_DIR / wide_filename_a
@@ -6244,11 +6318,17 @@ async def analyze_preview_task(report_id: str):
 
             crop_filename = f"{report_id}-subject.jpg"
             crop_path = UPLOAD_DIR / crop_filename
+            from player_selection import selection_metadata
+            raw_first = (json.loads(raw_marker_anchors) or [{}])[0] if raw_marker_anchors else {}
+            first_hints = selection_metadata(raw_first)
+            if first_hints.get("visibility") == "partial":
+                raise ValueError("Primary image must show a fully visible player")
             fp = await asyncio.to_thread(
                 extract_player_fingerprint,
                 marker_image_path=str(marker_path),
                 box=primary_box_data,
                 crop_save_path=str(crop_path),
+                **({"visible_mask": first_hints["visible_mask"]} if first_hints.get("visible_mask") else {}),
             )
             fingerprint_payload = {
                 "jersey_hex": fp.jersey_hex,
@@ -8581,6 +8661,7 @@ def _collect_anchor_crop_paths(anchor_payload_list: list) -> tuple[list[str], li
     """EXISTING anchor tight/wide crop collection (with R2 restore), extracted
     verbatim. Wide crops keep the existing [:3] budget."""
     anchor_crops_full: list[str] = []
+    anchor_payload_list = [a for a in anchor_payload_list if isinstance(a, dict) and a.get("visibility") != "partial"]
     for a in anchor_payload_list:
         cf = a.get("crop_filename") if isinstance(a, dict) else None
         if not cf:
@@ -9138,7 +9219,8 @@ async def generate_full_report_task(report_id: str) -> None:
                 return []
 
         (gt_track, gt_t_off), audio_events_full = await asyncio.gather(_tracking_core(), _audio_core())
-        tap_times = [float(a["t"]) + gt_t_off for a in valid_anchors] if gt_track else []
+        from player_selection import full_body_anchors
+        tap_times = [float(a["t"]) + gt_t_off for a in full_body_anchors(valid_anchors)] if gt_track else []
         if gt_track:
             logger.info(
                 f"[track] {report_id}: {len(gt_track.get('points') or [])} points, "

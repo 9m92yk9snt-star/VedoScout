@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import selection from "./marker-studio/selectionHints.cjs";
 
 /**
  * MarkedCropCanvas — renders ONLY the marked region of a frame using a canvas.
@@ -13,7 +14,7 @@ import React, { useEffect, useRef } from "react";
  * the entire marked region is visible without distortion (letterboxed if the
  * box aspect ratio doesn't match the thumbnail's).
  */
-export default function MarkedCropCanvas({ frameDataUrl, box, className, width = 168, height = 108 }) {
+export default function MarkedCropCanvas({ frameDataUrl, box, mask, className, width = 168, height = 108 }) {
   const canvasRef = useRef(null);
   useEffect(() => {
     if (!frameDataUrl || !box) return;
@@ -55,12 +56,26 @@ export default function MarkedCropCanvas({ frameDataUrl, box, className, width =
       ctx.fillRect(0, 0, cw, ch);
       // Slightly punch up the crop so the player pops from the surrounding grass.
       ctx.filter = "saturate(1.25) contrast(1.08)";
-      ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+      if (selection.validMask(mask)) {
+        const cutout = document.createElement("canvas"); cutout.width = cw; cutout.height = ch;
+        const cc = cutout.getContext("2d");
+        if (!cc) return;
+        cc.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+        const alpha = document.createElement("canvas"); alpha.width = mask.width; alpha.height = mask.height;
+        const ac = alpha.getContext("2d");
+        if (!ac) return;
+        const pixels = ac.createImageData(mask.width, mask.height);
+        let offset = 0;
+        mask.runs.forEach((count, i) => { for (let n = 0; n < count; n++, offset++) if (i % 2) pixels.data[offset * 4 + 3] = 255; });
+        ac.putImageData(pixels, 0, 0);
+        cc.globalCompositeOperation = "destination-in"; cc.drawImage(alpha, dx, dy, dw, dh);
+        ctx.drawImage(cutout, 0, 0);
+      } else ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
       ctx.filter = "none";
     };
     img.src = frameDataUrl;
     return () => { cancelled = true; };
-  }, [frameDataUrl, box?.x, box?.y, box?.w, box?.h]);
+  }, [frameDataUrl, box, mask, width, height]);
   return (
     <canvas
       ref={canvasRef}
