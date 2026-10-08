@@ -30,6 +30,7 @@ import video_timebase
 import fix10a_runtime
 import fix10b_runtime
 import analysis_jobs
+from analysis_progress import analysis_progress
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -5785,13 +5786,10 @@ def _resolve_player_photo_url(doc: dict) -> Optional[str]:
 
 @api_router.get("/reports/{report_id}/status")
 async def get_report_status(report_id: str, user=Depends(get_current_user)):
-    """Lightweight polling endpoint used by the frontend during async preview generation.
+    """Read-only status for both preview and full-report generation.
 
-    Returns the current `analysis_status` (analyzing | ready | failed), an integer
-    `progress_step` (1..5) the UI overlay can render honestly, and — once ready —
-    the preview payload itself plus the URLs needed to render the report. Polled
-    every ~3 seconds by `UploadPage.jsx` while the heavy Gemini work runs in the
-    background task `analyze_preview_task`.
+    `status` remains the legacy preview status. `analysis_complete` is scoped
+    to this report's entitlement; a paid preview is never a completed dossier.
     """
     doc = await db.reports.find_one({"id": report_id})
     if not doc:
@@ -5801,7 +5799,8 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Not your report.")
 
     analysis_status = doc.get("analysis_status", "ready")  # legacy reports default to ready
-    step = int(doc.get("progress_step", 5 if analysis_status == "ready" else 1) or 1)
+    progress = analysis_progress(doc)
+    step = progress["progress_step"]
     error = doc.get("analysis_error")
 
     out = {
@@ -5837,6 +5836,16 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
             if isinstance((doc.get("pipeline_trace") or [{}])[-1], dict) else None
         ),
     }
+    out.update(progress)
+    # Context is available while the video is still being prepared as well.
+    out.update({
+        "player_details": doc.get("player_details") or {},
+        "is_paid": bool(doc.get("is_paid")),
+        "manually_unlocked": bool(doc.get("manually_unlocked")),
+        "created_at": doc.get("created_at"),
+        "poster_url": _resolve_poster_url(doc),
+        "display_crop_url": _resolve_display_crop_url(doc),
+    })
     if analysis_status == "ready":
         out.update({
             "preview": doc.get("preview"),
@@ -7308,6 +7317,7 @@ async def _serialize_report(doc: dict, include_full: bool) -> dict:
         # predate the lifecycle states fall back to ready when complete.
         "full_report_status": doc.get("full_report_status") or ("ready" if doc.get("full_report") else None),
     }
+    out.update(analysis_progress(doc))
     if not include_full:
         # Honest teaser for the free landing — a real overall number ONLY when a
         # full report already exists server-side; otherwise the UI shows a locked

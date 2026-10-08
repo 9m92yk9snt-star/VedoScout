@@ -222,7 +222,7 @@ jobs:
       - name: Verify duel hints, pixel ownership, routes and identity safety
         env:
           PYTHONPATH: backend:backend/tests
-        run: python -m pytest -q backend/tests/test_player_selection.py backend/tests/test_masked_pose_tracking.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py
+        run: python -m pytest -q backend/tests/test_analysis_progress.py backend/tests/test_player_selection.py backend/tests/test_masked_pose_tracking.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py
 
   frontend_build:
     runs-on: ubuntu-latest
@@ -242,14 +242,16 @@ jobs:
           node frontend/scripts/check-report-coverage.cjs
           node frontend/scripts/check-video-frame-authority.cjs
           node frontend/scripts/check-scout-tap-policy.cjs
-      - name: Verify guided-only player selection and frame ownership
+      - name: Verify player selection, frame ownership and analysis waiting states
         working-directory: frontend
         env:
           CI: 'true'
-        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas)\.test\.'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas|AnalysisWaiting|BackgroundAnalysisTracker)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:
           CI: 'false'
           REACT_APP_BACKEND_URL: http://127.0.0.1:8000
         run: yarn build
+      - name: Reject shared tap modules emitted as media assets
+        run: node frontend/scripts/check-browser-cjs.cjs

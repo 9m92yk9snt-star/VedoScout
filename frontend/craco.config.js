@@ -38,6 +38,19 @@ let webpackConfig = {
     },
     configure: (webpackConfig) => {
 
+      // CRA's asset catch-all does not exclude .cjs. Our shared tap/selection
+      // modules must be compiled as code, otherwise their imports become URL
+      // strings in production even though Node/Jest can execute them correctly.
+      const oneOf = webpackConfig.module.rules.find((rule) => Array.isArray(rule.oneOf))?.oneOf;
+      const appScriptRule = oneOf?.find((rule) => rule.include && typeof rule.loader === "string" && rule.loader.includes("babel-loader"));
+      if (!appScriptRule) throw new Error("Cannot configure shared tap modules: app Babel rule missing");
+      oneOf.unshift({ ...appScriptRule, test: /\.cjs$/, type: "javascript/auto" });
+      for (const rule of oneOf) {
+        if (rule.type === "asset/resource") {
+          rule.exclude = [...(Array.isArray(rule.exclude) ? rule.exclude : rule.exclude ? [rule.exclude] : []), /\.cjs$/];
+        }
+      }
+
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {
           ...webpackConfig.watchOptions,

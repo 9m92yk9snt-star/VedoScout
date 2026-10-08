@@ -7,7 +7,8 @@
 export function isFullReportReady(data) {
   if (!data) return false;
   const st = data.full_report_status;
-  if (st === "ready") return true;
+  const hasBody = data.has_full_report === true || !!data.full_report;
+  if (st === "ready") return hasBody;
   if (st) return false; // generating | verifying | finalizing | failed | awaiting_confirmation
-  return data.has_full_report === true || !!data.full_report;
+  return hasBody;
 }

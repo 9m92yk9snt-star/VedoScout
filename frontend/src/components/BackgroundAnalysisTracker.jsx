@@ -21,16 +21,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { X, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "../lib/api";
+import { getAnalysisView } from "../lib/analysisProgress.mjs";
 
 const STORAGE_KEY = "scoutmeplay.activeAnalysis";
 const POLL_INTERVAL_MS = 5000;
-const STAGE_LABELS = {
-  1: "Receiving your video",
-  2: "Preparing your video",
-  3: "Checking the content",
-  4: "Writing the scout report",
-  5: "Finalising",
-};
 
 /* ---------- Public API: start tracking from anywhere ---------- */
 export function startBackgroundAnalysis(reportId, meta = {}) {
@@ -52,6 +46,7 @@ export default function BackgroundAnalysisTracker() {
   const location = useLocation();
   const [active, setActive] = useState(() => readStored());
   const [status, setStatus] = useState(null);
+  const [connectionError, setConnectionError] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const pollRef = useRef(null);
   const didNotifyReady = useRef(false);
@@ -77,7 +72,7 @@ export default function BackgroundAnalysisTracker() {
     setActive(null);
     setStatus(null);
     if (pollRef.current) {
-      clearInterval(pollRef.current);
+      clearTimeout(pollRef.current);
       pollRef.current = null;
     }
   }, []);
@@ -85,16 +80,21 @@ export default function BackgroundAnalysisTracker() {
   /* Poll loop */
   useEffect(() => {
     if (!active) return undefined;
+    if (location.pathname === `/report/${active.id}`) return undefined;
     let cancelled = false;
+    let finished = false;
 
     const poll = async () => {
       try {
-        const { data } = await api.get(`/reports/${active.id}/status`);
+        const { data } = await api.get(`/reports/${active.id}/status`, { timeout: 15000 });
         if (cancelled) return;
         setStatus(data);
-        if (data.status === "ready" && !didNotifyReady.current) {
+        setConnectionError(false);
+        const view = getAnalysisView(data);
+        if (view.complete && !didNotifyReady.current) {
+          finished = true;
           didNotifyReady.current = true;
-          toast.success("Your scout report is ready!", {
+          toast.success(view.target === "full" ? "Your full scout report is ready!" : "Your initial preview is ready", {
             duration: 8000,
             action: {
               label: "View",
@@ -102,42 +102,46 @@ export default function BackgroundAnalysisTracker() {
             },
           });
           clear();
-        } else if (data.status === "failed") {
-          toast.error(data.error || "Analysis failed. Please try again.");
+        } else if (view.failed) {
+          finished = true;
+          toast.error(view.detail);
           clear();
         }
       } catch (err) {
+        if (cancelled) return;
         // Report deleted or 4xx → stop polling
-        if (err?.response?.status && err.response.status >= 400 && err.response.status < 500) {
+        if (err?.response?.status >= 400 && err.response.status < 500 && ![408, 429].includes(err.response.status)) {
+          finished = true;
+          toast.error(err.response.status === 401 ? "Sign in again to check your analysis." : "The analysis status could not be accessed.");
           clear();
         }
+        setConnectionError(true);
         // 5xx / network: just keep polling on the next tick
+      } finally {
+        if (!cancelled && !finished) pollRef.current = setTimeout(poll, POLL_INTERVAL_MS);
       }
     };
 
     poll();
-    pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       if (pollRef.current) {
-        clearInterval(pollRef.current);
+        clearTimeout(pollRef.current);
         pollRef.current = null;
       }
     };
-  }, [active, navigate, clear]);
+  }, [active, navigate, clear, location.pathname]);
 
   /* Don't render while the user is on the upload page — the in-page overlay
      already shows progress there. Re-appears once they navigate away. */
   const onUploadPage = location.pathname === "/upload";
 
-  if (!active || dismissed || onUploadPage || !status || status.status !== "analyzing") {
+  if (!active || dismissed || onUploadPage || location.pathname === `/report/${active.id}` || !status || getAnalysisView(status).complete || getAnalysisView(status).failed) {
     return null;
   }
 
-  const step = Math.max(1, Math.min(5, Number(status.progress_step) || 1));
-  const pct = Math.round((step / 5) * 100);
-  const label = STAGE_LABELS[step] || "Working…";
+  const view = getAnalysisView(status);
 
   return (
     <div
@@ -163,23 +167,18 @@ export default function BackgroundAnalysisTracker() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[9px] uppercase tracking-[0.22em] font-bold text-volt mb-0.5">
-              Step {step} of 5 · Analyzing
+              {active.playerName || "Your video"} · {view.target === "full" ? "Full analysis" : "Initial review"}
             </div>
-            <div className="text-[13px] font-bold text-cream-card truncate leading-tight">{label}</div>
+            <div className="text-[13px] font-bold text-cream-card leading-tight">{view.title}</div>
+            {connectionError && <div className="mt-1 text-[10px] text-cream-card/70">Rechecking the connection</div>}
             {status?.retry_in_progress && (
               <div
                 className="mt-1 text-[10px] text-amber-300/90 leading-tight italic"
                 data-testid="bg-analysis-retry-hint"
               >
-                Prøver igen for bedste kvalitet…
+                The server is repeating the review
               </div>
             )}
-            <div className="mt-1.5 h-1 bg-white/15 overflow-hidden rounded-full">
-              <div
-                className="h-full bg-gradient-to-r from-forest via-forest-pop to-volt transition-all duration-700"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
           </div>
           <button
             type="button"
@@ -194,10 +193,10 @@ export default function BackgroundAnalysisTracker() {
         <button
           type="button"
           data-testid="bg-tracker-goto-dashboard"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate(`/report/${active.id}`)}
           className="w-full px-4 py-2 bg-white/5 hover:bg-volt hover:text-ink text-[10px] uppercase tracking-[0.22em] font-bold text-cream-card/85 border-t border-white/10 transition-colors"
         >
-          Open dashboard
+          Follow your analysis
         </button>
       </div>
     </div>
@@ -211,8 +210,9 @@ function readStored() {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.id) return null;
-    // Self-expire after 30 min so stale entries don't haunt the user forever
-    if (Date.now() - (parsed.startedAt || 0) > 30 * 60 * 1000) {
+    // Long analyses can outlast 30 minutes. Read server readiness after a
+    // reload instead of discarding a still-active report prematurely.
+    if (Date.now() - (parsed.startedAt || 0) > 7 * 24 * 60 * 60 * 1000) {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }

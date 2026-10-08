@@ -355,7 +355,7 @@ def test_5_6_7_frontend_completion_helper():
         "finalizing: f({has_full_report: true, full_report_status: 'finalizing'}),"
         "generating: f({full_report_status: 'generating'}),"
         "failed: f({has_full_report: true, full_report_status: 'failed'}),"
-        "ready: f({full_report_status: 'ready'}),"
+        "ready: f({full_report_status: 'ready', has_full_report: true}),"
         "readyNoBody: f({full_report_status: 'ready', has_full_report: false}),"
         "legacyStatus: f({has_full_report: true}),"
         "legacyDoc: f({full_report: {scores: {}}}),"
@@ -369,16 +369,19 @@ def test_5_6_7_frontend_completion_helper():
     assert r["verifying"] is False, "TEST 5: has_full_report + verifying → keep polling"
     assert r["finalizing"] is False, "TEST 6: has_full_report + finalizing → keep polling"
     assert r["generating"] is False and r["failed"] is False
-    assert r["ready"] is True and r["readyNoBody"] is True, "TEST 7: ready → stop polling"
+    assert r["ready"] is True and r["readyNoBody"] is False, "TEST 7: ready must include a persisted report body"
     assert r["legacyStatus"] is True and r["legacyDoc"] is True, "legacy docs stay openable"
     assert r["empty"] is False and r["nul"] is False
 
 
 def test_frontend_wiring_uses_the_helper():
     rp = Path("/app/frontend/src/pages/ReportPage.jsx").read_text()
-    assert "if (isFullReportReady(data)) return data;" in rp, "polling gate"
+    poll = Path("/app/frontend/src/lib/pollAnalysis.mjs").read_text()
+    assert 'isFullReportReady(data) : isPreviewReady(data)' in poll, "polling gate"
+    assert 'pollAnalysis(api, id, {' in rp, "page uses the common polling gate"
     assert "unlocked && full_report && isFullReportReady(report)" in rp, "render gate"
-    assert "!isFullReportReady(report)" in rp, "auto-generate/poll trigger gate"
+    assert "isFullReportReady(currentAnalysis)" in rp, "auto-generation readiness gate"
+    assert "!previewComplete" in rp, "full generation waits for initial review"
     assert "data?.has_full_report) return data" not in rp, \
         "has_full_report alone must no longer stop polling"
 
