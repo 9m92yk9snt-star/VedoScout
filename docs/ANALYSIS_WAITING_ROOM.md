@@ -50,12 +50,21 @@ return the full report body.
 
 `analysisProgress.mjs` supplies one view model for the waiting room, background
 tracker, and dashboard report cards. `pollAnalysis.mjs` follows the same
-readiness helpers. Elapsed time updates a timer only: it cannot advance a stage,
+readiness helpers. The client clock counts down a server-supplied estimate only: it cannot advance a stage,
 mark a check complete, invent a percentage, or publish a report.
 
-Only upload byte progress is expressed as a percentage. There is no remaining
-time estimate: the current pipeline does not provide a calibrated completion
-estimate. The screen explains that duration depends on the video and checks.
+Only upload byte progress is expressed as a percentage. Analysis uses an
+indeterminate activity bar. `analysis_eta.py` reads at most 60 completed runs
+from the last three days, with a two-second timeout and a two-minute cache.
+At least five successful runs must match source hashes, configuration, runtime,
+stage and video duration (within 25%). Retried or human-confirmed runs are excluded.
+The 20th–85th percentile stage-to-completion durations form an estimated range;
+heterogeneous samples produce no estimate. The deadline stays anchored to the
+actual stage timestamp. Exceeding it shows “Taking longer than estimated”.
+Queue, player confirmation, stale activity and connection failures do not show
+an active countdown. Missing calibration shows “Estimate not available yet”.
+A new source version can therefore require five comparable completed analyses
+before any numeric estimate appears. Estimates never determine readiness.
 
 Status polling uses a 15-second request timeout and a 4.5-second interval.
 Transient network failures retain the current phase and show connection
@@ -65,7 +74,14 @@ offer a read-only status check. They do not restart the job. Explicit full-job
 failure/start failure is the condition for a retry action. Access failures are
 shown separately.
 
-The background tracker skips duplicate requests while its report page is open.
+“Continue in background” appears only after the server accepts the upload and
+while a job remains active. It registers observation and navigates to the profile
+(`/dashboard`), without generating or retrying an analysis. `ProfileAnalysisStatus`
+shows the same lifecycle and estimate, polls every six seconds, retains a ready
+card, and offers “Open report” only under the full readiness contract. Terminal
+401/403/404 responses stop polling; transient failures reconnect.
+
+The background tracker skips duplicate requests on the report and dashboard.
 It polls sequentially elsewhere, keeps following a paid report after preview
 readiness, and announces full readiness only under the full readiness contract.
 Reloading or returning from the dashboard resumes status observation without
@@ -86,7 +102,7 @@ build. Module source and tracking thresholds are unchanged.
 
 ## Verification
 
-Local verification on this change:
+Baseline waiting-room verification:
 
 - 203 backend cases: 26 progress/status cases plus existing selection, masked
   recovery, identity, geometry, and event-bridge regressions.
@@ -103,10 +119,26 @@ Local verification on this change:
   disconnection recovers, dashboard navigation resumes observation, partial
   report remains withheld, and ready report opens without uncaught errors.
 
+The profile fixture returns the backend's empty-inbox contract, including
+`notifications: []` and `messages: []`. Returning an arbitrary `{}` caused
+`InboxPanels` to throw after the status card appeared and unmount the app.
+The browser regression waits for both empty inbox panels, reloads the profile,
+and verifies that status observation resumes without generating a second job.
+The background handoff scrolls to the followed status card after it renders,
+with clearance for the fixed navigation. Later status polls do not move the
+page. The regression verifies the whole card is visible at mobile width.
+Failures now print the URL, browser errors and recent requests and save a
+screenshot so a missing status card can be distinguished from a page crash.
+
 The browser script intercepts API requests with synthetic fixtures and blocks
 external traffic. It does not use a real account, write a production database,
 or invoke models. Its screenshot is a coded UI preview with test status data.
 It checks routing/build/readiness behaviour, not football recognition accuracy.
+
+The design/estimate extension adds 22 backend ETA cases (48 together with
+status/access cases), six profile lifecycle/access cases, and further timer and
+background-button cases. Current frontend verification covers 79 cases across
+seven suites; the combined backend selection/status/ETA regression covers 225.
 
 Useful commands from the repository root:
 

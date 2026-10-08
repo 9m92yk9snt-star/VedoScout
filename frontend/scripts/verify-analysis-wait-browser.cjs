@@ -26,12 +26,13 @@ const server = http.createServer((request, response) => {
   response.writeHead(range ? 206 : 200, {'Content-Type':mime[path.extname(file)] || 'application/octet-stream', 'Accept-Ranges':'bytes', 'Content-Length':end-start+1, ...(range ? {'Content-Range':`bytes ${start}-${end}/${size}`} : {})});
   fs.createReadStream(file, {start, end}).pipe(response);
 });
+let browser, page;
+const errors = [], requests = [];
 
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({...(process.env.SCOUT_BROWSER_EXECUTABLE ? {executablePath:process.env.SCOUT_BROWSER_EXECUTABLE} : {}), headless:true, args:['--no-sandbox','--disable-dev-shm-usage']});
-  const errors = [], requests = [];
+  browser = await chromium.launch({...(process.env.SCOUT_BROWSER_EXECUTABLE ? {executablePath:process.env.SCOUT_BROWSER_EXECUTABLE} : {}), headless:true, args:['--no-sandbox','--disable-dev-shm-usage']});
   const user = {id:'test-owner', role:'admin', full_name:'UI test', email:'ui-test@example.invalid'};
   let doc = {id:'selected', user_id:user.id, is_paid:true, analysis_target:'full', analysis_status:'analyzing', progress_step:2,
     preview:null, full_report:null, full_report_status:null, has_full_report:false, created_at:new Date(Date.now()-120000).toISOString(),
@@ -69,6 +70,9 @@ const server = http.createServer((request, response) => {
       if (url.pathname === '/api/me/subscription') return send({subscription:{tier:'premium'},tiers:{},usage:{}});
       if (url.pathname === '/api/progress/players') return send({items:[]});
       if (url.pathname === '/api/dashboard/community') return send({});
+      // Match dashboard_hub.get_inbox's empty inbox contract. An arbitrary
+      // {} crashes InboxPanels after the profile status card first appears.
+      if (url.pathname === '/api/dashboard/inbox') return send({premium_access:true,notifications:[],messages:[],locked_message_count:0,unread_notifications:0,unread_messages:0});
       return send({});
     }
     // Offline typography for repeatable layout checks. Uses bundled fonts;
@@ -77,12 +81,13 @@ const server = http.createServer((request, response) => {
     if (url.origin !== origin && !['data:','blob:'].includes(url.protocol)) return route.abort();
     return route.continue();
   });
-  const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
   // Exercise the real resume-upload entry rather than calling an internal handler.
   await page.goto(origin+'/upload');
   // The production bundle must execute all three shared tap modules, not
   // import asset URLs. No tracking/recognition accuracy is asserted here.
   await page.getByTestId('upload-file-input').setInputFiles(clip);
+  await page.getByTestId('upload-mark-start').evaluate(element => element.scrollIntoView({block:'center', behavior:'instant'}));
   await page.getByTestId('upload-mark-start').click();
   await page.waitForFunction(() => {
     const stage = document.querySelector('[data-testid="scout-stage"]');
@@ -109,13 +114,15 @@ const server = http.createServer((request, response) => {
   await page.evaluate(() => {window.__waitTestOffset += 10*60*1000;sessionStorage.setItem('wait-test-offset',String(window.__waitTestOffset));});
   await page.waitForTimeout(1200);
   assert.equal(await page.getByTestId('analysis-waiting').getAttribute('data-phase'),'preparing');
-  assert.equal(await page.getByRole('progressbar').count(),0);
+  assert.equal(await page.getByRole('progressbar').getAttribute('aria-valuenow'),null);
+  assert((await page.getByTestId('analysis-finish-estimate').innerText()).includes('Estimate not available yet'));
   assert(!/sec left|90 sec|Identity locked/i.test(await page.getByTestId('analysis-waiting').innerText()));
   const beat = async () => {doc.last_progress_at = new Date(await page.evaluate(() => Date.now())).toISOString();};
   doc.analysis_status='ready';doc.progress_step=5;doc.preview={brief_summary:'Initial review'};await beat();
   await waitPhase('queued');
   assert.equal(requests.filter(r=>r.path.endsWith('/generate-full')).length,0,'new upload must not bypass server identity-profile preparation');
   doc.full_report_status='generating';doc.full_pipeline_stage='physical_reconstruction_start';await beat();
+  const estimateNow=await page.evaluate(()=>Date.now());doc.completion_estimate={status:'estimated',sample_count:12,calculated_at:new Date(estimateNow).toISOString(),earliest_at:new Date(estimateNow+4*60000).toISOString(),latest_at:new Date(estimateNow+7*60000).toISOString()};
   await waitPhase('analyzing');
   assert.equal(agentReviews,0,'waiting page must not invent a human-review stream');
   await page.getByRole('button',{name:'Next football tip'}).click();
@@ -140,15 +147,30 @@ const server = http.createServer((request, response) => {
   await page.getByTestId('analysis-server-status').filter({hasText:'Connection interrupted'}).waitFor({timeout:14000});
   assert.equal(await page.getByTestId('analysis-waiting').getAttribute('data-phase'),'analyzing');
   offline=false;await beat();
-  await page.getByRole('button',{name:'Back to dashboard'}).click(); await page.waitForURL('**/dashboard');
-  await page.getByTestId('bg-analysis-tracker').waitFor({timeout:14000});
-  assert(!(await page.getByTestId('bg-analysis-tracker').innerText()).includes('ready'));
-  await page.getByRole('button',{name:'Follow your analysis'}).click(); await page.waitForURL('**/report/selected');await waitPhase('analyzing');
+  await page.getByRole('button',{name:'Continue in background'}).click(); await page.waitForURL('**/dashboard');
+  await page.getByTestId('notifications-empty').waitFor({timeout:14000});
+  await page.getByTestId('messages-empty').waitFor({timeout:14000});
+  await page.getByTestId('profile-analysis-selected').waitFor({timeout:14000});
+  const profileCardBox = await page.getByTestId('profile-analysis-selected').boundingBox();
+  assert(profileCardBox.y >= 0 && profileCardBox.y + profileCardBox.height <= 844,'background handoff brings the whole status card into the mobile viewport');
+  assert.equal(await page.getByTestId('bg-analysis-tracker').count(),0);
+  assert(!(await page.getByTestId('profile-analysis-selected').innerText()).includes('Report ready'));
+  await page.reload();
+  await page.getByTestId('notifications-empty').waitFor({timeout:14000});
+  await page.getByTestId('profile-analysis-selected').waitFor({timeout:14000});
+  assert.equal(await page.getByTestId('profile-analysis-selected').getAttribute('data-phase'),'analyzing');
+  assert.equal(requests.filter(r=>r.path.endsWith('/generate-full')).length,0,'profile reload does not restart the accepted analysis');
+  if(process.env.SCOUT_PROFILE_SCREENSHOT_PATH) await page.screenshot({path:process.env.SCOUT_PROFILE_SCREENSHOT_PATH,fullPage:false});
+  await page.getByRole('link',{name:'View analysis status'}).click(); await page.waitForURL('**/report/selected');await waitPhase('analyzing');
   doc.full_report_status='verifying';await beat();await waitPhase('verifying');
   doc.full_report={scores:{technical:5,tactical:5,physical:5,mentality:5},scout_view:{},action_timeline:[],video_comments:[]};
   doc.has_full_report=true;doc.full_report_status='finalizing';await beat();await waitPhase('finalizing');
   assert.equal(await page.getByTestId('premium-report-v2').count(),0,'partial report body stays withheld');
+  await page.getByRole('button',{name:'Continue in background'}).click();await page.waitForURL('**/dashboard');
+  await page.getByTestId('profile-analysis-selected').waitFor({timeout:14000});
   doc.full_report_status='ready';await beat();
+  await page.getByRole('link',{name:'Open report',exact:true}).waitFor({timeout:15000});
+  await page.getByRole('link',{name:'Open report',exact:true}).click();await page.waitForURL('**/report/selected');
   try {
     await page.getByTestId('premium-report-v2').waitFor({timeout:15000});
   } catch(error) {
@@ -158,6 +180,14 @@ const server = http.createServer((request, response) => {
   }
   assert.equal(await page.getByTestId('analysis-waiting').count(),0,'exactly one transition to completed report');
   assert.deepEqual(errors,[],'no uncaught page errors');
-  console.log(JSON.stringify({passed:true,checks:20,productionTapModulesExecute:true,uploadHandoff:true,previewNotDone:true,reloadNoRestart:true,networkRecovery:true,partialBodyWithheld:true,readyReportOpens:true,mobileWidth:390,desktopWidth:1280,apiRequests:requests.length,errors,temporaryOutput:work},null,2));
+  console.log(JSON.stringify({passed:true,checks:21,productionTapModulesExecute:true,uploadHandoff:true,previewNotDone:true,reloadNoRestart:true,profileInboxRendered:true,profileHandoffVisible:true,profileReloadResumes:true,networkRecovery:true,partialBodyWithheld:true,readyReportOpens:true,mobileWidth:390,desktopWidth:1280,apiRequests:requests.length,errors,temporaryOutput:work},null,2));
   await browser.close();await new Promise(resolve=>server.close(resolve));
-})().catch(error=>{console.error(error);server.close();process.exit(1);});
+})().catch(async error=>{
+  console.error(error);
+  if (page && !page.isClosed()) {
+    console.error(JSON.stringify({url:page.url(),pageErrors:errors,body:(await page.locator('body').innerText()).slice(0,3000),recentRequests:requests.slice(-15)},null,2));
+    await page.screenshot({path:path.join(work,'failure.png'),fullPage:true});
+    console.error('Browser failure output:',work);
+  }
+  await browser?.close();server.close();process.exit(1);
+});

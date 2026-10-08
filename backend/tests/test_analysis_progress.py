@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Header
 from fastapi.testclient import TestClient
 
 from analysis_progress import analysis_progress
+from analysis_eta import completion_estimate
 
 
 def report(**updates):
@@ -80,7 +81,7 @@ def status_app(doc):
         return {"id": authorization, "role": "admin" if authorization == "admin" else "user"}
 
     namespace = {"Depends": Depends, "get_current_user": current_user, "HTTPException": HTTPException,
-                 "db": SimpleNamespace(reports=SimpleNamespace(find_one=find_one)), "analysis_progress": analysis_progress}
+                 "db": SimpleNamespace(reports=SimpleNamespace(find_one=find_one)), "analysis_progress": analysis_progress, "completion_estimate": completion_estimate}
     for name in ("video", "poster", "marker", "subject_crop", "display_crop", "player_photo"):
         namespace[f"_resolve_{name}_url"] = lambda d: "/api/uploads/test.jpg"
     exec(compile(ast.Module(body=[node], type_ignores=[]), "real-report-status", "exec"), namespace)

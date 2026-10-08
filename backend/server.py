@@ -31,6 +31,7 @@ import fix10a_runtime
 import fix10b_runtime
 import analysis_jobs
 from analysis_progress import analysis_progress
+from analysis_eta import completion_estimate
 from evidence_authority import (
     attach_event_evidence_authority,
     attach_clip_authority,
@@ -5837,6 +5838,7 @@ async def get_report_status(report_id: str, user=Depends(get_current_user)):
         ),
     }
     out.update(progress)
+    out["completion_estimate"] = await completion_estimate(db.reports, doc)
     # Context is available while the video is still being prepared as well.
     out.update({
         "player_details": doc.get("player_details") or {},

@@ -4,7 +4,7 @@ import * as matchers from "@testing-library/jest-dom/matchers";
 import AnalysisWaiting, { FootballTips } from "./AnalysisWaiting";
 import PrecisionScanOverlay from "./PrecisionScanOverlay";
 import PremiumReadyOverlay from "./PremiumReadyOverlay";
-import { activityLabel, assetUrl, elapsedLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
+import { activityLabel, assetUrl, completionLabel, elapsedLabel, getAnalysisView } from "../lib/analysisProgress.mjs";
 import { isFullReportReady } from "../lib/reportReady.mjs";
 expect.extend(matchers);
 
@@ -23,13 +23,13 @@ test("paid initial preview stays in the waiting room and does not claim full rea
   expect(screen.queryByText(/taps verified|identity locked|top speed|Scout Assigned|Writing Notes/i)).not.toBeInTheDocument();
 });
 
-test("long waits only change elapsed time and tips, never progress, ratings or task completion", () => {
+test("long waits never invent a deadline, ratings or task completion", () => {
   render(<AnalysisWaiting status={{ ...initial, full_report_status: "generating", full_pipeline_stage: "sequence_model_start" }} />);
   act(() => { jest.advanceTimersByTime(10 * 60_000); });
   expect(screen.getByTestId("analysis-waiting")).toHaveAttribute("data-phase", "analyzing");
-  expect(screen.getByTestId("analysis-waiting").querySelector(".analysis-elapsed")).toHaveTextContent("Elapsed 12:00");
-  expect(screen.getByRole("list", { name: "Analysis stages" }).querySelector('[data-state="active"]')).toHaveTextContent("Analyze play");
-  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("Estimate not available yet");
+  expect(screen.getByRole("list", { name: "Analysis stages" }).querySelector('[data-state="active"]')).toHaveTextContent("Reviewing play");
+  expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
   expect(screen.queryByText(/\d+%|sec left|almost there|calculated|potential/i)).not.toBeInTheDocument();
 });
 
@@ -65,7 +65,7 @@ test("only measured upload has a percentage and it is scoped to uploading", () =
   expect(screen.getByRole("progressbar", { name: "Video upload" })).toHaveAttribute("aria-valuenow", "43");
   expect(screen.getByRole("progressbar", { name: "Video upload" })).toHaveTextContent("43% uploaded");
   rerender(<PrecisionScanOverlay {...props} phase="saving" uploadPct={100} />);
-  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
   expect(screen.getByRole("heading", { name: "Saving your video" })).toBeInTheDocument();
 });
 
@@ -130,4 +130,33 @@ test("invalid clocks and heartbeats are not substituted with made-up timing", ()
 
 test.each(["generating", "awaiting_confirmation", "verifying", "finalizing", "failed"])("%s cannot be promoted by a partial body or preview", full_report_status => {
   expect(getAnalysisView({ ...initial, full_report_status, has_full_report: true }).complete).toBe(false);
+});
+
+
+test("remaining time is a server-backed range, expires and never reaches a fake five-second floor", () => {
+  const now = Date.now();
+  const data = { ...initial, full_report_status: "generating", full_pipeline_stage: "sequence_model_start", completion_estimate: {status:"estimated", calculated_at:new Date(now).toISOString(), earliest_at:new Date(now+4*60000).toISOString(), latest_at:new Date(now+7*60000).toISOString()} };
+  expect(completionLabel(data, now)).toBe("About 4–7 min");
+  expect(completionLabel(data, now+121000)).toBe("Estimate not available yet");
+  expect(completionLabel({...data,completion_estimate:{...data.completion_estimate,calculated_at:new Date(now+8*60000).toISOString()}},now+8*60000)).toBe("Taking longer than estimated");
+  render(<AnalysisWaiting status={data} onContinue={jest.fn()} />);
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("Estimated time remaining");
+  expect(screen.getByTestId("analysis-finish-estimate")).toHaveTextContent("About 4–7 min");
+  expect(screen.getByRole("button", {name:"Continue in background"})).toBeInTheDocument();
+});
+
+test("background exit is available only after upload acceptance and sends one navigation action", () => {
+  const leave=jest.fn();
+  const {rerender}=render(<AnalysisWaiting status={initial} phase="uploading" uploadPct={42} onContinue={leave}/>);
+  expect(screen.queryByRole("button",{name:"Continue in background"})).not.toBeInTheDocument();
+  rerender(<AnalysisWaiting status={initial} onContinue={leave}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Continue in background"}));
+  expect(leave).toHaveBeenCalledTimes(1);
+});
+
+
+test("stale worker activity suppresses a fresh calculated estimate", () => {
+  const now = Date.now();
+  const data = { last_progress_at: new Date(now-180000).toISOString(), completion_estimate: { status:"estimated", calculated_at:new Date(now).toISOString(), earliest_at:new Date(now+60000).toISOString(), latest_at:new Date(now+180000).toISOString() } };
+  expect(completionLabel(data, now)).toBe("Waiting for a status update");
 });
