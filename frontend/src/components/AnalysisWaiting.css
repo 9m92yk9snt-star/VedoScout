@@ -53,3 +53,4 @@
 @media(prefers-reduced-motion:reduce){.analysis-ready-note{animation:none}.profile-analysis-icon .animate-spin{animation:none}}
 
 .analysis-loading-paused .analysis-activity-bar>span{animation:none;width:35%;background:#b7c5ab}
+.profile-analysis-section{scroll-margin-top:90px}

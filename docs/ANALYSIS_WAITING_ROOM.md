@@ -119,6 +119,17 @@ Baseline waiting-room verification:
   disconnection recovers, dashboard navigation resumes observation, partial
   report remains withheld, and ready report opens without uncaught errors.
 
+The profile fixture returns the backend's empty-inbox contract, including
+`notifications: []` and `messages: []`. Returning an arbitrary `{}` caused
+`InboxPanels` to throw after the status card appeared and unmount the app.
+The browser regression waits for both empty inbox panels, reloads the profile,
+and verifies that status observation resumes without generating a second job.
+The background handoff scrolls to the followed status card after it renders,
+with clearance for the fixed navigation. Later status polls do not move the
+page. The regression verifies the whole card is visible at mobile width.
+Failures now print the URL, browser errors and recent requests and save a
+screenshot so a missing status card can be distinguished from a page crash.
+
 The browser script intercepts API requests with synthetic fixtures and blocks
 external traffic. It does not use a real account, write a production database,
 or invoke models. Its screenshot is a coded UI preview with test status data.

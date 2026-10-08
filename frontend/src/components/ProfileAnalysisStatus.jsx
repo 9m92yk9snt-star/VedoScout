@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import api, { ASSET_BASE } from "../lib/api";
@@ -7,6 +7,7 @@ import "./AnalysisWaiting.css";
 
 /** Profile status owns dashboard observation. It never starts or retries jobs. */
 export default function ProfileAnalysisStatus({ reports = [], followId }) {
+  const sectionRef = useRef(null);
   const [watched, setWatched] = useState([]);
   const [updates, setUpdates] = useState({});
   const [disconnected, setDisconnected] = useState({});
@@ -47,8 +48,12 @@ export default function ProfileAnalysisStatus({ reports = [], followId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pollKey]);
   const cards = watched.map(id => updates[id] || reports.find(r => r.id === id)).filter(Boolean);
+  const followedCardAvailable = cards.some(data => data.id === followId);
+  useEffect(() => {
+    if (followedCardAvailable) sectionRef.current?.scrollIntoView?.({ block: "start", behavior: "instant" });
+  }, [followId, followedCardAvailable]);
   if (!cards.length) return null;
-  return <section className="profile-analysis-section" aria-label="Your analysis status">
+  return <section ref={sectionRef} className="profile-analysis-section" aria-label="Your analysis status">
     <div className="profile-analysis-heading"><span>Your video · your report</span><h2>Follow your analysis</h2><p>Your analysis continues while you explore your profile.</p></div>
     {cards.map(data => {
       const view = getAnalysisView(data), player = data.player_details?.player_name || "Your player";
