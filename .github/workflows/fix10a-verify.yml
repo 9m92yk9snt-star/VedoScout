@@ -224,6 +224,12 @@ jobs:
           node frontend/scripts/audit-analysis-poll.cjs
           node frontend/scripts/check-report-coverage.cjs
           node frontend/scripts/check-video-frame-authority.cjs
+          node frontend/scripts/check-scout-tap-policy.cjs
+      - name: Verify guided-only player selection and frame ownership
+        working-directory: frontend
+        env:
+          CI: 'true'
+        run: yarn test --watchAll=false --runInBand --testPathPattern='(MarkerStudio|ScoutMode|sceneDetect|MarkedCropCanvas)\.test\.'
       - name: Build frontend
         working-directory: frontend
         env:

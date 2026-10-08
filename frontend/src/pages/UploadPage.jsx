@@ -13,6 +13,7 @@ import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
 import { isPremiumUser } from "@/lib/premium";
 import { serializeMarkerAnchors } from "@/lib/anchorSerialization.mjs";
+import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 
 const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
@@ -383,11 +384,7 @@ export default function UploadPage() {
     setStudioOpen(false);
     trackFunnel("player_tapped");
     const count = anchors?.length || 1;
-    toast.success(
-      count > 1
-        ? `${count} anchors locked. ScoutMe Pro Intelligence will track this exact player across the whole clip.`
-        : "Player locked. We'll analyse only the player in the box.",
-    );
+    toast.success(`${count} player selections saved. These will guide the identity checks during analysis.`);
   };
 
   const reMark = () => {
@@ -922,9 +919,6 @@ export default function UploadPage() {
         open={studioOpen}
         videoUrl={videoUrl}
         videoFile={file && !file._fromUrl ? file : null}
-        initialTimestamp={
-          videoRef.current ? (videoRef.current.currentTime || 0) : (markerTimestamp || 0)
-        }
         onConfirm={handleStudioConfirm}
         onCancel={() => setStudioOpen(false)}
       />
@@ -1292,7 +1286,7 @@ export default function UploadPage() {
               {file && !markerBlob && (
                 <div className="mt-4 space-y-3">
                   <div className="relative bg-black rounded-2xl border border-gray-border overflow-hidden">
-                    <video
+                    {!studioOpen && <video
                       ref={videoRef}
                       src={videoUrl}
                       controls
@@ -1301,16 +1295,16 @@ export default function UploadPage() {
                       onLoadedMetadata={handleVideoLoadedMetadata}
                       data-testid="upload-video-preview"
                       className="w-full aspect-video bg-black"
-                    />
+                    />}
                   </div>
 
                   {/* Studio capabilities — informational, the single action is the CTA below */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { icon: ZoomIn, label: "Zoom" },
-                      { icon: ScanSearch, label: "Auto detect" },
-                      { icon: EyeOff, label: "Ignore others" },
-                      { icon: LocateFixed, label: "Scout precision" },
+                      { icon: ScanSearch, label: "Player crop" },
+                      { icon: EyeOff, label: "Hidden player" },
+                      { icon: LocateFixed, label: "3 extra checks" },
                     ].map((t) => (
                       <div
                         key={t.label}
@@ -1333,7 +1327,7 @@ export default function UploadPage() {
                       </span>
                       <p className="text-[12.5px] text-ink/70 leading-snug">
                         Only your selected player will be analysed.<br className="hidden sm:block" />{" "}
-                        <span className="font-bold text-ink">Tap once. We&rsquo;ll ignore everyone else.</span>
+                        <span className="font-bold text-ink">Up to 10 guided taps + 3 extra checks.</span>
                       </p>
                     </div>
                     <button
@@ -1345,7 +1339,7 @@ export default function UploadPage() {
                       <span className="flex items-center gap-2 font-barlow font-black uppercase tracking-[0.14em] text-[13px]">
                         <Crosshair className="w-4 h-4" /> Lock onto player
                       </span>
-                      <span className="text-white/65 text-[10px] font-semibold">Takes less than 20 seconds →</span>
+                      <span className="text-white/65 text-[10px] font-semibold">Zoom, tap and check your player →</span>
                     </button>
                   </div>
                 </div>
@@ -1354,17 +1348,15 @@ export default function UploadPage() {
               {/* Done state — compact locked card */}
               {markerBlob && markerPreviewUrl && (
                 <div className="mt-4 rounded-2xl bg-cream-base/70 border border-ink/8 p-3.5 flex items-center gap-4">
-                  <img
-                    src={markerPreviewUrl}
-                    alt="Locked player"
-                    data-testid="upload-mark-preview"
-                    className="w-[86px] h-[64px] rounded-xl object-cover bg-black border border-ink/10 shrink-0"
-                  />
+                  <div data-testid="upload-mark-preview" aria-label="Your selected player" className="w-[72px] h-[96px] rounded-xl overflow-hidden bg-black border border-ink/10 shrink-0">
+                    {markerBox ? <MarkedCropCanvas frameDataUrl={markerPreviewUrl} box={markerBox} width={144} height={192} className="w-full h-full" /> :
+                      <img src={markerPreviewUrl} alt="Player reference frame" className="w-full h-full object-contain" />}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1.5 text-[13px] font-black text-ink">
-                      <CheckCircle2 className="w-4 h-4 text-forest shrink-0" /> Player locked successfully
+                      <CheckCircle2 className="w-4 h-4 text-forest shrink-0" /> Player selections saved
                     </p>
-                    <p className="text-[12px] text-ink/55 mt-0.5">Tracking precision ready — only this player will be analysed.</p>
+                    <p className="text-[12px] text-ink/55 mt-0.5">{markerAnchors?.length || 1} reference taps ready for identity checks.</p>
                   </div>
                   <button
                     type="button"

@@ -1,16 +1,4 @@
-/* eslint-env jest */
-/* global describe, test, expect */
-/**
- * sceneDetect.test.js — pure-logic tests for `distributeHints`.
- *
- * The `detectSceneCuts` itself requires a real HTMLVideoElement so we skip
- * it in unit tests (covered by E2E later). What we DO test here is the
- * deterministic hint-distribution math that drives ScoutMode's timeline.
- *
- * Run with:  cd /app/frontend && CI=true yarn test --testPathPattern=sceneDetect --watchAll=false
- */
-
-import { distributeHints } from "./sceneDetect";
+import { distributeHints, __testing__ } from "./sceneDetect";
 
 describe("distributeHints", () => {
   test("no scene cuts → spreads count hints across the whole duration", () => {
@@ -87,4 +75,40 @@ describe("distributeHints", () => {
     const hints = distributeHints(60, [30], 5);
     expect(hints).toHaveLength(5);
   });
+});
+
+test("identical histograms have zero distance; a complete colour change can exceed the cut threshold", () => {
+  const a = new Float32Array(24), b = new Float32Array(24);
+  for (const start of [0, 8, 16]) { a[start] = 1; b[start + 7] = 1; }
+  expect(__testing__.chiSquared(a, a)).toBe(0);
+  expect(__testing__.chiSquared(a, b)).toBe(1);
+});
+
+test("no scenes gives exactly ten timestamps spanning the full clip", () => {
+  const hints = distributeHints(60, [], 10);
+  expect(hints).toHaveLength(10);
+  expect(hints[0]).toBe(3);
+  expect(hints[9]).toBe(57);
+});
+
+test("each scene gets at least one tap when the budget permits it", () => {
+  const hints = distributeHints(60, [5, 20, 40], 10);
+  expect(hints).toHaveLength(10);
+  for (const [a, b] of [[0, 5], [5, 20], [20, 40], [40, 60]]) {
+    expect(hints.some(t => t > a && t < b)).toBe(true);
+  }
+});
+
+test("more scenes than taps still covers beginning AND end instead of dropping the end", () => {
+  const hints = distributeHints(120, Array.from({ length: 29 }, (_, i) => (i + 1) * 4), 10);
+  expect(hints).toHaveLength(10);
+  expect(hints[0]).toBe(2);
+  expect(hints[9]).toBe(118);
+  expect(new Set(hints).size).toBe(10);
+});
+
+test("duplicate and invalid cut times do not create empty scenes or non-finite hints", () => {
+  expect(distributeHints(60, [20, 20, NaN, Infinity, -1, 65], 10)).toEqual(distributeHints(60, [20], 10));
+  expect(distributeHints(Infinity, [], 10)).toEqual([]);
+  expect(distributeHints(60, [], 0)).toEqual([]);
 });
