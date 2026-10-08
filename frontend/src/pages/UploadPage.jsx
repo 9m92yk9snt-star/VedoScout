@@ -9,13 +9,11 @@ import PrecisionScanOverlay from "@/components/PrecisionScanOverlay";
 import { startBackgroundAnalysis } from "@/components/BackgroundAnalysisTracker";
 import MarkerStudio from "@/components/MarkerStudio";
 import AccountGateModal from "@/components/auth/AccountGateModal";
-import PremiumReadyOverlay from "@/components/PremiumReadyOverlay";
 import { useAuth } from "@/lib/auth-context";
 import { isPremiumUser } from "@/lib/premium";
 import { serializeMarkerAnchors } from "@/lib/anchorSerialization.mjs";
 import MarkedCropCanvas from "@/components/MarkedCropCanvas";
 
-const ASSET_BASE = process.env.REACT_APP_BACKEND_URL || "";
 import api from "@/lib/api";
 import { trackFunnel } from "@/lib/analytics";
 import { UploadCloud, Film, Loader2, ArrowRight, Crosshair, Check, RefreshCw, AlertCircle, Lock, Zap, Link as LinkIcon, FileUp, ShieldCheck, Clock, FileText, Lightbulb, Play, Maximize2, User, Calendar, Shirt, Hash, Video, Heart, Footprints, TrendingUp, CheckCircle2, Rocket, ZoomIn, ScanSearch, EyeOff, LocateFixed, Globe, Camera, ChevronsUpDown, X as XIcon } from "lucide-react";
@@ -75,24 +73,11 @@ export default function UploadPage() {
   const photoInputRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);            // 0–100 — XHR.upload.onprogress
-  const [backendStep, setBackendStep] = useState(0);        // 1–5 real backend progress_step
-  const [lastBeat, setLastBeat] = useState(null);            // server heartbeat (liveness)
-  const [uploadPhase, setUploadPhase] = useState("idle");   // 'uploading' | 'analyzing' | 'done'
-  const [premiumReadyReport, setPremiumReadyReport] = useState(null); // Session 130 — premium-tier celebration screen
+  const [uploadPhase, setUploadPhase] = useState("idle"); // uploading | saving
+  const [analysisStartedAt, setAnalysisStartedAt] = useState(null);
   const [howOpen, setHowOpen] = useState(false); // Step 2 "How it works" inline explainer
   const [videoMeta, setVideoMeta] = useState(null); // { duration, width, height } — smart summary card
   const [profiles, setProfiles] = useState([]); // Stage 5 — saved player identity profiles
-  // Holds the completed upload response while the "done" celebration is on
-  // screen so the CTA on PrecisionScanOverlay can short-circuit the 1.8 s hold.
-  const pendingDoneRef = useRef(null);
-  // Flag set when the user clicks "Go to Dashboard" — breaks the local
-  // poll loop in handleSubmit so the global BackgroundAnalysisTracker can take
-  // over and the user is free to navigate away.
-  const backgroundedRef = useRef(false);
-  // The report id from the upload response — lets the Go-to-Dashboard handler
-  // hand off to the background tracker immediately (no poll-tick dependency).
-  const reportIdRef = useRef(null);
-
   // ── Guest-first flow (Session 144) — upload first, account right before analysis ──
   const [gateOpen, setGateOpen] = useState(false);
   const [bgUpload, setBgUpload] = useState({ status: "idle", pct: 0, token: null });
@@ -531,6 +516,9 @@ export default function UploadPage() {
     const _playerPhoto = o.playerPhoto !== undefined ? o.playerPhoto : playerPhoto;
 
     setSubmitting(true);
+    setAnalysisStartedAt(Date.now());
+    setUploadPhase("uploading");
+    setUploadPct(0);
     const fd = new FormData();
     if (_file?._fromUrl && _tempToken) {
       fd.append("temp_video_token", _tempToken);
@@ -608,109 +596,30 @@ export default function UploadPage() {
     }
 
     try {
-      setUploadPct(0);
-      setUploadPhase("uploading");
+      const tokenUpload = fd.has("temp_video_token");
+      setUploadPhase(tokenUpload ? "saving" : "uploading");
       const { data } = await api.post("/reports/upload", fd, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 600000,
         onUploadProgress: (ev) => {
-          if (ev.total) {
+          if (!tokenUpload && ev.total) {
             const pct = Math.min(100, Math.round((ev.loaded * 100) / ev.total));
             setUploadPct(pct);
-            if (pct >= 100) setUploadPhase("analyzing");
+            if (pct >= 100) setUploadPhase("saving");
           }
         },
       });
 
-      // ====== ASYNC PIPELINE — poll the status endpoint for real backend progress. ======
-      // The upload endpoint now returns IMMEDIATELY (~30s) with analysis_status="analyzing"
-      // while the two slow Gemini calls (content gate + preview generation) run as a
-      // background task on the server. We poll /reports/{id}/status every 3s until
-      // status === "ready" (success) or "failed" (rejected/error).
-      let finalData = data;
-      reportIdRef.current = data?.id || null;
-      if (data?.id) trackFunnel("analysis_submitted");
-      if (data?.analysis_status === "analyzing") {
-        const start = Date.now();
-        const MAX_WAIT_MS = 10 * 60 * 1000; // 10 minute hard ceiling
-        backgroundedRef.current = false;
-        // poll loop
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          // User clicked "Go to Dashboard" → the button handler already did the
-          // navigation + toast; just make sure the tracker owns this report and
-          // stop the local loop (covers a click that landed mid-upload too).
-          if (backgroundedRef.current) {
-            startBackgroundAnalysis(data.id);
-            return;
-          }
-          if (Date.now() - start > MAX_WAIT_MS) {
-            startBackgroundAnalysis(data.id);
-            toast.error("Your report is taking longer than expected. We've saved it — check your Dashboard in a minute.");
-            navigate(`/dashboard`);
-            return;
-          }
-          await new Promise((r) => setTimeout(r, 3000));
-          try {
-            const { data: statusResp } = await api.get(`/reports/${data.id}/status`);
-            setUploadPhase("analyzing");
-            // Feed the REAL backend progress into the overlay so the ladder
-            // reflects reality (instead of the old client-side wall-clock lie
-            // that jumped to step 5 in 36 s even when backend was still at 2).
-            if (typeof statusResp.progress_step === "number") {
-              setBackendStep(statusResp.progress_step);
-              setUploadPct(Math.min(100, Math.round((statusResp.progress_step / 5) * 100)));
-            }
-            setLastBeat(statusResp.last_progress_at || null);
-            if (statusResp.status === "failed") {
-              const errMsg = statusResp.error || "Analysis failed. Please try again or upload a clearer clip.";
-              toast.error(errMsg);
-              setUploadPhase("idle");
-              return;
-            }
-            if (statusResp.status === "ready") {
-              finalData = { ...data, ...statusResp };
-              break;
-            }
-          } catch (pollErr) {
-            // Transient network blips — keep polling. Hard 4xx/5xx will surface above.
-            // eslint-disable-next-line no-console
-            console.warn("status poll failed (will retry):", pollErr?.message);
-          }
-        }
-      }
-
-      setUploadPhase("done");
-      // Remember the response so the CTA on the success overlay can fire it
-      // straight away (otherwise we wait ~1.8 s for the celebration to land).
-      // Session 127 — Premium tier users (admin/premium/vip/scout) NEVER see
-      // the HeroTeaser paywall modal ("Unlock the full report — $159"). It's
-      // reserved for free users only. Their reason may not be "prepaid" but
-      // they still have full access via their role. Bundle the check into the
-      // ref so both the timer-driven path AND the manual "View report" click
-      // route them straight to the premium celebration screen.
-      // Subscription-based premium (reason "subscription") and any report the
-      // backend already marked paid must ALSO bypass the free-tier HeroTeaser.
-      const skipHeroTeaser =
-        isPaidTier ||
-        eligibility?.reason === "prepaid" ||
-        eligibility?.reason === "subscription" ||
-        !!finalData?.is_paid;
-      pendingDoneRef.current = { data: finalData, skipHeroTeaser };
-      await new Promise((r) => setTimeout(r, 1800));
-      if (!pendingDoneRef.current) return;
-      pendingDoneRef.current = null;
-      if (!skipHeroTeaser) {
-        // Free-tier flow: straight to the report route — the NEW high-CTR
-        // FreePreviewLanding conversion page renders there. (Old HeroTeaser
-        // modal removed per owner request.)
-        setUploadPhase("idle");
-        if (finalData?.id) navigate(`/report/${finalData.id}`);
-        return;
-      }
-      // Session 130 — Premium-tier flow: dedicated PremiumReadyOverlay
-      // celebration screen. NO blur, NO pricing, NO upgrade prompts.
-      setPremiumReadyReport(finalData);
+      // The server has accepted the upload. The report route owns the entire
+      // preview + full-analysis wait; accepting or previewing is never "done".
+      if (!data?.id) throw new Error("The server did not return a report reference.");
+      trackFunnel("analysis_submitted");
+      startBackgroundAnalysis(data.id, {
+        startedAt: Date.parse(data.created_at) || Date.now(),
+        playerName: _form.player_name,
+        target: data.is_paid || data.manually_unlocked ? "full" : "preview",
+      });
+      navigate(`/report/${data.id}`, { replace: true });
     } catch (err) {
       // 402 with structured detail = pre-pay required
       const detail = err?.response?.data?.detail;
@@ -855,65 +764,16 @@ export default function UploadPage() {
         onClose={() => setEmbeddedOpen(false)}
       />
       <PrecisionScanOverlay
-        open={submitting && !premiumReadyReport}
-        phase={uploadPhase === "uploading" ? "uploading" : uploadPhase === "done" ? "done" : "analyzing"}
+        open={submitting}
+        phase={uploadPhase === "saving" ? "saving" : "uploading"}
         uploadPct={uploadPct}
-        backendStep={backendStep}
         playerName={form.player_name}
         playerAge={form.age}
         playerPosition={form.position}
         tapsCount={markerAnchors?.length || 0}
         heroImage={markerPreviewUrl}
-        lastProgressAt={lastBeat}
-        onContinueInBackground={() => {
-          // Immediate handoff — never depend on the poll loop's next tick.
-          backgroundedRef.current = true;
-          const rid = reportIdRef.current;
-          if (rid) {
-            startBackgroundAnalysis(rid);
-            toast.success("We'll let you know when your report is ready.", { duration: 4500 });
-          } else {
-            // Upload POST still in flight — the poll loop hands off once the id exists.
-            toast.success("Your upload keeps running — we'll let you know when the report is ready.", { duration: 4500 });
-          }
-          setSubmitting(false);
-          setUploadPhase("idle");
-          navigate("/dashboard");
-        }}
-        onViewReport={() => {
-          const pending = pendingDoneRef.current;
-          if (!pending) return;
-          pendingDoneRef.current = null;
-          if (!pending.skipHeroTeaser) {
-            // Free preview → the NEW conversion page (FreePreviewLanding) on the report route.
-            setSubmitting(false);
-            setUploadPhase("idle");
-            if (pending.data?.id) navigate(`/report/${pending.data.id}`);
-          } else {
-            // Session 130 — Premium celebration screen instead of instant nav.
-            setPremiumReadyReport(pending.data);
-          }
-        }}
-      />
-      {/* Old free-tier HeroTeaser modal REMOVED — free users now land on the
-          FreePreviewLanding conversion page at /report/{id}. */}
-      {/* Session 130 — Premium-tier celebration overlay. Deliberately separate
-          from HeroTeaser (which is the free-tier paywall). Zero blur, zero
-          pricing, single "Open Full Premium Report" CTA that navigates to the
-          full dossier where the auto-gen useEffect kicks in. */}
-      <PremiumReadyOverlay
-        open={!!premiumReadyReport}
-        report={premiumReadyReport}
-        assetBase={ASSET_BASE}
-        onOpenReport={() => {
-          const target = premiumReadyReport?.id;
-          setPremiumReadyReport(null);
-          if (target) navigate(`/report/${target}`);
-        }}
-        onDismiss={() => {
-          setPremiumReadyReport(null);
-          navigate("/dashboard");
-        }}
+        startedAt={analysisStartedAt}
+        target={isPaidTier || eligibility?.reason === "prepaid" || eligibility?.reason === "subscription" ? "full" : "preview"}
       />
       <MarkerStudio
         open={studioOpen}

@@ -15,6 +15,7 @@ import InboxPanels from "@/components/dashboard/InboxPanels";
 import CommunityPulse from "@/components/dashboard/CommunityPulse";
 import OpportunitiesPanel from "@/components/dashboard/OpportunitiesPanel";
 import api from "@/lib/api";
+import { assetUrl, getAnalysisView } from "@/lib/analysisProgress.mjs";
 import { useAuth } from "@/lib/auth-context";
 import { trackPurchase } from "@/lib/pixels";
 import {
@@ -297,6 +298,7 @@ export default function DashboardPage() {
                   <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-px bg-ink/10 border border-ink/10">
                     {reports.map((r) => {
                       const unlocked = r.is_paid || r.manually_unlocked;
+                      const analysis = getAnalysisView(r);
                       return (
                         <div key={r.id} className="group bg-cream-card hover:bg-white transition-colors flex flex-col overflow-hidden">
                         <Link
@@ -308,7 +310,7 @@ export default function DashboardPage() {
                           <div className="relative aspect-video bg-ink overflow-hidden">
                             {r.poster_url ? (
                               <img
-                                src={`${process.env.REACT_APP_BACKEND_URL}${r.poster_url}`}
+                                src={assetUrl(r.poster_url, process.env.REACT_APP_BACKEND_URL || "")}
                                 alt={r.player_details?.player_name}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                               />
@@ -338,8 +340,11 @@ export default function DashboardPage() {
                               <h3 className="font-barlow font-black uppercase text-lg text-ink group-hover:text-forest transition-colors leading-tight truncate">
                                 {r.player_details?.player_name}
                               </h3>
-                              <span className="text-forest text-[10px] uppercase tracking-widest font-black flex-shrink-0 mt-1">View →</span>
+                              <span className="text-forest text-[10px] uppercase tracking-widest font-black flex-shrink-0 mt-1">{analysis.complete ? "Open →" : "Follow →"}</span>
                             </div>
+                            <p className="mt-2 text-[11px] font-semibold text-forest" data-testid={`dashboard-analysis-${r.id}`}>
+                              {analysis.title}
+                            </p>
                             <div className="mt-1 flex items-center gap-2">
                               <MiniPitch position={r.player_details?.position} className="w-5 h-7 flex-shrink-0" />
                               <p className="text-[12px] text-ink/60 leading-snug">

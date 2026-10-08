@@ -9,6 +9,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, Crown, ArrowRight, LayoutDashboard, Target, Brain, Zap, Activity } from "lucide-react";
+import { isFullReportReady } from "../lib/reportReady.mjs";
 
 const RESOLVE_IMG = (report, assetBase) => {
   // Prefer the high-quality square DISPLAY crop (centred on the tapped player)
@@ -31,7 +32,7 @@ export default function PremiumReadyOverlay({ open, report, assetBase, onOpenRep
 
   return (
     <AnimatePresence>
-      {open && (
+      {open && isFullReportReady(report) && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

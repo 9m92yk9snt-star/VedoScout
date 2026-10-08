@@ -30,6 +30,8 @@ import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
 import DoubtConfirmModal from "@/components/DoubtConfirmModal";
 import PremiumBuildingDashboard from "@/components/report-states/PremiumBuildingDashboard";
 import { isFullReportReady } from "@/lib/reportReady.mjs";
+import { getAnalysisView, isPreviewReady } from "@/lib/analysisProgress.mjs";
+import { pollAnalysis } from "@/lib/pollAnalysis.mjs";
 import FreePreviewLanding from "@/components/report-states/FreePreviewLanding";
 import StatsTicker from "@/components/StatsTicker";
 
@@ -1622,6 +1624,10 @@ export default function ReportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [report, setReport] = useState(null);
+  const [analysisStatus, setAnalysisStatus] = useState(null);
+  const [analysisConnectionError, setAnalysisConnectionError] = useState(null);
+  const [analysisPollKey, setAnalysisPollKey] = useState(0);
+  const [fullReportError, setFullReportError] = useState(null);
   const previewTrackedRef = useRef(false);
   const [price, setPrice] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -1727,49 +1733,63 @@ export default function ReportPage() {
     }
   }, [report?.id]);
 
-  // Session 126 — Auto-generate the full scout dossier for premium tiers
-  // (admin/premium/vip/scout) OR any report that's already paid/unlocked but
-  // hasn't materialised the full_report yet. Was previously a manual button-
-  // click flow (line 3138 "Report unlocked · Generate full report"). Premium
-  // users should never see a "click to generate" prompt — the dossier just
-  // renders. Guard against re-triggering with a ref so React StrictMode's
-  // double-effect doesn't fire two Gemini jobs.
-  const autoGenTriggeredRef = useRef(false);
-  const [fullReportError, setFullReportError] = useState(null);
+  // One status stream spans the initial preview and full dossier. Readiness
+  // is report-scoped; a premium viewer does not unlock someone else's report.
+  const currentAnalysis = analysisStatus?.id === id ? { ...report, ...analysisStatus } : report;
+  const analysisTarget = report?.is_paid || report?.manually_unlocked ? "full" : "preview";
+  const reportComplete = !!report && getAnalysisView(report).complete;
   useEffect(() => {
-    if (!report || generatingFull || autoGenTriggeredRef.current) return;
-    // ONLY reports that are actually paid/unlocked may auto-generate — never
-    // trigger a (costly) full Gemini run just because the VIEWER is admin/premium.
-    const alreadyUnlocked = report.is_paid || report.manually_unlocked;
-    // FIX 00B — the report body existing is NOT completion: keep the flow
-    // (and polling) alive until full_report_status === "ready".
-    const needsFullReport = alreadyUnlocked && !isFullReportReady(report);
-    // Don't auto-fire if the backend is already generating (e.g. right after
-    // a successful checkout). The Stripe success path sets generatingFull.
-    if (needsFullReport) {
-      autoGenTriggeredRef.current = true;
-      (async () => {
-        setGeneratingFull(true);
-        try {
-          // Don't re-fire if the backend is already generating (e.g. right after
-          // a successful checkout or a doubt-confirmation wait) — just poll.
-          if (!["generating", "awaiting_confirmation", "verifying", "finalizing"].includes(report.full_report_status)) {
-            await api.post(`/reports/${id}/generate-full`);
-          }
-          await pollFullReportReady();
-          await fetchReport();
-        } catch (err) {
-          // Surface a retry card on the building dashboard instead of a toast.
-          setFullReportError(err?.message || "Generation was interrupted — tap retry, nothing is lost.");
-          // eslint-disable-next-line no-console
-          console.warn("Auto full-report generation failed:", err?.message);
-        } finally {
-          setGeneratingFull(false);
+    if (!report?.id || report.demo || reportComplete) return undefined;
+    let cancelled = false;
+    setFullReportError(null);
+    pollAnalysis(api, id, {
+      target: analysisTarget,
+      isCancelled: () => cancelled,
+      onConnectionError: setAnalysisConnectionError,
+      onStatus: data => {
+        setAnalysisStatus(data);
+        if (["generating", "awaiting_confirmation", "verifying", "finalizing", "ready"].includes(data?.full_report_status)) {
+          setFullReportError(previous => previous?.kind === "start" ? null : previous);
         }
-      })();
-    }
+        if (data?.doubt_status === "awaiting" && data?.doubt_moments?.length) setDoubtInfo({ moments: data.doubt_moments });
+        else if (data?.doubt_status && data.doubt_status !== "awaiting") setDoubtInfo(null);
+      },
+    }).then(async data => {
+      if (data && !cancelled) await fetchReport();
+    }).catch(error => { if (!cancelled) setFullReportError(error); });
+    return () => { cancelled = true; };
+    // Data updates belong to this stream; only a new report/target or an
+    // explicit "check status" restarts it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report, user]);
+  }, [id, report?.id, report?.demo, analysisTarget, reportComplete, analysisPollKey]);
+
+  const autoGenReportRef = useRef(null);
+  // A new upload's server task starts the full job after its identity profile
+  // is saved. Do not start it early just because the live preview became ready.
+  const previewComplete = isPreviewReady(report);
+  const currentFullStatus = currentAnalysis?.full_report_status;
+  useEffect(() => {
+    const alreadyUnlocked = report?.is_paid || report?.manually_unlocked;
+    if (!alreadyUnlocked || !previewComplete || isFullReportReady(currentAnalysis) || getAnalysisView(currentAnalysis).failed) return;
+    if (["generating", "awaiting_confirmation", "verifying", "finalizing", "failed"].includes(currentFullStatus) || autoGenReportRef.current === id) return;
+    autoGenReportRef.current = id;
+    let cancelled = false;
+    setGeneratingFull(true);
+    api.post(`/reports/${id}/generate-full`).then(({ data }) => {
+      if (!cancelled) setAnalysisStatus(previous => ({ ...previous, id, full_report_status: data.full_report_status || "generating" }));
+    }).catch(error => {
+      if (!cancelled) setFullReportError(Object.assign(error, { kind: error?.response?.status >= 400 && error.response.status < 500 ? "access" : "start" }));
+    })
+      .finally(() => { setGeneratingFull(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, report?.is_paid, report?.manually_unlocked, previewComplete, currentFullStatus]);
+
+  const checkAnalysisStatus = () => {
+    setFullReportError(null);
+    setAnalysisConnectionError(null);
+    setAnalysisPollKey(value => value + 1);
+  };
 
   // Auto-open the embedded checkout when ?unlock=1 (Hero Teaser navigates here with this param)
   /* eslint-disable */
@@ -1811,19 +1831,8 @@ export default function ReportPage() {
           np.delete("session_id");
           setSearchParams(np, { replace: true });
           await fetchReport();
-          // trigger full report generation (async + polled — backend returns
-          // immediately so we never hit Cloudflare's 100s edge timeout).
-          setGeneratingFull(true);
-          try {
-            await api.post(`/reports/${id}/generate-full`);
-            await pollFullReportReady();
-            await fetchReport();
-            toast.success("Full premium report ready");
-          } catch (e) {
-            toast.error(e?.message || e?.response?.data?.detail || "Failed to generate full report");
-          } finally {
-            setGeneratingFull(false);
-          }
+          // The shared waiting room follows full generation after payment.
+          toast.success("Report unlocked. Your full analysis is continuing.");
           return;
         }
         if (data.status === "expired") {
@@ -1890,78 +1899,21 @@ export default function ReportPage() {
   };
 
   const handleEmbeddedSuccess = async () => {
+    setEmbeddedOpen(false);
     await fetchReport();
-    // Trigger full report generation — backend now returns immediately and the
-    // heavy Gemini work runs in a background task. We poll until ready so the
-    // request never hits the Cloudflare 100s edge timeout.
-    setGeneratingFull(true);
-    try {
-      await api.post(`/reports/${id}/generate-full`);
-      await pollFullReportReady();
-      await fetchReport();
-      toast.success("Full premium report unlocked");
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Couldn't auto-generate full report. Click 'Regenerate' below.");
-    } finally {
-      setGeneratingFull(false);
-    }
-  };
-
-  // Polls the report-status endpoint until the full report finishes generating
-  // (or fails). The backend now auto-resumes orphaned generations (restart-safe
-  // watchdog), so we patiently poll up to 20 min before giving up.
-  const pollFullReportReady = async () => {
-    const start = Date.now();
-    const HARD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
-    const NO_PROGRESS_TIMEOUT_MS = 20 * 60 * 1000;
-    let lastProgress = start;
-    let heartbeat = null;
-    while (Date.now() - start < HARD_TIMEOUT_MS) {
-      try {
-        const { data } = await api.get(`/reports/${id}/status`);
-        if (data?.last_progress_at && data.last_progress_at !== heartbeat) {
-          heartbeat = data.last_progress_at;
-          const serverTime = Date.parse(heartbeat);
-          // A stale persisted timestamp is not a new liveness signal.
-          if (Number.isFinite(serverTime) && Date.now() - serverTime < NO_PROGRESS_TIMEOUT_MS) {
-            lastProgress = Date.now();
-          }
-        }
-        if (data?.doubt_status === "awaiting" && data?.doubt_moments?.length) {
-          setDoubtInfo({ moments: data.doubt_moments });
-        } else if (data?.doubt_status && data.doubt_status !== "awaiting") {
-          setDoubtInfo(null);
-        }
-        if (isFullReportReady(data)) return data;
-        if (data?.full_report_status === "failed") {
-          const failure = new Error(data?.full_report_error || "Full report generation failed");
-          failure.analysisTerminal = true;
-          throw failure;
-        }
-        if (Date.now() - lastProgress >= NO_PROGRESS_TIMEOUT_MS) {
-          const stalled = new Error("Analysis has not reported progress for 20 minutes. Please refresh to check recovery.");
-          stalled.analysisTerminal = true;
-          throw stalled;
-        }
-      } catch (e) {
-        const status = e?.response?.status;
-        if (e?.analysisTerminal || (status >= 400 && status < 500 && status !== 408 && status !== 429)) throw e;
-        // transient network blips — keep polling
-      }
-      await new Promise((r) => setTimeout(r, 4500));
-    }
-    throw new Error("Full report is taking longer than usual. Please refresh the page in a minute.");
+    toast.success("Report unlocked. Your full analysis is continuing.");
   };
 
   const handleGenerateFull = async () => {
     setGeneratingFull(true);
+    setFullReportError(null);
     try {
-      await api.post(`/reports/${id}/generate-full`);
-      await pollFullReportReady();
+      const { data } = await api.post(`/reports/${id}/generate-full`);
+      setAnalysisStatus(previous => ({ ...previous, id, full_report_status: data.full_report_status || "generating" }));
+      checkAnalysisStatus();
       await fetchReport();
-      toast.success("Full report ready");
-    } catch (err) {
-      toast.error(err?.message || err?.response?.data?.detail || "Failed to generate full report");
+    } catch (error) {
+      setFullReportError(error);
     } finally {
       setGeneratingFull(false);
     }
@@ -2175,7 +2127,7 @@ export default function ReportPage() {
   /* ═══ NEW premium building dashboard — unlocked but dossier not ready yet.
      Existing polling/auto-gen effects keep running and swap in the full
      dossier automatically the moment generation completes. ═══ */
-  if (unlocked && !report.demo) {
+  if (!report.demo && (unlocked || !isPreviewReady(report))) {
     return (
       <div className="min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
@@ -2189,9 +2141,11 @@ export default function ReportPage() {
         )}
         <PremiumBuildingDashboard
           report={report}
-          user={user}
+          status={analysisStatus?.id === id ? analysisStatus : null}
           error={fullReportError}
-          onRetry={() => window.location.reload()}
+          connectionError={analysisConnectionError}
+          onCheckStatus={checkAnalysisStatus}
+          onRetry={handleGenerateFull}
         />
       </div>
     );
