@@ -420,6 +420,32 @@ def build_sequence_plan(scene_graph: dict | None) -> dict:
                 "graph_context": _context_rows(frames, ss, ee),
             })
 
+    # Identity loss is a reason to search, not a reason to skip the action.
+    # Fill the uncovered part of each measured scene, keeping cut barriers and
+    # the normal window limit. These windows grant no actor/event authority.
+    for scene, (start, end) in bounds.items():
+        covered = sorted((w["start_ms"], w["end_ms"]) for w in analysis if w["scene_id"] == scene)
+        cursor, gaps = start, []
+        for left, right in covered:
+            if left > cursor:
+                gaps.append((cursor, left))
+            cursor = max(cursor, right)
+        if cursor < end:
+            gaps.append((cursor, end))
+        for left, right in gaps:
+            if right - left < 150:
+                continue
+            for ss, ee in _split_span(left, right):
+                analysis.append({
+                    "sequence_id": _stable_id("seq", scene, ss, ee),
+                    "scene_id": scene, "start_ms": ss, "end_ms": ee,
+                    "review_hz": NORMAL_REVIEW_HZ,
+                    "coverage_reason": "TARGET_IDENTITY_GAP_RECALL",
+                    "verified_frames": 0, "hypothesis_frames": 0,
+                    "graph_context": _context_rows(frames, ss, ee),
+                })
+    analysis.sort(key=lambda w: (w["start_ms"], w["scene_id"], w["end_ms"]))
+
     # Precision triggers, intentionally independent of whether an event has
     # already been classified. These tell the later refinement stage where
     # first touch/kick contact/feints/crossovers deserve denser inspection.

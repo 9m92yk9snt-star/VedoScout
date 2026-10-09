@@ -15,6 +15,7 @@ import goal_review_scheduler as scheduler
 
 MAX_ACTION_REVIEWS = max(0, int(os.environ.get("FIX13_MAX_ACTION_REVIEWS", "16")))
 MAX_ACTION_FRAMES = 12
+MAX_SEARCH_CONTEXT_MS = 8000
 MAX_FRAME_ALIGNMENT_MS = 20
 NATIVE_NEIGHBOR_RADIUS_MS = 120
 MAX_NATIVE_NEIGHBOR_FRAMES = 48
@@ -50,9 +51,16 @@ def build_plan(windows, analysis, budget=None):
             right = min(int(window["end_ms"]), int(desired_end), int(center + (2600 if has_contact else 1200)))
             if right - left < 150:
                 continue
+            # A guessed later shot must not hide the earlier scoring pass.
+            # Physical windows are already bounded and clipped at scene cuts;
+            # use their whole context while retaining the unproved search hint.
+            whole_window = window["end_ms"] - window["start_ms"] <= MAX_SEARCH_CONTEXT_MS
+            if whole_window:
+                left, right = int(window["start_ms"]), int(window["end_ms"])
             candidates.append({"scene_id": scene, "start_ms": left, "end_ms": right,
                                "center_ms": int(center), "dense_window_id": window["dense_window_id"],
                                "has_contact_time": has_contact,
+                               "search_scope": "WHOLE_PHYSICAL_WINDOW" if whole_window else "BOUNDED_HINT_CONTEXT",
                                "source_action_ids": [action.get("action_id")],
                                "reason": "OBSERVATION_NEEDS_PIXEL_INSPECTION"})
     # Physical recall still has an inspection path if the semantic provider
@@ -63,8 +71,8 @@ def build_plan(windows, analysis, budget=None):
                 for j in candidates):
             continue
         center = int((window["start_ms"] + window["end_ms"]) / 2)
-        candidates.append({"scene_id": window.get("scene_id"), "start_ms": max(window["start_ms"], center - 1000),
-                           "end_ms": min(window["end_ms"], center + 1000), "center_ms": center,
+        candidates.append({"scene_id": window.get("scene_id"), "start_ms": int(window["start_ms"]),
+                           "end_ms": int(window["end_ms"]), "center_ms": center,
                            "dense_window_id": window["dense_window_id"], "source_action_ids": [],
                            "has_contact_time": False,
                            "reason": "PHYSICAL_RECALL_WITHOUT_SEMANTIC_CONTACT"})
@@ -91,7 +99,7 @@ def build_plan(windows, analysis, budget=None):
             cell = min((c for c in cells if visits[(scene, c)] == minimum_visits), key=lambda c: cells[c][0]["center_ms"])
             job = cells[cell].pop(0)
             job["inspection_id"] = hashlib.sha256(json.dumps(
-                [job["scene_id"], job["start_ms"], job["end_ms"]]).encode()).hexdigest()[:20]
+                [job["scene_id"], job["dense_window_id"], job["start_ms"], job["end_ms"], job["center_ms"]]).encode()).hexdigest()[:20]
             job["selection_rank"] = len(ordered)
             job["selected"] = len(ordered) < limit
             ordered.append(job)
@@ -167,6 +175,19 @@ def bind_body(frame, box):
            for p in frame.get("players") or []):
         return None
     return player
+
+
+def measured_body_candidates(frame):
+    """Stable search IDs for uniquely measured crops, never player identities.
+
+    The pixel reader selects IDs rather than estimating body coordinates in a
+    portrait image. Only a subsequent independent crop reader can read digits.
+    """
+    bodies = sorted([p for p in frame.get("players") or []
+                     if bind_body(frame, p.get("box")) is p],
+                    key=lambda p: (p["box"]["x"], p["box"]["y"], p["local_track_id"]))
+    return [{"body_id": f"body_{i + 1}", "box": deepcopy(p["box"]),
+             "local_track_id": p["local_track_id"]} for i, p in enumerate(bodies[:12])]
 
 
 def apply_observations(frames, observations, inspection_id):
