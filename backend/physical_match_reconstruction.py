@@ -560,7 +560,8 @@ def reconstruct_physical_match(
             )
 
             stage = "jersey_request_selection"
-            requests = inspection_requests + jersey_consensus.select_jersey_review_requests(dense_frames, touches)
+            requests = jersey_consensus.merge_jersey_review_requests(
+                inspection_requests, jersey_consensus.select_jersey_review_requests(dense_frames, touches), touches)
 
             stage = "jersey_provider"
             votes_by_track = _safe_provider(

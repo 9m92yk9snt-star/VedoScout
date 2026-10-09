@@ -8,8 +8,13 @@ import re
 import math
 from copy import deepcopy
 
-VERSION = 1
+VERSION = 2
 NEUTRAL = "The verified evidence is insufficient to assess this claim."
+MISSING_ACTIONS = "The video evidence is incomplete. Missing detections do not establish a weakness in the player's shooting or scoring."
+QUALITY_NOTE = (
+    "This report contains partial verified evidence. Unconfirmed scoring claims "
+    "and assessments without a verified player/action link have been withheld. "
+    "Missing events do not establish zero shots, goals or assists, or a player weakness.")
 _GOAL = re.compile(r"\b(?:goals?|scor(?:es|ed|ing)|finishing|finisher|goal[- ]scorer|find(?:s|ing)? the (?:net|back of the net)|clinical)\b|\bscore\b(?!\s+(?:of|is|was|:))", re.I)
 _ASSIST = re.compile(r"\bassist(?:s|ed)?\b", re.I)
 _SAVE = re.compile(r"\b(?:save[sd]?|saved|forces? a save)\b", re.I)
@@ -17,6 +22,13 @@ _TIMESTAMP = re.compile(r"\b(\d{1,2}):(\d{2})\b")
 _CATEGORIES = ("technical", "tactical", "physical", "mentality")
 _ADVICE = {"training_plan", "next_match_missions", "development_roadmap",
            "development_priorities_detailed", "parent_tips", "benchmarks"}
+_SCORING_WORDS = r"(?:shots?|shooting|goals?|assists?|finishing|skud|afslutninger|m\u00e5l)"
+_ABSENCE = re.compile(
+    rf"\b(?:no|zero|0|without|lacks?|lacking|ingen|nul)\s+(?:any\s+)?(?:observed\s+|verified\s+)?{_SCORING_WORDS}\b"
+    rf"|\b{_SCORING_WORDS}\b(?:\s+\w+){{0,4}}\s+(?:not|never|ikke)\s+(?:observed|seen|shown|attempted|recorded|observeret|set)\b"
+    rf"|\b(?:did|does|has|have)\s+not\s+(?:attempt(?:ed)?|take(?:n)?|record(?:ed)?|produce(?:d)?)\s+(?:any\s+|a\s+)?{_SCORING_WORDS}\b", re.I)
+_ABSENCE_AS_WEAKNESS = re.compile(
+    r"\b(?:weak(?:ness)?|poor|underdeveloped|not (?:yet )?developed|lacking|needs? (?:development|improvement)|svag(?:hed)?|ikke udviklet)\b", re.I)
 
 
 def _skill_supports(name, events):
@@ -51,6 +63,8 @@ def _matching(events, row):
 
 
 def _supports(text, events):
+    if text in {NEUTRAL, MISSING_ACTIONS, QUALITY_NOTE}:
+        return True
     if _ASSIST.search(text):
         return any(e.get("canonical_event_type") == "ASSIST" and e.get("causal_verified") is True for e in events)
     if _SAVE.search(text):
@@ -75,9 +89,27 @@ def apply(full, canonical):
     # schemas record the actor proof as VERIFIED without its repeated boolean.
     events.extend(e for e in (canonical or {}).get("events") or [] if e not in events
                   and e.get("actor_resolution", {}).get("status") == "VERIFIED")
-    removed, unbound, invalid_skills = [], 0, []
+    previous = result.get("report_fact_authority") or {}
+    removed = list(previous.get("unsupported_claim_paths") or []) if previous.get("authority") == "CANONICAL_EVENTS" else []
+    unbound, invalid_skills = 0, []
+    scoring_complete = (result.get("verified_stats") or {}).get("goals_assists_available") is True
+
+    def absence_text(text, path):
+        if not _ABSENCE.search(text):
+            return None
+        # Even exhaustive zero attempts cannot demonstrate undeveloped skill.
+        # Partial detection cannot demonstrate zero attempts in the first place.
+        if not scoring_complete or _ABSENCE_AS_WEAKNESS.search(text):
+            removed.append(path)
+            return MISSING_ACTIONS if not scoring_complete else NEUTRAL
+        return None
 
     def clean_text(text, path, allowed=events):
+        if text in {NEUTRAL, MISSING_ACTIONS, QUALITY_NOTE}:
+            return text
+        absent = absence_text(text, path)
+        if absent is not None:
+            return absent
         parts = re.split(r"(?<=[.!?])\s+", text)
         keep = []
         for sentence in parts:
@@ -89,19 +121,24 @@ def apply(full, canonical):
                 keep.append(sentence)
         return " ".join(keep) if keep else NEUTRAL
 
-    def walk(value, path):
+    def walk(value, path, advice=False):
         if isinstance(value, dict):
             for k, v in list(value.items()):
-                if k in _ADVICE or k in {"action_timeline", "event_discovery", "verified_stats", "match_stats",
+                if k in {"action_timeline", "event_discovery", "verified_stats", "match_stats",
                                          "analysis_authority", "report_fact_authority", "evidence_authority_version"}:
                     continue
-                if k == "evidence" and isinstance(v, list):
+                if k == "evidence" and isinstance(v, list) and not advice:
                     continue  # evidence is checked below, including identity
-                value[k] = walk(v, f"{path}.{k}")
+                value[k] = walk(v, f"{path}.{k}", advice=advice or k in _ADVICE)
             return value
         if isinstance(value, list):
-            return [walk(v, f"{path}[{i}]") for i, v in enumerate(value)]
+            return [walk(v, f"{path}[{i}]", advice=advice) for i, v in enumerate(value)]
         if isinstance(value, str):
+            if advice:
+                # Generic exercises remain useful; evidence claims embedded in
+                # advice must not turn a detector failure into a player deficit.
+                absent = absence_text(value, path)
+                return value if absent is None else absent
             return clean_text(value, path)
         return value
 
@@ -159,10 +196,7 @@ def apply(full, canonical):
         "verified_event_ids": [e["event_id"] for e in events if e.get("event_id")],
     }
     if invalid_skills or removed:
-        result["evidence_quality_note"] = (
-            "This report contains partial verified evidence. Unconfirmed scoring claims "
-            "and assessments without a verified player/action link have been withheld. "
-            "Missing events do not establish zero goals or assists.")
+        result["evidence_quality_note"] = QUALITY_NOTE
     return result
 
 

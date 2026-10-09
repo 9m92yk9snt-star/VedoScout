@@ -779,7 +779,7 @@ def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[
     return requests
 
 
-async def read_action_pixel_evidence(api_key, session_id, paths, media_ms):
+async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_candidates=None):
     """Locate visible pixels for independent re-detection/crop review only."""
     import hashlib
     if not api_key or LlmChat is None:
@@ -790,12 +790,15 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms):
         "No selected player, jersey number, action label or expected result is supplied. "
         "Locate the visible football (not spare balls, field markings, socks or guessed hidden positions). "
         "If you cannot distinguish the active ball, return no ball boxes for that image. "
-        "Also locate player bodies whose jersey digits are clearly exposed and could be inspected in a tight crop. "
+        "The outlined body IDs are search labels, not shirt numbers or player identities. "
+        "Select only supplied body IDs whose jersey digits are exposed and could be inspected in a tight crop. "
+        "Do not invent IDs or estimate player-body coordinates. An empty selection is valid. "
         "Do not read or guess the digits; a separate crop reader does that. Do not infer identity, a pass, a shot, "
-        "a goal, an assist, ball ownership or an outcome. Coordinates are normalized 0..1 from the full image top-left. "
+        "a goal, an assist, ball ownership or an outcome. Each input may be a field crop of a portrait frame. "
+        "Ball coordinates are normalized 0..1 from the DISPLAYED IMAGE top-left, not from the source video. "
         'Return only {"frames":[{"idx":1,"balls":[{"box":{"x":0,"y":0,"w":0.01,"h":0.01},'
-        '"confidence":"high"|"medium"|"low"}],"jersey_bodies":[{"box":{"x":0,"y":0,"w":0.1,"h":0.2},'
-        '"confidence":"high"|"medium"|"low"}]}]} . Empty lists are valid.'
+        '"confidence":"high"|"medium"|"low"}],"selected_body_ids":["body_1"]}]} . Empty lists are valid. '
+        + "Measured search regions per image: " + json.dumps(body_candidates or [], separators=(",", ":"))
     )
     try:
         chat = LlmChat(api_key=api_key, session_id=session_id,
@@ -813,6 +816,54 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms):
     except Exception as exc:
         return {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
                 "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER}
+
+
+def _outline_search_bodies(image, candidates):
+    """Annotate a copy; the independent crop reader always gets native pixels."""
+    result = image.copy()
+    h, w = result.shape[:2]
+    for candidate in candidates:
+        box = candidate["box"]
+        x, y = int(box["x"] * w), int(box["y"] * h)
+        right, bottom = int((box["x"] + box["w"]) * w), int((box["y"] + box["h"]) * h)
+        cv2.rectangle(result, (x, y), (right, bottom), (255, 160, 0), 1)
+        cv2.putText(result, candidate["body_id"], (max(0, x), max(12, y - 5)),
+                    cv2.FONT_HERSHEY_SIMPLEX, .45, (255, 160, 0), 1, cv2.LINE_AA)
+    return result
+
+
+def _action_search_view(image, frame, candidates):
+    """Spend image resolution on the pitch; retain the exact native ROI mapping.
+
+    All measured bodies define the search band, including overlapping/unknown
+    players. The band selects pixels only and cannot establish ball ownership,
+    jersey identity, a shot or a goal. Other readers keep full scene context.
+    """
+    h, w = image.shape[:2]
+    boxes = [p["box"] for p in frame.get("players") or [] if _valid_box(p.get("box"))]
+    y0, y1 = 0, h
+    if h > 1.5 * w and boxes:
+        heights = sorted(b["h"] for b in boxes)
+        pad = max(.12, heights[len(heights) // 2])
+        top = min(b["y"] for b in boxes)
+        bottom = max(b["y"] + b["h"] for b in boxes)
+        y0 = max(0, int(math.floor((top - pad) * h)))
+        y1 = min(h, int(math.ceil((bottom + pad) * h)))
+        if y1 - y0 < 32:
+            y0, y1 = 0, h
+    roi = {"x": 0., "y": y0 / h, "w": 1., "h": (y1 - y0) / h}
+    displayed = [{"body_id": c["body_id"], "box": {
+        "x": c["box"]["x"], "y": (c["box"]["y"] - roi["y"]) / roi["h"],
+        "w": c["box"]["w"], "h": c["box"]["h"] / roi["h"]}} for c in candidates]
+    return _outline_search_bodies(image[y0:y1, :], displayed), roi, displayed
+
+
+def _native_search_box(box, roi):
+    if not _valid_box(box):
+        return None
+    box = {k: float(box[k]) for k in ("x", "y", "w", "h")}
+    return {"x": roi["x"] + box["x"] * roi["w"], "y": roi["y"] + box["y"] * roi["h"],
+            "w": box["w"] * roi["w"], "h": box["h"] * roi["h"]}
 
 
 def _native_ball_roi(detector, image, proposal):
@@ -892,7 +943,13 @@ class ShadowVisionProviders:
         requested = action_evidence_review.frame_times(job, dense_frames)
         if len(requested) < 2:
             return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_FRAMES_UNAVAILABLE", "frames": []}
-        cache_key = (str(video_path), job["inspection_id"], tuple(requested))
+        source_frames = {f["media_ms"]: f for f in dense_frames if f.get("media_ms") in requested
+                    and f.get("scene_id") == job["scene_id"] and not f.get("cut_barrier")
+                    and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"}
+        measured = {ms: action_evidence_review.measured_body_candidates(f) for ms, f in source_frames.items()}
+        search_geometry = {ms: [p.get("box") for p in f.get("players") or []] for ms, f in source_frames.items()}
+        body_hash = hashlib.sha256(json.dumps([measured, search_geometry], sort_keys=True).encode()).hexdigest()
+        cache_key = (str(video_path), job["inspection_id"], tuple(requested), body_hash)
         if cache_key in self._inspection_cache:
             return deepcopy(self._inspection_cache[cache_key])
         feedback = job.get("phase") == "FEEDBACK"
@@ -905,7 +962,7 @@ class ShadowVisionProviders:
         decoded = _read_frames(video_path, requested)
         images = {}
         with tempfile.TemporaryDirectory(prefix="action_pixels_") as directory:
-            paths, times = [], []
+            paths, times, body_manifest, search_rois = [], [], [], {}
             for index, requested_ms in enumerate(requested):
                 got = decoded.get(requested_ms)
                 if not got or got[0] in images:
@@ -914,14 +971,19 @@ class ShadowVisionProviders:
                 if not job["start_ms"] <= actual_ms <= job["end_ms"]:
                     continue
                 path = Path(directory) / f"pixels_{index:03d}.jpg"
-                if _write_jpg(path, image):
+                candidates = measured.get(actual_ms, [])
+                view, roi, displayed = _action_search_view(image, source_frames.get(actual_ms, {}), candidates)
+                if _write_jpg(path, view):
                     paths.append(str(path)); times.append(int(actual_ms)); images[int(actual_ms)] = image
+                    search_rois[int(actual_ms)] = roi
+                    body_manifest.append({"media_ms": int(actual_ms), "source_roi": roi, "bodies": displayed})
             if len(paths) < 2:
                 return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
             self.inspection_calls += 1
             self.feedback_inspection_calls += int(feedback)
             review = asyncio.run(read_action_pixel_evidence(
-                self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times))
+                self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times,
+                body_candidates=body_manifest))
         import dense_track_refinement
         detector = dense_track_refinement._default_detector()
         rows = []
@@ -938,10 +1000,14 @@ class ShadowVisionProviders:
             proposals = row.get("balls") if isinstance(row.get("balls"), list) else []
             for ball in proposals[:3]:
                 if isinstance(ball, dict) and ball.get("confidence") in {"high", "medium"}:
-                    balls.extend(corroborate_ball_pixels(detector, images[media_ms], ball.get("box")))
-            proposals = row.get("jersey_bodies") if isinstance(row.get("jersey_bodies"), list) else []
-            bodies = [p for p in proposals[:6] if isinstance(p, dict)
-                      and p.get("confidence") in {"high", "medium"} and _valid_box(p.get("box"))]
+                    native_box = _native_search_box(ball.get("box"), search_rois[media_ms])
+                    balls.extend(corroborate_ball_pixels(detector, images[media_ms], native_box))
+            selected = row.get("selected_body_ids") if isinstance(row.get("selected_body_ids"), list) else []
+            # A reader choice opens a crop request only. Coordinates and the
+            # local body binding come from the exact measured source frame.
+            bodies = [{"body_id": c["body_id"], "box": deepcopy(c["box"]),
+                       "source": "MEASURED_BODY_ID_SELECTION"}
+                      for c in measured.get(media_ms, []) if c["body_id"] in selected]
             rows.append({"media_ms": media_ms, "scene_id": job["scene_id"],
                          "ball_candidates": balls[:3], "jersey_bodies": bodies})
         # A sparse search image cannot supply a velocity/contact chain. Use
@@ -983,6 +1049,7 @@ class ShadowVisionProviders:
                   "native_neighbor_requested_ms": neighbor_requested,
                   "native_neighbor_decoded_ms": neighbor_actual,
                   "native_neighbor_roi_attempts": roi_attempts,
+                  "body_search_regions": body_manifest, "body_selection_version": 2,
                   "canonical_authority": False, "ball_corroboration": "NATIVE_CLASS_32_DETECTOR"}
         self._inspection_cache[cache_key] = deepcopy(result)
         return result

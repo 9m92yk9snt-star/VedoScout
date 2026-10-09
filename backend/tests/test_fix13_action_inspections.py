@@ -67,7 +67,7 @@ def test_invalid_times_are_rejected_and_contact_sampling_keeps_early_and_termina
     job = inspection.build_plan([window()], analysis)["jobs"][0]
     frames = [frame(ms) for ms in range(800, 4000, 50)]
     requested = inspection.frame_times(job, frames)
-    assert len(requested) <= 12 and 1100 in requested and 3700 in requested
+    assert len(requested) <= 12 and 1100 in requested and 3950 in requested
     assert any(1100 < ms < 1300 for ms in requested)
     assert not inspection.frame_times(job, [{**frame(1100), "used_fallback": True}])
 
@@ -156,7 +156,7 @@ def test_native_neighbors_do_not_add_model_images_and_reject_misaligned_decodes(
     captured = []
     def decode(_video, times):
         return {ms: (ms + 17 if ms == 1100 else ms, np.zeros((64, 64, 3), np.uint8)) for ms in times}
-    async def read(_key, _session, paths, times):
+    async def read(_key, _session, paths, times, **_kwargs):
         captured.append(list(times))
         return {"status": "COMPLETED", "frames": [{"idx": 1, "balls": [{"confidence": "high", "box": BALL}]}]}
     monkeypatch.setattr(inspection, "frame_times", lambda *_: [1000, 2000])
@@ -381,3 +381,7 @@ def test_readonly_replay_keeps_no_key_offline_and_exports_checksummed_partial_re
         assert json.loads(z.read("manifest.json"))["db_writes"] == 0
     with pytest.raises(RuntimeError, match="requires EMERGENT_LLM_KEY"):
         replay.replay(filename, support_vision=True)
+    fingerprints = iter([{"source": "before"}, {"source": "after"}])
+    monkeypatch.setattr(replay, "_backend_sha256", lambda: next(fingerprints))
+    with pytest.raises(RuntimeError, match="Backend source changed during replay"):
+        replay.replay(filename)

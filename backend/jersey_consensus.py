@@ -155,6 +155,48 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
     return requests
 
 
+def merge_jersey_review_requests(pixel_requests, ordinary_requests, touch_graph):
+    """Readable crops keep their physical actor priority under the same budget.
+
+    Pixel inspection can expose many uninvolved backs. They must not consume
+    the first two independent reads reserved for a release/control actor.
+    Neither crop selection nor prioritisation supplies a shirt number.
+    """
+    priority = _track_priority(touch_graph)
+    touch_times = {}
+    for touch in (touch_graph or {}).get("touches") or []:
+        ms = touch.get("representative_ms", touch.get("media_ms"))
+        if _num(ms):
+            touch_times.setdefault(touch.get("player_track_id"), []).append(ms)
+    grouped, seen = {}, set()
+    for inspected, rows in ((True, pixel_requests), (False, ordinary_requests)):
+        for request in rows or []:
+            track, ms, box = request.get("track_id"), request.get("media_ms"), request.get("box")
+            if not isinstance(track, str) or not _num(ms) or not _valid_box(box):
+                continue
+            key = (track, ms, *(float(box[k]) for k in ("x", "y", "w", "h")))
+            if key in seen:
+                continue
+            seen.add(key)
+            grouped.setdefault(track, []).append({**deepcopy(request), "pixel_selected": inspected})
+    selected = []
+    for track in sorted(grouped, key=lambda t: (*priority.get(t, (3, 10**9)), t)):
+        def crop_order(request):
+            distance = min((abs(request["media_ms"] - ms) for ms in touch_times.get(track, [])), default=0)
+            return (not request["pixel_selected"], distance, request["media_ms"])
+        chosen = []
+        for request in sorted(grouped[track], key=crop_order):
+            if any(abs(request["media_ms"] - old["media_ms"]) < MIN_TEMPORAL_SEPARATION_MS for old in chosen):
+                continue
+            chosen.append(request)
+            request.update(selection_rank=len(chosen), review_priority=priority.get(track, (3, 10**9))[0],
+                           expected_jersey_number=None)
+            selected.append(request)
+            if len(chosen) >= MAX_REVIEW_FRAMES:
+                break
+    return selected
+
+
 def aggregate_jersey_votes(votes) -> dict:
     """Aggregate independent frame reads into a fail-closed posterior."""
     cleaned = []

@@ -43,7 +43,30 @@ import video_timebase
 from scripts import reference_action_review
 
 
+def _backend_sha256():
+    return {**{p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},
+            "scripts/replay_report_evidence.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+            "scripts/reference_action_review.py": hashlib.sha256(Path(reference_action_review.__file__).read_bytes()).hexdigest()}
+
+
+def restore_direct_taps(authority, anchor_document):
+    """Restore exported user selections, never unexported tracking observations."""
+    result = deepcopy(authority)
+    if result.get("target_points"):
+        return result, {"status": "ALREADY_EXPORTED", "restored_points": 0}
+    if not isinstance(anchor_document, dict) or not isinstance(anchor_document.get("anchors"), list):
+        return result, {"status": "DIRECT_TAPS_NOT_EXPORTED", "restored_points": 0}
+    taps_only = unified_identity_authority.build_unified_identity_authority(
+        identity_timeline={"scenes": result.get("scenes") or []},
+        anchors=anchor_document["anchors"], anchor_time_offset=anchor_document.get("anchor_time_offset", 0))
+    result["target_points"] = taps_only["target_points"]
+    return result, {"status": "DIRECT_USER_SELECTIONS_ONLY", "restored_points": len(taps_only["target_points"]),
+                    "source": "CHECKSUM_VERIFIED_ANCHORS_JSON", "continuous_identity_restored": False}
+
+
 def replay(path, video_detail=False, support_vision=False, output_dir=None, reference_cases=None):
+    backend_sha256 = _backend_sha256()
     video_path = None
     api_key = os.environ.get("EMERGENT_LLM_KEY", "") if support_vision else ""
     if support_vision and not api_key:
@@ -56,7 +79,8 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
         if hashlib.sha256(z.read(name.strip().lstrip("*"))).hexdigest() != digest:
             raise ValueError("Evidence checksum mismatch")
     report = json.loads(z.read("report.json"))
-    authority = report["unified_identity_authority"]
+    anchor_document = json.loads(z.read("anchors.json")) if "anchors.json" in z.namelist() else None
+    authority, identity_restoration = restore_direct_taps(report["unified_identity_authority"], anchor_document)
     traces = [json.loads(z.read(name)) for name in z.namelist() if name.startswith("traces/") and name.endswith(".json")]
     physical, requests = {"traces": [], "status": "ok"}, []
     inspection_plan = action_evidence_review.build_plan([t["window"] for t in traces], report["football_sequence_analysis"])
@@ -126,10 +150,13 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                         contacts.setdefault("accepted", []).append(deepcopy(c))
                         contacts.setdefault("contacts", []).append(deepcopy(c))
                 graph = touch_graph.build_touch_graph(contacts, authority, frames)
+                graph = contact_role_resolver.apply_contact_roles(graph, contacts, dense_frames=frames, ball_trajectory=trajectory)
                 votes = {tid: row.get("votes") or [] for tid, row in original["jersey_consensus"].items()
                          if isinstance(row, dict)}
                 if bundle is not None and inspection_requests:
-                    fresh = bundle.jersey_vote_provider(str(video_path), inspection_requests)
+                    jersey_requests = jersey_consensus.merge_jersey_review_requests(
+                        inspection_requests, jersey_consensus.select_jersey_review_requests(frames, graph), graph)
+                    fresh = bundle.jersey_vote_provider(str(video_path), jersey_requests)
                     for track, rows in fresh.items():
                         votes[track] = [*(votes.get(track) or []), *rows]
                 jersey = jersey_consensus.apply_jersey_consensus(frames, graph, votes)
@@ -251,7 +278,10 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
     attempts = {"action_inspections": getattr(bundle, "inspection_calls", 0), "jersey_reads": getattr(bundle, "jersey_calls", 0),
                 "role_reads": getattr(bundle, "role_calls", 0), "goal_reads": getattr(bundle, "goal_calls", 0),
                 "field_side_reads": getattr(goal_provider, "field_side_calls", 0)}
+    if _backend_sha256() != backend_sha256:
+        raise RuntimeError("Backend source changed during replay; results cannot be certified against one source fingerprint")
     result = {"report_id": report["id"], "model_request_attempts": sum(attempts.values()), "db_writes": 0,
+            "identity_restoration": identity_restoration, "backend_source_unchanged_during_replay": True,
             "support_vision_enabled": support_vision, "support_review_attempts": attempts,
             "native_detail_frames_added": detail_frames,
             "native_inspection": {
@@ -270,15 +300,11 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
             "inspection_plan": inspection_plan,
             "cross_window_evidence": cross_window_context,
             "evidence_feedback_plan": feedback_plan,
-            "replay_backend_sha256": {
-                **{p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                   for p in sorted(Path(__file__).resolve().parents[1].glob("*.py"))},
-                "scripts/replay_report_evidence.py": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                "scripts/reference_action_review.py": hashlib.sha256(Path(reference_action_review.__file__).read_bytes()).hexdigest(),
-            },
+            "replay_backend_sha256": backend_sha256,
             "limitation": ("Fresh supporting reviews requested against the exported video; inspect reader statuses and proof before accepting events. "
                            if support_vision else "Saved observations only. Newly scheduled support reviews have not been executed. ")
-                          + "Original weak Step-3 detector proposals are absent. Replay does not certify full-video completeness."}
+                          + "Direct user selections can be restored from anchors; continuous identity observations and original weak Step-3 detector proposals are absent. "
+                          + "Replay does not certify full-video completeness."}
     if reference_cases is not None:
         result["reference_review"] = reference_action_review.assess(reference_cases, canonical, physical, inspection_plan)
     if output_dir is not None:

@@ -221,7 +221,30 @@ def _pixel_box(box, width, height):
 
 
 def _default_camera_estimator(prev_gray, gray, exclude_boxes):
-    return motion_compensation.estimate_camera(prev_gray, gray, exclude_boxes)
+    # Camera motion is background evidence. Work at the same bounded width as
+    # the pace engine, then map the verified affine matrix back to native pixels.
+    # Person/ball detections and their coordinates remain native observations.
+    if prev_gray.shape != gray.shape:
+        return None, "frame_shape_changed"
+    h, w = gray.shape[:2]
+    if w <= motion_compensation.PROC_W:
+        return motion_compensation.estimate_camera(prev_gray, gray, exclude_boxes)
+    sw = motion_compensation.PROC_W
+    sh = max(2, int(round(h * sw / w)))
+    sx, sy = sw / w, sh / h
+    small_prev = cv2.resize(prev_gray, (sw, sh), interpolation=cv2.INTER_AREA)
+    small = cv2.resize(gray, (sw, sh), interpolation=cv2.INTER_AREA)
+    excluded = [(x * sx, y * sy, bw * sx, bh * sy) for x, y, bw, bh in exclude_boxes]
+    matrix, reason = motion_compensation.estimate_camera(small_prev, small, excluded)
+    if matrix is None:
+        return None, reason
+    # S^-1 M S also handles the one-pixel aspect rounding in a portrait frame.
+    matrix = np.asarray(matrix, dtype=float).copy()
+    matrix[0, 1] *= sy / sx
+    matrix[1, 0] *= sx / sy
+    matrix[0, 2] /= sx
+    matrix[1, 2] /= sy
+    return matrix, reason
 
 
 def _default_detector():
@@ -865,6 +888,17 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             for score, di in ranked:
                 assign_pairs.append((score, ti, di))
         assign_pairs.sort(reverse=True)
+
+        # Resolve ambiguity in BOTH directions. Two old tracks competing for
+        # one detected body must not acquire identity by greedy list order.
+        by_detection = {}
+        for score, ti, di in assign_pairs:
+            by_detection.setdefault(di, []).append((score, ti))
+        for di, choices in by_detection.items():
+            if len(choices) > 1 and choices[0][0] - choices[1][0] < MATCH_AMBIG_MARGIN:
+                ambiguous_det_candidates.setdefault(di, set()).update(
+                    live[ti]["local_track_id"] for score, ti in choices
+                    if choices[0][0] - score < MATCH_AMBIG_MARGIN)
 
         used_tracks, used_dets = set(), set()
         players_out = []

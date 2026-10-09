@@ -306,11 +306,32 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
         frame = min(frames, key=lambda row: abs(int(row["media_ms"]) - int(media_ms)))
         return frame if abs(int(frame["media_ms"]) - int(media_ms)) <= 100 else None
 
-    def tap_scene(tap):
-        if tap.get("scene_id") is not None:
-            return tap.get("scene_id")
-        frame = nearest_frame(int(tap["media_ms"]))
-        return frame.get("scene_id") if isinstance(frame, dict) else None
+    def canonical_scene_at(media_ms):
+        matches = [s for s in authority.get("scenes") or []
+                   if isinstance(s, dict) and _is_num(s.get("start_ms")) and _is_num(s.get("end_ms"))
+                   and s["start_ms"] <= media_ms <= s["end_ms"]]
+        return matches[0].get("scene_id") if len(matches) == 1 else None
+
+    def same_scene_as_tap(tap, media_ms, physical_scene):
+        # FIX09A and the physical scene graph number their own cuts. Their
+        # scene_003 labels are not a shared namespace. Compare source time
+        # bounds, and additionally respect every available physical cut.
+        tap_ms = int(round(float(tap["media_ms"])))
+        low, high = sorted((tap_ms, media_ms))
+        if any(low < f["media_ms"] <= high and f.get("cut_barrier") for f in frames):
+            return False
+        tap_frame = nearest_frame(tap_ms)
+        measured_scene = tap_frame.get("scene_id") if isinstance(tap_frame, dict) else None
+        if measured_scene is not None and physical_scene is not None and measured_scene != physical_scene:
+            return False
+        tap_source_scene, touch_source_scene = canonical_scene_at(tap_ms), canonical_scene_at(media_ms)
+        if tap_source_scene is not None and touch_source_scene is not None:
+            return tap_source_scene == touch_source_scene
+        if measured_scene is not None and physical_scene is not None:
+            return measured_scene == physical_scene
+        # Older authorities without time bounds retain their same-label
+        # contract; unknown scenes do not grant a cross-cut handoff.
+        return tap.get("scene_id") is not None and tap.get("scene_id") == physical_scene
 
     def local_matching_votes(track_id, media_ms):
         row = consensus.get(track_id) if isinstance(consensus.get(track_id), dict) else {}
@@ -361,7 +382,7 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
         nearby_taps = [
             tap for tap in taps
             if abs(media_ms - int(round(float(tap["media_ms"])))) <= JERSEY_HANDOFF_MAX_TAP_GAP_MS
-            and (scene is None or tap_scene(tap) is None or tap_scene(tap) == scene)
+            and same_scene_as_tap(tap, media_ms, scene)
         ]
         if not nearby_taps:
             continue
@@ -455,6 +476,7 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
             "nearest_vote_gap_ms": nearest_vote_gap_ms,
             "nearest_vote_max_ms": JERSEY_HANDOFF_NEAREST_VOTE_MAX_MS,
             "tap_media_ms": int(tap["media_ms"]),
+            "scene_binding": "CANONICAL_TIME_BOUNDS_AND_PHYSICAL_CUTS",
             "touch_media_ms": media_ms,
             "gap_ms": abs(media_ms - int(tap["media_ms"])),
         }
