@@ -594,6 +594,28 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             if _num(resolved.get("media_ms")) else None
         ),
     }
+    from player_selection import valid_point, body_indices_at_point
+    selected_point = resolved.get("target_point")
+    direct_point = (valid_point(selected_point)
+                    and resolved.get("tap_authority") is True
+                    and resolved.get("primary_source") == "USER_TAP")
+    if direct_point:
+        delta = authority_evidence["authority_frame_delta_ms"]
+        if delta is None or abs(delta) > TAP_FRAME_NEAR_MS:
+            return {"status": "UNRESOLVED", "reason": "TAP_POINT_FRAME_NOT_ALIGNED",
+                    "local_track_id": None, "candidate_local_track_ids": [],
+                    "proof_eligible": False, **authority_evidence}
+        boxes = [tuple((p.get("box") or {}).get(k) for k in ("x", "y", "w", "h")) for p in players]
+        excluded = [(p["x"], p["y"]) for p in resolved.get("exclude_points") or [] if valid_point(p)]
+        indices = body_indices_at_point(boxes, (selected_point["x"], selected_point["y"]), excluded)
+        players = [players[i] for i in indices]
+        authority_evidence["selection_binding"] = "USER_SELECTED_POINT"
+        if len(players) != 1:
+            return {"status": "HYPOTHESES" if players else "UNRESOLVED",
+                    "reason": "TAP_POINT_BODY_AMBIGUOUS" if players else "TAP_POINT_BODY_NOT_FOUND",
+                    "local_track_id": None,
+                    "candidate_local_track_ids": [p["local_track_id"] for p in players if p.get("local_track_id")],
+                    "proof_eligible": False, **authority_evidence}
     ranked = []
     for p in players:
         if not isinstance(p, dict) or not _valid_box(p.get("box")):
@@ -602,7 +624,7 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
         ov = _iou(rb, pb)
         rx, ry = _center(rb); px, py = _center(pb)
         dist_h = math.hypot(rx - px, ry - py) / max(float(rb["h"]), float(pb["h"]), 1e-6)
-        if ov >= TARGET_MATCH_IOU_MIN or dist_h <= TARGET_MATCH_CENTER_H:
+        if direct_point or ov >= TARGET_MATCH_IOU_MIN or dist_h <= TARGET_MATCH_CENTER_H:
             score = 1.8 * ov + max(0.0, 1.0 - dist_h / TARGET_MATCH_CENTER_H)
             ranked.append({"score": score, "player": p})
     ranked.sort(reverse=True, key=lambda x: float(x["score"]))
@@ -610,6 +632,19 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
     normal = [row for row in ranked if isinstance(row["player"].get("local_track_id"), str)]
     if normal:
         ids = [row["player"]["local_track_id"] for row in normal[:3]]
+        # An associated bystander must not win just because another, better
+        # matching measured body still has an ambiguous track association.
+        # Preserve that physical ambiguity before granting target proof.
+        competing = [row for row in ranked
+                     if row["player"].get("association_state") == "HYPOTHESES"
+                     and float(row["score"]) >= float(normal[0]["score"]) - TARGET_MATCH_AMBIG_MARGIN
+                     and set(row["player"].get("candidate_local_track_ids") or []) != {ids[0]}]
+        if competing:
+            alternatives = sorted({*ids, *(track for row in competing
+                                          for track in row["player"].get("candidate_local_track_ids") or [])})
+            return {"status": "HYPOTHESES", "reason": "DENSE_TARGET_COMPETING_ASSOCIATION",
+                    "local_track_id": None, "candidate_local_track_ids": alternatives,
+                    "proof_eligible": False, **authority_evidence}
         ambiguous = len(normal) > 1 and float(normal[0]["score"]) - float(normal[1]["score"]) < TARGET_MATCH_AMBIG_MARGIN
         if ambiguous or resolved.get("proof_eligible") is not True:
             return {

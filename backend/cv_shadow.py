@@ -292,7 +292,7 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
     refs, negatives = [], []
     for a in anchors:
         try:
-            from player_selection import decode_mask
+            from player_selection import decode_mask, valid_point, body_indices_at_point
             human_mask = decode_mask(a.get("visible_mask"))
             if a.get("visibility") == "partial":
                 continue  # torso/head zones cannot be inferred from a fragment
@@ -301,7 +301,8 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
             # FIX 03 C02 — canonical random access: adaptive preroll + decode
             # forward on ACTUAL PTS (one POS_MSEC seek may overshoot on VFR)
             ok, frame, _actual_t = video_timebase.read_frame_at(cap, max(0.0, t), fps)
-            if not ok:
+            if not ok or ((human_mask is not None or valid_point(a.get("target_point")))
+                          and abs(_actual_t - t) > 0.025):
                 continue
             small = cv2.resize(frame, (sw, sh))
             pl = _pitch_l(small)
@@ -317,6 +318,17 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
             cand = _blobs(small, roi_mask, min_h=max(8, int(bh * 0.4)), max_h=int(bh * 1.6))
             cx0, cy0 = bx + bw / 2, by + bh / 2
             excluded = a.get("exclude_points") or []
+            selected_point = a.get("target_point")
+            point_px = (selected_point["x"] * sw, selected_point["y"] * sh) if valid_point(selected_point) else None
+            excluded_px = [(p["x"] * sw, p["y"] * sh) for p in excluded if valid_point(p)]
+
+            def selected_body(candidates):
+                if point_px is None:
+                    return min(candidates, key=lambda c: abs(c[0] + c[2] / 2 - cx0)
+                               + abs(c[1] + c[3] / 2 - cy0)) if candidates else None
+                indices = body_indices_at_point(candidates, point_px, excluded_px)
+                return candidates[indices[0]] if len(indices) == 1 else None
+
             def human_excluded(c):
                 return any(c[0] <= p["x"] * sw <= c[0] + c[2] and c[1] <= p["y"] * sh <= c[1] + c[3]
                            for p in excluded)
@@ -333,15 +345,25 @@ def _build_tap_references(cap, fps, anchors, t_off, sw, sh, scale, detector=None
                 eligible = [c for c in det_in if not human_excluded(c)]
                 if not eligible and human_mask is None:
                     continue
-                rb = min(eligible, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0)) if eligible else (bx, by, bw, bh)
+                rb = selected_body(eligible)
+                if rb is None:
+                    if human_mask is None:
+                        continue
+                    rb = (bx, by, bw, bh)
                 refined_by = "detector"
             elif cand:
                 eligible = [c for c in cand if not human_excluded(c)]
                 if not eligible and human_mask is None:
                     continue
-                rb = min(eligible, key=lambda c: abs(c[0] + c[2] / 2 - cx0) + abs(c[1] + c[3] / 2 - cy0)) if eligible else (bx, by, bw, bh)
+                rb = selected_body(eligible)
+                if rb is None:
+                    if human_mask is None:
+                        continue
+                    rb = (bx, by, bw, bh)
                 refined_by = "blob"
             else:
+                if point_px is not None and human_mask is None:
+                    continue
                 rb = (bx, by, bw, bh)  # fallback: trust the raw tap box
                 refined_by = "raw"
             # visible-body awareness first: other people near the refined box —

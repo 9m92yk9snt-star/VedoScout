@@ -19,6 +19,7 @@ from pathlib import Path
 
 import cv2
 
+import support_vision_runner
 import video_timebase
 try:  # Supporting vision is optional; the physical engine must still import.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
@@ -28,6 +29,8 @@ except ImportError:  # pragma: no cover - availability is deployment-specific
 VERSION = 1
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
+# FIX14: per-request HTTP deadline below the 60/90s wait_for, retries disabled; a breach fails closed.
+VERIFY_REQUEST_TIMEOUT_S = 55.0
 MAX_GOAL_REVIEWS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "16"))
 MAX_GOAL_CLARIFICATIONS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT", "16"))
 MIN_FIELD_SIDE_FRAMES = 2
@@ -119,7 +122,7 @@ async def read_field_side_evidence(api_key: str, session_id: str,
                 "You inspect only visible football pitch/goal geometry. "
                 "Do not infer event outcomes. Respond with strict JSON only."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"These are chronological football frames: {timeline}. No event label or expected outcome is provided.\n"
             "For each image, consider the relevant visible goal mouth. If you can clearly distinguish the playable "
@@ -288,19 +291,19 @@ class GoalDirectionProvider:
             else:
                 try:
                     self.field_side_calls += 1
-                    evidence = asyncio.run(read_field_side_evidence(
-                        self.api_key,
-                        f"{self.session_prefix}-field-side-{strike_ms}",
-                        paths,
-                        actual_ms,
-                    ))
-                except Exception:
-                    evidence = {"status": "UNRESOLVED", "rows": [], "reason": "field_side_reader_error"}
+                    evidence = support_vision_runner.run_support_vision(read_field_side_evidence, [(
+                        (self.api_key, f"{self.session_prefix}-field-side-{strike_ms}", paths, actual_ms), {})],
+                        deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="field_side")[0]
+                except Exception as exc:
+                    evidence = {"status": "UNRESOLVED", "rows": [], "reason": "field_side_reader_error",
+                                **support_vision_runner.fail_closed_diagnostic(exc)}
         result["field_side_status"] = str(evidence.get("status") or "UNRESOLVED")
         result["field_side_by_ms"] = list(evidence.get("rows") or [])
         result["field_side_source"] = "INDEPENDENT_PLAYABLE_PITCH_REVIEW"
         result["field_side_model_audit"] = evidence.get("model_review_audit")
         result["field_side_reason"] = str(evidence.get("reason") or "field_side_unresolved")[:180]
+        if "support_vision_fail_closed" in evidence:
+            result["field_side_fail_closed"] = evidence["support_vision_fail_closed"]
         return remember(result)
 
 

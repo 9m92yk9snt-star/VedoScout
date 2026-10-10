@@ -367,6 +367,8 @@ def test_occ_16_provider_reader_parses_occlusion_and_reactions_without_faking_di
             pass
         def with_model(self, provider, model):
             return self
+        def with_params(self, **_params):
+            return self
         async def send_message(self, _message):
             return FakeResponse()
 

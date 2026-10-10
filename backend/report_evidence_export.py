@@ -47,7 +47,8 @@ SOURCE_MODULES = (
     "dense_identity_continuity.py", "dense_event_reconciliation.py", "report_fact_authority.py",
     "verified_stats.py", "fix10a_vision_providers.py", "fix10a_goal_direction.py",
     "fix10a_ball_proof_gate.py", "short_occlusion_contact_recovery.py", "post_strike_intervention.py",
-    "scoring_evidence_coverage.py", "identity_verify.py", "scripts/replay_report_evidence.py", "scripts/reference_action_review.py",
+    "scoring_evidence_coverage.py", "identity_verify.py", "support_vision_runner.py",
+    "scripts/replay_report_evidence.py", "scripts/reference_action_review.py",
 )
 SECRET_KEY = re.compile(
     r"(^|_)(password|passwd|secret|token|api_key|access_key|authorization|cookie|"

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 import fix10a_vision_providers as providers
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_goal_review_sampling_is_dense_immediately_after_release_and_dedupes_actual_pts(monkeypatch):
     captured = {}
 

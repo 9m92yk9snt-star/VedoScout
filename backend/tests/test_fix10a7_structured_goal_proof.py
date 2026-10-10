@@ -135,6 +135,9 @@ class _FakeChat:
     def with_model(self, *_args, **_kwargs):
         return self
 
+    def with_params(self, **_params):
+        return self
+
     async def send_message(self, _message):
         return json.dumps(self.payload)
 
@@ -186,4 +189,5 @@ async def test_svgp07_provider_parser_fails_closed_when_intermediate_ball_frame_
         paths.append(str(path))
     out = await vision.read_goal_scene_evidence("key", "session", paths, [1000, 1100, 1200])
     assert out["proof_ready"] is False
-    assert out["proof_reason"] == "STRUCTURED_WHOLE_BALL_CROSSING_NOT_PROVEN"
+    assert out["proof_reason"] == "GOAL_SCENE_PIXEL_RESPONSE_COVERAGE_GAP"
+    assert out["response_coverage"]["missing_frame_indices"]["ball_evidence"] == [2]

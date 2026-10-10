@@ -3,6 +3,7 @@ Shared pytest fixtures + auto-loaded environment for the backend test suite.
 Ensures `MONGO_URL` and `DB_NAME` are populated from /app/backend/.env so the
 test suite is runnable with a bare `pytest` invocation.
 """
+import asyncio
 import os
 from pathlib import Path
 
@@ -24,3 +25,14 @@ def pytest_collection_modifyitems(config, items):
             import inspect
             if inspect.iscoroutinefunction(item.obj):
                 item.add_marker(pytest.mark.asyncio)
+
+
+@pytest.fixture
+def inline_support_vision(monkeypatch):
+    """Explicit opt-in for adapter tests whose injected reader doubles cannot run in an SDK child."""
+    import support_vision_runner
+
+    def run_inline(function, calls, *, limit=1, deadline_s, label="support_vision"):
+        return asyncio.run(support_vision_runner._gather_limited(function, list(calls), limit))
+
+    monkeypatch.setattr(support_vision_runner, "run_support_vision", run_inline)

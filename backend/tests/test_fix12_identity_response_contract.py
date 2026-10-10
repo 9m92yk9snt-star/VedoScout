@@ -22,6 +22,9 @@ async def test_identity_verdict_requires_json_boolean(monkeypatch, tmp_path, fie
         def with_model(self, *_args):
             return self
 
+        def with_params(self, **_params):
+            return self
+
         async def send_message(self, _message):
             return json.dumps({field: value, "confidence": "high"})
     monkeypatch.setattr(identity, "LlmChat", Chat)

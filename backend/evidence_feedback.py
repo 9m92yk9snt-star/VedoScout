@@ -23,6 +23,9 @@ def gaps(trace):
         "target_ball_frames": sum((f.get("global_target") or {}).get("proof_eligible") is True
                                   and (trajectory.get(f.get("media_ms")) or {}).get("proof_eligible") is not True
                                   for f in trace.get("decoded_frames") or []),
+        "uninspected_frames": len({ms for job in trace.get("action_inspections") or []
+                                    if job.get("selected") and job.get("status") == "PARTIAL_RESPONSE"
+                                    for ms in job.get("missing_media_ms") or [] if inspection._num(ms)}),
     }
 
 
@@ -48,6 +51,10 @@ def build_plan(traces, budget=None, analysis=None):
         valid = lambda f: f.get("scene_id") == window["scene_id"] and not f.get("cut_barrier") \
             and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"
         centers = []
+        for job in trace.get("action_inspections") or []:
+            if job.get("selected") and job.get("status") == "PARTIAL_RESPONSE":
+                centers.extend((1, ms, "PIXEL_RESPONSE_COVERAGE_GAP")
+                               for ms in job.get("missing_media_ms") or [] if inspection._num(ms))
         strikes = {s.get("strike_id"): s for s in trace.get("strike_evidence") or []}
         for outcome in trace.get("outcome_evidence") or []:
             strike = strikes.get(outcome.get("strike_id")) or {}

@@ -26,6 +26,12 @@ HYPOTHESIS_DECAY = 0.88
 RELEASE_REACQUIRE_MAX_JUMP_NORM = 0.25
 RELEASE_REACQUIRE_MIN_CONFIDENCE = 0.04
 RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS = 80
+# Release-anchored identity: distances below are in tracked-ball sizes so the
+# same rule holds at any image scale. Same scale gate as ordinary A3 linking.
+RELEASE_MIN_SCALE_RATIO = 0.35
+RELEASE_UNIQUE_MARGIN_SIZES = 2.0
+SAME_OBJECT_SIZES = 1.5
+DISTINCT_OBJECT_SIZES = 3.0
 
 
 def _num(value) -> bool:
@@ -411,6 +417,115 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
     return trajectory_features(rows)
 
 
+def _size(box) -> float:
+    return max(float(box["w"]), float(box["h"]))
+
+
+def _distance(a, b) -> float:
+    (ax, ay), (bx, by) = _center(a), _center(b)
+    return math.hypot(ax - bx, ay - by)
+
+
+def _same_object(a, b) -> bool:
+    return _distance(a, b) <= SAME_OBJECT_SIZES * max(_size(a), _size(b))
+
+
+def _distinct_objects(a, b) -> bool:
+    return _distance(a, b) >= DISTINCT_OBJECT_SIZES * max(_size(a), _size(b))
+
+
+def _scale_ratio(a, b) -> float:
+    sa, sb = _area_scale(a), _area_scale(b)
+    return min(sa, sb) / max(sa, sb, 1e-9)
+
+
+def _measured_anchor(row) -> bool:
+    return bool(
+        isinstance(row, dict)
+        and _num(row.get("media_ms"))
+        and row.get("proof_eligible") is True
+        and row.get("time_authority") == "ACTUAL_MEDIA_PTS"
+        and row.get("used_fallback") is not True
+        and row.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+        and _valid_box(row.get("box"))
+    )
+
+
+def _separate_objects(frame, tracked_box) -> list[dict]:
+    """Detector objects recorded in the tracked ball's own frame, clearly apart from it."""
+    boxes = [
+        _box(c["box"]) for c in (frame or {}).get("ball_candidates") or []
+        if isinstance(c, dict) and _valid_box(c.get("box"))
+    ]
+    return [box for box in boxes if _distinct_objects(box, tracked_box)]
+
+
+def release_anchor_contact_conflict(dense_frames, contact_ball, anchor) -> str | None:
+    """Reject ball_after when the contact frame already records it as another object.
+
+    Absence of such evidence does not prove identity; it only leaves the
+    ordinary anchor gates in charge. The anchor is never relabelled.
+    """
+    if not (_measured_anchor(contact_ball) and _measured_anchor(anchor)):
+        return None
+    contact_ms = int(contact_ball["media_ms"])
+    if int(anchor["media_ms"]) <= contact_ms or not _distinct_objects(contact_ball["box"], anchor["box"]):
+        return None
+    frame = next((
+        f for f in dense_frames or []
+        if isinstance(f, dict) and _num(f.get("media_ms")) and int(f["media_ms"]) == contact_ms
+    ), None)
+    if any(_same_object(box, anchor["box"]) for box in _separate_objects(frame, _box(contact_ball["box"]))):
+        return "RELEASE_ANCHOR_SEPARATE_OBJECT_PRESENT_AT_CONTACT"
+    return None
+
+
+def _anchored_row(point, scene_id, provenance) -> dict:
+    return {
+        "media_ms": int(point["media_ms"]), "scene_id": scene_id, "state": "MEASURED",
+        "box": point["box"], "confidence": point["confidence"],
+        "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+        "used_fallback": False, "cut_barrier": False,
+        "provenance": provenance, "candidates": [],
+    }
+
+
+def _anchored_continuation(candidates, measured, media_ms):
+    """Return (candidate_near_track, unique_measured_continuation)."""
+    last = measured[-1]
+    dt = (int(media_ms) - int(last["media_ms"])) / 1000.0
+    envelope = BASE_JUMP_NORM + MAX_SPEED_NORM_S * dt
+    lx, ly = _center(last["box"])
+    velocity = None
+    if len(measured) > 1:
+        prev = measured[-2]
+        prev_gap_ms = int(last["media_ms"]) - int(prev["media_ms"])
+        if 0 < prev_gap_ms <= SHORT_GAP_MS:
+            px, py = _center(prev["box"])
+            velocity = ((lx - px) * 1000.0 / prev_gap_ms, (ly - py) * 1000.0 / prev_gap_ms)
+    if velocity is None:
+        # Without measured motion the closest object is not preferred; only a
+        # single plausible object may continue the anchor.
+        predicted, gate = (lx, ly), envelope
+    else:
+        predicted = (lx + velocity[0] * dt, ly + velocity[1] * dt)
+        gate = min(BASE_JUMP_NORM + 0.5 * MAX_ACCEL_NORM_S2 * dt * dt, DORMANT_MAX_RESIDUAL_NORM)
+    scored = sorted((
+        (math.hypot(_center(c["box"])[0] - predicted[0], _center(c["box"])[1] - predicted[1]), c)
+        for c in candidates
+        if _distance(c["box"], last["box"]) <= envelope
+        and _scale_ratio(c["box"], last["box"]) >= RELEASE_MIN_SCALE_RATIO
+    ), key=lambda pair: pair[0])
+    inside = [c for residual, c in scored if residual <= gate]
+    if not inside:
+        return False, None
+    if velocity is None:
+        return True, inside[0] if len(inside) == 1 else None
+    second = scored[1][0] if len(scored) > 1 else math.inf
+    unique = second - scored[0][0] >= RELEASE_UNIQUE_MARGIN_SIZES * _size(last["box"])
+    return True, inside[0] if unique else None
+
+
 def reconstruct_ball_trajectory_from_release_anchor(
     dense_frames, anchor: dict, scene_id: str | None = None,
     max_duration_ms: int = 3000,
@@ -418,40 +533,35 @@ def reconstruct_ball_trajectory_from_release_anchor(
     """Re-track one shot from its independently verified post-contact ball.
 
     The global trajectory may have stayed attached to a competing ball. A
-    verified release anchor can seed a separate, shot-local path, but it cannot
-    by itself bridge a detector jump: a player-supported jump must be confirmed
-    by a second nearby, actual-PTS ball observation before either point becomes
-    measured path evidence. No path is carried across a cut or scene boundary.
+    verified release anchor seeds a separate, shot-local path that follows
+    measured motion only: each point must be the unique scale-consistent
+    candidate at the motion prediction within a bounded gap, and an object
+    already recorded apart from the tracked ball cannot take over the path.
+    A player-supported jump must still be confirmed by a second nearby,
+    actual-PTS observation. Nothing crosses a cut, scene boundary or
+    unverified camera step, and no predicted position becomes measured.
     """
-    if not (
-        isinstance(anchor, dict)
-        and _num(anchor.get("media_ms"))
-        and anchor.get("proof_eligible") is True
-        and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
-        and anchor.get("used_fallback") is not True
-        and anchor.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
-        and _valid_box(anchor.get("box"))
-    ):
+    if not _measured_anchor(anchor):
         return []
 
     seed_ms = int(anchor["media_ms"])
-    rows = [{
-        "media_ms": seed_ms, "scene_id": scene_id, "state": "MEASURED",
-        "box": _box(anchor["box"]),
-        "confidence": float(anchor.get("confidence") or 0.0),
-        "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
-        "used_fallback": False, "cut_barrier": False,
-        "provenance": "VERIFIED_RELEASE_CONTACT_BALL_AFTER", "candidates": [],
-    }]
-    last = rows[0]
+    rows = [_anchored_row(
+        {"media_ms": seed_ms, "box": _box(anchor["box"]), "confidence": float(anchor.get("confidence") or 0.0)},
+        scene_id, "VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+    )]
+    frames = sorted(
+        (f for f in dense_frames or [] if isinstance(f, dict) and _num(f.get("media_ms"))),
+        key=lambda f: int(f["media_ms"]),
+    )
+    measured = [rows[0]]
+    separate = _separate_objects(next((f for f in frames if int(f["media_ms"]) == seed_ms), None), rows[0]["box"])
     pending = None
     jump_supported = False
 
-    for frame in sorted(
-        (f for f in dense_frames or [] if isinstance(f, dict) and _num(f.get("media_ms"))
-         and int(f["media_ms"]) > seed_ms), key=lambda f: int(f["media_ms"]),
-    ):
+    for frame in frames:
         ms = int(frame["media_ms"])
+        if ms <= seed_ms:
+            continue
         if ms - seed_ms > max(0, int(max_duration_ms)):
             break
         frame_scene = frame.get("scene_id")
@@ -459,11 +569,19 @@ def reconstruct_ball_trajectory_from_release_anchor(
             break
         if scene_id is not None and frame_scene not in {None, scene_id}:
             break
+        # Image-space continuity is not claimed across an unknown camera step;
+        # no transform is inferred here.
+        if frame.get("camera_state") not in {None, "AFFINE_VERIFIED"}:
+            break
         if frame.get("used_fallback") is True or frame.get("time_authority") not in {None, "ACTUAL_MEDIA_PTS"}:
             continue
         if pending and ms - pending["media_ms"] > RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS:
             pending = None
             continue
+        last = measured[-1]
+        gap_ms = ms - int(last["media_ms"])
+        if pending is None and gap_ms > DORMANT_REACQUIRE_MS:
+            break
         candidates = []
         for candidate in frame.get("ball_candidates") or []:
             if not isinstance(candidate, dict) or not _valid_box(candidate.get("box")):
@@ -471,68 +589,60 @@ def reconstruct_ball_trajectory_from_release_anchor(
             confidence = float(candidate.get("confidence") or 0.0)
             if confidence < RELEASE_REACQUIRE_MIN_CONFIDENCE:
                 continue
-            candidates.append({"box": _box(candidate["box"]), "confidence": confidence})
+            box = _box(candidate["box"])
+            if any(_same_object(box, other) for other in separate):
+                continue
+            candidates.append({"box": box, "confidence": confidence})
         if not candidates:
             continue
 
-        previous = pending if pending else last
-        dt = (ms - int(previous["media_ms"])) / 1000.0
-        if dt <= 0:
-            continue
-        px, py = _center(previous["box"])
-        ranked = sorted(
-            ((math.hypot(_center(c["box"])[0] - px, _center(c["box"])[1] - py), c)
-             for c in candidates), key=lambda pair: pair[0],
-        )
-        nearest_dist, nearest = ranked[0]
-        next_dist = ranked[1][0] if len(ranked) > 1 else float("inf")
-        ordinary_limit = BASE_JUMP_NORM + MAX_SPEED_NORM_S * dt
-
         if pending:
-            if nearest_dist > ordinary_limit or next_dist - nearest_dist < SCORE_MARGIN:
+            dt = (ms - pending["media_ms"]) / 1000.0
+            if dt <= 0:
+                continue
+            ranked = sorted(((_distance(c["box"], pending["box"]), c) for c in candidates), key=lambda pair: pair[0])
+            nearest_dist, nearest = ranked[0]
+            next_dist = ranked[1][0] if len(ranked) > 1 else float("inf")
+            if nearest_dist > BASE_JUMP_NORM + MAX_SPEED_NORM_S * dt or next_dist - nearest_dist < SCORE_MARGIN:
                 pending = None
                 continue
-            first = pending
-            rows.append({
-                "media_ms": first["media_ms"], "scene_id": scene_id,
-                "state": "MEASURED", "box": first["box"],
-                "confidence": first["confidence"], "proof_eligible": True,
-                "time_authority": "ACTUAL_MEDIA_PTS", "used_fallback": False,
-                "cut_barrier": False,
-                "provenance": "RELEASE_ANCHOR_REACQUISITION_CONFIRMED", "candidates": [],
-            })
-            row = {
-                "media_ms": ms, "scene_id": scene_id, "state": "MEASURED",
-                "box": nearest["box"], "confidence": nearest["confidence"],
-                "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
-                "used_fallback": False, "cut_barrier": False,
-                "provenance": "RELEASE_ANCHOR_REACQUISITION_CONFIRMED", "candidates": [],
-            }
-            rows.append(row)
-            last, pending, jump_supported = row, None, True
+            first = _anchored_row(pending, scene_id, "RELEASE_ANCHOR_REACQUISITION_CONFIRMED")
+            row = _anchored_row({"media_ms": ms, **nearest}, scene_id, "RELEASE_ANCHOR_REACQUISITION_CONFIRMED")
+            rows.extend([first, row])
+            measured.extend([first, row])
+            separate = _separate_objects(frame, row["box"])
+            pending, jump_supported = None, True
             continue
 
-        if nearest_dist <= ordinary_limit:
-            if next_dist - nearest_dist < SCORE_MARGIN:
-                continue
-            row = {
-                "media_ms": ms, "scene_id": scene_id, "state": "MEASURED",
-                "box": nearest["box"], "confidence": nearest["confidence"],
-                "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
-                "used_fallback": False, "cut_barrier": False,
-                "provenance": "RELEASE_ANCHORED_DENSE_TRAJECTORY", "candidates": [],
-            }
+        if gap_ms <= 0:
+            continue
+        near_track, best = (
+            _anchored_continuation(candidates, measured, ms) if gap_ms <= SHORT_GAP_MS else (False, None)
+        )
+        if best is not None:
+            row = _anchored_row({"media_ms": ms, **best}, scene_id, "RELEASE_ANCHORED_DENSE_TRAJECTORY")
             rows.append(row)
-            last = row
+            measured.append(row)
+            separate = _separate_objects(frame, row["box"])
+            continue
+        if near_track or jump_supported:
             continue
 
         # Permit a discontinuous recovery only as a pending hypothesis near a
         # verified local player's foot. It becomes usable after confirmation.
+        ranked = sorted((
+            (_distance(c["box"], last["box"]), c) for c in candidates
+            if _scale_ratio(c["box"], last["box"]) >= DORMANT_PLAYER_SUPPORTED_SCALE_MIN
+        ), key=lambda pair: pair[0])
+        if not ranked:
+            continue
+        nearest_dist, nearest = ranked[0]
+        next_dist = ranked[1][0] if len(ranked) > 1 else float("inf")
+        foot_h = _nearest_player_foot_h(nearest["box"], frame.get("players") or [])
         if (
-            not jump_supported and nearest_dist <= RELEASE_REACQUIRE_MAX_JUMP_NORM
+            nearest_dist <= RELEASE_REACQUIRE_MAX_JUMP_NORM
             and next_dist - nearest_dist >= SCORE_MARGIN
-            and _nearest_player_foot_h(nearest["box"], frame.get("players") or []) is not None
-            and _nearest_player_foot_h(nearest["box"], frame.get("players") or []) <= DORMANT_PLAYER_SUPPORT_H
+            and foot_h is not None and foot_h <= DORMANT_PLAYER_SUPPORT_H
         ):
             pending = {"media_ms": ms, "box": nearest["box"], "confidence": nearest["confidence"]}
 

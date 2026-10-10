@@ -510,8 +510,13 @@ def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None, *
             anchored = trajectory_engine.reconstruct_ball_trajectory_from_release_anchor(
                 dense_frames or [], touch.get("ball_after"), touch.get("scene_id"),
                 max_duration_ms=DELAYED_SEPARATION_WINDOW_MS)
+            # A ball_after already recorded as a separate object at contact
+            # must not fall back to the window-global path either.
+            conflict = trajectory_engine.release_anchor_contact_conflict(
+                dense_frames or [], touch.get("ball_at_contact"), touch.get("ball_after"))
             delayed = _delayed_separation_role(
-                touch, graph_touches, dense_frames or [], anchored or ball_trajectory or []
+                touch, graph_touches, dense_frames or [],
+                [] if conflict else (anchored or ball_trajectory or []),
             )
             if delayed is not None:
                 role = delayed

@@ -170,6 +170,40 @@ def _goal_review_eligibility(strike, strikes, touch_graph):
     }
 
 
+def _strike_ball_paths(strikes, touch_graph, dense_frames, window_trajectory):
+    """Bind each strike to the path of its own ball-after-contact anchor.
+
+    A present anchor is the identity seed: if recorded contact-frame evidence
+    shows it was a separate object, or it cannot seed a path, the strike gets
+    no path rather than the window-global one, which may follow a spare ball.
+    A rejected anchor is demoted in place so A7 and later gates fail closed.
+    """
+    paths = []
+    for strike in strikes:
+        anchor = strike.get("active_ball_anchor") if isinstance(strike, dict) else None
+        if not isinstance(anchor, dict):
+            paths.append({"rows": window_trajectory, "source": "WINDOW_GLOBAL_TRAJECTORY", "seed_ms": None})
+            continue
+        touch = _touch_for_strike(strike, touch_graph) or {}
+        conflict = ball_trajectory.release_anchor_contact_conflict(
+            dense_frames, touch.get("ball_at_contact"), anchor
+        )
+        if conflict:
+            anchor = {**anchor, "proof_eligible": False, "remote_spare_ball_used": None,
+                      "identity_rejection": conflict}
+            strike["active_ball_anchor"] = anchor
+        rows = ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
+            dense_frames, anchor, strike.get("scene_id")
+        )
+        paths.append({
+            "rows": rows,
+            "source": "VERIFIED_RELEASE_ANCHOR" if rows else "RELEASE_ANCHOR_REJECTED",
+            "seed_ms": int(anchor["media_ms"]) if rows else None,
+            **({"rejection_reason": conflict or "RELEASE_ANCHOR_NOT_PROOF_ELIGIBLE"} if not rows else {}),
+        })
+    return paths
+
+
 def _skipped_goal_review(eligibility):
     return {
         "status": "UNRESOLVED",
@@ -627,24 +661,9 @@ def reconstruct_physical_match(
                 key=lambda row: (int(row.get("media_ms") or 0), str(row.get("strike_id") or "")),
             )
 
-            # A verified ball-after-contact anchor is the identity seed for
-            # this strike. Reconstruct one bounded path from it and pass that
-            # same path through intervention, outcome, direction, and proof
-            # gates. Falling back to the window-global path after a valid seed
-            # would silently reattach this strike to a competing ball.
-            shot_trajectories = []
-            for strike in strikes:
-                anchor = strike.get("active_ball_anchor") if isinstance(strike, dict) else None
-                anchored_path = ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
-                    dense_with_jersey, anchor, strike.get("scene_id")
-                )
-                uses_anchor = bool(anchored_path)
-                selected_path = anchored_path if uses_anchor else trajectory
-                shot_trajectories.append({
-                    "rows": selected_path,
-                    "source": "VERIFIED_RELEASE_ANCHOR" if uses_anchor else "WINDOW_GLOBAL_TRAJECTORY",
-                    "seed_ms": int(anchor["media_ms"]) if uses_anchor else None,
-                })
+            shot_trajectories = _strike_ball_paths(
+                strikes, touch_with_jersey, dense_with_jersey, trajectory
+            )
 
             stage = "intervention_detection"
             a7_interventions = [

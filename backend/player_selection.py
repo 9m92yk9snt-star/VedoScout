@@ -21,6 +21,32 @@ def valid_point(point):
     return isinstance(point, dict) and all(number(point.get(k)) and 0 <= point[k] <= 1 for k in ("x", "y"))
 
 
+def body_indices_at_point(boxes, point, exclude_points=()):
+    """Return bodies containing the selected point in the same coordinate units.
+
+    ``boxes`` are (x, y, w, h) rectangles; points are (x, y). Ambiguity is
+    preserved as multiple indices. Neither the crop centre nor proximity to a
+    different body can replace the user's point.
+    """
+    def usable_point(value):
+        return isinstance(value, (tuple, list)) and len(value) == 2 and all(number(v) for v in value)
+
+    if not usable_point(point):
+        return []
+    negatives = [p for p in (exclude_points or ()) if usable_point(p)]
+    selected = []
+    for index, box in enumerate(boxes):
+        if not (isinstance(box, (tuple, list)) and len(box) == 4
+                and all(number(v) for v in box) and box[2] > 0 and box[3] > 0):
+            continue
+        x, y, w, h = box
+        def contains(p):
+            return x <= p[0] <= x + w and y <= p[1] <= y + h
+        if contains(point) and not any(contains(p) for p in negatives):
+            selected.append(index)
+    return selected
+
+
 def valid_mask(mask):
     if not isinstance(mask, dict) or mask.get("width") != 96 or mask.get("height") != 192:
         return False

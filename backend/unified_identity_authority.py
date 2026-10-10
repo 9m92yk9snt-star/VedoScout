@@ -119,15 +119,18 @@ def _tap_rows(anchors, anchor_time_offset, scenes) -> list[dict]:
     """Preserve the box the user actually selected at the selected media time."""
     out = []
     off = float(anchor_time_offset or 0.0)
-    from player_selection import expanded_anchors
+    from player_selection import expanded_anchors, valid_point
     for anchor in expanded_anchors(anchors):
         if (not isinstance(anchor, dict) or not _is_num(anchor.get("t"))
                 or not _valid_box(anchor.get("box"))):
             continue
         ms = int(round((float(anchor["t"]) + off) * 1000.0))
-        out.append({"media_ms": ms, "scene_id": _scene_for_ms(scenes, ms),
+        row = {"media_ms": ms, "scene_id": _scene_for_ms(scenes, ms),
                     "box": _box(anchor["box"]), "partial": anchor.get("visibility") == "partial",
-                    "exclude_points": anchor.get("exclude_points") or []})
+                    "exclude_points": anchor.get("exclude_points") or []}
+        if valid_point(anchor.get("target_point")):
+            row["target_point"] = deepcopy(anchor["target_point"])
+        out.append(row)
     return out
 
 
@@ -659,6 +662,9 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
             "USER_TAP", tap, strength="USER_TAP", sources=["USER_TAP"],
             tap_authority=not tap.get("partial"), proof_eligible=not tap.get("partial"),
             hypotheses=[_hyp("USER_TAP", tap)], reason="USER_PARTIAL_VISIBLE_BODY" if tap.get("partial") else "USER_SELECTED_BOX")
+        if tap.get("target_point"):
+            selected["target_point"] = deepcopy(tap["target_point"])
+            selected["exclude_points"] = deepcopy(tap.get("exclude_points") or [])
         if tap.get("partial"):
             selected["state"] = "PARTIAL"
             selected["identity_strength"] = "PARTIAL"
