@@ -25,6 +25,7 @@ from pathlib import Path
 import cv2
 
 import identity_verify
+import support_vision_runner
 import video_timebase
 import action_evidence_review
 import evidence_feedback
@@ -45,6 +46,8 @@ except ImportError:  # pragma: no cover - availability is deployment-specific
 VERSION = 1
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
+# FIX14: per-request HTTP deadline below the 60/90s wait_for, retries disabled; a breach fails closed.
+VERIFY_REQUEST_TIMEOUT_S = 55.0
 
 MAX_JERSEY_REQUESTS = int(os.environ.get("FIX10A_MAX_JERSEY_READS", "24"))
 MAX_ROLE_TRACKS = int(os.environ.get("FIX10A_MAX_ROLE_TRACKS", "4"))
@@ -164,16 +167,6 @@ def _write_jpg(path: Path, image) -> bool:
         return False
 
 
-async def _bounded_gather(coros, limit=3):
-    semaphore = asyncio.Semaphore(max(1, int(limit)))
-
-    async def _one(coro):
-        async with semaphore:
-            return await coro
-
-    return await asyncio.gather(*[_one(coro) for coro in coros])
-
-
 async def read_visible_player_role(api_key: str, session_id: str,
                                    tight_crop_path: str, context_frame_path: str) -> dict:
     """Independent pixel-only role read; no event story or expected role input."""
@@ -188,7 +181,7 @@ async def read_visible_player_role(api_key: str, session_id: str,
                 "You classify only visibly supported football player roles. "
                 "Never infer a role from an event outcome. Respond with strict JSON only."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             "Image 1 is a tight crop of one football player. Image 2 is the SAME frame with wider match context. "
             "Classify only that cropped player's visible role. Use GOALKEEPER only when direct visual cues support it "
@@ -237,6 +230,8 @@ def aggregate_role_votes(votes) -> dict:
             "confidence": confidence,
             "reason": str(vote.get("reason") or "")[:180],
             "model_review_audit": deepcopy(vote.get("model_review_audit")),
+            **({"support_vision_fail_closed": deepcopy(vote["support_vision_fail_closed"])}
+               if "support_vision_fail_closed" in vote else {}),
         })
     by_frame = {}
     for vote in cleaned:
@@ -285,6 +280,47 @@ def aggregate_role_votes(votes) -> dict:
     }
 
 
+def _goal_scene_response_coverage(data, media_ms) -> dict:
+    """Audit both per-image streams before any goal proof is admitted."""
+    count = len(media_ms)
+    expected = set(range(1, count + 1))
+    returned, missing, errors = {}, {}, []
+    for field in ("frames", "ball_evidence"):
+        rows = data.get(field) if isinstance(data, dict) else None
+        indices = set()
+        if not isinstance(rows, list):
+            errors.append(f"{field}:ROWS_NOT_LIST")
+            rows = []
+        for row in rows:
+            if not isinstance(row, dict):
+                errors.append(f"{field}:ROW_NOT_OBJECT")
+                continue
+            index = row.get("idx")
+            if not isinstance(index, int) or isinstance(index, bool) or index not in expected:
+                errors.append(f"{field}:INVALID_FRAME_INDEX")
+                continue
+            if index in indices:
+                errors.append(f"{field}:DUPLICATE_FRAME_INDEX")
+                continue
+            indices.add(index)
+            visibility = "visible" if field == "frames" else "ball_visible"
+            if not isinstance(row.get(visibility), bool):
+                errors.append(f"{field}:INVALID_VISIBILITY")
+            if field == "ball_evidence" and not isinstance(row.get("relation"), str):
+                errors.append(f"{field}:MISSING_BALL_RELATION")
+        returned[field] = sorted(indices)
+        missing[field] = sorted(expected - indices)
+    omitted = sorted(set(missing["frames"]) | set(missing["ball_evidence"]))
+    return {
+        "status": "INVALID_RESPONSE" if errors else "PARTIAL_RESPONSE" if omitted else "COMPLETED",
+        "input_frame_count": count,
+        "returned_frame_indices": returned,
+        "missing_frame_indices": missing,
+        "missing_media_ms": [media_ms[index - 1] for index in omitted],
+        "protocol_errors": sorted(set(errors)),
+    }
+
+
 async def read_goal_scene_evidence(api_key: str, session_id: str,
                                    frame_paths: list[str], media_ms: list[int], ball_reference=None) -> dict:
     """Independent multi-frame goal geometry, ball/occlusion and reaction audit.
@@ -317,10 +353,16 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         "reason": "insufficient_frames",
     }
     try:
+        if len(frame_paths) != len(media_ms):
+            return {**empty, "reason": "goal_scene_input_count_mismatch",
+                    "proof_reason": "goal_scene_input_count_mismatch"}
         pairs = [
             (Path(path), int(ms)) for path, ms in zip(frame_paths, media_ms)
             if path and Path(path).exists() and _num(ms)
         ]
+        if len(pairs) != len(frame_paths):
+            return {**empty, "reason": "goal_scene_invalid_input",
+                    "proof_reason": "goal_scene_invalid_input"}
         if len(pairs) < 2 or not api_key:
             return dict(empty)
         timeline = ", ".join(f"image {i + 1}={ms}ms" for i, (_path, ms) in enumerate(pairs))
@@ -332,10 +374,14 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
                 "from chronological images. Never infer a GOAL/SAVE from celebration, scoreboards or expected events. "
                 "Return only visible observations as strict JSON."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"These images are chronological match frames: {timeline}. The first images are at/just after a "
             "physically detected ball release; no semantic event label is provided.\n"
+            f"Return exactly {len(pairs)} frames rows AND exactly {len(pairs)} ball_evidence rows, "
+            f"one row per EVERY input image with unique integer idx 1 through {len(pairs)} in BOTH lists. "
+            "Do not omit an image because the goal or ball is unclear: use visible=false, "
+            "ball_visible=false and relation=UNRESOLVED as appropriate.\n"
             "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
             "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
             "visible=false when both bases are not clear.\n"
@@ -392,6 +438,15 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
         text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
         data = _extract_json(text) or {}
+
+        coverage = _goal_scene_response_coverage(data, [ms for _, ms in pairs])
+        audit = _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs])
+        if coverage["status"] != "COMPLETED":
+            return {
+                **empty, "model_review_audit": audit, "response_coverage": coverage,
+                "reason": "goal_scene_pixel_response_coverage_gap",
+                "proof_reason": "GOAL_SCENE_PIXEL_RESPONSE_COVERAGE_GAP",
+            }
 
         cleaned_frames = []
         for row in data.get("frames") or []:
@@ -676,7 +731,8 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
 
         return {
             "geometry_status": "VERIFIED" if geometry_verified else "UNRESOLVED",
-            "model_review_audit": _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs]),
+            "model_review_audit": audit,
+            "response_coverage": coverage,
             "frames": cleaned_frames,
             "crossing": crossing,
             "crossing_confidence": crossing_conf,
@@ -779,9 +835,48 @@ def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[
     return requests
 
 
+def _action_pixel_response(parsed, media_ms):
+    """Bind each proposal row to one supplied image; omission is not completion."""
+    count = len(media_ms)
+    expected = set(range(1, count + 1))
+    rows = (parsed or {}).get("frames") if isinstance(parsed, dict) else None
+    errors, indexed = [], {}
+    if not isinstance(rows, list):
+        errors.append("FRAMES_NOT_A_LIST")
+        rows = []
+    for row in rows:
+        if not isinstance(row, dict):
+            errors.append("FRAME_NOT_AN_OBJECT")
+            continue
+        index = row.get("idx")
+        if not isinstance(index, int) or isinstance(index, bool) or index not in expected:
+            errors.append("INVALID_FRAME_INDEX")
+            continue
+        if index in indexed:
+            errors.append("DUPLICATE_FRAME_INDEX")
+            continue
+        if not isinstance(row.get("balls"), list) or not isinstance(row.get("selected_body_ids"), list):
+            errors.append("INVALID_FRAME_FIELDS")
+            continue
+        indexed[index] = row
+    missing = sorted(expected - set(indexed))
+    status = "INVALID_RESPONSE" if errors else "PARTIAL_RESPONSE" if missing else "COMPLETED"
+    return {"status": status,
+            "reason": "action_pixel_reader_invalid_response" if errors else
+                      "action_pixel_reader_incomplete_response" if missing else "PIXEL_PROPOSALS_ONLY",
+            # Conflicting or malformed indices cannot be salvaged as pixel evidence.
+            "frames": [] if errors else [indexed[index] for index in sorted(indexed)],
+            "input_frame_count": count, "returned_frame_indices": sorted(indexed),
+            "missing_frame_indices": missing,
+            "missing_media_ms": [media_ms[index - 1] for index in missing],
+            "protocol_errors": sorted(set(errors))}
+
+
 async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_candidates=None):
     """Locate visible pixels for independent re-detection/crop review only."""
     import hashlib
+    if not paths or len(paths) != len(media_ms):
+        return {"status": "INVALID_INPUT", "reason": "action_pixel_reader_input_count_mismatch", "frames": []}
     if not api_key or LlmChat is None:
         return {"status": "UNAVAILABLE", "reason": "action_pixel_reader_unavailable", "frames": []}
     timeline = ", ".join(f"image {i + 1}={ms}ms" for i, ms in enumerate(media_ms))
@@ -796,21 +891,20 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_
         "Do not read or guess the digits; a separate crop reader does that. Do not infer identity, a pass, a shot, "
         "a goal, an assist, ball ownership or an outcome. Each input may be a field crop of a portrait frame. "
         "Ball coordinates are normalized 0..1 from the DISPLAYED IMAGE top-left, not from the source video. "
+        f"Return exactly {len(paths)} frame rows, one for EVERY input image, with unique integer idx values "
+        f"1 through {len(paths)}. Never omit an image: use balls=[] and selected_body_ids=[] when uncertain. "
         'Return only {"frames":[{"idx":1,"balls":[{"box":{"x":0,"y":0,"w":0.01,"h":0.01},'
         '"confidence":"high"|"medium"|"low"}],"selected_body_ids":["body_1"]}]} . Empty lists are valid. '
         + "Measured search regions per image: " + json.dumps(body_candidates or [], separators=(",", ":"))
     )
     try:
         chat = LlmChat(api_key=api_key, session_id=session_id,
-                       system_message="Inspect visible pixel locations only. Return strict JSON.").with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+                       system_message="Inspect visible pixel locations only. Return strict JSON.").with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         response = await asyncio.wait_for(chat.send_message(UserMessage(
             text=prompt, file_contents=[ImageContent(image_base64=_b64(p)) for p in paths])), timeout=90)
         raw = response if isinstance(response, str) else getattr(response, "text", None) or str(response)
         parsed = _extract_json(raw)
-        valid = isinstance((parsed or {}).get("frames"), list)
-        return {"status": "COMPLETED" if valid else "INVALID_RESPONSE",
-                "reason": "PIXEL_PROPOSALS_ONLY" if valid else "action_pixel_reader_invalid_json",
-                "frames": parsed["frames"] if valid else [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
+        return {**_action_pixel_response(parsed, media_ms), "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
                 "raw_response": raw[:50000], "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
                 "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest()}
     except Exception as exc:
@@ -981,9 +1075,15 @@ class ShadowVisionProviders:
                 return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
             self.inspection_calls += 1
             self.feedback_inspection_calls += int(feedback)
-            review = asyncio.run(read_action_pixel_evidence(
-                self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times,
-                body_candidates=body_manifest))
+            try:
+                review = support_vision_runner.run_support_vision(read_action_pixel_evidence, [(
+                    (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times),
+                    {"body_candidates": body_manifest})],
+                    deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="action_pixels")[0]
+            except Exception as exc:
+                review = {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
+                          "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
+                          **support_vision_runner.fail_closed_diagnostic(exc)}
         import dense_track_refinement
         detector = dense_track_refinement._default_detector()
         rows = []
@@ -1091,20 +1191,19 @@ class ShadowVisionProviders:
                 path = root / f"jersey_{index:03d}.jpg"
                 if crop is None or not _write_jpg(path, crop):
                     continue
-                jobs.append(identity_verify.read_visible_jersey_number(
-                    self.api_key,
-                    f"{self.session_prefix}-jersey-{index}",
-                    str(path),
-                ))
+                jobs.append(((self.api_key, f"{self.session_prefix}-jersey-{index}", str(path)), {}))
                 job_meta.append((track, actual_ms, row.get("request_id"), cache_key))
             if not jobs:
                 return votes_by_track
             self.jersey_calls += len(jobs)
             try:
-                results = asyncio.run(_bounded_gather(jobs, limit=3))
-            except Exception:
-                results = [{"readable": False, "number": None, "confidence": "low",
-                            "reason": "reader_error"} for _ in job_meta]
+                results = support_vision_runner.run_support_vision(
+                    identity_verify.read_visible_jersey_number, jobs, limit=3,
+                    deadline_s=math.ceil(len(jobs) / 3) * 60 + support_vision_runner.DEADLINE_MARGIN_S,
+                    label="jersey_numbers")
+            except Exception as exc:
+                results = [{"readable": False, "number": None, "confidence": "low", "reason": "reader_error",
+                            **support_vision_runner.fail_closed_diagnostic(exc, index)} for index in range(len(job_meta))]
             for (track, actual_ms, request_id, cache_key), result in zip(job_meta, results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "readable": False, "number": None, "confidence": "low", "reason": "reader_unavailable"
@@ -1147,20 +1246,19 @@ class ShadowVisionProviders:
                 context = root / f"role_context_{index:03d}.jpg"
                 if crop is None or not _write_jpg(tight, crop) or not _write_jpg(context, frame):
                     continue
-                jobs.append(read_visible_player_role(
-                    self.api_key,
-                    f"{self.session_prefix}-role-{index}",
-                    str(tight), str(context),
-                ))
+                jobs.append(((self.api_key, f"{self.session_prefix}-role-{index}", str(tight), str(context)), {}))
                 job_meta.append((row["track_id"], int(actual_ms), cache_key))
             if not jobs:
                 return {track: aggregate_role_votes(votes) for track, votes in raw_votes.items()}
             self.role_calls += len(jobs)
             try:
-                results = asyncio.run(_bounded_gather(jobs, limit=2))
-            except Exception:
-                results = [{"role": "UNKNOWN", "confidence": "low",
-                            "reason": "role_reader_error"} for _ in job_meta]
+                results = support_vision_runner.run_support_vision(
+                    read_visible_player_role, jobs, limit=2,
+                    deadline_s=math.ceil(len(jobs) / 2) * 60 + support_vision_runner.DEADLINE_MARGIN_S,
+                    label="player_roles")
+            except Exception as exc:
+                results = [{"role": "UNKNOWN", "confidence": "low", "reason": "role_reader_error",
+                            **support_vision_runner.fail_closed_diagnostic(exc, index)} for index in range(len(job_meta))]
             for (track, actual_ms, cache_key), result in zip(job_meta, results):
                 vote = dict(result) if isinstance(result, dict) else {
                     "role": "UNKNOWN", "confidence": "low", "reason": "reader_unavailable"
@@ -1233,19 +1331,18 @@ class ShadowVisionProviders:
                              "media_ms": int(anchor["media_ms"]), "box": deepcopy(anchor["box"])} \
                     if anchor_valid and int(anchor["media_ms"]) in actual_times else None
                 kwargs = {"ball_reference": reference} if "ball_reference" in inspect.signature(read_goal_scene_evidence).parameters else {}
-                review = asyncio.run(read_goal_scene_evidence(
-                    self.api_key,
-                    f"{self.session_prefix}-goal-{strike_ms}",
-                    paths, actual_times, **kwargs,
-                ))
-            except Exception:
-                review = {}
+                review = support_vision_runner.run_support_vision(read_goal_scene_evidence, [(
+                    (self.api_key, f"{self.session_prefix}-goal-{strike_ms}", paths, actual_times), kwargs)],
+                    deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="goal_scene")[0]
+            except Exception as exc:
+                review = support_vision_runner.fail_closed_diagnostic(exc)
         rows = review.get("frames") or [] if isinstance(review, dict) else []
         link = _active_ball_link(review, reference) if requires_reference else None
         if not rows:
             result = {
                 "status": "UNRESOLVED",
                 "model_review_audit": (review or {}).get("model_review_audit"),
+                "response_coverage": (review or {}).get("response_coverage"),
                 "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
                 "line_by_ms": [],
                 "visual_crossing_audit": {
@@ -1268,6 +1365,8 @@ class ShadowVisionProviders:
                     "reason": "goal_geometry_unresolved",
                 }),
             }
+            if isinstance(review, dict) and "support_vision_fail_closed" in review:
+                result["support_vision_fail_closed"] = review["support_vision_fail_closed"]
             self._goal_cache[cache_key] = result
             if requires_reference:
                 result["visual_crossing_audit"]["active_ball_link"] = link
@@ -1288,6 +1387,7 @@ class ShadowVisionProviders:
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
             "model_review_audit": (review or {}).get("model_review_audit"),
+            "response_coverage": (review or {}).get("response_coverage"),
             "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
             "line": dict(nearest["line"]),
             "line_media_ms": int(nearest["media_ms"]),

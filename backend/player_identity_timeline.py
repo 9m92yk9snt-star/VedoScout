@@ -59,6 +59,7 @@ SCALE_STEP = (0.60, 1.60)   # per-sample height ratio (zoom-plausible)
 SCALE_JOIN = (0.55, 1.80)   # within-scene re-acquisition join height ratio
 MAX_MISSES = 10             # samples (≈2 s @5 Hz) a track may survive unseen
 PIN_WINDOW_MS = 600
+TAP_POINT_FRAME_MAX_MS = 25  # same decoded-frame bound as dense tap binding
 PIN_APPEAR_WIN_MS = 5000    # C04 appearance-evidence window around a tap
 POST_WIN_MS = 3000          # post-separation evidence window
 RESUME_WIN_MS = 2000        # post-gap identity confirmation window
@@ -1229,7 +1230,8 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
     pins_by_scene = {}
     restrict_by_scene = {}
     tap_hyps_by_scene = {}
-    recovery = {"tap_recovered_pins": 0, "tap_restricted": 0}
+    recovery = {"tap_recovered_pins": 0, "tap_restricted": 0,
+                "tap_point_pins": 0, "tap_point_unresolved": 0}
     for tap in (taps or []):
         tms = tap.get("media_ms")
         tbox = tap.get("box")
@@ -1245,6 +1247,35 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         if sd is None:
             continue
         by_tid = {tr.tid: tr for tr in sd["tracks"]}
+        point = tap.get("target_point")
+        if isinstance(point, (list, tuple)) and len(point) == 2:
+            from player_selection import body_indices_at_point
+            sample_ms = tap.get("decoded_media_ms")
+            if "decoded_media_ms" not in tap:
+                available = [obs[i]["media_ms"] for i in sd["idxs"]
+                             if obs[i].get("time_authority") == "ACTUAL_MEDIA_PTS"
+                             and not obs[i].get("used_fallback")]
+                sample_ms = min(available, key=lambda ms: abs(ms - tms), default=None)
+            frame = next((obs[i] for i in sd["idxs"] if obs[i]["media_ms"] == sample_ms), None)
+            if (not isinstance(sample_ms, (int, float)) or abs(sample_ms - tms) > TAP_POINT_FRAME_MAX_MS
+                    or frame is None or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                    or frame.get("used_fallback") or (frame.get("cut") and sample_ms != tms)):
+                recovery["tap_point_unresolved"] += 1
+                continue
+            bodies = [(tr.tid, s["box"]) for tr in sd["tracks"] for s in tr.samples
+                      if s["ms"] == sample_ms]
+            indices = body_indices_at_point([box for _, box in bodies], point, tap.get("exclude_points"))
+            selected = {bodies[i][0] for i in indices}
+            if len(selected) == 1:
+                pins_by_scene.setdefault(sd["no"], []).append((int(sample_ms), next(iter(selected))))
+                recovery["tap_point_pins"] += 1
+            else:
+                recovery["tap_point_unresolved"] += 1
+                if selected:
+                    restrict_by_scene.setdefault(sd["no"], set()).update(selected)
+                    tap_hyps_by_scene.setdefault(sd["no"], []).append((int(sample_ms), frozenset(selected)))
+                    recovery["tap_restricted"] += 1
+            continue
         cands = {}
         for tr in sd["tracks"]:
             for s in tr.samples:
@@ -1500,6 +1531,8 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
         "recovery": {
             "tap_recovered_pins": recovery["tap_recovered_pins"],
             "tap_restricted": recovery["tap_restricted"],
+            "tap_point_pins": recovery["tap_point_pins"],
+            "tap_point_unresolved": recovery["tap_point_unresolved"],
             "tap_restricted_joins": stats.get("tap_restricted_joins", 0),
             "kinematic_reacq": stats.get("kinematic_reacq", 0),
             "shape_tiebreaks": stats.get("shape_tiebreaks", 0),
@@ -1526,7 +1559,7 @@ def build_identity_timeline(video_path: str, doc: dict):
     t_start = time.time()
     cap = None
     try:
-        from player_selection import expanded_anchors
+        from player_selection import expanded_anchors, valid_point
         anchors = [a for a in expanded_anchors(doc.get("anchors")) if isinstance(a, dict) and a.get("box")]
         if not anchors:
             return {"version": VERSION, "status": "skipped", "reason": "no_anchors"}
@@ -1567,6 +1600,10 @@ def build_identity_timeline(video_path: str, doc: dict):
         max_h = PLAYER_MAX_FRAC * sh
 
         observations = []
+        tap_times = sorted({int(round((float(a["t"]) + t_off) * 1000)) for a in anchors
+                            if isinstance(a.get("t"), (int, float)) and not isinstance(a.get("t"), bool)})
+        pending_taps = list(tap_times)
+        decoded_taps = {}
         cap.set(cv2.CAP_PROP_POS_MSEC, 0.0)
         interval = 1.0 / HZ if HZ > 0 else 0.0
         prev_sample_t = None
@@ -1575,12 +1612,19 @@ def build_identity_timeline(video_path: str, doc: dict):
             ok, t, _fb = video_timebase.grab_frame_time_seconds(cap, fps)
             if not ok:
                 break
-            if not video_timebase.should_sample(t, prev_sample_t, interval):
+            media_ms = int(round(t * 1000))
+            due_taps = [ms for ms in pending_taps if ms <= media_ms]
+            regular_sample = video_timebase.should_sample(t, prev_sample_t, interval)
+            if not regular_sample and not due_taps:
                 continue
             ok, frame = cap.retrieve()
             if not ok:
                 break
-            prev_sample_t = t
+            if regular_sample:
+                prev_sample_t = t
+            for ms in due_taps:
+                decoded_taps[ms] = media_ms if not _fb and 0 <= media_ms - ms <= TAP_POINT_FRAME_MAX_MS else None
+                pending_taps.remove(ms)
             small = cv2.resize(frame, (sw, sh))
             pitch_l = cv_shadow._pitch_l(small)
             tiny = cv2.cvtColor(cv2.resize(small, (160, max(2, int(sh * 160 / sw)))),
@@ -1619,7 +1663,9 @@ def build_identity_timeline(video_path: str, doc: dict):
                 team.add(ch)
                 dets.append({"box": b, "emb": emb, "team": team.classify(ch)})
             observations.append({
-                "media_ms": int(round(t * 1000)), "cut": cut,
+                "media_ms": media_ms, "cut": cut,
+                "time_authority": "FRAME_INDEX_FALLBACK" if _fb else "ACTUAL_MEDIA_PTS",
+                "used_fallback": bool(_fb),
                 "cam_dx": cam_dx, "cam_dy": cam_dy, "cam_affine": cam_affine,
                 "cam_mode": cam.mode, "sig": sig,
                 "width": sw, "height": sh, "detections": dets,
@@ -1630,12 +1676,18 @@ def build_identity_timeline(video_path: str, doc: dict):
             if a.get("visibility") == "partial":
                 continue  # visible fragment must not pin a full detector body
             try:
-                taps.append({
-                    "media_ms": int(round((float(a["t"]) + t_off) * 1000)),
+                tms = int(round((float(a["t"]) + t_off) * 1000))
+                row = {
+                    "media_ms": tms,
                     "box": (float(a["box"]["x"]) * sw, float(a["box"]["y"]) * sh,
                             max(4.0, float(a["box"]["w"]) * sw),
                             max(8.0, float(a["box"]["h"]) * sh)),
-                })
+                }
+                if valid_point(a.get("target_point")):
+                    row["target_point"] = (a["target_point"]["x"] * sw, a["target_point"]["y"] * sh)
+                    row["exclude_points"] = [(p["x"] * sw, p["y"] * sh) for p in a.get("exclude_points") or [] if valid_point(p)]
+                    row["decoded_media_ms"] = decoded_taps.get(tms)
+                taps.append(row)
             except Exception:
                 continue
 
@@ -1657,6 +1709,9 @@ def build_identity_timeline(video_path: str, doc: dict):
             "tap_references": len(refs),
             "negative_gallery": len(negatives),
             "detector": bool(detector.ok),
+            "tap_frame_bindings": [{"tap_ms": ms, "decoded_media_ms": decoded_taps.get(ms),
+                                    "frame_delta_ms": decoded_taps[ms] - ms if decoded_taps.get(ms) is not None else None}
+                                   for ms in tap_times],
             "compute_s": round(time.time() - t_start, 1),
         })
         logger.info(

@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -45,6 +46,7 @@ def test_vp02_role_conflict_is_unresolved_not_majority_guess():
     assert out["role"] is None
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_vp03_jersey_provider_reads_pixels_without_expected_number(monkeypatch):
     captured = []
 
@@ -72,6 +74,7 @@ def test_vp03_jersey_provider_reads_pixels_without_expected_number(monkeypatch):
     assert len(captured[0]) == 3
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_vp04_role_provider_binds_first_post_strike_other_touch(monkeypatch):
     def fake_frames(_video, requested):
         return {int(ms): (int(ms), _frame()) for ms in requested}
@@ -100,6 +103,7 @@ def test_vp04_role_provider_binds_first_post_strike_other_touch(monkeypatch):
     assert out["p001"]["role"] == "GOALKEEPER"
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_vp05_goal_provider_returns_dynamic_lines_and_independent_audit(monkeypatch):
     def fake_frames(_video, requested):
         return {int(ms): (int(ms), _frame()) for ms in requested}
@@ -129,6 +133,7 @@ def test_vp05_goal_provider_returns_dynamic_lines_and_independent_audit(monkeypa
     assert out["source"] == "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_vp06_goal_provider_low_confidence_outcome_is_unresolved(monkeypatch):
     def fake_frames(_video, requested):
         return {int(ms): (int(ms), _frame()) for ms in requested}

@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = "gpt-4o"  # calibrated: 4o-mini misses small players; 4o is reliable
+# FIX14: per-request HTTP deadline below the 60/90s wait_for, retries disabled; a breach fails closed.
+VERIFY_REQUEST_TIMEOUT_S = 55.0
 MAX_REF_CROPS = 3
 MAX_PROFILE_CROPS = 5
 MAX_PROFILE_WIDE = 3
@@ -67,7 +69,7 @@ async def verify_frame_identity(
                 "You verify football player identity across images. "
                 "Respond with STRICT JSON only — no prose, no markdown."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"The first {len(refs)} image(s) are reference crops of ONE specific youth football player. "
             "First, identify the player's distinctive features from the reference crops yourself "
@@ -140,7 +142,7 @@ async def verify_ring_placement(
                 "You verify football telestration accuracy across images. "
                 "Respond with STRICT JSON only — no prose, no markdown."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"The first {len(refs)} image(s) are reference crops of ONE specific youth football player. "
             "Identify the player's distinctive features yourself (kit colours, build, socks, boots). "
@@ -212,7 +214,7 @@ async def read_visible_jersey_number(
                 "Do not identify the player and do not infer a number from context. "
                 "Respond with STRICT JSON only — no prose, no markdown."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             "This image is a crop of one football player. Read ONLY a shirt/jersey number that is "
             "actually legible on the player's kit. Do not guess from team, position, identity, body shape, "
@@ -291,7 +293,7 @@ async def build_identity_profile(
                 "You verify football player identity across images. "
                 "Respond with STRICT JSON only — no prose, no markdown."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"The first {len(tights)} image(s) are TIGHT crops of ONE specific youth football player. "
             "The user tapped precisely on THEIR player at different moments of a match video — the target "
@@ -441,7 +443,7 @@ async def verify_preview_summary(
                 "You verify football player identity across images. "
                 "Respond with STRICT JSON only — no prose, no markdown."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"The first {len(tights)} image(s) are TIGHT crops of the TARGET player — the user tapped "
             "precisely on THEIR player; the target is at the CENTRE of each crop and may be partially hidden.\n"

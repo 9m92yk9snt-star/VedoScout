@@ -68,6 +68,7 @@ def test_scene_tail_after_target_loss_has_search_coverage_and_cannot_cross_cut()
     assert all(w["end_ms"] - w["start_ms"] <= sequence.MAX_ANALYSIS_WINDOW_MS for w in first)
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_index_selection_uses_exact_native_body_and_still_requires_independent_number_reader(monkeypatch):
     original = [frame(1000), frame(1300)]
     calls = []
@@ -122,6 +123,7 @@ def test_portrait_search_roi_maps_ball_and_body_coordinates_to_exact_native_pixe
     assert landscape_roi == full_roi
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_pixel_provider_remaps_search_ball_before_native_corroboration(monkeypatch):
     frames = [frame(1000), frame(1300)]
     for f in frames: f["players"][0]["box"] = {"x": .2, "y": .5, "w": .1, "h": .1}

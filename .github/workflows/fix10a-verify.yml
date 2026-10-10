@@ -55,6 +55,9 @@ jobs:
                   self.provider = provider
                   self.model = model
                   return self
+              def with_params(self, **params):
+                  self.params = params
+                  return self
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
@@ -100,6 +103,7 @@ jobs:
             backend/run_real_video_golden.py \
             backend/football_sequence_intelligence.py \
             backend/identity_verify.py \
+            backend/support_vision_runner.py \
             backend/server.py
       - name: Run FIX10 production regressions
         working-directory: backend
@@ -154,6 +158,9 @@ jobs:
               def with_model(self, provider, model):
                   self.provider = provider
                   self.model = model
+                  return self
+              def with_params(self, **params):
+                  self.params = params
                   return self
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")

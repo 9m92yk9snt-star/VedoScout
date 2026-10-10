@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy
 import numpy as np
+import pytest
 import fix10a_vision_providers as fvp
 import physical_match_reconstruction as pmr
 
@@ -18,6 +19,7 @@ def _frame(ms, track="p009"):
     }
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_provider_uses_verified_a7_actor_without_touch_graph(monkeypatch):
     image = np.zeros((120, 160, 3), dtype=np.uint8)
     monkeypatch.setattr(fvp, "_read_frames", lambda _v, requested: {int(ms):(int(ms),image) for ms in requested})

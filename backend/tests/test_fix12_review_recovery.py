@@ -5,6 +5,7 @@ import threading
 from types import SimpleNamespace
 from pathlib import Path
 import sys
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import fix10a_goal_direction as direction  # noqa: E402
@@ -98,6 +99,7 @@ def test_same_frame_reads_cannot_verify_number_or_role():
     assert vision.aggregate_role_votes([role, {**role, "media_ms": 1200}])["status"] == "VERIFIED"
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_jersey_cache_rebinds_local_track_without_another_model_call(monkeypatch):
     import numpy as np
     calls = []
