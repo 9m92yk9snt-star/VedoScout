@@ -635,16 +635,10 @@ def reconstruct_physical_match(
             shot_trajectories = []
             for strike in strikes:
                 anchor = strike.get("active_ball_anchor") if isinstance(strike, dict) else None
-                anchored_path = ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
-                    dense_with_jersey, anchor, strike.get("scene_id")
-                )
-                uses_anchor = bool(anchored_path)
-                selected_path = anchored_path if uses_anchor else trajectory
-                shot_trajectories.append({
-                    "rows": selected_path,
-                    "source": "VERIFIED_RELEASE_ANCHOR" if uses_anchor else "WINDOW_GLOBAL_TRAJECTORY",
-                    "seed_ms": int(anchor["media_ms"]) if uses_anchor else None,
-                })
+                shot_trajectories.append(ball_trajectory.select_release_ball_trajectory(
+                    dense_with_jersey, anchor, strike.get("scene_id"), trajectory,
+                    anchor_required="active_ball_anchor" in strike,
+                ))
 
             stage = "intervention_detection"
             a7_interventions = [

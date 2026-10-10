@@ -26,6 +26,8 @@ HYPOTHESIS_DECAY = 0.88
 RELEASE_REACQUIRE_MAX_JUMP_NORM = 0.25
 RELEASE_REACQUIRE_MIN_CONFIDENCE = 0.04
 RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS = 80
+RELEASE_MAX_MEASURED_GAP_MS = 80
+RELEASE_MIN_MOTION_SUPPORT = 0.50
 
 
 def _num(value) -> bool:
@@ -421,7 +423,10 @@ def reconstruct_ball_trajectory_from_release_anchor(
     verified release anchor can seed a separate, shot-local path, but it cannot
     by itself bridge a detector jump: a player-supported jump must be confirmed
     by a second nearby, actual-PTS ball observation before either point becomes
-    measured path evidence. No path is carried across a cut or scene boundary.
+    measured path evidence. Established measured motion, not proximity to the
+    last box or detector confidence, disambiguates competing objects. A loss
+    beyond the bounded measured-gap horizon ends this identity; it cannot grow
+    an arbitrary reattachment radius. No predicted point becomes proof.
     """
     if not (
         isinstance(anchor, dict)
@@ -446,6 +451,7 @@ def reconstruct_ball_trajectory_from_release_anchor(
     last = rows[0]
     pending = None
     jump_supported = False
+    velocity = None
 
     for frame in sorted(
         (f for f in dense_frames or [] if isinstance(f, dict) and _num(f.get("media_ms"))
@@ -459,19 +465,31 @@ def reconstruct_ball_trajectory_from_release_anchor(
             break
         if scene_id is not None and frame_scene not in {None, scene_id}:
             break
-        if frame.get("used_fallback") is True or frame.get("time_authority") not in {None, "ACTUAL_MEDIA_PTS"}:
+        if frame.get("used_fallback") is True or frame.get("time_authority") != "ACTUAL_MEDIA_PTS":
             continue
         if pending and ms - pending["media_ms"] > RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS:
-            pending = None
-            continue
+            break
+        if not pending and ms - int(last["media_ms"]) > RELEASE_MAX_MEASURED_GAP_MS:
+            break
         candidates = []
         for candidate in frame.get("ball_candidates") or []:
             if not isinstance(candidate, dict) or not _valid_box(candidate.get("box")):
                 continue
+            if (candidate.get("used_fallback") is True or candidate.get("proof_eligible") is False
+                    or candidate.get("state") not in {None, "MEASURED", "MEASURED_REACQUISITION"}
+                    or candidate.get("time_authority") not in {None, "ACTUAL_MEDIA_PTS"}):
+                continue
+            if not _num(candidate.get("confidence")) or not math.isfinite(candidate["confidence"]):
+                continue
             confidence = float(candidate.get("confidence") or 0.0)
             if confidence < RELEASE_REACQUIRE_MIN_CONFIDENCE:
                 continue
-            candidates.append({"box": _box(candidate["box"]), "confidence": confidence})
+            candidate_box = _box(candidate["box"])
+            reference_box = (pending or last)["box"]
+            scale_ratio = min(_area_scale(candidate_box), _area_scale(reference_box)) / max(
+                _area_scale(candidate_box), _area_scale(reference_box))
+            if scale_ratio >= 0.35:
+                candidates.append({"box": candidate_box, "confidence": confidence})
         if not candidates:
             continue
 
@@ -509,7 +527,49 @@ def reconstruct_ball_trajectory_from_release_anchor(
                 "provenance": "RELEASE_ANCHOR_REACQUISITION_CONFIRMED", "candidates": [],
             }
             rows.append(row)
+            fx, fy = _center(first["box"])
+            nx, ny = _center(row["box"])
+            velocity = ((nx - fx) / dt, (ny - fy) / dt)
             last, pending, jump_supported = row, None, True
+            continue
+
+        if velocity is not None:
+            prior = {"media_ms": last["media_ms"], "last_measured_ms": last["media_ms"],
+                     "box": last["box"], "last_measured_box": last["box"], "velocity": velocity}
+            prediction = _predict_box(prior, ms)
+            pcx, pcy = _center(prediction)
+            # SCORE_MARGIN remains a dimensionless support margin, not a raw
+            # 12%-of-image distance. Confidence cannot overrule ball identity.
+            sigma = max(BASE_JUMP_NORM, _area_scale(last["box"]))
+            motion_ranked = []
+            for c in candidates:
+                cx, cy = _center(c["box"])
+                if math.hypot(cx - px, cy - py) > ordinary_limit:
+                    continue
+                supported = _candidate_from_prior(c, prior, ms)
+                if supported is None:
+                    continue
+                residual = math.hypot(cx - pcx, cy - pcy)
+                scale_ratio = min(_area_scale(last["box"]), _area_scale(c["box"])) / max(
+                    _area_scale(last["box"]), _area_scale(c["box"]))
+                support = math.exp(-0.5 * (residual / sigma) ** 2) * scale_ratio
+                motion_ranked.append((support, supported))
+            motion_ranked.sort(key=lambda item: item[0], reverse=True)
+            if (not motion_ranked or motion_ranked[0][0] < RELEASE_MIN_MOTION_SUPPORT
+                    or (len(motion_ranked) > 1
+                    and motion_ranked[0][0] - motion_ranked[1][0] < SCORE_MARGIN)):
+                continue
+            nearest = motion_ranked[0][1]
+            row = {
+                "media_ms": ms, "scene_id": scene_id, "state": "MEASURED",
+                "box": nearest["box"], "confidence": nearest["confidence"],
+                "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+                "used_fallback": False, "cut_barrier": False,
+                "provenance": "RELEASE_ANCHORED_MEASURED_MOTION", "candidates": [],
+            }
+            rows.append(row)
+            velocity = nearest["velocity"]
+            last = row
             continue
 
         if nearest_dist <= ordinary_limit:
@@ -523,6 +583,8 @@ def reconstruct_ball_trajectory_from_release_anchor(
                 "provenance": "RELEASE_ANCHORED_DENSE_TRAJECTORY", "candidates": [],
             }
             rows.append(row)
+            nx, ny = _center(row["box"])
+            velocity = ((nx - px) / dt, (ny - py) / dt)
             last = row
             continue
 
@@ -537,3 +599,19 @@ def reconstruct_ball_trajectory_from_release_anchor(
             pending = {"media_ms": ms, "box": nearest["box"], "confidence": nearest["confidence"]}
 
     return rows
+
+
+def select_release_ball_trajectory(dense_frames, anchor, scene_id, global_trajectory,
+                                   *, anchor_required=False, max_duration_ms=3000) -> dict:
+    """One shared fail-closed policy for live, contact-role and replay callers.
+
+    Explicit/rejected anchors never fall back to an unrelated global object.
+    Legacy callers with no anchor contract retain their previous global path.
+    """
+    if anchor is not None or anchor_required:
+        rows = reconstruct_ball_trajectory_from_release_anchor(
+            dense_frames, anchor, scene_id, max_duration_ms)
+        return {"rows": rows,
+                "source": "VERIFIED_RELEASE_ANCHOR" if rows else "REJECTED_RELEASE_ANCHOR",
+                "seed_ms": int(anchor["media_ms"]) if rows else None}
+    return {"rows": global_trajectory or [], "source": "WINDOW_GLOBAL_TRAJECTORY", "seed_ms": None}

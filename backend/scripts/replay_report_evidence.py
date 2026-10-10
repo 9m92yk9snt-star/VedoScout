@@ -167,8 +167,9 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                 graph = contact_role_resolver.apply_contact_roles(graph, contacts, dense_frames=frames, ball_trajectory=trajectory)
                 strikes = [*shot_outcome_engine.find_strike_releases(graph, trajectory),
                            *shot_outcome_engine.find_scoring_control_contacts(graph)]
-                tracks = {s["strike_id"]: ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
-                    frames, s.get("active_ball_anchor"), s.get("scene_id")) or trajectory for s in strikes}
+                tracks = {s["strike_id"]: ball_trajectory.select_release_ball_trajectory(
+                    frames, s.get("active_ball_anchor"), s.get("scene_id"), trajectory,
+                    anchor_required="active_ball_anchor" in s)["rows"] for s in strikes}
                 interventions = {s["strike_id"]: post_strike_intervention.detect_post_strike_intervention(
                     s, frames, tracks[s["strike_id"]]) for s in strikes}
                 fresh_roles = bundle.role_evidence_provider(str(video_path), original["window"], strikes, graph, frames,

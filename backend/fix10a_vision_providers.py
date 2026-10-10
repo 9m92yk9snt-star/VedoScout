@@ -781,7 +781,7 @@ def _first_post_strike_other_touches(strikes, touch_graph) -> dict[str, int]:
     return out
 
 
-def _verified_intervention_track_times(interventions) -> dict[str, int]:
+def _verified_intervention_track_times(interventions, strikes=None, touch_graph=None) -> dict[str, int]:
     """Return only independently VERIFIED A7 intervention actors.
 
     A7 full-body intervention deliberately bypasses A4/A5 Touch Graph semantics.
@@ -789,8 +789,16 @@ def _verified_intervention_track_times(interventions) -> dict[str, int]:
     the already-verified A7 actor; otherwise a hand/arm save can never request a
     goalkeeper-role read.  No role is inferred here.
     """
-    out = {}
-    for row in interventions or []:
+    # The orchestrator hands off parallel strike/intervention arrays. Only a
+    # complete, temporally and scene-consistent pairing may affect scheduling.
+    # Reuse the existing causal gate; this never grants role/team/event proof.
+    rows = list(interventions or [])
+    parents = list(strikes or [])
+    paired = bool(parents and len(parents) == len(rows))
+    if paired:
+        from physical_match_reconstruction import _goal_review_eligibility
+    selected = {}
+    for index, row in enumerate(rows):
         if not isinstance(row, dict):
             continue
         if row.get("status") != "VERIFIED" or row.get("proof_eligible") is not True:
@@ -799,19 +807,35 @@ def _verified_intervention_track_times(interventions) -> dict[str, int]:
         if not isinstance(track, str) or not _num(row.get("media_ms")):
             continue
         media_ms = int(row["media_ms"])
-        out[track] = min(media_ms, out.get(track, media_ms))
-    return out
+        priority = 1
+        parent = parents[index] if paired else None
+        if (isinstance(parent, dict) and _num(parent.get("media_ms"))
+                and int(parent["media_ms"]) < media_ms <= int(parent["media_ms"]) + 3000
+                and row.get("scene_id") in {None, parent.get("scene_id")}
+                and _goal_review_eligibility(parent, parents, touch_graph).get("eligible") is True):
+            priority = 0
+        # An old unrelated pivot must not replace the relevant parent contact.
+        choice = (priority, media_ms)
+        if track not in selected or choice < selected[track]:
+            selected[track] = choice
+    return {track: choice[1] for track, choice in
+            sorted(selected.items(), key=lambda item: (*item[1], item[0]))}
 
 
 def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[dict]:
     requests = []
-    for track, pivot_ms in list(track_times.items())[:MAX_ROLE_TRACKS]:
+    if MAX_ROLE_TRACKS <= 0 or MAX_ROLE_FRAMES_PER_TRACK <= 0:
+        return requests
+    usable_tracks = 0
+    for track, pivot_ms in track_times.items():
         candidates = []
         for frame in window_evidence or []:
             if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
                 continue
             ms = int(frame["media_ms"])
             if abs(ms - int(pivot_ms)) > ROLE_REVIEW_RADIUS_MS or frame.get("used_fallback") is True:
+                continue
+            if frame.get("time_authority") not in {None, "ACTUAL_MEDIA_PTS"}:
                 continue
             for player in frame.get("players") or []:
                 if not isinstance(player, dict) or player.get("local_track_id") != track:
@@ -831,7 +855,11 @@ def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[
             chosen.append(row)
             if len(chosen) >= MAX_ROLE_FRAMES_PER_TRACK:
                 break
-        requests.extend(sorted(chosen, key=lambda row: row["media_ms"]))
+        if chosen:
+            requests.extend(sorted(chosen, key=lambda row: row["media_ms"]))
+            usable_tracks += 1
+            if usable_tracks >= MAX_ROLE_TRACKS:
+                break
     return requests
 
 
@@ -1221,9 +1249,9 @@ class ShadowVisionProviders:
         # A7 intervention actors are primary role-review candidates because A7
         # intentionally does not create ordinary A4/A5 touches. Touch-derived
         # candidates remain useful as secondary supporting context.
-        track_times = _verified_intervention_track_times(interventions)
+        track_times = _verified_intervention_track_times(interventions, strikes, touch_graph)
         for track, media_ms in _first_post_strike_other_touches(strikes, touch_graph).items():
-            track_times[track] = min(media_ms, track_times.get(track, media_ms))
+            track_times.setdefault(track, media_ms)
         requests = _role_review_requests(window_evidence, track_times)
         if not requests:
             return {}
