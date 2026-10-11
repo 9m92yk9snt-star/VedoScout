@@ -843,6 +843,9 @@ def _role_review_requests(window_evidence, track_times: dict[str, int]) -> list[
                 box = player.get("box")
                 if not _valid_box(box) or str(player.get("association_state") or "") == "HYPOTHESES":
                     continue
+                ids = player.get("candidate_local_track_ids")
+                if isinstance(ids, list) and ids != [track]:
+                    continue
                 area = float(box["w"]) * float(box["h"])
                 if area < ROLE_MIN_BOX_AREA:
                     continue

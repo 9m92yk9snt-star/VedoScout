@@ -510,7 +510,11 @@ def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None, *
             selected = trajectory_engine.select_release_ball_trajectory(
                 dense_frames or [], touch.get("ball_after"), touch.get("scene_id"), ball_trajectory,
                 anchor_required="ball_after" in touch,
+                contact_ball=touch.get("ball_at_contact"),
+                contact_required="ball_at_contact" in touch,
                 max_duration_ms=DELAYED_SEPARATION_WINDOW_MS)
+            if "contact_binding" in selected:
+                touch["release_ball_binding"] = deepcopy(selected["contact_binding"])
             delayed = _delayed_separation_role(
                 touch, graph_touches, dense_frames or [], selected["rows"]
             )

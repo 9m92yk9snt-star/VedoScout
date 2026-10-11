@@ -167,9 +167,9 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                 graph = contact_role_resolver.apply_contact_roles(graph, contacts, dense_frames=frames, ball_trajectory=trajectory)
                 strikes = [*shot_outcome_engine.find_strike_releases(graph, trajectory),
                            *shot_outcome_engine.find_scoring_control_contacts(graph)]
-                tracks = {s["strike_id"]: ball_trajectory.select_release_ball_trajectory(
-                    frames, s.get("active_ball_anchor"), s.get("scene_id"), trajectory,
-                    anchor_required="active_ball_anchor" in s)["rows"] for s in strikes}
+                paths = {s["strike_id"]: path for s, path in zip(
+                    strikes, pmr._strike_ball_paths(strikes, graph, frames, trajectory))}
+                tracks = {strike_id: path["rows"] for strike_id, path in paths.items()}
                 interventions = {s["strike_id"]: post_strike_intervention.detect_post_strike_intervention(
                     s, frames, tracks[s["strike_id"]]) for s in strikes}
                 fresh_roles = bundle.role_evidence_provider(str(video_path), original["window"], strikes, graph, frames,
@@ -194,7 +194,8 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                     if review.get("eligible") and relevant:
                         requests.append({"window": window, "strike": strike, "review": review, "touch_graph": graph,
                                          "eligibility": pmr._goal_review_eligibility(strike, strikes, graph),
-                                         "track": trajectory_used, "roles": roles, "intervention": a7,
+                                         "track": trajectory_used, "shot_track": paths[strike["strike_id"]],
+                                         "roles": roles, "intervention": a7,
                                          "trace_id": original["trace_id"], "outcome_index": len(outcomes)})
                     outcome = shot_outcome_engine.reconstruct_post_strike_outcome(strike, trajectory_used, graph,
                                                                                  goal_geometry=geometry, role_evidence=roles)
@@ -203,6 +204,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                     outcome = fix10a_ball_proof_gate.apply_ball_proof_gate(outcome, trajectory_used)
                     outcome["goal_review_eligibility"] = pmr._goal_review_eligibility(strike, strikes, graph)
                     outcome["goal_review_decision"] = review
+                    outcome = pmr._apply_ball_path_audit(outcome, paths[strike["strike_id"]])
                     outcomes.append(outcome)
                 physical["traces"].append({**original, "decoded_frames": frames, "touch_graph": graph,
                                             "contacts": contacts, "ball_trajectory": trajectory,
@@ -230,6 +232,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                     outcome["goal_review_decision"] = {**job["review"], "report_priority_rank": rank}
                     outcome["goal_review_eligibility"] = pmr._goal_review_eligibility(job["strike"],
                         by_id[job["trace_id"]]["strike_evidence"], job["touch_graph"])
+                    outcome = pmr._apply_ball_path_audit(outcome, job["shot_track"])
                     by_id[job["trace_id"]]["outcome_evidence"][job["outcome_index"]] = outcome
                     trace = by_id[job["trace_id"]]
                     trace["provider_adapter_errors"] = sorted(set([*trace["provider_adapter_errors"], *pmr._adapter_diagnostics(geometry)]))
@@ -241,8 +244,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                 action_evidence_provider=bundle.action_evidence_provider if bundle is not None else None,
                 jersey_vote_provider=bundle.jersey_vote_provider if bundle is not None else None,
                 role_evidence_provider=bundle.role_evidence_provider if bundle is not None else None,
-                goal_geometry_provider=goal_provider, review_jobs=[{**j, "shot_track": {
-                    "rows": j["track"], "source": "SAVED_REPLAY_TRAJECTORY", "seed_ms": None}} for j in requests],
+                goal_geometry_provider=goal_provider, review_jobs=requests,
                 feedback_trace_ids=reference_sources)
             physical["evidence_feedback_plan"] = feedback_plan
             _, cross_window_context = pmr._apply_cross_window_review_context([], physical["traces"])

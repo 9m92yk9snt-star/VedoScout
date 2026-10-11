@@ -1,0 +1,208 @@
+{
+  "kind": "CODEX_R6_CONTACT_BOUND_CANDIDATE",
+  "date": "2026-10-11",
+  "branch": "codex-r6-contact-bound-20261011",
+  "parent_commit": "6d070fdfb90837cea202d07c7b6488835b8a9f81",
+  "preserved_versions": {
+    "exact_emergent_unfinished_r6": "83cf6b37b5d9fb594712d96e32b7b878ef509183",
+    "verified_local_r5": "89bfb8bbb061d5d59f5efe9df804fb12b0448e7b",
+    "independently_tested_local_r6": "6d070fdfb90837cea202d07c7b6488835b8a9f81"
+  },
+  "integration_policy": "Reviewed selected differences, not a blind merge. Retains measured-motion, causal role scheduling, strict budgets and fail-closed caller contracts from local R6.",
+  "files": [
+    {
+      "path": "backend/ball_trajectory.py",
+      "sha256": "9f7cd04849f6150858b85408089b833ea7d5d614cf08a7f966fc293e677ce2d5",
+      "git_blob": "d42b763bbe67a950848ddf60360bda239d97674d",
+      "bytes": 31373,
+      "before_sha256": "0d608211f033e2ead89ba3ab2d542b98ffec4ee663d80516d68630456948b958",
+      "before_git_blob": "57b314dc6eb50fd1a5d97f2a4b7c81981cd8e690"
+    },
+    {
+      "path": "backend/contact_role_resolver.py",
+      "sha256": "880ad48cd9c33389cc9898cd26d1c7edd4fe84a971a9126284289d4d2cac881a",
+      "git_blob": "3abfeeb88cd362635e8fdafc96466490b9d44bde",
+      "bytes": 23243,
+      "before_sha256": "7a86b41eb42ebc630924906592c3faf0e22f076b3882a9c77e9868c551c0ebc4",
+      "before_git_blob": "f5987c99e620acaf4fed0bbbe6cd21209fb87f48"
+    },
+    {
+      "path": "backend/fix10a_vision_providers.py",
+      "sha256": "6bf07e12ed35a5162f23c1bdb3a58ca8fad3f6eed58c1fc5e96f21fccfaeac7e",
+      "git_blob": "6965a56faa8e0ba2c99f7ddd63842cfa9ae696d5",
+      "bytes": 79364,
+      "before_sha256": "8f1d9e31cabaffd869aed6785e65d8d2aefb2a6103fc6474e23eafea6bdeae6c",
+      "before_git_blob": "b549198e58c1058719031494b9d06c59b0bda00b"
+    },
+    {
+      "path": "backend/physical_match_reconstruction.py",
+      "sha256": "93ff137c284f6c0a14433301deb8fe2caeb88f6b9f23daab4de56d49bbf9f973",
+      "git_blob": "d13e747272ce485fa8614cef198b7e3ec8d09fba",
+      "bytes": 51780,
+      "before_sha256": "80d1cd9952c47710425e6aec413c5e4d7b9e5d8a610cf9ce6ed87413c3af562f",
+      "before_git_blob": "6c2ff398c604f167d9e4fc458174ca237215a4cb"
+    },
+    {
+      "path": "backend/scripts/replay_report_evidence.py",
+      "sha256": "9fa89e97777214513e15162ffb7be168c5ac27619cb8e67fcaa76f9261677184",
+      "git_blob": "ccd1b4fbfca80aa5239ede651e747e985d1ed279",
+      "bytes": 25519,
+      "before_sha256": "08b5691f5e7ee79bcd60157c9d3ba1084d940753f39ee1a518504537c4adabba",
+      "before_git_blob": "d793dc0f66067a90ce3746cdec5aa72fe60a3f2d"
+    },
+    {
+      "path": "backend/scripts/audit_cached_contact_paths.py",
+      "sha256": "22da2b3fa37bd372c85b9563b7e3d3657a297599c160c57e90cac58b2385e483",
+      "git_blob": "cf97c82a5951b3955eda2b5930ba315cf7fb6e58",
+      "bytes": 7651,
+      "before_sha256": null,
+      "before_git_blob": null
+    },
+    {
+      "path": "backend/scripts/run_fix15_offline_tests.py",
+      "sha256": "fe9b2dffc4d55df7db80afa2ab6a370bc0e3102f5807aebfdd2161d966fff9ea",
+      "git_blob": "3487d9689d5f55e4fa28f13d4c5d747003109e9a",
+      "bytes": 1932,
+      "before_sha256": null,
+      "before_git_blob": null
+    },
+    {
+      "path": "backend/tests/test_fix15_r6_contact_binding.py",
+      "sha256": "6e7532e73802c00e24121a2f5c17d00142a7304413f9d1118594e0a7593973a7",
+      "git_blob": "d169735426bb1320738b0611d4c490ef962761b9",
+      "bytes": 9923,
+      "before_sha256": null,
+      "before_git_blob": null
+    }
+  ],
+  "validation": {
+    "passed": 490,
+    "failed": 0,
+    "test_files": 38,
+    "new_tests_this_revision": 31,
+    "total_r6_tests": 72,
+    "pre_r6_tests_in_selected_suite": 418,
+    "elapsed_s": 3.35,
+    "warnings": 1,
+    "warning": "Local newer Starlette test client deprecates project-pinned httpx; all route tests passed.",
+    "full_previous_1245_suite_rerun": false,
+    "tests": [
+      "tests/test_fix15_r6_ball_identity.py",
+      "tests/test_fix15_r6_role_scheduling.py",
+      "tests/test_fix15_r6_anchor_callers.py",
+      "tests/test_fix15_r6_contact_binding.py",
+      "tests/test_fix10a3_ball_trajectory.py",
+      "tests/test_fix10a3_dormant_reacquisition.py",
+      "tests/test_fix10a4_ball_contact.py",
+      "tests/test_fix10a4_short_occlusion_recovery.py",
+      "tests/test_fix10a4_post_anchor_discontinuity.py",
+      "tests/test_fix10a5_touch_graph.py",
+      "tests/test_fix10a_contact_role_resolver.py",
+      "tests/test_fix10a7_shot_outcome.py",
+      "tests/test_fix10a7_support_intervention.py",
+      "tests/test_fix10a7_full_body_intervention.py",
+      "tests/test_fix10a7_role_intervention_handoff.py",
+      "tests/test_fix10a7_ball_proof_gate.py",
+      "tests/test_fix10a7_goal_audit.py",
+      "tests/test_fix10a7_structured_goal_proof.py",
+      "tests/test_fix10a_physical_reconstruction.py",
+      "tests/test_fix11_release_anchored_ball_path.py",
+      "tests/test_fix10a_goal_direction.py",
+      "tests/test_fix10a_window_failure_diagnostics.py",
+      "tests/test_fix10a_vision_providers.py",
+      "tests/test_fix13_action_inspections.py",
+      "tests/test_fix13_evidence_feedback.py",
+      "tests/test_fix13_cross_window_evidence.py",
+      "tests/test_fix15_goal_response_coverage.py",
+      "tests/test_fix15_pixel_response_coverage.py",
+      "tests/test_fix15_selected_point_identity.py",
+      "tests/test_fix13_reference_review.py",
+      "tests/test_fix10a1_dense_replay.py",
+      "tests/test_fix10a_fix11_recall.py",
+      "tests/test_fix10b_runtime.py",
+      "tests/test_fix10b_reconciliation.py",
+      "tests/test_fix10b_fix11_reconciliation.py",
+      "tests/test_fix10b_scoring_evidence_coverage.py",
+      "tests/test_fix10a_provider_wiring.py",
+      "tests/test_report_evidence_export.py"
+    ],
+    "command_from_backend": "python scripts/run_fix15_offline_tests.py --backend . --tb line tests/test_fix15_r6_ball_identity.py tests/test_fix15_r6_role_scheduling.py tests/test_fix15_r6_anchor_callers.py tests/test_fix15_r6_contact_binding.py tests/test_fix10a3_ball_trajectory.py tests/test_fix10a3_dormant_reacquisition.py tests/test_fix10a4_ball_contact.py tests/test_fix10a4_short_occlusion_recovery.py tests/test_fix10a4_post_anchor_discontinuity.py tests/test_fix10a5_touch_graph.py tests/test_fix10a_contact_role_resolver.py tests/test_fix10a7_shot_outcome.py tests/test_fix10a7_support_intervention.py tests/test_fix10a7_full_body_intervention.py tests/test_fix10a7_role_intervention_handoff.py tests/test_fix10a7_ball_proof_gate.py tests/test_fix10a7_goal_audit.py tests/test_fix10a7_structured_goal_proof.py tests/test_fix10a_physical_reconstruction.py tests/test_fix11_release_anchored_ball_path.py tests/test_fix10a_goal_direction.py tests/test_fix10a_window_failure_diagnostics.py tests/test_fix10a_vision_providers.py tests/test_fix13_action_inspections.py tests/test_fix13_evidence_feedback.py tests/test_fix13_cross_window_evidence.py tests/test_fix15_goal_response_coverage.py tests/test_fix15_pixel_response_coverage.py tests/test_fix15_selected_point_identity.py tests/test_fix13_reference_review.py tests/test_fix10a1_dense_replay.py tests/test_fix10a_fix11_recall.py tests/test_fix10b_runtime.py tests/test_fix10b_reconciliation.py tests/test_fix10b_fix11_reconciliation.py tests/test_fix10b_scoring_evidence_coverage.py tests/test_fix10a_provider_wiring.py tests/test_report_evidence_export.py",
+    "forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    },
+    "new_model_calls": 0,
+    "existing_assertions_weakened": false,
+    "initial_expanded_suite_environment_issues": {
+      "missing_existing_reference_fixture": 1,
+      "missing_project_pinned_httpx_dependency": 3,
+      "resolved_by": "Restored the parent-identical fixture; installed httpx==0.28.1 in the private local test environment. No production requirement changes."
+    }
+  },
+  "offline_cache_audit": {
+    "cache_manifest_sha256": "a7f0bbae900a4083583bc43a5ff618ad1ba0d451121b8d9dd04861743652435d",
+    "windows": 5,
+    "source_frames": 1945,
+    "source_strike_paths": 29,
+    "source_binding_statuses": {
+      "REJECTED": 17,
+      "VERIFIED": 12
+    },
+    "source_binding_rejection_reasons": {
+      "CONTACT_BALL_NOT_PROOF_ELIGIBLE": 1,
+      "CONTACT_TO_RELEASE_ANCHOR_UNPROVEN": 15,
+      "RELEASE_ANCHOR_NOT_PROOF_ELIGIBLE": 1
+    },
+    "reconstructed_strikes": 54,
+    "reconstructed_binding_statuses": {
+      "REJECTED": 27,
+      "VERIFIED": 27
+    },
+    "reconstructed_outcome_types": {
+      "PLAYER_INTERVENTION": 45,
+      "UNRESOLVED": 9
+    },
+    "forbidden_attempts": {
+      "native_detector": 0,
+      "network": 0,
+      "sdk": 0,
+      "video_decode": 0
+    },
+    "new_model_calls": 0,
+    "source_observations_unchanged": true,
+    "saved_goal_outcomes_reused": false,
+    "fresh_video_qualification_performed": false,
+    "limitations": [
+      "Earlier native cache, not the later complete supporting-review run",
+      "No new camera transforms, role/jersey votes, or whole-ball goal-crossing proof",
+      "The initial contact object's match-ball identity is not independently certified",
+      "No canonical event acceptance or full-video completeness certification"
+    ],
+    "reference_windows_with_frame_coverage": 5,
+    "no_canonical_events_accepted_by_this_audit": true,
+    "raw_cache_or_case_details_uploaded": false
+  },
+  "frozen": {
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b",
+    "anchors_sha256": "0a49e85e325cbffb36f2296bad75ebf5051a53e5e8442a534fbe18f172da29ed",
+    "anchor_count": 12,
+    "support_vision_runner_sha256": "9391e37153184be8da2e0e68e88c7e6de0053555be4928e0dd8f794ce4e12137",
+    "fix10b_reconciliation_sha256": "d6dca9feb754cdad30ea1ff4ead3b8079f44c7331be5b72d652a14a47ff59e69",
+    "original_16_file_r5_manifest": "ALL_MATCH",
+    "parent_reference_fixture_git_blob": "b4dda36bcc8e3b0c652aa2fa447f774f48c35103",
+    "original_git_checkout": "CLEAN"
+  },
+  "scope": {
+    "emergent_service_used": false,
+    "new_model_calls": 0,
+    "new_video_decode_calls": 0,
+    "new_native_detector_calls": 0,
+    "production_writes": 0,
+    "deployment": false,
+    "merge": false,
+    "main_or_pr28_ref_changes": false
+  },
+  "latest_completed_strict_video_assessment": "R5_0_OF_5",
+  "new_strict_five_event_video_assessment_performed": false
+}

@@ -28,10 +28,16 @@ RELEASE_REACQUIRE_MIN_CONFIDENCE = 0.04
 RELEASE_REACQUIRE_CONFIRM_MAX_GAP_MS = 80
 RELEASE_MAX_MEASURED_GAP_MS = 80
 RELEASE_MIN_MOTION_SUPPORT = 0.50
+CONTACT_RELEASE_MAX_MS = 300
 
 
 def _num(value) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _valid_box(box) -> bool:
@@ -413,6 +419,20 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
     return trajectory_features(rows)
 
 
+def _proof_measured_ball(row) -> bool:
+    return bool(
+        isinstance(row, dict)
+        and _num(row.get("media_ms"))
+        and row.get("proof_eligible") is True
+        and row.get("time_authority") == "ACTUAL_MEDIA_PTS"
+        and row.get("used_fallback") is not True
+        and row.get("cut_barrier") is not True
+        and row.get("cut") is not True
+        and row.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
+        and _valid_box(row.get("box"))
+    )
+
+
 def reconstruct_ball_trajectory_from_release_anchor(
     dense_frames, anchor: dict, scene_id: str | None = None,
     max_duration_ms: int = 3000,
@@ -428,15 +448,7 @@ def reconstruct_ball_trajectory_from_release_anchor(
     beyond the bounded measured-gap horizon ends this identity; it cannot grow
     an arbitrary reattachment radius. No predicted point becomes proof.
     """
-    if not (
-        isinstance(anchor, dict)
-        and _num(anchor.get("media_ms"))
-        and anchor.get("proof_eligible") is True
-        and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
-        and anchor.get("used_fallback") is not True
-        and anchor.get("state") in {"MEASURED", "MEASURED_REACQUISITION"}
-        and _valid_box(anchor.get("box"))
-    ):
+    if not _proof_measured_ball(anchor):
         return []
 
     seed_ms = int(anchor["media_ms"])
@@ -464,6 +476,11 @@ def reconstruct_ball_trajectory_from_release_anchor(
         if frame.get("cut_barrier") is True or frame.get("cut") is True:
             break
         if scene_id is not None and frame_scene not in {None, scene_id}:
+            break
+        # A label is not a transform. Explicitly unresolved camera geometry
+        # ends this image-space identity; a later label cannot repair the gap.
+        # Missing labels retain the legacy measured-coordinate contract.
+        if frame.get("camera_state") not in {None, "AFFINE_VERIFIED"}:
             break
         if frame.get("used_fallback") is True or frame.get("time_authority") != "ACTUAL_MEDIA_PTS":
             continue
@@ -601,17 +618,78 @@ def reconstruct_ball_trajectory_from_release_anchor(
     return rows
 
 
+def release_anchor_contact_binding(dense_frames, contact_ball, anchor, scene_id) -> dict:
+    """Check the measured contact-to-seed path independently of the global path.
+
+    A peer's OLD coordinates cannot establish permanent object identity. Start
+    from the physically verified contact ball and require a bounded sequence
+    of unique native measurements to the EXACT post-contact observation. This
+    never infers a missing camera transform, a touch, or an event label.
+    """
+    rejected = {"status": "REJECTED", "reason": "CONTACT_TO_RELEASE_ANCHOR_UNPROVEN",
+                "measured_times_ms": []}
+    if not _proof_measured_ball(contact_ball):
+        return {**rejected, "reason": "CONTACT_BALL_NOT_PROOF_ELIGIBLE"}
+    if not _proof_measured_ball(anchor):
+        return {**rejected, "reason": "RELEASE_ANCHOR_NOT_PROOF_ELIGIBLE"}
+    contact_ms, seed_ms = int(contact_ball["media_ms"]), int(anchor["media_ms"])
+    if not 0 <= seed_ms - contact_ms <= CONTACT_RELEASE_MAX_MS:
+        return {**rejected, "reason": "CONTACT_TO_RELEASE_TIME_INVALID"}
+    for point in (contact_ball, anchor):
+        if scene_id is not None and point.get("scene_id") not in {None, scene_id}:
+            return {**rejected, "reason": "CONTACT_TO_RELEASE_SCENE_MISMATCH"}
+    # Mixed/fallback observations are not a missing image that can be silently
+    # bridged. They cannot certify this specific contact-to-seed contract.
+    for frame in dense_frames or []:
+        if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
+            continue
+        if contact_ms < frame["media_ms"] <= seed_ms and (
+            frame.get("used_fallback") is True
+            or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"
+        ):
+            return {**rejected, "reason": "CONTACT_TO_RELEASE_TIME_AUTHORITY_INVALID"}
+    bridge = reconstruct_ball_trajectory_from_release_anchor(
+        dense_frames, contact_ball, scene_id, max_duration_ms=seed_ms - contact_ms)
+    measured_seed = next((r for r in bridge if r["media_ms"] == seed_ms), None)
+    if measured_seed is None or not all(
+        math.isclose(float(measured_seed["box"][k]), float(anchor["box"][k]),
+                     rel_tol=0.0, abs_tol=1e-9) for k in ("x", "y", "w", "h")
+    ):
+        return {**rejected, "measured_times_ms": [r["media_ms"] for r in bridge]}
+    return {"status": "VERIFIED", "reason": "MEASURED_CONTACT_TO_EXACT_RELEASE_ANCHOR",
+            "contact_ms": contact_ms, "seed_ms": seed_ms,
+            "measured_times_ms": [r["media_ms"] for r in bridge]}
+
+
 def select_release_ball_trajectory(dense_frames, anchor, scene_id, global_trajectory,
-                                   *, anchor_required=False, max_duration_ms=3000) -> dict:
+                                   *, anchor_required=False, max_duration_ms=3000,
+                                   contact_ball=None, contact_required=False) -> dict:
     """One shared fail-closed policy for live, contact-role and replay callers.
 
     Explicit/rejected anchors never fall back to an unrelated global object.
     Legacy callers with no anchor contract retain their previous global path.
     """
     if anchor is not None or anchor_required:
-        rows = reconstruct_ball_trajectory_from_release_anchor(
-            dense_frames, anchor, scene_id, max_duration_ms)
+        binding = None
+        if contact_ball is not None or contact_required:
+            binding = release_anchor_contact_binding(dense_frames, contact_ball, anchor, scene_id)
+            if binding["status"] != "VERIFIED":
+                return {"rows": [], "source": "REJECTED_RELEASE_ANCHOR", "seed_ms": None,
+                        "contact_binding": binding}
+        if binding is not None:
+            # Keep the measured contact prefix while tracking forward. Resetting
+            # at the after-contact seed discards already established velocity
+            # and can make a nearby, stationary competitor look equally valid.
+            seed_ms = int(anchor["media_ms"])
+            rows = reconstruct_ball_trajectory_from_release_anchor(
+                dense_frames, contact_ball, scene_id,
+                seed_ms - int(contact_ball["media_ms"]) + max(0, int(max_duration_ms)))
+            rows = [row for row in rows if row["media_ms"] >= seed_ms]
+        else:
+            rows = reconstruct_ball_trajectory_from_release_anchor(
+                dense_frames, anchor, scene_id, max_duration_ms)
         return {"rows": rows,
                 "source": "VERIFIED_RELEASE_ANCHOR" if rows else "REJECTED_RELEASE_ANCHOR",
-                "seed_ms": int(anchor["media_ms"]) if rows else None}
+                "seed_ms": int(anchor["media_ms"]) if rows else None,
+                **({"contact_binding": binding} if binding is not None else {})}
     return {"rows": global_trajectory or [], "source": "WINDOW_GLOBAL_TRAJECTORY", "seed_ms": None}
