@@ -280,6 +280,26 @@ def _local_kit_conflict(track, detection, media_ms):
     return constraint if constraint and constraint["status"] == "REJECTED" else None
 
 
+def _jersey_crop_quality(gray, detection, detections):
+    """Measure crop-selection cues only; no digits, team or identity score."""
+    height, width = gray.shape[:2]
+    box = detection["box"]
+    # This tight central torso is measured on the actual CV image. A later
+    # reader uses the original frame; no upscaled dimensions count here.
+    x0 = max(0, int(math.ceil((box["x"] + .12 * box["w"]) * width)))
+    x1 = min(width, int(math.floor((box["x"] + .88 * box["w"]) * width)))
+    y0 = max(0, int(math.ceil((box["y"] + .18 * box["h"]) * height)))
+    y1 = min(height, int(math.floor((box["y"] + .58 * box["h"]) * height)))
+    roi = gray[y0:y1, x0:x1] if x1 > x0 and y1 > y0 else None
+    isolated = not any(other is not detection and _valid_box(other.get("box"))
+                       and _iou(box, other["box"]) >= LOCAL_KIT_OVERLAP_IOU
+                       for other in detections)
+    sharpness = float(cv2.Laplacian(roi, cv2.CV_64F).var()) if roi is not None and roi.size else 0.0
+    return {"source": "NATIVE_TORSO_PIXELS", "width_px": max(0, x1 - x0),
+            "height_px": max(0, y1 - y0), "sharpness": round(sharpness, 4),
+            "isolated": bool(isolated), "canonical_identity_authority": False}
+
+
 def _pixel_box(box, width, height):
     return (
         float(box["x"]) * width,
@@ -943,6 +963,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         detections = [d for d in (people or []) if isinstance(d, dict) and _valid_box(d.get("box"))]
         h, w = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        jersey_quality = {di: _jersey_crop_quality(gray, det, detections)
+                          for di, det in enumerate(detections)}
         matrix = np.asarray([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=float)
         camera_state = "SEED_OR_FIRST_FRAME"
         if prev_gray is not None and live:
@@ -1080,6 +1102,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "association_state": "VERIFIED_LOCAL",
                 "association_reason": camera_state,
                 "association_score": round(float(score), 4),
+                "jersey_crop_quality": deepcopy(jersey_quality[di]),
                 "team": tr.get("team"),
                 "team_confidence": tr.get("team_confidence"),
                 "team_source": tr.get("team_source"),
@@ -1115,6 +1138,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "association_reason": ("LOCAL_KIT_CONTINUITY_UNCERTAIN"
                                        if di in kit_hypotheses else "CLOSE_EQUAL_LOCAL_TRACK_CANDIDATES"),
                 "association_score": None,
+                "jersey_crop_quality": deepcopy(jersey_quality[di]),
                 "team": det.get("team"),
                 "team_confidence": det.get("team_confidence"),
                 "team_source": det.get("team_source"),
@@ -1151,6 +1175,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "association_state": "NEW_LOCAL_TRACK",
                 "association_reason": "UNMATCHED_DETECTION",
                 "association_score": None,
+                "jersey_crop_quality": deepcopy(jersey_quality[di]),
                 "team": tr.get("team"),
                 "team_confidence": tr.get("team_confidence"),
                 "team_source": tr.get("team_source"),
