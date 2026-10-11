@@ -37,6 +37,16 @@ DENSE_BALL_CONF_T = 0.03
 A7_BALL_SUPPORT_CONF_T = 0.001
 A7_BALL_SUPPORT_MAX = 12
 DENSE_TEAM_TAP_CONTINUITY_MS = 1200
+# Native torso chroma can reject an incompatible local association, but can
+# never identify a player or prove a team/jersey number. Require independent,
+# recent, clean measurements before using it even as a negative constraint.
+LOCAL_KIT_MIN_SAMPLES = 3
+LOCAL_KIT_SEPARATION_MS = 120
+LOCAL_KIT_HISTORY_MS = 1200
+LOCAL_KIT_MAX_SPREAD = 5.0
+LOCAL_KIT_CAUTION_DISTANCE = 10.0
+LOCAL_KIT_CONFLICT_DISTANCE = 20.0
+LOCAL_KIT_OVERLAP_IOU = 0.25
 
 
 def _num(value) -> bool:
@@ -209,6 +219,65 @@ def _match_score(pred, det_box) -> float | None:
     if ov < MATCH_IOU_MIN and dist_h > MATCH_CENTER_H:
         return None
     return 1.7 * ov + max(0.0, 1.0 - dist_h / MATCH_CENTER_H)
+
+
+def _valid_local_chroma(value):
+    return fsg._valid_chroma(value) and not any(isinstance(v, bool) for v in value)
+
+
+def _update_local_kit_history(track, detection, detections, media_ms, *, eligible):
+    """Remember only uniquely measured, non-overlapping native torso samples."""
+    if not eligible or not _valid_local_chroma(detection.get("kit_chroma")):
+        return
+    box = detection.get("box")
+    if not _valid_box(box) or any(
+        other is not detection and _valid_box(other.get("box"))
+        and _iou(box, other["box"]) >= LOCAL_KIT_OVERLAP_IOU
+        for other in detections
+    ):
+        return
+    history = [r for r in track.get("_local_kit_history") or []
+               if 0 <= media_ms - r["media_ms"] <= LOCAL_KIT_HISTORY_MS]
+    if history and media_ms - history[-1]["media_ms"] < LOCAL_KIT_SEPARATION_MS:
+        track["_local_kit_history"] = history
+        return
+    history.append({"media_ms": int(media_ms), "chroma": list(detection["kit_chroma"])})
+    track["_local_kit_history"] = history[-12:]
+
+
+def _local_kit_constraint(track, detection, media_ms):
+    """Return uncertainty/rejection support, never a positive identity score."""
+    chroma = detection.get("kit_chroma")
+    if not _valid_local_chroma(chroma):
+        return None
+    history = [r for r in track.get("_local_kit_history") or []
+               if 0 <= media_ms - r["media_ms"] <= LOCAL_KIT_HISTORY_MS
+               and _valid_local_chroma(r.get("chroma"))]
+    if len(history) < LOCAL_KIT_MIN_SAMPLES:
+        return None
+    # Insufficient temporal separation (including a duplicated frame) cannot
+    # establish a persistent reference, even if an injected history contains it.
+    times = sorted(r["media_ms"] for r in history)
+    if any(b - a < LOCAL_KIT_SEPARATION_MS for a, b in zip(times, times[1:])):
+        return None
+    center = fsg._median_chroma([r["chroma"] for r in history])
+    spread = max(fsg._chroma_distance(r["chroma"], center) for r in history)
+    if spread > LOCAL_KIT_MAX_SPREAD:
+        return None
+    distance = fsg._chroma_distance(chroma, center)
+    if distance < LOCAL_KIT_CAUTION_DISTANCE:
+        return None
+    rejected = distance >= LOCAL_KIT_CONFLICT_DISTANCE
+    return {"status": "REJECTED" if rejected else "HYPOTHESES",
+            "reason": "INCOMPATIBLE_MEASURED_LOCAL_KIT" if rejected else "LOCAL_KIT_CONTINUITY_UNCERTAIN",
+            "reference_samples": len(history),
+            "chroma_distance": round(distance, 4), "reference_max_spread": round(spread, 4),
+            "canonical_identity_authority": False}
+
+
+def _local_kit_conflict(track, detection, media_ms):
+    constraint = _local_kit_constraint(track, detection, media_ms)
+    return constraint if constraint and constraint["status"] == "REJECTED" else None
 
 
 def _pixel_box(box, width, height):
@@ -912,16 +981,46 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         # Candidate scores per existing track.  Near-equal alternatives remain
         # unbound hypotheses instead of being decided by detector/list order.
         per_track = {}
+        kit_rejections = []
+        kit_cautions = []
+        kit_hypotheses = {}
+        kit_measurement_eligible = bool(
+            not dense.get("used_fallback")
+            and dense.get("time_authority") == "ACTUAL_MEDIA_PTS"
+            and camera_state in {"SEED_OR_FIRST_FRAME", "AFFINE_VERIFIED"})
         for ti, pred in predictions.items():
             ranked = []
             for di, det in enumerate(detections):
                 score = _match_score(pred, det["box"])
                 if score is not None:
+                    constraint = (_local_kit_constraint(live[ti], det, media_ms)
+                                  if kit_measurement_eligible else None)
+                    if constraint is not None:
+                        audit = {"local_track_id": live[ti]["local_track_id"],
+                                 "detection_index": di, **constraint}
+                        if constraint["status"] == "REJECTED":
+                            kit_rejections.append(audit)
+                        else:
+                            # A moderately changed torso may be a shadow,
+                            # mixed crop, or another player. Do not overwrite
+                            # the last accepted body/history with that guess.
+                            kit_cautions.append(audit)
+                            kit_hypotheses.setdefault(di, set()).add(live[ti]["local_track_id"])
+                        continue
                     ranked.append((score, di))
             ranked.sort(reverse=True)
             per_track[ti] = ranked
 
-        ambiguous_det_candidates: dict[int, set[str]] = {}
+        # A cautious kit edge must not hide a competing, otherwise admissible
+        # body. Preserve all geometric alternatives that were not rejected,
+        # including tracks whose own candidate list is ambiguous.
+        for ti, ranked in per_track.items():
+            for _score, di in ranked:
+                if di in kit_hypotheses:
+                    kit_hypotheses[di].add(live[ti]["local_track_id"])
+
+        ambiguous_det_candidates: dict[int, set[str]] = {
+            di: set(ids) for di, ids in kit_hypotheses.items()}
         assign_pairs = []
         for ti, ranked in per_track.items():
             if not ranked:
@@ -970,6 +1069,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 tr["team_source"] = det.get("team_source")
             if fsg._valid_chroma(det.get("kit_chroma")):
                 tr["kit_chroma"] = deepcopy(det["kit_chroma"])
+            _update_local_kit_history(tr, det, detections, media_ms,
+                                      eligible=kit_measurement_eligible)
             used_tracks.add(ti); used_dets.add(di)
             players_out.append({
                 "local_track_id": tr["local_track_id"],
@@ -1011,7 +1112,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
                 "association_state": "HYPOTHESES",
-                "association_reason": "CLOSE_EQUAL_LOCAL_TRACK_CANDIDATES",
+                "association_reason": ("LOCAL_KIT_CONTINUITY_UNCERTAIN"
+                                       if di in kit_hypotheses else "CLOSE_EQUAL_LOCAL_TRACK_CANDIDATES"),
                 "association_score": None,
                 "team": det.get("team"),
                 "team_confidence": det.get("team_confidence"),
@@ -1038,6 +1140,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "kit_chroma": deepcopy(det.get("kit_chroma"))
                 if fsg._valid_chroma(det.get("kit_chroma")) else None,
             }
+            _update_local_kit_history(tr, det, detections, media_ms,
+                                      eligible=kit_measurement_eligible)
             live.append(tr)
             players_out.append({
                 "local_track_id": tid,
@@ -1065,6 +1169,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             "scene_id": active_scene,
             "cut_barrier": bool(cut),
             "camera_state": camera_state,
+            "local_kit_association_rejections": kit_rejections,
+            "local_kit_association_cautions": kit_cautions,
             "players": players_out,
             "ball_candidates": deepcopy(balls or []),
             "a7_ball_support_candidates": deepcopy(a7_support or []),
@@ -1086,6 +1192,10 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         "metrics": {
             "frames": len(output_frames),
             "players": sum(len(f.get("players") or []) for f in output_frames),
+            "local_kit_association_rejections": sum(
+                len(f.get("local_kit_association_rejections") or []) for f in output_frames),
+            "local_kit_association_cautions": sum(
+                len(f.get("local_kit_association_cautions") or []) for f in output_frames),
             "target_verified_frames": sum(
                 (f.get("global_target") or {}).get("status") == "VERIFIED" for f in output_frames
             ),
