@@ -341,11 +341,13 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
     people = collect(0, float(cv_detect.CONF_T))
     fsg._annotate_kit_chroma(frame_bgr, people)
     balls = collect(32, float(DENSE_BALL_CONF_T))
-    # Portrait padding shrinks the pitch into ~360 detector columns. Only when
-    # the ball is missing, inspect the visible players' ground band at native
-    # detail. These are detector proposals with the SAME class/confidence gate;
-    # downstream same-ball/contact proof remains mandatory.
-    if not _detail_pass and not balls and H > 1.5 * W and people:
+    # Portrait padding shrinks the pitch into ~360 detector columns. A ball
+    # elsewhere (including a reserve ball) cannot establish that the active
+    # ball was inspected at sufficient resolution. Inspect ONE bounded ground
+    # band even when the whole-frame pass found candidates. Keep the SAME
+    # class/confidence gate; none of these proposals establishes ball identity.
+    # _detail_pass forbids recursion, so the maximum is two native forwards.
+    if not _detail_pass and H > 1.5 * W and people:
         heights = sorted(p["box"]["h"] for p in people)
         median = heights[len(heights) // 2]
         field_players = [p for p in people if p["box"]["h"] <= median * 1.8]
@@ -359,7 +361,15 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
                 box = candidate["box"]
                 box["y"] = (y0 + box["y"] * (y1 - y0)) / H
                 box["h"] *= (y1 - y0) / H
-                if box["w"] <= .08 and box["h"] <= .04:
+                if (0 < box["w"] <= .08 and 0 < box["h"] <= .04
+                        and 0 <= box["x"] <= 1 - box["w"]
+                        and 0 <= box["y"] <= 1 - box["h"]):
+                    # Cross-pass duplicates are not competing balls. Preserve
+                    # the original whole-frame row/coordinates; detector score
+                    # must not silently replace a contact or release reference.
+                    if any(_iou(box, existing["box"]) >= cv_detect.NMS_T
+                           for existing in balls):
+                        continue
                     candidate["source"] = "NATIVE_GROUND_BAND_DETECTOR"
                     balls.append(candidate)
     if not include_a7_support:
@@ -811,8 +821,9 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
 
     ``detector_fn(frame_bgr)`` may be injected for deterministic tests and may
     return ``(people, balls)`` or ``(people, balls, a7_support)``.  Production
-    performs one detector forward pass per dense frame; weak A7 support proposals
-    remain isolated from A3/A4/A5 truth.  No image arrays are retained.
+    performs one whole-frame detector forward plus at most one bounded portrait
+    ground-band forward per dense frame. Weak A7 support proposals remain
+    isolated from A3/A4/A5 truth. No image arrays are retained.
     """
     scene = str(scene_id or "")
     frames_iter = iter(dense_frames or [])
