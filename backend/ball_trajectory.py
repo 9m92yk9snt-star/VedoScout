@@ -9,12 +9,16 @@ contact/event authority.
 from __future__ import annotations
 
 import math
+import hashlib
 from copy import deepcopy
+import numpy as np
 
 import frame_geometry
+import ball_motion_evidence
 
 VERSION = 1
 MAX_HYPOTHESES = 3
+MAX_SEARCH_HYPOTHESES = 6
 SCORE_MARGIN = 0.12
 MAX_SPEED_NORM_S = 4.0
 BASE_JUMP_NORM = 0.025
@@ -105,11 +109,18 @@ def _nearest_player_foot_h(candidate_box: dict, players, x_scale=1.0) -> float |
     return best
 
 
-def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int) -> dict | None:
-    if not _valid_box(candidate.get("box")):
+def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int,
+                          *, geometry=None) -> dict | None:
+    if (not _valid_box(candidate.get("box"))
+            or candidate.get("proof_eligible") is False or candidate.get("used_fallback") is True
+            or candidate.get("state") not in {None,"MEASURED","MEASURED_REACQUISITION"}
+            or candidate.get("time_authority") not in {None,"ACTUAL_MEDIA_PTS"}):
         return None
     box = _box(candidate["box"])
-    conf = max(0.0, min(1.0, float(candidate.get("confidence") or 0.0)))
+    confidence = candidate.get("confidence", 0.0)
+    if not _num(confidence):
+        return None
+    conf = max(0.0, min(1.0, float(confidence)))
     if prior is None:
         return {
             "box": box, "confidence": conf, "score": 0.50 * conf,
@@ -124,9 +135,20 @@ def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int) ->
     dt = (int(media_ms) - last_measured_ms) / 1000.0
     if dt <= 0:
         return None
+    # Native background motion belongs in association, not only in the later
+    # contact gate. Otherwise a camera acceleration can reject the SAME ball
+    # and make a stationary reserve appear to change its physical velocity.
+    native = isinstance(geometry, dict) and geometry.get("native") is True
+    if native and geometry.get("transform") is None:
+        return None
     pred = _predict_box(prior, media_ms)
+    if native:
+        pred = geometry["predict_box"](prior, media_ms)
+        if pred is None:
+            return None
     pcx, pcy = _center(pred); cx, cy = _center(box)
-    dist = math.hypot(cx - pcx, cy - pcy)
+    x_scale = geometry["x_scale"] if native else 1.0
+    dist = math.hypot((cx - pcx) * x_scale, cy - pcy)
     foot_h = candidate.get("_nearest_player_foot_h")
     player_supported = _num(foot_h) and float(foot_h) <= DORMANT_PLAYER_SUPPORT_H
     age_from_measurement_ms = int(media_ms) - last_measured_ms
@@ -141,7 +163,8 @@ def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int) ->
     if dist > max_dist:
         return None
     continuity = max(0.0, 1.0 - dist / max(max_dist, 1e-9))
-    prev_scale, cur_scale = _area_scale(prior.get("last_measured_box") or prior["box"]), _area_scale(box)
+    prev_scale = _area_scale(pred if native else (prior.get("last_measured_box") or prior["box"]))
+    cur_scale = _area_scale(box)
     scale_ratio = min(prev_scale, cur_scale) / max(prev_scale, cur_scale, 1e-9)
     min_scale_ratio = (
         DORMANT_PLAYER_SUPPORTED_SCALE_MIN
@@ -152,13 +175,17 @@ def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int) ->
         return None
     measured_box = prior.get("last_measured_box") or prior["box"]
     px, py = _center(measured_box)
+    if native:
+        px, py = geometry["transform"](measured_box, last_measured_ms)
     velocity = ((cx - px) / dt, (cy - py) / dt)
     accel = None
     acceleration_score = 1.0
     if prior.get("velocity") is not None:
         pvx, pvy = prior["velocity"]
+        if native:
+            pvx, pvy = geometry["transform_velocity"](prior["velocity"], last_measured_ms)
         accel = ((velocity[0] - pvx) / dt, (velocity[1] - pvy) / dt)
-        accel_mag = math.hypot(accel[0], accel[1])
+        accel_mag = math.hypot(accel[0] * x_scale, accel[1])
         if accel_mag > MAX_ACCEL_NORM_S2 * 1.75:
             return None
         acceleration_score = max(0.0, 1.0 - accel_mag / MAX_ACCEL_NORM_S2)
@@ -174,14 +201,14 @@ def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int) ->
     }
 
 
-def _rank_candidates(candidates, hypotheses, media_ms):
+def _rank_candidates(candidates, hypotheses, media_ms, *, geometry=None):
     ranked = []
     for ci, candidate in enumerate(candidates):
         if not isinstance(candidate, dict) or not _valid_box(candidate.get("box")):
             continue
         options = []
         for hi, prior in enumerate(hypotheses):
-            row = _candidate_from_prior(candidate, prior, media_ms)
+            row = _candidate_from_prior(candidate, prior, media_ms, geometry=geometry)
             if row is not None:
                 row["prior_hypothesis"] = hi
                 options.append(row)
@@ -196,6 +223,139 @@ def _rank_candidates(candidates, hypotheses, media_ms):
         ranked.append(best)
     ranked.sort(reverse=True, key=lambda r: r["score"])
     return ranked
+
+
+def _native_association_geometry(frames, index):
+    """Native association only; no camera guess or legacy fallback in a mixed trace."""
+    if not any("camera_motion" in f for f in frames):
+        return None
+    frame = frames[index]
+    scale = frame_geometry.horizontal_scale(frame)
+    unavailable = {"native": True, "transform": None}
+    if scale is None or not ball_motion_evidence._native(frame):
+        return unavailable
+    width, height = (frame["frame_dimensions"][k] for k in ("width", "height"))
+    matrices = {}
+
+    def matrix(ms):
+        if ms not in matrices:
+            matrices[ms] = ball_motion_evidence._transform_between(
+                frames, int(ms), frame["media_ms"])
+        return matrices[ms]
+
+    def transform(box, ms):
+        m = matrix(ms)
+        if m is None:
+            return None
+        x, y = _center(box)
+        p = m @ np.array([x*width, y*height, 1.])
+        return p[0]/width, p[1]/height
+
+    def transform_velocity(velocity, ms):
+        m = matrix(ms)
+        if m is None:
+            return None
+        v = m[:2, :2] @ np.array([velocity[0]*width, velocity[1]*height])
+        return v[0]/width, v[1]/height
+
+    def predict_box(prior, media_ms):
+        measured = prior.get("last_measured_box") or prior["box"]
+        ms = int(prior.get("last_measured_ms", prior["media_ms"]))
+        center = transform(measured, ms)
+        velocity = transform_velocity(prior.get("velocity") or (0., 0.), ms)
+        if center is None or velocity is None:
+            return None
+        dt = (media_ms-ms)/1000
+        # Transform all four corners, retaining measured size under camera zoom.
+        m = matrix(ms)
+        corners = np.array([
+            [measured["x"]*width, measured["y"]*height, 1.],
+            [(measured["x"]+measured["w"])*width, measured["y"]*height, 1.],
+            [measured["x"]*width, (measured["y"]+measured["h"])*height, 1.],
+            [(measured["x"]+measured["w"])*width, (measured["y"]+measured["h"])*height, 1.]])
+        projected = (m @ corners.T).T
+        w = float(projected[:, 0].max()-projected[:, 0].min())/width
+        h = float(projected[:, 1].max()-projected[:, 1].min())/height
+        return {"x": center[0]+velocity[0]*dt-w/2,
+                "y": center[1]+velocity[1]*dt-h/2, "w": w, "h": h}
+
+    return {"native": True, "transform": transform,
+            "transform_velocity": transform_velocity, "predict_box": predict_box,
+            "x_scale": scale}
+
+
+def _search_hypotheses(candidates, previous, media_ms, geometry):
+    """Retain new objects while a linked reserve wins; these are NEVER proof.
+
+    The authoritative trajectory and this bounded search channel are separate.
+    Repeated detector observations, a high score or a nearby player cannot
+    silently promote a search object into a verified contact or release seed.
+    """
+    previous = [h for h in previous if 0 < media_ms-h["last_measured_ms"] <= SHORT_GAP_MS]
+    pairs = []
+    scale = geometry["x_scale"] if geometry and geometry.get("transform") is not None else 1.0
+    for ci, candidate in enumerate(candidates):
+        for hi, prior in enumerate(previous):
+            row = _candidate_from_prior(candidate, prior, media_ms, geometry=geometry)
+            if row is None:
+                continue
+            predicted = (geometry["predict_box"](prior, media_ms)
+                         if geometry else _predict_box(prior, media_ms))
+            if predicted is None:
+                continue
+            px, py = _center(predicted); cx, cy = _center(row["box"])
+            residual = math.hypot((cx-px)*scale, cy-py)
+            sigma = max(BASE_JUMP_NORM, min(predicted["w"]*scale, predicted["h"]))
+            a, b = _area_scale(predicted), _area_scale(row["box"])
+            support = math.exp(-0.5*(residual/sigma)**2)*min(a,b)/max(a,b)
+            if support >= RELEASE_MIN_MOTION_SUPPORT:
+                pairs.append((support, hi, ci, row))
+    pairs.sort(key=lambda p: (-p[0], p[1], p[2]))
+    used = set()
+    matched = {}
+    for support, hi, ci, row in pairs:
+        if hi in used or ci in matched:
+            continue
+        # BOTH sides must be unique. Confidence cannot choose between two
+        # plausible balls, nor inflate one old object into two confirmations.
+        rivals = [p[0] for p in pairs if (p[1] == hi or p[2] == ci)
+                  and (p[1],p[2]) != (hi,ci)]
+        if rivals and support-max(rivals) < SCORE_MARGIN:
+            continue
+        used.add(hi)
+        matched[ci] = {**row, "prior_hypothesis": hi, "candidate_index": ci,
+                       "search_motion_support": float(support)}
+    linked = sorted(matched.values(), key=lambda r: -r["search_motion_support"])[:MAX_HYPOTHESES]
+    fresh = []
+    for ci, candidate in enumerate(candidates):
+        if ci in matched:
+            continue
+        row = _candidate_from_prior(candidate, None, media_ms)
+        if row is not None:
+            fresh.append({**row,"prior_hypothesis":None,"candidate_index":ci})
+    fresh.sort(key=lambda r: (-r["score"],tuple(r["box"][k] for k in ("x","y","w","h"))))
+    ranked = linked+fresh[:MAX_HYPOTHESES]
+    used = set()
+    kept = []
+    for row in ranked:
+        prior_index = row.get("prior_hypothesis")
+        if prior_index is not None:
+            used.add(prior_index)
+        hyp = _hypothesis_from_ranked(row, media_ms)
+        prior = previous[prior_index] if row.get("prior_hypothesis") is not None else None
+        hyp["search_observations"] = (prior.get("search_observations", 1)+1) if prior else 1
+        hyp["search_first_ms"] = prior.get("search_first_ms", media_ms) if prior else media_ms
+        seed = repr((media_ms,tuple(row["box"][k] for k in ("x","y","w","h")))).encode()
+        hyp["search_track_id"] = prior["search_track_id"] if prior else "ball_search_"+hashlib.sha256(seed).hexdigest()[:16]
+        hyp["search_motion_support"] = row.get("search_motion_support")
+        kept.append(hyp)
+        if len(kept) == MAX_SEARCH_HYPOTHESES:
+            break
+    # Missing search measurements stay INTERNAL for a bounded interval. They
+    # are not exported as if measured again in the current frame.
+    remaining = sorted((h for i, h in enumerate(previous) if i not in used),
+                       key=lambda h: (h["last_measured_ms"], h["search_observations"]), reverse=True)
+    return (kept+remaining)[:MAX_SEARCH_HYPOTHESES]
 
 
 def _hypothesis_from_ranked(row: dict, media_ms: int) -> dict:
@@ -261,14 +421,16 @@ def trajectory_features(points) -> list[dict]:
 def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
     """Reconstruct one fail-closed ball trajectory with bounded alternatives."""
     hypotheses = []
+    search = []
     rows = []
-    for frame in dense_frames or []:
-        if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
-            continue
+    frames = [frame for frame in dense_frames or []
+              if isinstance(frame, dict) and _num(frame.get("media_ms"))]
+    for index, frame in enumerate(frames):
         media_ms = int(round(float(frame["media_ms"])))
         cut = frame.get("cut_barrier") is True or frame.get("cut") is True
         if cut:
             hypotheses = []
+            search = []
         raw_candidates = []
         for candidate in frame.get("ball_candidates") or []:
             if not isinstance(candidate, dict) or not _valid_box(candidate.get("box")):
@@ -278,7 +440,11 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
                 row["box"], frame.get("players") or [], frame_geometry.horizontal_scale(frame)
             )
             raw_candidates.append(row)
-        ranked = _rank_candidates(raw_candidates, hypotheses, media_ms)
+        geometry = _native_association_geometry(frames, index)
+        ranked = _rank_candidates(raw_candidates, hypotheses, media_ms, geometry=geometry)
+        # Independent search sees EVERY proposal, including one that the
+        # authoritative ranker mis-associated. Nothing flows back into proof.
+        search = _search_hypotheses(raw_candidates, search, media_ms, geometry)
         used_fallback = bool(frame.get("used_fallback"))
         common = {
             "media_ms": media_ms,
@@ -290,6 +456,16 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
         }
         if "frame_dimensions" in frame:
             common["frame_dimensions"] = deepcopy(frame["frame_dimensions"])
+        common["search_candidates"] = [
+            {"box": _box(h["box"]), "confidence": round(h["confidence"], 4),
+             "search_observations": h["search_observations"],
+             "search_first_ms": h["search_first_ms"], "media_ms": media_ms,
+             "search_track_id": h["search_track_id"],
+             "search_motion_support": h["search_motion_support"],
+             "proof_eligible": False, "state": "SEARCH_ONLY",
+             "provenance": "BOUNDED_INDEPENDENT_BALL_SEARCH"}
+            for h in search if h["last_measured_ms"] == media_ms
+        ]
 
         # A discontinuous one-frame detector proposal must not immediately
         # replace an active trajectory.  Prefer candidates linked to an existing
@@ -304,7 +480,14 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
                 age = media_ms - int(best.get("last_measured_ms") or best["media_ms"])
                 if 0 < age <= DORMANT_REACQUIRE_MS:
                     if age <= SHORT_GAP_MS:
-                        predicted = _predict_box(best, media_ms)
+                        predicted = (geometry["predict_box"](best, media_ms)
+                                     if geometry and geometry.get("transform") is not None
+                                     else _predict_box(best, media_ms) if geometry is None else None)
+                        if predicted is None:
+                            rows.append({**common, "state": "MISSING", "box": None,
+                                         "confidence": 0.0, "candidates": [], "proof_eligible": False,
+                                         "provenance": "NATIVE_CAMERA_ASSOCIATION_UNAVAILABLE"})
+                            continue
                         best = {
                             **best,
                             "media_ms": media_ms,
@@ -382,7 +565,14 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
             age = media_ms - int(best.get("last_measured_ms") or best["media_ms"])
             if 0 < age <= DORMANT_REACQUIRE_MS:
                 if age <= SHORT_GAP_MS:
-                    predicted = _predict_box(best, media_ms)
+                    predicted = (geometry["predict_box"](best, media_ms)
+                                 if geometry and geometry.get("transform") is not None
+                                 else _predict_box(best, media_ms) if geometry is None else None)
+                    if predicted is None:
+                        rows.append({**common, "state": "MISSING", "box": None,
+                                     "confidence": 0.0, "candidates": [], "proof_eligible": False,
+                                     "provenance": "NATIVE_CAMERA_ASSOCIATION_UNAVAILABLE"})
+                        continue
                     best = {
                         **best,
                         "media_ms": media_ms,

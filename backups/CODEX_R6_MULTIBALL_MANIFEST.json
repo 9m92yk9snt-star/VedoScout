@@ -1,0 +1,154 @@
+{
+  "kind": "R6_BOUNDED_MULTIBALL_NATIVE_ASSOCIATION",
+  "parent_commit": "9a1b05ad5baade30d33c08dc751c9cc187f79113",
+  "branch": "codex-r6-native-jersey-20261011",
+  "files": {
+    "backend/ball_trajectory.py": "ba27a0dfebaedc987310572829928ce85988f0647a46e87cade5014e5e2a8e07",
+    "backend/tests/test_fix15_r6_multiball_search.py": "ce065d6c17dc9ea70e15293220f0541084b625c3c084626750ba15fe72bc9ac1",
+    "docs/FIX15_R6_MULTIBALL_STATUS.md": "4e156ac8c26b7f4739900bf21a816b672d2bd08792a853f5b80b0b3fa4aa8c40"
+  },
+  "native_audit": {
+    "kind": "LOCAL_NATIVE_FIVE_ACTION_BOUNDED_AUDIT",
+    "version": 1,
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b",
+    "detector_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "detector_source_sha256": "fbdb1123a4f364727e2809afe557a8831b402ef584da5260fcc790ba2a531fbd",
+    "decoded_frames": 1922,
+    "cache_hits": 1922,
+    "native_forwards": 0,
+    "anchors_sha256": "0a49e85e325cbffb36f2296bad75ebf5051a53e5e8442a534fbe18f172da29ed",
+    "identity_timeline_sha256": "098f5c6ce054a7a9a8b7b4ba0fae2fa5f5c3d4085e1eab69b0a131d396efe1ec",
+    "cases_sha256": "25503d3390ed96d8890c6b49d675804182b1a4e3db308467a696d924551582aa",
+    "stats": [
+      {
+        "trace_id": "dense_e29df0078338b31c",
+        "frames": 354,
+        "contacts": 27,
+        "strikes": 5,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 5
+        }
+      },
+      {
+        "trace_id": "recall_72554e852f36c920",
+        "frames": 481,
+        "contacts": 25,
+        "strikes": 14,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 12,
+          "UNRESOLVED": 2
+        }
+      },
+      {
+        "trace_id": "recall_30df768b8d18b6f8",
+        "frames": 402,
+        "contacts": 23,
+        "strikes": 9,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 6,
+          "UNRESOLVED": 3
+        }
+      },
+      {
+        "trace_id": "recall_e8c9c9cb3f9fe740",
+        "frames": 333,
+        "contacts": 19,
+        "strikes": 6,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 5,
+          "UNRESOLVED": 1
+        }
+      },
+      {
+        "trace_id": "recall_bdbaabd5fe9a824d",
+        "frames": 352,
+        "contacts": 34,
+        "strikes": 21,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 20,
+          "UNRESOLVED": 1
+        }
+      }
+    ],
+    "canonical_counts": {},
+    "forbidden_attempts": {
+      "network": 0,
+      "sdk": 0
+    },
+    "new_paid_model_calls": 0,
+    "old_contacts_votes_or_outcomes_supplied": false,
+    "full_recall_audit": false,
+    "elapsed_s": 81.158
+  },
+  "source_hashes_sha256": "d2c5432d1875896405a2c966c0373462bde7d5a400b27ec6bb13cead1631ca64",
+  "assessment": {
+    "all_verified": false,
+    "verified": 0,
+    "requested": 5,
+    "canonical_authority": false,
+    "expected_outcomes_supplied_to_models": false
+  },
+  "cases": [
+    {
+      "case_id": "saved_shot",
+      "reference_ms": 23680,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING"
+    },
+    {
+      "case_id": "target_goal",
+      "reference_ms": 30830,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING"
+    },
+    {
+      "case_id": "assist_1",
+      "reference_ms": 43190,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING"
+    },
+    {
+      "case_id": "assist_2",
+      "reference_ms": 49440,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING"
+    },
+    {
+      "case_id": "assist_3",
+      "reference_ms": 56440,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING"
+    }
+  ],
+  "audit_receipt_sha256": "548617c3701c08f48d8e0fdcabd39652a61ec81fbc194dcccf28b92d804ff540",
+  "test_result": {
+    "passed": 914,
+    "new_tests": 35,
+    "test_files": 56,
+    "baseline_failed": 31,
+    "baseline_passed": 4,
+    "baseline_behavior_failures_existing_api": 18,
+    "baseline_new_search_metadata_failures": 13,
+    "log_sha256": "b3107ece310de0d6b39fe824df97e81f694cf308f9623d9cdc37113ef6290929",
+    "forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    }
+  },
+  "free_jersey_reader": {
+    "state": "DIAGNOSTIC_QUEUE_IN_PROGRESS",
+    "model": "Qwen3VL-4B-Instruct-Q4_K_M",
+    "offline_guard": "SECCOMP_ERRNO_EPERM",
+    "applied_to_canonical_report": false,
+    "goal_body_number_reads": [
+      30865,
+      31115
+    ],
+    "reader_expected_number_or_outcome_supplied": false,
+    "handoff_diagnostic": "VERIFIED_BY_UNCHANGED_GATES"
+  },
+  "deployment_performed": false,
+  "merge_performed": false,
+  "deployment_requires_five_action_PASS": true
+}
