@@ -32,6 +32,7 @@ import touch_graph
 import unified_identity_authority
 import dense_identity_continuity
 import goal_review_scheduler
+import goal_review_sampling
 import action_evidence_review
 
 VERSION = 1
@@ -464,7 +465,7 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
         previous = tr["outcome_evidence"][job["outcome_index"]]
         tr.setdefault("feedback_prior_outcomes", []).append(deepcopy(previous))
         try:
-            geometry = _safe_provider(goal_geometry_provider, deepcopy(job["window"]), deepcopy(job["strike"]),
+            geometry = _safe_provider(goal_geometry_provider, deepcopy(job["window"]), goal_review_sampling.provider_strike(job),
                 default=None, diagnostics=tr["provider_diagnostics"], name="goal_geometry_feedback")
             tr["outcome_evidence"][job["outcome_index"]] = _review_outcome(job, geometry, previous)
             tr["provider_adapter_errors"] = sorted(set(tr["provider_adapter_errors"] + _adapter_diagnostics(geometry)))
@@ -869,7 +870,7 @@ def reconstruct_physical_match(
         trace = traces_by_window[job["window"]["dense_window_id"]]
         try:
             geometry = _safe_provider(
-                goal_geometry_provider, deepcopy(job["window"]), deepcopy(job["strike"]),
+                goal_geometry_provider, deepcopy(job["window"]), goal_review_sampling.provider_strike(job),
                 default=None, diagnostics=trace["provider_diagnostics"], name="goal_geometry")
             previous = trace["outcome_evidence"][job["outcome_index"]]
             outcome = _review_outcome(job, geometry, previous)

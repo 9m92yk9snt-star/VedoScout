@@ -31,6 +31,7 @@ import video_timebase
 import action_evidence_review
 import evidence_feedback
 import goal_review_scheduler
+import goal_review_sampling
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -69,7 +70,8 @@ def _num(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _goal_review_times(strike_ms: int, end_ms: int, budget: int, start_ms: int = 0):
+def _goal_review_times(strike_ms: int, end_ms: int, budget: int, start_ms: int = 0,
+                       *, focus_end_ms=None, anchor_ms=None):
     """Keep release, terminal context and dense early frames within the budget."""
     offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
     candidates = sorted({max(0, strike_ms + offset) for offset in offsets
@@ -78,8 +80,20 @@ def _goal_review_times(strike_ms: int, end_ms: int, budget: int, start_ms: int =
         return []
     # A chronological head slice loses the terminal outcome. Prioritize both
     # ends, then early crossing detail and the remaining late-flight context.
-    priority = [strike_ms, candidates[-1], max(0, strike_ms - 150)]
-    priority.extend(strike_ms + offset for offset in (50, 100, 150, 200))
+    priority = [strike_ms, candidates[-1]]
+    if (type(focus_end_ms) is int and type(anchor_ms) is int
+            and start_ms <= strike_ms <= anchor_ms < focus_end_ms <= min(end_ms, strike_ms + 2600)):
+        # The native measured path ends here. Inspect the next short interval
+        # densely instead of jumping from early release to late reaction.
+        focused = [anchor_ms, focus_end_ms] + [focus_end_ms + offset for offset in range(50, 301, 50)]
+        focused = [ms for ms in focused if start_ms <= ms <= min(end_ms, strike_ms + 2600)]
+        candidates = sorted(set(candidates + focused))
+        priority[1] = candidates[-1]
+        priority.extend(focused)
+        priority.extend([max(0, strike_ms - 150), strike_ms + 2200])
+    else:
+        priority.append(max(0, strike_ms - 150))
+        priority.extend(strike_ms + offset for offset in (50, 100, 150, 200))
     priority.extend(reversed(candidates))
     selected = []
     for ms in priority:
@@ -1336,11 +1350,14 @@ class ShadowVisionProviders:
             return None
         strike_ms = int(strike["media_ms"])
         end_ms = int(window.get("end_ms")) if isinstance(window, dict) and _num(window.get("end_ms")) else strike_ms + 2600
-        # Dense around the first post-release second so a body occlusion at
-        # the goal line is actually sampled; later frames preserve reaction
-        # context.  The provider call remains bounded by MAX_GOAL_FRAMES.
+        # Focus on a validated native path loss, retaining contact/reference
+        # and terminal context. Legacy callers keep the existing early plan.
+        # Inspection remains bounded by MAX_GOAL_FRAMES and creates no proof.
         start_ms = int(window.get("start_ms") or 0)
-        requested = _goal_review_times(strike_ms, end_ms, MAX_GOAL_FRAMES, start_ms=start_ms)
+        review_path = goal_review_sampling.contact_bound_native_path(strike, strike.get("_goal_review_ball_path"))
+        focus_end_ms = review_path["rows"][-1]["media_ms"] if review_path is not None else None
+        requested = _goal_review_times(strike_ms, end_ms, MAX_GOAL_FRAMES, start_ms=start_ms,
+            focus_end_ms=focus_end_ms, anchor_ms=review_path["seed_ms"] if review_path is not None else None)
         anchor = strike.get("active_ball_anchor") or {}
         anchor_valid = bool(_num(anchor.get("media_ms")) and _valid_box(anchor.get("box"))
                             and anchor.get("proof_eligible") is True and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
@@ -1401,6 +1418,8 @@ class ShadowVisionProviders:
         if not rows:
             result = {
                 "status": "UNRESOLVED",
+                "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
+                    "native_path_end_ms": focus_end_ms, "canonical_authority": False},
                 "model_review_audit": (review or {}).get("model_review_audit"),
                 "response_coverage": (review or {}).get("response_coverage"),
                 "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
@@ -1446,6 +1465,8 @@ class ShadowVisionProviders:
         )
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
+            "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
+                "native_path_end_ms": focus_end_ms, "canonical_authority": False},
             "model_review_audit": (review or {}).get("model_review_audit"),
             "response_coverage": (review or {}).get("response_coverage"),
             "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",

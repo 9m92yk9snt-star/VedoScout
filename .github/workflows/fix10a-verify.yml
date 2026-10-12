@@ -91,6 +91,7 @@ jobs:
             backend/cross_window_evidence.py \
             backend/evidence_feedback.py \
             backend/goal_review_scheduler.py \
+            backend/goal_review_sampling.py \
             backend/scripts/replay_report_evidence.py \
             backend/scripts/reference_action_review.py \
             backend/open_observation_compat.py \
