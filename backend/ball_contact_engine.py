@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 from copy import deepcopy
 
+import frame_geometry
+
 VERSION = 1
 CONTACT_MAX_H = 0.58
 CONTACT_STRONG_H = 0.30
@@ -84,7 +86,9 @@ def _nearest_trajectory_side(rows, index, direction):
     return None
 
 
-def _velocity(a, b):
+def _velocity(a, b, x_scale=1.0):
+    if x_scale is None:
+        return None
     if not (isinstance(a, dict) and isinstance(b, dict)
             and _valid_box(a.get("box")) and _valid_box(b.get("box"))):
         return None
@@ -92,12 +96,12 @@ def _velocity(a, b):
     if dt <= 0:
         return None
     x0, y0 = _center(a["box"]); x1, y1 = _center(b["box"])
-    return ((x1 - x0) / dt, (y1 - y0) / dt)
+    return ((x1 - x0) * x_scale / dt, (y1 - y0) / dt)
 
 
-def _trajectory_change(prev_row, cur_row, next_row) -> dict:
-    before = _velocity(prev_row, cur_row) if prev_row is not None else None
-    after = _velocity(cur_row, next_row) if next_row is not None else None
+def _trajectory_change(prev_row, cur_row, next_row, x_scale=1.0) -> dict:
+    before = _velocity(prev_row, cur_row, x_scale) if prev_row is not None else None
+    after = _velocity(cur_row, next_row, x_scale) if next_row is not None else None
     if before is None or after is None:
         return {"score": 0.0, "before": before, "after": after,
                 "speed_delta": None, "direction_change_deg": None}
@@ -168,10 +172,14 @@ def _player_by_id(frame, track_id):
         out["alternate_actor_boxes"].append(deepcopy(target["body_predicted_box"]))
     return out
 
-def _lower_body_geometry(player_box, ball_box) -> dict:
+def _lower_body_geometry(player_box, ball_box, x_scale=1.0) -> dict:
+    if x_scale is None:
+        return {"distance_h": 999.0, "proximity_score": 0.0,
+                "lower_body_overlap": False, "score": 0.0,
+                "reason": "CONTACT_FRAME_GEOMETRY_UNAVAILABLE"}
     fx, fy = _foot(player_box); bx, by = _center(ball_box)
     h = max(float(player_box["h"]), 1e-6)
-    d_h = math.hypot(bx - fx, by - fy) / h
+    d_h = math.hypot((bx - fx) * x_scale, by - fy) / h
     proximity = max(0.0, 1.0 - d_h / CONTACT_MAX_H)
     lower_y0 = float(player_box["y"]) + 0.58 * float(player_box["h"])
     lower_y1 = float(player_box["y"]) + 1.10 * float(player_box["h"])
@@ -235,15 +243,15 @@ def _actor_identity_key(frame, track_id):
     return GLOBAL_TARGET_ACTOR_KEY if _verified_global_target_track(frame) == track_id else f"LOCAL:{track_id}"
 
 
-def _boxes_actor_continuous(a, b, dt_ms):
-    if not (_valid_box(a) and _valid_box(b) and _num(dt_ms)):
+def _boxes_actor_continuous(a, b, dt_ms, x_scale=1.0):
+    if x_scale is None or not (_valid_box(a) and _valid_box(b) and _num(dt_ms)):
         return {"ok": False, "reason": "ACTOR_GEOMETRY_MISSING"}
     ah, bh = float(a["h"]), float(b["h"])
     ratio = bh / max(ah, 1e-6)
     if not ACTOR_HANDOFF_HEIGHT_RATIO_MIN <= ratio <= ACTOR_HANDOFF_HEIGHT_RATIO_MAX:
         return {"ok": False, "reason": "ACTOR_SCALE_DISCONTINUITY", "height_ratio": ratio}
     ax, ay = _center(a); bx, by = _center(b)
-    d_h = math.hypot(bx - ax, by - ay) / max(ah, bh, 1e-6)
+    d_h = math.hypot((bx - ax) * x_scale, by - ay) / max(ah, bh, 1e-6)
     max_h = ACTOR_HANDOFF_BASE_CENTER_H + ACTOR_HANDOFF_SPEED_H_PER_S * max(0.0, float(dt_ms) / 1000.0)
     return {
         "ok": d_h <= max_h,
@@ -282,6 +290,10 @@ def _player_for_actor_continuity(anchor_frame, anchor_track_id, frame):
     if dt_ms > ACTOR_HANDOFF_MAX_MS:
         return None, {"ok": False, "reason": "ACTOR_HANDOFF_TIME_EXCEEDED", "dt_ms": dt_ms}
 
+    x_scale = frame_geometry.compatible_scale(anchor_frame, frame)
+    if x_scale is None:
+        return None, {"ok": False, "reason": "ACTOR_FRAME_GEOMETRY_UNAVAILABLE"}
+
     anchor_player = _player_by_id(anchor_frame, anchor_track_id)
     if anchor_player is None:
         return None, {"ok": False, "reason": "ANCHOR_ACTOR_NOT_FOUND"}
@@ -310,7 +322,7 @@ def _player_for_actor_continuity(anchor_frame, anchor_track_id, frame):
     if target_handoff and candidate.get("synthetic_target_body") is True:
         candidate_boxes.extend(x for x in (candidate.get("alternate_actor_boxes") or []) if _valid_box(x))
     geometry_options = [
-        _boxes_actor_continuous(a, b, dt_ms)
+        _boxes_actor_continuous(a, b, dt_ms, x_scale)
         for a in anchor_boxes for b in candidate_boxes
         if _valid_box(a) and _valid_box(b)
     ]
@@ -349,9 +361,10 @@ def _player_for_actor_continuity(anchor_frame, anchor_track_id, frame):
     return candidate, evidence
 
 
-def _best_lower_geometry(player, ball_box):
+def _best_lower_geometry(player, ball_box, frame=None):
+    x_scale = frame_geometry.horizontal_scale(frame)
     if not (isinstance(player, dict) and _valid_box(player.get("box")) and _valid_box(ball_box)):
-        return _lower_body_geometry(player.get("box") if isinstance(player, dict) else {}, ball_box)
+        return _lower_body_geometry(player.get("box") if isinstance(player, dict) else {}, ball_box, x_scale)
     variants = [("DETECTED_BODY", player["box"])]
     if player.get("synthetic_target_body") is True:
         for box in player.get("alternate_actor_boxes") or []:
@@ -359,7 +372,7 @@ def _best_lower_geometry(player, ball_box):
                 variants.append(("TARGET_MOTION_PREDICTED_BODY", box))
     scored = []
     for source, box in variants:
-        geom = _lower_body_geometry(box, ball_box)
+        geom = _lower_body_geometry(box, ball_box, x_scale)
         geom["geometry_source"] = source
         geom["actor_box_used"] = deepcopy(box)
         scored.append(geom)
@@ -373,12 +386,15 @@ def _best_lower_geometry(player, ball_box):
 def _likely_holder(frame, ball_box):
     if not isinstance(frame, dict) or not _valid_box(ball_box):
         return None
+    x_scale = frame_geometry.horizontal_scale(frame)
+    if x_scale is None:
+        return None
     ranked = []
     for p in _players_for_physics(frame):
         if not isinstance(p, dict) or not isinstance(p.get("local_track_id"), str) or not _valid_box(p.get("box")):
             continue
         fx, fy = _foot(p["box"]); bx, by = _center(ball_box)
-        d_h = math.hypot(bx - fx, by - fy) / max(float(p["box"]["h"]), 1e-6)
+        d_h = math.hypot((bx - fx) * x_scale, by - fy) / max(float(p["box"]["h"]), 1e-6)
         if d_h <= POSSESSION_MAX_H:
             ranked.append((d_h, p["local_track_id"]))
     ranked.sort()
@@ -393,6 +409,9 @@ def _possession_transition(track_id, cur_frame, prev_frame, prev_ball, next_fram
         return {"score": 0.0, "kind": "UNRESOLVED", "before_holder": None, "after_holder": None}
     if prev_frame is None or prev_ball is None or next_frame is None or next_ball is None:
         return {"score": 0.0, "kind": "INSUFFICIENT_BOTH_SIDES",
+                "before_holder": None, "after_holder": None}
+    if frame_geometry.compatible_scale(cur_frame, prev_frame, next_frame) is None:
+        return {"score": 0.0, "kind": "FRAME_GEOMETRY_UNAVAILABLE",
                 "before_holder": None, "after_holder": None}
     before_holder = _likely_holder(prev_frame, prev_ball.get("box"))
     after_holder = _likely_holder(next_frame, next_ball.get("box"))
@@ -423,7 +442,8 @@ def _possession_transition(track_id, cur_frame, prev_frame, prev_ball, next_fram
         if resolved_actor is None or not _valid_box(side_ball.get("box")):
             continue
         fx, fy = _foot(resolved_actor["box"]); bx, by = _center(side_ball["box"])
-        distance_h = math.hypot(bx - fx, by - fy) / max(float(resolved_actor["box"]["h"]), 1e-6)
+        x_scale = frame_geometry.horizontal_scale(side_frame)
+        distance_h = math.hypot((bx - fx) * x_scale, by - fy) / max(float(resolved_actor["box"]["h"]), 1e-6)
         if distance_h > POSSESSION_MAX_H:
             continue
         if side == "before":
@@ -490,13 +510,15 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             prev_ball is not None and next_ball is not None
             and prev_frame is not None and next_frame is not None
         )
-        trajectory_evidence = _trajectory_change(prev_ball, ball, next_ball)
+        x_scale = (frame_geometry.compatible_scale(cur_frame, prev_frame, next_frame)
+                   if has_both_sides else frame_geometry.horizontal_scale(cur_frame))
+        trajectory_evidence = _trajectory_change(prev_ball, ball, next_ball, x_scale)
         for player in _players_for_physics(cur_frame):
             if not isinstance(player, dict) or not _valid_box(player.get("box")):
                 continue
             track_id = player.get("local_track_id") if isinstance(player.get("local_track_id"), str) else None
             candidate_ids = [x for x in (player.get("candidate_local_track_ids") or []) if isinstance(x, str)]
-            geometry = _best_lower_geometry(player, ball["box"])
+            geometry = _best_lower_geometry(player, ball["box"], cur_frame)
             continuity = _player_continuity(track_id, prev_frame, cur_frame, next_frame)
             possession = _possession_transition(
                 track_id, cur_frame, prev_frame, prev_ball, next_frame, next_ball, trajectory_evidence["score"]
@@ -525,6 +547,8 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
                 + 0.15 * continuity
             )
             rejection_reasons = []
+            if x_scale is None:
+                rejection_reasons.append("CONTACT_FRAME_GEOMETRY_UNAVAILABLE")
             if geometry["distance_h"] > CONTACT_MAX_H:
                 rejection_reasons.append("BALL_OUTSIDE_LOWER_BODY_CONTACT_ZONE")
             if not has_both_sides:
@@ -541,7 +565,8 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             if not association_safe:
                 rejection_reasons.append("PLAYER_ASSOCIATION_UNRESOLVED")
             qualifies_verified = bool(
-                measured
+                x_scale is not None
+                and measured
                 and has_both_sides
                 and geometry["distance_h"] <= CONTACT_MAX_H
                 and dynamic_support
@@ -551,7 +576,8 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
                 and overall >= VERIFIED_CONFIDENCE_MIN
             )
             occluded_supported = bool(
-                not measured
+                x_scale is not None
+                and not measured
                 and ball.get("state") == "PREDICTED_SHORT_GAP"
                 and has_both_sides
                 and geometry["distance_h"] <= CONTACT_MAX_H

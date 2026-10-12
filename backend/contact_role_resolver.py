@@ -14,6 +14,7 @@ from copy import deepcopy
 import ball_contact_engine as bce
 import short_occlusion_contact_recovery as recovery
 import ball_trajectory as trajectory_engine
+import frame_geometry
 
 VERSION = 1
 ROLE_RELEASE = "RELEASE"
@@ -232,7 +233,10 @@ def _delayed_separation_role(touch: dict, touches, dense_frames, ball_trajectory
         foot_y = float(pbox["y"]) + float(pbox["h"])
         ball_x = float(bbox["x"]) + float(bbox["w"]) / 2.0
         ball_y = float(bbox["y"]) + float(bbox["h"]) / 2.0
-        distance_h = math.hypot(ball_x - foot_x, ball_y - foot_y) / float(pbox["h"])
+        x_scale = frame_geometry.horizontal_scale(frame)
+        if x_scale is None:
+            continue
+        distance_h = math.hypot((ball_x - foot_x) * x_scale, ball_y - foot_y) / float(pbox["h"])
         samples.append((media_ms, distance_h))
 
     if len(samples) < DELAYED_MIN_MEASURED:

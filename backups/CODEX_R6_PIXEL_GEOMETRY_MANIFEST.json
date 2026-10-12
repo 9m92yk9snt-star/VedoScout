@@ -1,0 +1,365 @@
+{
+  "branch": "codex-r6-native-jersey-20261011",
+  "date": "2026-10-12",
+  "deployment_eligible": false,
+  "files": {
+    "backend/ball_contact_engine.py": "9e0263c545bdde74135b0edddbe6e9fe402bd083187e4679f23fa0c9b2a69c70",
+    "backend/ball_trajectory.py": "a1c52a5a8e4b7e4e3aca93f3f3d5f33818a2cc9c9b898105e3e4bca3145c8eba",
+    "backend/contact_role_resolver.py": "b00951fd901e62829a8272e1b80b2f4df2086ef6b0e4173ad95289f2aead90d7",
+    "backend/dense_track_refinement.py": "070c0278b21ca0a8ae737c8cc74da20f93dc32c573647dc7325e21bee21062c6",
+    "backend/frame_geometry.py": "d905c2cf734bfabeb662d112b49197512ca3e79b7c57fb2d1852809677b550c3",
+    "backend/scripts/audit_native_five_actions.py": "08c9597471ab5c1bcf5a3e3d33d299de3efd73acb742e611590c1fc912fc2055",
+    "backend/short_occlusion_contact_recovery.py": "12239139d0547da1d33fad6897a4fbac4b6ef83347f13bd19a09e9245e403739",
+    "backend/tests/test_fix15_r6_pixel_contact_geometry.py": "064133bbc84916e65668a8a206ca66af329f1e8ea5ca65919874aac2571547c6",
+    "docs/FIX15_R6_NATIVE_ACTION_STATUS.md": "f714e291b6e9c85210289da97bbe384a22027df337ca76a96561ce6fd41b1bbe"
+  },
+  "isolated_geometry_comparison": {
+    "forbidden_attempts": {
+      "native_detector": 0,
+      "network": 0,
+      "sdk": 0
+    },
+    "new_native_forwards": 0,
+    "receipt_sha256": "7507972fd43df3a66c8ac6cf7668cb74c93c855a74ff57fb172e3a4a92e1364d",
+    "same_refined_inputs_except_dimension_metadata": true,
+    "stats": [
+      {
+        "after_contacts": 25,
+        "after_physical_outcomes": {
+          "PLAYER_INTERVENTION": 7,
+          "UNRESOLVED": 1
+        },
+        "after_strikes": 8,
+        "before_contacts": 16,
+        "before_strikes": 6,
+        "freshly_redecoded_frames": 354,
+        "refinement_equal_except_dimensions": true,
+        "trace_id": "dense_e29df0078338b31c",
+        "verified_target_touches": 0
+      },
+      {
+        "after_contacts": 80,
+        "after_physical_outcomes": {
+          "PLAYER_INTERVENTION": 6,
+          "UNRESOLVED": 2
+        },
+        "after_strikes": 8,
+        "before_contacts": 55,
+        "before_strikes": 8,
+        "freshly_redecoded_frames": 402,
+        "refinement_equal_except_dimensions": true,
+        "trace_id": "recall_30df768b8d18b6f8",
+        "verified_target_touches": 7
+      },
+      {
+        "after_contacts": 47,
+        "after_physical_outcomes": {
+          "PLAYER_INTERVENTION": 12
+        },
+        "after_strikes": 12,
+        "before_contacts": 41,
+        "before_strikes": 13,
+        "freshly_redecoded_frames": 481,
+        "refinement_equal_except_dimensions": true,
+        "trace_id": "recall_72554e852f36c920",
+        "verified_target_touches": 1
+      },
+      {
+        "after_contacts": 44,
+        "after_physical_outcomes": {
+          "PLAYER_INTERVENTION": 18,
+          "UNRESOLVED": 2
+        },
+        "after_strikes": 20,
+        "before_contacts": 29,
+        "before_strikes": 19,
+        "freshly_redecoded_frames": 352,
+        "refinement_equal_except_dimensions": true,
+        "trace_id": "recall_bdbaabd5fe9a824d",
+        "verified_target_touches": 1
+      },
+      {
+        "after_contacts": 34,
+        "after_physical_outcomes": {
+          "PLAYER_INTERVENTION": 5,
+          "UNRESOLVED": 2
+        },
+        "after_strikes": 7,
+        "before_contacts": 27,
+        "before_strikes": 7,
+        "freshly_redecoded_frames": 333,
+        "refinement_equal_except_dimensions": true,
+        "trace_id": "recall_e8c9c9cb3f9fe740",
+        "verified_target_touches": 3
+      }
+    ],
+    "strict_verified": 0
+  },
+  "kind": "CODEX_R6_NATIVE_ACTION_PIXEL_GEOMETRY_CANDIDATE",
+  "latest_strict_assessment": {
+    "all_verified": false,
+    "cases": [
+      {
+        "case_id": "saved_shot",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 23680,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "target_goal",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 30830,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "assist_1",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 43190,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "assist_2",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 49440,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "assist_3",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 56440,
+        "status": "NOT_VERIFIED"
+      }
+    ],
+    "expected_outcomes_supplied_to_models": false,
+    "requested": 5,
+    "verified": 0
+  },
+  "local_model_trials": {
+    "applied_votes_or_observations": 0,
+    "downloaded_weights_and_runtime_stay_outside_product": true,
+    "paid_calls": 0,
+    "reliable_independent_jersey_consensus_demonstrated": false
+  },
+  "original_native_baseline": {
+    "anchors_sha256": "0a49e85e325cbffb36f2296bad75ebf5051a53e5e8442a534fbe18f172da29ed",
+    "forbidden_attempts": {
+      "network": 0,
+      "sdk": 0
+    },
+    "frames": 1922,
+    "native_forwards": 3797,
+    "receipt_sha256": "4bcd7ba63dc7d68a0aa5cb6bb90171fad05dbd11469a0452f4837f1b6bd176e3",
+    "strict_verified": 0,
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b"
+  },
+  "parent_commit": "e7537e4857bcba3627c7c694aaaa3fd45dc269ef",
+  "repeatable_native_audit": {
+    "anchors_sha256": "0a49e85e325cbffb36f2296bad75ebf5051a53e5e8442a534fbe18f172da29ed",
+    "cache_hits": 1922,
+    "canonical_counts": {},
+    "cases_sha256": "25503d3390ed96d8890c6b49d675804182b1a4e3db308467a696d924551582aa",
+    "decoded_frames": 1922,
+    "detector_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "detector_source_sha256": "fbdb1123a4f364727e2809afe557a8831b402ef584da5260fcc790ba2a531fbd",
+    "elapsed_s": 61.335,
+    "forbidden_attempts": {
+      "network": 0,
+      "sdk": 0
+    },
+    "full_recall_audit": false,
+    "identity_timeline_sha256": "098f5c6ce054a7a9a8b7b4ba0fae2fa5f5c3d4085e1eab69b0a131d396efe1ec",
+    "native_forwards": 0,
+    "new_paid_model_calls": 0,
+    "old_contacts_votes_or_outcomes_supplied": false,
+    "stats": [
+      {
+        "contacts": 25,
+        "frames": 354,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 7,
+          "UNRESOLVED": 1
+        },
+        "strikes": 8,
+        "trace_id": "dense_e29df0078338b31c"
+      },
+      {
+        "contacts": 47,
+        "frames": 481,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 12
+        },
+        "strikes": 12,
+        "trace_id": "recall_72554e852f36c920"
+      },
+      {
+        "contacts": 80,
+        "frames": 402,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 6,
+          "UNRESOLVED": 2
+        },
+        "strikes": 8,
+        "trace_id": "recall_30df768b8d18b6f8"
+      },
+      {
+        "contacts": 34,
+        "frames": 333,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 5,
+          "UNRESOLVED": 2
+        },
+        "strikes": 7,
+        "trace_id": "recall_e8c9c9cb3f9fe740"
+      },
+      {
+        "contacts": 44,
+        "frames": 352,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 18,
+          "UNRESOLVED": 2
+        },
+        "strikes": 20,
+        "trace_id": "recall_bdbaabd5fe9a824d"
+      }
+    ],
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b"
+  },
+  "review_video": {
+    "crop_pixels": [
+      0,
+      576,
+      1080,
+      1112
+    ],
+    "does_not_upgrade_automatic_verification": true,
+    "duration_s": 22.682426,
+    "intervals_s": [
+      [
+        20.0,
+        25.2,
+        23.68
+      ],
+      [
+        28.8,
+        33.0,
+        30.83
+      ],
+      [
+        41.4,
+        46.95,
+        43.19
+      ],
+      [
+        48.7,
+        52.65,
+        49.44
+      ],
+      [
+        55.1,
+        58.8,
+        56.44
+      ]
+    ],
+    "manual_review_only": true,
+    "sha256": "113a3618317eb9f500d3a8c3fc260a31d6ad67c741ebf8fc2df753d6d7a0eae6",
+    "source_fps_preserved": true,
+    "source_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b"
+  },
+  "scope": {
+    "coordinate_metric": "dx*(decoded_width/decoded_height),dy in decoded-frame-height units",
+    "distance_thresholds_unchanged": true,
+    "emergent_used": false,
+    "identity_event_and_same_ball_gates_unchanged": true,
+    "merge_or_deployment": false,
+    "new_model_or_runtime_dependency_added_to_product": false,
+    "new_paid_model_calls": 0,
+    "new_user_taps": false,
+    "raw_pixels_tracks_tap_coordinates_or_credentials_in_commit": false
+  },
+  "technical_pass_is_not_product_pass": true,
+  "validation": {
+    "existing_assertions_weakened": false,
+    "failed": 0,
+    "forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    },
+    "full_historical_suite_rerun_locally": false,
+    "new_tests": 43,
+    "passed": 820,
+    "previous_777_tests_retained": true,
+    "test_files": 52,
+    "tests": [
+      "tests/test_fix15_r6_ball_identity.py",
+      "tests/test_fix15_r6_role_scheduling.py",
+      "tests/test_fix15_r6_anchor_callers.py",
+      "tests/test_fix15_r6_contact_binding.py",
+      "tests/test_fix10a3_ball_trajectory.py",
+      "tests/test_fix10a3_dormant_reacquisition.py",
+      "tests/test_fix10a4_ball_contact.py",
+      "tests/test_fix10a4_short_occlusion_recovery.py",
+      "tests/test_fix10a4_post_anchor_discontinuity.py",
+      "tests/test_fix10a5_touch_graph.py",
+      "tests/test_fix10a_contact_role_resolver.py",
+      "tests/test_fix10a7_shot_outcome.py",
+      "tests/test_fix10a7_support_intervention.py",
+      "tests/test_fix10a7_full_body_intervention.py",
+      "tests/test_fix10a7_role_intervention_handoff.py",
+      "tests/test_fix10a7_ball_proof_gate.py",
+      "tests/test_fix10a7_goal_audit.py",
+      "tests/test_fix10a7_structured_goal_proof.py",
+      "tests/test_fix10a_physical_reconstruction.py",
+      "tests/test_fix11_release_anchored_ball_path.py",
+      "tests/test_fix10a_goal_direction.py",
+      "tests/test_fix10a_window_failure_diagnostics.py",
+      "tests/test_fix10a_vision_providers.py",
+      "tests/test_fix13_action_inspections.py",
+      "tests/test_fix13_evidence_feedback.py",
+      "tests/test_fix13_cross_window_evidence.py",
+      "tests/test_fix15_goal_response_coverage.py",
+      "tests/test_fix15_pixel_response_coverage.py",
+      "tests/test_fix15_selected_point_identity.py",
+      "tests/test_fix13_reference_review.py",
+      "tests/test_fix10a1_dense_replay.py",
+      "tests/test_fix10a_fix11_recall.py",
+      "tests/test_fix10b_runtime.py",
+      "tests/test_fix10b_reconciliation.py",
+      "tests/test_fix10b_fix11_reconciliation.py",
+      "tests/test_fix10b_scoring_evidence_coverage.py",
+      "tests/test_fix10a_provider_wiring.py",
+      "tests/test_report_evidence_export.py",
+      "tests/test_fix15_r6_ground_band.py",
+      "tests/test_fix10a2_dense_ball_floor.py",
+      "tests/test_fix10a2_dense_track_refinement.py",
+      "tests/test_fix13_shared_evidence.py",
+      "tests/test_fix15_r6_local_kit_continuity.py",
+      "tests/test_fix10a6_jersey_consensus.py",
+      "tests/test_fix15_r6_native_jersey_sampling.py",
+      "tests/test_fix14_orman10_recovery.py",
+      "tests/test_fix15_r6_body_crop.py",
+      "tests/test_fix09a_feature_ownership.py",
+      "tests/test_player_selection.py",
+      "tests/test_fix09a_identity_timeline.py",
+      "tests/test_fix09b0_unified_identity_authority.py",
+      "tests/test_fix15_r6_pixel_contact_geometry.py"
+    ],
+    "unchanged_api_baseline_integration_tests": {
+      "baseline_production_modules_unchanged": true,
+      "baseline_sha": "e7537e4857bcba3627c7c694aaaa3fd45dc269ef",
+      "failed": 6,
+      "passed": 9
+    },
+    "warnings": 1
+  }
+}

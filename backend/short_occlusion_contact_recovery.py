@@ -36,6 +36,7 @@ import cv2
 import numpy as np
 
 import ball_contact_engine as bce
+import frame_geometry
 import dense_replay
 
 VERSION = 1
@@ -175,21 +176,23 @@ def _player_by_id(frame, track_id):
     ), None)
 
 
-def _lower_geometry(player_box, ball_box):
+def _lower_geometry(player_box, ball_box, frame=None):
     # Reuse the exact A4 physical geometry formula without changing A4 gates.
-    return bce._lower_body_geometry(player_box, ball_box)
+    return bce._lower_body_geometry(player_box, ball_box, frame_geometry.horizontal_scale(frame))
 
 
 def _unique_lower_body_actor(frame, ball_box):
     """Return one verified physical actor or an explicit fail-closed reason."""
     if not isinstance(frame, dict) or not _valid_box(ball_box):
         return None, "CONTACT_FRAME_UNAVAILABLE", []
+    if frame_geometry.horizontal_scale(frame) is None:
+        return None, "CONTACT_FRAME_GEOMETRY_UNAVAILABLE", []
     verified = []
     ambiguous = []
     for player in bce._players_for_physics(frame):
         if not isinstance(player, dict) or not _valid_box(player.get("box")):
             continue
-        geom = bce._best_lower_geometry(player, ball_box)
+        geom = bce._best_lower_geometry(player, ball_box, frame)
         distance = float(geom.get("distance_h") or 999.0)
         # Very narrow articulated-kick lane: only a proof-backed
         # GLOBAL_TARGET body can extend from the ordinary contact radius to the
@@ -279,16 +282,22 @@ def _strong_trajectory_consequence(change):
     )
 
 
-def _actor_distance_h(player_box, ball_box):
+def _actor_distance_h(player_box, ball_box, frame=None):
+    x_scale = frame_geometry.horizontal_scale(frame)
+    if x_scale is None:
+        return None
     fx, fy = _foot(player_box); bx, by = _center(ball_box)
-    return math.hypot(bx - fx, by - fy) / max(float(player_box["h"]), 1e-6)
+    return math.hypot((bx - fx) * x_scale, by - fy) / max(float(player_box["h"]), 1e-6)
 
 
-def _separation_gain_h(anchor_player_box, anchor_ball_box, later_player_box, later_ball_box):
+def _separation_gain_h(anchor_player_box, anchor_ball_box, later_player_box, later_ball_box,
+                       anchor_frame=None, later_frame=None):
     if not all(_valid_box(x) for x in (anchor_player_box, anchor_ball_box, later_player_box, later_ball_box)):
         return None
-    start = _actor_distance_h(anchor_player_box, anchor_ball_box)
-    end = _actor_distance_h(later_player_box, later_ball_box)
+    if frame_geometry.compatible_scale(anchor_frame or {}, later_frame or {}) is None:
+        return None
+    start = _actor_distance_h(anchor_player_box, anchor_ball_box, anchor_frame)
+    end = _actor_distance_h(later_player_box, later_ball_box, later_frame)
     return end - start
 
 
@@ -411,8 +420,8 @@ def _support_seed_candidates(frames, anchor, actor, anchor_frame):
             displacement = math.hypot(cx - ax, cy - ay)
             if displacement > max_jump:
                 continue
-            actor_h = _actor_distance_h(current_actor["box"], candidate["box"])
-            if actor_h > SUPPORT_SEED_ACTOR_MAX_H:
+            actor_h = _actor_distance_h(current_actor["box"], candidate["box"], frame)
+            if actor_h is None or actor_h > SUPPORT_SEED_ACTOR_MAX_H:
                 continue
             out.append({
                 "frame": frame,
@@ -595,7 +604,7 @@ def _competing_contact_actor_ids(frame, target_track, ball_box):
         }
         if track == target_track or (track is None and candidates == {target_track}):
             continue
-        geometry = bce._best_lower_geometry(player, ball_box)
+        geometry = bce._best_lower_geometry(player, ball_box, frame)
         if float(geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H):
             ids.extend([track] if track else sorted(candidates))
     return sorted(set(x for x in ids if isinstance(x, str)))
@@ -612,7 +621,7 @@ def _exact_tap_seed_candidates(frame, actor):
             and _valid_box(candidate.get("box"))
         ):
             continue
-        geometry = _lower_geometry(actor["box"], candidate["box"])
+        geometry = _lower_geometry(actor["box"], candidate["box"], frame)
         if float(geometry.get("distance_h") or 999.0) > float(bce.CONTACT_MAX_H):
             continue
         competitors = _competing_contact_actor_ids(frame, target_track, candidate["box"])
@@ -862,6 +871,7 @@ def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
     previous = deepcopy(anchor_actor)
     previous["box"] = deepcopy(anchor_actor.get("detected_box") or anchor_actor["box"])
     previous_ms = start_ms
+    previous_frame = anchor_frame
     current_id = previous["local_track_id"]
     handoffs = []
     nodes = [{
@@ -886,7 +896,8 @@ def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
             if _team_conflict_for_tap(previous, candidate):
                 continue
             geometry = bce._boxes_actor_continuous(
-                previous["box"], candidate["box"], media_ms - previous_ms
+                previous["box"], candidate["box"], media_ms - previous_ms,
+                frame_geometry.compatible_scale(previous_frame, frame)
             )
             if geometry.get("ok") is True:
                 ranked.append((float(geometry.get("center_distance_h") or 0.0), candidate, geometry))
@@ -926,6 +937,7 @@ def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
         })
         previous = deepcopy(chosen)
         previous_ms = media_ms
+        previous_frame = frame
         current_id = chosen_id
     return previous, {
         "ok": True,
@@ -966,7 +978,7 @@ def _tap_release_competitors(frame, actor, ball_box):
             pcx, pcy = _center(player["box"]); acx, acy = _center(actor_box)
             if math.hypot(pcx - acx, pcy - acy) <= EXACT_TAP_SEED_CLUSTER_NORM:
                 continue
-        geometry = _lower_geometry(player["box"], ball_box)
+        geometry = _lower_geometry(player["box"], ball_box, frame)
         if float(geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H):
             rows.append({
                 "local_track_id": player.get("local_track_id"),
@@ -1008,7 +1020,7 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                     and _valid_box(seed.get("box"))
                 ):
                     continue
-                geometry = _lower_geometry(actor["box"], seed["box"])
+                geometry = _lower_geometry(actor["box"], seed["box"], release_frame)
                 if float(geometry.get("distance_h") or 999.0) > float(bce.CONTACT_MAX_H):
                     continue
                 competitors = _tap_release_competitors(release_frame, actor, seed["box"])
@@ -1056,7 +1068,8 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                 if final_actor is None:
                     continue
                 separation = _separation_gain_h(
-                    actor["box"], seed["box"], final_actor["box"], strong["box"]
+                    actor["box"], seed["box"], final_actor["box"], strong["box"],
+                    release_frame, strong_frame
                 )
                 if separation is None or separation < EXACT_TAP_MIN_SEPARATION_GAIN_H:
                     continue
@@ -1219,7 +1232,8 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
             if final_actor is None:
                 continue
             separation = _separation_gain_h(
-                actor["box"], seed["candidate"]["box"], final_actor["box"], strong["box"]
+                actor["box"], seed["candidate"]["box"], final_actor["box"], strong["box"],
+                frame, strong_frame
             )
             if separation is None or separation < EXACT_TAP_MIN_SEPARATION_GAIN_H:
                 continue
@@ -1370,8 +1384,8 @@ def _exact_tap_measured_release_recoveries(
             continue
         anchor_row = anchor_rows[0]
         anchor_ball = deepcopy(anchor_row["ball_at_contact"])
-        authority_geometry = _lower_geometry(actor["box"], anchor_ball["box"])
-        detected_geometry = _lower_geometry(actor["detected_box"], anchor_ball["box"])
+        authority_geometry = _lower_geometry(actor["box"], anchor_ball["box"], frame)
+        detected_geometry = _lower_geometry(actor["detected_box"], anchor_ball["box"], frame)
         if not (
             authority_geometry.get("lower_body_overlap") is True
             and detected_geometry.get("lower_body_overlap") is True
@@ -1440,7 +1454,7 @@ def _exact_tap_measured_release_recoveries(
             )
             if final_actor is None:
                 continue
-            flowed_geometry = _lower_geometry(body_last["box"], release_ball["box"])
+            flowed_geometry = _lower_geometry(body_last["box"], release_ball["box"], release_frame)
             if not (
                 flowed_geometry.get("lower_body_overlap") is True
                 and float(flowed_geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H)
@@ -1452,7 +1466,8 @@ def _exact_tap_measured_release_recoveries(
             if release_competitors:
                 continue
             separation = _separation_gain_h(
-                actor["box"], anchor_ball["box"], body_last["box"], release_ball["box"]
+                actor["box"], anchor_ball["box"], body_last["box"], release_ball["box"],
+                frame, release_frame
             )
             evidence = {
                 "version": VERSION,
@@ -1586,7 +1601,8 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
             change = _trajectory_change(incoming[0], incoming[1], anchor, synthetic_final)
             if not _strong_trajectory_consequence(change):
                 continue
-            separation = _separation_gain_h(actor["box"], anchor["box"], final_actor["box"], synthetic_final["box"])
+            separation = _separation_gain_h(actor["box"], anchor["box"], final_actor["box"], synthetic_final["box"],
+                                            frame, final_frame)
             if separation is None or separation < MIN_SEPARATION_GAIN_H:
                 continue
             evidence = {
@@ -1719,7 +1735,8 @@ def _measured_reacquisition_recoveries(frames, measured, contact_result, traject
         change = _trajectory_change(incoming[0], incoming[1], anchor, nxt)
         if not _strong_trajectory_consequence(change):
             continue
-        separation = _separation_gain_h(actor["box"], anchor["box"], next_actor["box"], nxt["box"])
+        separation = _separation_gain_h(actor["box"], anchor["box"], next_actor["box"], nxt["box"],
+                                        frame, next_frame)
         if separation is None or separation < MIN_SEPARATION_GAIN_H:
             continue
         evidence = {

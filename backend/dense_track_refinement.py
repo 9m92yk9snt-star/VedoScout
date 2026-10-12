@@ -1191,6 +1191,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         )
         output_frames.append({
             "media_ms": media_ms,
+            "frame_dimensions": {"width": int(w), "height": int(h),
+                                 "source": "DECODED_NATIVE_PIXELS"},
             "scene_id": active_scene,
             "cut_barrier": bool(cut),
             "camera_state": camera_state,

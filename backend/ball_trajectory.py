@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from copy import deepcopy
 
+import frame_geometry
+
 VERSION = 1
 MAX_HYPOTHESES = 3
 SCORE_MARGIN = 0.12
@@ -78,14 +80,14 @@ def _predict_box(hyp: dict, media_ms: int) -> dict:
     }
 
 
-def _nearest_player_foot_h(candidate_box: dict, players) -> float | None:
+def _nearest_player_foot_h(candidate_box: dict, players, x_scale=1.0) -> float | None:
     """Supporting-only geometry for trajectory re-acquisition.
 
     This signal may help A3 decide whether a discontinuous detector proposal is
     physically plausible near a player's lower body.  It is never touch/event
     authority; A4 still independently verifies actual contact.
     """
-    if not _valid_box(candidate_box):
+    if x_scale is None or not _valid_box(candidate_box):
         return None
     bx, by = _center(candidate_box)
     best = None
@@ -97,7 +99,7 @@ def _nearest_player_foot_h(candidate_box: dict, players) -> float | None:
         pb = player["box"]
         fx = float(pb["x"]) + float(pb["w"]) / 2.0
         fy = float(pb["y"]) + float(pb["h"])
-        dist_h = math.hypot(bx - fx, by - fy) / max(float(pb["h"]), 1e-6)
+        dist_h = math.hypot((bx - fx) * x_scale, by - fy) / max(float(pb["h"]), 1e-6)
         if best is None or dist_h < best:
             best = dist_h
     return best
@@ -273,7 +275,7 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
                 continue
             row = deepcopy(candidate)
             row["_nearest_player_foot_h"] = _nearest_player_foot_h(
-                row["box"], frame.get("players") or []
+                row["box"], frame.get("players") or [], frame_geometry.horizontal_scale(frame)
             )
             raw_candidates.append(row)
         ranked = _rank_candidates(raw_candidates, hypotheses, media_ms)
@@ -286,6 +288,8 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
             ),
             "cut_barrier": bool(cut),
         }
+        if "frame_dimensions" in frame:
+            common["frame_dimensions"] = deepcopy(frame["frame_dimensions"])
 
         # A discontinuous one-frame detector proposal must not immediately
         # replace an active trajectory.  Prefer candidates linked to an existing
