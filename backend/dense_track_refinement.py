@@ -282,14 +282,11 @@ def _local_kit_conflict(track, detection, media_ms):
 
 def _jersey_crop_quality(gray, detection, detections):
     """Measure crop-selection cues only; no digits, team or identity score."""
-    height, width = gray.shape[:2]
     box = detection["box"]
-    # This tight central torso is measured on the actual CV image. A later
-    # reader uses the original frame; no upscaled dimensions count here.
-    x0 = max(0, int(math.ceil((box["x"] + .12 * box["w"]) * width)))
-    x1 = min(width, int(math.floor((box["x"] + .88 * box["w"]) * width)))
-    y0 = max(0, int(math.ceil((box["y"] + .18 * box["h"]) * height)))
-    y1 = min(height, int(math.floor((box["y"] + .58 * box["h"]) * height)))
+    import jersey_pixels
+    # Selection and the reader inspect the same full-width torso rectangle.
+    # Its dimensions are measured before any reader interpolation.
+    x0, y0, x1, y1 = jersey_pixels.torso_bounds(gray, box) or (0, 0, 0, 0)
     roi = gray[y0:y1, x0:x1] if x1 > x0 and y1 > y0 else None
     isolated = not any(other is not detection and _valid_box(other.get("box"))
                        and _iou(box, other["box"]) >= LOCAL_KIT_OVERLAP_IOU
@@ -930,6 +927,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             return {"version": VERSION, "status": "skipped", "reason": "detector_unavailable",
                     "scene_id": scene, "frames": [], "metrics": {}}
         detector_fn = lambda frame: _detect_dense_people_and_ball(detector, frame, include_a7_support=True)
+    uses_default_camera = camera_estimator is None or camera_estimator is _default_camera_estimator
     if camera_estimator is None:
         camera_estimator = _default_camera_estimator
 
@@ -1196,6 +1194,17 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             "scene_id": active_scene,
             "cut_barrier": bool(cut),
             "camera_state": camera_state,
+            "camera_motion": {
+                "source": "NATIVE_BACKGROUND_AFFINE", "units": "DECODED_PIXELS",
+                "from_media_ms": output_frames[-1]["media_ms"], "to_media_ms": media_ms,
+                "matrix": matrix.tolist(),
+                "estimation_frame_dimensions": {
+                    "width": min(w, motion_compensation.PROC_W) if uses_default_camera else w,
+                    "height": round(h * min(w, motion_compensation.PROC_W) / w) if uses_default_camera else h,
+                },
+            } if (camera_state == "AFFINE_VERIFIED" and output_frames and prev_gray is not None
+                  and prev_gray.shape == gray.shape and output_frames[-1]["media_ms"] < media_ms
+                  and matrix is not None and matrix.shape == (2, 3) and np.isfinite(matrix).all()) else None,
             "local_kit_association_rejections": kit_rejections,
             "local_kit_association_cautions": kit_cautions,
             "players": players_out,

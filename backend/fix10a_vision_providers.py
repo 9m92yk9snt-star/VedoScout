@@ -25,6 +25,7 @@ from pathlib import Path
 import cv2
 
 import identity_verify
+import jersey_pixels
 import support_vision_runner
 import video_timebase
 import action_evidence_review
@@ -1218,7 +1219,7 @@ class ShadowVisionProviders:
                     vote.update(media_ms=int(actual_ms), request_id=row.get("request_id"), reused=True)
                     votes_by_track.setdefault(track, []).append(vote)
                     continue
-                crop = _crop(frame, box)
+                crop = jersey_pixels.native_torso_crop(frame, box)
                 path = root / f"jersey_{index:03d}.jpg"
                 if crop is None or not _write_jpg(path, crop):
                     continue

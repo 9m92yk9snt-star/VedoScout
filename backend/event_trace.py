@@ -65,9 +65,16 @@ def _compact_dense_frames(frames):
             "time_authority": frame.get("time_authority"),
             "used_fallback": bool(frame.get("used_fallback")),
             "camera_state": frame.get("camera_state"),
+            **({"frame_dimensions": _strip_images(frame["frame_dimensions"])}
+               if "frame_dimensions" in frame else {}),
+            **({"camera_motion": _strip_images(frame["camera_motion"])}
+               if "camera_motion" in frame else {}),
             "global_target": _strip_images(frame.get("global_target") or {}),
             "players": players,
             "ball_candidates": balls,
+            **({"a7_ball_support_candidates": [_strip_images(x) for x in
+                 (frame.get("a7_ball_support_candidates") or [])[:MAX_BALL_CANDIDATES]
+                 if isinstance(x, dict)]} if "a7_ball_support_candidates" in frame else {}),
         })
         if len(rows) >= MAX_FRAMES:
             break

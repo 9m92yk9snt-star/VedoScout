@@ -11,6 +11,7 @@ import math
 from copy import deepcopy
 
 import frame_geometry
+import ball_motion_evidence
 
 VERSION = 1
 CONTACT_MAX_H = 0.58
@@ -99,9 +100,16 @@ def _velocity(a, b, x_scale=1.0):
     return ((x1 - x0) * x_scale / dt, (y1 - y0) / dt)
 
 
-def _trajectory_change(prev_row, cur_row, next_row, x_scale=1.0) -> dict:
-    before = _velocity(prev_row, cur_row, x_scale) if prev_row is not None else None
-    after = _velocity(cur_row, next_row, x_scale) if next_row is not None else None
+def _trajectory_change(prev_row, cur_row, next_row, x_scale=1.0, camera_motion=None) -> dict:
+    if camera_motion and camera_motion.get("status") != "LEGACY":
+        if camera_motion.get("status") != "MEASURED" or camera_motion.get("resolved_motion") is not True:
+            return {"score": 0.0, "before": None, "after": None,
+                    "speed_delta": None, "direction_change_deg": None,
+                    "camera_motion": camera_motion}
+        before, after = camera_motion["before_velocity"], camera_motion["after_velocity"]
+    else:
+        before = _velocity(prev_row, cur_row, x_scale) if prev_row is not None else None
+        after = _velocity(cur_row, next_row, x_scale) if next_row is not None else None
     if before is None or after is None:
         return {"score": 0.0, "before": before, "after": after,
                 "speed_delta": None, "direction_change_deg": None}
@@ -121,6 +129,7 @@ def _trajectory_change(prev_row, cur_row, next_row, x_scale=1.0) -> dict:
         "after": {"x": after[0], "y": after[1]},
         "speed_delta": round(speed_delta, 6),
         "direction_change_deg": round(direction_deg, 3),
+        **({"camera_motion": camera_motion} if camera_motion and camera_motion.get("status") != "LEGACY" else {}),
     }
 
 
@@ -512,7 +521,10 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
         )
         x_scale = (frame_geometry.compatible_scale(cur_frame, prev_frame, next_frame)
                    if has_both_sides else frame_geometry.horizontal_scale(cur_frame))
-        trajectory_evidence = _trajectory_change(prev_ball, ball, next_ball, x_scale)
+        camera_motion = ball_motion_evidence.relative_ball_motion(frames, prev_ball, ball, next_ball)
+        trajectory_evidence = _trajectory_change(prev_ball, ball, next_ball, x_scale, camera_motion)
+        native_movement_safe = (camera_motion.get("status") == "LEGACY"
+                                or camera_motion.get("resolved_motion") is True)
         for player in _players_for_physics(cur_frame):
             if not isinstance(player, dict) or not _valid_box(player.get("box")):
                 continue
@@ -535,6 +547,7 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             )
             dynamic_support = bool(
                 has_both_sides
+                and native_movement_safe
                 and (
                     trajectory_evidence["score"] >= TRAJECTORY_SIGNAL_MIN
                     or possession["score"] >= POSSESSION_SIGNAL_MIN
@@ -555,6 +568,8 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
                 rejection_reasons.append("INSUFFICIENT_BEFORE_AFTER_PHYSICS")
             if not dynamic_support:
                 rejection_reasons.append("NO_INDEPENDENT_BALL_OR_POSSESSION_CHANGE")
+            if not native_movement_safe:
+                rejection_reasons.append(camera_motion["reason"])
             if continuity < CONTINUITY_SIGNAL_MIN:
                 rejection_reasons.append("PLAYER_TEMPORAL_CONTINUITY_WEAK")
             if not exact_time:

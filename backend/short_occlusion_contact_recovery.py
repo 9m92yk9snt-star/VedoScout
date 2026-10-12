@@ -246,9 +246,17 @@ def _velocity(a, b):
     return ((bx - ax) / dt, (by - ay) / dt)
 
 
-def _trajectory_change(in_a, in_b, out_a, out_b):
-    before = _velocity(in_a, in_b)
-    after = _velocity(out_a, out_b)
+def _trajectory_change(in_a, in_b, out_a, out_b, frames=None):
+    motion = bce.ball_motion_evidence.relative_ball_motion(
+        frames, in_a, in_b, out_b, outgoing_start=out_a)
+    if motion.get("status") != "LEGACY":
+        if motion.get("status") != "MEASURED" or motion.get("resolved_motion") is not True:
+            return {"score":0., "before":None,"after":None,"speed_delta":None,
+                    "direction_change_deg":None,"camera_motion":motion}
+        before, after = motion["before_velocity"], motion["after_velocity"]
+    else:
+        before = _velocity(in_a, in_b)
+        after = _velocity(out_a, out_b)
     if before is None or after is None:
         return {"score": 0.0, "before": None, "after": None,
                 "speed_delta": None, "direction_change_deg": None}
@@ -267,6 +275,7 @@ def _trajectory_change(in_a, in_b, out_a, out_b):
         "after": {"x": after[0], "y": after[1], "speed": sa},
         "speed_delta": round(speed_delta, 6),
         "direction_change_deg": round(direction_deg, 3),
+        **({"camera_motion":motion} if motion.get("status") != "LEGACY" else {}),
     }
 
 
@@ -733,11 +742,16 @@ def _flow_path_match_count(flow_nodes, detector_nodes):
     return count
 
 
-def _exact_tap_path_evidence(anchor, after, separation_gain_h):
+def _exact_tap_path_evidence(anchor, after, separation_gain_h, frames=None):
     dt = (int(after["media_ms"]) - int(anchor["media_ms"])) / 1000.0
     ax, ay = _center(anchor["box"]); bx, by = _center(after["box"])
     displacement = math.hypot(bx - ax, by - ay)
     outbound = ((bx - ax) / dt, (by - ay) / dt) if dt > 0 else (0.0, 0.0)
+    motion = bce.ball_motion_evidence.relative_ball_segment(frames, anchor, after)
+    if motion.get("status") != "LEGACY":
+        if motion.get("status") != "MEASURED" or motion.get("resolved_motion") is not True:
+            return {"score":0.,"before":None,"after":None,"camera_motion":motion}
+        displacement, outbound = motion["displacement_h"], motion["velocity"]
     relative_rate = float(separation_gain_h) / dt if dt > 0 else 0.0
     score = max(
         min(1.0, displacement / 0.08),
@@ -753,6 +767,7 @@ def _exact_tap_path_evidence(anchor, after, separation_gain_h):
         "outbound_displacement_norm": round(displacement, 6),
         "relative_separation_rate_h_s": round(relative_rate, 6),
         "source": "EXACT_TARGET_SUPPORT_PATH_RELATIVE_MOTION",
+        **({"camera_motion":motion} if motion.get("status") != "LEGACY" else {}),
     }
 
 
@@ -1089,7 +1104,7 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                     "proof_eligible": True,
                     "provenance": "A3_ELIGIBLE_SPORTS_BALL_REACQUISITION",
                 }
-                change = _exact_tap_path_evidence(anchor, after, separation)
+                change = _exact_tap_path_evidence(anchor, after, separation, frames)
                 if float(change.get("score") or 0.0) < TRAJECTORY_SIGNAL_MIN:
                     continue
                 evidence = {
@@ -1253,7 +1268,7 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
                 "proof_eligible": True,
                 "provenance": "A3_ELIGIBLE_SPORTS_BALL_REACQUISITION",
             }
-            change = _exact_tap_path_evidence(anchor, after, separation)
+            change = _exact_tap_path_evidence(anchor, after, separation, frames)
             if float(change.get("score") or 0.0) < TRAJECTORY_SIGNAL_MIN:
                 continue
             evidence = {
@@ -1598,7 +1613,7 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
                 "used_fallback": False,
                 "provenance": "STEP3_SUPPORT_PLUS_FORWARD_BACKWARD_FLOW",
             }
-            change = _trajectory_change(incoming[0], incoming[1], anchor, synthetic_final)
+            change = _trajectory_change(incoming[0], incoming[1], anchor, synthetic_final, frames)
             if not _strong_trajectory_consequence(change):
                 continue
             separation = _separation_gain_h(actor["box"], anchor["box"], final_actor["box"], synthetic_final["box"],
@@ -1732,7 +1747,7 @@ def _measured_reacquisition_recoveries(frames, measured, contact_result, traject
         next_actor, next_actor_continuity = bce._player_for_actor_continuity(frame, track, next_frame)
         if next_actor is None:
             continue
-        change = _trajectory_change(incoming[0], incoming[1], anchor, nxt)
+        change = _trajectory_change(incoming[0], incoming[1], anchor, nxt, frames)
         if not _strong_trajectory_consequence(change):
             continue
         separation = _separation_gain_h(actor["box"], anchor["box"], next_actor["box"], nxt["box"],
