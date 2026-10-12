@@ -476,6 +476,98 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
     return people, balls, support
 
 
+def _refine_selected_native_body(detector, image, detections, tap):
+    """Find a missed body at a USER selection, never infer temporal identity.
+
+    A whole-frame box can contain the selected point while missing the user's
+    visible foreground. In that case inspect two bounded native rectangles at
+    the unchanged selection. Both must yield exactly one point/mask-compatible
+    person, at the ordinary person floor, with agreeing measured geometry.
+    Views of one frame are NOT independent timestamps or jersey evidence.
+    Existing detections/IDs are not replaced. Ordinary bidirectional track
+    ambiguity checks still apply to the additional measured body.
+    """
+    from player_selection import valid_point, valid_mask, body_indices_at_point
+    import cv_detect
+    if (detector is None or not getattr(detector, "ok", False)
+            or not isinstance(tap, dict) or tap.get("primary_source") != "USER_TAP"
+            or tap.get("tap_authority") is not True or tap.get("proof_eligible") is not True
+            or not _valid_box(tap.get("box")) or not valid_point(tap.get("target_point"))
+            or not valid_mask(tap.get("visible_mask"))):
+        return None
+    box, point, mask = tap["box"], tap["target_point"], tap["visible_mask"]
+    excluded = [(p["x"], p["y"]) for p in tap.get("exclude_points") or [] if valid_point(p)]
+    existing_boxes = [tuple((d.get("box") or {}).get(k) for k in ("x", "y", "w", "h"))
+                      for d in detections if isinstance(d, dict)]
+    # Never use a crop to break a genuine same-frame body ambiguity or to
+    # replace an already compatible measured body with a higher score.
+    if body_indices_at_point(existing_boxes, (point["x"], point["y"]), excluded,
+                             selection_box=box, visible_mask=mask):
+        return None
+    height, width = image.shape[:2]
+    if not (height > 0 and width > 0
+            and 0 <= box["x"] < box["x"] + box["w"] <= 1
+            and 0 <= box["y"] < box["y"] + box["h"] <= 1
+            and box["x"] <= point["x"] <= box["x"] + box["w"]
+            and box["y"] <= point["y"] <= box["y"] + box["h"]):
+        return None
+    cx, cy = (box["x"] + box["w"] / 2) * width, (box["y"] + box["h"] / 2) * height
+    candidates, views, seen_rois = [], [], set()
+    for factor in (1.15, 1.5):
+        rw, rh = box["w"] * width * factor, box["h"] * height * factor
+        roi = (max(0, math.floor(cx - rw / 2)), max(0, math.floor(cy - rh / 2)),
+               min(width, math.ceil(cx + rw / 2)), min(height, math.ceil(cy + rh / 2)))
+        x0, y0, x1, y1 = roi
+        if x1 - x0 < 16 or y1 - y0 < 32 or roi in seen_rois:
+            return None
+        seen_rois.add(roi)
+        found, _discarded_balls = _detect_dense_people_and_ball(
+            detector, image[y0:y1, x0:x1], _detail_pass=True)
+        mapped = []
+        for person in found:
+            pb = person.get("box")
+            if (not _valid_box(pb) or not _num(person.get("confidence"))
+                    or not math.isfinite(person["confidence"])
+                    or person["confidence"] <= cv_detect.CONF_T
+                    or not (0 <= pb["x"] < pb["x"] + pb["w"] <= 1
+                            and 0 <= pb["y"] < pb["y"] + pb["h"] <= 1)):
+                continue
+            measured = deepcopy(person)
+            measured["box"] = {
+                "x": (x0 + pb["x"] * (x1 - x0)) / width,
+                "y": (y0 + pb["y"] * (y1 - y0)) / height,
+                "w": pb["w"] * (x1 - x0) / width,
+                "h": pb["h"] * (y1 - y0) / height,
+            }
+            # A detector callback cannot smuggle track, team or target authority
+            # into a new geometric observation.
+            measured = {k: measured[k] for k in ("box", "confidence", "kit_chroma") if k in measured}
+            mapped.append(measured)
+        indices = body_indices_at_point(
+            [tuple(p["box"][k] for k in ("x", "y", "w", "h")) for p in mapped],
+            (point["x"], point["y"]), excluded, selection_box=box, visible_mask=mask)
+        if len(indices) != 1:
+            return None
+        measured = mapped[indices[0]]
+        candidates.append(measured)
+        views.append({"native_roi": list(roi), "box": deepcopy(measured["box"]),
+                      "confidence": float(measured["confidence"])})
+    agreement = _iou(candidates[0]["box"], candidates[1]["box"])
+    if agreement < .70:
+        return None
+    # Retain the actual larger-context measurement, not an averaged/inflated
+    # box. A higher confidence cannot choose the body or overwrite a track.
+    result = deepcopy(candidates[1])
+    result["body_detection_source"] = "NATIVE_USER_SELECTION_BODY_REFINEMENT"
+    result["native_body_refinement"] = {
+        "source": "SAME_FRAME_NATIVE_PERSON_VIEWS", "views": views,
+        "geometry_iou": round(agreement, 6), "temporal_identity_authority": False,
+        "independent_timestamps": 1, "jersey_evidence": False,
+        "selection_anchor_media_ms": tap.get("media_ms"),
+    }
+    return result
+
+
 def _is_direct_tap_target(frame):
     target = frame.get("global_target") or {}
     return bool(
@@ -913,8 +1005,10 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
     ``detector_fn(frame_bgr)`` may be injected for deterministic tests and may
     return ``(people, balls)`` or ``(people, balls, a7_support)``.  Production
     performs one whole-frame detector forward plus at most one bounded portrait
-    ground-band forward per dense frame. Weak A7 support proposals remain
-    isolated from A3/A4/A5 truth. No image arrays are retained.
+    ground-band forward per dense frame. An unresolved original USER mask may
+    add at most two native person-only views near that tap; they cannot extend
+    tap authority or provide ball/jersey/event evidence. Weak A7 support
+    proposals remain isolated from A3/A4/A5 truth. No image arrays are retained.
     """
     scene = str(scene_id or "")
     frames_iter = iter(dense_frames or [])
@@ -964,6 +1058,12 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         else:
             people, balls = detected
         detections = [d for d in (people or []) if isinstance(d, dict) and _valid_box(d.get("box"))]
+        if (detector is not None and dense.get("time_authority") == "ACTUAL_MEDIA_PTS"
+                and dense.get("used_fallback") is not True and not cut):
+            tap = _nearest_tap_point(identity_authority or {}, media_ms)
+            measured = _refine_selected_native_body(detector, frame, detections, tap)
+            if measured is not None:
+                detections.append(measured)
         h, w = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         jersey_quality = {di: _jersey_crop_quality(gray, det, detections)
@@ -988,6 +1088,13 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         if matrix is not None:
             for ti, tr in enumerate(live):
                 if media_ms - _last_ms(tr, media_ms) > TRACK_MAX_GAP_MS:
+                    continue
+                if (tr.get("_selected_body_refinement_anchor_ms") is not None and output_frames
+                        and _last_ms(tr, media_ms) != output_frames[-1]["media_ms"]):
+                    # A freshly isolated visible fragment has no full-body
+                    # identity history. A missing source-frame observation
+                    # ends its local continuity; camera prediction alone must
+                    # not reacquire a same-kit teammate after the duel.
                     continue
                 # Camera matrices are between successive decoded frames, even
                 # when a player detection is missing. Keep their accumulated
@@ -1016,6 +1123,16 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         for ti, pred in predictions.items():
             ranked = []
             for di, det in enumerate(detections):
+                refined_origin = (det.get("native_body_refinement") or {}).get("selection_anchor_media_ms")
+                if (det.get("body_detection_source") == "NATIVE_USER_SELECTION_BODY_REFINEMENT"
+                        and (not _num(refined_origin)
+                             or live[ti].get("_selected_body_refinement_anchor_ms") != refined_origin)):
+                    # A missed selected body is not the foreground track whose
+                    # box failed its mask. Start a fresh local ID; do not let
+                    # a competing old track fall through to this new body.
+                    # Only a previously measured refinement from this same
+                    # selection may enter the ordinary association gates.
+                    continue
                 score = _match_score(pred, det["box"])
                 if score is not None:
                     constraint = (_local_kit_constraint(live[ti], det, media_ms)
@@ -1102,6 +1219,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "candidate_local_track_ids": [tr["local_track_id"]],
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
+                **{k: deepcopy(det[k]) for k in ("body_detection_source", "native_body_refinement")
+                   if k in det},
                 "association_state": "VERIFIED_LOCAL",
                 "association_reason": camera_state,
                 "association_score": round(float(score), 4),
@@ -1137,6 +1256,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 },
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
+                **{k: deepcopy(det[k]) for k in ("body_detection_source", "native_body_refinement")
+                   if k in det},
                 "association_state": "HYPOTHESES",
                 "association_reason": ("LOCAL_KIT_CONTINUITY_UNCERTAIN"
                                        if di in kit_hypotheses else "CLOSE_EQUAL_LOCAL_TRACK_CANDIDATES"),
@@ -1167,6 +1288,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "kit_chroma": deepcopy(det.get("kit_chroma"))
                 if fsg._valid_chroma(det.get("kit_chroma")) else None,
             }
+            if det.get("body_detection_source") == "NATIVE_USER_SELECTION_BODY_REFINEMENT":
+                tr["_selected_body_refinement_anchor_ms"] = (det.get("native_body_refinement") or {}).get("selection_anchor_media_ms")
             _update_local_kit_history(tr, det, detections, media_ms,
                                       eligible=kit_measurement_eligible)
             live.append(tr)
@@ -1175,6 +1298,8 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "candidate_local_track_ids": [tid],
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
+                **{k: deepcopy(det[k]) for k in ("body_detection_source", "native_body_refinement")
+                   if k in det},
                 "association_state": "NEW_LOCAL_TRACK",
                 "association_reason": "UNMATCHED_DETECTION",
                 "association_score": None,

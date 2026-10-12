@@ -197,7 +197,8 @@ def test_optical_tracker_seeds_the_forward_decoded_tap_picture(monkeypatch):
     assert chosen_times == [1.016, 1.016]
 
 
-def test_video_ingestion_samples_taps_without_moving_regular_sampling_grid(monkeypatch):
+@pytest.mark.parametrize("include_mask", [False, True])
+def test_video_ingestion_samples_taps_without_moving_regular_sampling_grid(monkeypatch, include_mask):
     import cv2
     import cv_detect
     times = [0, 83, 167, 183, 200, 217, 400, 600]
@@ -232,8 +233,18 @@ def test_video_ingestion_samples_taps_without_moving_regular_sampling_grid(monke
     monkeypatch.setattr(pit, "HZ", 5.)
     document = {"anchors": [{"t": t, "box": {"x": .2, "y": .3, "w": .1, "h": .5},
                              "target_point": {"x": .23, "y": .43}} for t in (.183, .210)]}
+    if include_mask:
+        from test_fix15_selected_mask_identity import mask
+        for anchor in document["anchors"]:
+            anchor["visible_mask"] = mask()
     result = pit.build_identity_timeline("unused.mp4", document)
     assert [o["media_ms"] for o in captured["observations"]] == [0, 183, 200, 217, 400, 600]
     assert [t["decoded_media_ms"] for t in captured["taps"]] == [183, 217]
     assert all(o["time_authority"] == "ACTUAL_MEDIA_PTS" for o in captured["observations"])
     assert result["tap_frame_bindings"][1]["frame_delta_ms"] == 7
+    if include_mask:
+        for original, ingested in zip(document["anchors"], captured["taps"]):
+            assert ingested["visible_mask"] == original["visible_mask"]
+            assert ingested["visible_mask"] is not original["visible_mask"]
+    else:
+        assert all("visible_mask" not in row for row in captured["taps"])

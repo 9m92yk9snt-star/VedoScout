@@ -1,5 +1,9 @@
 # R6: preserve selected visible pixels through identity binding
 
+The next source-bound repair finds the missed white body without inheriting
+the foreground player's local ID. See
+[`FIX15_R6_NATIVE_SELECTED_BODY_STATUS.md`](FIX15_R6_NATIVE_SELECTED_BODY_STATUS.md).
+
 Continuation of `ade1880` on `codex-r6-native-jersey-20261011`. Original video
 and all 12 original markings remain unchanged. Five-action video acceptance
 is still **0/5**. No deployment, merge, Emergent execution or paid model calls.

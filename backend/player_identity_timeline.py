@@ -37,6 +37,7 @@ import logging
 import math
 import os
 import time
+from copy import deepcopy
 
 logger = logging.getLogger("elite-scout")
 
@@ -1561,7 +1562,7 @@ def build_identity_timeline(video_path: str, doc: dict):
     t_start = time.time()
     cap = None
     try:
-        from player_selection import expanded_anchors, valid_point
+        from player_selection import expanded_anchors, valid_point, valid_mask
         anchors = [a for a in expanded_anchors(doc.get("anchors")) if isinstance(a, dict) and a.get("box")]
         if not anchors:
             return {"version": VERSION, "status": "skipped", "reason": "no_anchors"}
@@ -1689,6 +1690,8 @@ def build_identity_timeline(video_path: str, doc: dict):
                     row["target_point"] = (a["target_point"]["x"] * sw, a["target_point"]["y"] * sh)
                     row["exclude_points"] = [(p["x"] * sw, p["y"] * sh) for p in a.get("exclude_points") or [] if valid_point(p)]
                     row["decoded_media_ms"] = decoded_taps.get(tms)
+                    if valid_mask(a.get("visible_mask")):
+                        row["visible_mask"] = deepcopy(a["visible_mask"])
                 taps.append(row)
             except Exception:
                 continue
