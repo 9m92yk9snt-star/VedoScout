@@ -710,8 +710,16 @@ def estimate_time_offset(
     """The marker JPG is a pixel-true canvas capture of the frame the user SAW
     when tapping. Phone videos are often VFR; after transcode the same wall
     time can show a different frame. Scan the processed video around t_marker
-    and find the frame that actually matches → (drift Δ seconds, match score)."""
+    and find the frame that actually matches → (drift Δ seconds, match score).
+    Matching pixels are paired with their own post-decode PTS. Missing or
+    discontinuous timestamps cannot supply a frame-index/FPS calibration."""
+    cap = None
     try:
+        if (isinstance(t_marker, bool) or isinstance(search, bool)
+                or not math.isfinite(float(t_marker)) or float(t_marker) < 0
+                or not math.isfinite(float(search)) or float(search) < 0):
+            return 0.0, 0.0
+        import video_timebase
         marker = cv2.imread(str(marker_image_path))
         if marker is None:
             return 0.0, 0.0
@@ -727,12 +735,22 @@ def estimate_time_offset(
         if not cap.isOpened():
             return 0.0, 0.0
         start = max(0.0, float(t_marker) - search)
-        cap.set(cv2.CAP_PROP_POS_MSEC, start * 1000.0)
+        stop = float(t_marker) + search
+        okf, frame, _actual_t = video_timebase.read_frame_at(
+            cap, start, fps=cap.get(cv2.CAP_PROP_FPS))
         best_dt, best_score = 0.0, -1.0
-        while True:
-            pos = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-            okf, frame = cap.read()
-            if not okf or pos > float(t_marker) + search:
+        previous = None
+        while okf:
+            # OpenCV establishes picture_pts AFTER decode. A pre-read PTS
+            # belongs to the previous picture and creates a one-frame drift.
+            pos_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if (not isinstance(pos_ms, (int, float)) or isinstance(pos_ms, bool)
+                    or not math.isfinite(pos_ms) or pos_ms < 0):
+                return 0.0, 0.0
+            pos = pos_ms / 1000.0
+            if pos < start - 1e-3 or (previous is not None and pos <= previous):
+                return 0.0, 0.0
+            if pos > stop:
                 break
             fg = prep(frame)
             if fg.shape != mg.shape:
@@ -740,12 +758,16 @@ def estimate_time_offset(
             score = float(cv2.matchTemplate(fg, mg, cv2.TM_CCOEFF_NORMED)[0][0])
             if score > best_score:
                 best_score, best_dt = score, pos - float(t_marker)
-        cap.release()
+            previous = pos
+            okf, frame = cap.read()
         if best_score < 0.35:
             return 0.0, best_score
         return best_dt, best_score
     except Exception:
         return 0.0, 0.0
+    finally:
+        if cap is not None:
+            cap.release()
 
 
 def locate_player_by_thumb(frame_path: str | Path, box: dict, thumb_path: str | Path) -> dict | None:
