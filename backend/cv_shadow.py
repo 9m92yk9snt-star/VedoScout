@@ -70,15 +70,19 @@ def _sharpness(gray) -> float:
 
 
 def _comp_mask_crop(small, box):
-    """Isolate the single non-pitch component nearest the box centre.
+    """Isolate the non-pitch component nearest the centre INSIDE the body box.
     Excludes a second player in the same rectangle when they are separable.
-    Returns (crop, mask, merged) — merged=True when nothing could be isolated."""
+    No padding: outside pixels must not alter component selection, zone cuts,
+    aspect or appearance, even when they touch the selected body. The fallback
+    is bounded by the same clipped box. Returns (crop, mask, merged, origin);
+    merged=True when nothing could be isolated."""
     x, y, w, h = box
-    pad = int(h * 0.1)
-    x0, y0 = max(0, x - pad), max(0, y - pad)
-    x1 = min(small.shape[1], x + w + pad)
-    y1 = min(small.shape[0], y + h + pad)
+    ih, iw = small.shape[:2]
+    x0, y0 = min(iw, max(0, x)), min(ih, max(0, y))
+    x1, y1 = max(x0, min(iw, x + w)), max(y0, min(ih, y + h))
     roi = small[y0:y1, x0:x1]
+    if roi.size == 0:
+        return roi, np.zeros(roi.shape[:2], np.uint8), True, (x0, y0)
     ng = cv2.bitwise_not(_green_mask(roi))
     ng = cv2.morphologyEx(ng, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     n, lbl, stats, cents = cv2.connectedComponentsWithStats(ng, 8)

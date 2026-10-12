@@ -1,0 +1,303 @@
+{
+  "kind": "CODEX_R6_BODY_CROP_ISOLATION_CANDIDATE",
+  "date": "2026-10-12",
+  "branch": "codex-r6-native-jersey-20261011",
+  "parent_commit": "f96315eaabd3405dc335f9b7fb6aeecc28321716",
+  "parent_tree": "8991d464d785d732195067d3da42c3e68e743746",
+  "files": {
+    "backend/cv_shadow.py": "2b6f0acf90d83d51e73232a52e5d74bdd4e5b58951a15e2a6321508de3cc4409",
+    "backend/scripts/audit_body_crop.py": "cf005f40993be390129621683e3e893c7770468072c292c2f98a8d6a5b9723f5",
+    "backend/tests/test_fix15_r6_body_crop.py": "186315a4114444ba8b5cf41c296d8c6edb0486d10930a081e6c1f07fcf55926a",
+    "docs/FIX15_R6_BODY_CROP_STATUS.md": "4d2edfdbbf05ec14f970f3a44c80d09c86553509d361bc4f1727e1628ace4666"
+  },
+  "scope": {
+    "changed_production_functions": [
+      "cv_shadow._comp_mask_crop"
+    ],
+    "body_box_padding_removed": true,
+    "empty_intersection_has_no_embedding": true,
+    "pitch_l_estimator_unchanged": true,
+    "identity_and_canonical_gates_unchanged": true,
+    "new_paid_model_calls": 0,
+    "emergent_used": false,
+    "new_user_taps": false,
+    "merge_or_deployment": false,
+    "raw_video_images_tap_coordinates_private_timelines_or_credentials_in_commit": false
+  },
+  "validation": {
+    "passed": 777,
+    "failed": 0,
+    "test_files": 51,
+    "new_tests_this_revision": 25,
+    "baseline_new_tests_failed": 22,
+    "baseline_new_tests_passed": 3,
+    "previous_634_tests_retained": true,
+    "additional_existing_identity_tests": 118,
+    "elapsed_s": 3.49,
+    "warnings": 1,
+    "warning": "Local AnyIO/Starlette deprecation",
+    "full_historical_suite_rerun_locally": false,
+    "existing_assertions_weakened": false,
+    "forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    },
+    "tests": [
+      "tests/test_fix15_r6_ball_identity.py",
+      "tests/test_fix15_r6_role_scheduling.py",
+      "tests/test_fix15_r6_anchor_callers.py",
+      "tests/test_fix15_r6_contact_binding.py",
+      "tests/test_fix10a3_ball_trajectory.py",
+      "tests/test_fix10a3_dormant_reacquisition.py",
+      "tests/test_fix10a4_ball_contact.py",
+      "tests/test_fix10a4_short_occlusion_recovery.py",
+      "tests/test_fix10a4_post_anchor_discontinuity.py",
+      "tests/test_fix10a5_touch_graph.py",
+      "tests/test_fix10a_contact_role_resolver.py",
+      "tests/test_fix10a7_shot_outcome.py",
+      "tests/test_fix10a7_support_intervention.py",
+      "tests/test_fix10a7_full_body_intervention.py",
+      "tests/test_fix10a7_role_intervention_handoff.py",
+      "tests/test_fix10a7_ball_proof_gate.py",
+      "tests/test_fix10a7_goal_audit.py",
+      "tests/test_fix10a7_structured_goal_proof.py",
+      "tests/test_fix10a_physical_reconstruction.py",
+      "tests/test_fix11_release_anchored_ball_path.py",
+      "tests/test_fix10a_goal_direction.py",
+      "tests/test_fix10a_window_failure_diagnostics.py",
+      "tests/test_fix10a_vision_providers.py",
+      "tests/test_fix13_action_inspections.py",
+      "tests/test_fix13_evidence_feedback.py",
+      "tests/test_fix13_cross_window_evidence.py",
+      "tests/test_fix15_goal_response_coverage.py",
+      "tests/test_fix15_pixel_response_coverage.py",
+      "tests/test_fix15_selected_point_identity.py",
+      "tests/test_fix13_reference_review.py",
+      "tests/test_fix10a1_dense_replay.py",
+      "tests/test_fix10a_fix11_recall.py",
+      "tests/test_fix10b_runtime.py",
+      "tests/test_fix10b_reconciliation.py",
+      "tests/test_fix10b_fix11_reconciliation.py",
+      "tests/test_fix10b_scoring_evidence_coverage.py",
+      "tests/test_fix10a_provider_wiring.py",
+      "tests/test_report_evidence_export.py",
+      "tests/test_fix15_r6_ground_band.py",
+      "tests/test_fix10a2_dense_ball_floor.py",
+      "tests/test_fix10a2_dense_track_refinement.py",
+      "tests/test_fix13_shared_evidence.py",
+      "tests/test_fix15_r6_local_kit_continuity.py",
+      "tests/test_fix10a6_jersey_consensus.py",
+      "tests/test_fix15_r6_native_jersey_sampling.py",
+      "tests/test_fix14_orman10_recovery.py",
+      "tests/test_fix15_r6_body_crop.py",
+      "tests/test_fix09a_feature_ownership.py",
+      "tests/test_player_selection.py",
+      "tests/test_fix09a_identity_timeline.py",
+      "tests/test_fix09b0_unified_identity_authority.py"
+    ],
+    "test_log_sha256": "944ff6f1236aca9672220aa1fc4b3cca4d2243d59c0a7326cc2a4e65db6b1e9d"
+  },
+  "original_pixel_ab": {
+    "anchors_sha256": "0a49e85e325cbffb36f2296bad75ebf5051a53e5e8442a534fbe18f172da29ed",
+    "audit_source_sha256": "cf005f40993be390129621683e3e893c7770468072c292c2f98a8d6a5b9723f5",
+    "baseline_source_sha256": "045bef4579cd016ebfce9437aec1ddc53b4e55b7c3d3a997fd57396f712165a8",
+    "candidate_source_sha256": "2b6f0acf90d83d51e73232a52e5d74bdd4e5b58951a15e2a6321508de3cc4409",
+    "crop_isolation_pass": true,
+    "elapsed_s": 87.677,
+    "forbidden_attempts": {
+      "network": 0
+    },
+    "kind": "R6_ORIGINAL_BODY_CROP_AB",
+    "lanes": {
+      "after": {
+        "actual_pts_frames": 364,
+        "counts": {
+          "CUT_REID": 0,
+          "OCCLUDED": 15,
+          "PARTIAL": 35,
+          "REACQUIRED": 7,
+          "VISIBLE": 125
+        },
+        "crops_with_outside_support": 0,
+        "detected_bodies": 2292,
+        "elapsed_s": 25.503,
+        "embedding_calls": 2304,
+        "fallback_frames": 0,
+        "identity_counts_by_scene": {
+          "scene_001": 41,
+          "scene_003": 20,
+          "scene_004": 27,
+          "scene_005": 15,
+          "scene_006": 26,
+          "scene_007": 38
+        },
+        "input_sha256": "b3e1227e2b5a1feb5cf94df8ef44b6a59b2eea04d3a133cee99983115113d4f1",
+        "measured_target_points": 167,
+        "negative_gallery": 1,
+        "outside_perturbation_mismatches": 0,
+        "outside_perturbations": 4608,
+        "proof_eligible_target_points": 167,
+        "samples": 364,
+        "scenes": [
+          {
+            "end_ms": 19166,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_001",
+            "start_ms": 0
+          },
+          {
+            "end_ms": 25349,
+            "reid_state": "UNRESOLVED",
+            "scene_id": "scene_002",
+            "start_ms": 19283
+          },
+          {
+            "end_ms": 34015,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_003",
+            "start_ms": 25566
+          },
+          {
+            "end_ms": 47015,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_004",
+            "start_ms": 34232
+          },
+          {
+            "end_ms": 52865,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_005",
+            "start_ms": 47231
+          },
+          {
+            "end_ms": 58931,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_006",
+            "start_ms": 53081
+          },
+          {
+            "end_ms": 76697,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_007",
+            "start_ms": 59148
+          }
+        ],
+        "supported_pixels_outside_body": 0,
+        "tap_references": 11,
+        "valid_embeddings": 2300
+      },
+      "before": {
+        "actual_pts_frames": 364,
+        "counts": {
+          "CUT_REID": 0,
+          "OCCLUDED": 19,
+          "PARTIAL": 37,
+          "REACQUIRED": 8,
+          "VISIBLE": 128
+        },
+        "crops_with_outside_support": 2289,
+        "detected_bodies": 2292,
+        "elapsed_s": 62.174,
+        "embedding_calls": 2304,
+        "fallback_frames": 0,
+        "identity_counts_by_scene": {
+          "scene_001": 41,
+          "scene_003": 20,
+          "scene_004": 35,
+          "scene_005": 13,
+          "scene_006": 26,
+          "scene_007": 38
+        },
+        "input_sha256": "b3e1227e2b5a1feb5cf94df8ef44b6a59b2eea04d3a133cee99983115113d4f1",
+        "measured_target_points": 173,
+        "negative_gallery": 1,
+        "outside_perturbation_mismatches": 0,
+        "outside_perturbations": 0,
+        "proof_eligible_target_points": 173,
+        "samples": 364,
+        "scenes": [
+          {
+            "end_ms": 19166,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_001",
+            "start_ms": 0
+          },
+          {
+            "end_ms": 25349,
+            "reid_state": "UNRESOLVED",
+            "scene_id": "scene_002",
+            "start_ms": 19283
+          },
+          {
+            "end_ms": 34015,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_003",
+            "start_ms": 25566
+          },
+          {
+            "end_ms": 47015,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_004",
+            "start_ms": 34232
+          },
+          {
+            "end_ms": 52865,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_005",
+            "start_ms": 47231
+          },
+          {
+            "end_ms": 58931,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_006",
+            "start_ms": 53081
+          },
+          {
+            "end_ms": 76697,
+            "reid_state": "TAP_PINNED",
+            "scene_id": "scene_007",
+            "start_ms": 59148
+          }
+        ],
+        "supported_pixels_outside_body": 2292252,
+        "tap_references": 11,
+        "valid_embeddings": 2296
+      }
+    },
+    "local_detector_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "merge_or_deployment": false,
+    "native_detector_forwards": 364,
+    "numpy_version": "2.4.6",
+    "opencv_version": "4.13.0",
+    "original_anchor_count": 12,
+    "paid_model_calls": 0,
+    "pitch_l_held_fixed_during_outside_perturbations": true,
+    "pixel_keyed_detector_entries": 364,
+    "python_version": "3.12.14",
+    "saved_identity_votes_contacts_or_outcomes_supplied": false,
+    "strict_five_event_assessment_performed": false,
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b"
+  },
+  "frozen": {
+    "backend/support_vision_runner.py": "9391e37153184be8da2e0e68e88c7e6de0053555be4928e0dd8f794ce4e12137",
+    "backend/fix10b_reconciliation.py": "d6dca9feb754cdad30ea1ff4ead3b8079f44c7331be5b72d652a14a47ff59e69",
+    "backend/player_identity_timeline.py": "d20b6c1a7b8f9ef2e979ecfef4174b1c4f44eb7d800378d90ffb4b833f3e2c99"
+  },
+  "baseline_ci": {
+    "run_id": 38156110413,
+    "head_sha": "f96315eaabd3405dc335f9b7fb6aeecc28321716",
+    "all_five_jobs": "success"
+  },
+  "latest_completed_strict_video_assessment": "R5_0_OF_5",
+  "new_strict_five_event_video_assessment_performed": false,
+  "remaining_blockers": [
+    "Independent target identity after the real scene cut; existing jersey handoff still requires direct same-scene anchor",
+    "Reliable independent number reads; local OCR remains insufficient",
+    "Mixed-body and same-kit association not fully solved",
+    "Same-ball flight and goalkeeper interaction evidence",
+    "Independent goalkeeper role and whole-ball goal-line evidence"
+  ],
+  "identity_correctness_improvement_certified": false,
+  "crop_test_pass_is_not_full_product_pass": true
+}
