@@ -1,5 +1,9 @@
 # R6: inspect late visibility without attaching a reserve-ball contact
 
+The subsequent user-circle registration and source-pixel motion audit are in
+`FIX15_R6_CIRCLED_FEATURE_MOTION_STATUS.md`. The old isolated 31.965 proposal
+described below is not the user's circled feature.
+
 Continuation of `bebc6cc` on `codex-r6-native-jersey-20261011`. Original video,
 12 original user markings and the six-point contact-bound shot path are
 preserved. The strict five-action result remains **0/5**. No deployment/merge.
