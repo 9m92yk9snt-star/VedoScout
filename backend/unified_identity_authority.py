@@ -119,7 +119,7 @@ def _tap_rows(anchors, anchor_time_offset, scenes) -> list[dict]:
     """Preserve the box the user actually selected at the selected media time."""
     out = []
     off = float(anchor_time_offset or 0.0)
-    from player_selection import expanded_anchors, valid_point
+    from player_selection import expanded_anchors, valid_point, valid_mask
     for anchor in expanded_anchors(anchors):
         if (not isinstance(anchor, dict) or not _is_num(anchor.get("t"))
                 or not _valid_box(anchor.get("box"))):
@@ -130,6 +130,8 @@ def _tap_rows(anchors, anchor_time_offset, scenes) -> list[dict]:
                     "exclude_points": anchor.get("exclude_points") or []}
         if valid_point(anchor.get("target_point")):
             row["target_point"] = deepcopy(anchor["target_point"])
+        if valid_mask(anchor.get("visible_mask")):
+            row["visible_mask"] = deepcopy(anchor["visible_mask"])
         out.append(row)
     return out
 
@@ -665,6 +667,8 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
         if tap.get("target_point"):
             selected["target_point"] = deepcopy(tap["target_point"])
             selected["exclude_points"] = deepcopy(tap.get("exclude_points") or [])
+            if tap.get("visible_mask"):
+                selected["visible_mask"] = deepcopy(tap["visible_mask"])
         if tap.get("partial"):
             selected["state"] = "PARTIAL"
             selected["identity_strength"] = "PARTIAL"

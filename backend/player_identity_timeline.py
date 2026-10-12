@@ -1264,7 +1264,9 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
                 continue
             bodies = [(tr.tid, s["box"]) for tr in sd["tracks"] for s in tr.samples
                       if s["ms"] == sample_ms]
-            indices = body_indices_at_point([box for _, box in bodies], point, tap.get("exclude_points"))
+            indices = body_indices_at_point(
+                [box for _, box in bodies], point, tap.get("exclude_points"),
+                selection_box=tap.get("box"), visible_mask=tap.get("visible_mask"))
             selected = {bodies[i][0] for i in indices}
             if len(selected) == 1:
                 pins_by_scene.setdefault(sd["no"], []).append((int(sample_ms), next(iter(selected))))

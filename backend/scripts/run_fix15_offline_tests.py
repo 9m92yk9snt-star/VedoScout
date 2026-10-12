@@ -45,6 +45,13 @@ fix10a_vision_providers.LlmChat = block("actual_sdk")
 identity_verify.LlmChat = block("actual_sdk")
 import pytest
 
+# This standard Python runtime service is intentionally parent-owned. Start it
+# before process-hygiene fixtures take their baseline, rather than letting its
+# lazy first spawn be mistaken for an unreaped supporting-vision worker.
+# Worker lifecycle checks and every network/SDK/decode guard remain unchanged.
+import multiprocessing.resource_tracker as resource_tracker
+resource_tracker.ensure_running()
+
 rc = pytest.main(["-q", "--tb=" + args.tb, "-p", "no:cacheprovider", "-o", "asyncio_mode=auto", *args.tests])
 print(json.dumps({"kind": "R6_LOCAL_OFFLINE_TEST_RECEIPT", "backend": str(backend),
                   "pytest_exit_code": int(rc), "forbidden_attempts": attempts,

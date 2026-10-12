@@ -1,5 +1,8 @@
 # R6: source-bound motion in the user's circled region
 
+The later selected-mask identity repair and earlier optical search audit are
+documented in `FIX15_R6_SELECTED_MASK_BINDING_STATUS.md`.
+
 Continuation of `5d76a82` on `codex-r6-native-jersey-20261011`. This is an
 evidence checkpoint, not a detector, identity, or goal-gate change. Strict
 five-action acceptance remains **0/5**. No deployment or merge.

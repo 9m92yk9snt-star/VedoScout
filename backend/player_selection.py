@@ -21,7 +21,38 @@ def valid_point(point):
     return isinstance(point, dict) and all(number(point.get(k)) and 0 <= point[k] <= 1 for k in ("x", "y"))
 
 
-def body_indices_at_point(boxes, point, exclude_points=()):
+def mask_foreground_coverage(body, selection_box, mask):
+    """Fraction of the original selected foreground inside one measured body.
+
+    Geometry-only contradiction check, not person segmentation or identity.
+    Both rectangles must use the same coordinate units. Pixel centres avoid
+    counting background in a broad selection rectangle as selected foreground.
+    """
+    def rectangle(value):
+        if isinstance(value, dict):
+            value = [value.get(k) for k in ("x", "y", "w", "h")]
+        if (not isinstance(value, (tuple, list)) or len(value) != 4
+                or not all(number(v) for v in value) or value[2] <= 0 or value[3] <= 0):
+            return None
+        return value
+    body, selected = rectangle(body), rectangle(selection_box)
+    if body is None or selected is None or not valid_mask(mask):
+        return None
+    bx, by, bw, bh = body
+    sx, sy, sw, sh = selected
+    pos = inside = total = 0
+    for i, run in enumerate(mask["runs"]):
+        if i % 2:
+            total += run
+            for pixel in range(pos, pos + run):
+                y, x = divmod(pixel, 96)
+                px, py = sx + (x + .5) * sw / 96, sy + (y + .5) * sh / 192
+                inside += bx <= px <= bx + bw and by <= py <= by + bh
+        pos += run
+    return inside / total
+
+
+def body_indices_at_point(boxes, point, exclude_points=(), *, selection_box=None, visible_mask=None):
     """Return bodies containing the selected point in the same coordinate units.
 
     ``boxes`` are (x, y, w, h) rectangles; points are (x, y). Ambiguity is
@@ -42,8 +73,13 @@ def body_indices_at_point(boxes, point, exclude_points=()):
         x, y, w, h = box
         def contains(p):
             return x <= p[0] <= x + w and y <= p[1] <= y + h
-        if contains(point) and not any(contains(p) for p in negatives):
-            selected.append(index)
+        if not contains(point) or any(contains(p) for p in negatives):
+            continue
+        if visible_mask is not None:
+            coverage = mask_foreground_coverage(box, selection_box, visible_mask)
+            if coverage is None or coverage < .90:
+                continue
+        selected.append(index)
     return selected
 
 

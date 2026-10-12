@@ -214,11 +214,16 @@ def _target_candidates(authority, ms, active):
                         "local_track_id": None, "candidate_local_track_ids": [], "proof_eligible": False}
             boxes = [tuple(tr["box"].get(k) for k in ("x", "y", "w", "h")) for tr in active]
             excluded = [(p["x"], p["y"]) for p in resolved.get("exclude_points") or [] if valid_point(p)]
-            indices = body_indices_at_point(boxes, (selected["x"], selected["y"]), excluded)
+            point_indices = body_indices_at_point(boxes, (selected["x"], selected["y"]), excluded)
+            mask = resolved.get("visible_mask")
+            indices = body_indices_at_point(
+                boxes, (selected["x"], selected["y"]), excluded,
+                selection_box=rb, visible_mask=mask)
             active = [active[i] for i in indices]
             if len(active) != 1:
                 return {"status": "HYPOTHESES" if active else "UNRESOLVED",
-                        "reason": "TAP_POINT_BODY_AMBIGUOUS" if active else "TAP_POINT_BODY_NOT_FOUND",
+                        "reason": ("TAP_POINT_BODY_AMBIGUOUS" if active else
+                                   "TAP_POINT_BODY_MASK_CONFLICT" if point_indices and mask is not None else "TAP_POINT_BODY_NOT_FOUND"),
                         "local_track_id": None,
                         "candidate_local_track_ids": [tr["local_track_id"] for tr in active],
                         "proof_eligible": False}

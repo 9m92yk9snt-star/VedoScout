@@ -703,12 +703,17 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
                     "proof_eligible": False, **authority_evidence}
         boxes = [tuple((p.get("box") or {}).get(k) for k in ("x", "y", "w", "h")) for p in players]
         excluded = [(p["x"], p["y"]) for p in resolved.get("exclude_points") or [] if valid_point(p)]
-        indices = body_indices_at_point(boxes, (selected_point["x"], selected_point["y"]), excluded)
+        point_indices = body_indices_at_point(boxes, (selected_point["x"], selected_point["y"]), excluded)
+        mask = resolved.get("visible_mask")
+        indices = body_indices_at_point(
+            boxes, (selected_point["x"], selected_point["y"]), excluded,
+            selection_box=rb, visible_mask=mask)
         players = [players[i] for i in indices]
-        authority_evidence["selection_binding"] = "USER_SELECTED_POINT"
+        authority_evidence["selection_binding"] = "USER_SELECTED_POINT_AND_VISIBLE_MASK" if mask is not None else "USER_SELECTED_POINT"
         if len(players) != 1:
             return {"status": "HYPOTHESES" if players else "UNRESOLVED",
-                    "reason": "TAP_POINT_BODY_AMBIGUOUS" if players else "TAP_POINT_BODY_NOT_FOUND",
+                    "reason": ("TAP_POINT_BODY_AMBIGUOUS" if players else
+                               "TAP_POINT_BODY_MASK_CONFLICT" if point_indices and mask is not None else "TAP_POINT_BODY_NOT_FOUND"),
                     "local_track_id": None,
                     "candidate_local_track_ids": [p["local_track_id"] for p in players if p.get("local_track_id")],
                     "proof_eligible": False, **authority_evidence}
