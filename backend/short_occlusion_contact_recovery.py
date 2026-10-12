@@ -728,18 +728,67 @@ def _support_detector_paths(frames, anchor_frame, seed_candidate):
     ]
 
 
-def _flow_path_match_count(flow_nodes, detector_nodes):
-    count = 0
-    for flow_node in (flow_nodes or [])[1:]:
-        fx, fy = _center(flow_node["box"])
-        if any(
-            abs(int(node["media_ms"]) - int(flow_node["media_ms"])) <= EXACT_TAP_FLOW_MATCH_MS
-            and math.hypot(_center(node["box"])[0] - fx, _center(node["box"])[1] - fy)
-            <= EXACT_TAP_FLOW_MATCH_NORM
-            for node in detector_nodes[1:]
-        ):
-            count += 1
-    return count
+def _flow_path_match_count(flow_nodes, detector_nodes, *, required_detector_node=None):
+    """Count independent actual-time pairs, optionally binding the A3 endpoint.
+
+    A single weak measurement near two optical samples is one corroborating
+    observation, not two. A remote strong ball cannot borrow those weak
+    matches either. Keep the existing time/distance gates, exclude the seed,
+    and find a maximum one-to-one matching rather than depending on row order.
+    """
+    flow_nodes, detector_nodes = list(flow_nodes or []), list(detector_nodes or [])
+    if not flow_nodes or not detector_nodes:
+        return 0
+
+    def later(nodes):
+        seed_ms = nodes[0].get("media_ms") if isinstance(nodes[0], dict) else None
+        if type(seed_ms) is not int:
+            return []
+        return [n for n in nodes[1:] if isinstance(n, dict)
+                and type(n.get("media_ms")) is int and n["media_ms"] > seed_ms
+                and _valid_box(n.get("box"))
+                and all(math.isfinite(float(n["box"][k])) for k in ("x", "y", "w", "h"))]
+
+    flow, detected = later(flow_nodes), later(detector_nodes)
+
+    def matches(a, b):
+        ax, ay = _center(a["box"]); bx, by = _center(b["box"])
+        return (abs(a["media_ms"] - b["media_ms"]) <= EXACT_TAP_FLOW_MATCH_MS
+                and math.hypot(ax - bx, ay - by) <= EXACT_TAP_FLOW_MATCH_NORM)
+
+    # Timestamp keys make repeated rows and multiple same-frame proposals
+    # incapable of supplying extra independent observations.
+    edges = {}
+    for f in flow:
+        edges.setdefault(f["media_ms"], set()).update(
+            d["media_ms"] for d in detected if matches(f, d))
+
+    def match_size(forced_flow_ms=None):
+        required_ms = (required_detector_node["media_ms"]
+                       if forced_flow_ms is not None else None)
+        owners = {required_ms: forced_flow_ms} if forced_flow_ms is not None else {}
+
+        def augment(flow_ms, seen):
+            for detector_ms in sorted(edges[flow_ms]):
+                if detector_ms == required_ms or detector_ms in seen:
+                    continue
+                seen.add(detector_ms)
+                if detector_ms not in owners or augment(owners[detector_ms], seen):
+                    owners[detector_ms] = flow_ms
+                    return True
+            return False
+
+        for flow_ms in sorted(edges):
+            if flow_ms != forced_flow_ms:
+                augment(flow_ms, set())
+        return len(owners)
+
+    if required_detector_node is None:
+        return match_size()
+    if not any(n == required_detector_node for n in detected):
+        return 0
+    forced = {f["media_ms"] for f in flow if matches(f, required_detector_node)}
+    return max((match_size(ms) for ms in forced), default=0)
 
 
 def _exact_tap_path_evidence(anchor, after, separation_gain_h, frames=None):
@@ -1065,16 +1114,17 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                 continue
             detector_paths = _support_detector_paths(frames, release_frame, seed)
             for detector_path in detector_paths:
-                flow_matches = _flow_path_match_count(
-                    flow.get("nodes") or [], detector_path.get("nodes") or []
-                )
-                if flow_matches < FLOW_MIN_NODES - 1:
-                    continue
                 strong = next((
                     node for node in detector_path["nodes"][1:]
                     if node.get("a3_eligible") is True
                 ), None)
                 if strong is None:
+                    continue
+                flow_matches = _flow_path_match_count(
+                    flow.get("nodes") or [], detector_path["nodes"],
+                    required_detector_node=strong,
+                )
+                if flow_matches < FLOW_MIN_NODES - 1:
                     continue
                 strong_frame = _frame_near(frames, int(strong["media_ms"]), max_ms=25)
                 final_actor, final_path = _tap_actor_continuity(
@@ -1126,6 +1176,8 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                     "ball_flow_status": flow.get("status"),
                     "flow_nodes": deepcopy(flow.get("nodes") or []),
                     "flow_detector_match_count": flow_matches,
+                    "flow_detector_matches_independent": True,
+                    "a3_reacquisition_flow_bound": True,
                     "detector_path_nodes": deepcopy(detector_path.get("nodes") or []),
                     "a3_reacquisition_ms": int(strong["media_ms"]),
                     "a3_reacquisition_confidence": strong.get("confidence"),
@@ -1232,13 +1284,15 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
         paths = _support_detector_paths(frames, frame, seed["candidate"])
         candidates = []
         for path in paths:
-            flow_matches = _flow_path_match_count(flow.get("nodes") or [], path["nodes"])
-            if flow_matches < FLOW_MIN_NODES - 1:
-                continue
             strong = next(
                 (node for node in path["nodes"][1:] if node.get("a3_eligible") is True), None
             )
             if strong is None:
+                continue
+            flow_matches = _flow_path_match_count(
+                flow.get("nodes") or [], path["nodes"], required_detector_node=strong,
+            )
+            if flow_matches < FLOW_MIN_NODES - 1:
                 continue
             strong_frame = _frame_near(frames, int(strong["media_ms"]), max_ms=25)
             final_actor, actor_continuity = _exact_track_continuity(
@@ -1284,6 +1338,8 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
                 "flow_status": flow.get("status"),
                 "flow_nodes": deepcopy(flow.get("nodes") or []),
                 "flow_detector_match_count": flow_matches,
+                "flow_detector_matches_independent": True,
+                "a3_reacquisition_flow_bound": True,
                 "detector_path_nodes": deepcopy(path["nodes"]),
                 "a3_reacquisition_ms": int(strong["media_ms"]),
                 "a3_reacquisition_confidence": strong.get("confidence"),
