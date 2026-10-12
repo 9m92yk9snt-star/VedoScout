@@ -1,5 +1,9 @@
 # R6: inspect the contact-bound ball-path loss
 
+This checkpoint records the first 300 ms focus repair. The later 900 ms review
+and same-ball intervention repair are documented in
+`FIX15_R6_GOAL_FOLLOWUP_AND_INTERVENTION_STATUS.md`.
+
 Continuation of `4e200e8` on `codex-r6-native-jersey-20261011`. The original
 video and all 12 original markings remain unchanged. Five-action acceptance
 is still **0/5**, with no deployment or merge.

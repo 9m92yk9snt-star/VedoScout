@@ -32,6 +32,7 @@ import action_evidence_review
 import evidence_feedback
 import goal_review_scheduler
 import goal_review_sampling
+import fix10a_occluded_goal
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -83,13 +84,20 @@ def _goal_review_times(strike_ms: int, end_ms: int, budget: int, start_ms: int =
     priority = [strike_ms, candidates[-1]]
     if (type(focus_end_ms) is int and type(anchor_ms) is int
             and start_ms <= strike_ms <= anchor_ms < focus_end_ms <= min(end_ms, strike_ms + 2600)):
-        # The native measured path ends here. Inspect the next short interval
-        # densely instead of jumping from early release to late reaction.
-        focused = [anchor_ms, focus_end_ms] + [focus_end_ms + offset for offset in range(50, 301, 50)]
-        focused = [ms for ms in focused if start_ms <= ms <= min(end_ms, strike_ms + 2600)]
+        # Cover the complete existing short-occlusion horizon. A head-only
+        # 300 ms burst misses a ball briefly reappearing behind later bodies.
+        # Allocate remaining slots uniformly; no user clock/outcome is used.
+        loss_end_ms = min(focus_end_ms + fix10a_occluded_goal.MAX_OCCLUSION_SPAN_MS,
+                          end_ms, strike_ms + 2600)
+        terminal_ms = max(candidates[-1], loss_end_ms)
+        priority = list(dict.fromkeys([strike_ms, terminal_ms, anchor_ms, focus_end_ms]))
+        slots = max(0, budget - len(priority))
+        focused = [anchor_ms, focus_end_ms, loss_end_ms]
+        followups = [focus_end_ms + round((loss_end_ms - focus_end_ms) * i / slots)
+                     for i in range(1, slots + 1)] if slots else []
+        focused.extend(followups)
         candidates = sorted(set(candidates + focused))
-        priority[1] = candidates[-1]
-        priority.extend(focused)
+        priority.extend(followups)
         priority.extend([max(0, strike_ms - 150), strike_ms + 2200])
     else:
         priority.append(max(0, strike_ms - 150))

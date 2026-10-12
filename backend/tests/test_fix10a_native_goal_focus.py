@@ -69,13 +69,13 @@ def test_current_job_overwrites_stale_focus_without_mutating_strike_or_trajector
 
 
 @pytest.mark.parametrize("shift", [0, 10000, 25000])
-def test_generic_loss_focus_keeps_contact_seed_terminal_and_six_dense_followups(shift):
+def test_generic_loss_focus_keeps_contact_seed_terminal_and_complete_short_occlusion(shift):
     times = providers._goal_review_times(1000 + shift, 4000 + shift, 12,
         focus_end_ms=1200 + shift, anchor_ms=1100 + shift)
     assert {1000 + shift, 1100 + shift, 1200 + shift, 3600 + shift} <= set(times)
-    assert all(ms + shift in times for ms in range(1250, 1501, 50))
+    assert all(1200 + round(900 * i / 8) + shift in times for i in range(1, 9))
     assert times == sorted(set(times)) and len(times) == 12
-    assert times[0] == 850 + shift
+    assert times[0] == 1000 + shift
 
 
 def test_small_budget_and_window_bounds_remain_hard_limits():
@@ -83,7 +83,7 @@ def test_small_budget_and_window_bounds_remain_hard_limits():
     times = providers._goal_review_times(1000, 1320, 12, start_ms=1000, focus_end_ms=1200, anchor_ms=1100)
     assert all(1000 <= ms <= 1320 for ms in times)
     assert providers._goal_review_times(1000, 4000, 0, focus_end_ms=1200, anchor_ms=1100) == []
-    assert providers._goal_review_times(1000, 1690, 2, focus_end_ms=1680, anchor_ms=1100) == [1000, 1680]
+    assert providers._goal_review_times(1000, 1690, 2, focus_end_ms=1680, anchor_ms=1100) == [1000, 1690]
 
 
 @pytest.mark.usefixtures("inline_support_vision")
@@ -91,7 +91,7 @@ def test_provider_uses_loss_focus_dedupes_actual_pts_and_does_not_invent_goal(mo
     captured = {}
     def read(_path, requested):
         captured["requested"] = list(requested)
-        return {ms: (1267 if ms in {1250, 1300} else ms, np.zeros((32, 32, 3), dtype=np.uint8)) for ms in requested}
+        return {ms: (1367 if ms in {1312, 1425} else ms, np.zeros((32, 32, 3), dtype=np.uint8)) for ms in requested}
     def write(path, _image):
         path.write_bytes(b"test")
         return True
@@ -105,8 +105,8 @@ def test_provider_uses_loss_focus_dedupes_actual_pts_and_does_not_invent_goal(mo
     data = job()
     bundle = providers.ShadowVisionProviders("injected-test-key", "test").bind_video_path("dummy")
     result = bundle.goal_geometry_provider(data["window"], sampling.provider_strike(data))
-    assert all(ms in captured["requested"] for ms in range(1250, 1501, 50))
-    assert captured["actual"].count(1267) == 1
+    assert all(1200 + round(900 * i / 8) in captured["requested"] for i in range(1, 9))
+    assert captured["actual"].count(1367) == 1
     assert captured["reference"]["media_ms"] == 1100
     assert result["sampling_audit"]["native_path_end_ms"] == 1200
     assert result["sampling_audit"]["canonical_authority"] is False
