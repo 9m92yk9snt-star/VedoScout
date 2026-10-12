@@ -658,12 +658,15 @@ def reconstruct_ball_trajectory_from_release_anchor(
     pending = None
     jump_supported = False
     velocity = None
+    source_frames = sorted(
+        (f for f in dense_frames or [] if isinstance(f, dict) and _num(f.get("media_ms"))),
+        key=lambda f: int(f["media_ms"]),
+    )
 
-    for frame in sorted(
-        (f for f in dense_frames or [] if isinstance(f, dict) and _num(f.get("media_ms"))
-         and int(f["media_ms"]) > seed_ms), key=lambda f: int(f["media_ms"]),
-    ):
+    for index, frame in enumerate(source_frames):
         ms = int(frame["media_ms"])
+        if ms <= seed_ms:
+            continue
         if ms - seed_ms > max(0, int(max_duration_ms)):
             break
         frame_scene = frame.get("scene_id")
@@ -702,6 +705,50 @@ def reconstruct_ball_trajectory_from_release_anchor(
             if scale_ratio >= 0.35:
                 candidates.append({"box": candidate_box, "confidence": confidence})
         if not candidates:
+            continue
+
+        geometry = _native_association_geometry(source_frames, index)
+        if geometry is not None:
+            # A camera label alone cannot reconnect a shot identity. Native
+            # paths use exact background transforms and the SAME speed,
+            # acceleration, scale, measured-gap and support thresholds as A3.
+            # They never fall back to an unmeasured image-space jump.
+            if geometry.get("transform") is None:
+                break
+            prior = {"media_ms": last["media_ms"], "last_measured_ms": last["media_ms"],
+                     "box": last["box"], "last_measured_box": last["box"], "velocity": velocity}
+            prediction = geometry["predict_box"](prior, ms)
+            if prediction is None:
+                break
+            pcx, pcy = _center(prediction)
+            x_scale = geometry["x_scale"]
+            sigma = max(BASE_JUMP_NORM,
+                        math.sqrt(prediction["w"]*x_scale*prediction["h"]))
+            supported = []
+            for candidate in candidates:
+                row = _candidate_from_prior(candidate, prior, ms, geometry=geometry)
+                if row is None:
+                    continue
+                cx, cy = _center(row["box"])
+                residual = math.hypot((cx-pcx)*x_scale, cy-pcy)
+                a, b = _area_scale(prediction), _area_scale(row["box"])
+                support = math.exp(-0.5*(residual/sigma)**2)*min(a,b)/max(a,b)
+                supported.append((support,row))
+            supported.sort(key=lambda pair: pair[0], reverse=True)
+            if (not supported
+                    or (velocity is not None and supported[0][0] < RELEASE_MIN_MOTION_SUPPORT)
+                    or (len(supported)>1 and supported[0][0]-supported[1][0] < SCORE_MARGIN)):
+                continue
+            chosen = supported[0][1]
+            row = {"media_ms": ms, "scene_id": scene_id, "state": "MEASURED",
+                   "box": chosen["box"], "confidence": chosen["confidence"],
+                   "proof_eligible": True, "time_authority": "ACTUAL_MEDIA_PTS",
+                   "used_fallback": False, "cut_barrier": False,
+                   "provenance": "RELEASE_ANCHORED_NATIVE_CAMERA_MOTION", "candidates": [],
+                   "frame_dimensions": deepcopy(frame["frame_dimensions"])}
+            rows.append(row)
+            velocity = chosen["velocity"]
+            last = row
             continue
 
         previous = pending if pending else last
@@ -853,6 +900,104 @@ def release_anchor_contact_binding(dense_frames, contact_ball, anchor, scene_id)
     return {"status": "VERIFIED", "reason": "MEASURED_CONTACT_TO_EXACT_RELEASE_ANCHOR",
             "contact_ms": contact_ms, "seed_ms": seed_ms,
             "measured_times_ms": [r["media_ms"] for r in bridge]}
+
+
+def qualify_native_release_seed(dense_frames, contact_ball, provisional_anchor, scene_id):
+    """Choose an eligible seed BEFORE binding a fresh, weak native proposal.
+
+    A3 accepts proposals down to .03, while the unchanged release tracker needs
+    .04. Do not ask that tracker to certify an observation it must discard.
+    Instead, require a unique measured path FROM the verified contact, and
+    choose its earliest eligible post-contact observation. The weak proposal
+    must also be consistent with that path; it never becomes path proof.
+
+    This is not a retry for an explicitly rejected/required anchor. Callers
+    must restrict it to a fresh ball_after produced by the current touch.
+    No global/search/predicted trajectory, actor label or event label is used.
+    """
+    if (not _proof_measured_ball(contact_ball) or not _proof_measured_ball(provisional_anchor)
+            or provisional_anchor.get("identity_rejection") is not None
+            or any(type(p.get("media_ms")) is not int for p in (contact_ball, provisional_anchor))
+            or not _num(contact_ball.get("confidence")) or not 0 <= contact_ball["confidence"] <= 1
+            or not _num(provisional_anchor.get("confidence"))
+            or not 0 <= provisional_anchor["confidence"] < RELEASE_REACQUIRE_MIN_CONFIDENCE):
+        return None
+    contact_ms, original_ms = contact_ball["media_ms"], provisional_anchor["media_ms"]
+    if not 0 < original_ms-contact_ms <= CONTACT_RELEASE_MAX_MS:
+        return None
+    if any(scene_id is not None and p.get("scene_id") not in {None, scene_id}
+           for p in (contact_ball, provisional_anchor)):
+        return None
+    frames = sorted((f for f in dense_frames or [] if isinstance(f, dict)
+                     and type(f.get("media_ms")) is int), key=lambda f: f["media_ms"])
+    originals = [f for f in frames if f["media_ms"] == original_ms]
+    if (len(originals) != 1 or "camera_motion" not in originals[0]
+            or not ball_motion_evidence._native(originals[0])):
+        return None
+    original = originals[0]
+    proposals = [c for c in original.get("ball_candidates") or [] if isinstance(c, dict)
+                 and _valid_box(c.get("box")) and _num(c.get("confidence"))
+                 and c.get("proof_eligible") is not False and c.get("used_fallback") is not True
+                 and c.get("state") in {None, "MEASURED", "MEASURED_REACQUISITION"}
+                 and c.get("time_authority") in {None, "ACTUAL_MEDIA_PTS"}]
+    matching = [c for c in proposals if all(math.isclose(float(c["box"][k]),
+                float(provisional_anchor["box"][k]), rel_tol=0., abs_tol=1e-9)
+                for k in ("x", "y", "w", "h"))]
+    if len(matching) != 1 or not 0 <= matching[0]["confidence"] < RELEASE_REACQUIRE_MIN_CONFIDENCE:
+        return None
+
+    bridge = reconstruct_ball_trajectory_from_release_anchor(
+        frames, contact_ball, scene_id, max_duration_ms=CONTACT_RELEASE_MAX_MS)
+    seed = next((p for p in bridge if p["media_ms"] > original_ms
+                 and p.get("provenance") == "RELEASE_ANCHORED_NATIVE_CAMERA_MOTION"
+                 and _num(p.get("confidence"))
+                 and p["confidence"] >= RELEASE_REACQUIRE_MIN_CONFIDENCE), None)
+    if seed is None:
+        return None
+    binding = release_anchor_contact_binding(frames, contact_ball, seed, scene_id)
+    if binding["status"] != "VERIFIED":
+        return None
+
+    # Interpolation is SUPPORT ONLY, used to exclude a weak remote competitor.
+    # Both endpoints and every camera transform are independently measured.
+    before = ball_motion_evidence._transform_between(frames, contact_ms, original_ms)
+    after = ball_motion_evidence._transform_between(frames, original_ms, seed["media_ms"])
+    if before is None or after is None:
+        return None
+    width, height = (original["frame_dimensions"][k] for k in ("width", "height"))
+    def project_box(box, matrix):
+        corners = np.array([[box["x"]*width, box["y"]*height, 1.],
+            [(box["x"]+box["w"])*width, box["y"]*height, 1.],
+            [box["x"]*width, (box["y"]+box["h"])*height, 1.],
+            [(box["x"]+box["w"])*width, (box["y"]+box["h"])*height, 1.]])
+        pixels = (matrix @ corners.T).T
+        low, high = pixels[:, :2].min(axis=0), pixels[:, :2].max(axis=0)
+        return np.array([low[0]/width, low[1]/height,
+                         (high[0]-low[0])/width, (high[1]-low[1])/height])
+    fraction = (original_ms-contact_ms)/(seed["media_ms"]-contact_ms)
+    expected = ((1-fraction)*project_box(contact_ball["box"], before)
+                + fraction*project_box(seed["box"], np.linalg.inv(after)))
+    expected_box = dict(zip(("x", "y", "w", "h"), expected))
+    px, py = _center(expected_box)
+    x_scale = width/height
+    sigma = max(BASE_JUMP_NORM, math.sqrt(expected_box["w"]*x_scale*expected_box["h"]))
+    def support(box):
+        cx, cy = _center(box)
+        a, b = _area_scale(box), _area_scale(expected_box)
+        return math.exp(-.5*(math.hypot((cx-px)*x_scale, cy-py)/sigma)**2)*min(a,b)/max(a,b)
+    original_support = support(matching[0]["box"])
+    rivals = [support(c["box"]) for c in proposals if c is not matching[0]]
+    if (original_support < RELEASE_MIN_MOTION_SUPPORT
+            or (rivals and original_support-max(rivals) < SCORE_MARGIN)):
+        return None
+    return {"anchor": {**deepcopy(seed), "source": provisional_anchor.get("source"),
+                       "remote_spare_ball_used": False},
+            "audit": {"status": "QUALIFIED", "reason": "FRESH_NATIVE_SEED_BELOW_RELEASE_CONFIDENCE_FLOOR",
+                "original_anchor": deepcopy(provisional_anchor), "qualified_seed_ms": seed["media_ms"],
+                "release_confidence_floor": RELEASE_REACQUIRE_MIN_CONFIDENCE,
+                "contact_binding": binding, "provisional_consistency": {
+                    "source": "MEASURED_ENDPOINT_CAMERA_INTERPOLATION_SUPPORT_ONLY",
+                    "proof_eligible": False, "motion_support": float(original_support)}}}
 
 
 def select_release_ball_trajectory(dense_frames, anchor, scene_id, global_trajectory,

@@ -322,14 +322,8 @@ def _goal_scene_response_coverage(data, media_ms) -> dict:
     }
 
 
-async def read_goal_scene_evidence(api_key: str, session_id: str,
-                                   frame_paths: list[str], media_ms: list[int], ball_reference=None) -> dict:
-    """Independent multi-frame goal geometry, ball/occlusion and reaction audit.
-
-    Reactions are deliberately returned as support-only observations.  They do
-    not change the direct whole-ball ``crossing`` verdict inside this reader.
-    """
-    empty = {
+def _empty_goal_scene_review():
+    return {
         "geometry_status": "UNRESOLVED", "frames": [],
         "crossing": "UNRESOLVED", "crossing_confidence": "low",
         "ball_evidence": [], "same_ball_continuity": False,
@@ -353,95 +347,26 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         },
         "reason": "insufficient_frames",
     }
-    try:
-        if len(frame_paths) != len(media_ms):
-            return {**empty, "reason": "goal_scene_input_count_mismatch",
-                    "proof_reason": "goal_scene_input_count_mismatch"}
-        pairs = [
-            (Path(path), int(ms)) for path, ms in zip(frame_paths, media_ms)
-            if path and Path(path).exists() and _num(ms)
-        ]
-        if len(pairs) != len(frame_paths):
-            return {**empty, "reason": "goal_scene_invalid_input",
-                    "proof_reason": "goal_scene_invalid_input"}
-        if len(pairs) < 2 or not api_key:
-            return dict(empty)
-        timeline = ", ".join(f"image {i + 1}={ms}ms" for i, (_path, ms) in enumerate(pairs))
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=session_id,
-            system_message=(
-                "You inspect football goal geometry, ball visibility, literal occlusion and post-shot body reactions "
-                "from chronological images. Never infer a GOAL/SAVE from celebration, scoreboards or expected events. "
-                "Return only visible observations as strict JSON."
-            ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
-        prompt = (
-            f"These images are chronological match frames: {timeline}. The first images are at/just after a "
-            "physically detected ball release; no semantic event label is provided.\n"
-            f"Return exactly {len(pairs)} frames rows AND exactly {len(pairs)} ball_evidence rows, "
-            f"one row per EVERY input image with unique integer idx 1 through {len(pairs)} in BOTH lists. "
-            "Do not omit an image because the goal or ball is unclear: use visible=false, "
-            "ball_visible=false and relation=UNRESOLVED as appropriate.\n"
-            "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
-            "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
-            "visible=false when both bases are not clear.\n"
-            "BALL AUDIT: Follow only the visibly observable MOVING match ball in chronological order. For EVERY image "
-            "return one ball_evidence row. FIELD_SIDE means the whole visible ball is on the playable-field side of the "
-            "goal plane. ON_OR_STRADDLING_LINE means any part overlaps the plane. BEYOND_LINE_INSIDE_MOUTH means the "
-            "ENTIRE visible ball is clearly beyond the plane and between the inner post edges. OCCLUDED_GOAL_MOUTH is "
-            "allowed ONLY when the same moving ball was visible immediately before but is now hidden specifically by a "
-            "player/body in the goal-mouth / goal-line region; ball_visible must be false. OTHER means visible elsewhere. "
-            "UNRESOLVED means relation/identity is unclear. For hidden rows set occluder to PLAYER_BODY, "
-            "GOALKEEPER_BODY, GOAL_STRUCTURE, OTHER or UNKNOWN.\n"
-            "DIRECT CROSSING: same_ball_continuity=true ONLY if the ball is visible and continuously identifiable in "
-            "every sampled image from the last FIELD_SIDE frame through the first BEYOND_LINE_INSIDE_MOUTH frame. Any "
-            "hidden interval makes it false. CROSSED means that strict visible whole-ball transition is proven; "
-            "NOT_CROSSED means a continuous visible sequence proves it did not cross; otherwise UNRESOLVED.\n"
-            "REACTIONS (SUPPORT ONLY): Follow the same release player only if visually traceable from the release frames. "
-            "Report celebration OBSERVED only for a clear post-shot celebratory cue such as both arms raised / obvious "
-            "goal celebration, never merely running. For the player stationed in/nearest the relevant goal mouth, report "
-            "ball_contact as OBSERVED_CONTACT only if literal ball-body contact is visible; NO_VISIBLE_CONTACT only means "
-            "none is visible, not that contact is impossible. Report response=LATE_OR_NO_REACTION only when the player is "
-            "visibly static/late after release rather than making a timely save action. These reaction fields must NOT "
-            "change the crossing verdict.\n"
-            'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
-            '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
-            '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
-            '"ball_evidence":[{"idx":1,"ball_visible":true|false,'
-            '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
-            '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
-            '"ball_box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0}|null,'
-            '"occluder":"PLAYER_BODY"|"GOALKEEPER_BODY"|"GOAL_STRUCTURE"|"OTHER"|"UNKNOWN",'
-            '"confidence":"high"|"medium"|"low","reason":"<short literal visual reason>"}],'
-            '"same_ball_continuity":true|false,"first_crossing_idx":1|null,'
-            '"crossing":"CROSSED"|"NOT_CROSSED"|"UNRESOLVED",'
-            '"crossing_confidence":"high"|"medium"|"low",'
-            '"reaction_evidence":{"release_player_tracked":true|false,'
-            '"release_player_celebration":"OBSERVED"|"NOT_OBSERVED"|"UNRESOLVED",'
-            '"release_player_confidence":"high"|"medium"|"low",'
-            '"goal_mouth_defender_tracked":true|false,'
-            '"goal_mouth_defender_ball_contact":"OBSERVED_CONTACT"|"NO_VISIBLE_CONTACT"|"UNRESOLVED",'
-            '"goal_mouth_defender_response":"ACTIVE_SAVE_ATTEMPT"|"LATE_OR_NO_REACTION"|"OTHER"|"UNRESOLVED",'
-            '"goal_mouth_defender_confidence":"high"|"medium"|"low"},'
-            '"reason":"<short visual reason>"}'
-        )
-        msg = UserMessage(
-            text=prompt,
-            file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs],
-        )
-        if isinstance(ball_reference, dict) and _valid_box(ball_reference.get("box")):
-            prompt += ("\nThe physically measured active ball reference is " + json.dumps(ball_reference, sort_keys=True)
-                       + ". Include this reference frame in ball_evidence and assess crossings only AFTER this reference. "
-                         "Follow ONLY this ball from this image onward. If its visible continuation is ambiguous or a "
-                         "different ball reaches the goal, same_ball_continuity must be false. This reference supplies no expected result.")
-            msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs])
-        resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
-        text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
-        data = _extract_json(text) or {}
 
+
+def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=None) -> dict:
+    """Transport-independent parsing through the unchanged whole-ball gates.
+
+    A native reader can supply its real model audit without constructing an SDK
+    chat, using an API key, or claiming that a local model was a paid provider.
+    This parses observations, never supplies expected outcomes or event labels.
+    """
+    empty = _empty_goal_scene_review()
+    try:
+        if (not isinstance(raw_response, str) or not isinstance(media_ms, (list, tuple))
+                or len(media_ms) < 2 or any(type(ms) is not int or ms < 0 for ms in media_ms)
+                or any(a >= b for a, b in zip(media_ms, media_ms[1:]))):
+            return {**empty, "reason": "goal_scene_invalid_native_input",
+                    "proof_reason": "goal_scene_invalid_native_input"}
+        pairs = [(None, ms) for ms in media_ms]
+        data = _extract_json(raw_response) or {}
+        audit = deepcopy(model_review_audit) if isinstance(model_review_audit, dict) else None
         coverage = _goal_scene_response_coverage(data, [ms for _, ms in pairs])
-        audit = _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs])
         if coverage["status"] != "COMPLETED":
             return {
                 **empty, "model_review_audit": audit, "response_coverage": coverage,
@@ -749,6 +674,109 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "reaction_support_evidence": reaction_support,
             "reason": str(data.get("reason") or "goal_scene_review")[:220],
         }
+    except Exception:
+        failed = dict(empty)
+        failed["proof_reason"] = "goal_scene_reader_error"
+        failed["reason"] = "goal_scene_reader_error"
+        return failed
+
+
+
+async def read_goal_scene_evidence(api_key: str, session_id: str,
+                                   frame_paths: list[str], media_ms: list[int], ball_reference=None) -> dict:
+    """Independent multi-frame goal geometry, ball/occlusion and reaction audit.
+
+    Reactions are deliberately returned as support-only observations.  They do
+    not change the direct whole-ball ``crossing`` verdict inside this reader.
+    """
+    empty = _empty_goal_scene_review()
+    try:
+        if len(frame_paths) != len(media_ms):
+            return {**empty, "reason": "goal_scene_input_count_mismatch",
+                    "proof_reason": "goal_scene_input_count_mismatch"}
+        pairs = [
+            (Path(path), int(ms)) for path, ms in zip(frame_paths, media_ms)
+            if path and Path(path).exists() and _num(ms)
+        ]
+        if len(pairs) != len(frame_paths):
+            return {**empty, "reason": "goal_scene_invalid_input",
+                    "proof_reason": "goal_scene_invalid_input"}
+        if len(pairs) < 2 or not api_key:
+            return dict(empty)
+        timeline = ", ".join(f"image {i + 1}={ms}ms" for i, (_path, ms) in enumerate(pairs))
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=session_id,
+            system_message=(
+                "You inspect football goal geometry, ball visibility, literal occlusion and post-shot body reactions "
+                "from chronological images. Never infer a GOAL/SAVE from celebration, scoreboards or expected events. "
+                "Return only visible observations as strict JSON."
+            ),
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
+        prompt = (
+            f"These images are chronological match frames: {timeline}. The first images are at/just after a "
+            "physically detected ball release; no semantic event label is provided.\n"
+            f"Return exactly {len(pairs)} frames rows AND exactly {len(pairs)} ball_evidence rows, "
+            f"one row per EVERY input image with unique integer idx 1 through {len(pairs)} in BOTH lists. "
+            "Do not omit an image because the goal or ball is unclear: use visible=false, "
+            "ball_visible=false and relation=UNRESOLVED as appropriate.\n"
+            "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
+            "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
+            "visible=false when both bases are not clear.\n"
+            "BALL AUDIT: Follow only the visibly observable MOVING match ball in chronological order. For EVERY image "
+            "return one ball_evidence row. FIELD_SIDE means the whole visible ball is on the playable-field side of the "
+            "goal plane. ON_OR_STRADDLING_LINE means any part overlaps the plane. BEYOND_LINE_INSIDE_MOUTH means the "
+            "ENTIRE visible ball is clearly beyond the plane and between the inner post edges. OCCLUDED_GOAL_MOUTH is "
+            "allowed ONLY when the same moving ball was visible immediately before but is now hidden specifically by a "
+            "player/body in the goal-mouth / goal-line region; ball_visible must be false. OTHER means visible elsewhere. "
+            "UNRESOLVED means relation/identity is unclear. For hidden rows set occluder to PLAYER_BODY, "
+            "GOALKEEPER_BODY, GOAL_STRUCTURE, OTHER or UNKNOWN.\n"
+            "DIRECT CROSSING: same_ball_continuity=true ONLY if the ball is visible and continuously identifiable in "
+            "every sampled image from the last FIELD_SIDE frame through the first BEYOND_LINE_INSIDE_MOUTH frame. Any "
+            "hidden interval makes it false. CROSSED means that strict visible whole-ball transition is proven; "
+            "NOT_CROSSED means a continuous visible sequence proves it did not cross; otherwise UNRESOLVED.\n"
+            "REACTIONS (SUPPORT ONLY): Follow the same release player only if visually traceable from the release frames. "
+            "Report celebration OBSERVED only for a clear post-shot celebratory cue such as both arms raised / obvious "
+            "goal celebration, never merely running. For the player stationed in/nearest the relevant goal mouth, report "
+            "ball_contact as OBSERVED_CONTACT only if literal ball-body contact is visible; NO_VISIBLE_CONTACT only means "
+            "none is visible, not that contact is impossible. Report response=LATE_OR_NO_REACTION only when the player is "
+            "visibly static/late after release rather than making a timely save action. These reaction fields must NOT "
+            "change the crossing verdict.\n"
+            'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
+            '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
+            '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
+            '"ball_evidence":[{"idx":1,"ball_visible":true|false,'
+            '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
+            '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
+            '"ball_box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0}|null,'
+            '"occluder":"PLAYER_BODY"|"GOALKEEPER_BODY"|"GOAL_STRUCTURE"|"OTHER"|"UNKNOWN",'
+            '"confidence":"high"|"medium"|"low","reason":"<short literal visual reason>"}],'
+            '"same_ball_continuity":true|false,"first_crossing_idx":1|null,'
+            '"crossing":"CROSSED"|"NOT_CROSSED"|"UNRESOLVED",'
+            '"crossing_confidence":"high"|"medium"|"low",'
+            '"reaction_evidence":{"release_player_tracked":true|false,'
+            '"release_player_celebration":"OBSERVED"|"NOT_OBSERVED"|"UNRESOLVED",'
+            '"release_player_confidence":"high"|"medium"|"low",'
+            '"goal_mouth_defender_tracked":true|false,'
+            '"goal_mouth_defender_ball_contact":"OBSERVED_CONTACT"|"NO_VISIBLE_CONTACT"|"UNRESOLVED",'
+            '"goal_mouth_defender_response":"ACTIVE_SAVE_ATTEMPT"|"LATE_OR_NO_REACTION"|"OTHER"|"UNRESOLVED",'
+            '"goal_mouth_defender_confidence":"high"|"medium"|"low"},'
+            '"reason":"<short visual reason>"}'
+        )
+        msg = UserMessage(
+            text=prompt,
+            file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs],
+        )
+        if isinstance(ball_reference, dict) and _valid_box(ball_reference.get("box")):
+            prompt += ("\nThe physically measured active ball reference is " + json.dumps(ball_reference, sort_keys=True)
+                       + ". Include this reference frame in ball_evidence and assess crossings only AFTER this reference. "
+                         "Follow ONLY this ball from this image onward. If its visible continuation is ambiguous or a "
+                         "different ball reaches the goal, same_ball_continuity must be false. This reference supplies no expected result.")
+            msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs])
+        resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
+        text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
+        audit = _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs])
+        return parse_goal_scene_response(text, [ms for _, ms in pairs], audit)
     except Exception:
         failed = dict(empty)
         failed["proof_reason"] = "goal_scene_reader_error"
