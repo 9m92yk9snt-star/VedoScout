@@ -9,6 +9,7 @@ and never touches the production pipeline.
 from __future__ import annotations
 
 import logging
+import hashlib
 import os
 from pathlib import Path
 
@@ -36,10 +37,12 @@ class PersonDetector:
         """
         self.net = None
         self.ok = False
+        self.model_sha256 = None
         self.enabled = DETECTOR_ENABLED if enabled is None else bool(enabled)
         try:
             if self.enabled and MODEL_PATH.exists() and MODEL_PATH.stat().st_size > 1_000_000:
                 self.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+                self.model_sha256 = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()
                 self.ok = True
         except Exception as e:
             logger.warning(f"[cv-detect] model load failed: {e}")

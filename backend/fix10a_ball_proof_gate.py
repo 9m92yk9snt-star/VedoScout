@@ -14,6 +14,7 @@ multi-frame whole-ball transition when ordinary detector proof is unavailable.
 from __future__ import annotations
 
 from copy import deepcopy
+import goal_reappearance
 
 VERSION = 1
 BALL_ROW_NEAR_MS = 80
@@ -86,6 +87,42 @@ def apply_ball_proof_gate(outcome: dict, ball_trajectory) -> dict:
     if not segment or not (_num(segment.get("from_ms")) and _num(segment.get("to_ms"))):
         return _downgrade(row, "BALL_PROOF_SEGMENT_EVIDENCE_MISSING")
     from_ms, to_ms = int(segment["from_ms"]), int(segment["to_ms"])
+
+    if str(segment.get("proof_lane") or "") == goal_reappearance.LANE:
+        geometry = row.get("goal_geometry_evidence")
+        checked = goal_reappearance.resolve(
+            ball_trajectory, geometry, row.get("media_ms")
+        )
+        expected = (checked or {}).get("evidence") or []
+        valid = bool(
+            expected and checked.get("status") == "VERIFIED"
+            and crossing.get("direction_status") == "VERIFIED"
+            and crossing.get("direction") == "FIELD_TO_GOAL"
+            and row.get("direction_gate", {}).get("status") == "VERIFIED"
+            and all(segment.get(k) == expected[0].get(k) for k in (
+                "source", "from_ms", "to_ms", "crossing_ms",
+                "crossing_time_authority", "crossing_interval_ms",
+                "before_media_ms", "after_media_ms",
+                "same_ball_identity_verified", "whole_ball_inside_goal",
+            ))
+        )
+        details = {"proof_lane": goal_reappearance.LANE,
+                   "crossing_interval_ms": deepcopy(segment.get("crossing_interval_ms")),
+                   "crossing_time_authority": segment.get("crossing_time_authority"),
+                   "before_media_ms": list(segment.get("before_media_ms") or []),
+                   "after_media_ms": list(segment.get("after_media_ms") or []),
+                   "native_identity_verified": checked.get("status") == "VERIFIED" if checked else False}
+        if not valid:
+            return _downgrade(row, "OBSERVED_REAPPEARANCE_PHYSICAL_PROOF_INVALID", details)
+        crossing = deepcopy(crossing)
+        crossing["proof_gate"] = {"status": "VERIFIED", "details": details}
+        row["goal_plane_crossing"] = crossing
+        row["ball_proof_gate"] = {
+            "status": "VERIFIED",
+            "reason": "CONTACT_BOUND_CLASSIFIED_BALL_REAPPEARANCE_CERTIFIED",
+            "details": details,
+        }
+        return row
 
     if str(segment.get("proof_lane") or "") == "OCCLUDED_TRAJECTORY_GOAL":
         anchors = [int(ms) for ms in (segment.get("anchor_media_ms") or []) if _num(ms)]

@@ -33,6 +33,8 @@ import evidence_feedback
 import goal_review_scheduler
 import goal_review_sampling
 import fix10a_occluded_goal
+import goal_reappearance
+import native_goal_review
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -1114,6 +1116,54 @@ class ShadowVisionProviders:
         self.feedback_inspection_calls = 0
         self.role_calls = 0
         self.goal_calls = 0
+        self._native_goal_detector = None
+        self._native_video_fingerprint = None
+
+    def _measure_goal_reappearance(self, review, review_path, images_by_ms):
+        """Local identity measurement, outside the text/SDK reader boundary."""
+        if not isinstance(review_path, dict) or not isinstance(review, dict):
+            return None
+        occ = review.get("occlusion_crossing_audit")
+        if (not isinstance(occ, dict) or occ.get("status") != "VERIFIED_OCCLUSION"
+                or type(occ.get("occlusion_start_media_ms")) is not int):
+            return None
+        before = max((r for r in review_path["rows"]
+                      if r["media_ms"] < occ["occlusion_start_media_ms"]),
+                     key=lambda r: r["media_ms"], default=None)
+        if before is None:
+            return None
+        try:
+            import dense_track_refinement as dense
+            if self._native_goal_detector is None:
+                self._native_goal_detector = dense._default_detector()
+            detector = self._native_goal_detector
+            if detector is None or not getattr(detector, "ok", False):
+                return goal_reappearance.build_audit([], None, {
+                    "source": "LOCAL_NATIVE_BALL_REIDENTIFICATION",
+                    "method": "CLASSIFIED_APPEARANCE_CAMERA_MOTION",
+                    "status": "UNRESOLVED", "reason": "NATIVE_GOAL_DETECTOR_UNAVAILABLE"})
+            path = Path(self.video_path)
+            st = path.stat()
+            key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
+            if self._native_video_fingerprint is None or self._native_video_fingerprint[0] != key:
+                with path.open("rb") as handle:
+                    digest = hashlib.file_digest(handle, "sha256").hexdigest()
+                self._native_video_fingerprint = (key, digest)
+
+            def detect_frame(image, proposal):
+                people, balls = dense._detect_dense_people_and_ball(detector, image)
+                local, _roi = _native_ball_roi(detector, image, proposal)
+                return people, [*balls, *local]
+
+            return native_goal_review.measure_review(review, before, images_by_ms,
+                video_sha256=self._native_video_fingerprint[1],
+                model_sha256=getattr(detector, "model_sha256", None),
+                detect_frame=detect_frame, camera_estimator=dense._default_camera_estimator)
+        except Exception:
+            return goal_reappearance.build_audit([], None, {
+                "source": "LOCAL_NATIVE_BALL_REIDENTIFICATION",
+                "method": "CLASSIFIED_APPEARANCE_CAMERA_MOTION",
+                "status": "UNRESOLVED", "reason": "NATIVE_GOAL_REAPPEARANCE_MEASUREMENT_FAILED"})
 
     def action_evidence_provider(self, video_path, job, dense_frames):
         requested = action_evidence_review.frame_times(job, dense_frames)
@@ -1381,8 +1431,9 @@ class ShadowVisionProviders:
             requested = sorted([*requested, int(anchor["media_ms"])])
         requires_reference = bool(anchor or strike.get("status") in {"VERIFIED_PHYSICAL_RELEASE", "VERIFIED_PHYSICAL_SCORING_CONTACT"})
         anchor_key = (int(anchor["media_ms"]), tuple(float(anchor["box"][k]) for k in ("x", "y", "w", "h"))) if anchor_valid else None
+        path_key = hashlib.sha256(json.dumps(review_path, sort_keys=True).encode()).hexdigest() if review_path else None
         cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested),
-                     (requires_reference, anchor_key))
+                     (requires_reference, anchor_key), path_key)
         if cache_key in self._goal_cache:
             return self._goal_cache[cache_key]
         frames = _read_frames(video_path, requested)
@@ -1410,6 +1461,7 @@ class ShadowVisionProviders:
             if len(paths) < 2:
                 self._goal_cache[cache_key] = None
                 return None
+            reference = None
             try:
                 self.goal_calls += 1
                 reference = {"idx": actual_times.index(int(anchor["media_ms"])) + 1,
@@ -1421,6 +1473,16 @@ class ShadowVisionProviders:
                     deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="goal_scene")[0]
             except Exception as exc:
                 review = support_vision_runner.fail_closed_diagnostic(exc)
+        if isinstance(review, dict):
+            review = deepcopy(review)
+            # No reader response, including an unexpected certificate-shaped
+            # JSON object, has authority to identify the native release ball.
+            review.pop("ball_reappearance_audit", None)
+            images_by_ms = {int(actual): frame for actual, frame in frames.values()
+                            if int(actual) in actual_times}
+            native_audit = self._measure_goal_reappearance(review, review_path, images_by_ms)
+            if native_audit is not None:
+                review["ball_reappearance_audit"] = native_audit
         rows = review.get("frames") or [] if isinstance(review, dict) else []
         link = _active_ball_link(review, reference) if requires_reference else None
         if not rows:
@@ -1454,6 +1516,8 @@ class ShadowVisionProviders:
             }
             if isinstance(review, dict) and "support_vision_fail_closed" in review:
                 result["support_vision_fail_closed"] = review["support_vision_fail_closed"]
+            if isinstance(review, dict) and "ball_reappearance_audit" in review:
+                result["ball_reappearance_audit"] = deepcopy(review["ball_reappearance_audit"])
             self._goal_cache[cache_key] = result
             if requires_reference:
                 result["visual_crossing_audit"]["active_ball_link"] = link
@@ -1508,6 +1572,8 @@ class ShadowVisionProviders:
                 "status": "UNRESOLVED", "confidence": "low",
                 "reason": "REACTION_SUPPORT_INSUFFICIENT",
             }),
+            **({"ball_reappearance_audit": deepcopy(review["ball_reappearance_audit"])}
+               if "ball_reappearance_audit" in (review or {}) else {}),
         }
         if requires_reference:
             result["visual_crossing_audit"]["active_ball_link"] = link
@@ -1519,6 +1585,9 @@ class ShadowVisionProviders:
         return result
 
     def bind_video_path(self, video_path: str):
+        if str(video_path or "") != str(getattr(self, "video_path", "")):
+            self._goal_cache.clear()
+            self._native_video_fingerprint = None
         self.video_path = str(video_path or "")
         return self
 

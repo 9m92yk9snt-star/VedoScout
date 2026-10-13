@@ -84,6 +84,10 @@ jobs:
             backend/touch_graph.py \
             backend/jersey_consensus.py \
             backend/shot_outcome_engine.py \
+            backend/native_ball_reappearance.py \
+            backend/native_goal_review.py \
+            backend/goal_reappearance.py \
+            backend/fix10a_ball_proof_gate.py \
             backend/event_trace.py \
             backend/physical_match_reconstruction.py \
             backend/action_evidence_review.py \
@@ -110,7 +114,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py
 
   backend_regression:
     runs-on: ubuntu-latest

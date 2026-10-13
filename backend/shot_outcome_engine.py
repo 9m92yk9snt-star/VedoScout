@@ -14,6 +14,7 @@ import math
 from copy import deepcopy
 
 import fix10a_occluded_goal
+import goal_reappearance
 
 VERSION = 1
 MAX_POST_STRIKE_MS = 3000
@@ -488,6 +489,16 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
 
 def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=None, strike_actor=None):
     audit = _visual_crossing_audit(goal_geometry)
+    # A classified, independently linked ball reappearing wholly inside the
+    # goal is a separate proof lane; it does not depend on celebration or an
+    # extrapolated instant through an unseen post/net interaction.
+    reappeared = goal_reappearance.resolve(
+        rows, goal_geometry, strike_ms, touch_graph=touch_graph,
+        strike_actor=strike_actor,
+    )
+    if isinstance(reappeared, dict) and reappeared.get("status") in {"VERIFIED", "REJECTED"}:
+        reappeared["visual_audit"] = audit
+        return reappeared
     measured = [
         r for r in rows
         if r.get("state") == "MEASURED" and _valid_box(r.get("box"))

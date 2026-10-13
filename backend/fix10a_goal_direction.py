@@ -15,6 +15,7 @@ import math
 import os
 import tempfile
 from copy import deepcopy
+import goal_reappearance
 from pathlib import Path
 
 import cv2
@@ -436,6 +437,30 @@ def apply_direction_gate(outcome: dict, ball_trajectory, goal_geometry) -> dict:
     if not first or not (_num(first.get("from_ms")) and _num(first.get("to_ms"))):
         return _downgrade_crossing(row, "CROSSING_SEGMENT_EVIDENCE_MISSING")
     from_ms, to_ms = int(first["from_ms"]), int(first["to_ms"])
+
+    if str(first.get("proof_lane") or "") == goal_reappearance.LANE:
+        checked = goal_reappearance.resolve(
+            ball_trajectory, goal_geometry, row.get("media_ms")
+        )
+        expected = (checked or {}).get("evidence") or []
+        if not expected or checked.get("status") != "VERIFIED":
+            return _downgrade_crossing(row, "REAPPEARANCE_FIELD_TO_GOAL_DIRECTION_INVALID")
+        if any(first.get(k) != expected[0].get(k) for k in (
+            "from_ms", "to_ms", "crossing_ms", "crossing_interval_ms",
+            "before_media_ms", "after_media_ms", "source",
+        )):
+            return _downgrade_crossing(row, "REAPPEARANCE_DIRECTION_SEGMENT_MISMATCH")
+        crossing = deepcopy(crossing)
+        crossing.update(direction="FIELD_TO_GOAL", direction_status="VERIFIED",
+                        direction_evidence={"proof_lane": goal_reappearance.LANE,
+                            "from_ms": from_ms, "to_ms": to_ms,
+                            "uses_measured_after_position": True})
+        row["goal_plane_crossing"] = crossing
+        row["direction_gate"] = {
+            "status": "VERIFIED",
+            "reason": "OBSERVED_REAPPEARANCE_WHOLE_BALL_FIELD_TO_GOAL",
+        }
+        return row
 
     # Occlusion-aware lane: only the pre-occlusion ball is a detector-backed
     # measurement.  The resolver carries an explicit projected point just
