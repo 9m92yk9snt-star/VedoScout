@@ -6,6 +6,57 @@ import ball_trajectory
 
 NATIVE_REAPPEARANCE_HORIZON_MS = 900
 MAX_NATIVE_REAPPEARANCE_FRAMES = 56
+MAX_DENSE_READER_FRAMES = 64
+
+
+def dense_reader_times(original, strike, path, scan, images_by_ms, *, budget, start_ms, end_ms):
+    """Retain a complete, already decoded short loss in one reader call.
+
+    Sparse uniform sampling cannot reliably observe a 100 ms reappearance.
+    This plan has search authority only and never uses an expected goal time.
+    Return None when complete native coverage cannot fit or bind to pixels.
+    """
+    import hashlib
+    import numpy as np
+    valid = contact_bound_native_path(strike, path)
+    if (valid is None or not isinstance(original, list) or not original
+            or any(type(ms) is not int for ms in original)
+            or type(start_ms) is not int or type(end_ms) is not int
+            or not 0 <= start_ms <= end_ms
+            or type(budget) is not int or not 1 <= budget <= MAX_DENSE_READER_FRAMES
+            or not isinstance(images_by_ms, dict) or not isinstance(scan, dict)
+            or scan.get('source') != 'BOUNDED_NATIVE_GOAL_GAP_INSPECTION'
+            or scan.get('status') != 'SEARCH_ONLY' or scan.get('proof_eligible') is not False
+            or scan.get('canonical_events_applied') != 0
+            or scan.get('reason') != 'NATIVE_GAP_SEARCH_COMPLETE_GOAL_GEOMETRY_STILL_REQUIRED'):
+        return None
+    rows = scan.get('rows')
+    if (not isinstance(rows, list) or not 2 <= len(rows) <= MAX_NATIVE_REAPPEARANCE_FRAMES
+            or scan.get('sample_count') != len(rows)):
+        return None
+    times = [r.get('media_ms') if isinstance(r, dict) else None for r in rows]
+    first = valid['rows'][-1]['media_ms']
+    if (any(type(ms) is not int or not start_ms <= ms <= end_ms for ms in times)
+            or times != sorted(set(times)) or times[0] != first
+            or times[-1] > first + NATIVE_REAPPEARANCE_HORIZON_MS
+            or any(b-a > 35 for a,b in zip(times,times[1:]))):
+        return None
+    dims = scan.get('native_frame_dimensions')
+    if (not isinstance(dims, dict)
+            or any(type(dims.get(k)) is not int or dims[k] <= 0 for k in ('width','height'))):
+        return None
+    for ms, row in zip(times, rows):
+        image = images_by_ms.get(ms)
+        if (row.get('time_authority') != 'ACTUAL_MEDIA_PTS'
+                or not isinstance(image, np.ndarray) or image.dtype != np.uint8
+                or image.shape != (dims['height'], dims['width'], 3)
+                or hashlib.sha256(image.tobytes()).hexdigest() != row.get('source_bgr_pixel_sha256')):
+            return None
+    selected = set(times) | {original[0], original[-1], strike['media_ms'], valid['seed_ms']}
+    selected.update(r['media_ms'] for r in valid['rows'][-6:])
+    if (len(selected) > budget or any(not start_ms <= ms <= end_ms or ms not in images_by_ms for ms in selected)):
+        return None
+    return sorted(selected)
 
 
 def refocus_reader_times(original,strike,path,appearance,*,budget,start_ms,end_ms):

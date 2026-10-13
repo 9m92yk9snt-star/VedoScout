@@ -84,3 +84,8 @@ Eight freshly decoded original RGB crops match their receipts. No new model
 classifications or full five-action acceptance are claimed. Keep draft and
 retain the main/draft distinction above. See `docs/FIX15_CONTACT_ROLE_SEED_HANDOFF.md`
 and its validation JSON for the exact source and next blockers.
+
+
+## Latest continuation: complete dense reader coverage
+
+The integrated contact/image-classifier branch now prepares all source-bound native gap frames for one goal-reader call, capped at 64 images. Fresh original-video coverage retains 62 images, all seven brief reappearance images and six before positions. Fifty-five full BGR hashes and original ROI RGB hashes match the source receipts. Local selection: 1,610 passed, 28 SDK skipped. Image volume increases for eligible occlusion reviews; larger payload latency/cost and independent classification/geometry on the original remain unmeasured. No original GOAL PASS or fresh five-action run. See FIX15_DENSE_READER_COVERAGE.md and evidence/FIX15_DENSE_READER_ORIGINAL_COVERAGE.json. Keep draft.

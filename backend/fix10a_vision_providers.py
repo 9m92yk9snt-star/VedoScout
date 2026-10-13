@@ -59,6 +59,8 @@ MAX_JERSEY_REQUESTS = int(os.environ.get("FIX10A_MAX_JERSEY_READS", "24"))
 MAX_ROLE_TRACKS = int(os.environ.get("FIX10A_MAX_ROLE_TRACKS", "4"))
 MAX_ROLE_FRAMES_PER_TRACK = int(os.environ.get("FIX10A_MAX_ROLE_FRAMES", "4"))
 MAX_GOAL_FRAMES = int(os.environ.get("FIX10A_MAX_GOAL_FRAMES", "12"))
+MAX_DENSE_GOAL_FRAMES = min(goal_review_sampling.MAX_DENSE_READER_FRAMES,
+    max(0, int(os.environ.get("FIX15_MAX_DENSE_GOAL_FRAMES", "64"))))
 
 ROLE_REVIEW_RADIUS_MS = 900
 ROLE_MIN_SEPARATION_MS = 150
@@ -142,7 +144,7 @@ def _b64(path: str | Path) -> str:
 
 
 def _model_audit(raw, prompt, paths, times=None):
-    return {"provider": VERIFY_PROVIDER, "model": VERIFY_MODEL, "raw_response": str(raw)[:50000],
+    return {"provider": VERIFY_PROVIDER, "model": VERIFY_MODEL, "raw_response": str(raw)[:262144],
             "response_sha256": hashlib.sha256(str(raw).encode()).hexdigest(),
             "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest(),
             "image_sha256": [hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in paths],
@@ -1550,7 +1552,7 @@ class ShadowVisionProviders:
         anchor_key = (int(anchor["media_ms"]), tuple(float(anchor["box"][k]) for k in ("x", "y", "w", "h"))) if anchor_valid else None
         path_key = hashlib.sha256(json.dumps(review_path, sort_keys=True).encode()).hexdigest() if review_path else None
         cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested),
-                     (requires_reference, anchor_key), path_key)
+                     (requires_reference, anchor_key), path_key, MAX_DENSE_GOAL_FRAMES)
         if cache_key in self._goal_cache:
             return self._goal_cache[cache_key]
         frames = _read_frames(video_path, requested)
@@ -1558,11 +1560,15 @@ class ShadowVisionProviders:
             self._goal_cache[cache_key] = None
             return None
         original_requested=list(requested)
+        dense_requested=None
         native_images={int(actual):image for actual,image in frames.values()}
         prepared_gap=self._scan_native_goal_gap(strike,review_path,native_images,start_ms,end_ms) if review_path else None
         if isinstance(prepared_gap,dict):
-            requested=goal_review_sampling.refocus_reader_times(requested,strike,review_path,
-                prepared_gap.get("appearance_search"),budget=MAX_GOAL_FRAMES,start_ms=start_ms,end_ms=end_ms)
+            dense_requested=goal_review_sampling.dense_reader_times(requested,strike,review_path,
+                prepared_gap,native_images,budget=MAX_DENSE_GOAL_FRAMES,start_ms=start_ms,end_ms=end_ms)
+            requested=dense_requested if dense_requested is not None else goal_review_sampling.refocus_reader_times(
+                requested,strike,review_path,prepared_gap.get("appearance_search"),
+                budget=MAX_GOAL_FRAMES,start_ms=start_ms,end_ms=end_ms)
             for ms in requested:
                 if ms not in frames and ms in native_images:frames[ms]=(ms,native_images[ms])
         with tempfile.TemporaryDirectory(prefix="fix10a_goal_") as temp:
@@ -1622,7 +1628,9 @@ class ShadowVisionProviders:
             result = {
                 "status": "UNRESOLVED",
                 "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
-                    "original_requested_ms": original_requested,"native_appearance_focus_used":requested!=original_requested,
+                    "original_requested_ms": original_requested,"native_appearance_focus_used":dense_requested is None and requested!=original_requested,
+                    "dense_native_coverage_used":dense_requested is not None,
+                    "reader_image_budget":MAX_DENSE_GOAL_FRAMES if dense_requested is not None else MAX_GOAL_FRAMES,
                     "native_path_end_ms": focus_end_ms, "canonical_authority": False},
                 "model_review_audit": (review or {}).get("model_review_audit"),
                 "response_coverage": (review or {}).get("response_coverage"),
@@ -1676,7 +1684,9 @@ class ShadowVisionProviders:
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
             "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
-                "original_requested_ms": original_requested,"native_appearance_focus_used":requested!=original_requested,
+                "original_requested_ms": original_requested,"native_appearance_focus_used":dense_requested is None and requested!=original_requested,
+                    "dense_native_coverage_used":dense_requested is not None,
+                    "reader_image_budget":MAX_DENSE_GOAL_FRAMES if dense_requested is not None else MAX_GOAL_FRAMES,
                 "native_path_end_ms": focus_end_ms, "canonical_authority": False},
             "model_review_audit": (review or {}).get("model_review_audit"),
             "response_coverage": (review or {}).get("response_coverage"),
