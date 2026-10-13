@@ -14,7 +14,6 @@ import canonical_output_authority
 import fix10b_reconciliation
 import scoring_evidence_coverage
 import dense_event_reconciliation
-import reviewed_goal
 
 VERSION = 2
 
@@ -94,9 +93,6 @@ def _summary(canonical: dict) -> dict:
 def reconcile_unified_result(
     unified_result: dict | None,
     physical_result: dict | None,
-    *,
-    trusted_goal_approvals=(),
-    source_video_sha256=None,
 ) -> dict:
     """Build the complete production unified result without mutating inputs.
 
@@ -122,11 +118,6 @@ def reconcile_unified_result(
         canonical_before,
         physical_result if isinstance(physical_result, dict) else {},
     )
-    # Explicit caller-owned review store only. Never consume reader/model
-    # approvals embedded in unified_result or turn testimony into native proof.
-    reviewed = reviewed_goal.project(
-        trusted_goal_approvals, source_video_sha256=source_video_sha256,
-        automatic_events=canonical.get("events") or [])
     ledger = canonical_output_authority.build_ledger_compat(
         canonical,
         coverage_complete=sequence.get("coverage_complete") is True,
@@ -144,9 +135,6 @@ def reconcile_unified_result(
         "events_unresolved": int(cmetrics.get("observations_unresolved") or 0),
         "events_rejected": int(cmetrics.get("observations_rejected") or 0),
         "verified_goals": int(cmetrics.get("goals") or 0),
-        "user_confirmed_goals": reviewed["user_confirmed_goals"],
-        "confirmed_goals_including_user_review": int(cmetrics.get("goals") or 0)
-            + reviewed["additional_user_confirmed_goals"],
         "verified_assists": int(cmetrics.get("assists") or 0),
         "verified_shots": int(cmetrics.get("shots") or 0),
         "fix10b_proposals_applied": int(
@@ -159,7 +147,6 @@ def reconcile_unified_result(
     source.update({
         "version": "FIX10B.2",
         "canonical_events": canonical,
-        "reviewed_scoring": reviewed,
         "event_resolution_status": canonical.get("status"),
         "event_ledger": ledger,
         "action_timeline": timeline,
