@@ -1,3 +1,4 @@
+"""Human approval must not masquerade as automatic physical verification."""
 from copy import deepcopy
 import json
 from pathlib import Path
