@@ -49,6 +49,13 @@ except ImportError:  # pragma: no cover - availability is deployment-specific
 
     UserMessage = ImageContent = _UnavailableMessage
 
+if os.environ.get("SCOUTMEPLAY_DIRECT_GOAL_TEST") == "1":
+    # Explicit isolated-test mode survives supporting-reader process spawning.
+    # Production keeps its existing transport unless this flag is deliberately set.
+    from scripts.direct_openai_goal_transport import DirectGoalChat, Payload
+    LlmChat = DirectGoalChat
+    UserMessage = ImageContent = Payload
+
 VERSION = 1
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
