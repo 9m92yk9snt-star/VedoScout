@@ -8,6 +8,38 @@ the implemented post-occlusion lane instead requires a measured, consistent
 before/after sequence. Observations guide where to inspect without supplying
 the expected answer to the pixel detector.
 
+## Automatic search correction after the clarification
+
+The dense native gap inspection no longer waits for `VERIFIED_OCCLUSION`.
+That verdict required independent goal geometry and pre-occlusion visual
+observations, making evidence collection wait for the conclusion it should
+help investigate. A completed scene response plus an independently qualified,
+contact-bound native path can now open the bounded local search. The resulting
+packet remains `SEARCH_ONLY`; incomplete responses, unbound paths and fake PTS
+remain ineligible. All downstream physical/identity/direction gates are intact.
+
+The scene-reader prompt explicitly continues inspection after body occlusion
+for ball reappearance, spare balls, outside-post observations and possession.
+It separates the directly visible crossing verdict from the runtime's
+before/after occluded-goal inference. Neither a hidden interval nor absent
+celebration is, by itself, a reason to reject a measured post-occlusion goal.
+No invisible crossing timestamp is supplied by the user's description.
+
+A further original-pixel check used the shared YOLOv8n and an already cached
+YOLOv8m, five native crop sizes per frame, the original last-before image and
+six documented after images: 70 forwards / 14 model-frame pairs. Exact RGB
+hashes were checked against the original PNG receipt. At the documented after
+feature there are still no qualifying class-32 detections from either model.
+This is not a new automatic goal acceptance. The feature hints only select
+inspection regions; they never supply ball class or event outcome.
+
+Focused native/reappearance/occlusion/runtime tests: **176 passed**. No paid
+model calls, production report writes or deployment were performed.
+The full offline regression selection passed **1,510 tests, 28 skipped** in
+47.30 seconds, with zero attempted SDK, network or video-decode calls in the
+regression process. Pixel inference was a separate offline diagnostic, not
+silently substituted for a completed automatic goal verification.
+
 The previous goal lane needed a visible crossing or a short extrapolated
 trajectory plus celebration. A ball that disappears behind bodies and later
 reappears wholly inside the goal needs a separate physical-evidence lane.

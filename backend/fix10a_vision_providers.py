@@ -755,6 +755,12 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "player/body in the goal-mouth / goal-line region; ball_visible must be false. OTHER means visible elsewhere. "
             "UNRESOLVED means relation/identity is unclear. For hidden rows set occluder to PLAYER_BODY, "
             "GOALKEEPER_BODY, GOAL_STRUCTURE, OTHER or UNKNOWN.\n"
+            "POST-OCCLUSION SEARCH: A hidden passage does not prohibit an observable later ball position. "
+            "Continue inspecting EVERY later image for the active ball reappearing between players or inside the net. "
+            "Report its literal visible box and relation when clear; do not invent the hidden crossing time. "
+            "Check separately for already-present spare balls, a ball outside the posts and visible possession. "
+            "Absence of a visible outside ball or contact is not proof of its impossibility. The runtime separately "
+            "checks before/after ball identity and may verify an occluded goal without a directly visible passage.\n"
             "DIRECT CROSSING: same_ball_continuity=true ONLY if the ball is visible and continuously identifiable in "
             "every sampled image from the last FIELD_SIDE frame through the first BEYOND_LINE_INSIDE_MOUTH frame. Any "
             "hidden interval makes it false. CROSSED means that strict visible whole-ball transition is proven; "
@@ -1146,9 +1152,12 @@ class ShadowVisionProviders:
     def _inspect_goal_gap(self, review, strike, review_path, images_by_ms, start_ms, end_ms):
         occ = review.get("occlusion_crossing_audit") if isinstance(review, dict) else None
         coverage = review.get("response_coverage") if isinstance(review, dict) else None
-        if (review_path is None or not isinstance(occ, dict)
-                or occ.get("status") != "VERIFIED_OCCLUSION"
-                or not isinstance(coverage, dict) or coverage.get("status") != "COMPLETED"):
+        # Search must not wait for the geometry/occlusion verdict it is meant
+        # to help investigate. The native plan independently validates contact
+        # binding and original PTS. Proof attachment still requires verified
+        # geometry, literal occlusion, identity, direction and the final gate.
+        if (review_path is None or not isinstance(coverage, dict)
+                or coverage.get("status") != "COMPLETED"):
             return None
         requested = goal_review_sampling.native_reappearance_times(
             strike, review_path, start_ms=start_ms, end_ms=end_ms)
@@ -1175,6 +1184,9 @@ class ShadowVisionProviders:
             packet["requested_ms"] = requested
             packet["actual_ms"] = sorted(native_images)
             packet["additional_remote_model_calls"] = 0
+            packet["search_trigger"] = "QUALIFIED_CONTACT_BOUND_NATIVE_PATH_LOSS"
+            packet["reader_occlusion_status"] = (
+                occ.get("status", "UNRESOLVED") if isinstance(occ, dict) else "UNRESOLVED")
             return packet
         except Exception:
             return {"status":"SEARCH_ONLY","proof_eligible":False,

@@ -127,6 +127,40 @@ def test_binding_another_video_invalidates_goal_and_pixel_fingerprint_caches():
     assert provider._native_video_fingerprint is None
 
 
+@pytest.mark.parametrize('occlusion', [None, {'status':'UNRESOLVED'}])
+def test_native_search_does_not_wait_for_a_prior_occlusion_or_goal_verdict(monkeypatch,occlusion):
+    data=native_job()
+    provider=vision.ShadowVisionProviders(None,'local-search')
+    provider.bind_video_path('source-fixture.mp4')
+    path=data['shot_track']
+    before=path['rows'][-1]
+    times=sampling.native_reappearance_times(data['strike'],path,start_ms=0,end_ms=4000)
+    images={ms:np.zeros((60,80,3),dtype=np.uint8) for ms in times}
+    monkeypatch.setattr(vision,'_read_frames',lambda _path,times:{ms:(ms,images[ms]) for ms in times})
+    monkeypatch.setattr(provider,'_native_goal_context',lambda:{'fixture':'native-only'})
+    captured={}
+    def inspect(anchor,images_by_ms,**context):
+        captured.update(anchor=anchor,times=sorted(images_by_ms),context=context)
+        return {'status':'SEARCH_ONLY','proof_eligible':False,'canonical_events_applied':0}
+    monkeypatch.setattr(review_pixels,'inspect_gap',inspect)
+    review={'geometry_status':'UNRESOLVED','response_coverage':{'status':'COMPLETED'},
+            'occlusion_crossing_audit':occlusion}
+    packet=provider._inspect_goal_gap(review,data['strike'],path,{},0,4000)
+    assert captured['anchor']==before
+    assert captured['times']==times
+    assert packet['search_trigger']=='QUALIFIED_CONTACT_BOUND_NATIVE_PATH_LOSS'
+    assert packet['reader_occlusion_status']=='UNRESOLVED'
+    assert packet['proof_eligible'] is False and packet['canonical_events_applied']==0
+
+
+def test_partial_reader_cannot_open_native_gap_search(monkeypatch):
+    provider=vision.ShadowVisionProviders(None,'partial')
+    monkeypatch.setattr(provider,'_native_goal_context',lambda:pytest.fail('partial review opened detector'))
+    data=native_job()
+    assert provider._inspect_goal_gap({'response_coverage':{'status':'PARTIAL_RESPONSE'}},
+        data['strike'],data['shot_track'],{},0,4000) is None
+
+
 @pytest.mark.parametrize('shift',[0,10000,25000])
 def test_native_gap_plan_retains_short_reappearances_without_more_reader_images(shift):
     data=native_job()
