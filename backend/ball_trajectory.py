@@ -1000,6 +1000,27 @@ def qualify_native_release_seed(dense_frames, contact_ball, provisional_anchor, 
                     "proof_eligible": False, "motion_support": float(original_support)}}}
 
 
+def qualify_produced_contact_seed(dense_frames, touch, anchor, scene_id):
+    """Share fresh producer seed selection before either role or shot binding.
+
+    The anchor must still be the unchanged ball_after of a verified physical
+    touch. An external required seed or a previously rejected identity cannot
+    be replaced. Qualification measures a new seed; it never raises the weak
+    observation's confidence or changes the original touch.
+    """
+    after = touch.get("ball_after") if isinstance(touch, dict) else None
+    if (not isinstance(touch, dict) or not isinstance(anchor, dict) or not isinstance(after, dict)
+            or touch.get("status") != "VERIFIED" or touch.get("proof_eligible") is not True
+            or anchor.get("remote_spare_ball_used") is True or after.get("remote_spare_ball_used") is True
+            or anchor.get("source") not in {"VERIFIED_RELEASE_CONTACT_BALL_AFTER",
+                                            "VERIFIED_SCORING_CONTROL_BALL_AFTER",
+                                            "VERIFIED_CONTACT_ROLE_BALL_AFTER"}
+            or any(anchor.get(k) != after.get(k) for k in
+                   ("media_ms", "box", "confidence", "state", "proof_eligible", "time_authority"))):
+        return None
+    return qualify_native_release_seed(dense_frames, touch.get("ball_at_contact"), anchor, scene_id)
+
+
 def select_release_ball_trajectory(dense_frames, anchor, scene_id, global_trajectory,
                                    *, anchor_required=False, max_duration_ms=3000,
                                    contact_ball=None, contact_required=False) -> dict:

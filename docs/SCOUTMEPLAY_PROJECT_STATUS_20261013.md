@@ -69,3 +69,18 @@ head. Source merged into main is not evidence of a live deployment.
 No defensible overall completion percentage or completion date follows from
 the present evidence. The current bottleneck is physical event verification.
 Detailed validation: `docs/evidence/FIX15_R6_TEMPORAL_GOAL_VALIDATION.json`.
+
+## Separate continuation from PR #29
+
+`codex-r6-contact-seed-handoff-20261013` starts from PR #29 at `575737e`.
+It makes the role and later strike producers share the same qualification of
+a fresh weak native ball-after observation. Original contact binding now has
+six qualified measurements instead of being rejected before role review.
+The original role and goal are still unresolved as a release/goal decision;
+missing actor bodies and insufficient strong separation remain documented.
+
+This fork passes 171 focused checks and 1,559 offline regressions (28 SDK skips).
+Eight freshly decoded original RGB crops match their receipts. No new model
+classifications or full five-action acceptance are claimed. Keep draft and
+retain the main/draft distinction above. See `docs/FIX15_CONTACT_ROLE_SEED_HANDOFF.md`
+and its validation JSON for the exact source and next blockers.

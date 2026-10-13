@@ -177,19 +177,12 @@ def _strike_ball_paths(strikes, touch_graph, dense_frames, window_trajectory):
     for strike in strikes:
         touch = _touch_for_strike(strike, touch_graph) or {}
         anchor = strike.get("active_ball_anchor")
-        ball_after = touch.get("ball_after")
         # Producer-side selection only: never repair an already rejected seed
         # or substitute for an externally supplied required anchor. The fresh
         # proposal must still be the exact ball_after of this verified touch.
-        if (isinstance(anchor, dict) and isinstance(ball_after, dict)
-                and touch.get("status") == "VERIFIED" and touch.get("proof_eligible") is True
-                and anchor.get("source") in {"VERIFIED_RELEASE_CONTACT_BALL_AFTER",
-                                             "VERIFIED_SCORING_CONTROL_BALL_AFTER"}
-                and "release_seed_qualification" not in strike
-                and all(anchor.get(k) == ball_after.get(k)
-                        for k in ("media_ms", "box", "confidence", "state", "proof_eligible", "time_authority"))):
-            qualified = ball_trajectory.qualify_native_release_seed(
-                dense_frames, touch.get("ball_at_contact"), anchor, strike.get("scene_id"))
+        if "release_seed_qualification" not in strike:
+            qualified = ball_trajectory.qualify_produced_contact_seed(
+                dense_frames, touch, anchor, strike.get("scene_id"))
             if qualified is not None:
                 anchor = qualified["anchor"]
                 strike["active_ball_anchor"] = anchor

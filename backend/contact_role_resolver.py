@@ -505,14 +505,27 @@ def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None, *
     for touch in graph_touches:
         if not isinstance(touch, dict):
             continue
+        touch.pop("contact_role_seed_qualification", None)
         role = resolve_touch_role(touch, source_by_id)
         if role is None:
             continue
         if role.get("status") == "VERIFIED" and role.get("role") == ROLE_RECEIVE_CONTROL:
             # Re-examine the ball physically attached to this contact, rather
             # than a window-global path that may have switched to a spare ball.
+            anchor = deepcopy(touch.get("ball_after"))
+            # Role review precedes strike extraction. Use the same fresh
+            # producer qualification there, before a weak seed is rejected by
+            # the shared selector and hides every valid later measurement.
+            if isinstance(anchor, dict) and anchor.get("source") in {
+                    None, "VERIFIED_RELEASE_CONTACT_BALL_AFTER", "VERIFIED_SCORING_CONTROL_BALL_AFTER"}:
+                anchor["source"] = "VERIFIED_CONTACT_ROLE_BALL_AFTER"
+            qualified = trajectory_engine.qualify_produced_contact_seed(
+                dense_frames or [], touch, anchor, touch.get("scene_id"))
+            if qualified is not None:
+                anchor = qualified["anchor"]
+                touch["contact_role_seed_qualification"] = deepcopy(qualified["audit"])
             selected = trajectory_engine.select_release_ball_trajectory(
-                dense_frames or [], touch.get("ball_after"), touch.get("scene_id"), ball_trajectory,
+                dense_frames or [], anchor, touch.get("scene_id"), ball_trajectory,
                 anchor_required="ball_after" in touch,
                 contact_ball=touch.get("ball_at_contact"),
                 contact_required="ball_at_contact" in touch,
