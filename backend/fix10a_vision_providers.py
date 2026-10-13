@@ -145,6 +145,7 @@ def _model_audit(raw, prompt, paths, times=None):
     return {"provider": VERIFY_PROVIDER, "model": VERIFY_MODEL, "raw_response": str(raw)[:50000],
             "response_sha256": hashlib.sha256(str(raw).encode()).hexdigest(),
             "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest(),
+            "image_sha256": [hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in paths],
             "media_ms": list(times or [])}
 
 
@@ -798,6 +799,7 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
             '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
             '"ball_box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0}|null,'
+            '"visible_balls_complete":true|false,"other_visible_balls":[{"box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0},"confidence":"high"|"medium"|"low"}],'
             '"ball_airborne":true|false|null,"depth_relation":"IN_FRONT_OF_GOAL"|"INSIDE_GOAL_VOLUME"|"UNKNOWN",'
             '"depth_basis":"VISIBLE_BALL_ON_PITCH"|"VISIBLE_NEAR_POST_OCCLUSION"|"VISIBLE_NET_CONTACT"|"PERSPECTIVE_TO_GOAL_FRAME"|"UNKNOWN",'
             '"occluder":"PLAYER_BODY"|"GOALKEEPER_BODY"|"GOAL_STRUCTURE"|"OTHER"|"UNKNOWN",'
@@ -820,6 +822,7 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             '"active_ball_outside_posts":"OBSERVED"|"NOT_VISIBLE"|"UNKNOWN",'
             '"visible_possession":"GOALKEEPER"|"OUTFIELD_PLAYER"|"NONE_VISIBLE"|"UNKNOWN",'
             '"confidence":"high"|"medium"|"low"}],'
+            '"ball_classification_protocol":"ALL_VISIBLE_BALLS_V1",'
             '"reason":"<short visual reason>"}'
         )
         msg = UserMessage(
@@ -828,7 +831,11 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         )
         if isinstance(ball_reference, dict) and _valid_box(ball_reference.get("box")):
             prompt += ("\nThe physically measured active ball reference is " + json.dumps(ball_reference, sort_keys=True)
-                       + ". Include this reference frame in ball_evidence and assess crossings only AFTER this reference. "
+                       + ". This is a search candidate: independently verify that the region shows a football, not a hand, glove or shoe. "
+                         "A supplied box does not establish ball classification. Report unclear classification as unresolved. "
+                         "Classify other visible footballs separately in EVERY image; visible_balls_complete concerns visible objects only "
+                         "and must be false when a possible competing visible ball cannot be confidently classified. "
+                         "Include this reference frame in ball_evidence and assess crossings only AFTER this reference. "
                          "Follow ONLY this ball from this image onward. If its visible continuation is ambiguous or a "
                          "different ball reaches the goal, same_ball_continuity must be false. This reference supplies no expected result.")
             msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs])
@@ -1259,8 +1266,16 @@ class ShadowVisionProviders:
                     "source": "LOCAL_NATIVE_BALL_REIDENTIFICATION",
                     "method": "CLASSIFIED_APPEARANCE_CAMERA_MOTION",
                     "status": "UNRESOLVED", "reason": "NATIVE_GOAL_DETECTOR_UNAVAILABLE"})
-            return native_goal_review.measure_review(review, before, images_by_ms,
-                                                    **context)
+            audit=native_goal_review.measure_review(review,before,images_by_ms,**context)
+            if (audit.get("identity_link") or {}).get("status")=="VERIFIED_SAME_BALL":
+                return audit
+            history=[(r,images_by_ms[r["media_ms"]]) for r in review_path["rows"]
+                     if r["media_ms"]<before["media_ms"] and r["media_ms"] in images_by_ms]
+            visual=native_goal_review.measure_visual_review(review,before,images_by_ms,
+                reference_history=history,**context)
+            if visual is None:return audit
+            visual["native_detector_attempt_reason"]=(audit.get("identity_link") or {}).get("reason")
+            return visual
         except Exception:
             return goal_reappearance.build_audit([], None, {
                 "source": "LOCAL_NATIVE_BALL_REIDENTIFICATION",
@@ -1583,6 +1598,10 @@ class ShadowVisionProviders:
                     deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="goal_scene")[0]
             except Exception as exc:
                 review = support_vision_runner.fail_closed_diagnostic(exc)
+            if isinstance(review,dict):
+                import independent_ball_review
+                review["native_reader_input_audit"]=independent_ball_review.bind_input(
+                    review,paths,actual_times,native_images)
         if isinstance(review, dict):
             review = deepcopy(review)
             # No reader response, including an unexpected certificate-shaped

@@ -110,6 +110,11 @@ def _reference_center(row, width, height):
 
 
 def _classified(row, scene_id):
+    if (isinstance(row,dict) and row.get('classification_source')=='INDEPENDENT_MULTI_FRAME_IMAGE_BALL_CLASSIFICATION'):
+        import independent_ball_review
+        return bool(_verified_time(row) and box_ok(row.get('box')) and row.get('scene_id')==scene_id
+                    and type(row.get('class_id')) is int and row['class_id']==32
+                    and independent_ball_review.classified(row))
     return (
         _verified_time(row) and box_ok(row.get("box"))
         and type(row.get("class_id")) is int and row["class_id"] == 32
@@ -127,6 +132,9 @@ def _preexisting_stationary(candidate, before, frame, centers, diameter):
     if not _classified(row, before["scene_id"]) or row["media_ms"] != before["media_ms"]:
         return None
     crop = _crop(frame, row["box"])
+    if (row.get('classification_source')=='INDEPENDENT_MULTI_FRAME_IMAGE_BALL_CLASSIFICATION'
+            and crop is not None and row.get('native_pixel_sha256')!=_sha(crop)):
+        return None
     desc = _descriptor(crop) if crop is not None else None
     if desc is None:
         return None
@@ -142,7 +150,7 @@ def _preexisting_stationary(candidate, before, frame, centers, diameter):
             "before_reference_center": center, "before_descriptor": desc}
 
 
-def measure_native_link(before, candidates, frames_by_ms, *, video_sha256):
+def measure_native_link(before, candidates, frames_by_ms, *, video_sha256,reference_history=()):
     """Measure identity, not a goal label; fail closed on spare-ball ambiguity.
 
     The before row is an already proof-eligible contact-bound ball. Candidate
@@ -167,6 +175,14 @@ def measure_native_link(before, candidates, frames_by_ms, *, video_sha256):
     ref = _descriptor(patch)
     if ref is None:
         return {**unresolved, "reason": "NATIVE_REFERENCE_APPEARANCE_UNINFORMATIVE"}
+    references=[ref];history_hashes=[]
+    for entry in list(reference_history or ())[:6]:
+        if not isinstance(entry,(tuple,list)) or len(entry)!=2:continue
+        row,image=entry
+        if (not _verified_time(row) or row.get('state')!='MEASURED' or row.get('proof_eligible') is not True
+                or row.get('scene_id')!=before['scene_id'] or not before['media_ms']-500<=row['media_ms']<before['media_ms']):continue
+        p=_crop(image,row.get('box'));v=_descriptor(p) if p is not None else None
+        if v is not None:references.append(v);history_hashes.append({'media_ms':row['media_ms'],'crop_sha256':_sha(p)})
     ranked, stationary, rejected = [], [], []
     seen_tracks = set()
     for candidate in candidates or []:
@@ -195,6 +211,9 @@ def measure_native_link(before, candidates, frames_by_ms, *, video_sha256):
             crop = _crop(frame, row["box"])
             if crop is None:
                 break
+            if (row.get('classification_source')=='INDEPENDENT_MULTI_FRAME_IMAGE_BALL_CLASSIFICATION'
+                    and row.get('native_pixel_sha256')!=_sha(crop)):
+                break
             alignment = row.get("camera_alignment", {})
             if not isinstance(alignment, dict) or alignment.get("reference_media_ms") != before["media_ms"]:
                 break
@@ -205,7 +224,9 @@ def measure_native_link(before, candidates, frames_by_ms, *, video_sha256):
             desc = _descriptor(crop)
             if desc is None:
                 break
-            similarities.append(float(np.clip(np.dot(ref, desc), -1., 1.)))
+            visual=row.get('classification_source')=='INDEPENDENT_MULTI_FRAME_IMAGE_BALL_CLASSIFICATION'
+            similarities.append(max(float(np.clip(np.dot(r,desc),-1.,1.)) for r in references)
+                                if visual else float(np.clip(np.dot(ref, desc), -1., 1.)))
             descriptors.append(desc)
             hashes.append(_sha(crop))
             centers.append(center)
@@ -262,5 +283,6 @@ def measure_native_link(before, candidates, frames_by_ms, *, video_sha256):
         "appearance_margin": best["similarity"]-alternative,
         "motion_diameters": best["motion_diameters"],
         "stationary_ball_controls": stationary, "rejected_candidates": [],
+        "reference_history":history_hashes,
         "reason": "CLASSIFIED_MOVING_BALL_MATCHES_CONTACT_BOUND_NATIVE_APPEARANCE",
     }

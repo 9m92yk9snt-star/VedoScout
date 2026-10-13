@@ -14,6 +14,7 @@ import native_ball_reappearance as native
 import goal_reappearance
 import temporal_ball_search
 import native_goal_frame
+import independent_ball_review
 
 MAX_AFTER_FRAMES = 6
 MAX_BALLS_PER_FRAME = 8
@@ -173,8 +174,35 @@ def _iou(a, b):
     return goal_reappearance._iou(a, b)
 
 
+def measure_visual_review(review,before,images_by_ms,*,video_sha256,
+                          model_sha256,detect_frame,camera_estimator,reference_history=()):
+    """Use an audited image classification with the same local identity gates.
+
+    Returns None when that distinct classification protocol is unavailable.
+    This does not trust a reader's same-ball or goal verdict.
+    """
+    if not isinstance(before,dict):return None
+    classified=independent_ball_review.extract(review,images_by_ms,before.get('scene_id'))
+    if classified is None:return None
+    primaries=[r for r in classified['rows_by_ms'].get(before.get('media_ms'),[])
+               if r.get('primary') is True and _iou(r['box'],before.get('box'))>=.75]
+    if len(primaries)!=1:
+        return goal_reappearance.build_audit([],None,{
+            'source':native.SOURCE,'method':native.METHOD,'status':'UNRESOLVED',
+            'proof_eligible':False,'reason':'IMAGE_CLASSIFIER_CONTACT_BOUND_BEFORE_BALL_UNVERIFIED'})
+    # A reference gallery may only use earlier images in which this reader
+    # independently classified the measured active-ball box as a football.
+    history=[(r,im) for r,im in reference_history if isinstance(r,dict)
+             and any(b.get('primary') is True and _iou(b['box'],r.get('box'))>=.75
+                     for b in classified['rows_by_ms'].get(r.get('media_ms'),[]))]
+    return measure_review(review,before,images_by_ms,video_sha256=video_sha256,
+        model_sha256=model_sha256,detect_frame=detect_frame,camera_estimator=camera_estimator,
+        _visual_classifications=classified,reference_history=history)
+
+
 def measure_review(review, before, images_by_ms, *, video_sha256,
-                   model_sha256, detect_frame, camera_estimator):
+                   model_sha256, detect_frame, camera_estimator,
+                   _visual_classifications=None,reference_history=()):
     """Callbacks operate only on supplied original pixels, never reader JSON.
 
     ``detect_frame(image, proposal)`` returns native ``(people, balls)``. The
@@ -206,8 +234,8 @@ def measure_review(review, before, images_by_ms, *, video_sha256,
             and before["media_ms"] < occ["occlusion_start_media_ms"]
             and type(occ.get("occlusion_end_media_ms")) is int):
         return fail("CONTACT_BOUND_NATIVE_BALL_REFERENCE_MISSING")
-    if not all(isinstance(s, str) and re.fullmatch(r"[0-9a-f]{64}", s)
-               for s in (video_sha256, model_sha256)):
+    fingerprints=(video_sha256,) if _visual_classifications is not None else (video_sha256,model_sha256)
+    if not all(isinstance(s, str) and re.fullmatch(r"[0-9a-f]{64}", s) for s in fingerprints):
         return fail("NATIVE_GOAL_SOURCE_FINGERPRINT_MISSING")
     evidence = review.get("ball_evidence")
     if not isinstance(evidence, list):
@@ -243,7 +271,16 @@ def measure_review(review, before, images_by_ms, *, video_sha256,
             if not isinstance(people, list) or not isinstance(balls, list):
                 return fail("NATIVE_GOAL_DETECTOR_RESULT_INVALID")
             rows = []
+            if _visual_classifications is not None:
+                rows=deepcopy(_visual_classifications['rows_by_ms'].get(ms,[]))
+                # A locally classified alternative that the image reader did
+                # not cover remains a competing object, never silently erased.
+                if any(isinstance(b,dict) and native.box_ok(b.get('box'))
+                       and native.number(b.get('confidence')) and b['confidence']>=native.MIN_BALL_CONFIDENCE
+                       and not any(_iou(b['box'],r['box'])>=.45 for r in rows) for b in balls):
+                    return fail('IMAGE_CLASSIFIER_LOCAL_BALL_ALTERNATIVE_UNREVIEWED')
             for ball in balls:
+                if _visual_classifications is not None:break
                 if (not isinstance(ball, dict) or not native.box_ok(ball.get("box"))
                         or not native.number(ball.get("confidence"))
                         or not native.MIN_BALL_CONFIDENCE <= ball["confidence"] <= 1):
@@ -300,13 +337,15 @@ def measure_review(review, before, images_by_ms, *, video_sha256,
     native_post = []
     for r in post:
         rows = detected[r["media_ms"]]
-        matches = [b for b in rows if _iou(b["box"], r["ball_box"]) >= .75]
+        matches = [b for b in rows if _iou(b["box"], r["ball_box"]) >= .75
+                   and (_visual_classifications is None or b.get('primary') is True)]
         if len(matches) != 1:
             return fail("NATIVE_GOAL_REVIEWED_BALL_NOT_INDEPENDENTLY_CLASSIFIED")
         active.append(matches[0])
         alternatives.append([b for b in rows if b is not matches[0]])
         native_post.append({**deepcopy(r), "ball_box": deepcopy(matches[0]["box"]),
-                            "box_source": "INDEPENDENT_NATIVE_CLASS32_DETECTION"})
+                            "box_source": "INDEPENDENT_IMAGE_CLASSIFIER_WITH_NATIVE_PIXEL_REID"
+                            if _visual_classifications is not None else "INDEPENDENT_NATIVE_CLASS32_DETECTION"})
     candidates = [{"track_id": "reviewed-reappearance", "observations": active}]
     # Exhaustive one-to-one association of the other classified balls. Partial
     # or crossing alternatives remain unresolved rather than being dropped.
@@ -336,10 +375,13 @@ def measure_review(review, before, images_by_ms, *, video_sha256,
             candidate["before_observation"] = prior[0]
         candidates.append(candidate)
     link = native.measure_native_link(before, candidates, images_by_ms,
-                                      video_sha256=video_sha256)
+                                      video_sha256=video_sha256,reference_history=reference_history)
     audit = goal_reappearance.build_audit(native_post, occ, link)
     audit["native_sampling_audit"] = {"before_media_ms": ref_ms,
         "after_media_ms": times, "detected_ball_counts": {
             str(ms): len(detected[ms]) for ms in selected_times},
         "original_pixels_only": True, "reader_identity_ignored": True}
+    if _visual_classifications is not None:
+        audit['classification_audit']={k:v for k,v in _visual_classifications.items() if k!='rows_by_ms'}
+        audit['native_sampling_audit']['classification_source']=independent_ball_review.SOURCE
     return audit

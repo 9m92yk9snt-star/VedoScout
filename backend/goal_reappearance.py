@@ -15,6 +15,7 @@ import json
 import hashlib
 
 import native_ball_reappearance as native
+import independent_ball_review
 
 VERSION = 1
 LANE = "OBSERVED_POST_OCCLUSION_GOAL"
@@ -363,11 +364,7 @@ def resolve(rows, geometry, strike_ms, touch_graph=None, strike_actor=None):
                 and r.get("relation") == "BEYOND_LINE_INSIDE_MOUTH" and native.box_ok(r.get("ball_box"))):
             return fail("REAPPEARANCE_AFTER_OBSERVATION_INVALID")
         det = measured_by_ms.get(r["media_ms"])
-        if not (native._verified_time(det) and type(det.get("class_id")) is int and det["class_id"] == 32
-                and native.number(det.get("confidence")) and det["confidence"] >= native.MIN_BALL_CONFIDENCE
-                and det["confidence"] <= 1
-                and det.get("classification_source") == "LOCAL_NATIVE_CLASS32_DETECTOR"
-                and isinstance(det.get("model_sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", det["model_sha256"])
+        if not (native._classified(det,link.get("scene_id"))
                 and isinstance(link.get("scene_id"), str) and bool(link["scene_id"])
                 and det.get("scene_id") == link["scene_id"]
                 and _iou(det.get("box"),r["ball_box"]) >= .75
@@ -375,6 +372,9 @@ def resolve(rows, geometry, strike_ms, touch_graph=None, strike_actor=None):
                 and det["camera_alignment"].get("status") == "MEASURED"
                 and det["camera_alignment"].get("reference_media_ms") == before["media_ms"]):
             return fail("REAPPEARANCE_AFTER_NOT_CLASSIFIED_NATIVE_BALL")
+        if (det.get('classification_source')==independent_ball_review.SOURCE
+                and not independent_ball_review.bound_to_review(det,geometry.get('model_review_audit'))):
+            return fail('REAPPEARANCE_IMAGE_CLASSIFICATION_RESPONSE_UNBOUND')
         linked.append(r)
     post_times = [r["media_ms"] for r in linked]
     if any(a >= b or b-a > 120 for a,b in zip(post_times,post_times[1:])):
@@ -390,6 +390,9 @@ def resolve(rows, geometry, strike_ms, touch_graph=None, strike_actor=None):
             or not isinstance(link.get("before_crop_sha256"),str)
             or not re.fullmatch(r"[0-9a-f]{64}",link["before_crop_sha256"])):
         return fail("REAPPEARANCE_NATIVE_PIXEL_PROVENANCE_MISSING")
+    if any(det.get('classification_source')==independent_ball_review.SOURCE
+           and det.get('native_pixel_sha256')!=digest for det,digest in zip(measured,hashes)):
+        return fail('REAPPEARANCE_IMAGE_CLASSIFICATION_PIXEL_HASH_MISMATCH')
     before_metrics = _metrics(before["box"],geometry,before["media_ms"])
     after_metrics = [_metrics(r["ball_box"],geometry,r["media_ms"]) for r in linked]
     if before_metrics is None or any(m is None for m in after_metrics):
