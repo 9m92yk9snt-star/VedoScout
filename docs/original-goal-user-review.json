@@ -1,0 +1,20 @@
+{
+  "review_id": "original-goal-owner-confirmation-20261013",
+  "reviewer": "video_owner_in_chat",
+  "reviewed_at": "2026-10-13",
+  "source": "EXPLICIT_USER_REVIEW",
+  "decision": "APPROVE_GOAL",
+  "source_video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b",
+  "scene_id": "scene_003",
+  "actor_id": "GLOBAL_TARGET",
+  "contact_ms": 30915,
+  "statement": "Brugeren bekræfter udtrykkeligt målet ud fra det samlede observerede forløb.",
+  "observations": [
+    "Spilleren sparker med højre fod mod mål.",
+    "Bolden bevæger sig mod den inderste højre stolpe.",
+    "En modstanders ryg dækker bolden før målpassagen.",
+    "Brugeren identificerer kort efter samme bold mellem spillerne inde i målet.",
+    "Målmandens blik, arme og handsker følger mod højre.",
+    "Brugeren ser ingen bold flyve forbi målet og ingen spiller eller målmand tage bolden."
+  ]
+}

@@ -1,5 +1,29 @@
 # Observed whole-ball reappearance after a short body occlusion
 
+## Explicit owner approval, 13 October 2026
+
+The owner explicitly approves the original goal using the complete described
+sequence. `original-goal-user-review.json` records that decision, source-video
+hash, scene and original contact time. Every observation in that record is
+human-sourced; right foot, ball identity and goalkeeper reaction are not newly
+claimed machine measurements.
+
+`reviewed_goal.project` and the explicit caller-owned
+`trusted_goal_approvals` argument of `reconcile_unified_result` project such
+approvals as `USER_CONFIRMED_GOAL`. The reviewed scoring list and counts remain
+separate from canonical physical events, native evidence, automatic goal
+counts and unresolved automatic evidence. Duplicate reviews do not add goals;
+an exactly matched automatic goal is not counted twice. Foreign-source and
+incomplete reviews are rejected. Embedded model/unified-result review payloads
+are ignored. Authentication and persistence belong to a trusted calling review
+service; this is not a new unauthenticated HTTP endpoint.
+
+The review record is **not automatically loaded by production**. It is a
+source-bound approval checkpoint and an implemented runtime interface, not a
+claim that a live report was updated or deployed. Automated original-video
+verification remains unresolved. Focused review/runtime/reconciliation tests:
+33 passed. No new automatic five-action acceptance is claimed.
+
 The previous goal lane needed a visible crossing or a short extrapolated
 trajectory plus celebration. A ball that disappears behind bodies and later
 reappears wholly inside the goal needs a separate physical-evidence lane.
