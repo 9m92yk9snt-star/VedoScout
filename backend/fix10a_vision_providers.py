@@ -1119,6 +1119,67 @@ class ShadowVisionProviders:
         self._native_goal_detector = None
         self._native_video_fingerprint = None
 
+    def _native_goal_context(self):
+        import dense_track_refinement as dense
+        if self._native_goal_detector is None:
+            self._native_goal_detector = dense._default_detector()
+        detector = self._native_goal_detector
+        if detector is None or not getattr(detector, "ok", False):
+            return None
+        path = Path(self.video_path)
+        st = path.stat()
+        key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
+        if self._native_video_fingerprint is None or self._native_video_fingerprint[0] != key:
+            with path.open("rb") as handle:
+                digest = hashlib.file_digest(handle, "sha256").hexdigest()
+            self._native_video_fingerprint = (key, digest)
+
+        def detect_frame(image, proposal):
+            people, balls = dense._detect_dense_people_and_ball(detector, image)
+            local, _roi = _native_ball_roi(detector, image, proposal)
+            return people, [*balls, *local]
+
+        return {"detect_frame": detect_frame, "camera_estimator": dense._default_camera_estimator,
+                "model_sha256": getattr(detector, "model_sha256", None),
+                "video_sha256": self._native_video_fingerprint[1]}
+
+    def _inspect_goal_gap(self, review, strike, review_path, images_by_ms, start_ms, end_ms):
+        occ = review.get("occlusion_crossing_audit") if isinstance(review, dict) else None
+        coverage = review.get("response_coverage") if isinstance(review, dict) else None
+        if (review_path is None or not isinstance(occ, dict)
+                or occ.get("status") != "VERIFIED_OCCLUSION"
+                or not isinstance(coverage, dict) or coverage.get("status") != "COMPLETED"):
+            return None
+        requested = goal_review_sampling.native_reappearance_times(
+            strike, review_path, start_ms=start_ms, end_ms=end_ms)
+        if not requested:
+            return None
+        try:
+            context = self._native_goal_context()
+            if context is None:
+                return {"status":"SEARCH_ONLY","proof_eligible":False,
+                        "reason":"NATIVE_GOAL_DETECTOR_UNAVAILABLE"}
+            missing = [ms for ms in requested if ms not in images_by_ms]
+            extra = _read_frames(self.video_path, missing) if missing else {}
+            before = review_path["rows"][-1]
+            first,last = requested[0],requested[-1]
+            native_images = {ms: image for ms,image in images_by_ms.items() if first<=ms<=last}
+            native_images.update({actual:image for actual,image in extra.values() if first<=actual<=last})
+            images_by_ms.update(native_images)
+            # Reader frames may be additional times within the same horizon.
+            # Retain the bounded local plan, not a union exceeding its budget.
+            allowed = {ms for ms in requested if ms in native_images}
+            allowed.update(actual for actual,_image in extra.values() if first<=actual<=last)
+            native_images = {ms:native_images[ms] for ms in sorted(allowed)}
+            packet = native_goal_review.inspect_gap(before, native_images, **context)
+            packet["requested_ms"] = requested
+            packet["actual_ms"] = sorted(native_images)
+            packet["additional_remote_model_calls"] = 0
+            return packet
+        except Exception:
+            return {"status":"SEARCH_ONLY","proof_eligible":False,
+                    "reason":"NATIVE_GOAL_GAP_INSPECTION_FAILED"}
+
     def _measure_goal_reappearance(self, review, review_path, images_by_ms):
         """Local identity measurement, outside the text/SDK reader boundary."""
         if not isinstance(review_path, dict) or not isinstance(review, dict):
@@ -1133,32 +1194,14 @@ class ShadowVisionProviders:
         if before is None:
             return None
         try:
-            import dense_track_refinement as dense
-            if self._native_goal_detector is None:
-                self._native_goal_detector = dense._default_detector()
-            detector = self._native_goal_detector
-            if detector is None or not getattr(detector, "ok", False):
+            context = self._native_goal_context()
+            if context is None:
                 return goal_reappearance.build_audit([], None, {
                     "source": "LOCAL_NATIVE_BALL_REIDENTIFICATION",
                     "method": "CLASSIFIED_APPEARANCE_CAMERA_MOTION",
                     "status": "UNRESOLVED", "reason": "NATIVE_GOAL_DETECTOR_UNAVAILABLE"})
-            path = Path(self.video_path)
-            st = path.stat()
-            key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
-            if self._native_video_fingerprint is None or self._native_video_fingerprint[0] != key:
-                with path.open("rb") as handle:
-                    digest = hashlib.file_digest(handle, "sha256").hexdigest()
-                self._native_video_fingerprint = (key, digest)
-
-            def detect_frame(image, proposal):
-                people, balls = dense._detect_dense_people_and_ball(detector, image)
-                local, _roi = _native_ball_roi(detector, image, proposal)
-                return people, [*balls, *local]
-
             return native_goal_review.measure_review(review, before, images_by_ms,
-                video_sha256=self._native_video_fingerprint[1],
-                model_sha256=getattr(detector, "model_sha256", None),
-                detect_frame=detect_frame, camera_estimator=dense._default_camera_estimator)
+                                                    **context)
         except Exception:
             return goal_reappearance.build_audit([], None, {
                 "source": "LOCAL_NATIVE_BALL_REIDENTIFICATION",
@@ -1478,8 +1521,12 @@ class ShadowVisionProviders:
             # No reader response, including an unexpected certificate-shaped
             # JSON object, has authority to identify the native release ball.
             review.pop("ball_reappearance_audit", None)
+            review.pop("native_reappearance_gap_scan", None)
             images_by_ms = {int(actual): frame for actual, frame in frames.values()
                             if int(actual) in actual_times}
+            gap_scan = self._inspect_goal_gap(review, strike, review_path, images_by_ms, start_ms, end_ms)
+            if gap_scan is not None:
+                review["native_reappearance_gap_scan"] = gap_scan
             native_audit = self._measure_goal_reappearance(review, review_path, images_by_ms)
             if native_audit is not None:
                 review["ball_reappearance_audit"] = native_audit
@@ -1518,6 +1565,8 @@ class ShadowVisionProviders:
                 result["support_vision_fail_closed"] = review["support_vision_fail_closed"]
             if isinstance(review, dict) and "ball_reappearance_audit" in review:
                 result["ball_reappearance_audit"] = deepcopy(review["ball_reappearance_audit"])
+            if isinstance(review, dict) and "native_reappearance_gap_scan" in review:
+                result["native_reappearance_gap_scan"] = deepcopy(review["native_reappearance_gap_scan"])
             self._goal_cache[cache_key] = result
             if requires_reference:
                 result["visual_crossing_audit"]["active_ball_link"] = link
@@ -1574,6 +1623,8 @@ class ShadowVisionProviders:
             }),
             **({"ball_reappearance_audit": deepcopy(review["ball_reappearance_audit"])}
                if "ball_reappearance_audit" in (review or {}) else {}),
+            **({"native_reappearance_gap_scan": deepcopy(review["native_reappearance_gap_scan"])}
+               if "native_reappearance_gap_scan" in (review or {}) else {}),
         }
         if requires_reference:
             result["visual_crossing_audit"]["active_ball_link"] = link

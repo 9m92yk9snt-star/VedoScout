@@ -21,6 +21,125 @@ MAX_FIRST_AFTER_OCCLUSION_MS = 220
 MIN_BEFORE_ROWS = 3
 MIN_AFTER_ROWS = 3
 GEOMETRY_NEAR_MS = 500
+NATIVE_GEOMETRY_TRANSFER_NEAR_MS = 100
+
+
+def attach_native_gap_evidence(geometry):
+    """Use classified dense after positions only after independent geometry.
+
+    Static goal/field geometry is transferred between original frames by their
+    measured background affines. Search-only feature tracks and user assertions
+    never enter this lane. The ordinary resolver and final gates still run.
+    """
+    import numpy as np
+    if not isinstance(geometry, dict):
+        return geometry
+    scan = geometry.get("native_reappearance_gap_scan")
+    occ = geometry.get("occlusion_crossing_audit")
+    if (geometry.get("source") != "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW"
+            or geometry.get("status") != "VERIFIED" or geometry.get("field_side_status") != "VERIFIED"
+            or not isinstance(geometry.get("response_coverage"), dict)
+            or geometry["response_coverage"].get("status") != "COMPLETED"
+            or not isinstance(scan, dict) or scan.get("source") != "BOUNDED_NATIVE_GOAL_GAP_INSPECTION"
+            or scan.get("canonical_events_applied") != 0
+            or not isinstance(occ, dict) or occ.get("status") != "VERIFIED_OCCLUSION"
+            or type(occ.get("occlusion_end_media_ms")) is not int):
+        return geometry
+    checks = scan.get("candidate_identity_checks")
+    if not isinstance(checks, list):
+        return geometry
+    links = {}
+    for item in checks:
+        link = item.get("check") if isinstance(item, dict) else None
+        if (not isinstance(link, dict) or link.get("source") != native.SOURCE
+                or link.get("method") != native.METHOD):
+            return geometry
+        if (link.get("status") != "VERIFIED_SAME_BALL"
+                or link.get("proof_eligible") is not True
+                or type(link.get("before_media_ms")) is not int
+                or not isinstance(link.get("after_track_id"),str)):
+            continue
+        key=(link["before_media_ms"],link["after_track_id"])
+        if key in links and links[key]!=link:
+            return geometry
+        links[key] = link
+    if len(links) != 1:
+        return geometry
+    link = next(iter(links.values()))
+    if geometry.get("source_video_sha256") not in {None,link.get("source_video_sha256")}:
+        return geometry
+    rows = link.get("after_observations")
+    dims,alignments = scan.get("native_frame_dimensions"),scan.get("camera_alignments")
+    if (not isinstance(rows, list) or len(rows) < MIN_AFTER_ROWS
+            or not isinstance(dims, dict) or not isinstance(alignments, dict)
+            or any(type(dims.get(k)) is not int or dims[k] <= 0 for k in ("width","height"))):
+        return geometry
+    w,h = dims["width"],dims["height"]
+    if (not isinstance(geometry.get("field_side_by_ms"),list)
+            or not isinstance(geometry.get("line_by_ms"),list)):
+        return geometry
+    fields = {r["media_ms"]:r for r in geometry.get("field_side_by_ms",[])
+              if isinstance(r,dict) and type(r.get("media_ms")) is int
+              and r.get("confidence") in {"high","medium"}}
+    bases = [r for r in geometry.get("line_by_ms",[]) if isinstance(r,dict)
+             and type(r.get("media_ms")) is int and r.get("confidence") in {"high","medium"}
+             and r["media_ms"] in fields and str(r["media_ms"]) in alignments]
+    if not bases:
+        return geometry
+    result = deepcopy(geometry)
+    post,lines,points = [],[],[]
+    try:
+        def matrix_at(ms):
+            row = alignments[str(ms)]
+            if row.get("status") != "MEASURED" or row.get("reference_media_ms") != link["before_media_ms"]:
+                raise ValueError("unmeasured camera")
+            a = np.asarray(row["affine_to_reference"],dtype=float)
+            if a.shape != (2,3) or not np.isfinite(a).all() or np.linalg.det(a[:,:2])<=0:
+                raise ValueError("invalid camera")
+            scales=np.linalg.svd(a[:,:2],compute_uv=False)
+            if scales.min()<.5 or scales.max()>2:raise ValueError("camera scale")
+            return np.vstack([a,[0.,0.,1.]])
+
+        for row in rows:
+            if not native._classified(row,link.get("scene_id")):
+                return geometry
+            ms=row["media_ms"]
+            if ms<=occ["occlusion_end_media_ms"]:
+                return geometry
+            basis=min(bases,key=lambda r:abs(r["media_ms"]-ms))
+            if abs(basis["media_ms"]-ms)>NATIVE_GEOMETRY_TRANSFER_NEAR_MS:return geometry
+            transform=np.linalg.inv(matrix_at(ms))@matrix_at(basis["media_ms"])
+            def point(p):
+                q=transform@np.array([float(p["x"])*w,float(p["y"])*h,1.])
+                if not np.isfinite(q).all() or not (0<=q[0]/w<=1 and 0<=q[1]/h<=1):
+                    raise ValueError("mapped point outside frame")
+                return {"x":float(q[0]/w),"y":float(q[1]/h)}
+            line={k:point(basis["line"][k]) for k in ("p1","p2")}
+            field=point(fields[basis["media_ms"]]["point"])
+            provenance={"geometry_source":"MEASURED_BACKGROUND_TRANSFER_OF_INDEPENDENT_GEOMETRY",
+                        "geometry_reference_ms":basis["media_ms"]}
+            lr={"media_ms":ms,"line":line,"confidence":basis["confidence"],**provenance}
+            fr={"media_ms":ms,"point":field,"confidence":fields[basis["media_ms"]]["confidence"],**provenance}
+            local={"field_side_status":"VERIFIED","line_by_ms":[lr],"field_side_by_ms":[fr]}
+            metrics=_metrics(row["box"],local,ms)
+            if (metrics is None or metrics["field_signed_distance"]>=-metrics["normal_extent"]-1e-6
+                    or metrics["mouth_margin"]<=1e-6):return geometry
+            lines.append(lr);points.append(fr)
+            post.append({"media_ms":ms,"ball_box":deepcopy(row["box"]),"ball_visible":True,
+                "relation":"BEYOND_LINE_INSIDE_MOUTH","confidence":"high",
+                "box_source":"INDEPENDENT_NATIVE_CLASS32_DETECTION",**provenance})
+    except (KeyError,TypeError,ValueError,np.linalg.LinAlgError):
+        return geometry
+    line_by_ms={r["media_ms"]:r for r in result["line_by_ms"]}
+    field_by_ms={r["media_ms"]:r for r in result["field_side_by_ms"]}
+    line_by_ms.update({r["media_ms"]:r for r in lines})
+    field_by_ms.update({r["media_ms"]:r for r in points})
+    result["line_by_ms"]=[line_by_ms[ms] for ms in sorted(line_by_ms)]
+    result["field_side_by_ms"]=[field_by_ms[ms] for ms in sorted(field_by_ms)]
+    result["ball_reappearance_audit"]=build_audit(post,occ,link)
+    result["source_video_sha256"]=link.get("source_video_sha256")
+    result["ball_reappearance_audit"]["native_dense_geometry_transfer"]=True
+    return result
 
 
 def _iou(a, b):

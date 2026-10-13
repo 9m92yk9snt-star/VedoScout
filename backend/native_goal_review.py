@@ -16,6 +16,143 @@ import goal_reappearance
 MAX_AFTER_FRAMES = 6
 MAX_BALLS_PER_FRAME = 8
 MAX_ASSOCIATION_DIAMETERS = 3.
+MAX_GAP_ASSOCIATION_DIAMETERS = 1.5
+
+
+def inspect_gap(before, images_by_ms, *, model_sha256, video_sha256,
+                detect_frame, camera_estimator):
+    """Bounded native search through a path loss, without semantic promotion.
+
+    Keeps literal detector observations, camera-compensated candidate segments
+    and their native identity checks. An image feature or reader assertion is
+    never changed into a classified ball. This packet cannot certify a goal.
+    """
+    import cv2
+    import numpy as np
+    packet = {"status": "SEARCH_ONLY", "proof_eligible": False,
+              "source": "BOUNDED_NATIVE_GOAL_GAP_INSPECTION", "rows": [],
+              "candidate_identity_checks": [], "canonical_events_applied": 0}
+    if not (native._verified_time(before) and before.get("proof_eligible") is True
+            and before.get("state") == "MEASURED" and native.box_ok(before.get("box"))
+            and isinstance(before.get("scene_id"), str) and before["scene_id"]
+            and isinstance(images_by_ms, dict)
+            and all(isinstance(s, str) and re.fullmatch(r"[0-9a-f]{64}", s)
+                    for s in (model_sha256, video_sha256))):
+        return {**packet, "reason": "NATIVE_GAP_REFERENCE_OR_PROVENANCE_INVALID"}
+    ref_ms = before["media_ms"]
+    times = sorted(ms for ms in images_by_ms if type(ms) is int
+                   and ref_ms <= ms <= ref_ms+native.MAX_GAP_MS)
+    if not times or times[0] != ref_ms or len(times) > 56:
+        return {**packet, "reason": "NATIVE_GAP_FRAME_BUDGET_OR_REFERENCE_INVALID"}
+    ref_image = images_by_ms[ref_ms]
+    if (not isinstance(ref_image, np.ndarray) or ref_image.dtype != np.uint8
+            or ref_image.ndim != 3 or ref_image.shape[2] != 3):
+        return {**packet, "reason": "NATIVE_GAP_REFERENCE_PIXELS_MISSING"}
+    h, w = ref_image.shape[:2]
+    packet["native_frame_dimensions"] = {"width": w, "height": h}
+    packet["camera_alignments"] = {str(ref_ms): {
+        "status": "MEASURED", "reference_media_ms": ref_ms,
+        "affine_to_reference": [[1.,0.,0.],[0.,1.,0.]],
+        "measurement_reason": "EXACT_REFERENCE_FRAME"}}
+    ref_gray = cv2.cvtColor(ref_image, cv2.COLOR_BGR2GRAY)
+    detections, people_by_ms = {}, {}
+    for ms in times:
+        image = images_by_ms[ms]
+        if not isinstance(image, np.ndarray) or image.dtype != np.uint8 or image.shape != ref_image.shape:
+            return {**packet, "reason": "NATIVE_GAP_ORIGINAL_FRAME_DIMENSIONS_CHANGED"}
+        try:
+            people, balls = detect_frame(image, deepcopy(before["box"]))
+            if not isinstance(people, list) or not isinstance(balls, list):
+                return {**packet, "reason": "NATIVE_GAP_DETECTOR_RESULT_INVALID"}
+            qualified = []
+            for ball in balls:
+                if (not isinstance(ball, dict) or not native.box_ok(ball.get("box"))
+                        or not native.number(ball.get("confidence"))
+                        or not native.MIN_BALL_CONFIDENCE <= ball["confidence"] <= 1):
+                    continue
+                if any(_iou(ball["box"], r["box"]) >= .45 for r in qualified):
+                    continue
+                qualified.append({"media_ms": ms, "box": deepcopy(ball["box"]),
+                    "confidence": float(ball["confidence"]), "class_id": 32,
+                    "scene_id": before["scene_id"], "state": "MEASURED",
+                    "proof_eligible": False, "time_authority": "ACTUAL_MEDIA_PTS",
+                    "used_fallback": False, "cut_barrier": False,
+                    "source": "LOCAL_NATIVE_DETECTOR",
+                    "classification_source": "LOCAL_NATIVE_CLASS32_DETECTOR",
+                    "model_sha256": model_sha256})
+            if len(qualified) > MAX_BALLS_PER_FRAME:
+                return {**packet, "reason": "NATIVE_GAP_COMPETING_BALL_BUDGET_EXCEEDED"}
+            detections[ms], people_by_ms[ms] = qualified, people
+            packet["rows"].append({"media_ms": ms, "time_authority": "ACTUAL_MEDIA_PTS",
+                "source_bgr_pixel_sha256": native._sha(image),
+                "raw_class32_candidate_count": len(balls),
+                "qualified_ball_count": len(qualified), "qualified_balls": qualified})
+        except Exception:
+            return {**packet, "reason": "NATIVE_GAP_DETECTION_FAILED"}
+    for ms in times[1:]:
+        exclude = [p["box"] for p in people_by_ms[ms]+people_by_ms[ref_ms]
+                   if isinstance(p, dict) and isinstance(p.get("box"), dict)
+                   and all(native.number(p["box"].get(k)) for k in ("x", "y", "w", "h"))]
+        exclude += [r["box"] for r in detections[ms]+detections[ref_ms]]
+        try:
+            matrix, reason = camera_estimator(cv2.cvtColor(images_by_ms[ms], cv2.COLOR_BGR2GRAY),
+                ref_gray, [(b["x"]*w,b["y"]*h,b["w"]*w,b["h"]*h) for b in exclude])
+            if matrix is None:
+                return {**packet, "reason": "NATIVE_GAP_BACKGROUND_CAMERA_UNMEASURED"}
+            matrix = np.asarray(matrix, dtype=float)
+            if matrix.shape != (2,3) or not np.isfinite(matrix).all():
+                return {**packet, "reason": "NATIVE_GAP_BACKGROUND_CAMERA_INVALID"}
+            packet["camera_alignments"][str(ms)] = {
+                "status":"MEASURED","reference_media_ms":ref_ms,
+                "affine_to_reference":matrix.tolist(),"measurement_reason":str(reason)}
+            for r in detections[ms]:
+                r["camera_alignment"] = {"status":"MEASURED","reference_media_ms":ref_ms,
+                    "affine_to_reference":matrix.tolist(),"measurement_reason":str(reason)}
+                if native._reference_center(r,w,h) is None:
+                    return {**packet, "reason": "NATIVE_GAP_BACKGROUND_CAMERA_INVALID"}
+        except Exception:
+            return {**packet, "reason": "NATIVE_GAP_BACKGROUND_CAMERA_INVALID"}
+    paths = []
+    for ms in times[1:]:
+        candidates = []
+        for r in detections[ms]:
+            center = native._reference_center(r,w,h)
+            matches = [i for i,path in enumerate(paths)
+                if 0 < ms-path[-1]["media_ms"] <= 120 and math.dist(center,
+                    native._reference_center(path[-1],w,h)) <= MAX_GAP_ASSOCIATION_DIAMETERS*max(
+                        r["box"]["w"]*w,r["box"]["h"]*h)]
+            candidates.append((r,matches))
+        claimed = [i for _r, matches in candidates for i in matches]
+        for r,matches in candidates:
+            if len(matches)>1 or (matches and claimed.count(matches[0])>1):
+                return {**packet, "reason": "NATIVE_GAP_BALL_ASSOCIATION_AMBIGUOUS"}
+            if matches: paths[matches[0]].append(r)
+            else: paths.append([r])
+    complete = []
+    for i,path in enumerate(paths):
+        candidate = {"track_id":f"native-gap-{i}","observations":path}
+        if len(path) >= native.MIN_AFTER_SAMPLES and path[-1]["media_ms"]-path[0]["media_ms"] >= native.MIN_AFTER_SPAN_MS:
+            center = native._reference_center(path[0],w,h)
+            diameter = max(path[0]["box"]["w"]*w,path[0]["box"]["h"]*h)
+            priors = [r for r in detections[ref_ms] if math.dist(center, (
+                (r["box"]["x"]+r["box"]["w"]/2)*w,
+                (r["box"]["y"]+r["box"]["h"]/2)*h)) <= diameter*.5]
+            if len(priors)==1: candidate["before_observation"]=priors[0]
+            complete.append(candidate)
+    # Keep every competing complete/partial path in each time-overlap check.
+    # A short or unclassified alternative never becomes a verified reserve.
+    for candidate in complete:
+        first,last = candidate["observations"][0]["media_ms"],candidate["observations"][-1]["media_ms"]
+        overlapping = [c for i,p in enumerate(paths) if p[0]["media_ms"] <= last and p[-1]["media_ms"] >= first
+                       for c in [{"track_id":f"native-gap-{i}","observations":[r for r in p if first<=r["media_ms"]<=last]}]]
+        for c in overlapping:
+            original = next((p for p in complete if p["track_id"]==c["track_id"]),None)
+            if original and "before_observation" in original:c["before_observation"]=original["before_observation"]
+        check = native.measure_native_link(before, overlapping, images_by_ms,video_sha256=video_sha256)
+        packet["candidate_identity_checks"].append({"candidate_track_id":candidate["track_id"],"check":check})
+    packet["sample_count"] = len(times)
+    packet["reason"] = "NATIVE_GAP_SEARCH_COMPLETE_GOAL_GEOMETRY_STILL_REQUIRED"
+    return packet
 
 
 def _iou(a, b):

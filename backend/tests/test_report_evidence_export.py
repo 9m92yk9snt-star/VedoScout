@@ -200,8 +200,11 @@ def test_cross_report_object_references_are_not_read_or_signed(case, key):
 
 def test_missing_trace_and_size_limit_do_not_turn_into_empty_success(case):
     case[0]["fix10a_trace_manifest"] = [{"local_path": "/etc/passwd"}]
-    (case[1] / "match.web.mp4").write_bytes(b"x" * 10000)
-    build(case, max_file_bytes=5000)
+    # Leave room for the mandatory provenance/missing-source metadata; the
+    # video is deliberately above the cap regardless of that metadata size.
+    per_file_limit = 16 * 1024
+    (case[1] / "match.web.mp4").write_bytes(b"x" * (per_file_limit + 1))
+    build(case, max_file_bytes=per_file_limit)
     missing = read(case, "missing_data.json")
     assert any(r["item"] == "trace[0]" for r in missing)
     assert any(r["item"] == "canonical_web" and r["reason"] == "ExportLimitError" for r in missing)

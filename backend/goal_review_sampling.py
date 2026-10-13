@@ -4,6 +4,38 @@ import math
 
 import ball_trajectory
 
+NATIVE_REAPPEARANCE_HORIZON_MS = 900
+MAX_NATIVE_REAPPEARANCE_FRAMES = 56
+
+
+def native_reappearance_times(strike, path, *, start_ms, end_ms):
+    """Inspect a short loss at about native 60 fps without more reader images.
+
+    The existing twelve-image reader budget can sample only one frame of a
+    100 ms reappearance. Local decoding/detection uses a separate bounded plan;
+    none of its requested times has proof or event authority.
+    """
+    valid = contact_bound_native_path(strike, path)
+    if (valid is None or type(start_ms) is not int or type(end_ms) is not int
+            or not 0 <= start_ms <= end_ms):
+        return []
+    return native_gap_times(valid["rows"][-1]["media_ms"],start_ms=start_ms,end_ms=end_ms)
+
+
+def native_gap_times(last_visible_ms, *, start_ms, end_ms):
+    """Time planning only; callers must independently validate the ball path."""
+    if (type(last_visible_ms) is not int or type(start_ms) is not int or type(end_ms) is not int
+            or not 0<=start_ms<=end_ms):
+        return []
+    first = last_visible_ms
+    if not start_ms <= first < end_ms:
+        return []
+    last = min(first + NATIVE_REAPPEARANCE_HORIZON_MS, end_ms)
+    intervals = min(MAX_NATIVE_REAPPEARANCE_FRAMES - 1,
+                    max(1, math.ceil((last-first) / (1000/60))))
+    return sorted({first + round((last-first)*i/intervals)
+                   for i in range(intervals+1)})
+
 
 def contact_bound_native_path(strike, path):
     """Copy only an exact, independently contact-bound native measured path.

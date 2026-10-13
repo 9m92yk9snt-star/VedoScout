@@ -11,7 +11,11 @@ import pytest
 import native_goal_review as review_pixels
 import fix10a_vision_providers as vision
 import dense_track_refinement as dense
+import goal_reappearance
+import goal_review_sampling as sampling
 from test_fix15_native_goal_reappearance import fixture, detected, VIDEO_SHA, MODEL_SHA
+from test_fix15_native_goal_reappearance import run_full
+from test_fix10a_native_goal_focus import job as native_job
 
 
 def inputs():
@@ -111,6 +115,7 @@ def test_provider_automatically_measures_reappearance_after_reader_returns(monke
     assert audit['identity_link']['source_video_sha256']==hashlib.sha256(video.read_bytes()).hexdigest()
     assert provider.goal_calls==1
     assert audit['post_occlusion_rows'][0]['box_source']=='INDEPENDENT_NATIVE_CLASS32_DETECTION'
+    assert result['native_reappearance_gap_scan']['additional_remote_model_calls']==0
 
 
 def test_binding_another_video_invalidates_goal_and_pixel_fingerprint_caches():
@@ -120,3 +125,80 @@ def test_binding_another_video_invalidates_goal_and_pixel_fingerprint_caches():
     provider.bind_video_path('second.mp4')
     assert provider._goal_cache=={}
     assert provider._native_video_fingerprint is None
+
+
+@pytest.mark.parametrize('shift',[0,10000,25000])
+def test_native_gap_plan_retains_short_reappearances_without_more_reader_images(shift):
+    data=native_job()
+    # Apply a uniform media-time shift; the algorithm has no event timestamp.
+    for row in data['shot_track']['rows']:row['media_ms']+=shift
+    s=data['strike'];s['media_ms']+=shift;s['active_ball_anchor']['media_ms']+=shift
+    p=data['shot_track'];p['seed_ms']+=shift;p['contact_binding']['contact_ms']+=shift;p['contact_binding']['seed_ms']+=shift
+    times=sampling.native_reappearance_times(s,p,start_ms=shift,end_ms=4000+shift)
+    assert times[0]==1200+shift and times[-1]==2100+shift
+    assert len(times)<=sampling.MAX_NATIVE_REAPPEARANCE_FRAMES
+    assert max(b-a for a,b in zip(times,times[1:]))<=17
+    for offset in range(0,800,7):
+        visible=[ms for ms in times if 1200+shift+offset<=ms<=1300+shift+offset]
+        assert len(visible)>=6 and visible[-1]-visible[0]>=80
+
+
+@pytest.mark.parametrize('mutation',['unbound','cut','fallback','foreign_scene','support_only'])
+def test_unqualified_ball_paths_cannot_open_a_native_gap_scan(mutation):
+    d=native_job()
+    if mutation=='unbound':d['shot_track']['contact_binding']['status']='UNRESOLVED'
+    elif mutation=='foreign_scene':d['shot_track']['rows'][-1]['scene_id']='other'
+    elif mutation=='cut':d['shot_track']['rows'][-1]['cut_barrier']=True
+    elif mutation=='fallback':d['shot_track']['rows'][-1]['used_fallback']=True
+    elif mutation=='support_only':d['shot_track']['rows'][-1]['support_only']=True
+    assert sampling.native_reappearance_times(d['strike'],d['shot_track'],start_ms=0,end_ms=4000)==[]
+
+
+def gap_fixture():
+    pre,g,review,images,by_time=inputs()
+    def detect(im,proposal):
+        ms=next(ms for ms,image in images.items() if image is im)
+        return [],deepcopy(by_time[ms])
+    scan=review_pixels.inspect_gap(pre[-1],images,model_sha256=MODEL_SHA,video_sha256=VIDEO_SHA,
+        detect_frame=detect,camera_estimator=lambda *_:(np.array([[1.,0.,0.],[0.,1.,0.]]),'fixture-background'))
+    return pre,g,scan
+
+
+def test_sparse_reader_after_evidence_uses_native_positions_and_independent_geometry():
+    pre,g,scan=gap_fixture()
+    assert scan['status']=='SEARCH_ONLY' and scan['proof_eligible'] is False
+    assert scan['canonical_events_applied']==0
+    assert any(i['check']['status']=='VERIFIED_SAME_BALL' for i in scan['candidate_identity_checks'])
+    g['native_reappearance_gap_scan']=scan
+    # A single remote after position cannot pass the original three-row rule.
+    g['ball_reappearance_audit']['post_occlusion_rows']=g['ball_reappearance_audit']['post_occlusion_rows'][:1]
+    g['ball_reappearance_audit']['identity_link']=None
+    assert run_full(pre,g)['goal_plane_crossing']['status']!='VERIFIED'
+    augmented=goal_reappearance.attach_native_gap_evidence(g)
+    out=run_full(pre,augmented)
+    assert out['ball_proof_gate']['status']=='VERIFIED'
+    assert out['goal_plane_crossing']['evidence'][0]['crossing_interval_ms']==[1000,1667]
+    assert augmented['ball_reappearance_audit']['native_dense_geometry_transfer'] is True
+    assert g['ball_reappearance_audit']['identity_link'] is None
+
+
+@pytest.mark.parametrize('mutation',['no_field','no_goal','partial_review','no_camera','singular_camera',
+    'foreign_video','missing_lines','outside_goal','ambiguous_identity','unclassified','user_identity'])
+def test_dense_gap_positions_cannot_skip_geometry_classification_or_source_gates(mutation):
+    pre,g,scan=gap_fixture();g['native_reappearance_gap_scan']=scan
+    link=next(i['check'] for i in scan['candidate_identity_checks'] if i['check']['status']=='VERIFIED_SAME_BALL')
+    g['ball_reappearance_audit']['identity_link']=None
+    if mutation=='no_field':g['field_side_status']='UNRESOLVED'
+    elif mutation=='no_goal':g['status']='UNRESOLVED'
+    elif mutation=='partial_review':g['response_coverage']['status']='PARTIAL_RESPONSE'
+    elif mutation=='no_camera':scan['camera_alignments'].pop('1717')
+    elif mutation=='singular_camera':scan['camera_alignments']['1717']['affine_to_reference']=[[0,0,0],[0,0,0]]
+    elif mutation=='foreign_video':g['source_video_sha256']='c'*64
+    elif mutation=='missing_lines':g['line_by_ms']=None
+    elif mutation=='outside_goal':link['after_observations'][0]['box']=detected(1667,.6)['box']
+    elif mutation=='ambiguous_identity':
+        other=deepcopy(link);other['after_track_id']='other';scan['candidate_identity_checks'].append({'check':other})
+    elif mutation=='unclassified':link['after_observations'][0]['class_id']=0
+    elif mutation=='user_identity':link['source']='USER_OBSERVATION'
+    augmented=goal_reappearance.attach_native_gap_evidence(g)
+    assert run_full(pre,augmented)['goal_plane_crossing']['status']!='VERIFIED'

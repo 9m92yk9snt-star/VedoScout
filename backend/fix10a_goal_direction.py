@@ -305,6 +305,7 @@ class GoalDirectionProvider:
         result["field_side_reason"] = str(evidence.get("reason") or "field_side_unresolved")[:180]
         if "support_vision_fail_closed" in evidence:
             result["field_side_fail_closed"] = evidence["support_vision_fail_closed"]
+        result = goal_reappearance.attach_native_gap_evidence(result)
         return remember(result)
 
 
