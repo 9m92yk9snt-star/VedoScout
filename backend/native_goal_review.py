@@ -12,6 +12,8 @@ import re
 
 import native_ball_reappearance as native
 import goal_reappearance
+import temporal_ball_search
+import native_goal_frame
 
 MAX_AFTER_FRAMES = 6
 MAX_BALLS_PER_FRAME = 8
@@ -20,7 +22,7 @@ MAX_GAP_ASSOCIATION_DIAMETERS = 1.5
 
 
 def inspect_gap(before, images_by_ms, *, model_sha256, video_sha256,
-                detect_frame, camera_estimator):
+                detect_frame, camera_estimator,reference_history=()):
     """Bounded native search through a path loss, without semantic promotion.
 
     Keeps literal detector observations, camera-compensated candidate segments
@@ -151,6 +153,18 @@ def inspect_gap(before, images_by_ms, *, model_sha256, video_sha256,
         check = native.measure_native_link(before, overlapping, images_by_ms,video_sha256=video_sha256)
         packet["candidate_identity_checks"].append({"candidate_track_id":candidate["track_id"],"check":check})
     packet["sample_count"] = len(times)
+    try:
+        packet["appearance_search"] = temporal_ball_search.search(
+            before, images_by_ms, packet["camera_alignments"], video_sha256=video_sha256,reference_history=reference_history)
+    except Exception:
+        packet["appearance_search"] = {"status":"SEARCH_ONLY","proof_eligible":False,
+                                       "reason":"NATIVE_APPEARANCE_SEARCH_UNAVAILABLE"}
+    try:
+        packet["projected_goal_frame_search"] = native_goal_frame.inspect(
+            {ms:images_by_ms[ms] for ms in times[::max(1, len(times)//12)]},before["box"])
+    except Exception:
+        packet["projected_goal_frame_search"] = {"status":"SEARCH_ONLY","proof_eligible":False,
+                                                 "reason":"NATIVE_FRAME_STRUCTURE_SEARCH_UNAVAILABLE"}
     packet["reason"] = "NATIVE_GAP_SEARCH_COMPLETE_GOAL_GEOMETRY_STILL_REQUIRED"
     return packet
 

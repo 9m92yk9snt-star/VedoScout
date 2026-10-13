@@ -172,3 +172,52 @@ The export-limit fixture now leaves space for the expanded mandatory source
 provenance while keeping its test video above the per-file cap. The export
 production size limit and fail-closed behavior are unchanged. Source fingerprints
 now also include the native sampling module.
+
+## Continuation: temporal candidates, literal context and retained before images
+
+The unfinished local continuation was recovered and checked against PR #29
+head `1990b43`. It adds original-pixel appearance proposals, post/crossbar image
+candidates, and literal per-image right/left release-foot, same-keeper head,
+glove, outside-ball and possession observations. These are search/support
+data, not canonical ball identity, goal depth or a goal approval. A projected
+goal rectangle alone cannot establish that a ball is inside the goal volume.
+
+Native search runs before the one existing independent reader call so candidate
+times can improve that call's image coverage. Reader refocusing preserves the
+last three measured before positions, contact/seed and terminal context, and
+three remaining baseline slots when available. Unclassified candidates cannot consume
+the entire after interval. There are still at most twelve reader images and no
+additional remote reader calls. Source provenance includes all three modules.
+
+The saved original contact-bound path has last-before times 31,065 / 31,132 /
+31,182 ms. The prior reader plan omitted the first two. The revised original
+plan preserves all three and the original 31,857 ms image inside the documented
+short reappearance. Six before boxes were matched to their exact independently
+measured native detector candidates; the global spare-ball trajectory was not
+substituted. This schedule check uses saved measurements, not a new goal verdict.
+
+An airborne ball's screen position relative to a ground line cannot by itself
+establish its position in field space. A narrow airborne-before lane requires
+three high-confidence before relations and all after relations from a complete,
+hashed independent image response, each bound to the native ball boxes. Native
+same-ball identity, time-aligned geometry, whole-ball after position, field
+direction, contradictions and final proof checks remain mandatory. Contextual
+head/glove/foot observations cannot open this lane.
+
+Validation: **215 focused checks**, and **1,539 full offline regressions passed,
+28 skipped** in 47.15 seconds. All recorded SDK/network/video-decode attempts in
+the regression process were zero. The lifecycle suite and a full rerun passed
+after one earlier teardown process-hygiene error; the runner was not modified.
+
+A separate fresh original-video probe decoded **55 images**, verified all 55
+goal-region RGB hashes, and retained all seven 31,849–31,949 ms reappearance
+images. Five gap images contained detector-qualified proposals; the native
+moving-ball identity remained unresolved. Appearance search returned 129
+unclassified tracks, not a recovered football. Goal geometry and crossing both
+remain **UNRESOLVED**, with no canonical goal and no report count writes.
+This was not a fresh full five-action run; its last strict acceptance is **0/5**.
+
+The reproducible test target list and compact original-pixel/sampling receipt
+are in `docs/evidence/FIX15_R6_TEMPORAL_GOAL_VALIDATION.json`. Next work and the
+main/draft distinction are in `docs/SCOUTMEPLAY_PROJECT_STATUS_20261013.md`.
+Keep draft until original-video acceptance; no deployment occurred.

@@ -11,6 +11,8 @@ from __future__ import annotations
 from copy import deepcopy
 import math
 import re
+import json
+import hashlib
 
 import native_ball_reappearance as native
 
@@ -22,6 +24,59 @@ MIN_BEFORE_ROWS = 3
 MIN_AFTER_ROWS = 3
 GEOMETRY_NEAR_MS = 500
 NATIVE_GEOMETRY_TRANSFER_NEAR_MS = 100
+
+
+def _audited_airborne_depth(geometry, before, after):
+    """Audit field/goal SPACE for airborne balls, not their ground-line image side.
+
+    Both before and after relations must come from the hashed independent
+    image response and agree with measured native boxes. This is not a text
+    verdict, a goalkeeper reaction or a substitute for native ball identity.
+    """
+    audit=geometry.get('model_review_audit')
+    if not isinstance(audit,dict) or audit.get('provider') not in {'openai','LOCAL_NATIVE_CPU'}:
+        return None
+    raw=audit.get('raw_response');times=audit.get('media_ms')
+    if (not isinstance(raw,str) or not raw or audit.get('response_coordinate_mapping')
+            or not isinstance(times,list) or any(type(ms) is not int for ms in times)
+            or times!=sorted(set(times))
+            or not isinstance(audit.get('input_sha256'),str) or not re.fullmatch(r'[0-9a-f]{64}',audit['input_sha256'])
+            or hashlib.sha256(raw.encode()).hexdigest()!=audit.get('response_sha256')):
+        return None
+    try:
+        data=json.loads(raw[raw.index('{'):raw.rindex('}')+1])
+    except (ValueError,TypeError,json.JSONDecodeError):return None
+    coverage=geometry.get('response_coverage')
+    frames=data.get('frames') if isinstance(data,dict) else None
+    if (not isinstance(coverage,dict) or coverage.get('status')!='COMPLETED'
+            or coverage.get('input_frame_count')!=len(times) or not isinstance(frames,list)
+            or len(frames)!=len(times)
+            or any(not isinstance(f,dict) or type(f.get('idx')) is not int for f in frames)
+            or {f['idx'] for f in frames}!=set(range(1,len(times)+1))):return None
+    rows=data.get('ball_evidence') if isinstance(data,dict) else None
+    if not isinstance(rows,list):return None
+    indexed={}
+    for row in rows:
+        if (not isinstance(row,dict) or type(row.get('idx')) is not int
+                or not 1<=row['idx']<=len(times) or row['idx'] in indexed):return None
+        indexed[row['idx']]=row
+    if len(indexed)!=len(times):return None
+    by_ms={times[i-1]:row for i,row in indexed.items()}
+    basis={'VISIBLE_BALL_ON_PITCH','VISIBLE_NEAR_POST_OCCLUSION','VISIBLE_NET_CONTACT','PERSPECTIVE_TO_GOAL_FRAME'}
+    def matches(row,box,relation):
+        return (isinstance(row,dict) and row.get('ball_visible') is True
+                and row.get('confidence')=='high' and row.get('depth_relation')==relation
+                and isinstance(row.get('depth_basis'),str) and row['depth_basis'] in basis
+                and _iou(row.get('ball_box'),box)>=.75)
+    tail=before[-3:]
+    if (len(tail)<3 or any(not matches(by_ms.get(r['media_ms']),r['box'],'IN_FRONT_OF_GOAL')
+                          or by_ms[r['media_ms']].get('ball_airborne') is not True for r in tail)):
+        return None
+    if any(not matches(by_ms.get(r['media_ms']),r['ball_box'],'INSIDE_GOAL_VOLUME') for r in after):return None
+    return {'source':'HASHED_INDEPENDENT_IMAGE_DEPTH_WITH_NATIVE_BOX_BINDING',
+            'before_media_ms':[r['media_ms'] for r in tail],'after_media_ms':[r['media_ms'] for r in after],
+            'response_sha256':audit['response_sha256'],'input_sha256':audit['input_sha256'],
+            'direct_hidden_crossing_observed':False}
 
 
 def attach_native_gap_evidence(geometry):
@@ -339,8 +394,11 @@ def resolve(rows, geometry, strike_ms, touch_graph=None, strike_actor=None):
     after_metrics = [_metrics(r["ball_box"],geometry,r["media_ms"]) for r in linked]
     if before_metrics is None or any(m is None for m in after_metrics):
         return fail("REAPPEARANCE_TIME_ALIGNED_FIELD_ORIENTATION_MISSING")
+    airborne_depth=None
     if before_metrics["field_signed_distance"] <= before_metrics["normal_extent"]+1e-6:
-        return fail("REAPPEARANCE_BEFORE_NOT_WHOLE_BALL_FIELD_SIDE")
+        airborne_depth=_audited_airborne_depth(geometry,pre,linked)
+        if airborne_depth is None:
+            return fail("REAPPEARANCE_BEFORE_NOT_WHOLE_BALL_FIELD_SIDE")
     if any(m["field_side_sign"] != before_metrics["field_side_sign"] for m in after_metrics):
         return fail("REAPPEARANCE_FIELD_ORIENTATION_CHANGED")
     if any(m["field_signed_distance"] >= -m["normal_extent"]-1e-6 or m["mouth_margin"] <= 1e-6
@@ -382,8 +440,11 @@ def resolve(rows, geometry, strike_ms, touch_graph=None, strike_actor=None):
         "after_media_ms":post_times,"same_ball_identity_verified":True,
         "reactions_are_support_only":True,"stationary_ball_controls":deepcopy(link.get("stationary_ball_controls") or []),
         "whole_ball_inside_goal":True,
+        "before_field_space_authority":"AUDITED_AIRBORNE_WORLD_RELATION" if airborne_depth else "MEASURED_GROUND_LINE_IMAGE_SIDE",
+        "airborne_depth_audit":airborne_depth,
     }
     return {"status":"VERIFIED","crossing_ms":first["media_ms"],
             "reason":"CONTACT_BOUND_BALL_REAPPEARED_WHOLE_GOAL_SIDE_AFTER_BOUNDED_BODY_OCCLUSION",
             "evidence":[segment],"reappearance_audit":deepcopy(audit),
+            "contextual_support":deepcopy(geometry.get("contextual_support_evidence",{})),
             "occlusion_audit":deepcopy(occ),"reaction_support":deepcopy(geometry.get("reaction_support_evidence",{}))}

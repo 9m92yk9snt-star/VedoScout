@@ -35,6 +35,7 @@ import goal_review_sampling
 import fix10a_occluded_goal
 import goal_reappearance
 import native_goal_review
+import goal_context_observations
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -369,6 +370,7 @@ def _empty_goal_scene_review():
             "goal_mouth_defender_ball_contact": {},
             "reason": "insufficient_frames",
         },
+        "contextual_support_evidence": goal_context_observations.parse(None, []),
         "reason": "insufficient_frames",
     }
 
@@ -466,6 +468,12 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
             ball_rows_by_idx[idx] = {
                 "idx": idx,
                 "media_ms": int(pairs[idx - 1][1]),
+                "ball_airborne":row.get("ball_airborne") if type(row.get("ball_airborne")) is bool else None,
+                "depth_relation":row.get("depth_relation") if isinstance(row.get("depth_relation"),str)
+                    and row["depth_relation"] in {"IN_FRONT_OF_GOAL","INSIDE_GOAL_VOLUME","UNKNOWN"} else "UNKNOWN",
+                "depth_basis":row.get("depth_basis") if isinstance(row.get("depth_basis"),str)
+                    and row["depth_basis"] in {"VISIBLE_BALL_ON_PITCH","VISIBLE_NEAR_POST_OCCLUSION","VISIBLE_NET_CONTACT",
+                                               "PERSPECTIVE_TO_GOAL_FRAME","UNKNOWN"} else "UNKNOWN",
                 "ball_visible": row.get("ball_visible") is True,
                 "relation": relation,
                 "ball_box": dict(ball_box) if isinstance(ball_box, dict) else None,
@@ -696,6 +704,7 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
             "proof_reason": proof_reason,
             "occlusion_crossing_audit": occlusion_audit,
             "reaction_support_evidence": reaction_support,
+            "contextual_support_evidence": goal_context_observations.parse(data.get("context_evidence"),media_ms),
             "reason": str(data.get("reason") or "goal_scene_review")[:220],
         }
     except Exception:
@@ -747,6 +756,10 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
             "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
             "visible=false when both bases are not clear.\n"
+            "AIRBORNE BALL: Screen position above the ground line alone cannot establish goal depth. "
+            "Use visible goal structure and temporal context; report UNKNOWN depth if front/behind relation is unclear. "
+            "For every visible ball state whether it is airborne and whether it is IN_FRONT_OF_GOAL or INSIDE_GOAL_VOLUME. "
+            "Give a literal depth basis; keeper reaction and expected result cannot establish this relation.\n"
             "BALL AUDIT: Follow only the visibly observable MOVING match ball in chronological order. For EVERY image "
             "return one ball_evidence row. FIELD_SIDE means the whole visible ball is on the playable-field side of the "
             "goal plane. ON_OR_STRADDLING_LINE means any part overlaps the plane. BEYOND_LINE_INSIDE_MOUTH means the "
@@ -772,6 +785,12 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "none is visible, not that contact is impossible. Report response=LATE_OR_NO_REACTION only when the player is "
             "visibly static/late after release rather than making a timely save action. These reaction fields must NOT "
             "change the crossing verdict.\n"
+            "CONTEXT OBSERVATIONS (SUPPORT ONLY): For EVERY image return a context_evidence row. "
+            "Report the release foot only if literal foot-ball contact is visible. Track the same goalkeeper "
+            "and report the image direction of the visible head and arms/gloves separately; use UNKNOWN when "
+            "orientation, gloves or identity are unclear. Observe the active ball outside the posts and visible "
+            "possession separately. NOT_VISIBLE / NONE_VISIBLE describe the image, not exclusion of hidden "
+            "possession or an unseen save. None of these fields alone supplies a goal verdict.\n"
             'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
             '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
             '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
@@ -779,6 +798,8 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
             '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
             '"ball_box":{"x":0.0,"y":0.0,"w":0.0,"h":0.0}|null,'
+            '"ball_airborne":true|false|null,"depth_relation":"IN_FRONT_OF_GOAL"|"INSIDE_GOAL_VOLUME"|"UNKNOWN",'
+            '"depth_basis":"VISIBLE_BALL_ON_PITCH"|"VISIBLE_NEAR_POST_OCCLUSION"|"VISIBLE_NET_CONTACT"|"PERSPECTIVE_TO_GOAL_FRAME"|"UNKNOWN",'
             '"occluder":"PLAYER_BODY"|"GOALKEEPER_BODY"|"GOAL_STRUCTURE"|"OTHER"|"UNKNOWN",'
             '"confidence":"high"|"medium"|"low","reason":"<short literal visual reason>"}],'
             '"same_ball_continuity":true|false,"first_crossing_idx":1|null,'
@@ -791,6 +812,14 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             '"goal_mouth_defender_ball_contact":"OBSERVED_CONTACT"|"NO_VISIBLE_CONTACT"|"UNRESOLVED",'
             '"goal_mouth_defender_response":"ACTIVE_SAVE_ATTEMPT"|"LATE_OR_NO_REACTION"|"OTHER"|"UNRESOLVED",'
             '"goal_mouth_defender_confidence":"high"|"medium"|"low"},'
+            '"context_evidence":[{"idx":1,"foot_contact_visible":true|false,'
+            '"release_foot":"LEFT"|"RIGHT"|"UNKNOWN","same_goalkeeper_tracked":true|false,'
+            '"head_visible":true|false,"gloves_visible":true|false,'
+            '"head_direction":"IMAGE_LEFT"|"IMAGE_RIGHT"|"FRONT"|"UNKNOWN",'
+            '"arms_gloves_direction":"IMAGE_LEFT"|"IMAGE_RIGHT"|"FRONT"|"UNKNOWN",'
+            '"active_ball_outside_posts":"OBSERVED"|"NOT_VISIBLE"|"UNKNOWN",'
+            '"visible_possession":"GOALKEEPER"|"OUTFIELD_PLAYER"|"NONE_VISIBLE"|"UNKNOWN",'
+            '"confidence":"high"|"medium"|"low"}],'
             '"reason":"<short visual reason>"}'
         )
         msg = UserMessage(
@@ -1159,6 +1188,14 @@ class ShadowVisionProviders:
         if (review_path is None or not isinstance(coverage, dict)
                 or coverage.get("status") != "COMPLETED"):
             return None
+        packet=self._scan_native_goal_gap(strike,review_path,images_by_ms,start_ms,end_ms)
+        if isinstance(packet,dict):
+            packet["reader_occlusion_status"] = (
+                occ.get("status", "UNRESOLVED") if isinstance(occ, dict) else "UNRESOLVED")
+        return packet
+
+    def _scan_native_goal_gap(self, strike, review_path, images_by_ms, start_ms, end_ms):
+        """Prepare native search before the ONE existing independent reader call."""
         requested = goal_review_sampling.native_reappearance_times(
             strike, review_path, start_ms=start_ms, end_ms=end_ms)
         if not requested:
@@ -1180,13 +1217,23 @@ class ShadowVisionProviders:
             allowed = {ms for ms in requested if ms in native_images}
             allowed.update(actual for actual,_image in extra.values() if first<=actual<=last)
             native_images = {ms:native_images[ms] for ms in sorted(allowed)}
-            packet = native_goal_review.inspect_gap(before, native_images, **context)
+            history_rows=review_path["rows"][-6:]
+            history_missing=[r["media_ms"] for r in history_rows if r["media_ms"] not in images_by_ms]
+            try:
+                history_decoded=_read_frames(self.video_path,history_missing) if history_missing else {}
+            except Exception:
+                # Optional earlier appearance profiles may be unavailable;
+                # preserve the separately decoded gap and its original anchor.
+                history_decoded={}
+            images_by_ms.update({actual:image for actual,image in history_decoded.values()})
+            history=[(r,images_by_ms.get(r["media_ms"])) for r in history_rows if r["media_ms"]<before["media_ms"]]
+            packet = native_goal_review.inspect_gap(before, native_images, reference_history=history, **context)
             packet["requested_ms"] = requested
             packet["actual_ms"] = sorted(native_images)
             packet["additional_remote_model_calls"] = 0
+            packet["reference_history_missing_ms"]=[r["media_ms"] for r in history_rows
+                if r["media_ms"] not in images_by_ms]
             packet["search_trigger"] = "QUALIFIED_CONTACT_BOUND_NATIVE_PATH_LOSS"
-            packet["reader_occlusion_status"] = (
-                occ.get("status", "UNRESOLVED") if isinstance(occ, dict) else "UNRESOLVED")
             return packet
         except Exception:
             return {"status":"SEARCH_ONLY","proof_eligible":False,
@@ -1495,6 +1542,14 @@ class ShadowVisionProviders:
         if len(frames) < 2:
             self._goal_cache[cache_key] = None
             return None
+        original_requested=list(requested)
+        native_images={int(actual):image for actual,image in frames.values()}
+        prepared_gap=self._scan_native_goal_gap(strike,review_path,native_images,start_ms,end_ms) if review_path else None
+        if isinstance(prepared_gap,dict):
+            requested=goal_review_sampling.refocus_reader_times(requested,strike,review_path,
+                prepared_gap.get("appearance_search"),budget=MAX_GOAL_FRAMES,start_ms=start_ms,end_ms=end_ms)
+            for ms in requested:
+                if ms not in frames and ms in native_images:frames[ms]=(ms,native_images[ms])
         with tempfile.TemporaryDirectory(prefix="fix10a_goal_") as temp:
             root = Path(temp)
             paths, actual_times = [], []
@@ -1534,9 +1589,9 @@ class ShadowVisionProviders:
             # JSON object, has authority to identify the native release ball.
             review.pop("ball_reappearance_audit", None)
             review.pop("native_reappearance_gap_scan", None)
-            images_by_ms = {int(actual): frame for actual, frame in frames.values()
-                            if int(actual) in actual_times}
-            gap_scan = self._inspect_goal_gap(review, strike, review_path, images_by_ms, start_ms, end_ms)
+            images_by_ms = dict(native_images)
+            gap_scan = prepared_gap if prepared_gap is not None else self._inspect_goal_gap(
+                review, strike, review_path, images_by_ms, start_ms, end_ms)
             if gap_scan is not None:
                 review["native_reappearance_gap_scan"] = gap_scan
             native_audit = self._measure_goal_reappearance(review, review_path, images_by_ms)
@@ -1548,9 +1603,12 @@ class ShadowVisionProviders:
             result = {
                 "status": "UNRESOLVED",
                 "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
+                    "original_requested_ms": original_requested,"native_appearance_focus_used":requested!=original_requested,
                     "native_path_end_ms": focus_end_ms, "canonical_authority": False},
                 "model_review_audit": (review or {}).get("model_review_audit"),
                 "response_coverage": (review or {}).get("response_coverage"),
+                "contextual_support_evidence": deepcopy((review or {}).get("contextual_support_evidence") or
+                    goal_context_observations.parse(None,actual_times)),
                 "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
                 "line_by_ms": [],
                 "visual_crossing_audit": {
@@ -1599,9 +1657,12 @@ class ShadowVisionProviders:
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
             "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
+                "original_requested_ms": original_requested,"native_appearance_focus_used":requested!=original_requested,
                 "native_path_end_ms": focus_end_ms, "canonical_authority": False},
             "model_review_audit": (review or {}).get("model_review_audit"),
             "response_coverage": (review or {}).get("response_coverage"),
+            "contextual_support_evidence": deepcopy((review or {}).get("contextual_support_evidence") or
+                goal_context_observations.parse(None,actual_times)),
             "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
             "line": dict(nearest["line"]),
             "line_media_ms": int(nearest["media_ms"]),

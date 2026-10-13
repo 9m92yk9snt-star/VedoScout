@@ -8,6 +8,46 @@ NATIVE_REAPPEARANCE_HORIZON_MS = 900
 MAX_NATIVE_REAPPEARANCE_FRAMES = 56
 
 
+def refocus_reader_times(original,strike,path,appearance,*,budget,start_ms,end_ms):
+    """Use unclassified local candidates to inspect pixels, never to label events."""
+    if (not isinstance(original,list) or not original
+            or any(type(ms) is not int for ms in original)
+            or type(start_ms) is not int or type(end_ms) is not int or not 0<=start_ms<=end_ms):
+        return list(original) if isinstance(original,list) else []
+    valid=contact_bound_native_path(strike,path)
+    if (valid is None or not isinstance(appearance,dict)
+            or appearance.get('source')!='TEMPORAL_NATIVE_APPEARANCE_SEARCH'
+            or appearance.get('status')!='SEARCH_ONLY' or appearance.get('proof_eligible') is not False
+            or appearance.get('canonical_events_applied')!=0 or type(budget) is not int or budget<=0):
+        return list(original)
+    suggestions=appearance.get('suggested_review_ms')
+    if (not isinstance(suggestions,list) or not suggestions or len(suggestions)>6
+            or any(type(ms) is not int or not start_ms<=ms<=end_ms for ms in suggestions)
+            or any(not valid['rows'][-1]['media_ms']<ms<=valid['rows'][-1]['media_ms']+NATIVE_REAPPEARANCE_HORIZON_MS
+                   for ms in suggestions)):
+        return list(original)
+    # A before/after comparison needs the last three independently measured
+    # before positions. Retaining only the last one would make the airborne
+    # depth audit impossible once appearance candidates replace reader slots.
+    protected={original[0],original[-1],strike['media_ms'],valid['seed_ms']}
+    protected.update(row['media_ms'] for row in valid['rows'][-3:])
+    if any(not start_ms<=ms<=end_ms for ms in protected):return list(original)
+    if len(protected)>budget:return list(original)
+    selected=set(protected)
+    # Appearance proposals are unclassified. Keep temporal coverage from the
+    # original plan even when two noisy tracks propose all six extra images.
+    # Otherwise a true short reappearance can disappear from the reader input.
+    baseline_slots=min(3,len(set(original)-protected))
+    suggestion_slots=max(0,budget-len(protected)-baseline_slots)
+    for ms in suggestions[:suggestion_slots]:
+        selected.add(ms)
+    remaining=set(original)-selected
+    while remaining and len(selected)<budget:
+        ms=max(remaining,key=lambda ms:(min(abs(ms-p) for p in selected),-ms))
+        selected.add(ms);remaining.remove(ms)
+    return sorted(selected)
+
+
 def native_reappearance_times(strike, path, *, start_ms, end_ms):
     """Inspect a short loss at about native 60 fps without more reader images.
 
