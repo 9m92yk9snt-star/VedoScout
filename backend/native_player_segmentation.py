@@ -13,6 +13,7 @@ import numpy as np
 from PIL import Image
 
 from player_selection import valid_box, valid_point, valid_image_shape, valid_mask
+from player_segmentation_assets import ensure_model_asset
 
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "yolov8n-seg.onnx"
 MODEL_SHA256 = "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9"
@@ -25,13 +26,11 @@ class PersonSegmenter:
     def __init__(self):
         self.net = None
         self.sha256 = None
-        if MODEL_PATH.is_file():
-            self.sha256 = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()
-            if self.sha256 != MODEL_SHA256:
-                raise ValueError("Player model checksum mismatch")
-            self.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
-            self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-            self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+        ensure_model_asset(MODEL_PATH, MODEL_SHA256)
+        self.sha256 = MODEL_SHA256
+        self.net = cv2.dnn.readNetFromONNX(str(MODEL_PATH))
+        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+        self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
     def predict(self, image):
         if self.net is None:
@@ -50,11 +49,17 @@ class PersonSegmenter:
             return []
         rows = detections[0].T
         classes = rows[:, 4:84]
-        keep = (classes.argmax(axis=1) == 0) & (classes[:, 0] >= .35)
+        labels = classes.argmax(axis=1)
+        keep = ((labels == 0) | (labels == 32)) & (classes.max(axis=1) >= .35)
         rows = rows[keep]
+        labels = labels[keep]
         boxes = [[float(r[0] - r[2] / 2), float(r[1] - r[3] / 2), float(r[2]), float(r[3])] for r in rows]
-        scores = [float(r[4]) for r in rows]
-        indices = cv2.dnn.NMSBoxes(boxes, scores, .35, .7)
+        scores = [float(r[4 + label]) for r, label in zip(rows, labels)]
+        indices = []
+        for label in (0, 32):
+            group = [i for i, value in enumerate(labels) if value == label]
+            picked = cv2.dnn.NMSBoxes([boxes[i] for i in group], [scores[i] for i in group], .35, .7)
+            indices.extend(group[int(i)] for i in np.asarray(picked).reshape(-1))
         result = []
         for index in np.asarray(indices).reshape(-1)[:24]:
             row, box = rows[index], boxes[index]
@@ -69,7 +74,7 @@ class PersonSegmenter:
             bounded[y0:y1, x0:x1] = mask[y0:y1, x0:x1]
             if x1 > x0 and y1 > y0:
                 result.append({"box": (x0, y0, x1 - x0, y1 - y0),
-                               "mask": bounded, "score": scores[index]})
+                               "mask": bounded, "score": scores[index], "class_id": int(labels[index])})
         return result
 
 
@@ -147,13 +152,13 @@ def suggest_person_cutout(image_bytes, box, target, exclude_points=(), include_p
     else:
         instances, model_sha = _instances(roi)
         candidates = [i for i, instance in enumerate(instances)
-                      if all(_point_in_mask(instance["mask"], local(p)) for p in positive)]
+                      if instance.get("class_id", 0) == 0 and all(_point_in_mask(instance["mask"], local(p)) for p in positive)]
         if len(candidates) != 1:
             return {"status": "unavailable", "reason": "no_visible_person" if not candidates else "ambiguous_person"}
         chosen = candidates[0]
         binary = instances[chosen]["mask"].copy()
         for point in negative:
-            blockers = [i for i, instance in enumerate(instances) if _point_in_mask(instance["mask"], local(point))]
+            blockers = [i for i, instance in enumerate(instances) if instance.get("class_id", 0) == 0 and _point_in_mask(instance["mask"], local(point))]
             if chosen in blockers:
                 return {"status": "unavailable", "reason": "points_overlap"}
             if len(blockers) != 1:
@@ -162,6 +167,14 @@ def suggest_person_cutout(image_bytes, box, target, exclude_points=(), include_p
         if not all(_point_in_mask(binary, local(p)) for p in positive):
             return {"status": "unavailable", "reason": "target_not_visible"}
         body = instances[chosen]["box"]
+    # A sports-ball outline is never a body part. Remove its measured visible
+    # pixels even when the ball touches a hand or boot in the player proposal.
+    objects = _instances(roi)[0] if player_behind else instances
+    for item in objects:
+        if item.get("class_id", 0) == 32:
+            binary[item["mask"] > 0] = 0
+    if not all(_point_in_mask(binary, local(p)) for p in positive) or any(_point_in_mask(binary, local(p)) for p in negative):
+        return {"status": "unavailable", "reason": "point_conflict"}
     ys, xs = np.nonzero(binary)
     if len(xs) < 20:
         return {"status": "unavailable", "reason": "too_few_visible_pixels"}

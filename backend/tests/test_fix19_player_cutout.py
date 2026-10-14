@@ -154,3 +154,56 @@ def test_invalid_model_asset_is_not_loaded(monkeypatch, tmp_path):
 def test_native_request_requires_a_visible_human_point():
     with pytest.raises(ValueError, match="visible part"):
         native.suggest_person_cutout(image_bytes(), BOX, None, player_behind=True)
+
+
+def test_foreground_union_removes_disconnected_supported_arm_and_boot():
+    arm = np.full((20, 10), -1., np.float32); arm[2:7, 2:5] = 1
+    boot = arm.copy(); boot[15:18, 3:6] = 1
+    arm[8:10, 6:8] = 1
+    result = prompt.choose_prompt_mask(np.stack([arm, boot]), [.9, .8], [(3, 5)], [(8, 15)], prefer_largest=True)
+    np.testing.assert_array_equal(result, (arm > 0) | (boot > 0))
+
+
+def test_foreground_prompts_use_measured_person_bounds_and_group_red_points(monkeypatch):
+    target = np.zeros((40, 30), np.uint8); target[10:35, 5:25] = 1
+    front = np.zeros_like(target); front[5:36, 15:28] = 1
+    monkeypatch.setattr(native, "_instances", lambda image: ([{"mask": front, "box": (15, 5, 13, 31)}], "test"))
+    model = prompt.PromptSegmenter.__new__(prompt.PromptSegmenter)
+    calls = []
+    def decode(image, positive, negative, bounds, **kwargs):
+        calls.append((positive, negative, bounds, kwargs))
+        return target.copy() if len(calls) == 1 else front.copy()
+    model._decode = decode
+    # First target point must also have measured person support; the detector
+    # may give a merged duel instance, which is used only for proposal bounds.
+    measured = target | front
+    monkeypatch.setattr(native, "_instances", lambda image: ([{"mask": measured, "box": (5, 5, 23, 31)}], "test"))
+    result = model.predict(np.zeros((40, 30, 3), np.uint8), [(8, 20)], [(20, 10), (22, 30)], (4, 4, 29, 37))
+    assert len(calls) == 2
+    assert calls[1] == ([(20, 10), (22, 30)], [(8, 20)], (5, 5, 28, 36), {"prefer_largest": True})
+    assert result[20, 8] and not result[30, 22] and not result[15, 20]
+
+
+@pytest.mark.parametrize("people", [[], [instance(silhouette()), instance(silhouette())]])
+def test_unresolved_foreground_cannot_select_background(monkeypatch, people):
+    model = prompt.PromptSegmenter.__new__(prompt.PromptSegmenter)
+    model._decode = lambda *args, **kwargs: silhouette()
+    monkeypatch.setattr(native, "_instances", lambda image: (people, "test"))
+    assert model.predict(np.zeros((200, 100, 3), np.uint8), [(50, 80)], [(40, 85)], (25, 20, 75, 180)) is None
+
+
+def test_touching_ball_is_removed_from_person_outline(monkeypatch):
+    body = silhouette()
+    ball = np.zeros_like(body); ball[170:185, 53:65] = 1
+    monkeypatch.setattr(native, "_instances", lambda image: ([instance(body), {**instance(ball), "class_id": 32}], "test"))
+    result = native.suggest_person_cutout(image_bytes(), BOX, POINT)
+    assert result["status"] == "suggested"
+    assert pixel(result, .41, .85)  # player's other visible leg
+    assert not pixel(result, .59, .90)  # measured ball overlap
+
+
+def test_behind_model_output_cannot_contradict_a_negative_hint(monkeypatch):
+    monkeypatch.setattr(prompt, "segment_visible_player", lambda *args: (silhouette(), {}))
+    monkeypatch.setattr(native, "_instances", lambda image: ([], "test"))
+    result = native.suggest_person_cutout(image_bytes(), BOX, POINT, [{"x": .6, "y": .4}], player_behind=True)
+    assert result == {"status": "unavailable", "reason": "point_conflict"}

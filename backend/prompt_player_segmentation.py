@@ -6,6 +6,7 @@ import threading
 
 import cv2
 import numpy as np
+from player_segmentation_assets import ensure_model_asset
 
 MODEL_DIR = Path(__file__).resolve().parent / "models"
 MODEL_HASHES = {
@@ -28,9 +29,12 @@ def choose_prompt_mask(masks, scores, positives, negatives, *, prefer_largest=Fa
         valid.append(index)
     if not valid:
         return None
-    # For a foreground exclusion, choose the broadest supported object outline
-    # rather than a high-scoring shirt-only alternative.
-    best = max(valid, key=lambda i: (int(np.count_nonzero(masks[i] > 0)), float(scores[i]))) if prefer_largest else max(valid, key=lambda i: float(scores[i]))
+    # Remove every supported foreground alternative. Choosing only a shirt or
+    # the largest one can leave a disconnected foreground arm/boot in target.
+    # The union still excludes every explicit visible target point.
+    if prefer_largest:
+        return np.any(masks[valid] > 0, axis=0).astype(np.uint8)
+    best = max(valid, key=lambda i: float(scores[i]))
     return (masks[best] > 0).astype(np.uint8)
 
 
@@ -39,8 +43,7 @@ class PromptSegmenter:
         import onnxruntime as ort
         for filename, expected in MODEL_HASHES.items():
             path = MODEL_DIR / filename
-            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
-                raise ValueError("Player prompt-model checksum mismatch")
+            ensure_model_asset(path, expected)
         options = ort.SessionOptions()
         options.intra_op_num_threads = 2
         options.inter_op_num_threads = 1
@@ -83,18 +86,32 @@ class PromptSegmenter:
         return choose_prompt_mask(masks[0], scores[0], positives, negatives, prefer_largest=prefer_largest)
 
     def predict(self, image, positives, negatives, bounds):
+        from native_player_segmentation import _instances, _point_in_mask
+        instances = [item for item in _instances(image)[0] if item.get("class_id", 0) == 0]
+        # SAM also outlines grass and arbitrary objects. A prompt score alone
+        # is not sufficient to present an object as a player.
+        if not positives or not any(_point_in_mask(item["mask"], positives[0]) for item in instances):
+            return None
         mask = self._decode(image, positives, negatives, bounds)
         if mask is None:
             return None
-        # A negative identifies the foreground object, not only a tiny hole at
-        # that point. Decode its outline with the target points excluded, then
-        # remove all of its visible pixels from the behind-player suggestion.
+        # A full-frame box can make SAM select pitch/background with a high
+        # score. Bound each foreground prompt to its measured person extent,
+        # and group multiple red points on that same instance. These are model
+        # proposal bounds, never new human points or identity proof.
+        groups = {}
         for point in negatives:
-            blocker = self._decode(image, [point], positives, (0, 0, image.shape[1], image.shape[0]), prefer_largest=True)
+            candidates = [i for i, item in enumerate(instances) if _point_in_mask(item["mask"], point)]
+            if len(candidates) != 1:
+                return None
+            groups.setdefault(candidates[0], []).append(point)
+        for index, points in groups.items():
+            x, y, w, h = instances[index]["box"]
+            blocker = self._decode(image, points, positives,
+                                   (x, y, x + w, y + h), prefer_largest=True)
             if blocker is None:
                 return None
             mask[blocker > 0] = 0
-        from native_player_segmentation import _point_in_mask
         return mask if all(_point_in_mask(mask, p) for p in positives) else None
 
 

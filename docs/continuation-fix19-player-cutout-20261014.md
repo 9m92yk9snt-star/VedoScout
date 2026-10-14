@@ -1,5 +1,9 @@
 # ScoutMePlay / VedoScout — fortsættelse 14. oktober 2026
 
+**Nyere status:** FIX19-kode, modelpakning og validering fortsættes i
+`docs/fix19-player-cutout-validation.md`. Nedenstående er det oprindelige
+WIP-checkpoint og beskriver derfor også mangler, som senere er rettet.
+
 Dette er et checkpoint til en ny chat. Brugeren bad om at flytte samtalen,
 mens FIX19 stadig var under udvikling. Fortsæt arbejdet fra GitHub; antag ikke,
 at gamle lokale filer, screenshots eller samtalehistorik findes i den nye chat.

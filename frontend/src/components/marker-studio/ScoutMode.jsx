@@ -14,6 +14,7 @@ import selection from "./selectionHints.cjs";
 
 const { TARGET_TAPS, MIN_TAPS, screenToVideo, tapBox, markingProgress, nearbyTime, buildPayload } = policy;
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const insideBox = (point, box) => !!point && !!box && point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h;
 const fmt = t => {
   const s = Math.floor(Math.max(0, t || 0));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
@@ -180,10 +181,11 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
   const canTap = !!activeFrame && loadedImage === activeFrame.jpegDataUrl && !frameBusy && !submitting && !preview &&
     phase === "MARKING";
   const hasDraft = canTap && draft?.frame === activeFrame;
+  const hasVisibleTarget = insideBox(draft?.target_point, draft?.box);
   const maskDataUrl = useMemo(() => selection.maskImage(draft?.visible_mask), [draft?.visible_mask]);
   const maskKey = draft ? JSON.stringify([draft.box, draft.target_point, draft.exclude_points, draft.include_points, draft.player_behind, draft.visibility, draft.manualBox]) : "";
   useEffect(() => {
-    if (!requestMask || !draft?.maskRequested || !draft?.target_point || !canTap || draft.visible_mask || draft.maskDeclined === maskKey) { setMaskBusy(false); return undefined; }
+    if (!requestMask || !draft?.maskRequested || !hasVisibleTarget || !canTap || draft.visible_mask || draft.maskDeclined === maskKey) { setMaskBusy(false); return undefined; }
     const controller = new AbortController();
     const captured = draft;
     setMaskBusy(true);
@@ -195,17 +197,23 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         const box = mask && policy.validBox(result?.box) ? result.box : captured.box;
         if (!controller.signal.aborted) {
           setDraft(prev => prev?.frame === captured.frame && JSON.stringify([prev.box, prev.target_point, prev.exclude_points, prev.include_points, prev.player_behind, prev.visibility, prev.manualBox]) === maskKey
-            ? { ...prev, box, visible_mask: mask } : prev);
+            ? { ...prev, box, visible_mask: mask, maskRequested: !!mask } : prev);
           if (!mask) setNotice(captured.player_behind ? "Could not isolate the player behind. Tap a visible part, mark the player in front, or choose a clearer moment." : "Player outline unclear. Adjust the box or use a clearer moment.");
         }
       } catch {
-        if (!controller.signal.aborted) setNotice("Player outline unavailable. Your selected point and box are kept.");
+        if (!controller.signal.aborted) {
+          setDraft(prev => prev?.frame === captured.frame && JSON.stringify([prev.box, prev.target_point, prev.exclude_points, prev.include_points, prev.player_behind, prev.visibility, prev.manualBox]) === maskKey
+            ? { ...prev, maskRequested: false } : prev);
+          setNotice("Player outline unavailable. Your selected point and box are kept. Retry or choose a clearer moment.");
+        }
       } finally { if (!controller.signal.aborted) setMaskBusy(false); }
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
     // Keyed only to the frame and human inputs, never to the returned mask.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestMask, maskKey, activeFrame, canTap, draft?.maskRequested]);
+  }, [requestMask, maskKey, activeFrame, canTap, draft?.maskRequested, hasVisibleTarget]);
+  const outlinePending = !!requestMask && !!draft?.maskRequested && hasVisibleTarget && !draft?.visible_mask && draft?.maskDeclined !== maskKey;
+  const outlineBusy = maskBusy || outlinePending;
   const resetView = useCallback(() => { setZoom(1); setPan({ x: 0, y: 0 }); }, []);
 
   useEffect(() => {
@@ -220,21 +228,21 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     const point = screenToVideo({ x: e.clientX, y: e.clientY }, r, activeFrame, zoom, pan);
     if (!point) return;
     if (requestMask && draft?.maskRequested && tapIntent !== "target") setMaskBusy(true);
-    if ((tapIntent === "behind" || (draft?.player_behind && !draft.target_point && tapIntent === "target")) && hasDraft) {
+    if ((tapIntent === "behind" || (!hasVisibleTarget && tapIntent === "target")) && hasDraft) {
       if (point.x < draft.box.x || point.x > draft.box.x + draft.box.w || point.y < draft.box.y || point.y > draft.box.y + draft.box.h) {
         setNotice("Tap a visible part inside your marked area, or enlarge the box."); return;
       }
-      setDraft(prev => ({ ...prev, target_point: point, include_points: [], visible_mask: undefined, maskRequested: true }));
-      setTapIntent("target"); setNotice("Finding only the visible parts of your player behind.");
+      setDraft(prev => ({ ...prev, target_point: point, include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined }));
+      setTapIntent("target"); setNotice(draft.player_behind ? "Finding only the visible parts of your player behind." : "Finding your player’s outline at your new tap.");
     } else if (tapIntent === "include" && hasDraft) {
       const b = draft.box, pad = .005;
       const x = Math.max(0, Math.min(b.x, point.x - pad)), y = Math.max(0, Math.min(b.y, point.y - pad));
       const right = Math.min(1, Math.max(b.x + b.w, point.x + pad)), bottom = Math.min(1, Math.max(b.y + b.h, point.y + pad));
-      setDraft(prev => ({ ...prev, box: { x, y, w: right - x, h: bottom - y }, target_point: prev.target_point || point, include_points: [...(prev.include_points || []), point].slice(-4), visible_mask: undefined, continuity: undefined, tracking_check: undefined }));
+      setDraft(prev => ({ ...prev, box: { x, y, w: right - x, h: bottom - y }, target_point: prev.target_point || point, include_points: [...(prev.include_points || []), point].slice(-4), visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
       setTapIntent("target"); setNotice("Visible body part added. Check the updated cutout.");
     } else if (tapIntent === "exclude" && hasDraft) {
       const inside = point.x >= draft.box.x && point.x <= draft.box.x + draft.box.w && point.y >= draft.box.y && point.y <= draft.box.y + draft.box.h;
-      setDraft(prev => ({ ...prev, exclude_points: [...(prev.exclude_points || []), point].slice(-4), visible_mask: undefined, tracking_check: undefined,
+      setDraft(prev => ({ ...prev, exclude_points: [...(prev.exclude_points || []), point].slice(-4), visible_mask: undefined, maskRequested: true, maskDeclined: undefined, tracking_check: undefined,
         ...(inside ? { visibility: "partial", player_behind: true, continuity: undefined } : {}) }));
       if (inside) setPartial(true);
       setTapIntent("target"); setNotice("Opponent marked in red. Check that the cutout keeps only your player.");
@@ -242,10 +250,10 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
       setDraft({ box: tapBox(point), frame: activeFrame, target_point: point, maskRequested: true,
         ...(partial && !link ? { visibility: "partial", player_behind: true, manualBox: true } : {}) });
     }
-  }, [canTap, hiddenHelp, activeFrame, zoom, pan, tapIntent, hasDraft, partial, link, draft, requestMask]);
+  }, [canTap, hiddenHelp, activeFrame, zoom, pan, tapIntent, hasDraft, hasVisibleTarget, partial, link, draft, requestMask]);
 
   const handlePointerDown = useCallback((e, mode = "stage") => {
-    if (!canTap || hiddenHelp || tapIntent !== "target" || (e.button != null && e.button !== 0)) return;
+    if (!canTap || hiddenHelp || (["include", "exclude"].includes(tapIntent)) || (e.button != null && e.button !== 0)) return;
     if (e.target.closest("button, input")) return;
     if (mode !== "stage") e.stopPropagation();
     try { stageRef.current.setPointerCapture(e.pointerId); } catch { /* older devices */ }
@@ -294,11 +302,9 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
       const b = { ...g.box };
       if (g.mode === "move") { b.x = clamp(b.x + fx, 0, 1 - b.w); b.y = clamp(b.y + fy, 0, 1 - b.h); }
       else { b.w = clamp(b.w + fx, 0.02, 1 - b.x); b.h = clamp(b.h + fy, 0.04, 1 - b.y); }
-      setDraft(prev => ({ ...prev, box: b, manualBox: true, frame: activeFrame, visible_mask: undefined, continuity: undefined, tracking_check: undefined,
-        target_point: prev.target_point ? { x: clamp(prev.target_point.x, b.x + b.w * 0.01, b.x + b.w * 0.99),
-          y: clamp(prev.target_point.y, b.y + b.h * 0.01, b.y + b.h * 0.99) } : undefined }));
+      setDraft(prev => ({ ...prev, box: b, manualBox: true, frame: activeFrame, visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
     }
-  }, [activeFrame, zoom, requestMask]);
+  }, [activeFrame, zoom]);
 
   const handlePointerUp = useCallback(e => {
     pointers.current.delete(e.pointerId);
@@ -316,7 +322,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     }
   };
   const confirmMark = () => {
-    if (!hasDraft || actionLock.current || link || maskBusy || (requestMask && draft.player_behind && !draft.visible_mask)) return;
+    if (!hasDraft || !hasVisibleTarget || actionLock.current || link || outlineBusy || (requestMask && draft.player_behind && !draft.visible_mask)) return;
     actionLock.current = true;
     const updated = { ...marks, [current]: { t: activeFrame.t, box: { ...draft.box }, ...selection.hints(draft),
       ...(draft.continuity?.length ? { continuity: draft.continuity } : {}) } };
@@ -355,7 +361,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
   };
 
   const startLink = async direction => {
-    if (!hasDraft || frameBusy || link || maskBusy || phase !== "MARKING") return;
+    if (!hasDraft || frameBusy || link || outlineBusy || phase !== "MARKING") return;
     const next = nearbyTime(activeFrame.t, direction, duration, cuts);
     if (next === null || Math.abs(next - activeFrame.t) < 0.02) { setNotice("No nearby frame in this scene. Try the other direction."); return; }
     const session = sessionRef.current, base = { draft, frame: activeFrame };
@@ -372,7 +378,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
     finally { if (!session.signal.aborted) setFrameBusy(false); }
   };
   const finishLink = accept => {
-    if (!link || frameBusy || maskBusy || (accept && !hasDraft)) return;
+    if (!link || frameBusy || outlineBusy || (accept && (!hasDraft || !hasVisibleTarget))) return;
     if (accept && draft.visibility === "partial") { setNotice("Choose a nearby frame where the same player is fully visible."); return; }
     const linked = accept ? { t: activeFrame.t, box: { ...draft.box }, ...selection.hints(draft), same_player: true } : null;
     const restored = { ...link.draft, ...(linked ? { continuity: [...(link.draft.continuity || []).filter(c => Math.abs(c.t - linked.t) > 0.02), linked].slice(-2) } : {}) };
@@ -381,7 +387,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
   };
 
   const startPreview = async () => {
-    if (!requestTracking || !hasDraft || draft.visibility === "partial" || maskBusy || link) return;
+    if (!requestTracking || !hasDraft || draft.visibility === "partial" || outlineBusy || link) return;
     const session = sessionRef.current, captured = draft, base = activeFrame;
     const segment = time => cuts.filter(c => time >= c).length;
     const samples = [base];
@@ -487,7 +493,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         {activeFrame && !frameBusy && (
           <span className="absolute top-2 left-3 bg-black/70 px-2 py-1 rounded-lg text-xs text-white/80 pointer-events-none">{fmt(activeFrame.t)}</span>
         )}
-        {hasDraft && rect.w > 0 && <DraftMarker box={draft.box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={handlePointerDown} maskDataUrl={maskDataUrl} excludeMode={tapIntent !== "target"} />}
+        {hasDraft && rect.w > 0 && <DraftMarker box={draft.box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={handlePointerDown} maskDataUrl={maskDataUrl} excludeMode={["include", "exclude"].includes(tapIntent)} />}
         {hasDraft && rect.w > 0 && <SelectionPoints points={draft.exclude_points || []} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} />}
         {preview && rect.w > 0 && policy.validBox(preview.results[previewIndex]?.box) && <div style={{ pointerEvents: "none" }}>
           <DraftMarker box={preview.results[previewIndex].box} frame={activeFrame} rect={rect} zoom={zoom} pan={pan} onPointerDown={() => {}} excludeMode />
@@ -549,11 +555,11 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm text-[#CCFF00]">Your selected player</p>
-                <p className="text-[11px] text-white/60">{maskBusy ? "Finding your player’s outline…" : draft.player_behind ? draft.visible_mask ? "Only visible parts of the player behind are selected." : "Tap a visible part of YOUR player. Mark the player in front if needed." : draft.visible_mask ? "Check the head, shirt, arms and legs before confirming." : "Fit the box from head to feet. The outline could not be separated."}</p>
+                <p className="text-[11px] text-white/60">{!hasVisibleTarget ? "Tap a visible part of YOUR player inside the marked area." : outlineBusy ? "Finding your player’s outline…" : draft.player_behind ? draft.visible_mask ? "Only visible parts of the player behind are selected." : "Mark the player in front or retry. Confirm becomes available when your player’s cutout is ready." : draft.visible_mask ? "Check the head, shirt, arms and legs before confirming." : "Fit the box from head to feet. You can retry the outline or keep this area."}</p>
                 <div className="flex gap-2 mt-2">
                   <button type="button" data-testid="scout-retap" className={button} onClick={() => setDraft(null)}><RotateCcw size={15} className="inline mr-1" />Re-tap</button>
                   <button type="button" data-testid="scout-confirm-mark" className={primary + " flex-1"}
-                    disabled={submitting || actionLock.current || maskBusy || (!!requestMask && draft.player_behind && !draft.visible_mask)} onClick={link ? () => finishLink(true) : confirmMark}><Check size={18} />{link ? "Same player" : "Confirm"}</button>
+                    disabled={submitting || actionLock.current || !hasVisibleTarget || outlineBusy || (!!requestMask && draft.player_behind && !draft.visible_mask)} onClick={link ? () => finishLink(true) : confirmMark}><Check size={18} />{link ? "Same player" : "Confirm"}</button>
                 </div>
               </div>
             </div>
@@ -567,36 +573,41 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
           {hasDraft && <div className="flex gap-2">
             {!link && <button type="button" data-testid="scout-player-behind" className={button + " flex-1"} aria-pressed={draft.player_behind === true}
               onClick={() => {
+                if (draft.player_behind) {
+                  setDraft(prev => ({ ...prev, player_behind: undefined, visibility: undefined, exclude_points: [], include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
+                  setPartial(false); setTapIntent("target");
+                  setNotice("Area kept. Check the visible player’s outline before confirming."); return;
+                }
                 setDraft(prev => ({ ...prev, player_behind: true, visibility: "partial", manualBox: true,
-                  target_point: undefined, include_points: [], visible_mask: undefined, maskRequested: true, continuity: undefined, tracking_check: undefined }));
+                  target_point: undefined, include_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, continuity: undefined, tracking_check: undefined }));
                 setPartial(true); setRefine(true); setTapIntent("behind");
                 setNotice("Area kept. Tap a visible part of your player behind. Mark the player in front with Not my player if needed.");
-              }}>Player is behind</button>}
+              }}>{draft.player_behind ? "Player is visible" : "Player is behind"}</button>}
           </div>}
           {hasDraft && <div className="flex gap-2">
             <button type="button" data-testid="scout-refine" className={button + " flex-1"} aria-expanded={refine} onClick={() => { setRefine(v => !v); setTapIntent("target"); }}>Adjust selection</button>
             {requestTracking && draft.visibility !== "partial" && !link && <button type="button" data-testid="scout-check-tracking" className={button + " flex-1"}
-              disabled={maskBusy || frameBusy} onClick={startPreview}>Check tracking</button>}
+              disabled={outlineBusy || frameBusy} onClick={startPreview}>Check tracking</button>}
           </div>}
           {hasDraft && (refine || draft.visibility === "partial") && <div className="flex gap-2 flex-wrap">
             {requestMask && !draft.maskRequested && <button type="button" data-testid="scout-refine-cutout" className={button}
               onClick={() => setDraft(prev => ({ ...prev, maskRequested: true, maskDeclined: undefined }))}>Retry player outline</button>}
-            {requestMask && <button type="button" data-testid="scout-include-player" className={button} disabled={maskBusy} aria-pressed={tapIntent === "include"}
+            {requestMask && <button type="button" data-testid="scout-include-player" className={button} disabled={outlineBusy} aria-pressed={tapIntent === "include"}
               onClick={() => { setTapIntent(t => t === "include" ? "target" : "include"); setNotice("Tap a visible part of YOUR player that is missing from the cutout."); }}>Add player part</button>}
-            <button type="button" data-testid="scout-exclude-opponent" className={button} disabled={maskBusy} aria-pressed={tapIntent === "exclude"}
+            <button type="button" data-testid="scout-exclude-opponent" className={button} disabled={outlineBusy} aria-pressed={tapIntent === "exclude"}
               onClick={() => { setTapIntent(t => t === "exclude" ? "target" : "exclude"); setNotice("Tap the opponent — not your player. Red points exclude that person from this selection."); }}>Not my player</button>
-            {!!draft.exclude_points?.length && <button type="button" className={button} onClick={() => { setDraft(prev => ({ ...prev, exclude_points: [], visible_mask: undefined, tracking_check: undefined })); setTapIntent("target"); }}>Clear red points</button>}
+            {!!draft.exclude_points?.length && <button type="button" className={button} onClick={() => { setDraft(prev => ({ ...prev, exclude_points: [], visible_mask: undefined, maskRequested: true, maskDeclined: undefined, tracking_check: undefined })); setTapIntent("target"); }}>Clear red points</button>}
             {!!draft.visible_mask && !draft.player_behind && <button type="button" className={button} onClick={() => { setMaskBusy(false); setDraft(prev => ({ ...prev, visible_mask: undefined, maskRequested: false, maskDeclined: maskKey, tracking_check: undefined })); }}>Use box instead</button>}
           </div>}
           {hasDraft && draft.visibility === "partial" && !link && <div className="rounded-xl border border-white/20 p-2 space-y-2">
             <p className="text-[11px] text-white/75">Player behind. Only visible pixels are kept. You can add a nearby clear reference:</p>
             <div className="flex gap-2">
-              <button type="button" data-testid="scout-link-before" className={button + " flex-1"} disabled={maskBusy || frameBusy} onClick={() => startLink(-1)}>Before · −0.5s</button>
-              <button type="button" data-testid="scout-link-after" className={button + " flex-1"} disabled={maskBusy || frameBusy} onClick={() => startLink(1)}>After · +0.5s</button>
+              <button type="button" data-testid="scout-link-before" className={button + " flex-1"} disabled={outlineBusy || frameBusy} onClick={() => startLink(-1)}>Before · −0.5s</button>
+              <button type="button" data-testid="scout-link-after" className={button + " flex-1"} disabled={outlineBusy || frameBusy} onClick={() => startLink(1)}>After · +0.5s</button>
             </div>
             {!!draft.continuity?.length && <p className="text-[11px] text-[#CCFF00]">{draft.continuity.length} nearby identity check(s) saved</p>}
           </div>}
-          {link && <button type="button" data-testid="scout-cancel-link" className={button + " w-full"} disabled={maskBusy || frameBusy} onClick={() => finishLink(false)}>Cancel nearby check</button>}
+          {link && <button type="button" data-testid="scout-cancel-link" className={button + " w-full"} disabled={outlineBusy || frameBusy} onClick={() => finishLink(false)}>Cancel nearby check</button>}
           {!done && !link && !preview && (
             <div className="flex justify-between items-center gap-2">
               <button type="button" data-testid="scout-hidden-player" className={button + " flex items-center gap-1.5"} disabled={frameBusy}
@@ -629,7 +640,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
           {done && (
             <>
               <div className="flex gap-2 overflow-x-auto" data-testid="scout-selection-done">
-                {Object.entries(marks).filter(([, m]) => policy.validBox(m.box)).map(([i, m]) => <div key={i} className="flex-none w-14 h-16 border border-[#CCFF00] rounded-lg overflow-hidden"><MarkedCropCanvas frameDataUrl={frames[Number(i)].jpegDataUrl} box={m.box} width={112} height={128} className="w-full h-full" /></div>)}
+                {Object.entries(marks).filter(([, m]) => policy.validBox(m.box)).map(([i, m]) => <div key={i} className="flex-none w-14 h-16 border border-[#CCFF00] rounded-lg overflow-hidden"><MarkedCropCanvas frameDataUrl={frames[Number(i)].jpegDataUrl} box={m.box} mask={m.visible_mask} width={112} height={128} className="w-full h-full" /></div>)}
               </div>
               <p className="text-[11px] text-white/70">After saving, identity checks run automatically. No further player taps are required.</p>
               <button type="button" data-testid="scout-submit" disabled={submitting} className={primary + " w-full"} onClick={submit}>

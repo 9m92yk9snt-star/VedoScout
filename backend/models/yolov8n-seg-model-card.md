@@ -15,11 +15,12 @@ for candidate people in a bounded crop around the human's tap.
 - License: Ultralytics AGPL-3.0 (https://github.com/ultralytics/ultralytics/blob/v8.3.0/LICENSE)
 - Documentation: https://docs.ultralytics.com/tasks/segment/
 
-The intended bundled model is checksum-checked. The FIX19 continuation branch
-currently contains source and export instructions only; its three ONNX assets
-have not been committed. It is a work checkpoint, not a deployable release.
-See `docs/continuation-fix19-player-cutout-20261014.md` for asset checksums and
-remaining validation. Serving uses the existing OpenCV
+The bundled model is checksum-checked and restored locally from the binary
+parts in `segmentation-assets/manifest.json`. The original source license is
+preserved in `Ultralytics-AGPL-3.0.txt`. The complete package remains a review
+candidate until CI/review, not a production deployment.
+See `docs/fix19-player-cutout-validation.md` for current validation and known
+limitations. Serving uses the existing OpenCV
 CPU dependency; it does not install Torch, download weights, call an LLM,
 transmit the frame to another service, or infer hidden body parts.
 
