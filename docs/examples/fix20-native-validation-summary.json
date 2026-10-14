@@ -1,0 +1,237 @@
+{
+  "scope": "COMPLETED_NATIVE_DIAGNOSTIC_POSTHOC_QA_NOT_FULL_ANALYSIS",
+  "source_commit": "f6bbd6a0525020dc13b255a6206e9671a657cea7",
+  "source_video_sha256": "0e6c68902aa3d01971f7f327b0fa432e5c526c60654062cc6f01276646884abb",
+  "original_anchors_sha256": "81d030b01f2b171dc28d8cecfd254973b830173a2e24f3759b68adab2a2a047b",
+  "anchor_count": 11,
+  "declared_number": 15,
+  "original_declared_number": "5",
+  "declaration_override_source": "USER_DECLARED_NUMBER_NOT_OCR",
+  "source_unchanged": true,
+  "stages": [
+    {
+      "name": "tracking",
+      "elapsed_s": 14.084,
+      "counters": {
+        "network": 0,
+        "remote_sdk": 0,
+        "video_open": 1,
+        "detector_forward": 0
+      }
+    },
+    {
+      "name": "identity",
+      "elapsed_s": 43.619,
+      "counters": {
+        "network": 0,
+        "remote_sdk": 0,
+        "video_open": 1,
+        "detector_forward": 375
+      }
+    },
+    {
+      "name": "preparation",
+      "elapsed_s": 55.791,
+      "counters": {
+        "network": 0,
+        "remote_sdk": 0,
+        "video_open": 1,
+        "detector_forward": 576
+      }
+    },
+    {
+      "name": "physical",
+      "elapsed_s": 1238.576,
+      "counters": {
+        "network": 0,
+        "remote_sdk": 0,
+        "video_open": 78,
+        "detector_forward": 12073
+      }
+    },
+    {
+      "name": "reconciliation",
+      "elapsed_s": 3.683,
+      "counters": {
+        "network": 0,
+        "remote_sdk": 0,
+        "video_open": 0,
+        "detector_forward": 0
+      }
+    }
+  ],
+  "counters": {
+    "network": 0,
+    "remote_sdk": 0,
+    "video_open": 81,
+    "detector_forward": 13024
+  },
+  "preparation_metrics": {
+    "identity_points": 295,
+    "production_track_points": 224,
+    "scene_graph_frames": 576,
+    "sequence_windows": 17,
+    "refinement_windows": 20
+  },
+  "physical_status": "ok",
+  "physical_metrics": {
+    "critical_windows": 15,
+    "semantic_critical_windows": 13,
+    "physical_recall_windows": 11,
+    "physical_recall_windows_ok": 11,
+    "physical_recall_windows_failed": 0,
+    "windows_ok": 15,
+    "windows_failed": 0,
+    "windows_failed_by_stage": {},
+    "traces": 15,
+    "accepted_contacts": 333,
+    "inspection_ball_candidates": 0,
+    "inspection_native_neighbor_frames": 0,
+    "inspection_native_roi_attempts": 0,
+    "step3_recovered_contacts": 4,
+    "touches": 686,
+    "physical_strikes": 182,
+    "physical_release_strikes": 87,
+    "scoring_control_contacts": 95,
+    "goal_reviews_requested": 176,
+    "goal_reviews_skipped": 6,
+    "a7_verified_interventions": 4
+  },
+  "recall_execution_coverage": {
+    "version": 1,
+    "scan_complete": true,
+    "verification_complete": true,
+    "status": "verified_complete",
+    "planned_windows": 11,
+    "executed_windows": 11,
+    "windows_ok": 11,
+    "windows_failed": 0,
+    "planner_metrics": {
+      "scene_graph_frames": 576,
+      "target_active_frames": 252,
+      "graph_trigger_frames": 50,
+      "distinct_trigger_points": 486,
+      "recall_windows": 11
+    }
+  },
+  "decoded_frame_rows": 6165,
+  "distinct_media_pts": 4551,
+  "first_media_ms": 0,
+  "last_media_ms": 76664,
+  "fallback_rows": 0,
+  "non_actual_pts_rows": 0,
+  "new_remote_model_calls": 0,
+  "database_writes": 0,
+  "qualified_reference_actions": 0,
+  "reference_actions": 5,
+  "reference_labels_used_as_analysis_input": false,
+  "reference_cases": [
+    {
+      "case_id": "saved_shot",
+      "reference_ms": 23680,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "source_trace_id": "dense_e29df0078338b31c",
+      "inspection_status": "NOT_EXECUTED",
+      "nearest_frame_ms": 23682,
+      "nearest_target": {
+        "status": "UNRESOLVED",
+        "reason": "SCENE_CUT",
+        "proof_eligible": false
+      },
+      "nearby_strikes": 4,
+      "nearby_target_strikes": 0,
+      "nearby_physical_outcomes": {
+        "UNRESOLVED": 4
+      }
+    },
+    {
+      "case_id": "target_goal",
+      "reference_ms": 30830,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "source_trace_id": "recall_72554e852f36c920",
+      "inspection_status": "NOT_EXECUTED",
+      "nearest_frame_ms": 30832,
+      "nearest_target": {
+        "status": "VERIFIED",
+        "reason": "BOUNDED_DENSE_BODY_CONTINUITY",
+        "proof_eligible": true
+      },
+      "nearby_strikes": 2,
+      "nearby_target_strikes": 0,
+      "nearby_physical_outcomes": {
+        "UNRESOLVED": 2
+      }
+    },
+    {
+      "case_id": "assist_1",
+      "reference_ms": 43190,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "source_trace_id": "recall_30df768b8d18b6f8",
+      "inspection_status": "NOT_EXECUTED",
+      "nearest_frame_ms": 43182,
+      "nearest_target": {
+        "status": "UNRESOLVED",
+        "reason": "SCENE_CUT",
+        "proof_eligible": false
+      },
+      "nearby_strikes": 3,
+      "nearby_target_strikes": 0,
+      "nearby_physical_outcomes": {
+        "UNRESOLVED": 3
+      }
+    },
+    {
+      "case_id": "assist_2",
+      "reference_ms": 49440,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "source_trace_id": "dense_f72307202e61d854",
+      "inspection_status": "NOT_EXECUTED",
+      "nearest_frame_ms": 49448,
+      "nearest_target": {
+        "status": "UNRESOLVED",
+        "reason": "SCENE_CUT",
+        "proof_eligible": false
+      },
+      "nearby_strikes": 6,
+      "nearby_target_strikes": 0,
+      "nearby_physical_outcomes": {
+        "UNRESOLVED": 6
+      }
+    },
+    {
+      "case_id": "assist_3",
+      "reference_ms": 56440,
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "source_trace_id": "recall_bdbaabd5fe9a824d",
+      "inspection_status": "NOT_EXECUTED",
+      "nearest_frame_ms": 56448,
+      "nearest_target": {
+        "status": "VERIFIED",
+        "reason": "BOUNDED_DENSE_BODY_CONTINUITY",
+        "proof_eligible": true
+      },
+      "nearby_strikes": 3,
+      "nearby_target_strikes": 0,
+      "nearby_physical_outcomes": {
+        "UNRESOLVED": 3
+      }
+    }
+  ],
+  "limits": [
+    "Remote semantic, jersey, role and goal readers disabled",
+    "Original historical taps are not fresh human acceptance of FIX19 cutouts",
+    "Recall execution coverage is not event recall or verified football truth",
+    "No full online analysis, merge or deployment"
+  ],
+  "input_artifact_sha256": {
+    "receipt.json": "0828f0a2365a97fe8b0248f7b15a9d1b3e11f4c3b8822418aa18c6b9918c5478",
+    "physical.json": "4fdc0bdef4f7b6f619d8af0fd0cd8fea4992a5f85688c0f702b4f1bf9896d33c",
+    "reconciliation.json": "62278e7fce0535634742f4d4a729b9acd36247f2888495e0e2c4c30f22b722f8"
+  },
+  "qa_cases_sha256": "25503d3390ed96d8890c6b49d675804182b1a4e3db308467a696d924551582aa"
+}

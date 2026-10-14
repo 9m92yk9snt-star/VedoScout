@@ -1,5 +1,10 @@
 # FIX19 — initial player cutout and behind-mode review candidate
 
+The next continuation is draft PR33, documented in
+`docs/fix20-native-validation-and-reuse.md`. It adds measured native-work reuse,
+selection provenance and a completed native-only video diagnostic; it does not
+establish complete five-action acceptance or deploy FIX19.
+
 This change continues the saved FIX19 checkpoint on top of tested FIX16–18
 without moving PR31 or main. It is not a production deployment or a new
 complete match-analysis result.

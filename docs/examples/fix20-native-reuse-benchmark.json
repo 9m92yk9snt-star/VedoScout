@@ -1,0 +1,52 @@
+{
+  "scope": "BOUNDED_NATIVE_OVERLAP_BENCHMARK_NOT_FULL_ANALYSIS",
+  "windows_ms": [
+    [
+      0,
+      600
+    ],
+    [
+      300,
+      900
+    ]
+  ],
+  "source_video_sha256": "0e6c68902aa3d01971f7f327b0fa432e5c526c60654062cc6f01276646884abb",
+  "threads": 2,
+  "runs": [
+    {
+      "cache_enabled": false,
+      "elapsed_s": 24.509,
+      "detector_forwards": 148,
+      "evidence_sha256": "d05d232878c04fa2f4780fe7add8a1f6789e2f41e7bc05d7a53b4f5357fe2642",
+      "frames": 74,
+      "cache": null
+    },
+    {
+      "cache_enabled": true,
+      "elapsed_s": 18.219,
+      "detector_forwards": 110,
+      "evidence_sha256": "d05d232878c04fa2f4780fe7add8a1f6789e2f41e7bc05d7a53b4f5357fe2642",
+      "frames": 74,
+      "cache": {
+        "hits": 19,
+        "misses": 55,
+        "evictions": 0,
+        "entries": 55,
+        "payload_bytes": 97447,
+        "max_entries": 768,
+        "max_payload_bytes": 16777216,
+        "scope": "RUN_LOCAL_NATIVE_PIXEL_PROPOSALS_ONLY"
+      }
+    }
+  ],
+  "evidence_equal": true,
+  "source_unchanged": true,
+  "network_attempts": 0,
+  "expected_reference_labels_used_as_input": false,
+  "private_receipt_sha256": "380aa8a8b85ccc3d8dcc1f5b4406bf07a6c1f9c47709845541f53140ef0c48d3",
+  "tested_backend_source_sha256": {
+    "dense_track_refinement.py": "a9f9946438dbd325571e89214e810d6f9825a6a60ba60fc1a408267df5051c79",
+    "physical_match_reconstruction.py": "8e12440a0a09215e7a7324994b135678540b61fa0635b28dcb84a0a54444cfed"
+  },
+  "whole_report_performance_claim": false
+}
