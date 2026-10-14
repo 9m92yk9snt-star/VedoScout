@@ -99,6 +99,9 @@ def selection_metadata(anchor):
     out = {}
     if anchor.get("visibility") == "partial":
         out["visibility"] = "partial"
+    if anchor.get("player_behind") is True:
+        out["player_behind"] = True
+        out["visibility"] = "partial"
     if valid_point(anchor.get("target_point")):
         out["target_point"] = {k: float(anchor["target_point"][k]) for k in ("x", "y")}
     if isinstance(anchor.get("include_points"), list):

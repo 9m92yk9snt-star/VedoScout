@@ -6036,7 +6036,7 @@ async def preview_player_selection_tracking(frames: list[UploadFile] = File(...)
 async def suggest_player_selection_mask(frame: UploadFile = File(...), hints: str = Form(...),
                                         user=Depends(get_current_user)):
     """Ephemeral bounded preview. No report writes, video uploads or LLM calls."""
-    from player_selection import suggest_mask
+    from native_player_segmentation import suggest_person_cutout
     if len(hints) > 4096:
         raise HTTPException(400, "Selection hints too large")
     data = await frame.read(2 * 1024 * 1024 + 1)
@@ -6052,8 +6052,12 @@ async def suggest_player_selection_mask(frame: UploadFile = File(...), hints: st
         raise HTTPException(503, "Selection preview busy. Keep your box or retry.")
     async with _selection_slots:
         try:
-            return await asyncio.to_thread(suggest_mask, data, values.get("box"),
-                                           values.get("target_point"), values.get("exclude_points", []), values.get("include_points", []))
+            return await asyncio.to_thread(
+                suggest_person_cutout, data, values.get("box"), values.get("target_point"),
+                values.get("exclude_points", []), values.get("include_points", []),
+                player_behind=values.get("player_behind") is True or values.get("visibility") == "partial",
+                auto_box=values.get("auto_box") is True,
+            )
         except (ValueError, OSError):
             raise HTTPException(400, "Frame or selection could not be read")
         except Exception:
