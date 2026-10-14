@@ -8,7 +8,26 @@ import os
 import action_evidence_review as inspection
 import goal_review_scheduler as scheduler
 
-MAX_FEEDBACK_REVIEWS = min(8, max(0, int(os.environ.get("FIX13_MAX_FEEDBACK_REVIEWS", "4"))))
+MAX_FEEDBACK_REVIEWS = min(8, max(0, int(os.environ.get("FIX13_MAX_FEEDBACK_REVIEWS", "8"))))
+
+
+def _target_contact_search(contact, frames, scene):
+    """A measured target body can focus a search while its touch stays unproved."""
+    ms = contact.get("media_ms")
+    if not inspection._num(ms) or contact.get("time_authority") != "ACTUAL_MEDIA_PTS":
+        return False
+    available = [f for f in frames if f.get("scene_id") == scene
+                 and f.get("time_authority") == "ACTUAL_MEDIA_PTS"
+                 and not f.get("cut_barrier") and not f.get("used_fallback")]
+    frame = min(available, key=lambda f: abs(f["media_ms"] - ms), default=None)
+    if frame is None or abs(frame["media_ms"] - ms) > inspection.MAX_FRAME_ALIGNMENT_MS:
+        return False
+    target = frame.get("global_target") or {}
+    track = target.get("local_track_id")
+    return bool(target.get("status") == "VERIFIED" and target.get("proof_eligible") is True
+                and isinstance(track, str) and track
+                and (track == contact.get("player_track_id")
+                     or track in (contact.get("player_candidate_track_ids") or [])))
 
 
 def gaps(trace):
@@ -62,9 +81,18 @@ def build_plan(traces, budget=None, analysis=None):
                 or (outcome.get("goal_review_eligibility") or {}).get("eligible") is True
             if relevant and str(outcome.get("physical_outcome") or "").startswith("UNRESOLVED"):
                 release = strike.get("status") == "VERIFIED_PHYSICAL_RELEASE"
-                centers.append((1 if release else 2, outcome.get("media_ms"), "OUTCOME_CONTACT_GAP"))
+                centers.append((0 if release else 2, outcome.get("media_ms"), "OUTCOME_CONTACT_GAP"))
+        # A native release must be inspectable before target ownership is known.
+        # Opening a crop search supplies neither an identity nor a shot outcome.
+        for strike in trace.get("strike_evidence") or []:
+            if (strike.get("status") == "VERIFIED_PHYSICAL_RELEASE"
+                    and strike.get("proof_eligible") is True
+                    and strike.get("global_target_id") != "GLOBAL_TARGET"):
+                centers.append((1, strike.get("media_ms"), "PHYSICAL_RELEASE_IDENTITY_GAP"))
         for contact in (trace.get("contacts") or {}).get("unresolved") or []:
-            centers.append((1, contact.get("media_ms"), "PHYSICAL_CONTACT_GAP"))
+            focused = _target_contact_search(contact, frames, window["scene_id"])
+            centers.append((0 if focused else 2, contact.get("media_ms"),
+                            "TARGET_CONTACT_EVIDENCE_GAP" if focused else "PHYSICAL_CONTACT_GAP"))
         if gaps(trace)["target_ball_frames"]:
             path = {b.get("media_ms"): b for b in trace.get("ball_trajectory") or []}
             for touch in (trace.get("touch_graph") or {}).get("touches") or []:
@@ -73,11 +101,13 @@ def build_plan(traces, budget=None, analysis=None):
                         ms - 180 <= f["media_ms"] <= ms + 350
                         and (f.get("global_target") or {}).get("proof_eligible") is True
                         and (path.get(f["media_ms"]) or {}).get("proof_eligible") is not True for f in frames):
-                    centers.append((0, ms, "TARGET_RELEASE_OR_BALL_GAP"))
+                    role = touch.get("contact_role") or {}
+                    release = isinstance(role, dict) and role.get("status") == "VERIFIED" and role.get("role") == "RELEASE"
+                    centers.append((0 if release else 3, ms, "TARGET_RELEASE_OR_BALL_GAP"))
         if gaps(trace)["identity_frames"] or not (trace.get("contacts") or {}).get("accepted"):
             for job in trace.get("action_inspections") or []:
                 if job.get("selected") and job.get("status") not in {"ERROR", "UNAVAILABLE", "NOT_CONFIGURED", "DEFERRED"}:
-                    centers.append((2, job.get("center_ms"), "IDENTITY_OR_CONTACT_GAP"))
+                    centers.append((3, job.get("center_ms"), "IDENTITY_OR_CONTACT_GAP"))
         # Retry the most specific physical gap per window. No action kind or
         # expected jersey/goal/assist is supplied to the inspection reader.
         search_times = hints[window["scene_id"]] + [j["center_ms"] for j in trace.get("action_inspections") or []
@@ -112,22 +142,36 @@ def build_plan(traces, budget=None, analysis=None):
                 continue
             job["inspection_id"] = "feedback_" + hashlib.sha256(json.dumps(
                 [trace["trace_id"], reason, start, end, requested]).encode()).hexdigest()[:20]
+            job["requested_media_ms"] = requested
             candidates.append(job)
             break
+    # Overlapping dense/recall windows can request the identical source pixels.
+    # Keep the most specific search once, rather than spending two reader calls.
+    unique, seen_inputs = [], set()
+    for job in sorted(candidates, key=lambda j: (j["priority"], j["center_ms"], j["dense_window_id"])):
+        signature = (job["scene_id"], tuple(job["requested_media_ms"]))
+        if signature in seen_inputs:
+            rejected.append({"trace_id": job["dense_window_id"], "center_ms": job["center_ms"],
+                             "reason": "OVERLAPPING_FEEDBACK_PIXELS_ALREADY_SCHEDULED"})
+            continue
+        seen_inputs.add(signature)
+        unique.append(job)
     cells = defaultdict(list)
-    for job in candidates:
+    for job in unique:
         cells[(job["scene_id"], job["center_ms"] // scheduler.TIME_CELL_MS)].append(job)
     for jobs in cells.values():
         jobs.sort(key=lambda j: (j["priority"], j["center_ms"]))
-    ordered, visited = [], set()
+    ordered, visited, visited_scenes = [], set(), set()
     while cells:
-        available = [c for c in cells if c not in visited] or list(cells)
+        available = ([c for c in cells if c[0] not in visited_scenes]
+                     or [c for c in cells if c not in visited] or list(cells))
         def priority(cell):
             job = cells[cell][0]
             distance = min((abs(job["center_ms"] - old["center_ms"]) for old in ordered), default=0)
             return (job["priority"], -distance, job["center_ms"])
         cell = min(available, key=priority)
         visited.add(cell)
+        visited_scenes.add(cell[0])
         job = deepcopy(cells[cell].pop(0))
         job.update(selected=len(ordered) < limit, selection_rank=len(ordered))
         ordered.append(job)
