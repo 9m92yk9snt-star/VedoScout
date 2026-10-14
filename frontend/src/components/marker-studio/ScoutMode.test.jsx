@@ -34,7 +34,10 @@ beforeEach(() => {
   };
   jest.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
   jest.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
-  jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage: jest.fn() });
+  jest.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    drawImage: jest.fn(), putImageData: jest.fn(),
+    createImageData: jest.fn((w, h) => ({ data: new Uint8ClampedArray(w * h * 4) })),
+  });
   jest.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(() => "data:image/jpeg;base64,FRAME" + (++jpeg));
   authority.seekPresentedFrame.mockReset();
   detectSceneCuts.mockImplementation(async () => ({ cuts: [20, 40], samples: [] }));
@@ -294,6 +297,7 @@ test("ten guided selections are ready without another manual check", async () =>
   fireEvent.click(screen.getByTestId("scout-submit"));
   await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   expect(onConfirm.mock.calls[0][0].anchors).toHaveLength(10);
+  expect(onConfirm.mock.calls[0][0].anchors.slice(0, 3).map(a => a.t)).toEqual([2.989, 26.989, 56.989]);
 });
 
 test("two selections plus skipped frames cannot pass as three", async () => {
@@ -352,6 +356,7 @@ test("seeking to a nearby frame disables taps until its pixels arrive", async ()
   tap(); expect(screen.queryByTestId("scout-selection-preview")).not.toBeInTheDocument();
   await act(async () => resolveFrame({ mediaTime: 3.478 }));
   expect(screen.getByTestId("scout-presented-frame")).toHaveAttribute("data-frame-time", "3.478");
+  fireEvent.click(screen.getByText("Player visible — tap now"));
   fireEvent.load(screen.getByTestId("scout-presented-frame")); tap();
   expect(screen.getByTestId("scout-selection-preview")).toBeInTheDocument();
 });

@@ -84,7 +84,10 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
     return { t: frame.t, box: { ...mark.box }, ...selection.hints(mark),
       ...(mark.continuity?.length ? { continuity: mark.continuity.map(c => ({ ...c, segment: segment(c.t) })) } : {}),
       segment: segment(frame.t), frameIndex: Number(i) };
-  }).sort((a, b) => (a.visibility === 'partial') - (b.visibility === 'partial') || a.t - b.t);
+  // Keep broad guided references at the front of the existing crop budgets.
+  // Sorting back into time order would put all ten-tap profile crops near the
+  // beginning again. Partial fragments still follow clear references.
+  }).sort((a, b) => (a.visibility === 'partial') - (b.visibility === 'partial'));
   const checks = verifyMarks.map((m, i) => {
     if (m.visibility === 'partial' || !validBox(m.box) || !m.jpegDataUrl || !distinctVerifyTime(m.t, verifyMarks.slice(0, i))) {
       throw new Error('Choose three different, clearly visible moments for the extra checks.');

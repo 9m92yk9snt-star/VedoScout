@@ -280,7 +280,6 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         y: clamp(g.pan.y + dy, -r.height * (zoom - 1) / 2, r.height * (zoom - 1) / 2),
       });
     } else if (g.box) {
-      if (requestMask && draft?.maskRequested && tapIntent !== "target") setMaskBusy(true);
       const scale = Math.min(r.width / activeFrame.width, r.height / activeFrame.height);
       const fx = dx / (activeFrame.width * scale * zoom), fy = dy / (activeFrame.height * scale * zoom);
       const b = { ...g.box };
@@ -450,13 +449,13 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
       <header className="flex-none h-12 flex items-center justify-between px-3 border-b border-white/10">
         <button type="button" aria-label="Close player selection" data-testid="scout-close" onClick={onCancel} className="w-11 h-11 flex items-center justify-center"><X size={22} /></button>
         <span className="text-sm font-black tracking-wide">Select your player</span>
-        <span className="text-xs text-white/60">One player selection</span>
+        <span className="text-xs text-white/60">3–10 taps</span>
       </header>
       {(phase === "MARKING" || phase === "READY") && (
         <div className="flex-none px-4 py-2.5 flex justify-between gap-2 items-center bg-white/5">
           <div>
             <p className="text-sm font-bold">{done ? "Your selections are ready" : "Tap your player in the clear moments"}</p>
-            <p className="text-[11px] text-white/60">{hasDraft ? "Drag or resize the box to fit your player." : partial ? "Tap only the visible part of your player." : "Pinch to zoom · drag to pan · tap to select"}</p>
+            <p className="text-[11px] text-white/60">{done ? "Review your references. Add or adjust a selection if needed." : hasDraft ? "Drag or resize the box to fit your player." : partial ? "Tap only the visible part of your player." : "Pinch to zoom · drag to pan · tap to select"}</p>
           </div>
           <span data-testid="scout-progress-counter" className="text-[#CCFF00] text-xl font-black tabular-nums whitespace-nowrap">
             {confirmedCount + "/" + queue.length}
@@ -541,7 +540,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm text-[#CCFF00]">Your selected player</p>
-                <p className="text-[11px] text-white/60">{maskBusy ? "Preparing optional cutout…" : "Fit the box from head to feet. The whole crop is your reference."}</p>
+                <p className="text-[11px] text-white/60">{maskBusy ? "Preparing optional cutout…" : draft.visibility === "partial" ? "Fit the box around the visible part only." : "Fit the box from head to feet. The whole crop is your reference."}</p>
                 <div className="flex gap-2 mt-2">
                   <button type="button" data-testid="scout-retap" className={button} onClick={() => setDraft(null)}><RotateCcw size={15} className="inline mr-1" />Re-tap</button>
                   <button type="button" data-testid="scout-confirm-mark" className={primary + " flex-1"}
@@ -612,7 +611,7 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
           {done && (
             <>
               <div className="flex gap-2 overflow-x-auto" data-testid="scout-selection-done">
-                {Object.entries(marks).filter(([, m]) => policy.validBox(m.box)).map(([i, m]) => <div key={i} className="w-14 h-16 border border-[#CCFF00] rounded-lg overflow-hidden"><MarkedCropCanvas frameDataUrl={frames[Number(i)].jpegDataUrl} box={m.box} width={112} height={128} className="w-full h-full" /></div>)}
+                {Object.entries(marks).filter(([, m]) => policy.validBox(m.box)).map(([i, m]) => <div key={i} className="flex-none w-14 h-16 border border-[#CCFF00] rounded-lg overflow-hidden"><MarkedCropCanvas frameDataUrl={frames[Number(i)].jpegDataUrl} box={m.box} width={112} height={128} className="w-full h-full" /></div>)}
               </div>
               <p className="text-[11px] text-white/70">After saving, identity checks run automatically. No further player taps are required.</p>
               <button type="button" data-testid="scout-submit" disabled={submitting} className={primary + " w-full"} onClick={submit}>

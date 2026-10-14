@@ -15,6 +15,8 @@ it does not establish that they caused every unresolved point.
 - One initial editor with 3–10 clear, human-confirmed moments. The first
   suggestions span the start, middle and end of the clip. Skipped or partial
   views cannot replace the three clear references.
+  Their broad ordering is preserved in the uploaded anchors so the existing
+  bounded identity-crop budget includes later references without extra reads.
 - The main preview always shows the complete selected rectangle. Adjusting the
   box still preserves its actual displayed frame, time and selected point.
   Cutout refinement is optional and explicitly opened by the user, displayed

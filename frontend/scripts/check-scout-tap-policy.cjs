@@ -18,6 +18,14 @@ check('first proposed moments span the clip without changing source times', () =
   assert.deepEqual([...sorted].sort((a, b) => a - b), original);
   assert.deepEqual(policy.prioritizeTapMoments([5, 5, -1, Infinity, 60], 60), [5]);
 });
+check('broad references reach the existing three-crop identity budget', () => {
+  const proposed = policy.prioritizeTapMoments(frames.map(f => f.t), 60).map(t => ({t, jpegDataUrl: 'frame-' + t}));
+  const selected = Object.fromEntries(proposed.map((f, i) => [i, {t: f.t, box}]));
+  const result = policy.buildPayload(proposed, selected, [], [20, 40]);
+  assert.deepEqual(result.anchors.slice(0, 3).map(a => a.t), [3, 27, 57]);
+  assert.deepEqual(result.anchors.slice(0, 3).map(a => a.segment), [0, 1, 2]);
+  assert.equal(result.markerImageDataUrl, 'frame-3');
+});
 check('a partial crop cannot replace a clear initial reference', () => {
   assert.throws(() => policy.buildPayload(frames, {0: marks[0], 1: marks[1], 2: {...marks[2], visibility: 'partial'}}, [], []), /3 clear/);
 });
