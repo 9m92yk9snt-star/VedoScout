@@ -9152,7 +9152,8 @@ async def generate_full_report_task(report_id: str) -> None:
             "feedback_rounds": 1,
             "action_inspection_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_FRAMES,
             "action_native_neighbor_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES,
-        })
+        }, anchor_time_offset=doc.get("anchor_time_offset") or 0,
+            player_details=doc.get("player_details"))
         await db.reports.update_one({"id": report_id}, {"$set": {"analysis_run_manifest": run_manifest}})
         await _trace(report_id, "tracking_start")
         anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)

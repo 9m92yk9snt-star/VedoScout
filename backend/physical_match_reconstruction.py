@@ -512,6 +512,7 @@ def reconstruct_physical_match(
     window_rows = []
     unresolved_all = []
     review_jobs = []
+    native_session = dense_track_refinement.NativeDetectionSession() if detector_fn is None else None
 
     for window in windows:
         stage = "window_setup"
@@ -534,6 +535,7 @@ def reconstruct_physical_match(
             refined = {"frames": deepcopy(previous["decoded_frames"])} if previous is not None else dense_track_refinement.refine_window(
                 dense_iter, graph, authority, str(window.get("scene_id") or ""),
                 detector_fn=detector_fn, camera_estimator=camera_estimator,
+                native_session=native_session,
             )
             dense_frames = list(refined.get("frames") or []) if isinstance(refined, dict) else []
             dense_frames = dense_identity_continuity.apply(dense_frames)["frames"]
@@ -961,6 +963,7 @@ def reconstruct_physical_match(
         "action_inspection_plan": inspection_plan,
         "evidence_feedback_plan": feedback_plan,
         "cross_window_evidence": cross_window_context,
+        "native_detection_cache": native_session.metrics() if native_session is not None else None,
         "goal_review_plan": {
             "requests": len(scheduled_jobs),
             "unique_contacts": len({j["review"]["physical_review_id"] for j in scheduled_jobs}),
