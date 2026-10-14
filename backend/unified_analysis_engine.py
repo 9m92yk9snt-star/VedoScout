@@ -260,6 +260,7 @@ def _compact_sequence_plan(plan: dict | None) -> dict:
         "timebase": src.get("timebase"),
         "analysis_windows": analysis,
         "refinement_windows": refinement,
+        "unreviewable_windows": deepcopy(src.get("unreviewable_windows") or []),
         "metrics": deepcopy(src.get("metrics") or {}),
         "graph_context_persisted": False,
     }
@@ -444,6 +445,48 @@ def is_production_ready(result: dict | None) -> bool:
     )
 
 
+def physical_sequence_plan(result: dict | None) -> dict | None:
+    """Keep positive same-scene windows; record single-frame omissions.
+
+    Only an exact zero-duration window is recoverable here. Negative,
+    non-finite, reversed or unbound windows still reject the plan. This
+    scheduling view changes neither semantic observations nor event proof.
+    """
+    row = result if isinstance(result, dict) else {}
+    src = row.get("sequence_plan") if isinstance(row.get("sequence_plan"), dict) else {}
+    plan = deepcopy(src)
+    omitted = list(plan.get("unreviewable_windows") or [])
+    for key in ("analysis_windows", "refinement_windows"):
+        rows = src.get(key) or []
+        if not isinstance(rows, list):
+            return None
+        valid = []
+        for window in rows:
+            if (not isinstance(window, dict)
+                    or not isinstance(window.get("scene_id"), str)
+                    or not window["scene_id"].strip()):
+                return None
+            start, end = window.get("start_ms"), window.get("end_ms")
+            if not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                       and math.isfinite(v) for v in (start, end)):
+                return None
+            if start < 0 or end < start:
+                return None
+            if start == end:
+                diagnostic = {k: deepcopy(window[k]) for k in (
+                    "sequence_id", "refinement_id", "scene_id", "start_ms", "end_ms") if k in window}
+                diagnostic["reason"] = "ZERO_DURATION_WINDOW"
+                if diagnostic not in omitted:
+                    omitted.append(diagnostic)
+                continue
+            valid.append(deepcopy(window))
+        plan[key] = valid
+    if not plan["analysis_windows"]:
+        return None
+    plan["unreviewable_windows"] = omitted
+    return plan
+
+
 def can_run_physical(result: dict | None) -> bool:
     """Allow safe planned physical work despite a partial semantic response.
 
@@ -455,21 +498,9 @@ def can_run_physical(result: dict | None) -> bool:
         return True
     row = result if isinstance(result, dict) else {}
     canonical = row.get("canonical_events") if isinstance(row.get("canonical_events"), dict) else {}
-    plan = row.get("sequence_plan") if isinstance(row.get("sequence_plan"), dict) else {}
-    windows = plan.get("analysis_windows") or []
     if row.get("status") != "partial_coverage" or canonical.get("status") not in {"ok", "empty", "unresolved"}:
         return False
-    if not windows:
-        return False
-    for window in windows:
-        if not isinstance(window, dict) or not isinstance(window.get("scene_id"), str) or not window["scene_id"]:
-            return False
-        start, end = window.get("start_ms"), window.get("end_ms")
-        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in (start, end)):
-            return False
-        if start < 0 or end <= start:
-            return False
-    return True
+    return physical_sequence_plan(row) is not None
 
 
 def apply_result_to_report(full: dict, result: dict | None) -> dict:
@@ -478,6 +509,18 @@ def apply_result_to_report(full: dict, result: dict | None) -> dict:
     canonical = r.get("canonical_events") if isinstance(r.get("canonical_events"), dict) else {}
     sequence = r.get("sequence_analysis") if isinstance(r.get("sequence_analysis"), dict) else {}
     return canonical_output_authority.apply_to_report(full, canonical, sequence)
+
+
+def apply_legacy_result_to_report(full: dict, ledger: dict | None) -> dict:
+    """Expose fallback provenance so final stats/prose cannot claim completeness."""
+    import event_ledger
+    full["action_timeline"] = event_ledger.authoritative_timeline(ledger)
+    full["event_discovery"] = event_ledger.discovery_summary(ledger)
+    full["analysis_authority"] = {
+        "output": "FIX08_FALLBACK", "event_resolution": "FIX08_SPATIAL_LEDGER",
+        "physical_verification": False, "timebase": "canonical_media_ms",
+    }
+    return full
 
 
 def canonical_event_telestration_box(comment: dict | None) -> dict | None:

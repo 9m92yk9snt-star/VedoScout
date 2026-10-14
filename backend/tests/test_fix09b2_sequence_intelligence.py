@@ -126,7 +126,7 @@ def test_b205_identity_ambiguity_is_a_refinement_trigger_not_an_identity_guess()
     ]
     f = frame(0, target_status="HYPOTHESES", target_id=None,
               candidates=["p001", "p002"], players=players, proof=False)
-    plan = fsi.build_sequence_plan(graph([f]))
+    plan = fsi.build_sequence_plan(graph([f, {**f, "media_ms": 250}]))
     assert plan["analysis_windows"], "hypotheses remain in broad recall coverage"
     assert any("IDENTITY_AMBIGUITY" in r["reasons"] for r in plan["refinement_windows"])
 

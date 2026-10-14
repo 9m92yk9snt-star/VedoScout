@@ -757,6 +757,15 @@ def apply_verified_stats_authority(full: dict) -> dict:
     if not isinstance(full, dict):
         return full
     scan = full.pop("_scoring_scan", None)
+    authority = full.get("analysis_authority") or {}
+    if isinstance(authority, dict) and authority.get("output") == "FIX08_FALLBACK":
+        # Reviewing model proposals through the old spatial ledger is not a
+        # completed physical scoring scan. Retain observed events, but never
+        # present an empty fallback as proof of zero goals/assists or let its
+        # prose invent outcomes absent from those verified events.
+        scan = {**(scan if isinstance(scan, dict) else {}),
+                "coverage_complete": False, "incomplete_scoring_coverage": True,
+                "coverage_status": "PARTIAL", "authority": "FIX08_FALLBACK"}
     xv = full.get("cross_verification") if isinstance(full.get("cross_verification"), dict) else {}
     if str(xv.get("status") or "") == "fail_closed_error":
         full["verified_stats"] = {

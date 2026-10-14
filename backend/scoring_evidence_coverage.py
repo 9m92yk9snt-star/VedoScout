@@ -82,6 +82,8 @@ def assess(physical_result: dict | None, scene_graph: dict | None = None) -> dic
     reasons = []
     if physical.get("audit_storage_complete") is False:
         reasons.append("TRACE_AUDIT_STORAGE_INCOMPLETE")
+    if physical.get("unreviewable_sequence_windows"):
+        reasons.append("SOURCE_SEQUENCE_WINDOWS_UNREVIEWABLE")
     if provider_errors:
         reasons.append("SUPPORTING_REVIEW_UNAVAILABLE_OR_FAILED")
     if not frames_seen:

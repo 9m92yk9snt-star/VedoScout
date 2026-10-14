@@ -5416,6 +5416,13 @@ async def upload_video_and_create_preview(
     feature_consent: Optional[str] = Form(None),  # "true" when the OPTIONAL social-feature consent box is ticked
     user=Depends(get_current_user),
 ):
+    from player_identity_declaration import jersey_declaration_conflict
+    number_conflict = jersey_declaration_conflict(jersey_number, description)
+    if number_conflict:
+        raise HTTPException(status_code=422, detail=(
+            f"Your shirt number is {number_conflict['field_number']}, but your description says "
+            f"{number_conflict['description_number']}. Update one so both identify the same player."
+        ))
     # ============== UPLOAD GATE ==============
     # Free users get ONE free preview lifetime. After that, every upload requires
     # a pre-payment OR a Progress Pass credit.
@@ -8880,8 +8887,7 @@ async def _run_identity_corrective_pass(
                 "unresolved_assist_candidates": 0,
             })
         else:
-            retry["action_timeline"] = event_ledger.authoritative_timeline(_lg)
-            retry["event_discovery"] = event_ledger.discovery_summary(_lg)
+            retry = unified_analysis_engine.apply_legacy_result_to_report(retry, _lg)
             _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
             await _cross_verify_full_report(
                 report_id, retry,
@@ -9691,8 +9697,7 @@ async def generate_full_report_task(report_id: str) -> None:
             full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
         else:
             # Legacy fallback: only the validated FIX08 ledger may populate the timeline.
-            full["action_timeline"] = event_ledger.authoritative_timeline(event_ledger_obj)
-            full["event_discovery"] = event_ledger.discovery_summary(event_ledger_obj)
+            full = unified_analysis_engine.apply_legacy_result_to_report(full, event_ledger_obj)
         _apply_tracking_verification(
             full, anchor_payload_list, _event_authority_track, gt_t_off)
         # GROW YOUR GAME — hard 100%-evidence gate (drops unproven lessons).

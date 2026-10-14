@@ -277,7 +277,7 @@ def _clip_window(scene_bounds, scene_id, start_ms, end_ms):
 def _split_span(start_ms: int, end_ms: int, max_ms=MAX_ANALYSIS_WINDOW_MS,
                 overlap_ms=ANALYSIS_OVERLAP_MS) -> list[tuple[int, int]]:
     if end_ms <= start_ms:
-        return [(start_ms, end_ms)]
+        return []
     if end_ms - start_ms <= max_ms:
         return [(start_ms, end_ms)]
     out = []
@@ -397,6 +397,14 @@ def build_sequence_plan(scene_graph: dict | None) -> dict:
         }
 
     bounds = _scene_bounds(sg)
+    # A hard-cut flash can contain only one sampled frame. It has no measured
+    # temporal interval to review; do not join it to a neighbouring scene or
+    # ask the model to fit a football action into a zero-duration window.
+    unreviewable = [
+        {"scene_id": scene, "start_ms": start, "end_ms": end,
+         "reason": "ZERO_DURATION_SCENE"}
+        for scene, (start, end) in bounds.items() if start == end
+    ]
     motion = _target_motion(frames)
 
     # Broad coverage. Every target-active span is reviewed with context and
@@ -477,6 +485,7 @@ def build_sequence_plan(scene_graph: dict | None) -> dict:
         "timebase": "canonical_media_ms",
         "analysis_windows": analysis,
         "refinement_windows": refinement,
+        "unreviewable_windows": unreviewable,
         "metrics": {
             "scene_graph_frames": len(frames),
             "analysis_windows": len(analysis),
@@ -484,6 +493,7 @@ def build_sequence_plan(scene_graph: dict | None) -> dict:
             "broad_covered_ms_unioned_approx": covered_ms,
             "trigger_points": len(trigger_rows),
             "target_active_spans": len(_active_spans(frames)),
+            "unreviewable_windows": len(unreviewable),
         },
     }
 
@@ -828,7 +838,8 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
             "contract_complete": contract_complete,
         })
     incomplete_sequence_ids = [r["sequence_id"] for r in coverage if not r["contract_complete"]]
-    complete = bool(windows) and not incomplete_sequence_ids
+    unreviewable = deepcopy((plan or {}).get("unreviewable_windows") or [])
+    complete = bool(windows) and not incomplete_sequence_ids and not unreviewable
     actions_total = sum(len(s["actions"]) for s in sequences)
     return {
         "version": VERSION,
@@ -838,6 +849,7 @@ def normalise_sequence_analysis(raw, plan: dict) -> dict:
         "sequences": sequences,
         "coverage": coverage,
         "coverage_complete": complete,
+        "unreviewable_windows": unreviewable,
         "metrics": {
             "planned_windows": len(windows),
             "returned_sequences": len(sequences),
