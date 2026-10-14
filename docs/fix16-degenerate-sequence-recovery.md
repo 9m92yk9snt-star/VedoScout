@@ -31,6 +31,10 @@ replaced; ages, scores and ambiguous multi-player descriptions are ignored.
 - Dedicated regressions cover one-frame scenes, preserved cuts, partial physical
   execution, coverage diagnostics, malformed plans, fallback claims and identity
   declaration validation before billing.
+- Both server fallback routes are checked through their shared authority bridge,
+  including real empty/invalid-ledger and valid-ledger behaviour. Reference
+  diagnostics read the persisted accepted, unresolved and rejected contact groups;
+  displaying a local contact does not grant player identity or scoring authority.
 - A read-only replay of the failing export validates every echoed sequence ID
   against its scene/time boundaries. The 17 positive windows now enter physical
   review; the zero-duration window remains an explicit omission.
