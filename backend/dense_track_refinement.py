@@ -37,6 +37,16 @@ DENSE_BALL_CONF_T = 0.03
 A7_BALL_SUPPORT_CONF_T = 0.001
 A7_BALL_SUPPORT_MAX = 12
 DENSE_TEAM_TAP_CONTINUITY_MS = 1200
+# Native torso chroma can reject an incompatible local association, but can
+# never identify a player or prove a team/jersey number. Require independent,
+# recent, clean measurements before using it even as a negative constraint.
+LOCAL_KIT_MIN_SAMPLES = 3
+LOCAL_KIT_SEPARATION_MS = 120
+LOCAL_KIT_HISTORY_MS = 1200
+LOCAL_KIT_MAX_SPREAD = 5.0
+LOCAL_KIT_CAUTION_DISTANCE = 10.0
+LOCAL_KIT_CONFLICT_DISTANCE = 20.0
+LOCAL_KIT_OVERLAP_IOU = 0.25
 
 
 def _num(value) -> bool:
@@ -211,6 +221,82 @@ def _match_score(pred, det_box) -> float | None:
     return 1.7 * ov + max(0.0, 1.0 - dist_h / MATCH_CENTER_H)
 
 
+def _valid_local_chroma(value):
+    return fsg._valid_chroma(value) and not any(isinstance(v, bool) for v in value)
+
+
+def _update_local_kit_history(track, detection, detections, media_ms, *, eligible):
+    """Remember only uniquely measured, non-overlapping native torso samples."""
+    if not eligible or not _valid_local_chroma(detection.get("kit_chroma")):
+        return
+    box = detection.get("box")
+    if not _valid_box(box) or any(
+        other is not detection and _valid_box(other.get("box"))
+        and _iou(box, other["box"]) >= LOCAL_KIT_OVERLAP_IOU
+        for other in detections
+    ):
+        return
+    history = [r for r in track.get("_local_kit_history") or []
+               if 0 <= media_ms - r["media_ms"] <= LOCAL_KIT_HISTORY_MS]
+    if history and media_ms - history[-1]["media_ms"] < LOCAL_KIT_SEPARATION_MS:
+        track["_local_kit_history"] = history
+        return
+    history.append({"media_ms": int(media_ms), "chroma": list(detection["kit_chroma"])})
+    track["_local_kit_history"] = history[-12:]
+
+
+def _local_kit_constraint(track, detection, media_ms):
+    """Return uncertainty/rejection support, never a positive identity score."""
+    chroma = detection.get("kit_chroma")
+    if not _valid_local_chroma(chroma):
+        return None
+    history = [r for r in track.get("_local_kit_history") or []
+               if 0 <= media_ms - r["media_ms"] <= LOCAL_KIT_HISTORY_MS
+               and _valid_local_chroma(r.get("chroma"))]
+    if len(history) < LOCAL_KIT_MIN_SAMPLES:
+        return None
+    # Insufficient temporal separation (including a duplicated frame) cannot
+    # establish a persistent reference, even if an injected history contains it.
+    times = sorted(r["media_ms"] for r in history)
+    if any(b - a < LOCAL_KIT_SEPARATION_MS for a, b in zip(times, times[1:])):
+        return None
+    center = fsg._median_chroma([r["chroma"] for r in history])
+    spread = max(fsg._chroma_distance(r["chroma"], center) for r in history)
+    if spread > LOCAL_KIT_MAX_SPREAD:
+        return None
+    distance = fsg._chroma_distance(chroma, center)
+    if distance < LOCAL_KIT_CAUTION_DISTANCE:
+        return None
+    rejected = distance >= LOCAL_KIT_CONFLICT_DISTANCE
+    return {"status": "REJECTED" if rejected else "HYPOTHESES",
+            "reason": "INCOMPATIBLE_MEASURED_LOCAL_KIT" if rejected else "LOCAL_KIT_CONTINUITY_UNCERTAIN",
+            "reference_samples": len(history),
+            "chroma_distance": round(distance, 4), "reference_max_spread": round(spread, 4),
+            "canonical_identity_authority": False}
+
+
+def _local_kit_conflict(track, detection, media_ms):
+    constraint = _local_kit_constraint(track, detection, media_ms)
+    return constraint if constraint and constraint["status"] == "REJECTED" else None
+
+
+def _jersey_crop_quality(gray, detection, detections):
+    """Measure crop-selection cues only; no digits, team or identity score."""
+    box = detection["box"]
+    import jersey_pixels
+    # Selection and the reader inspect the same full-width torso rectangle.
+    # Its dimensions are measured before any reader interpolation.
+    x0, y0, x1, y1 = jersey_pixels.torso_bounds(gray, box) or (0, 0, 0, 0)
+    roi = gray[y0:y1, x0:x1] if x1 > x0 and y1 > y0 else None
+    isolated = not any(other is not detection and _valid_box(other.get("box"))
+                       and _iou(box, other["box"]) >= LOCAL_KIT_OVERLAP_IOU
+                       for other in detections)
+    sharpness = float(cv2.Laplacian(roi, cv2.CV_64F).var()) if roi is not None and roi.size else 0.0
+    return {"source": "NATIVE_TORSO_PIXELS", "width_px": max(0, x1 - x0),
+            "height_px": max(0, y1 - y0), "sharpness": round(sharpness, 4),
+            "isolated": bool(isolated), "canonical_identity_authority": False}
+
+
 def _pixel_box(box, width, height):
     return (
         float(box["x"]) * width,
@@ -221,7 +307,30 @@ def _pixel_box(box, width, height):
 
 
 def _default_camera_estimator(prev_gray, gray, exclude_boxes):
-    return motion_compensation.estimate_camera(prev_gray, gray, exclude_boxes)
+    # Camera motion is background evidence. Work at the same bounded width as
+    # the pace engine, then map the verified affine matrix back to native pixels.
+    # Person/ball detections and their coordinates remain native observations.
+    if prev_gray.shape != gray.shape:
+        return None, "frame_shape_changed"
+    h, w = gray.shape[:2]
+    if w <= motion_compensation.PROC_W:
+        return motion_compensation.estimate_camera(prev_gray, gray, exclude_boxes)
+    sw = motion_compensation.PROC_W
+    sh = max(2, int(round(h * sw / w)))
+    sx, sy = sw / w, sh / h
+    small_prev = cv2.resize(prev_gray, (sw, sh), interpolation=cv2.INTER_AREA)
+    small = cv2.resize(gray, (sw, sh), interpolation=cv2.INTER_AREA)
+    excluded = [(x * sx, y * sy, bw * sx, bh * sy) for x, y, bw, bh in exclude_boxes]
+    matrix, reason = motion_compensation.estimate_camera(small_prev, small, excluded)
+    if matrix is None:
+        return None, reason
+    # S^-1 M S also handles the one-pixel aspect rounding in a portrait frame.
+    matrix = np.asarray(matrix, dtype=float).copy()
+    matrix[0, 1] *= sy / sx
+    matrix[1, 0] *= sx / sy
+    matrix[0, 2] /= sx
+    matrix[1, 2] /= sy
+    return matrix, reason
 
 
 def _default_detector():
@@ -318,11 +427,13 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
     people = collect(0, float(cv_detect.CONF_T))
     fsg._annotate_kit_chroma(frame_bgr, people)
     balls = collect(32, float(DENSE_BALL_CONF_T))
-    # Portrait padding shrinks the pitch into ~360 detector columns. Only when
-    # the ball is missing, inspect the visible players' ground band at native
-    # detail. These are detector proposals with the SAME class/confidence gate;
-    # downstream same-ball/contact proof remains mandatory.
-    if not _detail_pass and not balls and H > 1.5 * W and people:
+    # Portrait padding shrinks the pitch into ~360 detector columns. A ball
+    # elsewhere (including a reserve ball) cannot establish that the active
+    # ball was inspected at sufficient resolution. Inspect ONE bounded ground
+    # band even when the whole-frame pass found candidates. Keep the SAME
+    # class/confidence gate; none of these proposals establishes ball identity.
+    # _detail_pass forbids recursion, so the maximum is two native forwards.
+    if not _detail_pass and H > 1.5 * W and people:
         heights = sorted(p["box"]["h"] for p in people)
         median = heights[len(heights) // 2]
         field_players = [p for p in people if p["box"]["h"] <= median * 1.8]
@@ -336,7 +447,15 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
                 box = candidate["box"]
                 box["y"] = (y0 + box["y"] * (y1 - y0)) / H
                 box["h"] *= (y1 - y0) / H
-                if box["w"] <= .08 and box["h"] <= .04:
+                if (0 < box["w"] <= .08 and 0 < box["h"] <= .04
+                        and 0 <= box["x"] <= 1 - box["w"]
+                        and 0 <= box["y"] <= 1 - box["h"]):
+                    # Cross-pass duplicates are not competing balls. Preserve
+                    # the original whole-frame row/coordinates; detector score
+                    # must not silently replace a contact or release reference.
+                    if any(_iou(box, existing["box"]) >= cv_detect.NMS_T
+                           for existing in balls):
+                        continue
                     candidate["source"] = "NATIVE_GROUND_BAND_DETECTOR"
                     balls.append(candidate)
     if not include_a7_support:
@@ -355,6 +474,98 @@ def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False,
         row["support_only"] = not row["a3_eligible"]
         row["proof_eligible"] = False
     return people, balls, support
+
+
+def _refine_selected_native_body(detector, image, detections, tap):
+    """Find a missed body at a USER selection, never infer temporal identity.
+
+    A whole-frame box can contain the selected point while missing the user's
+    visible foreground. In that case inspect two bounded native rectangles at
+    the unchanged selection. Both must yield exactly one point/mask-compatible
+    person, at the ordinary person floor, with agreeing measured geometry.
+    Views of one frame are NOT independent timestamps or jersey evidence.
+    Existing detections/IDs are not replaced. Ordinary bidirectional track
+    ambiguity checks still apply to the additional measured body.
+    """
+    from player_selection import valid_point, valid_mask, body_indices_at_point
+    import cv_detect
+    if (detector is None or not getattr(detector, "ok", False)
+            or not isinstance(tap, dict) or tap.get("primary_source") != "USER_TAP"
+            or tap.get("tap_authority") is not True or tap.get("proof_eligible") is not True
+            or not _valid_box(tap.get("box")) or not valid_point(tap.get("target_point"))
+            or not valid_mask(tap.get("visible_mask"))):
+        return None
+    box, point, mask = tap["box"], tap["target_point"], tap["visible_mask"]
+    excluded = [(p["x"], p["y"]) for p in tap.get("exclude_points") or [] if valid_point(p)]
+    existing_boxes = [tuple((d.get("box") or {}).get(k) for k in ("x", "y", "w", "h"))
+                      for d in detections if isinstance(d, dict)]
+    # Never use a crop to break a genuine same-frame body ambiguity or to
+    # replace an already compatible measured body with a higher score.
+    if body_indices_at_point(existing_boxes, (point["x"], point["y"]), excluded,
+                             selection_box=box, visible_mask=mask):
+        return None
+    height, width = image.shape[:2]
+    if not (height > 0 and width > 0
+            and 0 <= box["x"] < box["x"] + box["w"] <= 1
+            and 0 <= box["y"] < box["y"] + box["h"] <= 1
+            and box["x"] <= point["x"] <= box["x"] + box["w"]
+            and box["y"] <= point["y"] <= box["y"] + box["h"]):
+        return None
+    cx, cy = (box["x"] + box["w"] / 2) * width, (box["y"] + box["h"] / 2) * height
+    candidates, views, seen_rois = [], [], set()
+    for factor in (1.15, 1.5):
+        rw, rh = box["w"] * width * factor, box["h"] * height * factor
+        roi = (max(0, math.floor(cx - rw / 2)), max(0, math.floor(cy - rh / 2)),
+               min(width, math.ceil(cx + rw / 2)), min(height, math.ceil(cy + rh / 2)))
+        x0, y0, x1, y1 = roi
+        if x1 - x0 < 16 or y1 - y0 < 32 or roi in seen_rois:
+            return None
+        seen_rois.add(roi)
+        found, _discarded_balls = _detect_dense_people_and_ball(
+            detector, image[y0:y1, x0:x1], _detail_pass=True)
+        mapped = []
+        for person in found:
+            pb = person.get("box")
+            if (not _valid_box(pb) or not _num(person.get("confidence"))
+                    or not math.isfinite(person["confidence"])
+                    or person["confidence"] <= cv_detect.CONF_T
+                    or not (0 <= pb["x"] < pb["x"] + pb["w"] <= 1
+                            and 0 <= pb["y"] < pb["y"] + pb["h"] <= 1)):
+                continue
+            measured = deepcopy(person)
+            measured["box"] = {
+                "x": (x0 + pb["x"] * (x1 - x0)) / width,
+                "y": (y0 + pb["y"] * (y1 - y0)) / height,
+                "w": pb["w"] * (x1 - x0) / width,
+                "h": pb["h"] * (y1 - y0) / height,
+            }
+            # A detector callback cannot smuggle track, team or target authority
+            # into a new geometric observation.
+            measured = {k: measured[k] for k in ("box", "confidence", "kit_chroma") if k in measured}
+            mapped.append(measured)
+        indices = body_indices_at_point(
+            [tuple(p["box"][k] for k in ("x", "y", "w", "h")) for p in mapped],
+            (point["x"], point["y"]), excluded, selection_box=box, visible_mask=mask)
+        if len(indices) != 1:
+            return None
+        measured = mapped[indices[0]]
+        candidates.append(measured)
+        views.append({"native_roi": list(roi), "box": deepcopy(measured["box"]),
+                      "confidence": float(measured["confidence"])})
+    agreement = _iou(candidates[0]["box"], candidates[1]["box"])
+    if agreement < .70:
+        return None
+    # Retain the actual larger-context measurement, not an averaged/inflated
+    # box. A higher confidence cannot choose the body or overwrite a track.
+    result = deepcopy(candidates[1])
+    result["body_detection_source"] = "NATIVE_USER_SELECTION_BODY_REFINEMENT"
+    result["native_body_refinement"] = {
+        "source": "SAME_FRAME_NATIVE_PERSON_VIEWS", "views": views,
+        "geometry_iou": round(agreement, 6), "temporal_identity_authority": False,
+        "independent_timestamps": 1, "jersey_evidence": False,
+        "selection_anchor_media_ms": tap.get("media_ms"),
+    }
+    return result
 
 
 def _is_direct_tap_target(frame):
@@ -571,6 +782,33 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             if _num(resolved.get("media_ms")) else None
         ),
     }
+    from player_selection import valid_point, body_indices_at_point
+    selected_point = resolved.get("target_point")
+    direct_point = (valid_point(selected_point)
+                    and resolved.get("tap_authority") is True
+                    and resolved.get("primary_source") == "USER_TAP")
+    if direct_point:
+        delta = authority_evidence["authority_frame_delta_ms"]
+        if delta is None or abs(delta) > TAP_FRAME_NEAR_MS:
+            return {"status": "UNRESOLVED", "reason": "TAP_POINT_FRAME_NOT_ALIGNED",
+                    "local_track_id": None, "candidate_local_track_ids": [],
+                    "proof_eligible": False, **authority_evidence}
+        boxes = [tuple((p.get("box") or {}).get(k) for k in ("x", "y", "w", "h")) for p in players]
+        excluded = [(p["x"], p["y"]) for p in resolved.get("exclude_points") or [] if valid_point(p)]
+        point_indices = body_indices_at_point(boxes, (selected_point["x"], selected_point["y"]), excluded)
+        mask = resolved.get("visible_mask")
+        indices = body_indices_at_point(
+            boxes, (selected_point["x"], selected_point["y"]), excluded,
+            selection_box=rb, visible_mask=mask)
+        players = [players[i] for i in indices]
+        authority_evidence["selection_binding"] = "USER_SELECTED_POINT_AND_VISIBLE_MASK" if mask is not None else "USER_SELECTED_POINT"
+        if len(players) != 1:
+            return {"status": "HYPOTHESES" if players else "UNRESOLVED",
+                    "reason": ("TAP_POINT_BODY_AMBIGUOUS" if players else
+                               "TAP_POINT_BODY_MASK_CONFLICT" if point_indices and mask is not None else "TAP_POINT_BODY_NOT_FOUND"),
+                    "local_track_id": None,
+                    "candidate_local_track_ids": [p["local_track_id"] for p in players if p.get("local_track_id")],
+                    "proof_eligible": False, **authority_evidence}
     ranked = []
     for p in players:
         if not isinstance(p, dict) or not _valid_box(p.get("box")):
@@ -579,7 +817,7 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
         ov = _iou(rb, pb)
         rx, ry = _center(rb); px, py = _center(pb)
         dist_h = math.hypot(rx - px, ry - py) / max(float(rb["h"]), float(pb["h"]), 1e-6)
-        if ov >= TARGET_MATCH_IOU_MIN or dist_h <= TARGET_MATCH_CENTER_H:
+        if direct_point or ov >= TARGET_MATCH_IOU_MIN or dist_h <= TARGET_MATCH_CENTER_H:
             score = 1.8 * ov + max(0.0, 1.0 - dist_h / TARGET_MATCH_CENTER_H)
             ranked.append({"score": score, "player": p})
     ranked.sort(reverse=True, key=lambda x: float(x["score"]))
@@ -587,6 +825,19 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
     normal = [row for row in ranked if isinstance(row["player"].get("local_track_id"), str)]
     if normal:
         ids = [row["player"]["local_track_id"] for row in normal[:3]]
+        # An associated bystander must not win just because another, better
+        # matching measured body still has an ambiguous track association.
+        # Preserve that physical ambiguity before granting target proof.
+        competing = [row for row in ranked
+                     if row["player"].get("association_state") == "HYPOTHESES"
+                     and float(row["score"]) >= float(normal[0]["score"]) - TARGET_MATCH_AMBIG_MARGIN
+                     and set(row["player"].get("candidate_local_track_ids") or []) != {ids[0]}]
+        if competing:
+            alternatives = sorted({*ids, *(track for row in competing
+                                          for track in row["player"].get("candidate_local_track_ids") or [])})
+            return {"status": "HYPOTHESES", "reason": "DENSE_TARGET_COMPETING_ASSOCIATION",
+                    "local_track_id": None, "candidate_local_track_ids": alternatives,
+                    "proof_eligible": False, **authority_evidence}
         ambiguous = len(normal) > 1 and float(normal[0]["score"]) - float(normal[1]["score"]) < TARGET_MATCH_AMBIG_MARGIN
         if ambiguous or resolved.get("proof_eligible") is not True:
             return {
@@ -753,8 +1004,11 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
 
     ``detector_fn(frame_bgr)`` may be injected for deterministic tests and may
     return ``(people, balls)`` or ``(people, balls, a7_support)``.  Production
-    performs one detector forward pass per dense frame; weak A7 support proposals
-    remain isolated from A3/A4/A5 truth.  No image arrays are retained.
+    performs one whole-frame detector forward plus at most one bounded portrait
+    ground-band forward per dense frame. An unresolved original USER mask may
+    add at most two native person-only views near that tap; they cannot extend
+    tap authority or provide ball/jersey/event evidence. Weak A7 support
+    proposals remain isolated from A3/A4/A5 truth. No image arrays are retained.
     """
     scene = str(scene_id or "")
     frames_iter = iter(dense_frames or [])
@@ -772,6 +1026,7 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             return {"version": VERSION, "status": "skipped", "reason": "detector_unavailable",
                     "scene_id": scene, "frames": [], "metrics": {}}
         detector_fn = lambda frame: _detect_dense_people_and_ball(detector, frame, include_a7_support=True)
+    uses_default_camera = camera_estimator is None or camera_estimator is _default_camera_estimator
     if camera_estimator is None:
         camera_estimator = _default_camera_estimator
 
@@ -803,8 +1058,16 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         else:
             people, balls = detected
         detections = [d for d in (people or []) if isinstance(d, dict) and _valid_box(d.get("box"))]
+        if (detector is not None and dense.get("time_authority") == "ACTUAL_MEDIA_PTS"
+                and dense.get("used_fallback") is not True and not cut):
+            tap = _nearest_tap_point(identity_authority or {}, media_ms)
+            measured = _refine_selected_native_body(detector, frame, detections, tap)
+            if measured is not None:
+                detections.append(measured)
         h, w = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        jersey_quality = {di: _jersey_crop_quality(gray, det, detections)
+                          for di, det in enumerate(detections)}
         matrix = np.asarray([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=float)
         camera_state = "SEED_OR_FIRST_FRAME"
         if prev_gray is not None and live:
@@ -826,6 +1089,13 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             for ti, tr in enumerate(live):
                 if media_ms - _last_ms(tr, media_ms) > TRACK_MAX_GAP_MS:
                     continue
+                if (tr.get("_selected_body_refinement_anchor_ms") is not None and output_frames
+                        and _last_ms(tr, media_ms) != output_frames[-1]["media_ms"]):
+                    # A freshly isolated visible fragment has no full-body
+                    # identity history. A missing source-frame observation
+                    # ends its local continuity; camera prediction alone must
+                    # not reacquire a same-kit teammate after the duel.
+                    continue
                 # Camera matrices are between successive decoded frames, even
                 # when a player detection is missing. Keep their accumulated
                 # effect separately from the last measured body and velocity.
@@ -843,16 +1113,56 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         # Candidate scores per existing track.  Near-equal alternatives remain
         # unbound hypotheses instead of being decided by detector/list order.
         per_track = {}
+        kit_rejections = []
+        kit_cautions = []
+        kit_hypotheses = {}
+        kit_measurement_eligible = bool(
+            not dense.get("used_fallback")
+            and dense.get("time_authority") == "ACTUAL_MEDIA_PTS"
+            and camera_state in {"SEED_OR_FIRST_FRAME", "AFFINE_VERIFIED"})
         for ti, pred in predictions.items():
             ranked = []
             for di, det in enumerate(detections):
+                refined_origin = (det.get("native_body_refinement") or {}).get("selection_anchor_media_ms")
+                if (det.get("body_detection_source") == "NATIVE_USER_SELECTION_BODY_REFINEMENT"
+                        and (not _num(refined_origin)
+                             or live[ti].get("_selected_body_refinement_anchor_ms") != refined_origin)):
+                    # A missed selected body is not the foreground track whose
+                    # box failed its mask. Start a fresh local ID; do not let
+                    # a competing old track fall through to this new body.
+                    # Only a previously measured refinement from this same
+                    # selection may enter the ordinary association gates.
+                    continue
                 score = _match_score(pred, det["box"])
                 if score is not None:
+                    constraint = (_local_kit_constraint(live[ti], det, media_ms)
+                                  if kit_measurement_eligible else None)
+                    if constraint is not None:
+                        audit = {"local_track_id": live[ti]["local_track_id"],
+                                 "detection_index": di, **constraint}
+                        if constraint["status"] == "REJECTED":
+                            kit_rejections.append(audit)
+                        else:
+                            # A moderately changed torso may be a shadow,
+                            # mixed crop, or another player. Do not overwrite
+                            # the last accepted body/history with that guess.
+                            kit_cautions.append(audit)
+                            kit_hypotheses.setdefault(di, set()).add(live[ti]["local_track_id"])
+                        continue
                     ranked.append((score, di))
             ranked.sort(reverse=True)
             per_track[ti] = ranked
 
-        ambiguous_det_candidates: dict[int, set[str]] = {}
+        # A cautious kit edge must not hide a competing, otherwise admissible
+        # body. Preserve all geometric alternatives that were not rejected,
+        # including tracks whose own candidate list is ambiguous.
+        for ti, ranked in per_track.items():
+            for _score, di in ranked:
+                if di in kit_hypotheses:
+                    kit_hypotheses[di].add(live[ti]["local_track_id"])
+
+        ambiguous_det_candidates: dict[int, set[str]] = {
+            di: set(ids) for di, ids in kit_hypotheses.items()}
         assign_pairs = []
         for ti, ranked in per_track.items():
             if not ranked:
@@ -865,6 +1175,17 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
             for score, di in ranked:
                 assign_pairs.append((score, ti, di))
         assign_pairs.sort(reverse=True)
+
+        # Resolve ambiguity in BOTH directions. Two old tracks competing for
+        # one detected body must not acquire identity by greedy list order.
+        by_detection = {}
+        for score, ti, di in assign_pairs:
+            by_detection.setdefault(di, []).append((score, ti))
+        for di, choices in by_detection.items():
+            if len(choices) > 1 and choices[0][0] - choices[1][0] < MATCH_AMBIG_MARGIN:
+                ambiguous_det_candidates.setdefault(di, set()).update(
+                    live[ti]["local_track_id"] for score, ti in choices
+                    if choices[0][0] - score < MATCH_AMBIG_MARGIN)
 
         used_tracks, used_dets = set(), set()
         players_out = []
@@ -890,15 +1211,20 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 tr["team_source"] = det.get("team_source")
             if fsg._valid_chroma(det.get("kit_chroma")):
                 tr["kit_chroma"] = deepcopy(det["kit_chroma"])
+            _update_local_kit_history(tr, det, detections, media_ms,
+                                      eligible=kit_measurement_eligible)
             used_tracks.add(ti); used_dets.add(di)
             players_out.append({
                 "local_track_id": tr["local_track_id"],
                 "candidate_local_track_ids": [tr["local_track_id"]],
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
+                **{k: deepcopy(det[k]) for k in ("body_detection_source", "native_body_refinement")
+                   if k in det},
                 "association_state": "VERIFIED_LOCAL",
                 "association_reason": camera_state,
                 "association_score": round(float(score), 4),
+                "jersey_crop_quality": deepcopy(jersey_quality[di]),
                 "team": tr.get("team"),
                 "team_confidence": tr.get("team_confidence"),
                 "team_source": tr.get("team_source"),
@@ -930,9 +1256,13 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 },
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
+                **{k: deepcopy(det[k]) for k in ("body_detection_source", "native_body_refinement")
+                   if k in det},
                 "association_state": "HYPOTHESES",
-                "association_reason": "CLOSE_EQUAL_LOCAL_TRACK_CANDIDATES",
+                "association_reason": ("LOCAL_KIT_CONTINUITY_UNCERTAIN"
+                                       if di in kit_hypotheses else "CLOSE_EQUAL_LOCAL_TRACK_CANDIDATES"),
                 "association_score": None,
+                "jersey_crop_quality": deepcopy(jersey_quality[di]),
                 "team": det.get("team"),
                 "team_confidence": det.get("team_confidence"),
                 "team_source": det.get("team_source"),
@@ -958,15 +1288,22 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
                 "kit_chroma": deepcopy(det.get("kit_chroma"))
                 if fsg._valid_chroma(det.get("kit_chroma")) else None,
             }
+            if det.get("body_detection_source") == "NATIVE_USER_SELECTION_BODY_REFINEMENT":
+                tr["_selected_body_refinement_anchor_ms"] = (det.get("native_body_refinement") or {}).get("selection_anchor_media_ms")
+            _update_local_kit_history(tr, det, detections, media_ms,
+                                      eligible=kit_measurement_eligible)
             live.append(tr)
             players_out.append({
                 "local_track_id": tid,
                 "candidate_local_track_ids": [tid],
                 "box": _box(det["box"]),
                 "confidence": float(det.get("confidence") or 0.0),
+                **{k: deepcopy(det[k]) for k in ("body_detection_source", "native_body_refinement")
+                   if k in det},
                 "association_state": "NEW_LOCAL_TRACK",
                 "association_reason": "UNMATCHED_DETECTION",
                 "association_score": None,
+                "jersey_crop_quality": deepcopy(jersey_quality[di]),
                 "team": tr.get("team"),
                 "team_confidence": tr.get("team_confidence"),
                 "team_source": tr.get("team_source"),
@@ -982,9 +1319,24 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         )
         output_frames.append({
             "media_ms": media_ms,
+            "frame_dimensions": {"width": int(w), "height": int(h),
+                                 "source": "DECODED_NATIVE_PIXELS"},
             "scene_id": active_scene,
             "cut_barrier": bool(cut),
             "camera_state": camera_state,
+            "camera_motion": {
+                "source": "NATIVE_BACKGROUND_AFFINE", "units": "DECODED_PIXELS",
+                "from_media_ms": output_frames[-1]["media_ms"], "to_media_ms": media_ms,
+                "matrix": matrix.tolist(),
+                "estimation_frame_dimensions": {
+                    "width": min(w, motion_compensation.PROC_W) if uses_default_camera else w,
+                    "height": round(h * min(w, motion_compensation.PROC_W) / w) if uses_default_camera else h,
+                },
+            } if (camera_state == "AFFINE_VERIFIED" and output_frames and prev_gray is not None
+                  and prev_gray.shape == gray.shape and output_frames[-1]["media_ms"] < media_ms
+                  and matrix is not None and matrix.shape == (2, 3) and np.isfinite(matrix).all()) else None,
+            "local_kit_association_rejections": kit_rejections,
+            "local_kit_association_cautions": kit_cautions,
             "players": players_out,
             "ball_candidates": deepcopy(balls or []),
             "a7_ball_support_candidates": deepcopy(a7_support or []),
@@ -1006,6 +1358,10 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
         "metrics": {
             "frames": len(output_frames),
             "players": sum(len(f.get("players") or []) for f in output_frames),
+            "local_kit_association_rejections": sum(
+                len(f.get("local_kit_association_rejections") or []) for f in output_frames),
+            "local_kit_association_cautions": sum(
+                len(f.get("local_kit_association_cautions") or []) for f in output_frames),
             "target_verified_frames": sum(
                 (f.get("global_target") or {}).get("status") == "VERIFIED" for f in output_frames
             ),

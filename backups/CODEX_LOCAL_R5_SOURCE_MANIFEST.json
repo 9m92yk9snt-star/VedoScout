@@ -1,0 +1,146 @@
+{
+  "kind": "LOCAL_CUMULATIVE_R5_SOURCE_BACKUP",
+  "base_commit": "4ce62c1f6468b5f1f6a9cdcc4811e2624af9d290",
+  "date": "2026-10-11",
+  "files": [
+    {
+      "path": ".github/workflows/fix10a-verify.yml",
+      "sha256": "5b11e97006ed2ef15c69ac2790b0924af4709be910ba90d1f56070a9785b7416"
+    },
+    {
+      "path": "backend/cv_shadow.py",
+      "sha256": "045bef4579cd016ebfce9437aec1ddc53b4e55b7c3d3a997fd57396f712165a8"
+    },
+    {
+      "path": "backend/dense_track_refinement.py",
+      "sha256": "39f18c265ac756f674617c3dd23ec6286091ffd3307bc42b62c144f3a225578d"
+    },
+    {
+      "path": "backend/evidence_feedback.py",
+      "sha256": "630a168f9379871039ad3f2a28d83826b200666d1185106ff3af8fac8ff5d70c"
+    },
+    {
+      "path": "backend/fix10a_goal_direction.py",
+      "sha256": "873de9fb499a25661650a51df7ae2df065a202b9826af00548391bca196666a1"
+    },
+    {
+      "path": "backend/fix10a_vision_providers.py",
+      "sha256": "ba21d265e38f2f196f717df7212be3d209895c8e8c5b991a22393d2e77d9e723"
+    },
+    {
+      "path": "backend/football_scene_graph.py",
+      "sha256": "3d37e722b9a80cbf5a41c0bbb230a57df42086c6b37ee978502aaa962c61a8ed"
+    },
+    {
+      "path": "backend/identity_verify.py",
+      "sha256": "2711d827954f080f1465fd3e0e3aa7d3465e8a927e88c0353148cdd680600f80"
+    },
+    {
+      "path": "backend/player_identity_timeline.py",
+      "sha256": "d20b6c1a7b8f9ef2e979ecfef4174b1c4f44eb7d800378d90ffb4b833f3e2c99"
+    },
+    {
+      "path": "backend/player_selection.py",
+      "sha256": "b5df265b48625de4cff903b83afa20045bbfd33128828fc6214fa12d9a61859f"
+    },
+    {
+      "path": "backend/player_tracking.py",
+      "sha256": "4bf364b394b5cf635e8ccde08e44cd3f7129401f92496aa00b972b55edbd779e"
+    },
+    {
+      "path": "backend/report_evidence_export.py",
+      "sha256": "1bd96f8b24f969c60a6fad1793be9e8227e6b55d55dd106aed481793c0ef674b"
+    },
+    {
+      "path": "backend/support_vision_runner.py",
+      "sha256": "9391e37153184be8da2e0e68e88c7e6de0053555be4928e0dd8f794ce4e12137"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "sha256": "79bc5f1252e1ec6e21ae801046f1664a4fe87ca5af4c62f875c1098ab63c4808"
+    },
+    {
+      "path": "backend/tests/fix14_fake_llm_server.py",
+      "sha256": "83dc3642f394204e7c4ae7c21c1671723ae57976d3b469e0a9c6c253ca13eb0e"
+    },
+    {
+      "path": "backend/tests/fix14_offline_child.py",
+      "sha256": "f47e13710d8270edb87fe2e68b73d966f9a58ad7ccabe03d0cd1230e2bf36d4b"
+    },
+    {
+      "path": "backend/tests/test_fix10a_goal_direction.py",
+      "sha256": "0d6bfed323a8aef21331812cfe930e760f978af67c1d0e48d05efdec9c50dff9"
+    },
+    {
+      "path": "backend/tests/test_fix10a_goal_review_sampling.py",
+      "sha256": "d3234a0d4c6901260d94d1dd2ba3d9c1dbafcc3974e4630d0e6b58faa2bc9110"
+    },
+    {
+      "path": "backend/tests/test_fix10a_occluded_goal_crossing.py",
+      "sha256": "f9311817f257ff0f17bd364af8f400f11b9242f27c1024678898bc5a056c6f5b"
+    },
+    {
+      "path": "backend/tests/test_fix10a_vision_providers.py",
+      "sha256": "c04602e2af52d06b73d91f4b493f5b53d199954614152b9b90c239d2ba860210"
+    },
+    {
+      "path": "backend/tests/test_fix10a6_jersey_consensus.py",
+      "sha256": "4074adaee40bfbf8c935bb39e11866141030889541810592786831a2458b5c31"
+    },
+    {
+      "path": "backend/tests/test_fix10a7_role_intervention_handoff.py",
+      "sha256": "3029f9ee38f51e36f6d3cc5862a445b0632fb9953e4b164f1a66b5026ae134da"
+    },
+    {
+      "path": "backend/tests/test_fix10a7_structured_goal_proof.py",
+      "sha256": "752d4e926d7aaf1ab4e7ccbc7a808129c3c32c36e3542b9397d4b6ee3aea10b9"
+    },
+    {
+      "path": "backend/tests/test_fix12_identity_response_contract.py",
+      "sha256": "c5627bab716e242ae7271850bd6986c68944959b6462c8765b4945f6585b3622"
+    },
+    {
+      "path": "backend/tests/test_fix12_review_recovery.py",
+      "sha256": "e4b5a9e4813755db91c17d8854418a87f92df3d651633a6a4ece86f3dd498791"
+    },
+    {
+      "path": "backend/tests/test_fix13_action_inspections.py",
+      "sha256": "184e3e0c5909b4f5c1efac8d79ec0b154724426555c5540b0eb95e887634fb12"
+    },
+    {
+      "path": "backend/tests/test_fix13_evidence_feedback.py",
+      "sha256": "8398347386444e6d90962563ecf642cc3acffa99d5202da1d6b6491e023fe36c"
+    },
+    {
+      "path": "backend/tests/test_fix14_orman10_recovery.py",
+      "sha256": "1d10b058139a1739bffb7e19edbe744ebabac1850ba1f0134a784806fcb238ba"
+    },
+    {
+      "path": "backend/tests/test_fix14_support_vision_runner.py",
+      "sha256": "3ed34351ffd0671d8818a7445d5c7b4edc119f5403db00c0a8bf94bebd447781"
+    },
+    {
+      "path": "backend/tests/test_fix14_support_vision_timeout.py",
+      "sha256": "c299c103bab777e133e33d2fe34717106b7f3aab3a32262671f2b77a0bcc716c"
+    },
+    {
+      "path": "backend/tests/test_fix15_goal_response_coverage.py",
+      "sha256": "2493ab35e94a2ee0541609dfe721d761dd645d8062c2f917b6fbf6c186969cbd"
+    },
+    {
+      "path": "backend/tests/test_fix15_pixel_response_coverage.py",
+      "sha256": "332ca16a0620fd4a993e1ee878b2243843f7fdf5b17db7c8c39d3fa0f7c43c45"
+    },
+    {
+      "path": "backend/tests/test_fix15_selected_point_identity.py",
+      "sha256": "648fe2794563249f31a8939bfa1ff6dbe02894f0dfb24ef4bda9cb807f839a41"
+    },
+    {
+      "path": "backend/unified_identity_authority.py",
+      "sha256": "42ec6eb8b338a5423b06fee7796461cab2cae8364d5fa557eb3730a1a7f24701"
+    }
+  ],
+  "verification": "34 local SHA256 prefixes match Emergent's published R5 list; full remote R5 manifest still awaiting source export. Not an export of unfinished Emergent R6.",
+  "strict_video_acceptance": "R5_0_OF_5",
+  "deployed": false
+}

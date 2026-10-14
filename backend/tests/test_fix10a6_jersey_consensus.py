@@ -86,6 +86,10 @@ async def test_a605_non_target_reader_has_no_expected_number_hint(monkeypatch, t
             captured["model"] = model
             return self
 
+        def with_params(self, **params):
+            captured["params"] = params
+            return self
+
         async def send_message(self, msg):
             captured["prompt"] = msg.text
             return '{"readable":true,"number":"10","confidence":"high","reason":"digits clear"}'

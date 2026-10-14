@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -111,6 +112,7 @@ def test_gd05_review_budget_is_bounded_per_report():
     assert second["reason"] == "GOAL_REVIEW_BUDGET_EXHAUSTED"
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_gd06_wrapper_merges_multi_frame_field_side(monkeypatch):
     frame = np.zeros((80, 120, 3), dtype=np.uint8)
 

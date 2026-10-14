@@ -32,6 +32,7 @@ import touch_graph
 import unified_identity_authority
 import dense_identity_continuity
 import goal_review_scheduler
+import goal_review_sampling
 import action_evidence_review
 
 VERSION = 1
@@ -168,6 +169,40 @@ def _goal_review_eligibility(strike, strikes, touch_graph):
         "elapsed_ms": strike_ms - int(target_release["media_ms"]),
         "team_confidence": float(relation["confidence"]),
     }
+
+
+def _strike_ball_paths(strikes, touch_graph, dense_frames, window_trajectory):
+    """One contact-bound selector shared by the live orchestrator and replay."""
+    paths = []
+    for strike in strikes:
+        touch = _touch_for_strike(strike, touch_graph) or {}
+        anchor = strike.get("active_ball_anchor")
+        # Producer-side selection only: never repair an already rejected seed
+        # or substitute for an externally supplied required anchor. The fresh
+        # proposal must still be the exact ball_after of this verified touch.
+        if "release_seed_qualification" not in strike:
+            qualified = ball_trajectory.qualify_produced_contact_seed(
+                dense_frames, touch, anchor, strike.get("scene_id"))
+            if qualified is not None:
+                anchor = qualified["anchor"]
+                strike["active_ball_anchor"] = anchor
+                strike["active_ball_anchor_source"] = anchor["source"]
+                strike["release_seed_qualification"] = qualified["audit"]
+        path = ball_trajectory.select_release_ball_trajectory(
+            dense_frames, anchor, strike.get("scene_id"), window_trajectory,
+            anchor_required="active_ball_anchor" in strike,
+            contact_ball=touch.get("ball_at_contact"),
+            contact_required="ball_at_contact" in touch,
+        )
+        binding = path.get("contact_binding") or {}
+        if binding.get("status") == "REJECTED" and isinstance(anchor, dict):
+            # Downstream A7 must not re-open an unbound seed directly. Keep the
+            # original touch evidence untouched, and demote only this strike.
+            strike["active_ball_anchor"] = {**anchor, "proof_eligible": False,
+                "remote_spare_ball_used": None, "identity_rejection": binding["reason"]}
+            strike["remote_spare_ball_used"] = None
+        paths.append(path)
+    return paths
 
 
 def _skipped_goal_review(eligibility):
@@ -346,14 +381,22 @@ def _window_error(exc: Exception, stage: str) -> dict:
     }
 
 
+def _apply_ball_path_audit(outcome, track):
+    """Preserve the shared contact/anchor decision in every outcome lane."""
+    outcome["ball_trajectory_source"] = track["source"]
+    outcome["ball_trajectory_seed_ms"] = track["seed_ms"]
+    if "contact_binding" in track:
+        outcome["release_ball_binding"] = deepcopy(track["contact_binding"])
+    return outcome
+
+
 def _review_outcome(job, geometry, previous):
     track = job["shot_track"]
     outcome = shot_outcome_engine.reconstruct_post_strike_outcome(
         job["strike"], track["rows"], job["touch_graph"],
         goal_geometry=geometry, role_evidence=job["roles"])
     outcome["goal_review_decision"] = deepcopy(job["review"])
-    outcome["ball_trajectory_source"] = track["source"]
-    outcome["ball_trajectory_seed_ms"] = track["seed_ms"]
+    outcome = _apply_ball_path_audit(outcome, track)
     outcome["ball_trajectory_points"] = deepcopy(previous.get("ball_trajectory_points") or [])
     outcome = post_strike_intervention.apply_intervention_evidence(outcome, job["intervention"], job["roles"])
     outcome = fix10a_goal_direction.apply_direction_gate(outcome, track["rows"], geometry)
@@ -415,7 +458,7 @@ def run_feedback_round(traces, video_path, sequence_plan, sequence_analysis, sce
         previous = tr["outcome_evidence"][job["outcome_index"]]
         tr.setdefault("feedback_prior_outcomes", []).append(deepcopy(previous))
         try:
-            geometry = _safe_provider(goal_geometry_provider, deepcopy(job["window"]), deepcopy(job["strike"]),
+            geometry = _safe_provider(goal_geometry_provider, deepcopy(job["window"]), goal_review_sampling.provider_strike(job),
                 default=None, diagnostics=tr["provider_diagnostics"], name="goal_geometry_feedback")
             tr["outcome_evidence"][job["outcome_index"]] = _review_outcome(job, geometry, previous)
             tr["provider_adapter_errors"] = sorted(set(tr["provider_adapter_errors"] + _adapter_diagnostics(geometry)))
@@ -560,7 +603,8 @@ def reconstruct_physical_match(
             )
 
             stage = "jersey_request_selection"
-            requests = inspection_requests + jersey_consensus.select_jersey_review_requests(dense_frames, touches)
+            requests = jersey_consensus.merge_jersey_review_requests(
+                inspection_requests, jersey_consensus.select_jersey_review_requests(dense_frames, touches), touches)
 
             stage = "jersey_provider"
             votes_by_track = _safe_provider(
@@ -631,19 +675,8 @@ def reconstruct_physical_match(
             # same path through intervention, outcome, direction, and proof
             # gates. Falling back to the window-global path after a valid seed
             # would silently reattach this strike to a competing ball.
-            shot_trajectories = []
-            for strike in strikes:
-                anchor = strike.get("active_ball_anchor") if isinstance(strike, dict) else None
-                anchored_path = ball_trajectory.reconstruct_ball_trajectory_from_release_anchor(
-                    dense_with_jersey, anchor, strike.get("scene_id")
-                )
-                uses_anchor = bool(anchored_path)
-                selected_path = anchored_path if uses_anchor else trajectory
-                shot_trajectories.append({
-                    "rows": selected_path,
-                    "source": "VERIFIED_RELEASE_ANCHOR" if uses_anchor else "WINDOW_GLOBAL_TRAJECTORY",
-                    "seed_ms": int(anchor["media_ms"]) if uses_anchor else None,
-                })
+            shot_trajectories = _strike_ball_paths(
+                strikes, touch_with_jersey, dense_with_jersey, trajectory)
 
             stage = "intervention_detection"
             a7_interventions = [
@@ -705,8 +738,7 @@ def reconstruct_physical_match(
                     goal_geometry=goal_geometry, role_evidence=window_roles,
                 )
                 outcome["goal_review_decision"] = review
-                outcome["ball_trajectory_source"] = shot_track["source"]
-                outcome["ball_trajectory_seed_ms"] = shot_track["seed_ms"]
+                outcome = _apply_ball_path_audit(outcome, shot_track)
                 outcome["ball_trajectory_points"] = [
                     {
                         "media_ms": int(row["media_ms"]),
@@ -831,7 +863,7 @@ def reconstruct_physical_match(
         trace = traces_by_window[job["window"]["dense_window_id"]]
         try:
             geometry = _safe_provider(
-                goal_geometry_provider, deepcopy(job["window"]), deepcopy(job["strike"]),
+                goal_geometry_provider, deepcopy(job["window"]), goal_review_sampling.provider_strike(job),
                 default=None, diagnostics=trace["provider_diagnostics"], name="goal_geometry")
             previous = trace["outcome_evidence"][job["outcome_index"]]
             outcome = _review_outcome(job, geometry, previous)

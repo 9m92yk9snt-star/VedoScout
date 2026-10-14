@@ -14,6 +14,7 @@ from copy import deepcopy
 import ball_contact_engine as bce
 import short_occlusion_contact_recovery as recovery
 import ball_trajectory as trajectory_engine
+import frame_geometry
 
 VERSION = 1
 ROLE_RELEASE = "RELEASE"
@@ -232,7 +233,10 @@ def _delayed_separation_role(touch: dict, touches, dense_frames, ball_trajectory
         foot_y = float(pbox["y"]) + float(pbox["h"])
         ball_x = float(bbox["x"]) + float(bbox["w"]) / 2.0
         ball_y = float(bbox["y"]) + float(bbox["h"]) / 2.0
-        distance_h = math.hypot(ball_x - foot_x, ball_y - foot_y) / float(pbox["h"])
+        x_scale = frame_geometry.horizontal_scale(frame)
+        if x_scale is None:
+            continue
+        distance_h = math.hypot((ball_x - foot_x) * x_scale, ball_y - foot_y) / float(pbox["h"])
         samples.append((media_ms, distance_h))
 
     if len(samples) < DELAYED_MIN_MEASURED:
@@ -501,17 +505,35 @@ def apply_contact_roles(touch_graph: dict | None, contact_result: dict | None, *
     for touch in graph_touches:
         if not isinstance(touch, dict):
             continue
+        touch.pop("contact_role_seed_qualification", None)
         role = resolve_touch_role(touch, source_by_id)
         if role is None:
             continue
         if role.get("status") == "VERIFIED" and role.get("role") == ROLE_RECEIVE_CONTROL:
             # Re-examine the ball physically attached to this contact, rather
             # than a window-global path that may have switched to a spare ball.
-            anchored = trajectory_engine.reconstruct_ball_trajectory_from_release_anchor(
-                dense_frames or [], touch.get("ball_after"), touch.get("scene_id"),
+            anchor = deepcopy(touch.get("ball_after"))
+            # Role review precedes strike extraction. Use the same fresh
+            # producer qualification there, before a weak seed is rejected by
+            # the shared selector and hides every valid later measurement.
+            if isinstance(anchor, dict) and anchor.get("source") in {
+                    None, "VERIFIED_RELEASE_CONTACT_BALL_AFTER", "VERIFIED_SCORING_CONTROL_BALL_AFTER"}:
+                anchor["source"] = "VERIFIED_CONTACT_ROLE_BALL_AFTER"
+            qualified = trajectory_engine.qualify_produced_contact_seed(
+                dense_frames or [], touch, anchor, touch.get("scene_id"))
+            if qualified is not None:
+                anchor = qualified["anchor"]
+                touch["contact_role_seed_qualification"] = deepcopy(qualified["audit"])
+            selected = trajectory_engine.select_release_ball_trajectory(
+                dense_frames or [], anchor, touch.get("scene_id"), ball_trajectory,
+                anchor_required="ball_after" in touch,
+                contact_ball=touch.get("ball_at_contact"),
+                contact_required="ball_at_contact" in touch,
                 max_duration_ms=DELAYED_SEPARATION_WINDOW_MS)
+            if "contact_binding" in selected:
+                touch["release_ball_binding"] = deepcopy(selected["contact_binding"])
             delayed = _delayed_separation_role(
-                touch, graph_touches, dense_frames or [], anchored or ball_trajectory or []
+                touch, graph_touches, dense_frames or [], selected["rows"]
             )
             if delayed is not None:
                 role = delayed

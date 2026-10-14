@@ -14,6 +14,7 @@ import math
 from copy import deepcopy
 
 import fix10a_occluded_goal
+import goal_reappearance
 
 VERSION = 1
 MAX_POST_STRIKE_MS = 3000
@@ -488,6 +489,16 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
 
 def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=None, strike_actor=None):
     audit = _visual_crossing_audit(goal_geometry)
+    # A classified, independently linked ball reappearing wholly inside the
+    # goal is a separate proof lane; it does not depend on celebration or an
+    # extrapolated instant through an unseen post/net interaction.
+    reappeared = goal_reappearance.resolve(
+        rows, goal_geometry, strike_ms, touch_graph=touch_graph,
+        strike_actor=strike_actor,
+    )
+    if isinstance(reappeared, dict) and reappeared.get("status") in {"VERIFIED", "REJECTED"}:
+        reappeared["visual_audit"] = audit
+        return reappeared
     measured = [
         r for r in rows
         if r.get("state") == "MEASURED" and _valid_box(r.get("box"))
@@ -636,7 +647,53 @@ def _role_resolution(role_evidence, track_id):
     return {"status": "VERIFIED", "role": role, "reason": row.get("reason") or "ROLE_VERIFIED"}
 
 
-def _first_other_touch(touch_graph, strike, max_ms=MAX_POST_STRIKE_MS):
+def _intervention_ball_binding(touch, rows, strike):
+    """A later touch of another ball cannot describe this strike's outcome.
+
+    Explicit release-anchor callers must bind all three measured touch balls
+    to independent, exact observations on the selected shot-local path. The
+    touch's global trajectory-change score alone has no same-ball authority.
+    Legacy callers without an anchor contract retain their existing behavior.
+    """
+    if "active_ball_anchor" not in strike:
+        return {"required": False, "status": "LEGACY_NO_ANCHOR_CONTRACT"}
+    rejected = {"required": True, "status": "REJECTED", "reason": "POST_STRIKE_TOUCH_NOT_BOUND_TO_BALL_PATH"}
+    anchor = strike.get("active_ball_anchor")
+    if not _measured_touch_ball(anchor) or not isinstance(touch, dict) or touch.get("proof_eligible") is not True:
+        return rejected
+    scene = strike.get("scene_id")
+    if touch.get("scene_id") != scene:
+        return rejected
+
+    def eligible(point):
+        return bool(_measured_touch_ball(point) and type(point.get("media_ms")) is int
+                    and point.get("cut_barrier") is not True and point.get("cut") is not True
+                    and point.get("scene_id") in {None, scene})
+
+    def exact_match(point):
+        if not eligible(point):
+            return False
+        matches = [r for r in rows if eligible(r) and r["media_ms"] == point["media_ms"]]
+        return len(matches) == 1 and all(math.isclose(float(matches[0]["box"][k]), float(point["box"][k]),
+            rel_tol=0.0, abs_tol=1e-9) for k in ("x", "y", "w", "h"))
+
+    if not exact_match(anchor):
+        return {**rejected, "reason": "INTERVENTION_RELEASE_ANCHOR_NOT_IN_SELECTED_PATH"}
+    points = [touch.get(k) for k in ("ball_before", "ball_at_contact", "ball_after")]
+    if not all(exact_match(p) for p in points):
+        return rejected
+    times = [p["media_ms"] for p in points]
+    if not times[0] < times[1] < times[2]:
+        return {**rejected, "reason": "INTERVENTION_BALL_TIMES_NOT_INDEPENDENT"}
+    contact_ms = touch.get("representative_ms") if _num(touch.get("representative_ms")) else touch.get("media_ms")
+    left, right = touch.get("media_ms"), touch.get("end_ms", contact_ms)
+    if not (_num(left) and _num(right) and _num(contact_ms) and left <= times[1] <= right):
+        return {**rejected, "reason": "INTERVENTION_BALL_OUTSIDE_TOUCH_INTERVAL"}
+    return {"required": True, "status": "VERIFIED", "reason": "EXACT_MEASURED_TOUCH_BALLS_ON_SELECTED_SHOT_PATH",
+            "measured_times_ms": times}
+
+
+def _first_other_touch(touch_graph, strike, max_ms=MAX_POST_STRIKE_MS, *, rows=None):
     graph = touch_graph if isinstance(touch_graph, dict) else {}
     start = int(strike["media_ms"])
     actor = strike.get("player_track_id")
@@ -649,6 +706,7 @@ def _first_other_touch(touch_graph, strike, max_ms=MAX_POST_STRIKE_MS):
         and t.get("scene_id") == scene
         and _num(t.get("media_ms"))
         and start < int(t["media_ms"]) <= start + int(max_ms)
+        and (rows is None or _intervention_ball_binding(t, rows, strike).get("status") != "REJECTED")
     ]
     return min(candidates, key=lambda t: int(t["media_ms"]), default=None)
 
@@ -716,7 +774,7 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
         rows, goal_geometry, strike_ms=start, touch_graph=touch_graph,
         strike_actor=strike.get("player_track_id"),
     )
-    other_touch = _first_other_touch(touch_graph, strike)
+    other_touch = _first_other_touch(touch_graph, strike, rows=rows)
     intervention = _intervention_evidence(other_touch, rows)
     role = _role_resolution(role_evidence, intervention.get("player_track_id"))
     moves_away = (
@@ -770,6 +828,7 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
         "goal_plane_crossing": crossing,
         "goal_geometry_evidence": deepcopy(goal_geometry) if isinstance(goal_geometry, dict) else None,
         "intervention": intervention,
+        "intervention_ball_binding": _intervention_ball_binding(other_touch, rows, strike),
         "intervention_role": role,
         "save_evidence": save,
         "moves_away_after_intervention": bool(moves_away),

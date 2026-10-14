@@ -1,0 +1,62 @@
+{
+  "kind": "INDEPENDENT_LOCAL_R6_BACKUP_NOT_EMERGENT_R6",
+  "date": "2026-10-11",
+  "baseline_commit": "89bfb8bbb061d5d59f5efe9df804fb12b0448e7b",
+  "emergent_exact_backup_commit": "83cf6b37b5d9fb594712d96e32b7b878ef509183",
+  "files": [
+    {
+      "path": "backend/contact_role_resolver.py",
+      "sha256": "7a86b41eb42ebc630924906592c3faf0e22f076b3882a9c77e9868c551c0ebc4"
+    },
+    {
+      "path": "backend/scripts/replay_report_evidence.py",
+      "sha256": "08b5691f5e7ee79bcd60157c9d3ba1084d940753f39ee1a518504537c4adabba"
+    },
+    {
+      "path": "backend/physical_match_reconstruction.py",
+      "sha256": "80d1cd9952c47710425e6aec413c5e4d7b9e5d8a610cf9ce6ed87413c3af562f"
+    },
+    {
+      "path": "backend/ball_trajectory.py",
+      "sha256": "0d608211f033e2ead89ba3ab2d542b98ffec4ee663d80516d68630456948b958"
+    },
+    {
+      "path": "backend/fix10a_vision_providers.py",
+      "sha256": "8f1d9e31cabaffd869aed6785e65d8d2aefb2a6103fc6474e23eafea6bdeae6c"
+    },
+    {
+      "path": "backend/tests/test_fix15_r6_anchor_callers.py",
+      "sha256": "b84b0dbb55e0e0ba4936a0b25452bfe116f2f0d6ebbd0d9832e871c1fbc72547"
+    },
+    {
+      "path": "backend/tests/test_fix15_r6_role_scheduling.py",
+      "sha256": "9f7b7184af7e3953c29e5acaedb594f11a8c969d84fb9648e42749f860c92b50"
+    },
+    {
+      "path": "backend/tests/test_fix15_r6_ball_identity.py",
+      "sha256": "6113c1e68c6df19c4c8a97af0e3d77996597b018e4a4f0b2f39a983a58784bdf"
+    }
+  ],
+  "local_new_tests": {
+    "passed": 41,
+    "failed": 0,
+    "new_model_calls": 0,
+    "network_attempts": 0,
+    "video_decode_attempts": 0
+  },
+  "previous_focused_regression": {
+    "passed": 126,
+    "failed": 0,
+    "date": "2026-10-10",
+    "full_1245_suite": false
+  },
+  "emergent_against_local_new_tests": {
+    "passed": 15,
+    "failed": 26,
+    "note": "Includes incompatible helper APIs and different diagnostic labels; not 26 independent production defects. Behavioral differences include ambiguous ball bootstrap, non-proof observations, and global-path fallback.",
+    "model_calls": 0
+  },
+  "last_strict_video_acceptance": "R5_0_OF_5",
+  "r6_five_action_video_acceptance_performed": false,
+  "deployed": false
+}

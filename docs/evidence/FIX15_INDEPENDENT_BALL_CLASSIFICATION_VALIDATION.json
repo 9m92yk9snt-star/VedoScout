@@ -1,0 +1,20 @@
+{
+  "kind": "INDEPENDENT_IMAGE_CLASSIFIER_INTEGRATED_WITH_CONTACT_SEED_HANDOFF",
+  "base_commit": "43c00cd58c306c8a59d2a36264614f4b66a5228c",
+  "source_video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b",
+  "offline_regressions": {"passed": 1590, "sdk_skipped": 28, "elapsed_seconds": 48.32, "exit_code": 0, "network_attempts": 0, "model_attempts": 0, "video_decode_attempts": 0},
+  "new_fixture_cases": 31,
+  "original_contact_replay": {"binding": "VERIFIED", "native_before_positions": 6, "fresh_source_rgb_hash_matches": 8, "role": "RECEIVE_CONTROL", "original_goal_pass": false},
+  "independent_original_image_response_obtained": false,
+  "fresh_full_five_action_reconstruction": false,
+  "last_strict_acceptance": {"passed": 0, "total": 5},
+  "documented_original_reappearance_ms": [31849,31865,31882,31899,31915,31932,31949],
+  "original_baseline_reader_images_in_reappearance": 1,
+  "native_identity_required_after_samples": 3,
+  "native_identity_required_after_span_ms": 80,
+  "classification_protocol": "ALL_VISIBLE_BALLS_V1",
+  "additional_model_calls": 0,
+  "user_circle_is_identity_authority": false,
+  "canonical_events_applied": 0,
+  "production_deployed": false
+}

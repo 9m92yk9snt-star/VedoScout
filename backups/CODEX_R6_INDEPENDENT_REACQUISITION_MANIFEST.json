@@ -1,0 +1,33 @@
+{
+  "kind": "R6_INDEPENDENT_NATIVE_BALL_REACQUISITION_CHECKPOINT",
+  "parent_commit": "267fc54e31eaadbefede2500c2de6e11a232ed15",
+  "branch": "codex-r6-native-jersey-20261011",
+  "date_utc": "2026-10-12",
+  "files": [
+    "backend/short_occlusion_contact_recovery.py",
+    "backend/tests/test_fix15_r6_independent_reacquisition.py",
+    "docs/FIX15_R6_INDEPENDENT_REACQUISITION_STATUS.md",
+    "backups/CODEX_R6_INDEPENDENT_REACQUISITION_MANIFEST.json"
+  ],
+  "recovery_source_sha256": "96aac44ab64bc638dc05063128c5f706732b82190d813af8f8429bc87bcb6d5b",
+  "tests_source_sha256": "e3ba83d87d46a2f74f4494dc18642eb2f8f8a53d294c6debab3219ea2dc3a50b",
+  "new_regression_cases": 22,
+  "baseline_new_cases_failed": 22,
+  "focused_cases_passed": 66,
+  "offline_regression_passed": 1395,
+  "sdk_dependent_skipped": 19,
+  "native_tracking_integrations_passed": 3,
+  "fresh_blind_jersey_pixel_rebindings": 20,
+  "same_original_video": true,
+  "original_user_markings": 12,
+  "original_markings_modified": false,
+  "offline_tests_sha256": "0e034aed67926eb75371ee0607f67a493f8df9a12aa6503e6fdac73ae406472d",
+  "native_tests_sha256": "40b5ad0e270b73fa22e5acf249d11ed815e19c10e72b11a63dfa8d29049e5462",
+  "fresh_replay_receipt_sha256": "9e34cdc67987da6e6a44e4ac89b01834e9f6b73dc2d082fb3db2b87ea48baafb",
+  "strict_verified_actions": 0,
+  "requested_actions": 5,
+  "new_paid_model_calls": 0,
+  "source_proposals_promoted": 0,
+  "deployment_performed": false,
+  "merge_performed": false
+}

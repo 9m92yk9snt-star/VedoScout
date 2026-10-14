@@ -55,6 +55,9 @@ jobs:
                   self.provider = provider
                   self.model = model
                   return self
+              def with_params(self, **params):
+                  self.params = params
+                  return self
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
           PY
@@ -81,12 +84,22 @@ jobs:
             backend/touch_graph.py \
             backend/jersey_consensus.py \
             backend/shot_outcome_engine.py \
+            backend/native_ball_reappearance.py \
+            backend/native_goal_review.py \
+            backend/independent_ball_review.py \
+            backend/temporal_ball_search.py \
+            backend/native_goal_frame.py \
+            backend/goal_context_observations.py \
+            backend/goal_reappearance.py \
+            backend/fix10a_ball_proof_gate.py \
             backend/event_trace.py \
             backend/physical_match_reconstruction.py \
             backend/action_evidence_review.py \
+            backend/report_fact_authority.py \
             backend/cross_window_evidence.py \
             backend/evidence_feedback.py \
             backend/goal_review_scheduler.py \
+            backend/goal_review_sampling.py \
             backend/scripts/replay_report_evidence.py \
             backend/scripts/reference_action_review.py \
             backend/open_observation_compat.py \
@@ -99,12 +112,13 @@ jobs:
             backend/run_real_video_golden.py \
             backend/football_sequence_intelligence.py \
             backend/identity_verify.py \
+            backend/support_vision_runner.py \
             backend/server.py
       - name: Run FIX10 production regressions
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py tests/test_fix15_temporal_goal_context.py tests/test_fix15_contact_role_seed_handoff.py tests/test_fix15_independent_ball_review.py tests/test_fix15_dense_reader_coverage.py tests/test_fix15_direct_goal_transport.py
 
   backend_regression:
     runs-on: ubuntu-latest
@@ -153,6 +167,9 @@ jobs:
               def with_model(self, provider, model):
                   self.provider = provider
                   self.model = model
+                  return self
+              def with_params(self, **params):
+                  self.params = params
                   return self
               async def send_message(self, _message):
                   raise RuntimeError("CI Emergent stub: network/model call forbidden")
@@ -222,7 +239,7 @@ jobs:
       - name: Verify duel hints, pixel ownership, routes and identity safety
         env:
           PYTHONPATH: backend:backend/tests
-        run: python -m pytest -q backend/tests/test_analysis_progress.py backend/tests/test_analysis_eta.py backend/tests/test_player_selection.py backend/tests/test_masked_pose_tracking.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py
+        run: python -m pytest -q backend/tests/test_analysis_progress.py backend/tests/test_analysis_eta.py backend/tests/test_player_selection.py backend/tests/test_masked_pose_tracking.py backend/tests/test_player_selection_routes.py backend/tests/test_fix04_tracking_geometry.py backend/tests/test_fix09a_feature_ownership.py backend/tests/test_fix09a_identity_timeline.py backend/tests/test_fix09b0_unified_identity_authority.py backend/tests/test_fix09b0_event_bridge.py backend/tests/test_fix15_selected_point_identity.py backend/tests/test_fix15_selected_mask_identity.py backend/tests/test_fix15_native_selected_body.py
 
   frontend_build:
     runs-on: ubuntu-latest

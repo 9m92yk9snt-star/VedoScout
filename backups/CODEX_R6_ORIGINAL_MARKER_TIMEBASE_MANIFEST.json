@@ -1,0 +1,69 @@
+{
+  "kind": "CODEX_R6_ORIGINAL_MARKER_TIMEBASE_CHECKPOINT",
+  "parent_commit": "91b03c41289404d611fd17479d5d7f1706330ffa",
+  "branch": "codex-r6-native-jersey-20261011",
+  "files": {
+    "backend/precision_engine.py": "0f882a09e5d346b554b60331f5a0fb9be37f6491a04949eec4dc97322ad14b35",
+    "backend/tests/test_fix15_r6_native_marker_timebase.py": "60a66aff64a63eadbc1c6a85004ee0d3bed0f2c889444a3bd905151c89df2bbd",
+    "docs/FIX15_R6_ORIGINAL_MARKER_TIMEBASE_STATUS.md": "b82d93756d0d05da521ae2cb09847ca99251fac558393707c8a74457a0839d40"
+  },
+  "receipts": {
+    "verification/five-actions/original-photo-frame-matching/production-marker-offset-before.json": "b06883ad3938cdfeafa8676bf54871586867dcee30409368550b0ccaf0e005a4",
+    "verification/five-actions/original-photo-frame-matching/production-marker-offset-after.json": "eb3b88a18bde3b60deae444bb0d16ec5f7ca27b835323c8d9f19178554db3951",
+    "verification/five-actions/original-photo-frame-matching/user-mask-exact-rounding-receipt.json": "dac8e5153c224e70ed940dc4d5be85b74424efe3410d42700bffe6a3ccc66b18",
+    "verification/five-actions/original-photo-frame-matching/original-user-capture-receipt.json": "82eb64f7716a4cb06cd204353587801e19ff3f0ca4f4bbd9993753b4d8bc47fc",
+    "verification/timelines/original-marker-aligned/receipt.json": "ed16af3e166cd8c6c0632bbf680380e7a3d21513462d376c1cc063dbdf457560",
+    "verification/five-actions/original-marker-aligned-pixel-audit/receipt.json": "2410b14e2c5b3f0b5a3c1c18f192fca83cff80e8cbc75c0c7c8f70520ccf2892",
+    "verification/five-actions/original-marker-aligned-jersey-replay/receipt.json": "faef4898947d0a2a05a2b01746abcac30aa1a90b9e55aad9bce41ebee705d042",
+    "verification/five-actions/native-contact-rois-dense-first-window/receipt.json": "415da11a09265436c5d466bb6fdbe90329ca23f81715edb698825f81cba51ffe",
+    "verification/five-actions/original-marker-final-regression-tests.log": "309e1c4a984247e6b39f947aef61c26b0e5dd331d56fd51b4a91115ee8801b24",
+    "verification/five-actions/original-marker-native-tracking-integration-tests.log": "f1d4c18b0a8be575f5396d1ae95369f4a07475e7e4029c7431f3a9bd8c837ce4"
+  },
+  "source_recovery": {
+    "original_marker_jpegs": 12,
+    "original_user_capture": 1,
+    "new_uploads": 0,
+    "original_mov_paths_available": 0
+  },
+  "native_calibration": {
+    "old_offset": -0.01666600000000029,
+    "new_source_derived_offset": 0.0,
+    "identical_pixel_match_score": 0.998518168926239,
+    "original_input_unchanged": true
+  },
+  "test_result": {
+    "offline_unit_passed": 1373,
+    "sdk_dependent_skipped": 19,
+    "native_tracking_integration_passed": 3,
+    "new_timestamp_tests": 15,
+    "baseline_failed": 14,
+    "baseline_passed": 1,
+    "final_forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    }
+  },
+  "native_bounded_audit": {
+    "original_pts_frames": 1922,
+    "pixel_cache_hits": 1922,
+    "new_detector_forwards": 0,
+    "jersey_pixel_rebindings": 20,
+    "strict_verified": 0,
+    "requested": 5
+  },
+  "native_first_window_search": {
+    "frames": 354,
+    "forwards": 1882,
+    "search_only_proposals": 193,
+    "proposals_promoted": 0
+  },
+  "high_detail_goal_review": {
+    "exit_code": "TIMEOUT",
+    "incomplete_response_admitted": false
+  },
+  "new_paid_model_calls": 0,
+  "deployment_performed": false,
+  "merge_performed": false,
+  "deployment_requires_five_action_PASS": true
+}

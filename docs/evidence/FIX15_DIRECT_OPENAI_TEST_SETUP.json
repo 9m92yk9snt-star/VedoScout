@@ -1,0 +1,21 @@
+{
+  "scope": "ISOLATED_SINGLE_ORIGINAL_GOAL_CONTACT_SETUP",
+  "base_commit": "f73052ac56fe9ab40d1cedf998e608f835cf0ff1",
+  "offline_passed": 1616,
+  "sdk_skipped": 28,
+  "new_transport_cases": 6,
+  "offline_elapsed_seconds": 47.39,
+  "live_model_calls": 0,
+  "codespaces_container_started": false,
+  "remote_install_verified": false,
+  "local_original_input_preflight": {
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b",
+    "contact_ms": 30915,
+    "before_positions": 6,
+    "native_detector_available": true,
+    "api_key_configured": false
+  },
+  "original_goal_pass": false,
+  "full_five_action_acceptance": false,
+  "production_writes": 0
+}

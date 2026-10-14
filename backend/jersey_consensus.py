@@ -8,11 +8,15 @@ pure deterministic selection/aggregation/application logic.
 from __future__ import annotations
 
 from copy import deepcopy
+import math
 
 VERSION = 1
 MIN_TEMPORAL_SEPARATION_MS = 120
 MIN_BOX_AREA = 0.008
 MAX_REVIEW_FRAMES = 5
+MIN_TORSO_WIDTH_PX = 32
+MIN_TORSO_HEIGHT_PX = 40
+MIN_TORSO_SHARPNESS = 12.0
 VERIFY_MIN_AGREEING_FRAMES = 2
 VERIFY_MIN_POSTERIOR = 0.70
 VERIFY_MIN_MARGIN = 0.25
@@ -88,6 +92,51 @@ def _track_priority(touch_graph: dict | None) -> dict[str, tuple[int, int]]:
     return priority
 
 
+def _native_crop_quality(player, frame):
+    """Validated selection metadata, never number or target evidence."""
+    quality = player.get("jersey_crop_quality")
+    if not isinstance(quality, dict) or quality.get("source") != "NATIVE_TORSO_PIXELS":
+        return None
+    if frame.get("time_authority") != "ACTUAL_MEDIA_PTS" or frame.get("used_fallback"):
+        return None
+    values = [quality.get(k) for k in ("width_px", "height_px", "sharpness")]
+    if not all(_num(v) and math.isfinite(v) and v >= 0 for v in values):
+        return None
+    if type(quality.get("isolated")) is not bool:
+        return None
+    return quality
+
+
+def _choose_native_crops(rows):
+    """Prefer measured clear crops across the track's observed lifespan.
+
+    First take at most one candidate per temporal band, then fill unused slots.
+    The sharpest candidates lead the bounded provider queue. These cues do not
+    assert that a number is exposed or readable.
+    """
+    ranked = sorted(rows, key=lambda r: (-r["native_quality"]["sharpness"],
+                                        -r["area"], r["media_ms"]))
+    first, last = min(r["media_ms"] for r in rows), max(r["media_ms"] for r in rows)
+    span = max(1, last - first + 1)
+    chosen, bands = [], set()
+    for row in ranked:
+        band = min(MAX_REVIEW_FRAMES - 1, (row["media_ms"] - first) * MAX_REVIEW_FRAMES // span)
+        if band in bands or any(abs(row["media_ms"] - old["media_ms"]) < MIN_TEMPORAL_SEPARATION_MS
+                                for old in chosen):
+            continue
+        chosen.append(row)
+        bands.add(band)
+        if len(chosen) == MAX_REVIEW_FRAMES:
+            break
+    for row in ranked:
+        if len(chosen) == MAX_REVIEW_FRAMES:
+            break
+        if any(abs(row["media_ms"] - old["media_ms"]) < MIN_TEMPORAL_SEPARATION_MS for old in chosen):
+            continue
+        chosen.append(row)
+    return chosen
+
+
 def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> list[dict]:
     """Choose up to five clear, temporally separated crops per involved track."""
     involved = set(_involved_tracks(touch_graph))
@@ -96,7 +145,8 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
     priority = _track_priority(touch_graph)
     candidates: dict[str, list[dict]] = {track: [] for track in involved}
     for frame in window_evidence or []:
-        if not isinstance(frame, dict) or not _num(frame.get("media_ms")):
+        if (not isinstance(frame, dict) or not _num(frame.get("media_ms"))
+                or not math.isfinite(frame["media_ms"])):
             continue
         media_ms = int(round(float(frame["media_ms"])))
         if frame.get("used_fallback") is True:
@@ -111,7 +161,16 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
             if str(player.get("association_state") or "") == "HYPOTHESES":
                 continue
             area = float(box["w"]) * float(box["h"])
-            if area < MIN_BOX_AREA:
+            quality = _native_crop_quality(player, frame)
+            if "jersey_crop_quality" in player:
+                # A malformed or ineligible measured record must not silently
+                # fall back to area and re-admit a blurred/overlapped crop.
+                if (quality is None or quality["isolated"] is not True
+                        or quality["width_px"] < MIN_TORSO_WIDTH_PX
+                        or quality["height_px"] < MIN_TORSO_HEIGHT_PX
+                        or quality["sharpness"] < MIN_TORSO_SHARPNESS):
+                    continue
+            elif area < MIN_BOX_AREA:
                 continue
             candidates[track].append({
                 "track_id": track,
@@ -119,6 +178,7 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
                 "box": deepcopy(box),
                 "area": area,
                 "association_state": player.get("association_state"),
+                "native_quality": deepcopy(quality),
             })
 
     requests = []
@@ -127,21 +187,24 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
         key=lambda track: (*priority.get(track, (3, 10**9)), track),
     )
     for track in ordered_tracks:
-        ranked = sorted(
-            candidates.get(track) or [],
-            key=lambda row: (-float(row["area"]), int(row["media_ms"])),
-        )
-        chosen = []
-        for row in ranked:
-            if any(abs(int(row["media_ms"]) - int(old["media_ms"])) < MIN_TEMPORAL_SEPARATION_MS
-                   for old in chosen):
-                continue
-            chosen.append(row)
-            if len(chosen) >= MAX_REVIEW_FRAMES:
-                break
+        rows = candidates.get(track) or []
+        native = [r for r in rows if r["native_quality"] is not None]
+        if native:
+            chosen = _choose_native_crops(native)
+        else:
+            ranked = sorted(rows, key=lambda row: (-float(row["area"]), int(row["media_ms"])))
+            chosen = []
+            for row in ranked:
+                if any(abs(int(row["media_ms"]) - int(old["media_ms"])) < MIN_TEMPORAL_SEPARATION_MS
+                       for old in chosen):
+                    continue
+                chosen.append(row)
+                if len(chosen) >= MAX_REVIEW_FRAMES:
+                    break
         # One clear frame is supporting evidence; verification requires at
         # least two independent agreeing frames, regardless of crop reuse.
-        chosen.sort(key=lambda row: int(row["media_ms"]))
+        if not native:
+            chosen.sort(key=lambda row: int(row["media_ms"]))
         for index, row in enumerate(chosen):
             requests.append({
                 "request_id": f"jersey_{track}_{int(row['media_ms']):010d}",
@@ -151,8 +214,54 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
                 "selection_rank": index + 1,
                 "review_priority": priority.get(track, (3, 10**9))[0],
                 "expected_jersey_number": None,
+                **({"crop_selection": "NATIVE_QUALITY_TEMPORAL_BANDS",
+                    "crop_selection_quality": deepcopy(row["native_quality"])} if native else {}),
             })
     return requests
+
+
+def merge_jersey_review_requests(pixel_requests, ordinary_requests, touch_graph):
+    """Readable crops keep their physical actor priority under the same budget.
+
+    Pixel inspection can expose many uninvolved backs. They must not consume
+    the first two independent reads reserved for a release/control actor.
+    Neither crop selection nor prioritisation supplies a shirt number.
+    """
+    priority = _track_priority(touch_graph)
+    touch_times = {}
+    for touch in (touch_graph or {}).get("touches") or []:
+        ms = touch.get("representative_ms", touch.get("media_ms"))
+        if _num(ms):
+            touch_times.setdefault(touch.get("player_track_id"), []).append(ms)
+    grouped, seen = {}, set()
+    for inspected, rows in ((True, pixel_requests), (False, ordinary_requests)):
+        for request in rows or []:
+            track, ms, box = request.get("track_id"), request.get("media_ms"), request.get("box")
+            if not isinstance(track, str) or not _num(ms) or not math.isfinite(ms) or not _valid_box(box):
+                continue
+            key = (track, ms, *(float(box[k]) for k in ("x", "y", "w", "h")))
+            if key in seen:
+                continue
+            seen.add(key)
+            grouped.setdefault(track, []).append({**deepcopy(request), "pixel_selected": inspected})
+    selected = []
+    for track in sorted(grouped, key=lambda t: (*priority.get(t, (3, 10**9)), t)):
+        def crop_order(request):
+            distance = min((abs(request["media_ms"] - ms) for ms in touch_times.get(track, [])), default=0)
+            if not request["pixel_selected"] and request.get("crop_selection") == "NATIVE_QUALITY_TEMPORAL_BANDS":
+                return (True, 0, int(request.get("selection_rank") or 1), request["media_ms"])
+            return (not request["pixel_selected"], 1, distance, request["media_ms"])
+        chosen = []
+        for request in sorted(grouped[track], key=crop_order):
+            if any(abs(request["media_ms"] - old["media_ms"]) < MIN_TEMPORAL_SEPARATION_MS for old in chosen):
+                continue
+            chosen.append(request)
+            request.update(selection_rank=len(chosen), review_priority=priority.get(track, (3, 10**9))[0],
+                           expected_jersey_number=None)
+            selected.append(request)
+            if len(chosen) >= MAX_REVIEW_FRAMES:
+                break
+    return selected
 
 
 def aggregate_jersey_votes(votes) -> dict:

@@ -164,6 +164,7 @@ def test_recovered_pass_reopens_the_existing_receiver_review_in_another_window(m
     assert receiver["feedback_prior_outcomes"]  # first-pass decision remains auditable
 
 
+@pytest.mark.usefixtures("inline_support_vision")
 def test_feedback_has_a_separate_hard_model_budget_and_reuses_cached_role_pixels(monkeypatch):
     monkeypatch.setattr(inspection, "MAX_ACTION_REVIEWS", 1)
     monkeypatch.setattr(feedback, "MAX_FEEDBACK_REVIEWS", 1)

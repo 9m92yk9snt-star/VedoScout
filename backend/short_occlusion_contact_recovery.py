@@ -36,6 +36,7 @@ import cv2
 import numpy as np
 
 import ball_contact_engine as bce
+import frame_geometry
 import dense_replay
 
 VERSION = 1
@@ -175,21 +176,23 @@ def _player_by_id(frame, track_id):
     ), None)
 
 
-def _lower_geometry(player_box, ball_box):
+def _lower_geometry(player_box, ball_box, frame=None):
     # Reuse the exact A4 physical geometry formula without changing A4 gates.
-    return bce._lower_body_geometry(player_box, ball_box)
+    return bce._lower_body_geometry(player_box, ball_box, frame_geometry.horizontal_scale(frame))
 
 
 def _unique_lower_body_actor(frame, ball_box):
     """Return one verified physical actor or an explicit fail-closed reason."""
     if not isinstance(frame, dict) or not _valid_box(ball_box):
         return None, "CONTACT_FRAME_UNAVAILABLE", []
+    if frame_geometry.horizontal_scale(frame) is None:
+        return None, "CONTACT_FRAME_GEOMETRY_UNAVAILABLE", []
     verified = []
     ambiguous = []
     for player in bce._players_for_physics(frame):
         if not isinstance(player, dict) or not _valid_box(player.get("box")):
             continue
-        geom = bce._best_lower_geometry(player, ball_box)
+        geom = bce._best_lower_geometry(player, ball_box, frame)
         distance = float(geom.get("distance_h") or 999.0)
         # Very narrow articulated-kick lane: only a proof-backed
         # GLOBAL_TARGET body can extend from the ordinary contact radius to the
@@ -243,9 +246,17 @@ def _velocity(a, b):
     return ((bx - ax) / dt, (by - ay) / dt)
 
 
-def _trajectory_change(in_a, in_b, out_a, out_b):
-    before = _velocity(in_a, in_b)
-    after = _velocity(out_a, out_b)
+def _trajectory_change(in_a, in_b, out_a, out_b, frames=None):
+    motion = bce.ball_motion_evidence.relative_ball_motion(
+        frames, in_a, in_b, out_b, outgoing_start=out_a)
+    if motion.get("status") != "LEGACY":
+        if motion.get("status") != "MEASURED" or motion.get("resolved_motion") is not True:
+            return {"score":0., "before":None,"after":None,"speed_delta":None,
+                    "direction_change_deg":None,"camera_motion":motion}
+        before, after = motion["before_velocity"], motion["after_velocity"]
+    else:
+        before = _velocity(in_a, in_b)
+        after = _velocity(out_a, out_b)
     if before is None or after is None:
         return {"score": 0.0, "before": None, "after": None,
                 "speed_delta": None, "direction_change_deg": None}
@@ -264,6 +275,7 @@ def _trajectory_change(in_a, in_b, out_a, out_b):
         "after": {"x": after[0], "y": after[1], "speed": sa},
         "speed_delta": round(speed_delta, 6),
         "direction_change_deg": round(direction_deg, 3),
+        **({"camera_motion":motion} if motion.get("status") != "LEGACY" else {}),
     }
 
 
@@ -279,16 +291,22 @@ def _strong_trajectory_consequence(change):
     )
 
 
-def _actor_distance_h(player_box, ball_box):
+def _actor_distance_h(player_box, ball_box, frame=None):
+    x_scale = frame_geometry.horizontal_scale(frame)
+    if x_scale is None:
+        return None
     fx, fy = _foot(player_box); bx, by = _center(ball_box)
-    return math.hypot(bx - fx, by - fy) / max(float(player_box["h"]), 1e-6)
+    return math.hypot((bx - fx) * x_scale, by - fy) / max(float(player_box["h"]), 1e-6)
 
 
-def _separation_gain_h(anchor_player_box, anchor_ball_box, later_player_box, later_ball_box):
+def _separation_gain_h(anchor_player_box, anchor_ball_box, later_player_box, later_ball_box,
+                       anchor_frame=None, later_frame=None):
     if not all(_valid_box(x) for x in (anchor_player_box, anchor_ball_box, later_player_box, later_ball_box)):
         return None
-    start = _actor_distance_h(anchor_player_box, anchor_ball_box)
-    end = _actor_distance_h(later_player_box, later_ball_box)
+    if frame_geometry.compatible_scale(anchor_frame or {}, later_frame or {}) is None:
+        return None
+    start = _actor_distance_h(anchor_player_box, anchor_ball_box, anchor_frame)
+    end = _actor_distance_h(later_player_box, later_ball_box, later_frame)
     return end - start
 
 
@@ -411,8 +429,8 @@ def _support_seed_candidates(frames, anchor, actor, anchor_frame):
             displacement = math.hypot(cx - ax, cy - ay)
             if displacement > max_jump:
                 continue
-            actor_h = _actor_distance_h(current_actor["box"], candidate["box"])
-            if actor_h > SUPPORT_SEED_ACTOR_MAX_H:
+            actor_h = _actor_distance_h(current_actor["box"], candidate["box"], frame)
+            if actor_h is None or actor_h > SUPPORT_SEED_ACTOR_MAX_H:
                 continue
             out.append({
                 "frame": frame,
@@ -595,7 +613,7 @@ def _competing_contact_actor_ids(frame, target_track, ball_box):
         }
         if track == target_track or (track is None and candidates == {target_track}):
             continue
-        geometry = bce._best_lower_geometry(player, ball_box)
+        geometry = bce._best_lower_geometry(player, ball_box, frame)
         if float(geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H):
             ids.extend([track] if track else sorted(candidates))
     return sorted(set(x for x in ids if isinstance(x, str)))
@@ -612,7 +630,7 @@ def _exact_tap_seed_candidates(frame, actor):
             and _valid_box(candidate.get("box"))
         ):
             continue
-        geometry = _lower_geometry(actor["box"], candidate["box"])
+        geometry = _lower_geometry(actor["box"], candidate["box"], frame)
         if float(geometry.get("distance_h") or 999.0) > float(bce.CONTACT_MAX_H):
             continue
         competitors = _competing_contact_actor_ids(frame, target_track, candidate["box"])
@@ -710,25 +728,79 @@ def _support_detector_paths(frames, anchor_frame, seed_candidate):
     ]
 
 
-def _flow_path_match_count(flow_nodes, detector_nodes):
-    count = 0
-    for flow_node in (flow_nodes or [])[1:]:
-        fx, fy = _center(flow_node["box"])
-        if any(
-            abs(int(node["media_ms"]) - int(flow_node["media_ms"])) <= EXACT_TAP_FLOW_MATCH_MS
-            and math.hypot(_center(node["box"])[0] - fx, _center(node["box"])[1] - fy)
-            <= EXACT_TAP_FLOW_MATCH_NORM
-            for node in detector_nodes[1:]
-        ):
-            count += 1
-    return count
+def _flow_path_match_count(flow_nodes, detector_nodes, *, required_detector_node=None):
+    """Count independent actual-time pairs, optionally binding the A3 endpoint.
+
+    A single weak measurement near two optical samples is one corroborating
+    observation, not two. A remote strong ball cannot borrow those weak
+    matches either. Keep the existing time/distance gates, exclude the seed,
+    and find a maximum one-to-one matching rather than depending on row order.
+    """
+    flow_nodes, detector_nodes = list(flow_nodes or []), list(detector_nodes or [])
+    if not flow_nodes or not detector_nodes:
+        return 0
+
+    def later(nodes):
+        seed_ms = nodes[0].get("media_ms") if isinstance(nodes[0], dict) else None
+        if type(seed_ms) is not int:
+            return []
+        return [n for n in nodes[1:] if isinstance(n, dict)
+                and type(n.get("media_ms")) is int and n["media_ms"] > seed_ms
+                and _valid_box(n.get("box"))
+                and all(math.isfinite(float(n["box"][k])) for k in ("x", "y", "w", "h"))]
+
+    flow, detected = later(flow_nodes), later(detector_nodes)
+
+    def matches(a, b):
+        ax, ay = _center(a["box"]); bx, by = _center(b["box"])
+        return (abs(a["media_ms"] - b["media_ms"]) <= EXACT_TAP_FLOW_MATCH_MS
+                and math.hypot(ax - bx, ay - by) <= EXACT_TAP_FLOW_MATCH_NORM)
+
+    # Timestamp keys make repeated rows and multiple same-frame proposals
+    # incapable of supplying extra independent observations.
+    edges = {}
+    for f in flow:
+        edges.setdefault(f["media_ms"], set()).update(
+            d["media_ms"] for d in detected if matches(f, d))
+
+    def match_size(forced_flow_ms=None):
+        required_ms = (required_detector_node["media_ms"]
+                       if forced_flow_ms is not None else None)
+        owners = {required_ms: forced_flow_ms} if forced_flow_ms is not None else {}
+
+        def augment(flow_ms, seen):
+            for detector_ms in sorted(edges[flow_ms]):
+                if detector_ms == required_ms or detector_ms in seen:
+                    continue
+                seen.add(detector_ms)
+                if detector_ms not in owners or augment(owners[detector_ms], seen):
+                    owners[detector_ms] = flow_ms
+                    return True
+            return False
+
+        for flow_ms in sorted(edges):
+            if flow_ms != forced_flow_ms:
+                augment(flow_ms, set())
+        return len(owners)
+
+    if required_detector_node is None:
+        return match_size()
+    if not any(n == required_detector_node for n in detected):
+        return 0
+    forced = {f["media_ms"] for f in flow if matches(f, required_detector_node)}
+    return max((match_size(ms) for ms in forced), default=0)
 
 
-def _exact_tap_path_evidence(anchor, after, separation_gain_h):
+def _exact_tap_path_evidence(anchor, after, separation_gain_h, frames=None):
     dt = (int(after["media_ms"]) - int(anchor["media_ms"])) / 1000.0
     ax, ay = _center(anchor["box"]); bx, by = _center(after["box"])
     displacement = math.hypot(bx - ax, by - ay)
     outbound = ((bx - ax) / dt, (by - ay) / dt) if dt > 0 else (0.0, 0.0)
+    motion = bce.ball_motion_evidence.relative_ball_segment(frames, anchor, after)
+    if motion.get("status") != "LEGACY":
+        if motion.get("status") != "MEASURED" or motion.get("resolved_motion") is not True:
+            return {"score":0.,"before":None,"after":None,"camera_motion":motion}
+        displacement, outbound = motion["displacement_h"], motion["velocity"]
     relative_rate = float(separation_gain_h) / dt if dt > 0 else 0.0
     score = max(
         min(1.0, displacement / 0.08),
@@ -744,6 +816,7 @@ def _exact_tap_path_evidence(anchor, after, separation_gain_h):
         "outbound_displacement_norm": round(displacement, 6),
         "relative_separation_rate_h_s": round(relative_rate, 6),
         "source": "EXACT_TARGET_SUPPORT_PATH_RELATIVE_MOTION",
+        **({"camera_motion":motion} if motion.get("status") != "LEGACY" else {}),
     }
 
 
@@ -862,6 +935,7 @@ def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
     previous = deepcopy(anchor_actor)
     previous["box"] = deepcopy(anchor_actor.get("detected_box") or anchor_actor["box"])
     previous_ms = start_ms
+    previous_frame = anchor_frame
     current_id = previous["local_track_id"]
     handoffs = []
     nodes = [{
@@ -886,7 +960,8 @@ def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
             if _team_conflict_for_tap(previous, candidate):
                 continue
             geometry = bce._boxes_actor_continuous(
-                previous["box"], candidate["box"], media_ms - previous_ms
+                previous["box"], candidate["box"], media_ms - previous_ms,
+                frame_geometry.compatible_scale(previous_frame, frame)
             )
             if geometry.get("ok") is True:
                 ranked.append((float(geometry.get("center_distance_h") or 0.0), candidate, geometry))
@@ -926,6 +1001,7 @@ def _tap_actor_continuity(frames, anchor_frame, anchor_actor, end_frame):
         })
         previous = deepcopy(chosen)
         previous_ms = media_ms
+        previous_frame = frame
         current_id = chosen_id
     return previous, {
         "ok": True,
@@ -966,7 +1042,7 @@ def _tap_release_competitors(frame, actor, ball_box):
             pcx, pcy = _center(player["box"]); acx, acy = _center(actor_box)
             if math.hypot(pcx - acx, pcy - acy) <= EXACT_TAP_SEED_CLUSTER_NORM:
                 continue
-        geometry = _lower_geometry(player["box"], ball_box)
+        geometry = _lower_geometry(player["box"], ball_box, frame)
         if float(geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H):
             rows.append({
                 "local_track_id": player.get("local_track_id"),
@@ -1008,7 +1084,7 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                     and _valid_box(seed.get("box"))
                 ):
                     continue
-                geometry = _lower_geometry(actor["box"], seed["box"])
+                geometry = _lower_geometry(actor["box"], seed["box"], release_frame)
                 if float(geometry.get("distance_h") or 999.0) > float(bce.CONTACT_MAX_H):
                     continue
                 competitors = _tap_release_competitors(release_frame, actor, seed["box"])
@@ -1038,16 +1114,17 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                 continue
             detector_paths = _support_detector_paths(frames, release_frame, seed)
             for detector_path in detector_paths:
-                flow_matches = _flow_path_match_count(
-                    flow.get("nodes") or [], detector_path.get("nodes") or []
-                )
-                if flow_matches < FLOW_MIN_NODES - 1:
-                    continue
                 strong = next((
                     node for node in detector_path["nodes"][1:]
                     if node.get("a3_eligible") is True
                 ), None)
                 if strong is None:
+                    continue
+                flow_matches = _flow_path_match_count(
+                    flow.get("nodes") or [], detector_path["nodes"],
+                    required_detector_node=strong,
+                )
+                if flow_matches < FLOW_MIN_NODES - 1:
                     continue
                 strong_frame = _frame_near(frames, int(strong["media_ms"]), max_ms=25)
                 final_actor, final_path = _tap_actor_continuity(
@@ -1056,7 +1133,8 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                 if final_actor is None:
                     continue
                 separation = _separation_gain_h(
-                    actor["box"], seed["box"], final_actor["box"], strong["box"]
+                    actor["box"], seed["box"], final_actor["box"], strong["box"],
+                    release_frame, strong_frame
                 )
                 if separation is None or separation < EXACT_TAP_MIN_SEPARATION_GAIN_H:
                     continue
@@ -1076,7 +1154,7 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                     "proof_eligible": True,
                     "provenance": "A3_ELIGIBLE_SPORTS_BALL_REACQUISITION",
                 }
-                change = _exact_tap_path_evidence(anchor, after, separation)
+                change = _exact_tap_path_evidence(anchor, after, separation, frames)
                 if float(change.get("score") or 0.0) < TRAJECTORY_SIGNAL_MIN:
                     continue
                 evidence = {
@@ -1098,6 +1176,8 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                     "ball_flow_status": flow.get("status"),
                     "flow_nodes": deepcopy(flow.get("nodes") or []),
                     "flow_detector_match_count": flow_matches,
+                    "flow_detector_matches_independent": True,
+                    "a3_reacquisition_flow_bound": True,
                     "detector_path_nodes": deepcopy(detector_path.get("nodes") or []),
                     "a3_reacquisition_ms": int(strong["media_ms"]),
                     "a3_reacquisition_confidence": strong.get("confidence"),
@@ -1204,13 +1284,15 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
         paths = _support_detector_paths(frames, frame, seed["candidate"])
         candidates = []
         for path in paths:
-            flow_matches = _flow_path_match_count(flow.get("nodes") or [], path["nodes"])
-            if flow_matches < FLOW_MIN_NODES - 1:
-                continue
             strong = next(
                 (node for node in path["nodes"][1:] if node.get("a3_eligible") is True), None
             )
             if strong is None:
+                continue
+            flow_matches = _flow_path_match_count(
+                flow.get("nodes") or [], path["nodes"], required_detector_node=strong,
+            )
+            if flow_matches < FLOW_MIN_NODES - 1:
                 continue
             strong_frame = _frame_near(frames, int(strong["media_ms"]), max_ms=25)
             final_actor, actor_continuity = _exact_track_continuity(
@@ -1219,7 +1301,8 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
             if final_actor is None:
                 continue
             separation = _separation_gain_h(
-                actor["box"], seed["candidate"]["box"], final_actor["box"], strong["box"]
+                actor["box"], seed["candidate"]["box"], final_actor["box"], strong["box"],
+                frame, strong_frame
             )
             if separation is None or separation < EXACT_TAP_MIN_SEPARATION_GAIN_H:
                 continue
@@ -1239,7 +1322,7 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
                 "proof_eligible": True,
                 "provenance": "A3_ELIGIBLE_SPORTS_BALL_REACQUISITION",
             }
-            change = _exact_tap_path_evidence(anchor, after, separation)
+            change = _exact_tap_path_evidence(anchor, after, separation, frames)
             if float(change.get("score") or 0.0) < TRAJECTORY_SIGNAL_MIN:
                 continue
             evidence = {
@@ -1255,6 +1338,8 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
                 "flow_status": flow.get("status"),
                 "flow_nodes": deepcopy(flow.get("nodes") or []),
                 "flow_detector_match_count": flow_matches,
+                "flow_detector_matches_independent": True,
+                "a3_reacquisition_flow_bound": True,
                 "detector_path_nodes": deepcopy(path["nodes"]),
                 "a3_reacquisition_ms": int(strong["media_ms"]),
                 "a3_reacquisition_confidence": strong.get("confidence"),
@@ -1370,8 +1455,8 @@ def _exact_tap_measured_release_recoveries(
             continue
         anchor_row = anchor_rows[0]
         anchor_ball = deepcopy(anchor_row["ball_at_contact"])
-        authority_geometry = _lower_geometry(actor["box"], anchor_ball["box"])
-        detected_geometry = _lower_geometry(actor["detected_box"], anchor_ball["box"])
+        authority_geometry = _lower_geometry(actor["box"], anchor_ball["box"], frame)
+        detected_geometry = _lower_geometry(actor["detected_box"], anchor_ball["box"], frame)
         if not (
             authority_geometry.get("lower_body_overlap") is True
             and detected_geometry.get("lower_body_overlap") is True
@@ -1440,7 +1525,7 @@ def _exact_tap_measured_release_recoveries(
             )
             if final_actor is None:
                 continue
-            flowed_geometry = _lower_geometry(body_last["box"], release_ball["box"])
+            flowed_geometry = _lower_geometry(body_last["box"], release_ball["box"], release_frame)
             if not (
                 flowed_geometry.get("lower_body_overlap") is True
                 and float(flowed_geometry.get("distance_h") or 999.0) <= float(bce.CONTACT_MAX_H)
@@ -1452,7 +1537,8 @@ def _exact_tap_measured_release_recoveries(
             if release_competitors:
                 continue
             separation = _separation_gain_h(
-                actor["box"], anchor_ball["box"], body_last["box"], release_ball["box"]
+                actor["box"], anchor_ball["box"], body_last["box"], release_ball["box"],
+                frame, release_frame
             )
             evidence = {
                 "version": VERSION,
@@ -1583,10 +1669,11 @@ def _support_flow_recoveries(frames, measured, contact_result, video_path, flow_
                 "used_fallback": False,
                 "provenance": "STEP3_SUPPORT_PLUS_FORWARD_BACKWARD_FLOW",
             }
-            change = _trajectory_change(incoming[0], incoming[1], anchor, synthetic_final)
+            change = _trajectory_change(incoming[0], incoming[1], anchor, synthetic_final, frames)
             if not _strong_trajectory_consequence(change):
                 continue
-            separation = _separation_gain_h(actor["box"], anchor["box"], final_actor["box"], synthetic_final["box"])
+            separation = _separation_gain_h(actor["box"], anchor["box"], final_actor["box"], synthetic_final["box"],
+                                            frame, final_frame)
             if separation is None or separation < MIN_SEPARATION_GAIN_H:
                 continue
             evidence = {
@@ -1716,10 +1803,11 @@ def _measured_reacquisition_recoveries(frames, measured, contact_result, traject
         next_actor, next_actor_continuity = bce._player_for_actor_continuity(frame, track, next_frame)
         if next_actor is None:
             continue
-        change = _trajectory_change(incoming[0], incoming[1], anchor, nxt)
+        change = _trajectory_change(incoming[0], incoming[1], anchor, nxt, frames)
         if not _strong_trajectory_consequence(change):
             continue
-        separation = _separation_gain_h(actor["box"], anchor["box"], next_actor["box"], nxt["box"])
+        separation = _separation_gain_h(actor["box"], anchor["box"], next_actor["box"], nxt["box"],
+                                        frame, next_frame)
         if separation is None or separation < MIN_SEPARATION_GAIN_H:
             continue
         evidence = {

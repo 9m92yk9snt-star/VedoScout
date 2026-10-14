@@ -47,7 +47,10 @@ SOURCE_MODULES = (
     "dense_identity_continuity.py", "dense_event_reconciliation.py", "report_fact_authority.py",
     "verified_stats.py", "fix10a_vision_providers.py", "fix10a_goal_direction.py",
     "fix10a_ball_proof_gate.py", "short_occlusion_contact_recovery.py", "post_strike_intervention.py",
-    "scoring_evidence_coverage.py", "identity_verify.py", "scripts/replay_report_evidence.py", "scripts/reference_action_review.py",
+    "native_ball_reappearance.py", "native_goal_review.py", "goal_reappearance.py", "goal_review_sampling.py", "cv_detect.py",
+    "temporal_ball_search.py", "native_goal_frame.py", "goal_context_observations.py",
+    "scoring_evidence_coverage.py", "identity_verify.py", "support_vision_runner.py",
+    "scripts/replay_report_evidence.py", "scripts/reference_action_review.py",
 )
 SECRET_KEY = re.compile(
     r"(^|_)(password|passwd|secret|token|api_key|access_key|authorization|cookie|"

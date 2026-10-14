@@ -64,7 +64,7 @@ def _cut_flags(frames):
     return flags
 
 
-def _read_window(cap, w0: float, w1: float, step: float, fps=None):
+def _read_window(cap, w0: float, w1: float, step: float, fps=None, *, seed_time=None):
     """Returns [(t, gray_480w, hsv_240w, tiny_160w_f32), ...].
 
     FIX 03/04 canonical contract: adaptive-preroll seek at/before w0, then
@@ -73,15 +73,24 @@ def _read_window(cap, w0: float, w1: float, step: float, fps=None):
     sampling is by elapsed ACTUAL media time — never frame_index/fps."""
     frames = []
     lo = max(0.0, w0)
-    ok, t, _fb = video_timebase.seek_with_preroll(cap, lo, fps)
+    ok, t, used_fallback = video_timebase.seek_with_preroll(cap, lo, fps)
     last_t = None
+    seed_seen = False
     while ok:
         if t > w1 + 1e-3:
             break
-        if t >= lo - 1e-3 and video_timebase.should_sample(t, last_t, step * 0.8):
+        regular = t >= lo - 1e-3 and video_timebase.should_sample(t, last_t, step * 0.8)
+        tap_frame = seed_time is not None and not seed_seen and t >= seed_time - 1e-3
+        if tap_frame:
+            seed_seen = True
+        # A box-relative human mask belongs to its selected picture. Keep
+        # that picture in addition to the regular optical-flow cadence.
+        include_tap = tap_frame and not used_fallback and abs(t - seed_time) <= 0.025
+        if (regular or include_tap) and (seed_time is None or not used_fallback):
             ok2, fr = cap.retrieve()
             if ok2:
-                last_t = t
+                if regular:
+                    last_t = t
                 h, w = fr.shape[:2]
                 small = cv2.resize(fr, (TARGET_W, max(2, int(h * TARGET_W / w))))
                 g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
@@ -90,7 +99,7 @@ def _read_window(cap, w0: float, w1: float, step: float, fps=None):
                 )
                 tiny = cv2.resize(g, (160, max(2, int(g.shape[0] * 160 / g.shape[1])))).astype("float32")
                 frames.append((t, g, hsv, tiny))
-        ok, t, _fb = video_timebase.grab_frame_time_seconds(cap, fps)
+        ok, t, used_fallback = video_timebase.grab_frame_time_seconds(cap, fps)
     return frames
 
 
@@ -552,9 +561,10 @@ def _run_direction(frames, i0: int, box_px, out: dict, direction: int, doubts: l
 def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float = SPAN) -> dict:
     """Track the tapped player around every tap. Returns
     {points: [{t,x,y,w,h,conf}...], segments: [[t0,t1]...], t_off, hz}."""
-    from player_selection import full_body_anchors, decode_mask
+    from player_selection import full_body_anchors, decode_mask, valid_point
     seeds = [
-        (float(a["t"]) + float(t_off or 0.0), a["box"], decode_mask(a.get("visible_mask")))
+        (float(a["t"]) + float(t_off or 0.0), a["box"], decode_mask(a.get("visible_mask")),
+         valid_point(a.get("target_point")))
         for a in full_body_anchors((anchors or [])[:MAX_TRACKER_SEEDS])
         if isinstance(a, dict) and isinstance(a.get("t"), (int, float)) and isinstance(a.get("box"), dict)
     ]
@@ -570,13 +580,18 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
     fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
     fps = fps if fps > 0 else None  # explicit last-resort fallback only
     try:
-        for t_seed, b, mask in seeds:
-            frames = _read_window(cap, t_seed - span, t_seed + span, step, fps)
+        for t_seed, b, mask, selected_point in seeds:
+            kwargs = {"seed_time": t_seed} if selected_point else {}
+            frames = _read_window(cap, t_seed - span, t_seed + span, step, fps, **kwargs)
             if len(frames) < 3:
                 continue
             H, W = frames[0][1].shape[:2]
-            i0 = min(range(len(frames)), key=lambda i: abs(frames[i][0] - t_seed))
-            if abs(frames[i0][0] - t_seed) > 0.5:
+            indices = ([i for i, f in enumerate(frames) if f[0] >= t_seed - 1e-3]
+                       if selected_point else list(range(len(frames))))
+            if not indices:
+                continue
+            i0 = min(indices, key=lambda i: abs(frames[i][0] - t_seed))
+            if abs(frames[i0][0] - t_seed) > (0.025 if selected_point else 0.5):
                 continue
             box_px = [
                 float(b["x"]) * W, float(b["y"]) * H,
@@ -599,7 +614,7 @@ def track_player(video_path: str, anchors: list, t_off: float = 0.0, span: float
             segs.append([p["t"], p["t"]])
     segs = [[round(a, 2), round(b, 2)] for a, b in segs if b - a >= 0.3]
     # ── doubt moments: identity-risk stops NOT already covered by a user tap ──
-    seed_times = [t for t, _b, _mask in seeds]
+    seed_times = [t for t, _b, _mask, _point in seeds]
     doubt_out: list = []
     for dmom in sorted(doubts, key=lambda d: d["t"]):
         if any(abs(dmom["t"] - st) <= 1.2 for st in seed_times):

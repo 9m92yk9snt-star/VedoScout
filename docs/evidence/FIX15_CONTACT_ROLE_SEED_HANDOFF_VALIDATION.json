@@ -1,0 +1,314 @@
+{
+  "kind": "ORIGINAL_CONTACT_ROLE_SEED_HANDOFF",
+  "authority": "SAVED_PHYSICAL_EVIDENCE_REPLAY",
+  "base_commit": "575737e30a441c832774c45a463e635601cb5876",
+  "offline_guard": {
+    "kernel_network_filter": "SECCOMP_ERRNO_EPERM",
+    "libc_socket_self_check": "PASS"
+  },
+  "source_video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b",
+  "source_trace_sha256": "15159464656533eee8beadd9903be13ed7663830f7c0d005e929ad6c601f74b8",
+  "fresh_original_rgb_matches": [
+    {
+      "actual_ms": 30915,
+      "goal_region_rgb_sha256": "857aaf266f4fde126a3436d3a57f4d850b35be560b344764b3aec64d052a953f"
+    },
+    {
+      "actual_ms": 30965,
+      "goal_region_rgb_sha256": "578337b71135d2f39156051dde38f845e237b0ca31443d6e1509e9e1b40480a2"
+    },
+    {
+      "actual_ms": 30982,
+      "goal_region_rgb_sha256": "3267307e7b00183d844b14d71035d1e0a0b338d4905116164009987374465a0b"
+    },
+    {
+      "actual_ms": 31015,
+      "goal_region_rgb_sha256": "93b91eb45403ab5598644e9b69bc37c15edeb185cd86fe60da69761207011b1c"
+    },
+    {
+      "actual_ms": 31032,
+      "goal_region_rgb_sha256": "0f31224d7df4f48e19a8a315694b966d2b7329a95e24adaeccb7315cb2a2fb59"
+    },
+    {
+      "actual_ms": 31065,
+      "goal_region_rgb_sha256": "e4fddbf20e2cef99fa63c0e6db036150507d8a4ee1d35d41b9ab6cece739e413"
+    },
+    {
+      "actual_ms": 31132,
+      "goal_region_rgb_sha256": "4d6ab2bda96c31c327178e2b62776870e0773b360f566984cb62d4eda84bc130"
+    },
+    {
+      "actual_ms": 31182,
+      "goal_region_rgb_sha256": "0844611415256b7267f8acb3f1a83356536427db06777f493e22fb96417e5c97"
+    }
+  ],
+  "old_binding": {
+    "status": "REJECTED",
+    "reason": "CONTACT_TO_RELEASE_ANCHOR_UNPROVEN",
+    "measured_times_ms": [
+      30915
+    ]
+  },
+  "old_measured_rows": 0,
+  "new_binding": {
+    "status": "VERIFIED",
+    "reason": "MEASURED_CONTACT_TO_EXACT_RELEASE_ANCHOR",
+    "contact_ms": 30915,
+    "seed_ms": 30982,
+    "measured_times_ms": [
+      30915,
+      30982
+    ]
+  },
+  "qualification": {
+    "status": "QUALIFIED",
+    "reason": "FRESH_NATIVE_SEED_BELOW_RELEASE_CONFIDENCE_FLOOR",
+    "original_anchor": {
+      "media_ms": 30965,
+      "state": "MEASURED",
+      "box": {
+        "x": 0.6953125,
+        "y": 0.6892208553016989,
+        "w": 0.03125,
+        "h": 0.019332161687170477
+      },
+      "confidence": 0.0389,
+      "proof_eligible": true,
+      "time_authority": "ACTUAL_MEDIA_PTS",
+      "source": "VERIFIED_CONTACT_ROLE_BALL_AFTER"
+    },
+    "qualified_seed_ms": 30982,
+    "release_confidence_floor": 0.04,
+    "contact_binding": {
+      "status": "VERIFIED",
+      "reason": "MEASURED_CONTACT_TO_EXACT_RELEASE_ANCHOR",
+      "contact_ms": 30915,
+      "seed_ms": 30982,
+      "measured_times_ms": [
+        30915,
+        30982
+      ]
+    },
+    "provisional_consistency": {
+      "source": "MEASURED_ENDPOINT_CAMERA_INTERPOLATION_SUPPORT_ONLY",
+      "proof_eligible": false,
+      "motion_support": 0.8851983960299149
+    }
+  },
+  "new_measured_ms": [
+    30982,
+    31015,
+    31032,
+    31065,
+    31132,
+    31182
+  ],
+  "body_and_separation": [
+    {
+      "media_ms": 30982,
+      "body_status": "VERIFIED_LOCAL",
+      "distance_h": 0.4508342078379309,
+      "strong_separation": false,
+      "target_compatible": true,
+      "jersey_reid": true
+    },
+    {
+      "media_ms": 31015,
+      "body_status": "VERIFIED_LOCAL",
+      "distance_h": 0.5303364523169841,
+      "strong_separation": false,
+      "target_compatible": true,
+      "jersey_reid": true
+    },
+    {
+      "media_ms": 31032,
+      "body_status": "VERIFIED_LOCAL",
+      "distance_h": 0.5642389538415071,
+      "strong_separation": false,
+      "target_compatible": true,
+      "jersey_reid": true
+    },
+    {
+      "media_ms": 31065,
+      "body_status": "VERIFIED_LOCAL",
+      "distance_h": 0.6232234540058368,
+      "strong_separation": false,
+      "target_compatible": true,
+      "jersey_reid": true
+    },
+    {
+      "media_ms": 31132,
+      "body_status": "MISSING",
+      "strong_separation": false
+    },
+    {
+      "media_ms": 31182,
+      "body_status": "MISSING",
+      "strong_separation": false
+    }
+  ],
+  "original_touch_after_changed": false,
+  "original_release_role": "RECEIVE_CONTROL",
+  "original_release_pass": false,
+  "original_goal_pass": false,
+  "canonical_events_applied": 0,
+  "new_paid_model_calls": 0,
+  "full_five_action_rerun_performed": false,
+  "last_strict_five_action_acceptance": {
+    "passed": 0,
+    "total": 5
+  },
+  "validation": {
+    "focused_passed": 171,
+    "offline_regressions_passed": 1559,
+    "offline_skipped": 28,
+    "elapsed_s": 46.98,
+    "forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    }
+  },
+  "new_native_pixel_classifications": false,
+  "ocr_diagnostic": {
+    "authority": "SEARCH_ONLY",
+    "readings": 34,
+    "high_confidence_85_reads": 0,
+    "used_in_production": false,
+    "original_goal_pass": false
+  },
+  "tested_source_sha256": {
+    "backend/ball_trajectory.py": "fb952c14a019a06eaf2e2043217fd18ba20c8751e73ceef61c22992363795d05",
+    "backend/contact_role_resolver.py": "a8e42a54610120678834d5dfe3e21311d1bc809ae9147e4ee516e790daf6d432",
+    "backend/physical_match_reconstruction.py": "12e7fa349cf695c9dd5735f97ddb01127af608edf6e408a2b17234c5b87b0f86",
+    "backend/tests/test_fix15_contact_role_seed_handoff.py": "ae1fcbb828b8ea58b9ca75ab7f2798473d11701be9b6927d68184c5367b506e1"
+  },
+  "offline_test_targets": [
+    "backend/tests/test_analysis_eta.py",
+    "backend/tests/test_analysis_progress.py",
+    "backend/tests/test_analysis_watchdog.py",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G1_post_grab_pts_owns_each_frame",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G2_vfr_times_stay_irregular_no_fps_grid",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G2b_window_inclusion_with_overshooting_seek",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G4_slow_motion_continuous_tracking",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G5_G6_sprint_found_by_bounded_prediction_no_lag",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G7_camera_pan_is_not_player_velocity",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G8_pan_plus_player_motion_and_pan_reversal",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G9_scale_up_gradual",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G10_scale_down_gradual",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G11_one_frame_scale_explosion_rejected",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G12_implausible_jump_rejected_despite_high_ncc",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G13_G15_same_kit_crossover_never_switches_then_resumes",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G14_G15_ambiguous_frames_withheld_then_unique_resume",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G16_persistent_ambiguity_stops_with_doubt",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G17_scene_cut_stop_remains",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G17b_cut_flags_work_on_new_frame_tuples",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G18_colour_veto_remains",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G19_original_tap_drift_guard_remains",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G20_static_background_latch_remains",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G23_zero_model_calls_in_geometry_code",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G24_tap_during_full_sprint_no_ramp",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G25_hard_stop_reacquired_not_teleport_rejected",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G26_sharp_reversal_reacquired_on_new_trajectory",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G27_close_duel_geometry_withheld",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G28_partial_occlusion_crossover_resumes_clean",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G29_merged_body_region_never_a_clean_bbox",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G30_mixed_rejection_streak_stops_direction",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G31_reversal_with_same_kit_old_path_decoy",
+    "backend/tests/test_fix04_tracking_geometry.py::test_G32_unsafe_primary_jump_recovery_reacquires",
+    "backend/tests/test_fix04_tracking_geometry.py::test_pure_teleport_gate_bounds",
+    "backend/tests/test_fix04_tracking_geometry.py::test_pure_prediction_bounded_and_camera_compensated",
+    "backend/tests/test_fix04_tracking_geometry.py::test_pure_scale_candidates_bounded_by_seed",
+    "backend/tests/test_fix04_tracking_geometry.py::test_pure_ambiguity_and_second_peak",
+    "backend/tests/test_fix04_tracking_geometry.py::test_pure_near_rival_contamination",
+    "backend/tests/test_fix04_tracking_geometry.py::test_pure_camera_shift_recovers_translation_and_fails_safe",
+    "backend/tests/test_fix09a_feature_ownership.py",
+    "backend/tests/test_fix09a_identity_timeline.py",
+    "backend/tests/test_fix09b0_event_bridge.py",
+    "backend/tests/test_fix09b0_unified_identity_authority.py",
+    "backend/tests/test_fix09b1_scene_graph.py",
+    "backend/tests/test_fix09b2_sequence_intelligence.py",
+    "backend/tests/test_fix09b3_canonical_event_resolver.py",
+    "backend/tests/test_fix09b_detector_integration.py",
+    "backend/tests/test_fix09bc_staging_validation.py",
+    "backend/tests/test_fix09c_canonical_output_authority.py",
+    "backend/tests/test_fix09c_stats_precision.py",
+    "backend/tests/test_fix10a0_motion_timebase.py",
+    "backend/tests/test_fix10a1_dense_replay.py",
+    "backend/tests/test_fix10a2_dense_ball_floor.py",
+    "backend/tests/test_fix10a2_dense_track_refinement.py",
+    "backend/tests/test_fix10a3_ball_trajectory.py",
+    "backend/tests/test_fix10a3_dormant_reacquisition.py",
+    "backend/tests/test_fix10a4_ball_contact.py",
+    "backend/tests/test_fix10a4_post_anchor_discontinuity.py",
+    "backend/tests/test_fix10a4_short_occlusion_recovery.py",
+    "backend/tests/test_fix10a5_touch_graph.py",
+    "backend/tests/test_fix10a6_jersey_consensus.py",
+    "backend/tests/test_fix10a7_ball_proof_gate.py",
+    "backend/tests/test_fix10a7_full_body_intervention.py",
+    "backend/tests/test_fix10a7_goal_audit.py",
+    "backend/tests/test_fix10a7_role_intervention_handoff.py",
+    "backend/tests/test_fix10a7_shot_outcome.py",
+    "backend/tests/test_fix10a7_structured_goal_proof.py",
+    "backend/tests/test_fix10a7_support_intervention.py",
+    "backend/tests/test_fix10a8_diagnostics.py",
+    "backend/tests/test_fix10a8_event_trace.py",
+    "backend/tests/test_fix10a_contact_role_resolver.py",
+    "backend/tests/test_fix10a_fix11_recall.py",
+    "backend/tests/test_fix10a_goal_direction.py",
+    "backend/tests/test_fix10a_goal_review_sampling.py",
+    "backend/tests/test_fix10a_goal_sequence_stabilization.py",
+    "backend/tests/test_fix10a_golden_fixture_validator.py",
+    "backend/tests/test_fix10a_occluded_goal_crossing.py",
+    "backend/tests/test_fix10a_open_observation_compat.py",
+    "backend/tests/test_fix10a_open_observation_integration.py",
+    "backend/tests/test_fix10a_physical_reconstruction.py",
+    "backend/tests/test_fix10a_production_runtime.py",
+    "backend/tests/test_fix10a_provider_wiring.py",
+    "backend/tests/test_fix10a_real_video_runner.py",
+    "backend/tests/test_fix10a_team_model_repeatability.py",
+    "backend/tests/test_fix10a_vision_providers.py",
+    "backend/tests/test_fix10a_window_failure_diagnostics.py",
+    "backend/tests/test_fix10b_fix11_reconciliation.py",
+    "backend/tests/test_fix10b_reconciliation.py",
+    "backend/tests/test_fix10b_runtime.py",
+    "backend/tests/test_fix10b_scoring_evidence_coverage.py",
+    "backend/tests/test_fix13_action_inspections.py",
+    "backend/tests/test_fix13_cross_window_evidence.py",
+    "backend/tests/test_fix13_evidence_feedback.py",
+    "backend/tests/test_fix13_reference_review.py",
+    "backend/tests/test_fix13_shared_evidence.py",
+    "backend/tests/test_fix14_orman10_recovery.py",
+    "backend/tests/test_fix14_support_vision_runner.py",
+    "backend/tests/test_fix14_support_vision_timeout.py",
+    "backend/tests/test_fix15_goal_response_coverage.py",
+    "backend/tests/test_fix15_pixel_response_coverage.py",
+    "backend/tests/test_fix15_r6_anchor_callers.py",
+    "backend/tests/test_fix15_r6_ball_identity.py",
+    "backend/tests/test_fix15_r6_body_crop.py",
+    "backend/tests/test_fix15_r6_contact_binding.py",
+    "backend/tests/test_fix15_r6_ground_band.py",
+    "backend/tests/test_fix15_r6_independent_reacquisition.py",
+    "backend/tests/test_fix15_r6_jersey_pixels.py",
+    "backend/tests/test_fix15_r6_local_kit_continuity.py",
+    "backend/tests/test_fix15_r6_multiball_search.py",
+    "backend/tests/test_fix15_r6_native_goal_parser.py",
+    "backend/tests/test_fix15_r6_native_jersey_sampling.py",
+    "backend/tests/test_fix15_r6_native_marker_timebase.py",
+    "backend/tests/test_fix15_r6_native_release_camera.py",
+    "backend/tests/test_fix15_r6_native_seed_selection.py",
+    "backend/tests/test_fix15_r6_pixel_contact_geometry.py",
+    "backend/tests/test_fix15_r6_role_scheduling.py",
+    "backend/tests/test_fix15_r6_stationary_ball.py",
+    "backend/tests/test_fix15_selected_point_identity.py",
+    "backend/tests/test_masked_pose_tracking.py",
+    "backend/tests/test_player_selection.py",
+    "backend/tests/test_precision_engine.py",
+    "backend/tests/test_report_evidence_export.py",
+    "backend/tests/test_unified_analysis_engine.py",
+    "backend/tests/test_fix15_native_goal_reappearance.py",
+    "backend/tests/test_fix15_native_goal_review.py",
+    "backend/tests/test_fix15_temporal_goal_context.py",
+    "backend/tests/test_fix15_contact_role_seed_handoff.py"
+  ]
+}

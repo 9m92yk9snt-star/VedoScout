@@ -15,10 +15,12 @@ import math
 import os
 import tempfile
 from copy import deepcopy
+import goal_reappearance
 from pathlib import Path
 
 import cv2
 
+import support_vision_runner
 import video_timebase
 try:  # Supporting vision is optional; the physical engine must still import.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
@@ -28,6 +30,8 @@ except ImportError:  # pragma: no cover - availability is deployment-specific
 VERSION = 1
 VERIFY_PROVIDER = "openai"
 VERIFY_MODEL = os.environ.get("FIX10A_SUPPORT_VISION_MODEL", "gpt-4o")
+# FIX14: per-request HTTP deadline below the 60/90s wait_for, retries disabled; a breach fails closed.
+VERIFY_REQUEST_TIMEOUT_S = 55.0
 MAX_GOAL_REVIEWS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "16"))
 MAX_GOAL_CLARIFICATIONS_PER_REPORT = int(os.environ.get("FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT", "16"))
 MIN_FIELD_SIDE_FRAMES = 2
@@ -119,7 +123,7 @@ async def read_field_side_evidence(api_key: str, session_id: str,
                 "You inspect only visible football pitch/goal geometry. "
                 "Do not infer event outcomes. Respond with strict JSON only."
             ),
-        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL)
+        ).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         prompt = (
             f"These are chronological football frames: {timeline}. No event label or expected outcome is provided.\n"
             "For each image, consider the relevant visible goal mouth. If you can clearly distinguish the playable "
@@ -288,19 +292,20 @@ class GoalDirectionProvider:
             else:
                 try:
                     self.field_side_calls += 1
-                    evidence = asyncio.run(read_field_side_evidence(
-                        self.api_key,
-                        f"{self.session_prefix}-field-side-{strike_ms}",
-                        paths,
-                        actual_ms,
-                    ))
-                except Exception:
-                    evidence = {"status": "UNRESOLVED", "rows": [], "reason": "field_side_reader_error"}
+                    evidence = support_vision_runner.run_support_vision(read_field_side_evidence, [(
+                        (self.api_key, f"{self.session_prefix}-field-side-{strike_ms}", paths, actual_ms), {})],
+                        deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="field_side")[0]
+                except Exception as exc:
+                    evidence = {"status": "UNRESOLVED", "rows": [], "reason": "field_side_reader_error",
+                                **support_vision_runner.fail_closed_diagnostic(exc)}
         result["field_side_status"] = str(evidence.get("status") or "UNRESOLVED")
         result["field_side_by_ms"] = list(evidence.get("rows") or [])
         result["field_side_source"] = "INDEPENDENT_PLAYABLE_PITCH_REVIEW"
         result["field_side_model_audit"] = evidence.get("model_review_audit")
         result["field_side_reason"] = str(evidence.get("reason") or "field_side_unresolved")[:180]
+        if "support_vision_fail_closed" in evidence:
+            result["field_side_fail_closed"] = evidence["support_vision_fail_closed"]
+        result = goal_reappearance.attach_native_gap_evidence(result)
         return remember(result)
 
 
@@ -433,6 +438,30 @@ def apply_direction_gate(outcome: dict, ball_trajectory, goal_geometry) -> dict:
     if not first or not (_num(first.get("from_ms")) and _num(first.get("to_ms"))):
         return _downgrade_crossing(row, "CROSSING_SEGMENT_EVIDENCE_MISSING")
     from_ms, to_ms = int(first["from_ms"]), int(first["to_ms"])
+
+    if str(first.get("proof_lane") or "") == goal_reappearance.LANE:
+        checked = goal_reappearance.resolve(
+            ball_trajectory, goal_geometry, row.get("media_ms")
+        )
+        expected = (checked or {}).get("evidence") or []
+        if not expected or checked.get("status") != "VERIFIED":
+            return _downgrade_crossing(row, "REAPPEARANCE_FIELD_TO_GOAL_DIRECTION_INVALID")
+        if any(first.get(k) != expected[0].get(k) for k in (
+            "from_ms", "to_ms", "crossing_ms", "crossing_interval_ms",
+            "before_media_ms", "after_media_ms", "source",
+        )):
+            return _downgrade_crossing(row, "REAPPEARANCE_DIRECTION_SEGMENT_MISMATCH")
+        crossing = deepcopy(crossing)
+        crossing.update(direction="FIELD_TO_GOAL", direction_status="VERIFIED",
+                        direction_evidence={"proof_lane": goal_reappearance.LANE,
+                            "from_ms": from_ms, "to_ms": to_ms,
+                            "uses_measured_after_position": True})
+        row["goal_plane_crossing"] = crossing
+        row["direction_gate"] = {
+            "status": "VERIFIED",
+            "reason": "OBSERVED_REAPPEARANCE_WHOLE_BALL_FIELD_TO_GOAL",
+        }
+        return row
 
     # Occlusion-aware lane: only the pre-occlusion ball is a detector-backed
     # measurement.  The resolver carries an explicit projected point just

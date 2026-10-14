@@ -22,6 +22,9 @@ class _ModelPath:
     def stat(self):
         return SimpleNamespace(st_size=2_000_000)
 
+    def read_bytes(self):
+        return b"fixture-native-detector-weights"
+
     def __str__(self):
         return "/tmp/test-yolov8n.onnx"
 
@@ -62,6 +65,7 @@ def test_explicit_production_enable_overrides_legacy_shadow_switch(monkeypatch):
     production = cv_detect.PersonDetector(enabled=True)
     assert production.ok is True
     assert production.enabled is True
+    assert production.model_sha256 == hashlib.sha256(_ModelPath().read_bytes()).hexdigest()
     assert loaded == ["/tmp/test-yolov8n.onnx"]
 
 
@@ -79,6 +83,7 @@ def test_repository_onnx_model_loads_and_matches_parser_contract():
 
     detector = cv_detect.PersonDetector(enabled=True)
     assert detector.ok is True
+    assert detector.model_sha256 == hashlib.sha256(data).hexdigest()
     people, balls = fsg._detect_people_and_ball(
         detector, np.zeros((360, 640, 3), dtype=np.uint8))
     assert isinstance(people, list)

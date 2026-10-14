@@ -1,0 +1,247 @@
+{
+  "branch": "codex-r6-native-jersey-20261011",
+  "date": "2026-10-12",
+  "deployment_eligible": false,
+  "files": {
+    "backend/ball_contact_engine.py": "3ba3601a1f85d4beca7ed481d869092e216fb13ca3942c2209d103b86447979b",
+    "backend/ball_motion_evidence.py": "371eddc41c17dba5136f0338168877783c68ba81b2fbf2fc1e73fb9163971381",
+    "backend/dense_track_refinement.py": "a8ab564486db8450d8963ca190d8383262c25170f9d01ee81d4f1b375fc3d57a",
+    "backend/event_trace.py": "5e08a14eba53dd397496be717aa03a94f8cf139c0dafc4f10e0f46010282ed9c",
+    "backend/fix10a_vision_providers.py": "79453f3fde5f7f8405b2b85bdc0acc41a0dd469aaf7c5eefbcf3f808855941a0",
+    "backend/jersey_pixels.py": "edd5530fa125fbc092ea7f8b13783c36ec50981b031a0117759cd88deac948d2",
+    "backend/short_occlusion_contact_recovery.py": "b16cd6b836aff89f955b605461152ca0e470bce1e49e73177667e06492d7394e",
+    "backend/tests/test_fix15_r6_jersey_pixels.py": "5c0dd4fee930c733aa974989efaf61175c8f5b1531a1df1de0c46da67caff939",
+    "backend/tests/test_fix15_r6_stationary_ball.py": "d7e6e82321bbdaba38e0082d825f66c52ad7dd3ccc71e56cf44439701e35eb76",
+    "docs/FIX15_R6_NATIVE_MOTION_STATUS.md": "7d15add819929a97a32d3ca98e5523570b24e76007da8658195c4997ea3cb257"
+  },
+  "kind": "CODEX_R6_NATIVE_MOTION_AND_JERSEY_PIXELS_CHECKPOINT",
+  "latest_strict_assessment": {
+    "all_verified": false,
+    "cases": [
+      {
+        "case_id": "saved_shot",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 23680,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "target_goal",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 30830,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "assist_1",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 43190,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "assist_2",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 49440,
+        "status": "NOT_VERIFIED"
+      },
+      {
+        "case_id": "assist_3",
+        "event_id": null,
+        "event_ms": null,
+        "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+        "reference_ms": 56440,
+        "status": "NOT_VERIFIED"
+      }
+    ],
+    "expected_outcomes_supplied_to_models": false,
+    "requested": 5,
+    "verified": 0
+  },
+  "local_reader_controls": {
+    "llama4b_reads": 4,
+    "llama4b_receipt_sha256": "d292ccf5ee13cce3917018ab59c192de01fb7f74407b3be8b5385938b773001a",
+    "llama4b_votes_applied": 0,
+    "no_expected_numbers_or_events_supplied": true,
+    "ocr_crops": 726,
+    "ocr_receipt_sha256": "ce55beb0ad57a1cb42c28d92d8428b19fba0b52087a12486e80afd2c149f7f52",
+    "ocr_votes_applied": 0,
+    "onnxruntime_telemetry": "DISABLED",
+    "process_network_filter": {
+      "kernel_network_filter": "SECCOMP_ERRNO_EPERM",
+      "libc_socket_self_check": "PASS"
+    }
+  },
+  "native_audit": {
+    "anchors_sha256": "0a49e85e325cbffb36f2296bad75ebf5051a53e5e8442a534fbe18f172da29ed",
+    "cache_hits": 1922,
+    "canonical_counts": {},
+    "cases_sha256": "25503d3390ed96d8890c6b49d675804182b1a4e3db308467a696d924551582aa",
+    "decoded_frames": 1922,
+    "detector_sha256": "013a98f3bc0264a3d793ef29ccbd178ceb0bbb86bc12ff3510273ce85b1c4526",
+    "detector_source_sha256": "fbdb1123a4f364727e2809afe557a8831b402ef584da5260fcc790ba2a531fbd",
+    "elapsed_s": 66.128,
+    "forbidden_attempts": {
+      "network": 0,
+      "sdk": 0
+    },
+    "full_recall_audit": false,
+    "identity_timeline_sha256": "098f5c6ce054a7a9a8b7b4ba0fae2fa5f5c3d4085e1eab69b0a131d396efe1ec",
+    "kind": "LOCAL_NATIVE_FIVE_ACTION_BOUNDED_AUDIT",
+    "native_forwards": 0,
+    "new_paid_model_calls": 0,
+    "old_contacts_votes_or_outcomes_supplied": false,
+    "stats": [
+      {
+        "contacts": 20,
+        "frames": 354,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 7,
+          "UNRESOLVED": 1
+        },
+        "strikes": 8,
+        "trace_id": "dense_e29df0078338b31c"
+      },
+      {
+        "contacts": 18,
+        "frames": 481,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 9
+        },
+        "strikes": 9,
+        "trace_id": "recall_72554e852f36c920"
+      },
+      {
+        "contacts": 14,
+        "frames": 402,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 5,
+          "UNRESOLVED": 2
+        },
+        "strikes": 7,
+        "trace_id": "recall_30df768b8d18b6f8"
+      },
+      {
+        "contacts": 17,
+        "frames": 333,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 7,
+          "UNRESOLVED": 1
+        },
+        "strikes": 8,
+        "trace_id": "recall_e8c9c9cb3f9fe740"
+      },
+      {
+        "contacts": 26,
+        "frames": 352,
+        "outcomes": {
+          "PLAYER_INTERVENTION": 16,
+          "UNRESOLVED": 2
+        },
+        "strikes": 18,
+        "trace_id": "recall_bdbaabd5fe9a824d"
+      }
+    ],
+    "version": 1,
+    "video_sha256": "2774978344f9c54e44f81c2328f3165d3aada4f1b95193964bb22b73a9ecf85b"
+  },
+  "native_audit_receipt_sha256": "3cde5609987056513bc55c6e4deab9f316b891661f888ea1c69f7b8716bcc0d0",
+  "parent_commit": "a81f57338021e5126f7f888ef21e8f6b46674b7e",
+  "scope": {
+    "emergent_used": false,
+    "existing_thresholds_relaxed": false,
+    "merge_or_deployment": false,
+    "new_model_or_runtime_dependency_in_product": false,
+    "new_motion_floor": "greater than max(2 native pixels, 1 measured ball radius)",
+    "new_paid_model_calls": 0,
+    "new_user_taps": false,
+    "old_contact_votes_or_outcomes_supplied": false,
+    "raw_pixels_tracks_taps_or_credentials_in_commit": false
+  },
+  "technical_pass_is_not_five_action_pass": true,
+  "validation": {
+    "existing_assertions_weakened": false,
+    "failed": 0,
+    "forbidden_attempts": {
+      "actual_sdk": 0,
+      "network": 0,
+      "video_decode": 0
+    },
+    "new_tests": 53,
+    "passed": 879,
+    "previous_820_tests_retained": true,
+    "test_files": 55,
+    "test_log_sha256": "830e6e6d35a47cf737475ab2433cd7d2c4d50329d5cb0e36aa4ef6028de3e550",
+    "tests": [
+      "tests/test_fix15_r6_ball_identity.py",
+      "tests/test_fix15_r6_role_scheduling.py",
+      "tests/test_fix15_r6_anchor_callers.py",
+      "tests/test_fix15_r6_contact_binding.py",
+      "tests/test_fix10a3_ball_trajectory.py",
+      "tests/test_fix10a3_dormant_reacquisition.py",
+      "tests/test_fix10a4_ball_contact.py",
+      "tests/test_fix10a4_short_occlusion_recovery.py",
+      "tests/test_fix10a4_post_anchor_discontinuity.py",
+      "tests/test_fix10a5_touch_graph.py",
+      "tests/test_fix10a_contact_role_resolver.py",
+      "tests/test_fix10a7_shot_outcome.py",
+      "tests/test_fix10a7_support_intervention.py",
+      "tests/test_fix10a7_full_body_intervention.py",
+      "tests/test_fix10a7_role_intervention_handoff.py",
+      "tests/test_fix10a7_ball_proof_gate.py",
+      "tests/test_fix10a7_goal_audit.py",
+      "tests/test_fix10a7_structured_goal_proof.py",
+      "tests/test_fix10a_physical_reconstruction.py",
+      "tests/test_fix11_release_anchored_ball_path.py",
+      "tests/test_fix10a_goal_direction.py",
+      "tests/test_fix10a_window_failure_diagnostics.py",
+      "tests/test_fix10a_vision_providers.py",
+      "tests/test_fix13_action_inspections.py",
+      "tests/test_fix13_evidence_feedback.py",
+      "tests/test_fix13_cross_window_evidence.py",
+      "tests/test_fix15_goal_response_coverage.py",
+      "tests/test_fix15_pixel_response_coverage.py",
+      "tests/test_fix15_selected_point_identity.py",
+      "tests/test_fix13_reference_review.py",
+      "tests/test_fix10a1_dense_replay.py",
+      "tests/test_fix10a_fix11_recall.py",
+      "tests/test_fix10b_runtime.py",
+      "tests/test_fix10b_reconciliation.py",
+      "tests/test_fix10b_fix11_reconciliation.py",
+      "tests/test_fix10b_scoring_evidence_coverage.py",
+      "tests/test_fix10a_provider_wiring.py",
+      "tests/test_report_evidence_export.py",
+      "tests/test_fix15_r6_ground_band.py",
+      "tests/test_fix10a2_dense_ball_floor.py",
+      "tests/test_fix10a2_dense_track_refinement.py",
+      "tests/test_fix13_shared_evidence.py",
+      "tests/test_fix15_r6_local_kit_continuity.py",
+      "tests/test_fix10a6_jersey_consensus.py",
+      "tests/test_fix15_r6_native_jersey_sampling.py",
+      "tests/test_fix14_orman10_recovery.py",
+      "tests/test_fix15_r6_body_crop.py",
+      "tests/test_fix09a_feature_ownership.py",
+      "tests/test_player_selection.py",
+      "tests/test_fix09a_identity_timeline.py",
+      "tests/test_fix09b0_unified_identity_authority.py",
+      "tests/test_fix15_r6_pixel_contact_geometry.py",
+      "tests/test_fix15_r6_stationary_ball.py",
+      "tests/test_fix15_r6_jersey_pixels.py",
+      "tests/test_fix10a8_event_trace.py"
+    ],
+    "unchanged_baseline_integration": {
+      "failed": 7,
+      "log_sha256": "f608303e90c4ca6ba6b7945b884311f194fb7df84edbbb6f702c2b346afff57a",
+      "passed": 0,
+      "production_modules_unchanged": true,
+      "sha": "a81f57338021e5126f7f888ef21e8f6b46674b7e",
+      "signature_errors": false
+    },
+    "warnings": 1
+  }
+}
