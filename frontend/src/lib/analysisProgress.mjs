@@ -8,7 +8,7 @@ export function isPreviewReady(data) {
 }
 
 const FULL_PHASES = {
-  awaiting_confirmation: ["A quick player check", "Confirm the player in the highlighted moments so the analysis can continue."],
+  awaiting_confirmation: ["Checking player identity", "Continuing automatically with your saved player marks. No extra taps are needed."],
   verifying: ["Checking the evidence", "Checking which actions can be attributed to your player before completing the report."],
   finalizing: ["Preparing your report", "Saving the report and its video evidence. The report opens when this step is complete."],
 };
@@ -82,7 +82,7 @@ export function getAnalysisView(data = {}, { phase, uploadPct, target } = {}) {
     : [prepared ? "done" : "active", previewReady ? "done" : prepared ? "active" : "pending"];
   return {
     key, title, detail, target: full ? "full" : "preview", complete: !duringUpload && complete,
-    failed: key === "failed", confirmation: key === "awaiting_confirmation",
+    failed: key === "failed", confirmation: false,
     uploadPercent: key === "uploading" && Number.isFinite(uploadPct) ? Math.max(0, Math.min(100, uploadPct)) : null,
     task: TASKS[data.full_pipeline_stage] || null,
     steps: labels.map((label, index) => ({ label, state: states[index] })),

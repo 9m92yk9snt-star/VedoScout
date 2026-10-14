@@ -1,4 +1,4 @@
-/** One editor, one decoder, one contract: guided taps + three extra checks. */
+/** One editor, one decoder, one contract: guided taps, then automatic identity checks. */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ScoutMode from "./marker-studio/ScoutMode";
 import api from "../lib/api";

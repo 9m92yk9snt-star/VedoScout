@@ -1164,7 +1164,7 @@ export default function UploadPage() {
                       { icon: ZoomIn, label: "Zoom" },
                       { icon: ScanSearch, label: "Player crop" },
                       { icon: EyeOff, label: "Hidden player" },
-                      { icon: LocateFixed, label: "3 extra checks" },
+                      { icon: LocateFixed, label: "Automatic checks" },
                     ].map((t) => (
                       <div
                         key={t.label}
@@ -1187,7 +1187,7 @@ export default function UploadPage() {
                       </span>
                       <p className="text-[12.5px] text-ink/70 leading-snug">
                         Only your selected player will be analysed.<br className="hidden sm:block" />{" "}
-                        <span className="font-bold text-ink">Up to 10 guided taps + 3 extra checks.</span>
+                        <span className="font-bold text-ink">One selection flow: 3–10 clear taps, then automatic checks.</span>
                       </p>
                     </div>
                     <button
@@ -1209,14 +1209,15 @@ export default function UploadPage() {
               {markerBlob && markerPreviewUrl && (
                 <div className="mt-4 rounded-2xl bg-cream-base/70 border border-ink/8 p-3.5 flex items-center gap-4">
                   <div data-testid="upload-mark-preview" aria-label="Your selected player" className="w-[72px] h-[96px] rounded-xl overflow-hidden bg-black border border-ink/10 shrink-0">
-                    {markerBox ? <MarkedCropCanvas frameDataUrl={markerPreviewUrl} box={markerBox} mask={markerAnchors?.[0]?.visible_mask} width={144} height={192} className="w-full h-full" /> :
+                    {markerBox ? <MarkedCropCanvas frameDataUrl={markerPreviewUrl} box={markerBox} width={144} height={192} className="w-full h-full" /> :
                       <img src={markerPreviewUrl} alt="Player reference frame" className="w-full h-full object-contain" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1.5 text-[13px] font-black text-ink">
                       <CheckCircle2 className="w-4 h-4 text-forest shrink-0" /> Player selections saved
                     </p>
-                    <p className="text-[12px] text-ink/55 mt-0.5">{markerAnchors?.length || 1} reference taps ready for identity checks.</p>
+                    <p className="text-[12px] text-ink/55 mt-0.5">{markerAnchors?.length || 1} reference taps ready. Identity checks run automatically.</p>
+                    {form.jersey_number && <p data-testid="upload-selected-jersey" className="text-[12px] font-bold text-forest mt-1">Shirt number: {form.jersey_number}</p>}
                   </div>
                   <button
                     type="button"
