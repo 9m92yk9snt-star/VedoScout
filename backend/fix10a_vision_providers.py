@@ -450,6 +450,30 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
                 "confidence": confidence,
             })
         geometry_verified = len(cleaned_frames) >= 2
+        # Goalposts and playable pitch are read from the same source images.
+        # A second model must not independently redraw this coordinate system.
+        # The optional protocol preserves older saved/injected reader schemas.
+        field_side = {}
+        if data.get("field_side_protocol") == "VISIBLE_PLAYABLE_PITCH_V1":
+            points = []
+            geometry_indices = {r["idx"] for r in cleaned_frames}
+            for row in data.get("frames") or []:
+                if not isinstance(row, dict) or row.get("idx") not in geometry_indices:
+                    continue
+                point = row.get("field_side")
+                if (row.get("field_side_visible") is not True or not isinstance(point, dict)
+                        or str(row.get("field_side_confidence") or "low").lower() not in {"high", "medium"}
+                        or any(not _num(point.get(k)) or not math.isfinite(point[k])
+                               or not 0 <= point[k] <= 1 for k in ("x", "y"))):
+                    continue
+                points.append({"media_ms": media_ms[row["idx"]-1],
+                    "point": {k: float(point[k]) for k in ("x", "y")},
+                    "confidence": str(row["field_side_confidence"]).lower()})
+            field_side = {"field_side_status": "VERIFIED" if len(points) >= 2 else "UNRESOLVED",
+                "field_side_by_ms": points, "field_side_source": "SHARED_GOAL_SCENE_PLAYABLE_PITCH",
+                "field_side_model_audit": {"audit_ref": "model_review_audit"},
+                "field_side_reason": "MULTI_FRAME_FIELD_SIDE_VISIBLE" if len(points) >= 2
+                                     else "FIELD_SIDE_VISIBILITY_INSUFFICIENT"}
 
         crossing = str(data.get("crossing") or "UNRESOLVED").upper()
         crossing_conf = str(data.get("crossing_confidence") or "low").lower()
@@ -709,6 +733,7 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
 
         return {
             "geometry_status": "VERIFIED" if geometry_verified else "UNRESOLVED",
+            **field_side,
             "model_review_audit": audit,
             "response_coverage": coverage,
             "frames": cleaned_frames,
@@ -777,6 +802,11 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
             "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
             "visible=false when both bases are not clear.\n"
+            "PLAYABLE PITCH: In that SAME image and coordinate system, independently of the ball or outcome, "
+            "mark one clearly visible point on playable pitch immediately IN FRONT OF that goal line. "
+            "The point must not lie on the line, inside/behind the net or on an ambiguous surface. "
+            "Set field_side_visible=false when the pitch side is unclear. Player reactions and ball movement "
+            "must not decide the pitch side.\n"
             "AIRBORNE BALL: Screen position above the ground line alone cannot establish goal depth. "
             "Use visible goal structure and temporal context; report UNKNOWN depth if front/behind relation is unclear. "
             "For every visible ball state whether it is airborne and whether it is IN_FRONT_OF_GOAL or INSIDE_GOAL_VOLUME. "
@@ -814,7 +844,10 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "possession or an unseen save. None of these fields alone supplies a goal verdict.\n"
             'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
             '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
-            '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
+            '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low",'
+            '"field_side_visible":true|false,"field_side":{"x":0.0,"y":0.0}|null,'
+            '"field_side_confidence":"high"|"medium"|"low"}],'
+            '"field_side_protocol":"VISIBLE_PLAYABLE_PITCH_V1",'
             '"ball_evidence":[{"idx":1,"ball_visible":true|false,'
             '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
             '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
@@ -872,6 +905,14 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         audit = _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs])
         times = [ms for _, ms in pairs]
         result = parse_goal_scene_response(text, times, audit)
+        # This reader requested pitch-side observations in the same image
+        # pass. Missing fields stay missing; they do not trigger another model
+        # to redraw the geometry. Legacy/custom providers retain their adapter.
+        if "field_side_source" not in result:
+            result.update(field_side_status="UNRESOLVED", field_side_by_ms=[],
+                field_side_source="SHARED_GOAL_SCENE_PLAYABLE_PITCH",
+                field_side_model_audit={"audit_ref": "model_review_audit"},
+                field_side_reason="FIELD_SIDE_VISIBILITY_INSUFFICIENT")
         if isinstance(sequence_context, dict) and sequence_context.get("source") == sequence_observation_context.SOURCE:
             parsed = _extract_json(text)
             result["outcome_explanations"] = sequence_observation_context.outcome_explanations(parsed, times)
@@ -1258,6 +1299,7 @@ class ShadowVisionProviders:
         self.role_calls = 0
         self.goal_calls = 0
         self._native_goal_detector = None
+        self._native_goal_session = None
         self._native_video_fingerprint = None
         self._selected_reference = None
 
@@ -1311,6 +1353,9 @@ class ShadowVisionProviders:
         detector = self._native_goal_detector
         if detector is None or not getattr(detector, "ok", False):
             return None
+        if self._native_goal_session is None:
+            self._native_goal_session = dense.NativeDetectionSession()
+        self._native_goal_session.detector = detector
         path = Path(self.video_path)
         st = path.stat()
         key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
@@ -1320,7 +1365,10 @@ class ShadowVisionProviders:
             self._native_video_fingerprint = (key, digest)
 
         def detect_frame(image, proposal):
-            people, balls = dense._detect_dense_people_and_ball(detector, image)
+            # Gap search and reappearance validation often revisit identical
+            # pixels. Reuse only raw native proposals; each path/actor decision
+            # is still computed from its own measured contact and source PTS.
+            people, balls, _support = self._native_goal_session.detect(image)
             local, _roi = _native_ball_roi(detector, image, proposal)
             return people, [*balls, *local]
 
@@ -1785,11 +1833,15 @@ class ShadowVisionProviders:
             native_audit = self._measure_goal_reappearance(review, review_path, images_by_ms)
             if native_audit is not None:
                 review["ball_reappearance_audit"] = native_audit
+        shared_field_side = {k: deepcopy(review[k]) for k in (
+            "field_side_status", "field_side_by_ms", "field_side_source",
+            "field_side_model_audit", "field_side_reason") if isinstance(review, dict) and k in review}
         rows = review.get("frames") or [] if isinstance(review, dict) else []
         link = _active_ball_link(review, reference) if requires_reference else None
         if not rows:
             result = {
                 "status": "UNRESOLVED",
+                **shared_field_side,
                 "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
                     "original_requested_ms": original_requested,"native_appearance_focus_used":dense_requested is None and requested!=original_requested,
                     "dense_native_coverage_used":dense_requested is not None,
@@ -1849,6 +1901,7 @@ class ShadowVisionProviders:
         )
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
+            **shared_field_side,
             "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
                 "original_requested_ms": original_requested,"native_appearance_focus_used":dense_requested is None and requested!=original_requested,
                     "dense_native_coverage_used":dense_requested is not None,
@@ -1909,6 +1962,9 @@ class ShadowVisionProviders:
     def bind_video_path(self, video_path: str):
         if str(video_path or "") != str(getattr(self, "video_path", "")):
             self._goal_cache.clear()
+            self._jersey_cache.clear()
+            self._role_cache.clear()
+            self._native_goal_session = None
             self._native_video_fingerprint = None
             self._selected_reference = None
             self._inspection_cache.clear()

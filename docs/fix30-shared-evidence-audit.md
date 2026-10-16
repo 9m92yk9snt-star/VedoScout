@@ -15,6 +15,10 @@ The saved 76.76-second portrait-video export took 83m13s from creation to readin
 - Tap suggestions rank clarity in actual source frames within coverage slots. The browser samples more of a short montage and preserves portrait aspect ratio. There is no randomization or previous-video image cache; the same video may still produce the same best frames.
 - Deleted decorative PDF/share-image annotation generators. Snapshot labels no longer assign unrelated events to “Hidden Talent” or “Biggest Development Area” by array position. PDF observed goal/assist counts, coverage notes and withheld outlook now match the web report. Score unavailability is explained; page numbering and PDF cache version are corrected.
 - Native-cache metrics are persisted. Native preparation and occlusion-search times are recorded, including feedback work.
+- The production goal-image call reads goalposts and a literal playable-pitch point together. The direction adapter retains that shared coordinate evidence instead of decoding the same frames and making a second model call. Missing pitch visibility stays explicit. Legacy/injected providers retain their previous adapter. The old export contains 27 field-side audit rows with 25 distinct inputs; those extra production reads are no longer needed by the shared reader.
+- Contact candidate generation calculates each frame/ball holder once rather than repeating the same whole-player search for every candidate body. Exact source-time frame lookup avoids repeated full-window scans. The cache exists only inside one unchanged calculation.
+- Goal-gap search and reappearance validation reuse raw native detector proposals for identical pixels/settings. Proposal-specific ball regions, actor bindings, source PTS and outcome decisions are still evaluated independently. Video changes also clear jersey/role caches.
+- Report writing has its own progress stage. The old export spent about 173 seconds there while the UI still said it was reconciling actions.
 
 ## Saved-data replay
 
@@ -36,6 +40,8 @@ A separate bounded local detector comparison used the 16 largest saved model sea
 
 Reconciliation of the unchanged saved traces retains the six other canonical events and reopens the unsupported shot. The saved data still does not prove the requested goal, save and three assists automatically. Changed image packs and appearance comparisons require fresh reader responses before their real-world accuracy can be assessed. Window-work reduction is not a measured wall-clock speedup.
 
+A paired local comparison of contact generation across all 15 saved windows used unchanged JSON, with networking and video decoding blocked. All 35,563 candidate dictionaries were identical and neither input was mutated. This phase took 21.0928 seconds with commit `d3a9ecc` and 8.3971 seconds with the shared holder/frame work (about 60% less time in this phase). This is one local paired measurement, not a production end-to-end benchmark or a new event-accuracy result.
+
 ## Validation scope
 
 New regression controls cover appearance without number reads, coarse versus physical cuts, selected-body conflicts, source-bound crops, shared budgets, native search refinement, merged coverage and revisable action attribution. Frontend tests cover source-frame clarity and tap selection.
@@ -43,5 +49,7 @@ New regression controls cover appearance without number reads, coarse versus phy
 The controlled offline harness blocks SDK calls, networking and user-video decoding. Server-import cases need the full CI dependencies (local environment lacks bcrypt); synthetic-video cases run separately with decoding restricted to pytest-generated files. The historical API/deployment suite is run in CI with its configured dependencies. PDF QA renders a local copy and checks coverage disclosure, positive observed-count layout, withheld outlook and sequential page numbers; synthetic counts used for layout are not report findings.
 
 Local results: 2,035 core backend cases passed, 28 skipped; the final targeted reconciliation/runtime run passed 84 cases after adding the rebound control. The three generated-video tracking cases passed separately. All 95 frontend tests and the production build passed, along with the polling, coverage, frame-time, tap-policy and bundle checks. Test groups overlap and should not be summed. No external model/network attempt occurred in the controlled suites.
+
+After the shared geometry, native proposal and holder-work follow-up, 393 affected backend cases passed with zero model/network/video-decode attempts. The integration control carries a synthetic complete goal transition from one image-reader response through outcome reconstruction, direction and ball certification without a second geometry reader; it is not a user-video result.
 
 No deployment, new video upload or live report mutation is part of this change.

@@ -67,6 +67,9 @@ def test_omitted_input_image_stays_an_explicit_coverage_gap():
 
 def test_native_and_existing_reader_apply_the_same_proof_rules(monkeypatch,tmp_path):
     data=payload()
+    data['field_side_protocol']='VISIBLE_PLAYABLE_PITCH_V1'
+    for frame in data['frames']:
+        frame.update(field_side_visible=True,field_side={'x':.5,'y':.6},field_side_confidence='high')
     class Chat:
         def __init__(self,**k):pass
         def with_model(self,*a):return self
@@ -78,5 +81,6 @@ def test_native_and_existing_reader_apply_the_same_proof_rules(monkeypatch,tmp_p
         p=tmp_path/f'fixture-{i}.jpg';p.write_bytes(b'fixture-only');paths.append(str(p))
     existing=asyncio.run(vision.read_goal_scene_evidence('test-only','fixture',paths,[1000,1100,1200]))
     native=vision.parse_goal_scene_response(json.dumps(data),[1000,1100,1200],{'provider':'LOCAL_NATIVE_CPU'})
+    assert native['field_side_status']=='VERIFIED'
     existing.pop('model_review_audit');native.pop('model_review_audit')
     assert native==existing

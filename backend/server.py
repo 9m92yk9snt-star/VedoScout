@@ -9637,7 +9637,9 @@ async def generate_full_report_task(report_id: str) -> None:
             _geometry_authority_track, gt_t_off,
             event_ledger_obj=event_ledger_obj,
             canonical_events=_unified_result.get("canonical_events") if isinstance(_unified_result, dict) else None)
-        # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
+        # Phase B — report writing/assessment ∥ movement/pace metrics.
+        # Canonical actions are already resolved; this model cannot replace them.
+        await _trace(report_id, "report_synthesis_start")
         full, _mm_done = await asyncio.gather(
             call_gemini_with_video(
                 session_id=f"full-{report_id}",
@@ -9650,6 +9652,7 @@ async def generate_full_report_task(report_id: str) -> None:
             ),
             _movement_pace_core(),
         )
+        await _trace(report_id, "report_synthesis_complete")
         full = scrub_hedging(full)
         if isinstance(_unified_result, dict):
             full = unified_analysis_engine.apply_result_to_report(full, _unified_result)

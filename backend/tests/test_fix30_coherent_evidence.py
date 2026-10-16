@@ -118,8 +118,11 @@ def test_reference_crops_are_source_bound_and_cleared_when_video_changes(monkeyp
     bundle = vision.ShadowVisionProviders("", "test").bind_video_path(str(path)).bind_selected_reference(authority)
     assert bundle._selected_reference["source_video_sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
     assert len(bundle._selected_reference["images"]) == 3
+    bundle._jersey_cache["old"] = {"number": "15"}
+    bundle._role_cache["old"] = {"role": "GOALKEEPER"}
     bundle.bind_video_path(str(tmp_path / "other.mp4"))
     assert bundle._selected_reference is None
+    assert not bundle._jersey_cache and not bundle._role_cache
 
 
 def test_shifted_recall_and_semantic_splits_become_one_bounded_cover_without_losing_scenes():

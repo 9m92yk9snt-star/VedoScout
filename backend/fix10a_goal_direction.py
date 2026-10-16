@@ -276,6 +276,11 @@ class GoalDirectionProvider:
         if not isinstance(base, dict):
             return remember(base)
         result = dict(base)
+        if result.get("field_side_source") == "SHARED_GOAL_SCENE_PLAYABLE_PITCH":
+            # The production reader already observed both posts and playable
+            # pitch together. Keep its literal evidence, including unresolved
+            # visibility, instead of decoding/calling a second model again.
+            return remember(goal_reappearance.attach_native_gap_evidence(result))
         lines = [
             row for row in result.get("line_by_ms") or []
             if isinstance(row, dict) and _num(row.get("media_ms"))

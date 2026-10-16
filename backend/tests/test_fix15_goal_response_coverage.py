@@ -94,6 +94,8 @@ async def test_complete_but_hidden_response_stays_unresolved_without_retry(monke
     assert result["proof_ready"] is False and result["geometry_status"] == "UNRESOLVED"
     assert result["reason"] == "goal and ball not visible"
     assert len(result["ball_evidence"]) == 12
+    assert result["field_side_source"] == "SHARED_GOAL_SCENE_PLAYABLE_PITCH"
+    assert result["field_side_status"] == "UNRESOLVED" and result["field_side_by_ms"] == []
 
 
 @pytest.mark.parametrize("field", ["frames", "ball_evidence"])
