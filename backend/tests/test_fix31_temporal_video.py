@@ -405,6 +405,10 @@ async def test_proxy_route_keeps_source_sampling_without_claiming_unobserved_nat
         async def send_message(self, message):
             assert message.file_contents[-1].file_path == str(clip)
             return "{}"  # no LOCAL Gemini converter: the proxy owns conversion
+    class Converter:
+        def _transform_messages(self, **_kwargs):
+            pytest.fail("proxy route unexpectedly invoked the local native converter")
+    monkeypatch.setitem(sys.modules, "litellm", SimpleNamespace(GoogleAIStudioGeminiConfig=Converter))
     monkeypatch.setitem(sys.modules, "emergentintegrations.llm.chat", SimpleNamespace(
         LlmChat=ProxyChat, UserMessage=Payload, FileContentWithMimeType=Payload))
     result = await video.read_video("dummy", "session", "Observe the labelled frames", clip, source_clock=clock)
