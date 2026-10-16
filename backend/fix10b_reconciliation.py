@@ -561,6 +561,11 @@ def _same_actor_after_track_split(trace, receiver_touch, scorer_touch):
     start_ms, end_ms = _touch_ms(receiver_touch), _touch_ms(scorer_touch)
     if start_ms is None or end_ms is None or end_ms < start_ms:
         return False, {"status": "UNRESOLVED", "reason": "INVALID_TOUCH_TIME"}
+    if any(isinstance(frame, dict) and _num(frame.get("media_ms"))
+           and start_ms <= frame["media_ms"] <= end_ms
+           and (frame.get("cut") is True or frame.get("cut_barrier") is True)
+           for frame in trace.get("decoded_frames") or []):
+        return False, {"status": "REJECTED", "reason": "SOURCE_CUT_BETWEEN_ACTOR_TRACKS"}
 
     left_rows = _track_boxes(trace, left, scene, start_ms, end_ms)
     right_rows = _track_boxes(trace, right, scene, start_ms, end_ms)

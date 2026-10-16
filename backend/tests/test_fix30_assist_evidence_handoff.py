@@ -66,6 +66,13 @@ def test_local_team_reuse_does_not_guess_an_assist(failure):
     assert not any(p["kind"] == "ASSIST" for p in recon.proposals_from_trace(trace))
 
 
+@pytest.mark.parametrize("flag", ["cut", "cut_barrier"])
+def test_a_receiver_track_split_cannot_cross_a_real_source_cut(flag):
+    trace = local_team_case(split=True)
+    next(frame for frame in trace["decoded_frames"] if frame["media_ms"] == 1800)[flag] = True
+    assert not any(p["kind"] == "ASSIST" for p in recon.proposals_from_trace(trace))
+
+
 def test_cross_window_control_finish_keeps_its_verified_ball_anchor():
     traces = windows.cases()
     scorer = traces[1]["strike_evidence"][0]
