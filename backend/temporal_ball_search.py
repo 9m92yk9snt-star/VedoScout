@@ -46,8 +46,14 @@ def _proposals(image, references, before_box,reference_patches):
     gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY).astype(np.float32)
     diameter = max(before_box['w']*w, before_box['h']*h)
     proposals = []
+    seen_sizes, seen_boxes = set(), set()
     for scale in SCALES:
         side = max(6, round(diameter*scale))
+        # Several requested scales round to the same native size for a small
+        # ball. They inspect exactly the same pixels and are not extra evidence.
+        if side in seen_sizes:
+            continue
+        seen_sizes.add(side)
         sigma = max(1., side/5)
         # Bright local blobs, including blurred/partially exposed candidates.
         small = cv2.GaussianBlur(gray, (0, 0), sigma*.55)
@@ -58,9 +64,13 @@ def _proposals(image, references, before_box,reference_patches):
         # Correlation searches patch texture as well as blob extrema. A partly
         # exposed ball need not have a brightness maximum at its centre.
         correlations=[]
+        seen_templates=set()
         for patch in reference_patches:
             template=cv2.resize(cv2.cvtColor(patch,cv2.COLOR_BGR2GRAY),(side,side),interpolation=cv2.INTER_AREA).astype(np.float32)
             if float(template.std())<5:continue
+            key=template.tobytes()
+            if key in seen_templates:continue
+            seen_templates.add(key)
             correlations.append(cv2.matchTemplate(gray,template,cv2.TM_CCOEFF_NORMED))
         correlation=np.maximum.reduce(correlations) if correlations else None
         maximum = cv2.dilate(response, np.ones((max(3, side//2),)*2, np.uint8))
@@ -87,6 +97,9 @@ def _proposals(image, references, before_box,reference_patches):
             x0, py0 = x-side//2, y-side//2
             if x0 < 0 or py0 < 0 or x0+side > w or py0+side > h:
                 continue
+            key=(x0,py0,side)
+            if key in seen_boxes:continue
+            seen_boxes.add(key)
             patch = image[py0:py0+side, x0:x0+side]
             descriptor = native._descriptor(patch)
             if descriptor is None:
@@ -186,13 +199,15 @@ def search(before, frames_by_ms, alignments, *, video_sha256,reference_history=(
         # Bidirectional nearest assignment avoids merging nearby candidate
         # tracks. Association uncertainty remains visible, never ball identity.
         pairs.sort()
+        best_paths,best_proposals={},{}
+        for _distance,i,j in pairs:
+            best_paths.setdefault(j,i)
+            best_proposals.setdefault(i,j)
         used_paths,used_proposals=set(),set()
         for distance,i,j in pairs:
             if i in used_paths or j in used_proposals:
                 continue
-            best_path=next(pair[1] for pair in pairs if pair[2]==j)
-            best_proposal=next(pair[2] for pair in pairs if pair[1]==i)
-            if best_path!=i or best_proposal!=j:
+            if best_paths[j]!=i or best_proposals[i]!=j:
                 continue
             paths[i].append(proposals[j]);used_paths.add(i);used_proposals.add(j)
         for j,p in enumerate(proposals):

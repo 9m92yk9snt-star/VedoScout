@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
+import cv2
 
 import ball_contact_engine as contacts
 import dense_track_refinement as dense
@@ -12,6 +13,9 @@ import fix10a_ball_proof_gate as ball_gate
 import fix10a_goal_direction as direction
 import fix10a_vision_providers as vision
 import shot_outcome_engine as outcomes
+import temporal_ball_search as temporal
+import native_ball_reappearance as native
+import short_occlusion_contact_recovery as occlusion
 
 
 def scene_payload(times):
@@ -120,3 +124,76 @@ def test_ball_holder_work_is_shared_across_candidate_players_without_changing_co
     assert contacts.detect_contact_candidates(frames, balls) == cached
     assert len(reads) >= shared_reads*4
     assert (frames, balls) == original
+
+
+def test_identical_native_sizes_do_not_repeat_pixel_descriptors(monkeypatch):
+    from test_fix15_native_goal_reappearance import canvas_with
+    box = {"x": .5, "y": .5, "w": .015, "h": .02}
+    image = canvas_with(box)
+    patch = native._crop(image, box)
+    reference = native._descriptor(patch)
+    calls = []
+    original = native._descriptor
+    def descriptor(pixels):
+        calls.append((pixels.__array_interface__["data"][0], pixels.shape))
+        return original(pixels)
+    monkeypatch.setattr(native, "_descriptor", descriptor)
+    monkeypatch.setattr(temporal, "SCALES", (.4, .55, .75))
+    repeated_sizes = temporal._proposals(image, [reference], box, [patch])
+    assert repeated_sizes and len(calls) == len(set(calls))
+    repeated_work = len(calls)
+    calls.clear()
+    monkeypatch.setattr(temporal, "SCALES", (.4,))
+    assert temporal._proposals(image, [reference], box, [patch]) == repeated_sizes
+    assert len(calls) == repeated_work
+
+
+def test_identical_appearance_templates_share_one_correlation_without_changing_candidates(monkeypatch):
+    from test_fix15_native_goal_reappearance import canvas_with
+    box = {"x": .5, "y": .5, "w": .03, "h": .04}
+    image = canvas_with(box)
+    patch = native._crop(image, box)
+    reference = native._descriptor(patch)
+    calls = []
+    original = cv2.matchTemplate
+    monkeypatch.setattr(cv2, "matchTemplate", lambda *args, **kw: calls.append(1) or original(*args, **kw))
+    repeated = temporal._proposals(image, [reference]*3, box, [patch, patch.copy(), patch.copy()])
+    repeat_work = len(calls)
+    calls.clear()
+    assert temporal._proposals(image, [reference], box, [patch]) == repeated
+    assert len(calls) == repeat_work and repeat_work > 0
+
+
+@pytest.mark.parametrize("mode", ["exact_tap", "continuous_tap"])
+def test_flow_does_not_decode_when_no_existing_detector_endpoint_can_use_it(monkeypatch, mode):
+    import test_fix10a4_short_occlusion_recovery as fixture
+    frames = fixture._exact_tap_fixture(a3_reacquisition=False) if mode == "exact_tap" else fixture._tap_continuity_release_fixture()
+    if mode == "continuous_tap":
+        for frame in frames:
+            for candidate in frame["a7_ball_support_candidates"]:
+                candidate.update(a3_eligible=False, support_only=True)
+    monkeypatch.setattr(occlusion, "_track_support_with_flow", lambda *a, **k: pytest.fail("unusable video decode"))
+    recover = occlusion._exact_tap_support_recoveries if mode == "exact_tap" else occlusion._tap_continuity_support_recoveries
+    verified, _diagnostic = recover(frames, fixture._empty_contacts(), "unused.mp4")
+    assert not verified
+
+
+@pytest.mark.parametrize("first_failure", [False, True])
+def test_repeated_release_rows_reuse_completed_flow_but_retry_transient_failure(monkeypatch, first_failure):
+    import test_fix10a4_short_occlusion_recovery as fixture
+    frames, contact_rows = fixture._exact_tap_measured_release_fixture()
+    duplicate = deepcopy(contact_rows["contacts"][-1])
+    duplicate["contact_id"] += "-overlap"
+    contact_rows["contacts"].append(duplicate)
+    original = occlusion._track_support_with_flow
+    calls = []
+    def track(*args, **kwargs):
+        calls.append(1)
+        if first_failure and len(calls) == 1:
+            return {"status": "UNRESOLVED", "reason": "TRANSIENT_TEST_READER_FAILURE"}
+        return original(*args, **kwargs)
+    monkeypatch.setattr(occlusion, "_track_support_with_flow", track)
+    verified, _diagnostic = occlusion._exact_tap_measured_release_recoveries(
+        frames, contact_rows, "synthetic.mp4", fixture._flow_provider())
+    assert len(verified) == 1
+    assert len(calls) == (3 if first_failure else 2)

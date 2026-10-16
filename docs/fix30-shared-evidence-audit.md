@@ -52,4 +52,16 @@ Local results: 2,035 core backend cases passed, 28 skipped; the final targeted r
 
 After the shared geometry, native proposal and holder-work follow-up, 393 affected backend cases passed with zero model/network/video-decode attempts. The integration control carries a synthetic complete goal transition from one image-reader response through outcome reconstruction, direction and ball certification without a second geometry reader; it is not a user-video result.
 
+## Continued receiver/scorer and native-work cleanup
+
+- Direct assists and receiver-to-finisher track stitching now use the same event-local team evidence already used by scoring/deflection ownership. An unresolved broad team vote no longer discards the existing body-bound local observation. Repeated copies of a source timestamp do not count as separate observations; explicitly fallback, cut or requested-time rows cannot supply this native evidence.
+- Cross-window ball binding accepts the existing verified scoring-control anchor as well as the release anchor, with each source matched to its producer status. A controlled finish can therefore complete the same assist chain on either side of a processing-window boundary. Source, measured-ball and overlap checks remain unchanged.
+- Three positive regression cases reproduced the previous rejection: a locally identified teammate, the same teammate after a measured ID split, and a cross-window controlled finish. All three now produce an assist from a complete synthetic scoring chain. Opponents, wrong bodies, missing goal proof and unbound balls do not.
+- The saved-JSON replay now reports eight target-team contacts whose broad vote is unresolved but whose event-local body samples are usable (seven broad-label conflicts and one unspecified gap). This supplies team evidence, not missing goal outcomes. The unchanged export still yields no new verified goal/assist.
+- Temporal pixel search no longer repeats identical rounded sizes, identical correlation templates or the same crop descriptor. Bidirectional candidate assignment computes its nearest choices once rather than rescanning its sorted pair list. Native descriptor variance is calculated once.
+- A paired local comparison used six existing source PNGs with one reference input and with three repeated reference inputs: all 612 proposals across the 12 bounded searches were identical, with unchanged source pixels. The measured phase took 3.4634 seconds before and 2.7618 seconds after. The repeated-input cases deliberately exercise reuse; these figures do not predict full-run savings.
+- The existing requirement for a later native detector endpoint is checked before optical-flow decoding, where it already made the resulting flow unusable. Measured release alternatives share successful body/ball flow from the same seed. Failed reads can still retry; no global frame cache or additional image retention is introduced.
+
+The continued backend sweep passed 1,443 cases with zero SDK, network or video-decode attempts. It covers physical contacts, identity, cross-window evidence, goal/assist reconciliation and native reappearance. These tests include generated pixel arrays; no new external reader response or full video analysis is part of this result.
+
 No deployment, new video upload or live report mutation is part of this change.

@@ -61,9 +61,10 @@ def _descriptor(patch):
     saturation = cv2.calcHist([hsv], [1], mask, [8], [0, 256]).ravel()
     gray = cv2.cvtColor(p, cv2.COLOR_BGR2GRAY).astype(np.float32)
     interior = gray[mask.astype(bool)]
-    if float(interior.std()) < MIN_INTERIOR_STD:
+    interior_std = float(interior.std())
+    if interior_std < MIN_INTERIOR_STD:
         return None
-    normal = np.clip((gray-float(interior.mean()))/max(float(interior.std()), 12), -3, 3)
+    normal = np.clip((gray-float(interior.mean()))/max(interior_std, 12), -3, 3)
     normal[mask == 0] = 0
     texture = cv2.resize(normal, (8, 8), interpolation=cv2.INTER_AREA).ravel()
     parts = []

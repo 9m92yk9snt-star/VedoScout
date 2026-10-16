@@ -6,6 +6,7 @@ This does not rerun perception or predict the accuracy of future model replies.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 import socket
@@ -34,6 +35,13 @@ def replay(root):
         before = json.loads((root / "canonical.json").read_text())["canonical_events"]
     role_conflicts = reconciliation._shot_role_conflicts(before.get("events") or [], {"traces": traces})
     reconciled = reconciliation.reconcile_canonical_events(before, {"status": "ok", "traces": traces})
+    team_handoffs = Counter()
+    for trace in traces:
+        for touch in reconciliation._touches(trace):
+            local = reconciliation._touch_team_evidence(trace, touch)
+            if (not reconciliation._team_is_target(touch) and local.get("status") == "SUPPORTING"
+                    and local.get("team") == "target_team"):
+                team_handoffs[(touch.get("team_relation") or {}).get("reason") or "UNSPECIFIED"] += 1
     # Re-use the saved jobs, not fabricated model answers or expected actions.
     jobs = []
     for trace in traces:
@@ -75,6 +83,8 @@ def replay(root):
             "new_budget_allocation_media_ms": seen, "review_calls": provider.calls,
             "clarification_calls": provider.clarification_calls},
         "reopened_shot_role_conflicts": list(role_conflicts.values()),
+        "event_local_team_handoff": {"newly_usable_target_team_touches": sum(team_handoffs.values()),
+            "coarse_reason_counts": dict(team_handoffs), "new_scoring_outcomes_implied": False},
         "saved_canonical_counts": before.get("counts"),
         "reconciled_saved_counts": reconciled.get("counts"),
         "warning": "New image packs and appearance comparisons have no saved model responses; five-event accuracy is not established."}

@@ -270,9 +270,12 @@ def _time_local_team_evidence(trace, *, track_id, scene, media_ms,
     """
     if not (isinstance(track_id, str) and _valid_box(reference_box)):
         return {"status": "UNRESOLVED", "reason": "EVENT_ACTOR_GEOMETRY_MISSING"}
-    rows = []
+    rows_by_observation = {}
     for frame in trace.get("decoded_frames") or [] if isinstance(trace, dict) else []:
         if not isinstance(frame, dict) or frame.get("scene_id") != scene or not _num(frame.get("media_ms")):
+            continue
+        if (frame.get("used_fallback") is True or frame.get("cut_barrier") is True or frame.get("cut") is True
+                or frame.get("time_authority") not in (None, "ACTUAL_MEDIA_PTS")):
             continue
         frame_ms = int(frame["media_ms"])
         if not int(media_ms) + int(start_offset_ms) <= frame_ms <= int(media_ms) + int(end_offset_ms):
@@ -292,13 +295,20 @@ def _time_local_team_evidence(trace, *, track_id, scene, media_ms,
                 geometry_ok and team in {"target_team", "opponent"}
                 and _num(confidence) and float(confidence) >= TEAM_CONFIDENCE_MIN
             ):
-                rows.append({
+                sample = {
                     "media_ms": frame_ms,
                     "team": team,
                     "confidence": float(confidence),
                     "source": player.get("team_source"),
-                })
+                }
+                # Overlapping windows can contain the same source image.
+                # It remains one observation, not another vote for that team.
+                key = (frame_ms, team)
+                previous = rows_by_observation.get(key)
+                if previous is None or sample["confidence"] < previous["confidence"]:
+                    rows_by_observation[key] = sample
             break
+    rows = list(rows_by_observation.values())
     target = [row for row in rows if row["team"] == "target_team"]
     opponent = [row for row in rows if row["team"] == "opponent"]
     if len(target) >= int(min_samples) and not opponent:
@@ -329,7 +339,8 @@ def _touch_actor_box(touch):
     return box if _valid_box(box) else None
 
 
-def _scorer_team_evidence(trace, touch):
+def _touch_team_evidence(trace, touch):
+    """One event-local team observation shared by receiver and scorer roles."""
     if _team_is_target(touch):
         return deepcopy(touch.get("team_relation") or {})
     media_ms = _touch_ms(touch)
@@ -539,7 +550,9 @@ def _same_actor_after_track_split(trace, receiver_touch, scorer_touch):
         return True, {"status": "DIRECT", "from_track": left, "to_track": right}
     if not (isinstance(left, str) and isinstance(right, str)):
         return False, {"status": "UNRESOLVED", "reason": "TRACK_ID_MISSING"}
-    if not (_team_is_target(receiver_touch) and _team_is_target(scorer_touch)):
+    team_evidence = [_touch_team_evidence(trace, touch) for touch in (receiver_touch, scorer_touch)]
+    if any(evidence.get("status") != "SUPPORTING" or evidence.get("team") != "target_team"
+           for evidence in team_evidence):
         return False, {"status": "UNRESOLVED", "reason": "TEAM_CONTINUITY_UNVERIFIED"}
 
     scene = receiver_touch.get("scene_id")
@@ -639,7 +652,7 @@ def _superseding_scoring_release(trace, target, strikes, outcomes, touches):
         if candidate.get("global_target_id") == GLOBAL_TARGET_ID:
             return candidate
         candidate_touch = _touch_by_id(touches, candidate.get("touch_id"))
-        team = _scorer_team_evidence(trace, candidate_touch)
+        team = _touch_team_evidence(trace, candidate_touch)
         if (
             team.get("status") == "SUPPORTING"
             and team.get("team") == "target_team"
@@ -785,7 +798,10 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             touches, actor=target_track, scene=scene, after_ms=target_ms,
             max_ms=DIRECT_RECEIVE_MAX_MS,
         )
-        if not isinstance(receiver, dict) or not _team_is_target(receiver):
+        if not isinstance(receiver, dict):
+            continue
+        receiver_team = _touch_team_evidence(row, receiver)
+        if receiver_team.get("status") != "SUPPORTING" or receiver_team.get("team") != "target_team":
             continue
         receiver_track = receiver.get("player_track_id")
         receiver_ms = _touch_ms(receiver)
@@ -878,7 +894,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             "source_touch_id": target.get("touch_id"),
             "source_strike_id": scoring.get("strike_id"),
             "goal_proof": _goal_proof(scoring_outcome),
-            "receiver_team_evidence": deepcopy(receiver.get("team_relation") or {}),
+            "receiver_team_evidence": deepcopy(receiver_team),
             "receiver_actor_stitch": deepcopy(scoring_stitch or {}),
             "proof_eligible": True,
             "reason": "TARGET_RELEASE_TO_TEAMMATE_RECEIVE_TO_TEAMMATE_GOAL",
@@ -955,7 +971,7 @@ def proposals_from_trace(trace: dict | None) -> list[dict]:
             candidate_touch = _touch_by_id(touches, candidate.get("touch_id"))
             if not _verified_touch(candidate_touch):
                 continue
-            candidate_team = _scorer_team_evidence(row, candidate_touch)
+            candidate_team = _touch_team_evidence(row, candidate_touch)
             if not (
                 candidate_team.get("status") == "SUPPORTING"
                 and candidate_team.get("team") == "target_team"
