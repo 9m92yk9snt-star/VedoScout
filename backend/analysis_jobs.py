@@ -45,7 +45,7 @@ def file_sha256(path):
     return digest.hexdigest()
 
 
-def manifest(video_path, anchors, configuration):
+def manifest(video_path, anchors, configuration, *, anchor_time_offset=0, player_details=None):
     """Record actual sources/configuration; never infer a deployed commit."""
     backend = Path(__file__).resolve().parent
     source_hashes = {p.name: file_sha256(p) for p in sorted(backend.glob("*.py"))}
@@ -53,8 +53,17 @@ def manifest(video_path, anchors, configuration):
     git_sha = raw_sha if len(raw_sha) == 40 and all(c in "0123456789abcdef" for c in raw_sha.lower()) else None
     taps = [{k: a[k] for k in ("t", "box", "segment", "verify") if k in a}
             for a in anchors or [] if isinstance(a, dict)]
+    # Preserve the legacy geometry hash for old exports. New provenance must
+    # also distinguish the actual human-selected point, pixels and occlusion.
+    from player_selection import selection_metadata
+    selections = [{**{k: a[k] for k in ("t", "box", "segment", "verify") if k in a},
+                   **selection_metadata(a)} for a in anchors or [] if isinstance(a, dict)]
+    def fingerprint(value):
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                         allow_nan=False).encode()).hexdigest()
+    selection_inputs = {"schema": 1, "anchors": selections, "anchor_time_offset": anchor_time_offset}
     versions = {}
-    for package in ("numpy", "opencv-python", "opencv-python-headless"):
+    for package in ("numpy", "opencv-python", "opencv-python-headless", "onnxruntime", "Pillow"):
         try:
             versions[package] = metadata.version(package)
         except metadata.PackageNotFoundError:
@@ -64,6 +73,9 @@ def manifest(video_path, anchors, configuration):
             "runtime_versions": versions, "person_detector_sha256": file_sha256(detector) if detector.is_file() else None,
             "source_video_sha256": file_sha256(video_path), "source_video_role": "CANONICAL_WEB_VIDEO",
             "original_taps_sha256": hashlib.sha256(json.dumps(taps, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+            "selection_input_schema": 1, "selection_inputs_sha256": fingerprint(selection_inputs),
+            "anchor_time_offset": anchor_time_offset,
+            "player_details_sha256": fingerprint(player_details),
             "original_tap_count": len(taps), "configuration": configuration}
 
 

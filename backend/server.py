@@ -5416,6 +5416,13 @@ async def upload_video_and_create_preview(
     feature_consent: Optional[str] = Form(None),  # "true" when the OPTIONAL social-feature consent box is ticked
     user=Depends(get_current_user),
 ):
+    from player_identity_declaration import jersey_declaration_conflict
+    number_conflict = jersey_declaration_conflict(jersey_number, description)
+    if number_conflict:
+        raise HTTPException(status_code=422, detail=(
+            f"Your shirt number is {number_conflict['field_number']}, but your description says "
+            f"{number_conflict['description_number']}. Update one so both identify the same player."
+        ))
     # ============== UPLOAD GATE ==============
     # Free users get ONE free preview lifetime. After that, every upload requires
     # a pre-payment OR a Progress Pass credit.
@@ -6029,7 +6036,7 @@ async def preview_player_selection_tracking(frames: list[UploadFile] = File(...)
 async def suggest_player_selection_mask(frame: UploadFile = File(...), hints: str = Form(...),
                                         user=Depends(get_current_user)):
     """Ephemeral bounded preview. No report writes, video uploads or LLM calls."""
-    from player_selection import suggest_mask
+    from native_player_segmentation import suggest_person_cutout
     if len(hints) > 4096:
         raise HTTPException(400, "Selection hints too large")
     data = await frame.read(2 * 1024 * 1024 + 1)
@@ -6045,8 +6052,12 @@ async def suggest_player_selection_mask(frame: UploadFile = File(...), hints: st
         raise HTTPException(503, "Selection preview busy. Keep your box or retry.")
     async with _selection_slots:
         try:
-            return await asyncio.to_thread(suggest_mask, data, values.get("box"),
-                                           values.get("target_point"), values.get("exclude_points", []), values.get("include_points", []))
+            return await asyncio.to_thread(
+                suggest_person_cutout, data, values.get("box"), values.get("target_point"),
+                values.get("exclude_points", []), values.get("include_points", []),
+                player_behind=values.get("player_behind") is True or values.get("visibility") == "partial",
+                auto_box=values.get("auto_box") is True,
+            )
         except (ValueError, OSError):
             raise HTTPException(400, "Frame or selection could not be read")
         except Exception:
@@ -7553,7 +7564,6 @@ async def set_video_share(report_id: str, payload: VideoSharePayload, user=Depen
 
 # ─── Doubt-moment control (Stage 3): owner confirms identity at low-confidence
 #     crossovers BEFORE the AI analysis runs ───────────────────────────────────
-DOUBT_WAIT_S = 120
 
 
 class DoubtTap(BaseModel):
@@ -7577,6 +7587,10 @@ async def confirm_doubt_moments(report_id: str, payload: DoubtConfirmPayload, us
         raise HTTPException(status_code=404, detail="Report not found.")
     if doc.get("user_id") != user["id"] and user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Not your report.")
+    # Compatibility only for a worker from an older deployment already waiting.
+    # New runs never accept additional owner taps during automatic analysis.
+    if doc.get("doubt_status") != "awaiting":
+        raise HTTPException(status_code=409, detail="Player checks are handled automatically for this analysis.")
     moments = doc.get("doubt_moments") or []
     if not moments:
         raise HTTPException(status_code=400, detail="No doubt moments to confirm.")
@@ -7667,86 +7681,37 @@ async def _verify_doubt_taps(report_id: str, file_path: Path, confirmations: lis
     return kept
 
 
-async def _run_doubt_confirmation(
-    report_id: str, file_path: Path, valid_anchors: list, gt_t_off: float,
-    gt_track: dict, doubt_moments: list,
+async def _continue_identity_analysis(
+    report_id: str, gt_track: dict, doubt_moments: list,
 ) -> dict:
-    """Publish flagged crossover frames, wait (bounded) for the owner's answer,
-    and re-run the deterministic tracker with the confirmed taps as extra
-    ground-truth seeds. Timeout/skip → original track (old behaviour)."""
-    enriched = []
-    for i, dmom in enumerate(doubt_moments[:3]):
-        lease = analysis_jobs.CURRENT_RUN.get()
-        suffix = f"-{lease.run_id}" if lease else ""
-        fname = f"{report_id}{suffix}-doubt-{i + 1}.jpg"
-        out_path = UPLOAD_DIR / fname
-        if not await asyncio.to_thread(_extract_video_frame, Path(file_path), float(dmom["t"]), out_path):
-            continue
-        url = f"/api/uploads/{fname}"
-        try:
-            if r2_storage.is_configured():
-                url = await asyncio.to_thread(
-                    r2_storage.upload_file, f"reports/{report_id}/{fname}", out_path, "image/jpeg")
-        except Exception:
-            pass
-        enriched.append({**dmom, "frame_url": url})
-    if not enriched:
+    """Record tracking uncertainty and continue to native identity/evidence review.
+
+    Initial human anchors remain the only user seeds. A colour change or
+    crossover is a search hint, never permission to infer another player's
+    identity. No frames, owner poll, extra tap or new model request here.
+    """
+    if not doubt_moments:
         return gt_track
     await db.reports.update_one(
         {"id": report_id},
         {"$set": {
-            "doubt_moments": enriched,
-            "doubt_status": "awaiting",
-            "full_report_status": "awaiting_confirmation",
-            **_wd_heartbeat(),
-        }},
-    )
-    logger.info(f"[doubt] {report_id}: {len(enriched)} low-confidence crossovers — waiting up to {DOUBT_WAIT_S}s for owner")
-    waited = 0.0
-    fresh = None
-    while waited < DOUBT_WAIT_S:
-        await asyncio.sleep(3)
-        waited += 3
-        fresh = await db.reports.find_one(
-            {"id": report_id}, {"_id": 0, "doubt_status": 1, "doubt_confirmations": 1})
-        if fresh and fresh.get("doubt_status") in ("confirmed", "skipped"):
-            break
-        if int(waited) % 30 == 0:
-            await db.reports.update_one({"id": report_id}, {"$set": _wd_heartbeat()})
-    status = (fresh or {}).get("doubt_status")
-    confirmations = (fresh or {}).get("doubt_confirmations") or []
-    final = status if status in ("confirmed", "skipped") else "timeout"
-    if final == "confirmed" and confirmations:
-        confirmations = await _verify_doubt_taps(report_id, file_path, confirmations)
-        if not confirmations:
-            final = "skipped"
-            logger.info(f"[doubt] {report_id}: no taps survived the identity gate — honest fallback")
-    if final == "confirmed" and confirmations:
-        # Confirmed taps FIRST so they always survive the 16-seed cap. Their t
-        # is already in video time — subtract t_off since track_player re-adds it.
-        seeds = [
-            {"t": float(c["t"]) - float(gt_t_off or 0.0), "box": c["box"]}
-            for c in confirmations
-            if isinstance(c, dict) and isinstance(c.get("box"), dict)
-        ] + valid_anchors
-        try:
-            gt_track = await asyncio.to_thread(track_player, str(file_path), seeds, gt_t_off)
-            gt_track.pop("doubt_moments", None)
-            final = "applied"
-        except Exception:
-            logger.exception(f"doubt re-track failed for {report_id}")
-    await db.reports.update_one(
-        {"id": report_id},
-        {"$set": {
-            "doubt_status": final,
+            "doubt_moments": doubt_moments,
+            "doubt_status": "automatic",
+            "doubt_resolved": True,
+            "identity_recovery": {
+                "mode": "automatic",
+                "status": "delegated_to_identity_pipeline",
+                "manual_checks_required": False,
+                "uncertain_moments": doubt_moments,
+            },
             "full_report_status": "generating",
-            # refresh the stall anchor so the watchdog doesn't requeue a
-            # generation that legitimately waited long for the parent's answer
-            "full_report_started_at": datetime.now(timezone.utc).isoformat(),
             **_wd_heartbeat(),
         }},
     )
-    logger.info(f"[doubt] {report_id}: resolution={final}")
+    logger.info(
+        f"[identity] {report_id}: {len(doubt_moments)} uncertain moments "
+        "retained for automatic evidence review; initial anchors unchanged"
+    )
     return gt_track
 
 
@@ -8880,8 +8845,7 @@ async def _run_identity_corrective_pass(
                 "unresolved_assist_candidates": 0,
             })
         else:
-            retry["action_timeline"] = event_ledger.authoritative_timeline(_lg)
-            retry["event_discovery"] = event_ledger.discovery_summary(_lg)
+            retry = unified_analysis_engine.apply_legacy_result_to_report(retry, _lg)
             _apply_tracking_verification(retry, anchor_payload_list, gt_track, gt_t_off)
             await _cross_verify_full_report(
                 report_id, retry,
@@ -9188,14 +9152,15 @@ async def generate_full_report_task(report_id: str) -> None:
             "feedback_rounds": 1,
             "action_inspection_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_ACTION_FRAMES,
             "action_native_neighbor_frames": fix10a_runtime.fix10a_vision_providers.action_evidence_review.MAX_NATIVE_NEIGHBOR_FRAMES,
-        })
+        }, anchor_time_offset=doc.get("anchor_time_offset") or 0,
+            player_details=doc.get("player_details"))
         await db.reports.update_one({"id": report_id}, {"$set": {"analysis_run_manifest": run_manifest}})
         await _trace(report_id, "tracking_start")
         anchor_crops_full, wide_crops_full = _collect_anchor_crop_paths(anchor_payload_list)
 
         # ── Ground-truth tracking (deterministic, seeded by the user's taps) ──
         # Session 143 — PARALLEL PIPELINE:
-        #   Phase A: optical tracking (+doubt confirmation) ∥ audio extraction
+        #   Phase A: optical tracking (automatic identity review) ∥ audio extraction
         #   Phase B: movement/pace metrics (GPT-vision) ∥ Gemini full analysis
         # Saves 1-2 min of wall-clock vs the old strictly-sequential flow.
         valid_anchors = [
@@ -9213,12 +9178,11 @@ async def generate_full_report_task(report_id: str) -> None:
                         )
                     track = await asyncio.to_thread(track_player, str(file_path), valid_anchors, t_off)
                     doubt_moments = track.pop("doubt_moments", []) or []
-                    if doubt_moments and not doc.get("doubt_resolved"):
+                    if doubt_moments:
                         try:
-                            track = await _run_doubt_confirmation(
-                                report_id, file_path, valid_anchors, t_off, track, doubt_moments)
+                            track = await _continue_identity_analysis(report_id, track, doubt_moments)
                         except Exception:
-                            logger.exception(f"doubt confirmation flow failed for {report_id}")
+                            logger.exception(f"automatic identity diagnostics failed for {report_id}")
             except Exception:
                 logger.exception(f"player tracking failed for {report_id}")
                 track = None
@@ -9691,8 +9655,7 @@ async def generate_full_report_task(report_id: str) -> None:
             full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
         else:
             # Legacy fallback: only the validated FIX08 ledger may populate the timeline.
-            full["action_timeline"] = event_ledger.authoritative_timeline(event_ledger_obj)
-            full["event_discovery"] = event_ledger.discovery_summary(event_ledger_obj)
+            full = unified_analysis_engine.apply_legacy_result_to_report(full, event_ledger_obj)
         _apply_tracking_verification(
             full, anchor_payload_list, _event_authority_track, gt_t_off)
         # GROW YOUR GAME — hard 100%-evidence gate (drops unproven lessons).

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import ast
 import copy
 import gzip
 import hashlib
@@ -16,6 +17,22 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import report_evidence_export as ex
+
+
+def test_export_contains_transitive_local_analysis_source_dependencies():
+    root = Path(ex.__file__).parent
+    listed = set(ex.SOURCE_MODULES)
+    pending, visited = list(listed), set()
+    while pending:
+        filename = pending.pop()
+        if filename in visited:
+            continue
+        visited.add(filename)
+        for node in ast.walk(ast.parse((root/filename).read_text())):
+            names = ([a.name.split(".")[0] for a in node.names] if isinstance(node, ast.Import)
+                     else [node.module.split(".")[0]] if isinstance(node, ast.ImportFrom) and node.module else [])
+            pending.extend(name+".py" for name in names if (root/(name+".py")).exists() and name+".py" not in visited)
+    assert not visited-listed, "An exported analysis must include the code used by its local dependencies"
 
 
 @pytest.fixture

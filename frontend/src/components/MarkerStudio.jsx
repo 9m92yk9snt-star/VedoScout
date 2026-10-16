@@ -1,4 +1,4 @@
-/** One editor, one decoder, one contract: guided taps + three extra checks. */
+/** One editor, one decoder, one contract: guided taps, then automatic identity checks. */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ScoutMode from "./marker-studio/ScoutMode";
 import api from "../lib/api";
@@ -8,9 +8,12 @@ async function requestMask(frame, draft, signal) {
   const image = await fetch(frame.jpegDataUrl, { signal });
   const body = new FormData();
   body.append("frame", await image.blob(), "selection.jpg");
-  body.append("hints", JSON.stringify({ box: draft.box, target_point: draft.target_point, exclude_points: draft.exclude_points || [], include_points: draft.include_points || [] }));
+  body.append("hints", JSON.stringify({ box: draft.box, target_point: draft.target_point,
+    exclude_points: draft.exclude_points || [], include_points: draft.include_points || [],
+    player_behind: draft.player_behind === true, visibility: draft.visibility,
+    auto_box: !draft.manualBox && draft.visibility !== "partial" }));
   const { data } = await api.post("/player-selection/mask", body, { signal, timeout: 12000 });
-  return data.status === "suggested" && selection.validMask(data.mask) ? data.mask : null;
+  return data.status === "suggested" && selection.validMask(data.mask) ? data : null;
 }
 
 async function requestTracking(frames, draft, signal) {

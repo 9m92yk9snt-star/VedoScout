@@ -6,6 +6,29 @@ const box = { x: 0.2, y: 0.2, w: 0.1, h: 0.2 };
 const frames = Array.from({ length: 10 }, (_, i) => ({ t: i * 6 + 3, jpegDataUrl: 'jpeg-' + i }));
 const marks = Object.fromEntries(frames.map((f, i) => [i, { t: f.t, box: { ...box } }]));
 const checks = [12, 30, 48].map(t => ({ t, box: { ...box }, jpegDataUrl: 'check-' + t }));
+check('three clear taps can continue without additional manual checks', () => {
+  const result = policy.buildPayload(frames, {0: marks[0], 5: marks[5], 9: marks[9]}, [], [20, 40]);
+  assert.deepEqual(result.anchors.map(a => a.t), [3, 33, 57]);
+  assert.equal(result.anchors.filter(a => a.verify).length, 0);
+});
+check('first proposed moments span the clip without changing source times', () => {
+  const original = frames.map(f => f.t);
+  const sorted = policy.prioritizeTapMoments(original, 60);
+  assert.deepEqual(sorted.slice(0, 3), [3, 27, 57]);
+  assert.deepEqual([...sorted].sort((a, b) => a - b), original);
+  assert.deepEqual(policy.prioritizeTapMoments([5, 5, -1, Infinity, 60], 60), [5]);
+});
+check('broad references reach the existing three-crop identity budget', () => {
+  const proposed = policy.prioritizeTapMoments(frames.map(f => f.t), 60).map(t => ({t, jpegDataUrl: 'frame-' + t}));
+  const selected = Object.fromEntries(proposed.map((f, i) => [i, {t: f.t, box}]));
+  const result = policy.buildPayload(proposed, selected, [], [20, 40]);
+  assert.deepEqual(result.anchors.slice(0, 3).map(a => a.t), [3, 27, 57]);
+  assert.deepEqual(result.anchors.slice(0, 3).map(a => a.segment), [0, 1, 2]);
+  assert.equal(result.markerImageDataUrl, 'frame-3');
+});
+check('a partial crop cannot replace a clear initial reference', () => {
+  assert.throws(() => policy.buildPayload(frames, {0: marks[0], 1: marks[1], 2: {...marks[2], visibility: 'partial'}}, [], []), /3 clear/);
+});
 check('ten guided taps plus exactly three explicit checks', () => {
   const result = policy.buildPayload(frames, marks, checks, [20, 40]);
   assert.equal(result.anchors.length, 13);
@@ -23,7 +46,7 @@ check('hidden/skipped moment never becomes an anchor', () => {
 });
 check('two visible taps plus a skip cannot reach minimum three', () => {
   const progress = policy.markingProgress([0, 1, 2], 2, { 0: marks[0], 1: marks[1], 2: { skipped: true } });
-  assert.equal(progress.verify, false);
+  assert.equal(progress.ready, false);
   assert.equal(progress.confirmed, 2);
   assert.equal(progress.needsVisible, true);
 });
@@ -31,10 +54,10 @@ check('repeating/editing a tap cannot inflate count', () => {
   const progress = policy.markingProgress([0, 1, 2], 0, { 0: marks[0] });
   assert.equal(progress.confirmed, 1);
   assert.equal(progress.next, 1);
-  assert.equal(progress.verify, false);
+  assert.equal(progress.ready, false);
 });
 check('three visible moments plus skipped frames can proceed', () => {
-  assert.equal(policy.markingProgress([0, 1, 2, 3], 3, { 0: marks[0], 1: marks[1], 2: marks[2], 3: { skipped: true } }).verify, true);
+  assert.equal(policy.markingProgress([0, 1, 2, 3], 3, { 0: marks[0], 1: marks[1], 2: marks[2], 3: { skipped: true } }).ready, true);
 });
 check('replacement image must carry its actual new timestamp', () => {
   const replaced = frames.map((f, i) => i === 0 ? { t: 3.497, jpegDataUrl: 'nearby' } : f);
@@ -54,7 +77,7 @@ check('zero-sized/outside/non-finite box is rejected', () => {
 });
 check('verification requires three genuinely different times', () => {
   assert.throws(() => policy.buildPayload(frames, marks, [checks[0], checks[0], checks[2]], []), /different/);
-  assert.throws(() => policy.buildPayload(frames, marks, checks.slice(0, 2), []), /3 extra/);
+  assert.throws(() => policy.buildPayload(frames, marks, checks.slice(0, 2), []), /complete set of 3/);
 });
 check('checks are proposed throughout the clip, not all at the end', () => {
   assert.deepEqual([0, 1, 2].map(i => policy.verifyTime(60, i)), [12, 30, 48]);

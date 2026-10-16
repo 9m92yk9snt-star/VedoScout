@@ -1,0 +1,50 @@
+{
+  "scope": "SAVED_OBSERVATIONS_RECONCILIATION_ONLY_NOT_NEW_FULL_ANALYSIS",
+  "base_commit": "0681fa7",
+  "source_video_sha256": "0e6c68902aa3d01971f7f327b0fa432e5c526c60654062cc6f01276646884abb",
+  "elapsed_s": 4.312,
+  "traces": 15,
+  "original_events": 0,
+  "new_events": 0,
+  "canonical_events_unchanged": true,
+  "reconciliation": {
+    "version": 1,
+    "authority": "FIX10B_PHYSICAL_RECONCILIATION",
+    "proposals_total": 0,
+    "proposals_applied": 0,
+    "proposals_contradictory": 0,
+    "applied_proposal_ids": [],
+    "changes": [],
+    "scoring_claims_unresolved": 0,
+    "shot_events_recovered_with_unknown_outcome": 0,
+    "shot_observations_linked_to_proved_outcome": 0,
+    "physical_status": "ok"
+  },
+  "new_remote_model_calls": 0,
+  "new_video_decode_calls": 0,
+  "new_manual_taps": 0,
+  "database_writes": 0,
+  "original_five_action_acceptance": 0,
+  "new_five_action_acceptance": 0,
+  "source_sha256": {
+    "canonical_event_resolver.py": "74b4b5bc74447a98cd63f101f6aec984504a13fc50d83c8d6ed8f635dca00df8",
+    "dense_event_reconciliation.py": "d7c36ed9713b85e16745f1feaf350a0e25b8eee6f2fa0273f383efc9ba5ea7db",
+    "fix10b_reconciliation.py": "056243e85a60a16c922ccc0b892034c4a756dab38501174abd26984216f30a67",
+    "tests/test_fix22_evidence_coordination.py": "af0ff9563dd65765e60f78e757ee1816e91093d701eebd6ae349413b3a1afc66"
+  },
+  "test_comparison": {
+    "baseline_new_cases_failed": 16,
+    "baseline_new_cases_passed": 11,
+    "patched_new_cases_failed": 0,
+    "patched_new_cases_passed": 27,
+    "broad_passed": 1660,
+    "broad_skipped": 28,
+    "forbidden_network_sdk_video_attempts": 0,
+    "excluded_server_test": "test_fix07_verified_stats_claims.py: missing bcrypt at collection"
+  },
+  "limits": [
+    "No external readers or new observations",
+    "Known identity/contact/outcome gaps remain; no claim that five actions are proved",
+    "Controlled positive/negative regressions validate the repaired coordination contracts"
+  ]
+}

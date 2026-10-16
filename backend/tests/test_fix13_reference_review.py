@@ -102,6 +102,29 @@ def test_one_event_cannot_fill_two_missing_cases():
     assert result["verified"] == 1 and not result["all_verified"]
 
 
+def test_contact_diagnostics_read_the_persisted_trace_resolution_groups():
+    source = feedback_fixture.trace()
+    source["contacts"] = {
+        "accepted": [{"media_ms": 1000, "contact_id": "physical-contact",
+                      "player_track_id": "p001", "status": "VERIFIED", "proof_eligible": True}],
+        "unresolved": [{"media_ms": 1100, "contact_id": "ambiguous-contact",
+                        "status": "HYPOTHESES", "proof_eligible": False}],
+        "rejected": [{"media_ms": 1200, "contact_id": "rejected-contact",
+                      "status": "REJECTED", "proof_eligible": False},
+                     {"media_ms": 5000, "contact_id": "outside-reference-range"}],
+    }
+    before = deepcopy(source)
+    result = review.assess([case()], {"events": []}, {"traces": [source]},
+                           review.build_plan([source], [case()]))
+    row = result["cases"][0]
+    assert [(c["contact_id"], c["resolution"]) for c in row["nearby_contacts"]] == [
+        ("physical-contact", "accepted"), ("ambiguous-contact", "unresolved"),
+        ("rejected-contact", "rejected")]
+    assert row["status"] == "NOT_VERIFIED" and result["verified"] == 0
+    assert result["canonical_authority"] is False
+    assert source == before
+
+
 def evidence_zip(tmp_path, traces, video=None, source_hash=None):
     report = {"id": "test-report", "full_report": {}, "unified_identity_authority": {},
               "football_sequence_analysis": runtime_fixture._unified()["sequence_analysis"], "football_scene_graph": {},

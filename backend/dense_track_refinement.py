@@ -9,6 +9,9 @@ GLOBAL_TARGET identity: that authority remains exclusively in
 from __future__ import annotations
 
 import math
+import hashlib
+import json
+from collections import OrderedDict
 from copy import deepcopy
 
 import cv2
@@ -339,6 +342,71 @@ def _default_detector():
     if not detector.ok:
         return None
     return detector
+
+
+class NativeDetectionSession:
+    """Run-local, bounded reuse of stateless native pixel proposals only.
+
+    Overlapping replay windows still build their own tracks, target bindings,
+    contacts and outcomes. No pixels, identity or evidence decisions are cached.
+    Serialized proposals keep the payload budget exact and give every caller
+    fresh mutable data. The loaded model and current detector settings are part
+    of the key; unavailable models and failed calls are never cached.
+    """
+    def __init__(self, *, max_entries=768, max_bytes=16 * 1024 * 1024):
+        self.detector = None
+        self.max_entries = max(0, int(max_entries))
+        self.max_bytes = max(0, int(max_bytes))
+        self._cache = OrderedDict()
+        self._bytes = 0
+        self.hits = self.misses = self.evictions = 0
+
+    def get_detector(self):
+        if self.detector is None:
+            self.detector = _default_detector()
+        return self.detector
+
+    def detect(self, frame):
+        import cv_detect
+        detector = self.get_detector()
+        model_sha = getattr(detector, "model_sha256", None)
+        cacheable = (self.max_entries > 0 and self.max_bytes > 0
+                     and isinstance(model_sha, str) and len(model_sha) == 64)
+        key = None
+        if cacheable:
+            settings = (model_sha, cv_detect.INPUT, cv_detect.CONF_T, cv_detect.NMS_T,
+                        DENSE_BALL_CONF_T, A7_BALL_SUPPORT_CONF_T, A7_BALL_SUPPORT_MAX,
+                        frame.shape, frame.dtype.str)
+            digest = hashlib.sha256(repr(settings).encode())
+            digest.update(frame.tobytes(order="C"))
+            key = digest.digest()
+            payload = self._cache.get(key)
+            if payload is not None:
+                self._cache.move_to_end(key)
+                self.hits += 1
+                return tuple(json.loads(payload))
+        self.misses += 1
+        result = _detect_dense_people_and_ball(detector, frame, include_a7_support=True)
+        if key is not None:
+            try:
+                payload = json.dumps(result, separators=(",", ":"), allow_nan=False).encode()
+            except (TypeError, ValueError):
+                return result
+            if len(payload) <= self.max_bytes:
+                while self._cache and (len(self._cache) >= self.max_entries
+                                       or self._bytes + len(payload) > self.max_bytes):
+                    _, old = self._cache.popitem(last=False)
+                    self._bytes -= len(old)
+                    self.evictions += 1
+                self._cache[key] = payload
+                self._bytes += len(payload)
+        return result
+
+    def metrics(self):
+        return {"hits": self.hits, "misses": self.misses, "evictions": self.evictions,
+                "entries": len(self._cache), "payload_bytes": self._bytes,
+                "max_entries": self.max_entries, "max_payload_bytes": self.max_bytes,
+                "scope": "RUN_LOCAL_NATIVE_PIXEL_PROPOSALS_ONLY"}
 
 
 def _detect_dense_people_and_ball(detector, frame_bgr, include_a7_support=False, *, _detail_pass=False):
@@ -999,7 +1067,7 @@ def _verify_bracketed_dense_target(frames, authority):
 
 
 def refine_window(dense_frames, scene_graph: dict | None, identity_authority: dict | None,
-                  scene_id: str, detector_fn=None, camera_estimator=None) -> dict:
+                  scene_id: str, detector_fn=None, camera_estimator=None, *, native_session=None) -> dict:
     """Refine scene-local tracks over one already bounded dense window.
 
     ``detector_fn(frame_bgr)`` may be injected for deterministic tests and may
@@ -1021,11 +1089,12 @@ def refine_window(dense_frames, scene_graph: dict | None, identity_authority: di
     active_scene = scene
     detector = None
     if detector_fn is None:
-        detector = _default_detector()
+        detector = native_session.get_detector() if native_session is not None else _default_detector()
         if detector is None:
             return {"version": VERSION, "status": "skipped", "reason": "detector_unavailable",
                     "scene_id": scene, "frames": [], "metrics": {}}
-        detector_fn = lambda frame: _detect_dense_people_and_ball(detector, frame, include_a7_support=True)
+        detector_fn = native_session.detect if native_session is not None else (
+            lambda frame: _detect_dense_people_and_ball(detector, frame, include_a7_support=True))
     uses_default_camera = camera_estimator is None or camera_estimator is _default_camera_estimator
     if camera_estimator is None:
         camera_estimator = _default_camera_estimator

@@ -286,3 +286,7 @@ backend/uploads/d8c04d5d-6618-4db2-a128-865447478ef6.web.mp4
 credentials.json
 *.key
 .credentials
+# Restored locally from the checksum-pinned binary parts in segmentation-assets.
+backend/models/yolov8n-seg.onnx
+backend/models/mobile-sam-encoder.onnx
+backend/models/mobile-sam-decoder.onnx

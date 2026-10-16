@@ -27,7 +27,6 @@ import PaymentBadges from "@/components/PaymentBadges";
 import DreamPricingTiers from "@/components/DreamPricingTiers";
 import PremiumReadyBanner from "@/components/PremiumReadyBanner";
 import PremiumReportV2 from "@/components/report-v2/PremiumReportV2";
-import DoubtConfirmModal from "@/components/DoubtConfirmModal";
 import PremiumBuildingDashboard from "@/components/report-states/PremiumBuildingDashboard";
 import { isFullReportReady } from "@/lib/reportReady.mjs";
 import { getAnalysisView, isPreviewReady } from "@/lib/analysisProgress.mjs";
@@ -1635,8 +1634,7 @@ export default function ReportPage() {
   const [checkoutModal, setCheckoutModal] = useState({ open: false, state: "preparing", errorMessage: null });
   const [embeddedOpen, setEmbeddedOpen] = useState(false);
   const [generatingFull, setGeneratingFull] = useState(false);
-  const [doubtInfo, setDoubtInfo] = useState(null);
-  const [doubtBusy, setDoubtBusy] = useState(false);
+  const legacyDoubtResumeRef = useRef(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareState, setShareState] = useState(null); // null → follow report doc; {token} local override
@@ -1701,37 +1699,16 @@ export default function ReportPage() {
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
-  // Stage 3 — surface the doubt-confirmation prompt when the report doc says
-  // the tracker is waiting for the owner's answer (also covers page reloads).
+  // Resume an older in-flight worker without asking the owner to mark again.
+  // New workers record uncertainty and continue automatically.
   useEffect(() => {
-    if (report?.doubt_status === "awaiting" && report?.doubt_moments?.length) {
-      setDoubtInfo({ moments: report.doubt_moments });
-    }
-  }, [report?.doubt_status]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const submitDoubt = async (taps, skip = false) => {
-    setDoubtBusy(true);
-    try {
-      await api.post(`/reports/${id}/doubt-confirm`, { taps, skip });
-      setDoubtInfo(null);
-      toast.success(skip
-        ? "Okay — the tracker decides on its own. Analysis continues."
-        : "Player confirmed — tracking updated. Analysis continues.");
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Could not submit — try again.");
-    } finally {
-      setDoubtBusy(false);
-    }
-  };
-
-  // Marketing pixels: ViewContent once per report view (the "product page")
-  const viewContentTrackedRef = useRef(false);
-  useEffect(() => {
-    if (report?.id && !viewContentTrackedRef.current) {
-      viewContentTrackedRef.current = true;
-      trackViewContent("scout_report");
-    }
-  }, [report?.id]);
+    const status = analysisStatus?.id === id ? analysisStatus.doubt_status : report?.doubt_status;
+    const canResume = user?.id === report?.user_id || user?.role === "admin";
+    if (status !== "awaiting" || !canResume || legacyDoubtResumeRef.current === id) return;
+    legacyDoubtResumeRef.current = id;
+    api.post(`/reports/${id}/doubt-confirm`, { taps: [], skip: true })
+      .catch(() => { legacyDoubtResumeRef.current = null; });
+  }, [id, report, analysisStatus, user?.id, user?.role]);
 
   // One status stream spans the initial preview and full dossier. Readiness
   // is report-scoped; a premium viewer does not unlock someone else's report.
@@ -1751,8 +1728,6 @@ export default function ReportPage() {
         if (["generating", "awaiting_confirmation", "verifying", "finalizing", "ready"].includes(data?.full_report_status)) {
           setFullReportError(previous => previous?.kind === "start" ? null : previous);
         }
-        if (data?.doubt_status === "awaiting" && data?.doubt_moments?.length) setDoubtInfo({ moments: data.doubt_moments });
-        else if (data?.doubt_status && data.doubt_status !== "awaiting") setDoubtInfo(null);
       },
     }).then(async data => {
       if (data && !cancelled) await fetchReport();
@@ -2132,14 +2107,6 @@ export default function ReportPage() {
     return (
       <div className="min-h-screen bg-[#F2EDE2] pb-16">
         <Navigation />
-        {doubtInfo && (
-          <DoubtConfirmModal
-            moments={doubtInfo.moments}
-            busy={doubtBusy}
-            onConfirm={(taps) => submitDoubt(taps, false)}
-            onSkip={() => submitDoubt([], true)}
-          />
-        )}
         <PremiumBuildingDashboard
           report={report}
           status={analysisStatus?.id === id ? analysisStatus : null}
@@ -2190,14 +2157,6 @@ export default function ReportPage() {
   return (
     <div className="min-h-screen bg-deepnavy text-ink pb-20">
       <Navigation />
-      {doubtInfo && (
-        <DoubtConfirmModal
-          moments={doubtInfo.moments}
-          busy={doubtBusy}
-          onConfirm={(taps) => submitDoubt(taps, false)}
-          onSkip={() => submitDoubt([], true)}
-        />
-      )}
       <CheckoutTransitionModal
         open={checkoutModal.open}
         state={checkoutModal.state}

@@ -132,6 +132,13 @@ test.each(["generating", "awaiting_confirmation", "verifying", "finalizing", "fa
   expect(getAnalysisView({ ...initial, full_report_status, has_full_report: true }).complete).toBe(false);
 });
 
+test("an older player-check state continues automatically without a manual instruction", () => {
+  const view = getAnalysisView({ ...initial, full_report_status: "awaiting_confirmation" });
+  expect(view.confirmation).toBe(false);
+  expect(view.complete).toBe(false);
+  expect(view.detail).toContain("No extra taps");
+});
+
 
 test("remaining time is a server-backed range, expires and never reaches a fake five-second floor", () => {
   const now = Date.now();

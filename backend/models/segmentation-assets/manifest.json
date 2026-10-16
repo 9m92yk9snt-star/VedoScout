@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "assets": {
+    "yolov8n-seg.onnx": {
+      "bytes": 13841502,
+      "sha256": "015043fb9cc94830ad7065dd3e28d6f8e5758fe03071451675120f6a6b6e44e9",
+      "parts": [
+        {
+          "file": "yolov8n-seg.onnx.part001",
+          "bytes": 8388608,
+          "sha256": "db859388dda41a4128753f4bb48c9f36429c3a20a2b1da7267641dd94d6135b5"
+        },
+        {
+          "file": "yolov8n-seg.onnx.part002",
+          "bytes": 5452894,
+          "sha256": "802ea8dee941e01420c22710402cd687e6db7fa7bb54825340a859ec901350c0"
+        }
+      ]
+    },
+    "mobile-sam-encoder.onnx": {
+      "bytes": 27969718,
+      "sha256": "85dc9194671a1173fc5632fc1ffae698f3ca0c82c7b208ed618a568377380d7e",
+      "parts": [
+        {
+          "file": "mobile-sam-encoder.onnx.part001",
+          "bytes": 8388608,
+          "sha256": "14ab8da666c2324749ce6ac049ca8dd78359928fa47b2ca30554042dcd900b21"
+        },
+        {
+          "file": "mobile-sam-encoder.onnx.part002",
+          "bytes": 8388608,
+          "sha256": "8e762366274945604cdba546ef1d8e968ed2b2946b9fe9db67137f3f65d97cff"
+        },
+        {
+          "file": "mobile-sam-encoder.onnx.part003",
+          "bytes": 8388608,
+          "sha256": "8f97e47779636cef6915681ae95394a69e62c27ccfeca4a8ea823a240525d508"
+        },
+        {
+          "file": "mobile-sam-encoder.onnx.part004",
+          "bytes": 2803894,
+          "sha256": "13ad37da007063b2600d49736b8ca1839b1a089ff111116f23b02080c1d5e37c"
+        }
+      ]
+    },
+    "mobile-sam-decoder.onnx": {
+      "bytes": 16496933,
+      "sha256": "43c7655a81b62c0f2b0e31d2bc91d3811b48d7f736ecf93b3a4a1254318241cf",
+      "parts": [
+        {
+          "file": "mobile-sam-decoder.onnx.part001",
+          "bytes": 8388608,
+          "sha256": "bdb282ed7b87fa5ebc8ae638a6d0f0ed253be75d841faccfbcbe89b1dbf5cbc0"
+        },
+        {
+          "file": "mobile-sam-decoder.onnx.part002",
+          "bytes": 8108325,
+          "sha256": "a2545dff7699cffc819abc6e08f6dbddcc1561739e1e33e1fa3593e4c815e81f"
+        }
+      ]
+    }
+  }
+}

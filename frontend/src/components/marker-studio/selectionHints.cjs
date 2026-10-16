@@ -7,6 +7,7 @@ function validMask(m) {
 function hints(a) {
   const result = {};
   if (a.visibility === 'partial') result.visibility = 'partial';
+  if (a.player_behind === true) { result.player_behind = true; result.visibility = 'partial'; }
   if (validPoint(a.target_point)) result.target_point = { ...a.target_point };
   if (Array.isArray(a.include_points)) result.include_points = a.include_points.filter(validPoint).slice(0, 4).map(p => ({ ...p }));
   if (Array.isArray(a.exclude_points)) result.exclude_points = a.exclude_points.filter(validPoint).slice(0, 4).map(p => ({ ...p }));

@@ -62,7 +62,7 @@ def _involved_tracks(touch_graph: dict | None) -> list[str]:
     return out
 
 
-def _track_priority(touch_graph: dict | None) -> dict[str, tuple[int, int]]:
+def _track_priority(touch_graph: dict | None, window_evidence=None) -> dict[str, tuple[int, int]]:
     """Rank materially involved tracks before the provider's bounded budget.
 
     The vision provider intentionally caps reads per report/window.  Ordering by
@@ -89,6 +89,34 @@ def _track_priority(touch_graph: dict | None) -> dict[str, tuple[int, int]]:
         candidate = (rank, order)
         if track not in priority or candidate < priority[track]:
             priority[track] = candidate
+    # A followed body may still have only an occluded/ambiguous touch. Reserve
+    # its independent number reads before other actors consume the crop budget.
+    # This affects selection only; no number or contact proof is granted here.
+    touch_scenes = {}
+    for touch in graph.get("touches") or []:
+        if not isinstance(touch, dict):
+            continue
+        track, scene = touch.get("player_track_id"), touch.get("scene_id")
+        if isinstance(track, str) and isinstance(scene, str):
+            touch_scenes.setdefault(track, set()).add(scene)
+    for frame in window_evidence or []:
+        if (not isinstance(frame, dict) or not _num(frame.get("media_ms"))
+                or not math.isfinite(frame["media_ms"])
+                or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                or frame.get("used_fallback") or frame.get("cut_barrier")):
+            continue
+        target = frame.get("global_target") or {}
+        if not isinstance(target, dict):
+            continue
+        track = target.get("local_track_id")
+        if (not isinstance(track, str) or not track or track not in priority or target.get("status") != "VERIFIED"
+                or target.get("proof_eligible") is not True
+                or track in touch_scenes and frame.get("scene_id") not in touch_scenes[track]):
+            continue
+        bodies = [p for p in frame.get("players") or [] if isinstance(p, dict) and p.get("local_track_id") == track
+                  and p.get("association_state") == "VERIFIED_LOCAL" and _valid_box(p.get("box"))]
+        if len(bodies) == 1:
+            priority[track] = (0, priority[track][1])
     return priority
 
 
@@ -142,7 +170,7 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
     involved = set(_involved_tracks(touch_graph))
     if not involved:
         return []
-    priority = _track_priority(touch_graph)
+    priority = _track_priority(touch_graph, window_evidence)
     candidates: dict[str, list[dict]] = {track: [] for track in involved}
     for frame in window_evidence or []:
         if (not isinstance(frame, dict) or not _num(frame.get("media_ms"))
@@ -220,14 +248,14 @@ def select_jersey_review_requests(window_evidence, touch_graph: dict | None) -> 
     return requests
 
 
-def merge_jersey_review_requests(pixel_requests, ordinary_requests, touch_graph):
+def merge_jersey_review_requests(pixel_requests, ordinary_requests, touch_graph, *, window_evidence=None):
     """Readable crops keep their physical actor priority under the same budget.
 
     Pixel inspection can expose many uninvolved backs. They must not consume
     the first two independent reads reserved for a release/control actor.
     Neither crop selection nor prioritisation supplies a shirt number.
     """
-    priority = _track_priority(touch_graph)
+    priority = _track_priority(touch_graph, window_evidence)
     touch_times = {}
     for touch in (touch_graph or {}).get("touches") or []:
         ms = touch.get("representative_ms", touch.get("media_ms"))

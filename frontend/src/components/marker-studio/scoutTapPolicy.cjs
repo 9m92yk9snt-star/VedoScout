@@ -27,17 +27,25 @@ function tapBox(point) {
   return { x: clamp(point.x - w / 2, 0, 1 - w), y: clamp(point.y - h * 0.42, 0, 1 - h), w, h };
 }
 
+function prioritizeTapMoments(times, duration) {
+  // Present a broad identity reference early; never create an automatic tap.
+  const ordered = [...new Set(times.filter(t => Number.isFinite(t) && t >= 0 && t < duration))].sort((a, b) => a - b);
+  if (ordered.length < 3) return ordered;
+  const middle = ordered.reduce((best, t) => Math.abs(t - duration / 2) < Math.abs(best - duration / 2) ? t : best);
+  return [...new Set([ordered[0], middle, ordered[ordered.length - 1], ...ordered])];
+}
+
 function markingProgress(queue, current, marks) {
   const confirmed = queue.filter(i => validBox(marks[i]?.box)).length;
   // An updated/repeated mark occupies one slot, not another confirmation.
   const pending = queue.filter(i => !marks[i]);
   if (pending.length) {
     const after = pending.find(i => queue.indexOf(i) > queue.indexOf(current));
-    return { next: after ?? pending[0], confirmed, verify: false };
+    return { next: after ?? pending[0], confirmed, ready: false };
   }
   const full = queue.filter(i => validBox(marks[i]?.box) && marks[i]?.visibility !== 'partial').length;
-  if (full >= MIN_TAPS) return { next: null, confirmed, verify: true };
-  return { next: queue.find(i => marks[i]?.skipped) ?? current, confirmed, verify: false, needsVisible: true };
+  if (full >= MIN_TAPS) return { next: null, confirmed, ready: true };
+  return { next: queue.find(i => marks[i]?.skipped) ?? current, confirmed, ready: false, needsVisible: true };
 }
 
 function nearbyTime(time, direction, duration, cuts = []) {
@@ -62,8 +70,10 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
     throw new Error('A player box is invalid. Please re-mark it.');
   }
   const entries = Object.entries(marks).filter(([, m]) => !m.skipped && validBox(m.box));
-  if (entries.filter(([, m]) => m.visibility !== 'partial').length < MIN_TAPS || entries.length > TARGET_TAPS || verifyMarks.length !== VERIFY_TAPS) {
-    throw new Error('Complete at least 3 guided taps and 3 extra checks.');
+  // Older saved drafts may include the three explicit checks. New selections
+  // need only the guided anchors; no verify flag is inferred from their order.
+  if (entries.filter(([, m]) => m.visibility !== 'partial').length < MIN_TAPS || entries.length > TARGET_TAPS || ![0, VERIFY_TAPS].includes(verifyMarks.length)) {
+    throw new Error('Complete at least 3 clear guided taps. Legacy extra checks must be a complete set of 3.');
   }
   const segment = time => cuts.filter(c => time >= c).length;
   const anchors = entries.map(([i, mark]) => {
@@ -74,7 +84,10 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
     return { t: frame.t, box: { ...mark.box }, ...selection.hints(mark),
       ...(mark.continuity?.length ? { continuity: mark.continuity.map(c => ({ ...c, segment: segment(c.t) })) } : {}),
       segment: segment(frame.t), frameIndex: Number(i) };
-  }).sort((a, b) => (a.visibility === 'partial') - (b.visibility === 'partial') || a.t - b.t);
+  // Keep broad guided references at the front of the existing crop budgets.
+  // Sorting back into time order would put all ten-tap profile crops near the
+  // beginning again. Partial fragments still follow clear references.
+  }).sort((a, b) => (a.visibility === 'partial') - (b.visibility === 'partial'));
   const checks = verifyMarks.map((m, i) => {
     if (m.visibility === 'partial' || !validBox(m.box) || !m.jpegDataUrl || !distinctVerifyTime(m.t, verifyMarks.slice(0, i))) {
       throw new Error('Choose three different, clearly visible moments for the extra checks.');
@@ -88,4 +101,4 @@ function buildPayload(frames, marks, verifyMarks, cuts) {
   };
 }
 
-module.exports = { TARGET_TAPS, MIN_TAPS, VERIFY_TAPS, VERIFY_SPACING, validBox, screenToVideo, tapBox, markingProgress, nearbyTime, verifyTime, distinctVerifyTime, buildPayload };
+module.exports = { TARGET_TAPS, MIN_TAPS, VERIFY_TAPS, VERIFY_SPACING, validBox, screenToVideo, tapBox, prioritizeTapMoments, markingProgress, nearbyTime, verifyTime, distinctVerifyTime, buildPayload };

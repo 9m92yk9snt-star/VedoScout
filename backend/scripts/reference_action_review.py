@@ -98,8 +98,10 @@ def assess(cases, canonical, physical, plan):
                         "event_ms": event.get("canonical_ms") if event else None,
                         "inspection_status": inspections[-1].get("status") if inspections else "NOT_EXECUTED",
                         "source_trace_id": trace.get("trace_id"),
-                        "nearby_contacts": [{k: c.get(k) for k in ("media_ms", "contact_id", "player_track_id", "status", "proof_eligible")}
-                                            for c in (trace.get("contacts") or {}).get("contacts") or [] if near(c)],
+                        "nearby_contacts": [{**{k: c.get(k) for k in ("media_ms", "contact_id", "player_track_id", "status", "proof_eligible")},
+                                             "resolution": resolution}
+                                            for resolution in ("accepted", "unresolved", "rejected")
+                                            for c in (trace.get("contacts") or {}).get(resolution) or [] if near(c)],
                         "nearby_touches": [{k: t.get(k) for k in ("media_ms", "touch_id", "player_track_id", "global_target_id", "status", "proof_eligible", "contact_role")}
                                            for t in (trace.get("touch_graph") or {}).get("touches") or [] if near(t)],
                         "nearby_strikes": [{k: s.get(k) for k in ("media_ms", "strike_id", "player_track_id", "global_target_id", "status", "contact_role")}

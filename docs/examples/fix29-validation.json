@@ -1,0 +1,208 @@
+{
+  "scope": "LOCAL_IMPLEMENTATION_AND_SAVED_NATIVE_REPLAY_NOT_FULL_LIVE_ANALYSIS",
+  "base_commit": "3a6b50f",
+  "fix28": {
+    "reported_commit": "0efda7f",
+    "local_git_object_found": false,
+    "github_commit_lookup_status": 422,
+    "matching_github_branches": 0,
+    "matching_github_commit_search_results": 0,
+    "exact_source_recovered": false,
+    "features_rebuilt_with_new_tests": true
+  },
+  "source_video_sha256": "0e6c68902aa3d01971f7f327b0fa432e5c526c60654062cc6f01276646884abb",
+  "input_physical_sha256": "4fdc0bdef4f7b6f619d8af0fd0cd8fea4992a5f85688c0f702b4f1bf9896d33c",
+  "changed_module_sha256": {
+    "backend/action_evidence_review.py": "c8f8dd507b738c96926d838954859eda7359a90289bc1079c21fc1f1bd5aea9e",
+    "backend/cross_window_evidence.py": "fda857480ac2d579b89af15e26ce48a983d38723714a42bd05457bfc13689ada",
+    "backend/dense_identity_continuity.py": "577e9cd21b1553cbbb354bd4a3867b562b17b519c8cb4117a24195ace6d07976",
+    "backend/evidence_feedback.py": "7263ca10f51162841e0f36ee99d6339e423d4d718a2d841b5f79fc442f479c7f",
+    "backend/fix10a_goal_direction.py": "bc72521fbf9301e761501930895af5c3138dcdf70c41f8551ea54d2744627dd6",
+    "backend/fix10a_vision_providers.py": "41fd30451eb549a70a9aef0b48ec5950672f9384def553322a9eac9f6eee68cd",
+    "backend/goal_review_sampling.py": "160d345d1589114f0fa807b2f9b4d40b2326e3024c0363daf8b28d88aaf13ff6",
+    "backend/goal_review_scheduler.py": "4046245b59f85cf311e9cedc6673d9ebc3d319d80d290c4adfeb73e13f9b7c93",
+    "backend/physical_match_reconstruction.py": "3ca49a8b81d62cc28e741ef8092e971bdfd64e872e94be187c21032b28b7a7fb",
+    "backend/report_evidence_export.py": "db7f142d51a560817ebf5d87e5560c31f16d0f4e81c53b93679248ea48d7ac3a",
+    "backend/shot_outcome_engine.py": "97cce59649a06f810a7ab17bf51eda08a93ea0c19191c99f3267e6464060f710",
+    "backend/unified_identity_authority.py": "ef070ceb010afb723f716b64eca4f88b7755b50bd864179fba3f8cd34f26878a",
+    "backend/video_timebase.py": "e98a14a79fd395a18635b516d54e4daba899b1364130fd009c5fc180acd47182",
+    "backend/sequence_observation_context.py": "818be02297a7813d004a7deb8f8164823d8086c70d891735e2e0affca5449f8d",
+    "backend/attack_sequence_search.py": "a6f8703365311880576fae3a9e0ec23b1fa9936da0f58378f0d5f2a2af5d43e7"
+  },
+  "audit_script_sha256": "2e64a494eac58fba5e754c601c29e1c7a76344ecf73174d0eb00848ba690f467",
+  "source_unchanged_during_native_audit": true,
+  "tests": {
+    "files": 109,
+    "passed": 1877,
+    "skipped": 28,
+    "existing_dependency_warnings": 2,
+    "seconds": 57.0,
+    "new_fix29_cases": 56,
+    "additional_fix29_and_export_selection_passed": 92,
+    "additional_selection_overlaps_core": true,
+    "log_sha256": "a4bce23904a894154c51cda42b2db77826645a8ac2d5e1464619de107bebd79d",
+    "offline_receipt": {
+      "backend": "/workspace/scratch/23ba3d883b50/VedoScout-fix29-work/backend",
+      "forbidden_attempts": {
+        "actual_sdk": 0,
+        "network": 0,
+        "video_decode": 0
+      },
+      "kind": "R6_LOCAL_OFFLINE_TEST_RECEIPT",
+      "native_video_decode_calls": 0,
+      "new_model_calls": 0,
+      "pytest_exit_code": 0
+    }
+  },
+  "controlled_before_after": {
+    "scope": "CONTROLLED_PRODUCTION_FUNCTIONS_NOT_USER_VIDEO_PROOF",
+    "cases": {
+      "identity_long_native_track": {
+        "baseline_end_proof": false,
+        "new_end_proof": true
+      },
+      "reid_after_cut": {
+        "baseline_target": false,
+        "new_target": true
+      },
+      "late_measured_crossing": {
+        "baseline_status": "UNRESOLVED",
+        "new_status": "VERIFIED"
+      },
+      "long_review_context": {
+        "baseline_end_ms": 3600,
+        "new_end_ms": 7000
+      }
+    }
+  },
+  "decoder": {
+    "jobs": 13,
+    "requested_images": 156,
+    "actual_pts_and_pixels_identical": true,
+    "baseline_seconds": 25.796,
+    "batched_seconds": 9.002,
+    "scope": "SAME_REQUESTED_SOURCE_IMAGES_NOT_FULL_ANALYSIS_TIME",
+    "source_files_match_final": [
+      "video_timebase.py",
+      "fix10a_vision_providers.py"
+    ],
+    "local_repeat_count": 3,
+    "other_runs_seconds": [
+      {
+        "baseline": 31.835,
+        "batched": 12.543
+      },
+      {
+        "baseline": 27.43,
+        "batched": 9.74
+      }
+    ],
+    "limits": [
+      "Local runs; cache and machine load affect wall time",
+      "Baseline random access ran before grouped decoding"
+    ]
+  },
+  "native": {
+    "windows_ok": 15,
+    "windows_failed": 0,
+    "accepted_contacts": 333,
+    "physical_strikes": 182,
+    "native_recovered_contacts": 4,
+    "proof_identity_frames_baseline": 1333,
+    "proof_identity_frames_new": 1333,
+    "decoded_frames_and_accepted_contacts_exactly_preserved": true,
+    "physical_outcome_and_goal_crossing_records_exactly_preserved": true,
+    "canonical_counts": {},
+    "canonical_reference_actions_verified": 0,
+    "reference_actions": 5,
+    "reference_labels_used_as_analysis_input": false,
+    "physical_seconds": 66.163,
+    "baseline_physical_seconds": 78.401,
+    "physical_times_are_not_a_controlled_speed_comparison": true,
+    "new_physical_sha256": "28daf2f5f984f93f470d5e536d1cbefe74cdfcd35050d02f77e6a61ac9058d59",
+    "baseline_physical_sha256": "af871a92a0707267d707607986a69ccdf666e461eb68d1bc96784baeb2967a95",
+    "counters": {
+      "network": 0,
+      "sdk": 0,
+      "video_opens": 64,
+      "detector_forwards": 0
+    }
+  },
+  "sampling": {
+    "jobs": 13,
+    "old_total_images": 156,
+    "new_total_images": 156,
+    "old_mean_images_within_100ms_of_native_focus": 0.3076923076923077,
+    "new_mean_images_within_100ms_of_native_focus": 4,
+    "native_focus_is_not_a_verified_action": true
+  },
+  "posthoc_reference_cases": [
+    {
+      "case_id": "saved_shot",
+      "reference_ms": 23680,
+      "expected_type": "SHOT",
+      "expected_outcome": "SAVED",
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "nearest_actual_ms": 23682,
+      "target_status": "UNRESOLVED",
+      "target_reason": "SCENE_CUT"
+    },
+    {
+      "case_id": "target_goal",
+      "reference_ms": 30830,
+      "expected_type": "GOAL",
+      "expected_outcome": "GOAL",
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "nearest_actual_ms": 30832,
+      "target_status": "VERIFIED",
+      "target_reason": "BOUNDED_DENSE_BODY_CONTINUITY"
+    },
+    {
+      "case_id": "assist_1",
+      "reference_ms": 43190,
+      "expected_type": "ASSIST",
+      "expected_outcome": "TEAMMATE_GOAL",
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "nearest_actual_ms": 43182,
+      "target_status": "UNRESOLVED",
+      "target_reason": "SCENE_CUT"
+    },
+    {
+      "case_id": "assist_2",
+      "reference_ms": 49440,
+      "expected_type": "ASSIST",
+      "expected_outcome": "TEAMMATE_GOAL",
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "nearest_actual_ms": 49448,
+      "target_status": "UNRESOLVED",
+      "target_reason": "SCENE_CUT"
+    },
+    {
+      "case_id": "assist_3",
+      "reference_ms": 56440,
+      "expected_type": "ASSIST",
+      "expected_outcome": "TEAMMATE_GOAL",
+      "status": "NOT_VERIFIED",
+      "failure_reason": "QUALIFIED_CANONICAL_EVENT_MISSING",
+      "nearest_actual_ms": 56448,
+      "target_status": "VERIFIED",
+      "target_reason": "BOUNDED_DENSE_BODY_CONTINUITY"
+    }
+  ],
+  "new_uploads": 0,
+  "new_taps": 0,
+  "database_writes": 0,
+  "external_model_calls": 0,
+  "limits": [
+    "No live image, jersey, role or goal reader ran; the source video remains 0/5 in the reader-free control",
+    "New automatic post-cut identification requires actual fresh independent jersey observations",
+    "The specialized football detector suggestion has not been trained or benchmarked; existing detector retained",
+    "The original FIX28 source and its earlier validation could not be independently recovered",
+    "No claim of complete FIX23-FIX27 restoration",
+    "No push, merge or deployment"
+  ]
+}

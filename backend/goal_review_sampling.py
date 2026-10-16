@@ -178,6 +178,9 @@ def provider_strike(job):
     """Bind the current job path on normal and feedback provider calls alike."""
     strike = deepcopy(job["strike"])
     strike.pop("_goal_review_ball_path", None)
+    strike.pop("_sequence_context", None)
+    if isinstance(job.get("sequence_context"), dict):
+        strike["_sequence_context"] = deepcopy(job["sequence_context"])
     path = contact_bound_native_path(strike, job.get("shot_track"))
     if path is not None:
         strike["_goal_review_ball_path"] = path

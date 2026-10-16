@@ -150,9 +150,25 @@ def build(physical):
                           'start_ms':min(by_id[t]['window']['start_ms'] for t in sources),
                           'end_ms':max(by_id[t]['window']['end_ms'] for t in sources)},
                 'decoded_frames':[], 'touch_graph':{'touches':[]}, 'strike_evidence':[], 'outcome_evidence':[],
+                'source_video':deepcopy(by_id[sources[0]].get('source_video') or {}),
+                'role_evidence':{}, 'entity_mappings':{},
                 'source_trace_ids':sources, 'cross_window_links':scope_links}
         for tid in sources:
             tr=by_id[tid]
+            merged['entity_mappings'][tid]={p['local_track_id']:'body:'+repr(root((tid,p['local_track_id'])))
+                for f in tr.get('decoded_frames') or [] for p in f.get('players') or []
+                if isinstance(p.get('local_track_id'),str)}
+            for track, role in (tr.get('role_evidence') or {}).items():
+                if not isinstance(role,dict) or role.get('status')!='VERIFIED':
+                    continue
+                entity='body:'+repr(root((tid,track)))
+                old=merged['role_evidence'].get(entity)
+                if old and old.get('role')!=role.get('role'):
+                    merged['role_evidence'][entity]={'status':'CONFLICT', 'alternatives':list(dict.fromkeys(
+                        (old.get('alternatives') or [old.get('role')])+[role.get('role')]))}
+                elif old is None:
+                    merged['role_evidence'][entity]={'role':role.get('role'), 'status':'VERIFIED',
+                        'votes':[{'media_ms':v.get('media_ms')} for v in role.get('votes') or []]}
             merged['decoded_frames'].extend(rewrite(tr.get('decoded_frames') or [],tid))
             merged['touch_graph']['touches'].extend(rewrite((tr.get('touch_graph') or {}).get('touches') or [],tid))
             for strike in tr.get('strike_evidence') or []:

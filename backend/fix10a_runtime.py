@@ -142,6 +142,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
     canonical fallback; no fabricated event is introduced.
     """
     result = unified_result if isinstance(unified_result, dict) else {}
+    physical_plan = unified_analysis_engine.physical_sequence_plan(result)
     sequence = (
         result.get("sequence_analysis")
         if isinstance(result.get("sequence_analysis"), dict)
@@ -281,7 +282,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
         try:
             physical = await asyncio.to_thread(
                 physical_match_reconstruction.reconstruct_physical_match,
-                str(video_path), result.get("sequence_plan") or {}, sequence,
+                str(video_path), physical_plan if physical_plan is not None else result.get("sequence_plan") or {}, sequence,
                 result.get("scene_graph") or {}, result.get("identity_authority") or {}, jersey_vote_provider,
                 source_video=source_video or {}, goal_geometry_provider=goal_geometry_provider,
                 role_evidence=role_evidence or {}, role_evidence_provider=role_evidence_provider,
@@ -304,6 +305,14 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
         storage_errors.extend({"trace_id": m.get("trace_id"), "error_type": "StorageUnavailable"}
                               for m in unpersisted)
         physical["audit_storage_complete"] = not storage_errors
+        unreviewable = (physical_plan or {}).get("unreviewable_windows") or []
+        if unreviewable:
+            physical["unreviewable_sequence_windows"] = deepcopy(unreviewable)
+            physical["recall_coverage"] = {
+                **(physical.get("recall_coverage") or {}), "complete": False,
+                "verification_complete": False,
+                "status": "PARTIAL", "unreviewable_windows": deepcopy(unreviewable),
+            }
         if storage_errors:
             physical["status"] = "partial"
         # Storage degradation changes coverage, never discards a completed
@@ -326,6 +335,7 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
             "fix10a_trace_storage_status": "partial" if storage_errors else "ok",
             "fix10a_trace_storage_errors": storage_errors,
             "fix10a_sequence_contract_complete": sequence.get("coverage_complete") is True,
+            "fix10a_unreviewable_sequence_windows": deepcopy(unreviewable),
             "fix10a_supporting_vision": support_mode,
             "fix10a_fix10b_summary": fix10b_candidate.get("summary") or {},
             "fix10a_error": None,

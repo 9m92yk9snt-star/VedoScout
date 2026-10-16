@@ -33,8 +33,13 @@ CONFIG_KEYS = ("IDENTITY_TIMELINE_ENABLED", "IDENTITY_TIMELINE_HZ",
                "FIX10A_SUPPORT_VISION_ENABLED", "CV_SHADOW_ENABLED", "FIX13_MAX_ACTION_REVIEWS", "FIX13_MAX_FEEDBACK_REVIEWS",
                "FIX10A_MAX_GOAL_REVIEWS_PER_REPORT", "FIX10A_MAX_GOAL_CLARIFICATIONS_PER_REPORT",
                "FIX10A_SUPPORT_VISION_MODEL", "FIX10A_MAX_JERSEY_READS", "FIX10A_MAX_ROLE_TRACKS",
-               "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES")
+               "FIX10A_MAX_ROLE_FRAMES", "FIX10A_MAX_GOAL_FRAMES", "FIX15_MAX_DENSE_GOAL_FRAMES")
 SOURCE_MODULES = (
+    "sequence_observation_context.py", "attack_sequence_search.py",
+    "ball_motion_evidence.py", "cv_shadow.py", "dense_track_refinement.py", "event_ledger.py",
+    "fix10a_occluded_goal.py", "frame_geometry.py", "independent_ball_review.py", "jersey_consensus.py",
+    "jersey_pixels.py", "media_binaries.py", "motion_compensation.py", "open_observation_compat.py",
+    "player_selection.py", "tracking_geometry.py", "unified_event_bridge.py",
     "unified_analysis_engine.py", "unified_identity_authority.py",
     "player_identity_timeline.py", "player_tracking.py", "video_timebase.py",
     "football_scene_graph.py", "football_sequence_intelligence.py",

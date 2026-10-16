@@ -5,13 +5,18 @@ gaps are not physical contradictions. Cuts, ambiguous body associations and a
 different verified target are contradictions and terminate propagation.
 """
 from copy import deepcopy
+import math
 
 import unified_identity_authority as uia
+from goal_review_scheduler import _iou
 
 MAX_CONTINUITY_MS = 1200
 MAX_FRAME_GAP_MS = 80
 SEED_REASONS = {"OK_EXACT", "OK_NEAREST_TAP_FRAME",
                 "PROOF_TARGET_SINGLE_CANDIDATE_HYPOTHESIS_COLLAPSE"}
+IDENTITY_BARRIERS = {"UNRESOLVED_IDENTITY", "SOURCE_CONFLICT", "SCENE_CUT",
+                     "USER_EXCLUDED_OPPONENT", "USER_PARTIAL_VISIBLE_BODY",
+                     "DENSE_TARGET_COMPETING_ASSOCIATION"}
 
 
 def _body(frame, track):
@@ -20,6 +25,35 @@ def _body(frame, track):
               and p.get("association_state") == "VERIFIED_LOCAL"
               and uia._valid_box(p.get("box"))]
     return bodies[0] if len(bodies) == 1 else None
+
+
+def _native_unique_step(before, after, track):
+    """Long continuity needs actual, isolated detections, not an ID string.
+
+    Keep the old short bridge for legacy measurements. Beyond it, every step
+    must have a native body observation and a unique forward/backward match.
+    A new independent seed can start another segment after a crossing/cut.
+    """
+    import cv_detect
+    a, b = _body(before, track), _body(after, track)
+    if (a and b and a.get("team") in {"target_team", "opponent"}
+            and b.get("team") in {"target_team", "opponent"} and a["team"] != b["team"]):
+        return False
+    for frame, body in ((before, a), (after, b)):
+        if body is None:
+            return False
+        confidence = body.get("confidence")
+        quality = body.get("jersey_crop_quality")
+        quality = quality if isinstance(quality, dict) else {}
+        if (not isinstance(confidence, (int, float)) or isinstance(confidence, bool)
+                or not math.isfinite(confidence) or confidence <= cv_detect.CONF_T
+                or quality.get("source") != "NATIVE_TORSO_PIXELS" or quality.get("isolated") is not True):
+            return False
+        if any(p is not body and _iou(p.get("box"), body["box"]) >= .25
+               for p in frame.get("players") or []):
+            return False
+    return (len([p for p in after.get("players") or [] if uia.boxes_agree(a["box"], p.get("box"))]) == 1
+            and len([p for p in before.get("players") or [] if uia.boxes_agree(b["box"], p.get("box"))]) == 1)
 
 
 def apply(frames, touch_graph=None):
@@ -39,10 +73,12 @@ def apply(frames, touch_graph=None):
         if (t.get("status") == "VERIFIED" and t.get("proof_eligible") is True
                 and t.get("global_target_id") == uia.GLOBAL_TARGET_ID
                 and resolution.get("status") == "VERIFIED"
-                and resolution.get("reason") == "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP"
+                and resolution.get("reason") in {"UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP",
+                    "UNIQUE_MULTI_FRAME_JERSEY_REID_FROM_VERIFIED_REFERENCE"}
                 and ms in by_ms):
             seeds.append((by_ms[ms], t.get("player_track_id"), resolution["reason"]))
     proposals = {}
+    native_steps = {}
     for index, track, reason in seeds:
         seed = rows[index]
         seed_body = _body(seed, track)
@@ -50,15 +86,23 @@ def apply(frames, touch_graph=None):
             continue
         for direction in (-1, 1):
             previous, previous_body = seed, seed_body
+            measured_segment = True
             for i in range(index, len(rows) if direction == 1 else -1, direction):
                 f = rows[i]
                 body = _body(f, track)
                 target = f.get("global_target") or {}
-                if (abs(f["media_ms"] - seed["media_ms"]) > MAX_CONTINUITY_MS
+                if measured_segment:
+                    key = (*sorted((id(previous), id(f))), track)
+                    if key not in native_steps:
+                        native_steps[key] = _native_unique_step(previous, f, track)
+                    measured_segment = native_steps[key]
+                extended = abs(f["media_ms"] - seed["media_ms"]) > MAX_CONTINUITY_MS
+                if (extended and not measured_segment
                         or abs(f["media_ms"] - previous["media_ms"]) > MAX_FRAME_GAP_MS
                         or f.get("scene_id") != seed.get("scene_id")
-                        or f.get("cut_barrier") or f.get("used_fallback")
+                        or f.get("cut_barrier") or f.get("cut") or f.get("used_fallback")
                         or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                        or target.get("reason") in IDENTITY_BARRIERS
                         or body is None
                         or not uia.boxes_agree(previous_body["box"], body["box"])
                         or (target.get("status") == "VERIFIED" and target.get("proof_eligible") is True
@@ -71,7 +115,9 @@ def apply(frames, touch_graph=None):
                        for p in f.get("players") or []):
                     break
                 proposals.setdefault(i, {}).setdefault(track, {
-                    "seed_ms": seed["media_ms"], "seed_reason": reason})
+                    "seed_ms": seed["media_ms"], "seed_reason": reason,
+                    "native_segment_verified": measured_segment,
+                    "extended_visible_track": extended})
                 previous, previous_body = f, body
     promoted = 0
     for i, candidates in proposals.items():
@@ -85,7 +131,8 @@ def apply(frames, touch_graph=None):
         body = _body(f, track)
         f["global_target"] = {
             "status": "VERIFIED", "proof_eligible": True,
-            "reason": "BOUNDED_DENSE_BODY_CONTINUITY",
+            "reason": ("MEASURED_VISIBLE_TRACK_CONTINUITY" if evidence["extended_visible_track"]
+                       else "BOUNDED_DENSE_BODY_CONTINUITY"),
             "local_track_id": track, "candidate_local_track_ids": [track],
             "body_box": deepcopy(body["box"]),
             "body_team": body.get("team"),

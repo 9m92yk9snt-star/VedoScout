@@ -12,6 +12,7 @@ import math
 import os
 
 import goal_review_scheduler as scheduler
+import sequence_observation_context
 
 MAX_ACTION_REVIEWS = max(0, int(os.environ.get("FIX13_MAX_ACTION_REVIEWS", "16")))
 MAX_ACTION_FRAMES = 12
@@ -113,22 +114,7 @@ def build_plan(windows, analysis, budget=None):
 
 
 def frame_times(job, frames):
-    available = sorted({int(f["media_ms"]) for f in frames if _num(f.get("media_ms"))
-                        and f.get("scene_id") == job["scene_id"] and not f.get("cut_barrier")
-                        and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"
-                        and job["start_ms"] <= f["media_ms"] <= job["end_ms"]})
-    if len(available) <= MAX_ACTION_FRAMES:
-        return available
-    # Contact times are unproved search hints here. Cover the whole interval
-    # instead of borrowing outcome sampling that concentrates on a known kick.
-    center = min(available, key=lambda ms: abs(ms - job["center_ms"]))
-    selected = {available[0], available[-1], center}
-    if job.get("has_contact_time"):
-        selected.update(min(available, key=lambda ms: abs(ms - (center + offset))) for offset in (-50, 50))
-    while len(selected) < MAX_ACTION_FRAMES:
-        selected.add(max((ms for ms in available if ms not in selected),
-                         key=lambda ms: (min(abs(ms - old) for old in selected), -ms)))
-    return sorted(selected)
+    return sequence_observation_context.sampling_plan(job, frames, MAX_ACTION_FRAMES)["media_ms"]
 
 
 def neighbor_times(seed_ms, frames, scene_id):
@@ -177,7 +163,7 @@ def bind_body(frame, box):
     return player
 
 
-def measured_body_candidates(frame):
+def measured_body_candidates(frame, *, body_labels=None):
     """Stable search IDs for uniquely measured crops, never player identities.
 
     The pixel reader selects IDs rather than estimating body coordinates in a
@@ -186,7 +172,7 @@ def measured_body_candidates(frame):
     bodies = sorted([p for p in frame.get("players") or []
                      if bind_body(frame, p.get("box")) is p],
                     key=lambda p: (p["box"]["x"], p["box"]["y"], p["local_track_id"]))
-    return [{"body_id": f"body_{i + 1}", "box": deepcopy(p["box"]),
+    return [{"body_id": (body_labels or {}).get(p["local_track_id"], f"body_{i + 1}"), "box": deepcopy(p["box"]),
              "local_track_id": p["local_track_id"]} for i, p in enumerate(bodies[:12])]
 
 
