@@ -97,9 +97,9 @@ def reconcile_unified_result(
 ) -> dict:
     """Build the complete production unified result without mutating inputs.
 
-    A partial FIX10A run may contribute only from successful traces. Every
-    proposal still has to pass FIX10B's strict physical-proof gates. Failed or
-    ambiguous windows therefore cannot invent events.
+    A partial FIX10A run may contribute physical proposals from successful
+    traces and complete source-video chains through the shared actor resolver.
+    Unresolved physical reconstruction does not veto qualified visual evidence.
     """
     source = deepcopy(unified_result) if isinstance(unified_result, dict) else {}
     canonical_before = (

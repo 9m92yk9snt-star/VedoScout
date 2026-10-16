@@ -19,6 +19,7 @@ import hashlib
 import math
 from copy import deepcopy
 import cross_window_evidence
+import canonical_event_resolver
 
 VERSION = 1
 GLOBAL_TARGET_ID = "GLOBAL_TARGET"
@@ -1413,6 +1414,32 @@ def _shot_role_conflicts(events, physical):
     """
     import sequence_observation_context as sequence_context
     conflicts = {}
+    # A fresh complete pass/receiver/finish observation corrects an older
+    # sparse semantic label. Do not relabel independently proved target shots
+    # (for example a shot followed by a teammate's rebound).
+    for assist in events:
+        if assist.get("canonical_event_type") != "ASSIST" or not canonical_event_resolver.has_motion_proof(assist):
+            continue
+        chain = assist.get("causal_chain") or {}
+        for old in events:
+            if (old is assist or old.get("canonical_action_type") != "SHOT"
+                    or old.get("scene_id") != assist.get("scene_id")
+                    or old.get("reconciliation_authority") == "FIX10B_PHYSICAL_RECONCILIATION"
+                    or canonical_event_resolver.has_motion_proof(old) or not _num(old.get("canonical_ms"))):
+                continue
+            same_release = _num(assist.get("contact_ms")) and abs(old["canonical_ms"]-assist["contact_ms"]) <= 250
+            teammate_finish = (_num(chain.get("teammate_shot_ms"))
+                and abs(old["canonical_ms"]-chain["teammate_shot_ms"]) <= 250
+                and chain.get("finisher_local_track_id")
+                and chain["finisher_local_track_id"] != old.get("actor_local_track_id"))
+            target_strike = any(_verified_release(s) and s.get("global_target_id") == GLOBAL_TARGET_ID
+                and s.get("scene_id") == old.get("scene_id")
+                and abs(s["media_ms"]-old["canonical_ms"]) <= 250
+                for trace in (physical or {}).get("traces") or [] for s in trace.get("strike_evidence") or [])
+            if (same_release or teammate_finish) and not target_strike:
+                conflicts[old.get("event_id")] = {"source": "SOURCE_VIDEO_PASS_RECEIVER_FINISH",
+                    "corrected_by_event_id": assist.get("event_id"), "native_finisher_track_id": chain.get("finisher_local_track_id"),
+                    "video_observation": deepcopy((assist.get("proof") or {}).get("video_observation"))}
     for trace in (physical or {}).get("traces") or []:
         frames = trace.get("decoded_frames") or []
         by_ms = {f["media_ms"]: f for f in frames if sequence_context.actual(f)}
@@ -1444,6 +1471,7 @@ def _shot_role_conflicts(events, physical):
                     for event in events:
                         if (event.get("canonical_event_type") != "SHOT"
                                 or event.get("reconciliation_authority") == "FIX10B_PHYSICAL_RECONCILIATION"
+                                or canonical_event_resolver.has_motion_proof(event)
                                 or event.get("scene_id") != f.get("scene_id")
                                 or not _num(event.get("canonical_ms"))
                                 or abs(event["canonical_ms"]-f["media_ms"]) > CANONICAL_MATCH_MS):
@@ -1570,16 +1598,16 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
             resolved_unresolved_keys.add((proposal.get("scene_id"),
                 proposal.get("source_unresolved_sequence_id"), str(unresolved_action_id)))
 
-    # A semantic GOAL/ASSIST chain can have internally consistent timestamps
-    # while attributing the teammate's strike to the target. Once FIX10B is
-    # authoritative, scoring needs a matching verified physical proposal.
-    # Keep unmatched claims visible for review, but never publish them as
-    # verified target goals/assists or count them in the report.
+    # Older sparse semantic chains can misattribute a teammate's strike. A
+    # complete source-video chain already resolved against measured identities
+    # and transfer is also valid evidence. Do not veto it merely because the
+    # separate physical crossing reconstruction could not resolve that play.
     scoring_unresolved = []
     verified_events = []
     for event in events:
         if (event.get("canonical_event_type") in {"GOAL", "ASSIST"}
-                and event.get("reconciliation_authority") != "FIX10B_PHYSICAL_RECONCILIATION"):
+                and event.get("reconciliation_authority") != "FIX10B_PHYSICAL_RECONCILIATION"
+                and not canonical_event_resolver.has_motion_proof(event)):
             scoring_unresolved.append({
                 "event_id": event.get("event_id"),
                 "scene_id": event.get("scene_id"),

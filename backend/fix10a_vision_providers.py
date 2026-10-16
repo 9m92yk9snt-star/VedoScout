@@ -37,6 +37,7 @@ import fix10a_occluded_goal
 import goal_reappearance
 import native_goal_review
 import goal_context_observations
+import video_model_input
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -1152,6 +1153,73 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_
                 "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER}
 
 
+_DEFAULT_ACTION_PIXEL_READER = read_action_pixel_evidence
+
+
+async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, body_candidates,
+                                     sequence_context=None, selected_reference=None):
+    """One motion read supplies identity, action roles and pixel search proposals."""
+    timeline = [{"idx": i+1, "source_ms": ms,
+                 "bodies": [b["body_id"] for b in row.get("bodies") or []]}
+                for i, (ms, row) in enumerate(zip(media_ms, body_candidates))]
+    prompt = (
+        "Review the complete chronological football video, including buildup and aftermath. "
+        "Its frame labels are source-video milliseconds. Playback is deliberately slowed: each source view lasts one second, "
+        "and successive source views are about 125 ms apart. Playback seconds are NOT source time. "
+        "Use only the supplied integer frame indices in your answer. Body labels follow measured tracks; "
+        "they are not shirt numbers. Some body labels disappear during overlaps; use labels from clear frames to track the person "
+        "through the play, and cite the actual labelled evidence frames. A local track label can switch people: compare the pixels, not just the label. "
+        "Compare the selected player's reference crops using hair, build, "
+        "socks, boots and sleeves even when the shirt number is hidden. Kit colour alone cannot identify a teammate. "
+        "Keep passer, receiver and finisher separate. Follow each active-ball sequence forward from the pass "
+        "and backward from the outcome. A player leaving the picture after his pass does not erase that pass. "
+        "A briefly hidden ball can reappear; describe the visible before/after evidence rather than inventing its hidden path. "
+        "continuous_visible_sequence means the same uninterrupted play, not that the ball must be visible in every frame. "
+        "For a goal identify the active ball inside the goal after the strike, excluding stationary spare balls; "
+        "keeper gaze or celebration alone is not enough. For a save identify the keeper intervention and subsequent ball movement. "
+        "Report visible actions and their outcome; don't replace an observed pass by the receiver's shot. "
+        "No expected event count, event times, shirt number or result is provided. "
+        "For every input frame return a frames row; empty ball proposals are fine. Ball boxes use the displayed video coordinates. "
+        "Mark active_ball=true only for the ball followed in the current play, not stationary spares. "
+        "For visible ball-foot/body contact or clear ball control, also supply control_body_id and control_visible=true. "
+        "This needs a visible ball at that body, not gaze, proximity alone or the action label. Otherwise use null/false. "
+        "Select only visibly exposed jersey bodies for separate digit reading; do not guess digits. "
+        "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
+        "\"target_observations\":[{\"idx\":1,\"body_id\":\"body_1\",\"confidence\":\"high\",\"features\":[\"hair\",\"boots\"]}],"
+        "\"actions\":[{\"kind\":\"PASS|CROSS|SHOT|RECEIVE|CARRY|DRIBBLE|DUEL|RUN|OTHER\","
+        "\"start_idx\":1,\"contact_idx\":2,\"end_idx\":3,\"actor_body_id\":\"body_1\",\"actor_evidence_indices\":[1,2],"
+        "\"contact_visibility\":\"VISIBLE|PARTIAL|OCCLUDED|UNKNOWN\",\"foot\":\"LEFT|RIGHT|UNKNOWN\","
+        "\"outcome\":\"GOAL|SAVED|BLOCKED|OFF_TARGET|COMPLETED|INCOMPLETE|TEAMMATE_SHOT|TEAMMATE_GOAL|UNKNOWN\","
+        "\"outcome_visible\":true,\"outcome_idx\":null,\"receiver_body_id\":null,\"receiver_idx\":null,"
+        "\"finisher_body_id\":null,\"shot_idx\":null,\"continuous_visible_sequence\":true,"
+        "\"outcome_evidence_indices\":[],\"details\":[\"visible evidence\"]}]}. "
+        "Use null when a contact/role/outcome was not observed. For a teammate goal include receiver, finisher, shot and outcome indices. "
+        "Only list target matches actually distinguishable in the source pixels. "
+        "Source-index map: " + json.dumps(timeline, separators=(",", ":"))
+        + "\nShared measured context (not an expected action story): "
+        + json.dumps(sequence_observation_context.motion_reader_context(sequence_context), separators=(",", ":"))
+    )
+    with tempfile.TemporaryDirectory(prefix="motion_references_") as directory:
+        refs = []
+        for i, data in enumerate((selected_reference or {}).get("images") or []):
+            path = Path(directory)/f"reference_{i}.jpg"
+            path.write_bytes(base64.b64decode(data))
+            refs.append(str(path))
+        result = await video_model_input.read_video(api_key, session_id, prompt, clip_path, refs,
+                                                   timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms)
+    raw = video_model_input.response_text(result)
+    parsed = _extract_json(raw)
+    return {**_action_pixel_response(parsed, media_ms),
+            "clip_review_complete": (parsed or {}).get("reviewed_entire_clip") is True,
+            "target_observations": _target_observations(parsed, media_ms, body_candidates) if refs else [],
+            "video_actions": (parsed or {}).get("actions") if isinstance((parsed or {}).get("actions"), list) else [],
+            "observation_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
+            "provider": "gemini", "model": video_model_input.MODEL, "video_input": result["video_input"],
+            "raw_response": raw[:262144], "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
+            "input_sha256": hashlib.sha256((prompt+result["video_input"]["model_video_sha256"]+
+                "".join(result["video_input"]["reference_sha256"])).encode()).hexdigest()}
+
+
 def _target_observations(parsed, times, manifest):
     result = []
     rows = parsed.get("target_observations") if isinstance(parsed, dict) else None
@@ -1302,19 +1370,21 @@ class ShadowVisionProviders:
         self._native_goal_session = None
         self._native_video_fingerprint = None
         self._selected_reference = None
+        self._reference_gallery = None
 
     def bind_selected_reference(self, authority):
         """Prepare source pixels once; never require an OCR bootstrap to re-ID."""
         self._selected_reference = None
+        self._reference_gallery = None
         taps = {r["media_ms"]: r for r in (authority or {}).get("target_points") or []
                 if type(r.get("media_ms")) is int and _valid_box(r.get("box"))
                 and r.get("tap_authority") is True and r.get("proof_eligible") is True
                 and r.get("primary_source") == "USER_TAP"}
         if not taps or not getattr(self, "video_path", None):
             return self
-        # Three different user views, no extra model request or manual tap.
+        # Keep all existing user views once, then send the three closest views
+        # to each clip. No new tap or OCR bootstrap is required.
         times = sorted(taps)
-        times = sorted({times[round(i*(len(times)-1)/2)] for i in range(3)})
         decoded = _read_frames(self.video_path, times)
         images, evidence = [], []
         for ms in times:
@@ -1344,7 +1414,23 @@ class ShadowVisionProviders:
             self._selected_reference = {"source": "USER_SELECTED_SOURCE_PIXELS", "source_video_sha256": sha,
                 "evidence_ms": evidence, "images": images,
                 "input_sha256": hashlib.sha256(b"".join(base64.b64decode(b) for b in images)).hexdigest()}
+            self._reference_gallery = deepcopy(self._selected_reference)
+            self._selected_reference = self._reference_for_window({"start_ms": evidence[0], "end_ms": evidence[-1]})
         return self
+
+    def _reference_for_window(self, job):
+        gallery = self._reference_gallery or self._selected_reference
+        if not gallery:
+            return None
+        result = deepcopy(gallery)
+        times, images = result.get("evidence_ms") or [], result.get("images") or []
+        if len(times) == len(images) and len(times) > 3:
+            center = (job["start_ms"]+job["end_ms"])/2
+            chosen = sorted(sorted(range(len(times)), key=lambda i: (abs(times[i]-center), times[i]))[:3])
+            result["evidence_ms"] = [times[i] for i in chosen]
+            result["images"] = [images[i] for i in chosen]
+            result["input_sha256"] = hashlib.sha256(b"".join(base64.b64decode(b) for b in result["images"])).hexdigest()
+        return {**result, "global_target_id": "GLOBAL_TARGET", "number_required": False}
 
     def _native_goal_context(self):
         import dense_track_refinement as dense
@@ -1474,19 +1560,25 @@ class ShadowVisionProviders:
                 "status": "UNRESOLVED", "reason": "NATIVE_GOAL_REAPPEARANCE_MEASUREMENT_FAILED"})
 
     def action_evidence_provider(self, video_path, job, dense_frames):
-        requested = action_evidence_review.frame_times(job, dense_frames)
+        temporal = read_action_pixel_evidence is _DEFAULT_ACTION_PIXEL_READER
+        reference = self._reference_for_window(job)
+        requested = (action_evidence_review.motion_frame_times(job, dense_frames) if temporal else
+                     action_evidence_review.frame_times(job, dense_frames))
         if len(requested) < 2:
             return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_FRAMES_UNAVAILABLE", "frames": []}
         source_frames = {f["media_ms"]: f for f in dense_frames if f.get("media_ms") in requested
                     and f.get("scene_id") == job["scene_id"] and not f.get("cut_barrier")
                     and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"}
         body_labels = sequence_observation_context.labels(dense_frames)
-        measured = {ms: action_evidence_review.measured_body_candidates(f, body_labels=body_labels) for ms, f in source_frames.items()}
+        candidate_reader = action_evidence_review.motion_body_candidates if temporal else action_evidence_review.measured_body_candidates
+        measured = {ms: candidate_reader(f, body_labels=body_labels) for ms, f in source_frames.items()}
         context = job.get("sequence_context") or sequence_observation_context.build(job, dense_frames, times=requested)
         search_geometry = {ms: [p.get("box") for p in f.get("players") or []] for ms, f in source_frames.items()}
         body_hash = hashlib.sha256(json.dumps([measured, search_geometry], sort_keys=True).encode()).hexdigest()
-        cache_key = (str(video_path), tuple(requested), body_hash, context.get("fingerprint"),
-                     (self._selected_reference or {}).get("input_sha256"))
+        cache_key = ("MOTION_V1" if temporal else "PIXELS", str(video_path), tuple(requested), body_hash,
+                     hashlib.sha256(json.dumps(sequence_observation_context.motion_reader_context(context), sort_keys=True).encode()).hexdigest()
+                     if temporal else context.get("fingerprint"),
+                     (reference or {}).get("input_sha256"))
         if cache_key in self._inspection_cache:
             return deepcopy(self._inspection_cache[cache_key])
         feedback = job.get("phase") == "FEEDBACK"
@@ -1500,6 +1592,9 @@ class ShadowVisionProviders:
         images = {}
         with tempfile.TemporaryDirectory(prefix="action_pixels_") as directory:
             paths, times, body_manifest, search_rois = [], [], [], {}
+            # One fixed crop throughout the video preserves motion and camera
+            # context. Never reframe separately around the acting player.
+            search_frame = {"players": [p for f in source_frames.values() for p in f.get("players") or []]}
             for index, requested_ms in enumerate(requested):
                 got = decoded.get(requested_ms)
                 if not got or got[0] in images:
@@ -1509,35 +1604,53 @@ class ShadowVisionProviders:
                     continue
                 path = Path(directory) / f"pixels_{index:03d}.jpg"
                 candidates = measured.get(actual_ms, [])
-                view, roi, displayed = _action_search_view(image, source_frames.get(actual_ms, {}), candidates)
+                view, roi, displayed = _action_search_view(image, search_frame if temporal else source_frames.get(actual_ms, {}), candidates)
                 if _write_jpg(path, view):
                     paths.append(str(path)); times.append(int(actual_ms)); images[int(actual_ms)] = image
                     search_rois[int(actual_ms)] = roi
-                    body_manifest.append({"media_ms": int(actual_ms), "source_roi": roi, "bodies": displayed})
+                    body_manifest.append({"media_ms": int(actual_ms), "source_roi": roi, "bodies": displayed,
+                                          "source_bodies": candidates})
             if len(paths) < 2:
                 return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
             self.inspection_calls += 1
             self.feedback_inspection_calls += int(feedback)
             try:
-                kwargs = {"body_candidates": body_manifest}
-                if "sequence_context" in inspect.signature(read_action_pixel_evidence).parameters:
-                    kwargs["sequence_context"] = context
-                if "selected_reference" in inspect.signature(read_action_pixel_evidence).parameters:
-                    kwargs["selected_reference"] = self._selected_reference
-                review = support_vision_runner.run_support_vision(read_action_pixel_evidence, [(
-                    (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}-{self.inspection_calls}", paths, times), kwargs)],
-                    deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="action_pixels")[0]
+                if temporal:
+                    clip_path = Path(directory)/"motion.mp4"
+                    clip_manifest = video_model_input.write_motion_clip(paths, times, clip_path)
+                    review = support_vision_runner.run_support_vision(read_action_video_evidence, [(
+                        (self.api_key, f"{self.session_prefix}-motion-{job['inspection_id']}", str(clip_path), times, body_manifest),
+                        {"sequence_context": context, "selected_reference": reference})],
+                        deadline_s=video_model_input.VIDEO_TIMEOUT_S + 5 + support_vision_runner.DEADLINE_MARGIN_S,
+                        label="action_video")[0]
+                    review["motion_clip"] = clip_manifest
+                else:
+                    kwargs = {"body_candidates": body_manifest}
+                    if "sequence_context" in inspect.signature(read_action_pixel_evidence).parameters:
+                        kwargs["sequence_context"] = context
+                    if "selected_reference" in inspect.signature(read_action_pixel_evidence).parameters:
+                        kwargs["selected_reference"] = reference
+                    review = support_vision_runner.run_support_vision(read_action_pixel_evidence, [(
+                        (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}-{self.inspection_calls}", paths, times), kwargs)],
+                        deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="action_pixels")[0]
             except Exception as exc:
                 review = {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
                           "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
                           **support_vision_runner.fail_closed_diagnostic(exc)}
+        return self._apply_action_review(video_path, job, dense_frames, review, requested, times, images,
+                                         search_rois, measured, body_manifest, body_labels, context, cache_key, reference)
+
+    def _apply_action_review(self, video_path, job, dense_frames, review, requested, times, images,
+                             search_rois, measured, body_manifest, body_labels, context, cache_key, reference):
         import dense_track_refinement
         if self._native_goal_detector is None:
             self._native_goal_detector = dense_track_refinement._default_detector()
         detector = self._native_goal_detector
         rows = []
+        visual_controls = []
         seen_indices = set()
-        for row in (review.get("frames") or [])[:action_evidence_review.MAX_ACTION_FRAMES]:
+        frame_limit = action_evidence_review.MAX_ACTION_VIDEO_FRAMES if review.get("motion_clip") else action_evidence_review.MAX_ACTION_FRAMES
+        for row in (review.get("frames") or [])[:frame_limit]:
             if not isinstance(row, dict) or not isinstance(row.get("idx"), int) or isinstance(row.get("idx"), bool):
                 continue
             index = row["idx"] - 1
@@ -1550,7 +1663,19 @@ class ShadowVisionProviders:
             for ball in proposals[:3]:
                 if isinstance(ball, dict) and ball.get("confidence") in {"high", "medium"}:
                     native_box = _native_search_box(ball.get("box"), search_rois[media_ms])
-                    balls.extend(corroborate_ball_pixels(detector, images[media_ms], native_box))
+                    if (review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
+                            and ball.get("active_ball") is True and ball.get("control_visible") is True
+                            and ball.get("confidence") == "high" and _valid_box(native_box)):
+                        body = next((c for c in measured.get(media_ms, [])
+                                     if c["body_id"] == ball.get("control_body_id")), None)
+                        if body:
+                            visual_controls.append({"media_ms": media_ms, "local_track_id": body["local_track_id"],
+                                "ball_box": native_box, "confidence": "high", "control_visible": True,
+                                "source": "SOURCE_VIDEO_VISIBLE_BALL_CONTROL"})
+                    measured_balls = corroborate_ball_pixels(detector, images[media_ms], native_box)
+                    if review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1" and ball.get("active_ball") is True:
+                        measured_balls = [{**b, "video_active_ball": True} for b in measured_balls]
+                    balls.extend(measured_balls)
             selected = row.get("selected_body_ids") if isinstance(row.get("selected_body_ids"), list) else []
             # A reader choice opens a crop request only. Coordinates and the
             # local body binding come from the exact measured source frame.
@@ -1597,8 +1722,10 @@ class ShadowVisionProviders:
         matches = [{**row, "local_track_id": body_tracks.get(row.get("body_id"))}
                    for row in review.get("target_observations") or []]
         result = {**review, "frames": rows, "time_authority": "ACTUAL_MEDIA_PTS",
+                  "video_control_observations": visual_controls,
                   "target_observations": matches,
-                  "selected_reference": {k: v for k, v in (self._selected_reference or {}).items() if k != "images"},
+                  "selected_reference": {k: v for k, v in (reference or {}).items() if k != "images"},
+                  "source_video_sha256": context.get("source_video_sha256"),
                   "requested_media_ms": requested, "decoded_media_ms": times,
                   "native_neighbor_requested_ms": neighbor_requested,
                   "native_neighbor_decoded_ms": neighbor_actual,
@@ -1967,6 +2094,7 @@ class ShadowVisionProviders:
             self._native_goal_session = None
             self._native_video_fingerprint = None
             self._selected_reference = None
+            self._reference_gallery = None
             self._inspection_cache.clear()
         self.video_path = str(video_path or "")
         return self

@@ -20,6 +20,35 @@ def _num(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+def motion_fallback_requests(ordered):
+    """One clarification per unresolved clip action, plus an independent recall.
+
+    A completed motion review replaces repeated scrutiny of every control as
+    a possible goal. Missing/failed video reads retain the existing native
+    review policy. No event or physical proof is created/deleted here.
+    """
+    selected, deferred, groups = [], [], {}
+    for job in ordered:
+        context = job.get("motion_review") or {}
+        if context.get("complete") is not True:
+            selected.append(job)
+            continue
+        ms = job["strike"]["media_ms"]
+        pivots = [v for v in context.get("unresolved_contact_ms") or [] if _num(v)]
+        pivot = min(pivots, key=lambda p: abs(p-ms), default=None)
+        # A separate native recall remains available when the motion reader
+        # missed a release; expected events never select these jobs.
+        group = (job["window"].get("dense_window_id"), pivot if pivot is not None and abs(pivot-ms) <= 800 else "native_recall")
+        if group not in groups:
+            groups[group] = job
+            selected.append(job)
+        elif job["review"].get("physical_review_id") == groups[group]["review"].get("physical_review_id"):
+            selected.append(job)  # same contact consumes the existing geometry cache
+        else:
+            deferred.append(job)
+    return selected, deferred
+
+
 def _iou(a, b):
     if not all(isinstance(box, dict) and all(_num(box.get(k)) for k in ("x", "y", "w", "h"))
                and box["w"] > 0 and box["h"] > 0 for box in (a, b)):

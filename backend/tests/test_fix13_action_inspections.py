@@ -182,7 +182,7 @@ def test_native_neighbors_do_not_add_model_images_and_reject_misaligned_decodes(
 
 
 def test_decode_failure_is_not_counted_as_a_model_request(monkeypatch):
-    monkeypatch.setattr(inspection, "frame_times", lambda *_: [1000, 2000])
+    monkeypatch.setattr(inspection, "motion_frame_times", lambda *_: [1000, 2000])
     monkeypatch.setattr(vision, "_read_frames", lambda *_: {})
     bundle = vision.ShadowVisionProviders("key", "decode")
     result = bundle.action_evidence_provider("unused", {"inspection_id": "job", "start_ms": 800, "end_ms": 2200}, [])

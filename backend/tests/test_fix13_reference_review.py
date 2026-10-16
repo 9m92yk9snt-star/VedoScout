@@ -180,6 +180,7 @@ def test_fresh_replay_scopes_readers_and_supplies_feedback_eligibility(monkeypat
         calls["roles"].append(window["dense_window_id"])
         return {}
     bundle = SimpleNamespace(action_evidence_provider=inspect, role_evidence_provider=roles,
+        bind_selected_reference=lambda _authority: None,
         jersey_vote_provider=lambda *_: pytest.fail("No jersey crops were proposed"),
         goal_geometry_provider=lambda _w, s: calls["goals"].append(s) or None)
     monkeypatch.setenv("EMERGENT_LLM_KEY", "injected-test-reader")
@@ -214,3 +215,39 @@ def test_replay_rejects_different_video_before_any_reader(monkeypatch, tmp_path)
     source = evidence_zip(tmp_path, [replay_trace()], video=b"wrong", source_hash=hashlib.sha256(b"right").hexdigest())
     with pytest.raises(ValueError, match="analysis source hash"):
         replay.replay(source, support_vision=True, reference_cases=[case()])
+
+
+def test_motion_only_review_never_repeats_native_reconstruction_or_other_models(monkeypatch, tmp_path):
+    calls = []
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("motion-only review attempted another reconstruction or model reader")
+    def inspect(_path, job, _frames):
+        calls.append(deepcopy(job))
+        bundle.inspection_calls += 1
+        return {"status": "COMPLETED", "frames": []}
+    bundle = SimpleNamespace(action_evidence_provider=inspect, inspection_calls=0,
+        bind_selected_reference=lambda authority: calls.append({"reference_binding": True}),
+        jersey_vote_provider=forbidden, role_evidence_provider=forbidden, goal_geometry_provider=forbidden)
+    monkeypatch.setenv("EMERGENT_LLM_KEY", "injected-test-reader")
+    monkeypatch.setattr(replay.fix10a_vision_providers, "LlmChat", object())
+    monkeypatch.setattr(replay.fix10a_vision_providers, "build_shadow_providers", lambda *_: bundle)
+    monkeypatch.setattr(replay.fix10a_goal_direction, "wrap_goal_geometry_provider", forbidden)
+    monkeypatch.setattr(replay.ball_trajectory, "reconstruct_ball_trajectory", forbidden)
+    monkeypatch.setattr(replay.pmr, "run_feedback_round", forbidden)
+    video = b"source bytes decoded only by the injected motion reader"
+    source = evidence_zip(tmp_path, [replay_trace("selected"), replay_trace("unrelated",5000)],
+        video=video, source_hash=hashlib.sha256(video).hexdigest())
+    result = replay.replay(source, support_vision=True, motion_only=True, reference_cases=[case()])
+    assert len(calls) == 2 and calls[0] == {"reference_binding": True}
+    assert "expected_outcome" not in json.dumps(calls) and "expected_type" not in json.dumps(calls)
+    assert result["review_mode"] == "MOTION_ONLY_SAVED_NATIVE_GRAPH"
+    assert result["support_review_attempts"] == {"action_inspections": 1, "jersey_reads": 0,
+        "role_reads": 0, "goal_reads": 0, "field_side_reads": 0}
+    assert result["db_writes"] == 0 and not result["reference_review"]["all_verified"]
+
+
+def test_motion_only_cannot_silently_enable_models_or_repeat_full_video_detection(tmp_path):
+    with pytest.raises(ValueError, match="requires --support-vision"):
+        replay.replay(tmp_path/"absent.zip", motion_only=True)
+    with pytest.raises(ValueError, match="cannot combine"):
+        replay.replay(tmp_path/"absent.zip", motion_only=True, support_vision=True, video_detail=True)

@@ -122,6 +122,7 @@ def test_reference_crops_are_source_bound_and_cleared_when_video_changes(monkeyp
     bundle._role_cache["old"] = {"role": "GOALKEEPER"}
     bundle.bind_video_path(str(tmp_path / "other.mp4"))
     assert bundle._selected_reference is None
+    assert bundle._reference_gallery is None
     assert not bundle._jersey_cache and not bundle._role_cache
 
 

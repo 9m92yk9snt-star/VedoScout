@@ -103,9 +103,12 @@ READER_FUNCTIONS = {
 }
 
 
-def test_exactly_the_five_production_readers_are_registered_for_isolation():
-    assert {q for _m, q in svr.ISOLATED_READERS} == set(READER_FUNCTIONS)
-    for name, function in READER_FUNCTIONS.items():
+def test_exactly_the_eight_production_readers_are_registered_for_isolation():
+    import video_model_input
+    functions = {**READER_FUNCTIONS, "read_action_video_evidence": vp.read_action_video_evidence,
+        "read_video": video_model_input.read_video, "read_text": video_model_input.read_text}
+    assert {q for _m, q in svr.ISOLATED_READERS} == set(functions)
+    for name, function in functions.items():
         assert svr.isolated_reader_ref(function) == (function.__module__, name)
 
 
@@ -115,6 +118,7 @@ def test_exactly_the_five_production_readers_are_registered_for_isolation():
         (
             "fix10a_vision_providers.py",
             [
+                "read_action_video_evidence",
                 "read_action_pixel_evidence",
                 "read_visible_jersey_number",
                 "read_visible_player_role",
@@ -760,7 +764,7 @@ def test_action_and_role_call_sites_fail_closed_with_diagnostic(monkeypatch):
     seen = []
     monkeypatch.setattr(svr, "run_support_vision", _raise_fail_closed(seen))
     monkeypatch.setattr(vp, "_read_frames", _zero_frames)
-    monkeypatch.setattr(inspection, "frame_times", lambda *_: [1000, 1300])
+    monkeypatch.setattr(inspection, "motion_frame_times", lambda *_: [1000, 1300])
     frames = [
         {"media_ms": ms, "scene_id": "scene", "time_authority": "ACTUAL_MEDIA_PTS", "players": []} for ms in (1000, 1300)
     ]
@@ -777,7 +781,7 @@ def test_action_and_role_call_sites_fail_closed_with_diagnostic(monkeypatch):
     roles = vp.ShadowVisionProviders("key", "fix14").role_evidence_provider("unused.mp4", {}, [], {}, window, interventions)
     assert roles["p1"]["status"] == "UNRESOLVED" and roles["p1"]["role"] is None
     assert roles["p1"]["votes"][0]["support_vision_fail_closed"]["lifecycle"]["lifecycle"] == "ABORTED"
-    assert [ref[1] for ref in seen] == ["read_action_pixel_evidence", "read_visible_player_role"]
+    assert [ref[1] for ref in seen] == ["read_action_video_evidence", "read_visible_player_role"]
 
 
 def test_goal_and_field_side_call_sites_fail_closed_with_diagnostic(monkeypatch):

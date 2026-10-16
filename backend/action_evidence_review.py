@@ -16,6 +16,7 @@ import sequence_observation_context
 
 MAX_ACTION_REVIEWS = max(0, int(os.environ.get("FIX13_MAX_ACTION_REVIEWS", "16")))
 MAX_ACTION_FRAMES = 12
+MAX_ACTION_VIDEO_FRAMES = 65  # one complete existing 8-second physical window
 MAX_SEARCH_CONTEXT_MS = 8000
 MAX_FRAME_ALIGNMENT_MS = 20
 NATIVE_NEIGHBOR_RADIUS_MS = 120
@@ -123,6 +124,18 @@ def frame_times(job, frames):
     return sequence_observation_context.sampling_plan(job, frames, MAX_ACTION_FRAMES)["media_ms"]
 
 
+def motion_frame_times(job, frames):
+    """Uniform temporal coverage, bound to actual source frames, not a guessed contact."""
+    available = sorted({f["media_ms"] for f in frames
+                        if sequence_observation_context.actual(f, job.get("scene_id"))
+                        and job["start_ms"] <= f["media_ms"] <= job["end_ms"]})
+    if len(available) < 2:
+        return available
+    count = min(MAX_ACTION_VIDEO_FRAMES, max(2, math.ceil((available[-1]-available[0])/125)+1))
+    return sorted({min(available, key=lambda ms: (abs(ms-(available[0]+(available[-1]-available[0])*i/(count-1))), ms))
+                   for i in range(count)})
+
+
 def neighbor_times(seed_ms, frames, scene_id):
     """Four native search frames around a measured seed; never cross a barrier."""
     if not _num(seed_ms):
@@ -193,6 +206,24 @@ def measured_body_candidates(frame, *, body_labels=None):
                     key=lambda p: (p["box"]["x"], p["box"]["y"], p["local_track_id"]))
     return [{"body_id": (body_labels or {}).get(p["local_track_id"], f"body_{i + 1}"), "box": deepcopy(p["box"]),
              "local_track_id": p["local_track_id"]} for i, p in enumerate(bodies[:12])]
+
+
+def motion_body_candidates(frame, *, body_labels=None):
+    """Video body labels do not require an isolated, readable jersey crop.
+
+    An overlap can hide digits while the person remains visible in motion.
+    Measured local identity and visible-target comparison remain separate.
+    """
+    import unified_identity_authority as uia
+    bodies = [p for p in frame.get("players") or [] if isinstance(p.get("local_track_id"), str)
+        and p.get("association_state") == "VERIFIED_LOCAL" and uia._valid_box(p.get("box"))]
+    counts = defaultdict(int)
+    for p in bodies:
+        counts[p["local_track_id"]] += 1
+    return [{"body_id": (body_labels or {}).get(p["local_track_id"], p["local_track_id"]),
+        "local_track_id": p["local_track_id"], "box": deepcopy(p["box"]),
+        "number_crop_eligible": bind_body(frame, p["box"]) is p}
+        for p in sorted(bodies, key=lambda p: (p["box"]["x"], p["local_track_id"])) if counts[p["local_track_id"]] == 1]
 
 
 def apply_observations(frames, observations, inspection_id):

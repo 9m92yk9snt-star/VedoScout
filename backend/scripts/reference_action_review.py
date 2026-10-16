@@ -4,6 +4,7 @@ import hashlib
 import json
 
 import action_evidence_review as inspection
+import canonical_event_resolver
 
 ALLOWED = {("SHOT", "SAVED"), ("GOAL", "GOAL"), ("ASSIST", "TEAMMATE_GOAL")}
 
@@ -75,7 +76,8 @@ def assess(cases, canonical, physical, plan):
     events = [e for e in (canonical or {}).get("events") or [] if isinstance(e, dict)]
     qualified = [e for e in events if e.get("global_target_id") == "GLOBAL_TARGET"
                  and e.get("causal_verified") is True and (e.get("proof") or {}).get("proof_eligible") is True
-                 and ((e.get("proof") or {}).get("fix10b_physical") or {}).get("proof_eligible") is True]
+                 and (((e.get("proof") or {}).get("fix10b_physical") or {}).get("proof_eligible") is True
+                      or canonical_event_resolver.has_motion_proof(e))]
     results, used = [], set()
     for case in validate_cases(cases):
         ms = case["reference_ms"]

@@ -40,6 +40,7 @@ def gaps(trace):
         "unresolved_contacts": len((trace.get("contacts") or {}).get("unresolved") or []),
         "verified_contacts": len((trace.get("contacts") or {}).get("accepted") or []),
         "unresolved_outcomes": sum(str(o.get("physical_outcome") or "").startswith("UNRESOLVED")
+                                   and (o.get("goal_geometry_evidence") or {}).get("reason") != "OUTCOME_ALREADY_RESOLVED_FROM_SOURCE_CLIP"
                                    for o in trace.get("outcome_evidence") or []),
         "target_ball_frames": sum((f.get("global_target") or {}).get("proof_eligible") is True
                                   and (trajectory.get(f.get("media_ms")) or {}).get("proof_eligible") is not True
@@ -87,6 +88,8 @@ def build_plan(traces, budget=None, analysis=None):
                                for ms in job.get("missing_media_ms") or [] if inspection._num(ms))
         strikes = {s.get("strike_id"): s for s in trace.get("strike_evidence") or []}
         for outcome in trace.get("outcome_evidence") or []:
+            if (outcome.get("goal_geometry_evidence") or {}).get("reason") == "OUTCOME_ALREADY_RESOLVED_FROM_SOURCE_CLIP":
+                continue
             strike = strikes.get(outcome.get("strike_id")) or {}
             relevant = strike.get("global_target_id") == "GLOBAL_TARGET" \
                 or (outcome.get("goal_review_eligibility") or {}).get("eligible") is True

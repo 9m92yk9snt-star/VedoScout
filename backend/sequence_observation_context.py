@@ -38,6 +38,117 @@ def fingerprint(packet):
     return packet
 
 
+def video_observations(observation, frames, window):
+    """Translate clip indices to measured bodies/source PTS for the existing resolver.
+
+    This creates observations, not events. Player identity, team/ball transfer
+    and causal ownership are still resolved against the shared native graph.
+    """
+    import football_sequence_intelligence as sequence
+    obs = observation or {}
+    clip, transport = obs.get("motion_clip") or {}, obs.get("video_input") or {}
+    times = clip.get("frame_source_ms") or []
+    if (obs.get("observation_protocol") != "SOURCE_INDEXED_MOTION_CLIP_V1"
+            or obs.get("clip_review_complete") is not True
+            or obs.get("status") not in {"COMPLETED", "PARTIAL_RESPONSE"}
+            or transport.get("sampling_prepared_for_provider") is not True
+            or transport.get("sampling_strategy") != "SOURCE_INDEXED_1FPS_PLAYBACK"
+            or transport.get("playback_fps") != 1
+            or transport.get("frame_source_ms") != times
+            or not obs.get("input_sha256") or not obs.get("response_sha256")
+            or not clip.get("clip_sha256") or clip["clip_sha256"] != transport.get("model_video_sha256")
+            or len(times) < 2 or any(type(t) is not int for t in times)
+            or any(b <= a for a, b in zip(times, times[1:]))):
+        return {"sequences": []}
+    by_ms = {f["media_ms"]: f for f in frames if actual(f, window.get("scene_id"))}
+    if any(t not in by_ms for t in times):
+        return {"sequences": []}
+    served = {row["media_ms"]: {b["body_id"]: b.get("local_track_id") for b in row.get("source_bodies") or []}
+              for row in obs.get("body_search_regions") or []}
+    def at(index):
+        return times[index-1] if type(index) is int and 1 <= index <= len(times) else None
+    def body(index, label):
+        ms = at(index)
+        track = served.get(ms, {}).get(label)
+        candidates = [p for p in by_ms.get(ms, {}).get("players") or []
+                      if track and p.get("local_track_id") == track and p.get("association_state") == "VERIFIED_LOCAL"]
+        return candidates[0] if len(candidates) == 1 else None
+    sid = "motion_" + str(obs["input_sha256"])[:20]
+    actions = []
+    for index, raw in enumerate(_rows(obs.get("video_actions"))):
+        if not isinstance(raw, dict):
+            continue
+        if any(raw.get(k) is not None and at(raw[k]) is None for k in
+               ("start_idx", "contact_idx", "end_idx", "receiver_idx", "shot_idx", "outcome_idx")):
+            continue
+        start, contact, end = (at(raw.get(k)) for k in ("start_idx", "contact_idx", "end_idx"))
+        if start is None or end is None or start > end or (contact is not None and not start <= contact <= end):
+            continue
+        actor_evidence, actor_ids = [], set()
+        for i in _rows(raw.get("actor_evidence_indices")):
+            b, ms = body(i, raw.get("actor_body_id")), at(i)
+            if b and start <= ms <= end:
+                actor_evidence.append({"media_ms": ms, "box": deepcopy(b["box"]), "visibility": "VISIBLE"})
+                actor_ids.add(b["local_track_id"])
+        if len(actor_ids) != 1 or not actor_evidence:
+            continue
+        actor = next(iter(actor_ids))
+        receiver, finisher = body(raw.get("receiver_idx"), raw.get("receiver_body_id")), body(raw.get("shot_idx"), raw.get("finisher_body_id"))
+        outcome_ms = at(raw.get("outcome_idx"))
+        outcome_evidence = sorted({at(i) for i in _rows(raw.get("outcome_evidence_indices")) if at(i) is not None})
+        terminal = outcome_ms if outcome_ms is not None else end
+        continuous = (raw.get("continuous_visible_sequence") is True
+            and not any(start <= f.get("media_ms", -1) <= terminal and not actual(f, window.get("scene_id")) for f in frames)
+            and not any(b-a > 250 for a, b in zip(times, times[1:]) if start <= a <= terminal))
+        visible = (continuous and raw.get("outcome_visible") is True and bool(outcome_evidence)
+                   and min(outcome_evidence) >= (contact if contact is not None else start)
+                   and (outcome_ms is None or outcome_ms in outcome_evidence))
+        if raw.get("outcome") == "TEAMMATE_GOAL" and (receiver is None or finisher is None):
+            visible = False
+        chain = {"target_contact_ms": contact, "receiver_local_track_id": receiver["local_track_id"] if receiver else None,
+            "receiver_ms": at(raw.get("receiver_idx")), "teammate_shot_ms": at(raw.get("shot_idx")),
+            "goal_outcome_ms": outcome_ms, "continuous_visible_sequence": continuous}
+        action = sequence._normalise_action({"action_id": f"{sid}_{index}", "kind": raw.get("kind"),
+            "start_ms": start, "end_ms": end, "contact_ms": contact,
+            "actor_local_track_id": actor, "actor_candidate_local_track_ids": [actor],
+            "actor_evidence": actor_evidence, "evidence_ms": [e["media_ms"] for e in actor_evidence],
+            "target_status": "UNRESOLVED", "outcome": raw.get("outcome"), "outcome_visible": visible,
+            "contact_visibility": raw.get("contact_visibility"), "foot": raw.get("foot"),
+            "details": _rows(raw.get("details")), "causal_chain": chain}, window)
+        if action is None:
+            continue
+        action["causal_chain"]["finisher_local_track_id"] = finisher["local_track_id"] if finisher else None
+        action["video_observation"] = {"authority": "TEMPORAL_VIDEO_OBSERVATION", "input_sha256": obs["input_sha256"],
+            "response_sha256": obs["response_sha256"], "clip_sha256": clip["clip_sha256"],
+            "source_video_sha256": obs.get("source_video_sha256"), "model": obs.get("model"),
+            "outcome_evidence_ms": outcome_evidence, "source_frame_indices": list(_rows(raw.get("actor_evidence_indices"))),
+            "source_bounds_ms": [times[0], times[-1]], "provider_requested_fps": transport.get("requested_fps"),
+            "source_sampling_fps": transport.get("source_sampling_fps"), "playback_fps": transport.get("playback_fps")}
+        actions.append(action)
+    return {"sequences": [{"sequence_id": sid, "scene_id": window.get("scene_id"),
+        "start_ms": times[0], "end_ms": times[-1], "actions": actions}]}
+
+
+def motion_window_complete(observation, frames, window):
+    """Scheduling coverage only: a short feedback clip cannot replace a whole window."""
+    packet = video_observations(observation, frames, window)
+    native = [f["media_ms"] for f in frames if actual(f, window.get("scene_id"))]
+    times = (observation.get("motion_clip") or {}).get("frame_source_ms") or []
+    return bool(packet.get("sequences") and native and times
+                and times[0] <= min(native)+150 and times[-1] >= max(native)-150)
+
+
+def motion_reader_context(packet):
+    """Only the shared measurements actually supplied to the motion reader."""
+    source = packet or {}
+    return {"scene_id": source.get("scene_id"), "source_video_sha256": source.get("source_video_sha256"),
+        "known_target_bodies": [{k: r.get(k) for k in ("media_ms", "body_id", "track_id", "box")}
+            for r in source.get("body_observations") or [] if r.get("target_observed") is True],
+        "verified_contacts": deepcopy(source.get("verified_contacts") or []),
+        "roles": deepcopy(source.get("roles") or {}),
+        "related_sequence": deepcopy(source.get("related_sequence"))}
+
+
 def _rows(value):
     return value if isinstance(value, (list, tuple)) else []
 

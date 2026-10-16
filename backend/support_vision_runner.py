@@ -52,7 +52,10 @@ ADVISORY_ID = "AIOHTTP_LARGE_RAW_BYTES_BODY"
 AIOHTTP_LARGE_BODY_ADVISORY = ("Sending a large body directly with raw bytes might lock the event loop. "
                                "You should probably pass an io.BytesIO object instead")
 ISOLATED_READERS = frozenset({
+    ("video_model_input", "read_video"),
+    ("video_model_input", "read_text"),
     ("fix10a_vision_providers", "read_action_pixel_evidence"),
+    ("fix10a_vision_providers", "read_action_video_evidence"),
     ("fix10a_vision_providers", "read_visible_player_role"),
     ("fix10a_vision_providers", "read_goal_scene_evidence"),
     ("fix10a_goal_direction", "read_field_side_evidence"),

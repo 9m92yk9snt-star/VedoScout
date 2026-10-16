@@ -79,6 +79,14 @@ def apply_reference_matches(frames, observation):
     if (reference.get("source") != "USER_SELECTED_SOURCE_PIXELS"
             or not reference.get("source_video_sha256") or not reference.get("input_sha256")):
         return rows
+    import sequence_observation_context
+    scene = next((f.get("scene_id") for f in rows), None)
+    source_times = [f["media_ms"] for f in rows if sequence_observation_context.actual(f, scene)]
+    if not source_times:
+        return rows
+    direct_motion = (observation.get("source_video_sha256") == reference["source_video_sha256"]
+        and bool(sequence_observation_context.video_observations(observation, rows,
+            {"scene_id": scene, "start_ms": min(source_times), "end_ms": max(source_times)}).get("sequences")))
     by_ms = {f["media_ms"]: f for f in rows}
     votes = {}
     for match in (observation or {}).get("target_observations") or []:
@@ -92,7 +100,7 @@ def apply_reference_matches(frames, observation):
             continue
         body = _body(f, track)
         target = f.get("global_target") or {}
-        if (body is None or not _native_unique_step(f, f, track)
+        if (body is None or (not direct_motion and not _native_unique_step(f, f, track))
                 or body.get("team") == "opponent" or _hard_barrier(target)
                 or target.get("proof_eligible") is True and target.get("local_track_id") != track):
             continue
@@ -106,14 +114,18 @@ def apply_reference_matches(frames, observation):
                 or _hard_barrier(f.get("global_target") or {})
                 or ((f.get("global_target") or {}).get("proof_eligible") is True
                     and (f.get("global_target") or {}).get("local_track_id") != track)
-                or _body(f, track) is None for f in path)
+                or (not direct_motion and _body(f, track) is None) for f in path)
                 or any(b["media_ms"]-a["media_ms"] > MAX_FRAME_GAP_MS
-                       or not _native_unique_step(a, b, track) for a, b in zip(path, path[1:]))):
+                       or (not direct_motion and not _native_unique_step(a, b, track)) for a, b in zip(path, path[1:]))):
             continue
         # Competing high-confidence matches in a frame/segment are uncertainty.
         if any(other != track and other_scene == scene and other_times & times
                for (other_scene, other), other_times in votes.items()):
             continue
+        # A complete video supplies direct selected-person comparisons at these
+        # exact source frames. It need not satisfy a jersey-isolation test in
+        # every intervening frame. Only the directly observed frames become
+        # seeds; ordinary native propagation across gaps remains unchanged.
         for ms in times:
             f = by_ms[ms]
             if (f.get("global_target") or {}).get("proof_eligible") is True:

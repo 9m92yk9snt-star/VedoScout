@@ -8,6 +8,8 @@ Missing saved support observations remain missing, never replaced by stubs.
 EMERGENT_LLM_KEY already in the operator's environment. No credentials are read
 from the ZIP and no production report is rewritten. --output-dir checkpoints
 the new traces, canonical document, corrected report and a checksummed ZIP.
+--motion-only with --support-vision reuses the saved native graph and performs
+one motion read per selected window, without jersey/role/goal or feedback calls.
 """
 import argparse
 from copy import deepcopy
@@ -40,6 +42,7 @@ import action_evidence_review
 import fix10a_vision_providers
 import physical_match_reconstruction as pmr
 import video_timebase
+import sequence_observation_context
 from scripts import reference_action_review
 
 
@@ -65,7 +68,9 @@ def restore_direct_taps(authority, anchor_document):
                     "source": "CHECKSUM_VERIFIED_ANCHORS_JSON", "continuous_identity_restored": False}
 
 
-def replay(path, video_detail=False, support_vision=False, output_dir=None, reference_cases=None):
+def replay(path, video_detail=False, support_vision=False, output_dir=None, reference_cases=None, motion_only=False):
+    if motion_only and (not support_vision or video_detail):
+        raise ValueError("--motion-only requires --support-vision and cannot combine with --video-detail")
     backend_sha256 = _backend_sha256()
     video_path = None
     api_key = os.environ.get("EMERGENT_LLM_KEY", "") if support_vision else ""
@@ -105,8 +110,10 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                 raise ValueError("Exported video does not match the analysis source hash")
             if support_vision:
                 bundle = fix10a_vision_providers.build_shadow_providers(api_key, f"readonly-{report['id']}", str(video_path))
-                goal_provider = fix10a_goal_direction.wrap_goal_geometry_provider(
-                    bundle.goal_geometry_provider, api_key, f"readonly-{report['id']}", str(video_path))
+                bundle.bind_selected_reference(authority)
+                if not motion_only:
+                    goal_provider = fix10a_goal_direction.wrap_goal_geometry_provider(
+                        bundle.goal_geometry_provider, api_key, f"readonly-{report['id']}", str(video_path))
             if video_detail:
                 cap = cv2.VideoCapture(str(video_path))
                 detector = cv_detect.PersonDetector()
@@ -121,12 +128,24 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                     for job in inspection_plan["jobs"]:
                         if job["dense_window_id"] != original["window"]["dense_window_id"] or not job["selected"]:
                             continue
-                        observed = bundle.action_evidence_provider(str(video_path), job, frames)
+                        context = sequence_observation_context.build(job, frames,
+                            times=action_evidence_review.motion_frame_times(job, frames), source_video=original.get("source_video"))
+                        observed = bundle.action_evidence_provider(str(video_path), {**job, "sequence_context": context}, frames)
                         applied = action_evidence_review.apply_observations(frames, observed, job["inspection_id"])
-                        frames = applied["frames"]
+                        frames = dense_identity_continuity.apply_reference_matches(applied["frames"], observed)
                         inspection_requests.extend(applied["jersey_requests"])
                         inspections.append({**job, **observed, "added_ball_candidates": applied["added_ball_candidates"],
                                             "binding_rejections": applied["binding_rejections"]})
+                if motion_only:
+                    shared = dense_identity_continuity.apply(frames, original.get("touch_graph"))
+                    dense_track_refinement._apply_dense_team_labels(shared["frames"])
+                    physical["traces"].append({**deepcopy(original), "decoded_frames": shared["frames"],
+                        "touch_graph": shared["touch_graph"], "action_inspections": [*(original.get("action_inspections") or []), *inspections]})
+                    if output_dir is not None:
+                        checkpoint = Path(output_dir)
+                        checkpoint.mkdir(parents=True, exist_ok=True)
+                        (checkpoint/"physical_replay.json").write_text(json.dumps(physical, indent=2))
+                    continue
                 if cap is not None:
                     for f in frames:
                         if f.get("ball_candidates"):
@@ -238,14 +257,17 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
                     trace["provider_adapter_errors"] = sorted(set([*trace["provider_adapter_errors"], *pmr._adapter_diagnostics(geometry)]))
                     if output_dir is not None:
                         (Path(output_dir) / "physical_replay.json").write_text(json.dumps(physical, indent=2))
-            physical["traces"], _, feedback_plan = pmr.run_feedback_round(
-                physical["traces"], str(video_path or ""), {}, review_analysis,
-                report["football_scene_graph"], authority,
-                action_evidence_provider=bundle.action_evidence_provider if bundle is not None else None,
-                jersey_vote_provider=bundle.jersey_vote_provider if bundle is not None else None,
-                role_evidence_provider=bundle.role_evidence_provider if bundle is not None else None,
-                goal_geometry_provider=goal_provider, review_jobs=requests,
-                feedback_trace_ids=reference_sources)
+            if motion_only:
+                feedback_plan = {"rounds": 0, "executed_windows": 0, "mode": "MOTION_ONLY_NO_EXTRA_READERS"}
+            else:
+                physical["traces"], _, feedback_plan = pmr.run_feedback_round(
+                    physical["traces"], str(video_path or ""), {}, review_analysis,
+                    report["football_scene_graph"], authority,
+                    action_evidence_provider=bundle.action_evidence_provider if bundle is not None else None,
+                    jersey_vote_provider=bundle.jersey_vote_provider if bundle is not None else None,
+                    role_evidence_provider=bundle.role_evidence_provider if bundle is not None else None,
+                    goal_geometry_provider=goal_provider, review_jobs=requests,
+                    feedback_trace_ids=reference_sources)
             physical["evidence_feedback_plan"] = feedback_plan
             _, cross_window_context = pmr._apply_cross_window_review_context([], physical["traces"])
             physical["cross_window_evidence"] = cross_window_context
@@ -284,6 +306,7 @@ def replay(path, video_detail=False, support_vision=False, output_dir=None, refe
     if _backend_sha256() != backend_sha256:
         raise RuntimeError("Backend source changed during replay; results cannot be certified against one source fingerprint")
     result = {"report_id": report["id"], "model_request_attempts": sum(attempts.values()), "db_writes": 0,
+            "review_mode": "MOTION_ONLY_SAVED_NATIVE_GRAPH" if motion_only else "PHYSICAL_EVIDENCE_REPLAY",
             "identity_restoration": identity_restoration, "backend_source_unchanged_during_replay": True,
             "support_vision_enabled": support_vision, "support_review_attempts": attempts,
             "native_detail_frames_added": detail_frames,
@@ -340,11 +363,12 @@ if __name__ == "__main__":
     parser.add_argument("zip_path", type=Path)
     parser.add_argument("--video-detail", action="store_true")
     parser.add_argument("--support-vision", action="store_true", help="Use the operator's environment key for fresh bounded reviews; never writes to a DB")
+    parser.add_argument("--motion-only", action="store_true", help="One motion read per selected window; reuse the saved native graph, skip all other model readers")
     parser.add_argument("--output-dir", type=Path, help="Write review checkpoints and a checksummed evidence ZIP to this private directory")
     parser.add_argument("--cases-json", type=Path, help="Offline reference times and acceptance criteria; expected outcomes are never sent to readers")
     args = parser.parse_args()
     cases = json.loads(args.cases_json.read_text()) if args.cases_json else None
-    result = replay(args.zip_path, args.video_detail, args.support_vision, args.output_dir, cases)
+    result = replay(args.zip_path, args.video_detail, args.support_vision, args.output_dir, cases, args.motion_only)
     print(json.dumps(result, indent=2))
     if cases is not None and not result["reference_review"]["all_verified"]:
         raise SystemExit(2)

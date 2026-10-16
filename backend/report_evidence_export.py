@@ -54,7 +54,7 @@ SOURCE_MODULES = (
     "fix10a_ball_proof_gate.py", "short_occlusion_contact_recovery.py", "post_strike_intervention.py",
     "native_ball_reappearance.py", "native_goal_review.py", "goal_reappearance.py", "goal_review_sampling.py", "cv_detect.py",
     "temporal_ball_search.py", "native_goal_frame.py", "goal_context_observations.py",
-    "scoring_evidence_coverage.py", "identity_verify.py", "support_vision_runner.py",
+    "scoring_evidence_coverage.py", "identity_verify.py", "support_vision_runner.py", "video_model_input.py",
     "scripts/replay_report_evidence.py", "scripts/reference_action_review.py",
 )
 SECRET_KEY = re.compile(
@@ -346,7 +346,7 @@ def build_export(doc, output, *, upload_dir, source_root, environment="unspecifi
                     index.append({k: call.get(k) for k in ("call_id", "run_id", "report_id",
                         "session_id", "model", "status", "started_at", "finished_at",
                         "prompt_sha256", "response_sha256", "response_bytes",
-                        "raw_response_truncated", "video_sha256", "video_role", "error_type")})
+                        "raw_response_truncated", "video_sha256", "video_role", "input_type", "video_input", "error_type")})
                     payload = json_bytes(call)
                     try:
                         add_stream(f"analysis_model_calls/{i:03d}.json", io.BytesIO(payload),
