@@ -75,7 +75,7 @@ def _summary(canonical: dict) -> dict:
         "version": VERSION,
         "status": (
             "applied"
-            if int((reconciliation or {}).get("proposals_applied") or 0) > 0
+            if int((reconciliation or {}).get("proposals_applied") or 0) > 0 or (reconciliation or {}).get("changes")
             else "no_change"
         ),
         "mode": "production",
@@ -86,6 +86,7 @@ def _summary(canonical: dict) -> dict:
             (reconciliation or {}).get("proposals_contradictory") or 0
         ),
         "changes": deepcopy((reconciliation or {}).get("changes") or []),
+        "shot_role_conflicts_reopened": int((reconciliation or {}).get("shot_role_conflicts_reopened") or 0),
         "counts": deepcopy(canonical.get("counts") or {}) if isinstance(canonical, dict) else {},
     }
 

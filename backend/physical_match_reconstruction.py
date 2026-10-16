@@ -555,6 +555,8 @@ def reconstruct_physical_match(
         stage = "window_setup"
         try:
             provider_diagnostics = []
+            stage_timings = {}
+            native_started = time.monotonic()
             stage = "dense_replay"
             previous = (_feedback_context or {}).get("traces", {}).get(window["dense_window_id"])
             if previous is not None:
@@ -576,6 +578,7 @@ def reconstruct_physical_match(
             )
             dense_frames = list(refined.get("frames") or []) if isinstance(refined, dict) else []
             dense_frames = dense_identity_continuity.apply(dense_frames)["frames"]
+            stage_timings["native_decode_detection_tracking_seconds"] = round(time.monotonic()-native_started, 3)
 
             # Inspection admission precedes physical/identity proof. Pixel
             # proposals do not become contacts or target identity directly:
@@ -601,7 +604,8 @@ def reconstruct_physical_match(
                     diagnostics=provider_diagnostics, name="action_pixels")
                 observation = observation if isinstance(observation, dict) else {"status": "NO_EVIDENCE", "frames": []}
                 applied = action_evidence_review.apply_observations(dense_frames, observation, job["inspection_id"])
-                dense_frames = applied["frames"]
+                dense_frames = dense_identity_continuity.apply_reference_matches(applied["frames"], observation)
+                dense_frames = dense_identity_continuity.apply(dense_frames)["frames"]
                 inspection_requests.extend(applied["jersey_requests"])
                 inspection_rows.append({**job, **observation, "added_ball_candidates": applied["added_ball_candidates"],
                                         "binding_rejections": applied["binding_rejections"],
@@ -617,9 +621,11 @@ def reconstruct_physical_match(
             contact_result = ball_contact_engine.resolve_contacts(candidates)
 
             stage = "short_occlusion_recovery"
+            occlusion_started = time.monotonic()
             step3_recovery = short_occlusion_contact_recovery.recover_short_occlusion_contacts(
                 dense_frames, trajectory, contact_result, video_path=str(video_path)
             )
+            stage_timings["short_occlusion_search_seconds"] = round(time.monotonic()-occlusion_started, 3)
 
             stage = "short_occlusion_apply"
             contact_result = short_occlusion_contact_recovery.apply_recovered_contacts(
@@ -772,6 +778,7 @@ def reconstruct_physical_match(
                         "window": window, "strike": request_strike, "review": review,
                         "eligibility": eligibility, "shot_track": shot_track,
                         "touch_graph": touch_with_jersey, "roles": window_roles,
+                        "inspection_search_hints": sequence_observation_context.review_search_hints(inspection_rows, dense_with_jersey),
                         "intervention": a7, "outcome_index": len(outcomes),
                         "diagnostics": provider_diagnostics,
                     })
@@ -887,6 +894,7 @@ def reconstruct_physical_match(
                 "goal_reviews_skipped": goal_reviews_skipped,
                 "goal_clarifications_requested": goal_clarifications_requested,
                 "provider_diagnostics": provider_diagnostics,
+                "stage_timings": stage_timings,
                 "provider_adapter_errors": sorted(set(adapter_errors)),
                 "unresolved_reasons": unresolved,
             })
@@ -960,7 +968,15 @@ def reconstruct_physical_match(
             goal_geometry_provider=goal_geometry_provider, role_evidence_provider=role_evidence_provider,
             role_evidence=role_evidence, source_video=source, review_jobs=review_jobs)
         feedback_by_id = {r["dense_window_id"]: r for r in feedback_rows if r.get("status") == "ok"}
-        window_rows = [feedback_by_id.get(r["dense_window_id"], r) for r in window_rows]
+        combined_rows = []
+        for row in window_rows:
+            replacement = feedback_by_id.get(row["dense_window_id"])
+            if replacement is not None:
+                original_times, feedback_times = row.get("stage_timings") or {}, replacement.get("stage_timings") or {}
+                replacement["stage_timings"] = {k: round(original_times.get(k, 0)+feedback_times.get(k, 0), 3)
+                                                for k in original_times.keys() | feedback_times.keys()}
+            combined_rows.append(replacement if replacement is not None else row)
+        window_rows = combined_rows
         traces_by_window = {t["trace_id"]: t for t in traces}
         _, cross_window_context = _apply_cross_window_review_context([], traces)
         if trace_callback is not None:
@@ -1020,6 +1036,7 @@ def reconstruct_physical_match(
             "unique_contacts": len({j["review"]["physical_review_id"] for j in scheduled_jobs}),
             "review_budget": getattr(goal_geometry_provider, "max_reviews", None),
             "clarification_budget": getattr(goal_geometry_provider, "max_clarifications", None),
+            "shared_budget": getattr(goal_geometry_provider, "max_total_reviews", None),
             "reviews_executed": getattr(goal_geometry_provider, "calls", None),
             "clarifications_executed": getattr(goal_geometry_provider, "clarification_calls", None),
         },

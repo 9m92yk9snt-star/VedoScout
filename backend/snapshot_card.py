@@ -87,74 +87,7 @@ def _cover(img, w, h):
     return img.resize((w, h), Image.LANCZOS)
 
 
-# ── annotation primitives (y-down, same relative coords as the web SVG) ──
-
-def _dashed_line(draw, p1, p2, color, width=8, dash=26, gap=18):
-    x1, y1 = p1
-    x2, y2 = p2
-    dist = math.hypot(x2 - x1, y2 - y1)
-    if dist == 0:
-        return
-    ux, uy = (x2 - x1) / dist, (y2 - y1) / dist
-    pos = 0.0
-    while pos < dist:
-        end = min(pos + dash, dist)
-        draw.line([(x1 + ux * pos, y1 + uy * pos), (x1 + ux * end, y1 + uy * end)], fill=color, width=width)
-        pos = end + gap
-
-
-def _dashed_ellipse(draw, bbox, color, width=8, seg=16, gap=12):
-    ang = 0
-    while ang < 360:
-        draw.arc(bbox, start=ang, end=min(ang + seg, 360), fill=color, width=width)
-        ang += seg + gap
-
-
-def _arrow_head(draw, tip, angle_deg, color, size=26, width=8):
-    a = math.radians(angle_deg)
-    for da in (math.radians(150), -math.radians(150)):
-        ex = tip[0] + size * math.cos(a + da)
-        ey = tip[1] + size * math.sin(a + da)
-        draw.line([tip, (ex, ey)], fill=color, width=width)
-
-
-def _annot(draw, kind, x, y, w, h):
-    kind = "circle" if kind == "space" else (kind or "")
-    if kind in ("path", "arrow"):
-        col = (126, 211, 33)
-        p1 = (x + 0.38 * w, y + 0.64 * h)
-        p2 = (x + 0.58 * w, y + 0.46 * h)
-        draw.line([p1, p2], fill=col, width=9)
-        _arrow_head(draw, p2, math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0])), col, size=30, width=9)
-        if kind == "path":
-            _dashed_ellipse(draw, (x + 0.14 * w, y + 0.72 * h, x + 0.46 * w, y + 0.84 * h), col)
-    elif kind == "scan":
-        col = (255, 255, 255)
-        p1 = (x + 0.72 * w, y + 0.21 * h)
-        p2 = (x + 0.46 * w, y + 0.21 * h)
-        _dashed_line(draw, p1, p2, col)
-        _arrow_head(draw, p2, 180, col, size=28, width=9)
-        r = 9
-        draw.ellipse((p1[0] + 18 - r, p1[1] - r, p1[0] + 18 + r, p1[1] + r), fill=col)
-    elif kind == "run":
-        col = (245, 166, 35)
-        pts = []
-        p0, pc, p1 = (x + 0.20 * w, y + 0.82 * h), (x + 0.42 * w, y + 0.64 * h), (x + 0.58 * w, y + 0.38 * h)
-        for i in range(25):
-            t = i / 24
-            bx = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * pc[0] + t ** 2 * p1[0]
-            by = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * pc[1] + t ** 2 * p1[1]
-            pts.append((bx, by))
-        for i in range(0, len(pts) - 1, 2):
-            draw.line([pts[i], pts[i + 1]], fill=col, width=9)
-        _arrow_head(draw, p1, math.degrees(math.atan2(p1[1] - pc[1], p1[0] - pc[0])), col, size=28, width=9)
-        r = 0.075 * h
-        cx, cy = x + 0.64 * w, y + 0.28 * h
-        _dashed_ellipse(draw, (cx - r, cy - r, cx + r, cy + r), col)
-    elif kind == "circle":
-        _dashed_ellipse(draw, (x + 0.43 * w, y + 0.715 * h, x + 0.77 * w, y + 0.845 * h), (232, 68, 46))
-
-
+# Header icons are presentation only; photos have no template overlays.
 def _icon(draw, key, cx, cy, r=20):
     white = (255, 255, 255)
     if key == "strength":
@@ -202,7 +135,7 @@ def build_snapshot_card(report_doc: dict, key: str, output_path: str, image_reso
     card.paste(_hgrad(CW_, HB, g1, g2), (0, 0))
     _icon(cd, key, 62, HB // 2)
     f_lab = _font("Barlow-Bold.ttf", 36)
-    cd.text((104, HB / 2 - 21), LABELS.get(key, ""), font=f_lab, fill=(255, 255, 255))
+    cd.text((104, HB / 2 - 21), str(moment.get("label") or LABELS.get(key, "")).upper(), font=f_lab, fill=(255, 255, 255))
     ts = moment.get("timestamp")
     if ts:
         f_ts = _font("Barlow-Black.ttf", 44)

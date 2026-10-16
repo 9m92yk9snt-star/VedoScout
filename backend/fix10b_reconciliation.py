@@ -1382,6 +1382,63 @@ def _recount(bundle: dict) -> dict:
     return bundle
 
 
+def _shot_role_conflicts(events, physical):
+    """Later measured actors can reopen an earlier model-only shot claim.
+
+    A search hypothesis alone never removes an event. It must name an actual
+    native body with a verified ball contact, while the independently selected
+    target is visible on a different body in that exact source frame. This is
+    uncertainty about the original action, not a synthetic assist or goal.
+    """
+    import sequence_observation_context as sequence_context
+    conflicts = {}
+    for trace in (physical or {}).get("traces") or []:
+        frames = trace.get("decoded_frames") or []
+        by_ms = {f["media_ms"]: f for f in frames if sequence_context.actual(f)}
+        tracks = {label: track for track, label in sequence_context.labels(frames).items()}
+        for review in trace.get("action_inspections") or []:
+            for hypothesis in (review.get("sequence_reasoning") or {}).get("hypotheses") or []:
+                for step in hypothesis.get("steps") or []:
+                    if step.get("observation") != "SHOT_MOTION":
+                        continue
+                    f = by_ms.get(step.get("media_ms")); track = tracks.get(step.get("body_id"))
+                    if not f or not track:
+                        continue
+                    target = f.get("global_target") or {}
+                    if (target.get("status") != "VERIFIED" or target.get("proof_eligible") is not True
+                            or not target.get("local_track_id") or target["local_track_id"] == track):
+                        continue
+                    bodies = [p for p in f.get("players") or [] if p.get("local_track_id") == track
+                              and p.get("association_state") == "VERIFIED_LOCAL"]
+                    selected_bodies = [p for p in f.get("players") or []
+                                       if p.get("local_track_id") == target["local_track_id"]
+                                       and p.get("association_state") == "VERIFIED_LOCAL"]
+                    contacts = [s for s in trace.get("strike_evidence") or [] if s.get("player_track_id") == track
+                                and s.get("scene_id") == f.get("scene_id")
+                                and s.get("proof_eligible") is True and _num(s.get("media_ms"))
+                                and abs(s["media_ms"]-f["media_ms"]) <= 120
+                                and s.get("status") in {"VERIFIED_PHYSICAL_RELEASE", "VERIFIED_PHYSICAL_SCORING_CONTACT"}]
+                    if len(bodies) != 1 or len(selected_bodies) != 1 or not contacts:
+                        continue
+                    for event in events:
+                        if (event.get("canonical_event_type") != "SHOT"
+                                or event.get("reconciliation_authority") == "FIX10B_PHYSICAL_RECONCILIATION"
+                                or event.get("scene_id") != f.get("scene_id")
+                                or not _num(event.get("canonical_ms"))
+                                or abs(event["canonical_ms"]-f["media_ms"]) > CANONICAL_MATCH_MS):
+                            continue
+                        if any(_verified_release(s) and s.get("global_target_id") == GLOBAL_TARGET_ID
+                               and s.get("scene_id") == f.get("scene_id")
+                               and abs(s["media_ms"]-event["canonical_ms"]) <= CANONICAL_MATCH_MS
+                               for s in trace.get("strike_evidence") or []):
+                            continue  # a target shot followed by a teammate rebound is a valid pair
+                        conflicts[event.get("event_id")] = {"trace_id": trace.get("trace_id"),
+                            "media_ms": f["media_ms"], "native_finisher_track_id": track,
+                            "target_track_id": target["local_track_id"],
+                            "contact_ids": [s.get("strike_id") for s in contacts]}
+    return conflicts
+
+
 def reconcile_canonical_events(canonical_bundle: dict | None,
                                physical_result: dict | None) -> dict:
     """Return a copied FIX10B canonical bundle and an auditable change set."""
@@ -1391,11 +1448,20 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
         "rejected": [], "counts": {}, "metrics": {},
     }
     events = [deepcopy(e) for e in canonical.get("events") or [] if isinstance(e, dict)]
+    role_conflicts = _shot_role_conflicts(events, physical_result)
+    for event in events:
+        if event.get("event_id") not in role_conflicts:
+            continue
+        canonical.setdefault("unresolved", []).append({"reason": "SHOT_ROLE_CONFLICT_WITH_MEASURED_ACTOR",
+            "scene_id": event.get("scene_id"), "event_id": event.get("event_id"),
+            "original_event": deepcopy(event), "evidence": role_conflicts[event.get("event_id")]})
+    events = [e for e in events if e.get("event_id") not in role_conflicts]
     # Every consumer sees the same overlap-qualified entity namespace.
     contexts = cross_window_evidence.build(physical_result or {})["contexts"]
     proposals = collect_proposals(physical_result, contexts=contexts)
     proposals.extend(_unresolved_shot_release_proposals(canonical, physical_result, contexts=contexts))
-    changes = []
+    changes = [{"event_id": eid, "change": "REOPENED_SHOT_ROLE_CONFLICT", "evidence": evidence}
+               for eid, evidence in role_conflicts.items()]
 
     # If the same target contact has both a GOAL and an ASSIST proposal, the
     # chain is contradictory and neither gets authority.
@@ -1509,14 +1575,14 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
                 and (row.get("scene_id"), row.get("sequence_id"),
                      str(row.get("action_id") or "")) in resolved_unresolved_keys)
     ] + scoring_unresolved
-    if scoring_unresolved and not canonical["events"]:
+    if (scoring_unresolved or role_conflicts) and not canonical["events"]:
         canonical["status"] = "unresolved"
     metrics = deepcopy(canonical.get("metrics") or {})
     metrics["observations_unresolved"] = max(
         0,
         int(metrics.get("observations_unresolved") or 0)
         - len(resolved_unresolved_keys),
-    ) + len(scoring_unresolved)
+    ) + len(scoring_unresolved) + len(role_conflicts)
     canonical["metrics"] = metrics
     canonical["version"] = f"FIX10B.{VERSION}"
     canonical["global_target_id"] = GLOBAL_TARGET_ID
@@ -1530,6 +1596,7 @@ def reconcile_canonical_events(canonical_bundle: dict | None,
         "applied_proposal_ids": applied,
         "changes": changes,
         "scoring_claims_unresolved": len(scoring_unresolved),
+        "shot_role_conflicts_reopened": len(role_conflicts),
         "shot_events_recovered_with_unknown_outcome": len(resolved_unresolved_keys - linked_known_keys),
         "shot_observations_linked_to_proved_outcome": len(linked_known_keys),
         "physical_status": (physical_result or {}).get("status") if isinstance(physical_result, dict) else None,

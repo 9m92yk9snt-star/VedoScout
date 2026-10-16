@@ -7,7 +7,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { Check, X, EyeOff, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import MarkedCropCanvas from "../MarkedCropCanvas";
-import { detectSceneCuts, distributeHints } from "./sceneDetect";
+import { detectSceneCuts, selectTapHints } from "./sceneDetect";
 import videoFrameAuthority from "./videoFrameAuthority.cjs";
 import policy from "./scoutTapPolicy.cjs";
 import selection from "./selectionHints.cjs";
@@ -124,12 +124,12 @@ export default function ScoutMode({ open, videoUrl, onCancel, onConfirm, request
         setDuration(video.duration);
         setBoot({ progress: 0.08, label: "Finding moments across your clip" });
         const detected = await detectSceneCuts(video, {
-          samples: 12, signal: controller.signal,
+          samples: Math.min(32, Math.max(12, Math.ceil(video.duration / 3))), signal: controller.signal,
           onProgress: p => { if (!controller.signal.aborted) setBoot({ progress: 0.08 + p * 0.3, label: "Finding moments across your clip" }); },
         });
         if (controller.signal.aborted) return;
         setCuts(detected.cuts);
-        const hints = policy.prioritizeTapMoments(distributeHints(video.duration, detected.cuts, TARGET_TAPS), video.duration);
+        const hints = policy.prioritizeTapMoments(selectTapHints(video.duration, detected.cuts, detected.qualitySamples, TARGET_TAPS), video.duration);
         const captured = [];
         for (let i = 0; i < hints.length; i++) {
           if (controller.signal.aborted) return;

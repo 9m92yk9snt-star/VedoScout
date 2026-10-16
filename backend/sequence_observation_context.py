@@ -105,8 +105,16 @@ def sampling_plan(job, frames, budget=12):
     valid = [f for f in frames if f.get("media_ms") in available_set]
     focus = ([{"media_ms": job["center_ms"], "reason": "SUPPLIED_SEARCH_TIME", "canonical_authority": False}]
              if job.get("has_contact_time") and num(job.get("center_ms")) else native_focuses(job, valid))
+    centers = job.get("search_centers_ms") or []
+    if len(centers) > 1:
+        focus = [{"media_ms": ms, "reason": "SHARED_WINDOW_SEARCH_TIME", "canonical_authority": False}
+                 for ms in centers if num(ms)]
     near = lambda ms: min(available, key=lambda t: (abs(t-ms), t))
     selected = {available[0], available[-1]}
+    # Every joined observation retains its own focus before adding neighbours.
+    for row in focus:
+        if len(selected) < budget:
+            selected.add(near(row["media_ms"]))
     for row in focus:
         for offset in ((-50, 0, 50) if job.get("has_contact_time") else (-33, 0, 17, 50)):
             if len(selected) < budget:
@@ -202,6 +210,27 @@ def reader_view(packet):
         result["related_sequence"] = reader_view(packet["related_sequence"])
     result["canonical_authority"] = False
     return result
+
+
+def review_search_hints(inspections, frames):
+    """Connect an observed shot/release hypothesis to its native body for search.
+
+    These hints allocate inspection; they have no identity or outcome authority.
+    """
+    tracks = {label: track for track, label in labels(frames).items()}
+    by_ms = {f["media_ms"]: f for f in frames if actual(f)}
+    hints = []
+    for review in inspections or []:
+        for hypothesis in (review.get("sequence_reasoning") or {}).get("hypotheses") or []:
+            for step in hypothesis.get("steps") or []:
+                if step.get("observation") not in {"SHOT_MOTION", "RELEASE"}:
+                    continue
+                f = by_ms.get(step.get("media_ms")); track = tracks.get(step.get("body_id"))
+                if f is not None and track and any(p.get("local_track_id") == track
+                        and p.get("association_state") == "VERIFIED_LOCAL" for p in f.get("players") or []):
+                    hints.append({"media_ms": f["media_ms"], "player_track_id": track,
+                                  "scene_id": f.get("scene_id"), "canonical_authority": False})
+    return hints
 
 
 def parse_reasoning(data, times, manifest):

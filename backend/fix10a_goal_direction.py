@@ -16,6 +16,7 @@ import os
 import tempfile
 from copy import deepcopy
 import goal_reappearance
+import goal_review_sampling
 from pathlib import Path
 
 import cv2
@@ -198,6 +199,8 @@ class GoalDirectionProvider:
         self.clarification_calls = 0
         self.field_side_calls = 0
         self.max_clarifications = max(0, MAX_GOAL_CLARIFICATIONS_PER_REPORT)
+        self.max_total_reviews = (self.max_reviews + self.max_clarifications
+                                  if max_reviews is None else self.max_reviews)
         self._cache = {}
 
     def __call__(self, window: dict, strike: dict):
@@ -216,6 +219,12 @@ class GoalDirectionProvider:
             start_ms, end_ms = int(context["start_ms"]), int(context["end_ms"])
             window = {**window, "start_ms": start_ms, "end_ms": end_ms}
             strike = {**strike, "media_ms": int(context["media_ms"])}
+        if not goal_review_sampling.has_contact_reference(strike, window):
+            return {"status": "UNRESOLVED", "source": "INDEPENDENT_MULTI_FRAME_GOAL_REVIEW",
+                "reason": "CONTACT_BALL_REFERENCE_UNAVAILABLE", "line_by_ms": [],
+                "review_delivery": {"status": "SKIPPED", "start_ms": start_ms, "end_ms": end_ms},
+                "visual_crossing_audit": {"status": "UNRESOLVED", "confidence": "low",
+                    "reason": "CONTACT_BALL_REFERENCE_UNAVAILABLE", "proof_ready": False}}
         anchor = strike.get("active_ball_anchor") or {}
         ball_key = (int(anchor["media_ms"]), tuple(round(float(anchor["box"][k]), 5) for k in ("x", "y", "w", "h"))) \
             if _num(anchor.get("media_ms")) and _valid_box(anchor.get("box")) else None
@@ -237,8 +246,9 @@ class GoalDirectionProvider:
             self._cache.setdefault(cache_key, []).append((start_ms, end_ms, deepcopy(value)))
             return value
         clarification = (strike or {}).get("_review_lane") == "CLARIFICATION"
-        exhausted = (self.clarification_calls >= self.max_clarifications if clarification
-                     else self.calls >= self.max_reviews)
+        # Identity is resolved by the common pipeline, not by separate model
+        # quotas. An unused known-player slot can inspect an unknown actor.
+        exhausted = self.calls + self.clarification_calls >= self.max_total_reviews
         budget_reason = "GOAL_CLARIFICATION_BUDGET_EXHAUSTED" if clarification else "GOAL_REVIEW_BUDGET_EXHAUSTED"
         if exhausted:
             result = {

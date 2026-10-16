@@ -82,6 +82,8 @@ def test_unmeasured_geometry_keeps_the_old_short_bridge_without_extending_it():
 
 def attack_case():
     target = events.strike(1000, "p", target=True)
+    target["active_ball_anchor"] = {"media_ms": 1000, "box": {"x": .3, "y": .58, "w": .01, "h": .01},
+                                    "proof_eligible": True, "state": "MEASURED", "time_authority": "ACTUAL_MEDIA_PTS"}
     scorer = events.strike(4200, "receiver")
     trace = events.trace([events.touch(1000, "p", target=True), events.touch(3000, "receiver"),
                           events.touch(4200, "receiver")], [target, scorer],

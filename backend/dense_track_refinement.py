@@ -833,8 +833,13 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             max_interp_ms=TARGET_NEAR_MS,
         )
     if not isinstance(resolved, dict) or not _valid_box(resolved.get("box")):
+        barrier_reasons = sorted({str(r.get("reason") or "UNKNOWN")
+            for r in authority.get("unresolved_intervals") or []
+            if isinstance(r, dict) and _num(r.get("start_ms")) and _num(r.get("end_ms"))
+            and min(r["start_ms"], r["end_ms"]) <= media_ms <= max(r["start_ms"], r["end_ms"])})
         return {
             "status": "UNRESOLVED", "reason": why,
+            "identity_barrier_reasons": barrier_reasons,
             "local_track_id": None, "candidate_local_track_ids": [],
             "proof_eligible": False,
         }

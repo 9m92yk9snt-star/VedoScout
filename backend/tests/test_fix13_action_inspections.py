@@ -244,7 +244,8 @@ async def test_pixel_reader_receives_no_semantic_outcome_or_target_number_and_pr
 def review_job(ms, name="w", end=8000, ball=BALL):
     strike = {"strike_id": f"s{ms}", "touch_id": f"t{ms}", "scene_id": "scene", "media_ms": ms,
               "player_track_id": "p1", "proof_eligible": True, "status": "VERIFIED_PHYSICAL_RELEASE",
-              "active_ball_anchor": {"media_ms": ms, "box": deepcopy(ball)}, "contact_role": {"role": "RELEASE"}}
+              "active_ball_anchor": {"media_ms": ms, "box": deepcopy(ball), "proof_eligible": True,
+                                     "state": "MEASURED", "time_authority": "ACTUAL_MEDIA_PTS"}, "contact_role": {"role": "RELEASE"}}
     return {"window": window(name=name, end=end), "strike": strike, "review": {"lane": "CLARIFICATION"},
             "touch_graph": {"touches": [{"touch_id": f"t{ms}", "contact_geometry": {"actor_box_used": deepcopy(BODY)}}]}}
 
@@ -262,11 +263,11 @@ def test_overlap_chooses_complete_context_once_but_competing_balls_remain_separa
     assert "_review_context" not in jobs[0]["strike"]
 
 
-def test_goal_budget_reaches_late_time_in_same_scene_and_has_separate_verified_reserve():
+def test_goal_budget_reaches_late_time_in_same_scene_with_shared_capacity():
     jobs = [review_job(t) for t in range(100, 1900, 100)] + [review_job(56000, end=60000)]
     ordered = scheduler.ordered_requests(jobs, {})
     assert [j["strike"]["media_ms"] for j in ordered[:2]] == [100, 56000]
-    assert direction.GoalDirectionProvider(lambda *_: {}, "", "t", "v").max_clarifications >= 5
+    assert direction.GoalDirectionProvider(lambda *_: {}, "", "t", "v").max_total_reviews >= 5
 
 
 @pytest.mark.usefixtures("inline_support_vision")

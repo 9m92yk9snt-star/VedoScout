@@ -131,10 +131,11 @@ def test_budget_visits_late_scenes_before_repeated_early_contacts():
     assert len(ordered) == len(rows)
 
 
-def test_verified_chain_and_releases_precede_uncertain_control_noise():
+def test_shared_queue_visits_late_chain_and_release_before_uncertain_control_noise():
     ordered = scheduler.ordered_requests([job("s", 100, role="RECEIVE_CONTROL"),
                                          job("s", 300), job("v", 50000, lane="VERIFIED_CHAIN")], {})
-    assert [j["strike"]["media_ms"] for j in ordered] == [50000, 300, 100]
+    assert {j["strike"]["media_ms"] for j in ordered[:2]} == {50000, 300}
+    assert ordered[-1]["strike"]["media_ms"] == 100
 
 
 def test_prompt_contract_forbids_a_second_match_history():

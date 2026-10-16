@@ -23,7 +23,9 @@ import analysis_jobs  # noqa: E402
 def strike(ms=1000, target=None):
     return {"strike_id": f"s{ms}", "touch_id": f"t{ms}", "scene_id": "scene",
             "media_ms": ms, "player_track_id": "p1", "global_target_id": target,
-            "status": "VERIFIED_PHYSICAL_RELEASE", "proof_eligible": True}
+            "status": "VERIFIED_PHYSICAL_RELEASE", "proof_eligible": True,
+            "active_ball_anchor": {"media_ms": ms, "box": {"x": .4, "y": .6, "w": .01, "h": .01},
+                "proof_eligible": True, "state": "MEASURED", "time_authority": "ACTUAL_MEDIA_PTS"}}
 
 
 def test_uncertain_owner_gets_review_without_target_registration():
@@ -51,20 +53,21 @@ def test_downstream_unknown_team_is_reviewable_but_opponent_is_excluded():
     assert not physical._goal_clarification_eligibility(receiver, [target, receiver], {}, window)["eligible"]
 
 
-def test_clarification_budget_cannot_starve_verified_chain_and_overlap_is_reused(monkeypatch):
+def test_shared_budget_reuses_overlap_and_has_no_reserved_identity_lane(monkeypatch):
     monkeypatch.setattr(direction, "MAX_GOAL_CLARIFICATIONS_PER_REPORT", 1)
     calls = []
     provider = direction.GoalDirectionProvider(lambda w, s: calls.append(s["media_ms"]) or {"status": "UNRESOLVED"},
-                                               "", "test", "unused", max_reviews=1)
+                                               "", "test", "unused", max_reviews=2)
     w = {"scene_id": "scene", "dense_window_id": "w1", "start_ms": 0, "end_ms": 8000}
     first = {**strike(), "_review_lane": "CLARIFICATION"}
     provider(w, first)
     provider({**w, "dense_window_id": "w2"}, first)
     assert len(calls) == 1 and provider.clarification_calls == 1
-    blocked = {**strike(2000), "_review_lane": "CLARIFICATION"}
-    assert provider(w, blocked)["reason"] == "GOAL_CLARIFICATION_BUDGET_EXHAUSTED"
-    provider(w, {**blocked, "_review_lane": "VERIFIED_CHAIN"})
-    assert calls == [1000, 2000] and provider.calls == 1
+    second = {**strike(2000), "_review_lane": "CLARIFICATION"}
+    provider(w, second)
+    provider(w, {**second, "_review_lane": "VERIFIED_CHAIN"})  # same physical pixels reuse the result
+    assert calls == [1000, 2000] and provider.clarification_calls == 2
+    assert provider(w, {**strike(3000), "_review_lane": "VERIFIED_CHAIN"})["reason"] == "GOAL_REVIEW_BUDGET_EXHAUSTED"
 
 
 def test_longer_context_is_not_replaced_by_short_window_cache():

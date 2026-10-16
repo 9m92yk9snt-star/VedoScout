@@ -115,7 +115,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 26  # v26 = "Scout's First Impression" title (was Parent Summary)
+PDF_RENDER_VERSION = 27  # Remove template markers; show evidence coverage and score availability.
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -12283,7 +12283,7 @@ async def download_player_card(report_id: str, user=Depends(get_current_user)):
 
 # ============== SHAREABLE SNAPSHOT MOMENT CARD (PNG, 1080x1350) ==============
 
-SNAP_CARD_VERSION = 1
+SNAP_CARD_VERSION = 2  # Render evidence labels instead of position-based skill claims.
 _SNAP_KEYS = {"strength", "noticed", "hidden", "develop"}
 
 

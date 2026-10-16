@@ -13,10 +13,21 @@ from goal_review_scheduler import _iou
 MAX_CONTINUITY_MS = 1200
 MAX_FRAME_GAP_MS = 80
 SEED_REASONS = {"OK_EXACT", "OK_NEAREST_TAP_FRAME",
-                "PROOF_TARGET_SINGLE_CANDIDATE_HYPOTHESIS_COLLAPSE"}
-IDENTITY_BARRIERS = {"UNRESOLVED_IDENTITY", "SOURCE_CONFLICT", "SCENE_CUT",
+                "PROOF_TARGET_SINGLE_CANDIDATE_HYPOTHESIS_COLLAPSE",
+                "MULTI_FRAME_SELECTED_APPEARANCE"}
+IDENTITY_BARRIERS = {"UNRESOLVED_IDENTITY", "SOURCE_CONFLICT",
                      "USER_EXCLUDED_OPPONENT", "USER_PARTIAL_VISIBLE_BODY",
                      "DENSE_TARGET_COMPETING_ASSOCIATION"}
+
+
+def _hard_barrier(target):
+    # A coarse reader's absence/failed re-ID can be resolved by fresh native
+    # observations. Preserve actual source contradictions and user exclusions.
+    reasons = target.get("identity_barrier_reasons") or []
+    if target.get("reason") == "UNRESOLVED_IDENTITY" and reasons and all(
+            r in {"target_absent", "reid_failed", "ambiguous_duel"} for r in reasons):
+        return False
+    return target.get("reason") in IDENTITY_BARRIERS
 
 
 def _body(frame, track):
@@ -54,6 +65,65 @@ def _native_unique_step(before, after, track):
             return False
     return (len([p for p in after.get("players") or [] if uia.boxes_agree(a["box"], p.get("box"))]) == 1
             and len([p for p in before.get("players") or [] if uia.boxes_agree(b["box"], p.get("box"))]) == 1)
+
+
+def apply_reference_matches(frames, observation):
+    """Fuse the existing pixel reader's comparisons to actual selected crops.
+
+    The reader must locate a measured body on two separated source frames.
+    Kit colour, an expected shirt number, or an event story cannot do this.
+    Native continuity then carries the identity between visible observations.
+    """
+    rows = deepcopy(frames or [])
+    reference = (observation or {}).get("selected_reference") or {}
+    if (reference.get("source") != "USER_SELECTED_SOURCE_PIXELS"
+            or not reference.get("source_video_sha256") or not reference.get("input_sha256")):
+        return rows
+    by_ms = {f["media_ms"]: f for f in rows}
+    votes = {}
+    for match in (observation or {}).get("target_observations") or []:
+        f = by_ms.get(match.get("media_ms"))
+        track = match.get("local_track_id")
+        features = set(v for v in match.get("features") or [] if isinstance(v, str)
+                       and v in {"hair", "build", "socks", "boots", "sleeves"})
+        if (f is None or match.get("confidence") != "high" or len(features) < 2
+                or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                or any(f.get(k) for k in ("cut", "cut_barrier", "used_fallback"))):
+            continue
+        body = _body(f, track)
+        target = f.get("global_target") or {}
+        if (body is None or not _native_unique_step(f, f, track)
+                or body.get("team") == "opponent" or _hard_barrier(target)
+                or target.get("proof_eligible") is True and target.get("local_track_id") != track):
+            continue
+        votes.setdefault((f.get("scene_id"), track), set()).add(f["media_ms"])
+    for (scene, track), times in votes.items():
+        if len(times) < 2 or max(times)-min(times) < 150:
+            continue
+        path = [f for f in rows if min(times) <= f["media_ms"] <= max(times)]
+        if (any(f.get("scene_id") != scene or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                or any(f.get(k) for k in ("cut", "cut_barrier", "used_fallback"))
+                or _hard_barrier(f.get("global_target") or {})
+                or ((f.get("global_target") or {}).get("proof_eligible") is True
+                    and (f.get("global_target") or {}).get("local_track_id") != track)
+                or _body(f, track) is None for f in path)
+                or any(b["media_ms"]-a["media_ms"] > MAX_FRAME_GAP_MS
+                       or not _native_unique_step(a, b, track) for a, b in zip(path, path[1:]))):
+            continue
+        # Competing high-confidence matches in a frame/segment are uncertainty.
+        if any(other != track and other_scene == scene and other_times & times
+               for (other_scene, other), other_times in votes.items()):
+            continue
+        for ms in times:
+            f = by_ms[ms]
+            if (f.get("global_target") or {}).get("proof_eligible") is True:
+                continue
+            f["global_target"] = {"status": "VERIFIED", "proof_eligible": True,
+                "reason": "MULTI_FRAME_SELECTED_APPEARANCE", "local_track_id": track,
+                "candidate_local_track_ids": [track], "body_box": deepcopy(_body(f, track)["box"]),
+                "appearance_evidence": {**deepcopy(reference), "evidence_ms": sorted(times),
+                                        "number_required": False}}
+    return rows
 
 
 def apply(frames, touch_graph=None):
@@ -97,12 +167,17 @@ def apply(frames, touch_graph=None):
                         native_steps[key] = _native_unique_step(previous, f, track)
                     measured_segment = native_steps[key]
                 extended = abs(f["media_ms"] - seed["media_ms"]) > MAX_CONTINUITY_MS
-                if (extended and not measured_segment
+                # SCENE_CUT from the sparse timeline means its surrounding
+                # samples straddle a cut. It is not a cut in this exact frame.
+                # An uninterrupted native body path can resolve that gap;
+                # actual decoded cuts and identity conflicts still stop it.
+                coarse_gap = target.get("reason") in {"SCENE_CUT", "UNRESOLVED_IDENTITY"}
+                if ((extended or coarse_gap) and not measured_segment
                         or abs(f["media_ms"] - previous["media_ms"]) > MAX_FRAME_GAP_MS
                         or f.get("scene_id") != seed.get("scene_id")
                         or f.get("cut_barrier") or f.get("cut") or f.get("used_fallback")
                         or f.get("time_authority") != "ACTUAL_MEDIA_PTS"
-                        or target.get("reason") in IDENTITY_BARRIERS
+                        or _hard_barrier(target)
                         or body is None
                         or not uia.boxes_agree(previous_body["box"], body["box"])
                         or (target.get("status") == "VERIFIED" and target.get("proof_eligible") is True

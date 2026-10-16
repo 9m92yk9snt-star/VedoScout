@@ -177,9 +177,13 @@ def test_feedback_has_a_separate_hard_model_budget_and_reuses_cached_role_pixels
     bundle = vision.ShadowVisionProviders("fake", "test")
     base = {"start_ms": 900, "end_ms": 1400, "scene_id": "scene"}
     for name, phase in [("a", "INITIAL"), ("b", "INITIAL"), ("c", "FEEDBACK"), ("d", "FEEDBACK")]:
-        result = bundle.action_evidence_provider("unused", {**base, "inspection_id": name, "phase": phase}, [])
+        # A different search question changes the prompt. Merely changing the
+        # inspection ID no longer spends a second read of identical inputs.
+        result = bundle.action_evidence_provider("unused", {**base, "inspection_id": name, "phase": phase, "reason": name}, [])
         assert (result["status"] == "DEFERRED") is (name in {"b", "d"})
     assert bundle.inspection_calls == 2 and bundle.feedback_inspection_calls == 1
+    reused = bundle.action_evidence_provider("unused", {**base, "inspection_id": "same-pixels-new-id", "reason": "a"}, [])
+    assert reused["status"] == "COMPLETED" and bundle.inspection_calls == 2
     requests = [{"media_ms": t, "track_id": "keeper", "box": deepcopy(pixels.BODY)} for t in (1000,1200)]
     monkeypatch.setattr(vision, "_role_review_requests", lambda *_: deepcopy(requests))
     async def role_reader(*_a): return {"role": "GOALKEEPER", "confidence": "high"}

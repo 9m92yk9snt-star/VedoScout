@@ -1,4 +1,4 @@
-import { distributeHints, __testing__ } from "./sceneDetect";
+import { distributeHints, selectTapHints, __testing__ } from "./sceneDetect";
 
 describe("distributeHints", () => {
   test("no scene cuts → spreads count hints across the whole duration", () => {
@@ -111,4 +111,34 @@ test("duplicate and invalid cut times do not create empty scenes or non-finite h
   expect(distributeHints(60, [20, 20, NaN, Infinity, -1, 65], 10)).toEqual(distributeHints(60, [20], 10));
   expect(distributeHints(Infinity, [], 10)).toEqual([]);
   expect(distributeHints(60, [], 0)).toEqual([]);
+});
+
+test("tap hints select clearer actual source frames in each coverage slot", () => {
+  const samples = [{ t: 3, clarity: 0.01 }, { t: 5, clarity: 0.4 }, { t: 27, clarity: 0.1 },
+    { t: 32, clarity: 0.3 }, { t: 55, clarity: 0.2 }];
+  const hints = selectTapHints(60, [], samples, 3);
+  expect(hints).toEqual([5, 32, 55]);
+  expect(new Set(hints).size).toBe(3);
+});
+
+test("a bright transition or sharper frame across a cut cannot replace this scene's tap", () => {
+  const hints = selectTapHints(60, [30], [{ t: 29.9, clarity: 10 }, { t: 31, clarity: 5 },
+    { t: 12, clarity: 0.1 }, { t: 44, clarity: 0.2 }], 2);
+  expect(hints).toEqual([12, 31]);
+  expect(hints[0]).toBeLessThan(30);
+  expect(hints[1]).toBeGreaterThan(30);
+});
+
+test("quality selection uses fallback coverage only when no readable samples exist", () => {
+  expect(selectTapHints(60, [], [{ t: 5, clarity: NaN }], 3)).toEqual(distributeHints(60, [], 3));
+  expect(selectTapHints(0, [], [], 3)).toEqual([]);
+});
+
+test("clarity rejects black frames and prefers sharp source detail to uniform blur", () => {
+  const w = 20, h = 40;
+  const pixels = value => ({ getImageData: () => ({ data: Uint8ClampedArray.from(
+    Array.from({ length: w * h }, (_, i) => [value(i), value(i), value(i), 255]).flat()) }) });
+  expect(__testing__.frameClarity(pixels(() => 0), w, h)).toBe(0);
+  expect(__testing__.frameClarity(pixels(i => (i % w) % 2 ? 80 : 180), w, h)).toBeGreaterThan(
+    __testing__.frameClarity(pixels(() => 128), w, h));
 });

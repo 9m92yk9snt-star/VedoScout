@@ -245,6 +245,7 @@ export function deriveV2(report) {
         const bound = authority ? resolveAuthorityFrame(full.video_comments, x) : null;
         return {
           key: x.key,
+          label: x.label || (smAuthority ? "Verified involvement" : null),
           title: x.title || "—",
           desc: x.desc || "—",
           timestamp: x.timestamp || null,
@@ -444,6 +445,7 @@ export function deriveV2(report) {
     topStrengths, devPriorities, ageComparison, snapshot, snapshotMoments, roadmap,
     trainingWeek, parentSummary, parentTips, coachNotes, scoutOutlook,
     matchStats, matchStatsCoverage, videoHighlight, identityNote, actionTimeline, parentsPackage, missions,
+    evidenceQualityNote: full.evidence_quality_note || null,
     parentMetrics, growYourGame, parentCorner, crossVerification,
   };
 }
