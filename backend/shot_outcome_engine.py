@@ -403,7 +403,7 @@ def _visual_crossing_audit(goal_geometry):
     }
 
 
-def _structured_visual_crossing_proof(goal_geometry, strike_ms):
+def _structured_visual_crossing_proof(goal_geometry, strike_ms, *, observation_end_ms=None):
     """Validate the independent structured whole-ball proof lane.
 
     This does not trust a bare visual ``CROSSED`` label.  It requires the
@@ -439,7 +439,8 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
     link = audit.get("active_ball_link")
     if isinstance(link, dict) and (not _num(link.get("media_ms")) or link["media_ms"] > before_ms):
         return None
-    if not (start <= before_ms < crossing_ms <= beyond_ms <= start + MAX_POST_STRIKE_MS):
+    end = int(observation_end_ms) if _num(observation_end_ms) else start + MAX_POST_STRIKE_MS
+    if not (start <= before_ms < crossing_ms <= beyond_ms <= end):
         return None
     evidence_rows = [row for row in audit.get("structured_evidence") or [] if isinstance(row, dict)]
     critical_before = [
@@ -487,7 +488,8 @@ def _structured_visual_crossing_proof(goal_geometry, strike_ms):
     }
 
 
-def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=None, strike_actor=None):
+def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=None, strike_actor=None,
+                            observation_end_ms=None):
     audit = _visual_crossing_audit(goal_geometry)
     # A classified, independently linked ball reappearing wholly inside the
     # goal is a separate proof lane; it does not depend on celebration or an
@@ -513,7 +515,7 @@ def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=Non
             metrics["cut_barrier"] = bool(row.get("cut_barrier"))
             samples.append(metrics)
     if not samples:
-        visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms)
+        visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms, observation_end_ms=observation_end_ms)
         if visual_proof is not None:
             return visual_proof
         return {"status": "UNRESOLVED", "crossing_ms": None,
@@ -584,7 +586,7 @@ def _goal_crossing_evidence(rows, goal_geometry, strike_ms=None, touch_graph=Non
                 "reason": "WHOLE_BALL_CROSSED_TIME_ALIGNED_GOAL_PLANE",
                 "evidence": evidence[:4], "visual_audit": audit}
     if audit["status"] == "VERIFIED_CROSSING":
-        visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms)
+        visual_proof = _structured_visual_crossing_proof(goal_geometry, strike_ms, observation_end_ms=observation_end_ms)
         if visual_proof is not None:
             return visual_proof
         # A visibly asserted crossing can still be hidden at the exact line.
@@ -762,19 +764,55 @@ def _moves_away_after_intervention(rows, intervention_ms, goal_geometry):
     return post[0] * toward_goal[0] + post[1] * toward_goal[1] < -AWAY_DOT_MIN
 
 
+def _measured_outcome_end(strike, trajectory):
+    """Extend time only as far as this contact's continuous native ball allows.
+
+    A search plan or an LLM assertion alone cannot extend outcome authority.
+    Existing 80 ms same-ball continuity and 900 ms occlusion limits remain.
+    """
+    from goal_review_scheduler import _iou
+    import ball_trajectory as tracking
+    start = int(strike["media_ms"])
+    default = start + MAX_POST_STRIKE_MS
+    context = strike.get("_measured_attack_limit") or {}
+    anchor = strike.get("active_ball_anchor") or {}
+    if (context.get("source") != "CONTIGUOUS_MEASURED_ATTACK_CONTEXT"
+            or context.get("scene_id") != strike.get("scene_id")
+            or not _num(context.get("end_ms")) or context["end_ms"] < start
+            or not _measured_touch_ball(anchor) or anchor.get("source") != "VERIFIED_RELEASE_CONTACT_BALL_AFTER"
+            or anchor.get("remote_spare_ball_used") is not False):
+        return default
+    rows = sorted([r for r in trajectory if _num(r.get("media_ms")) and r["media_ms"] >= anchor["media_ms"]],
+                  key=lambda r: r["media_ms"])
+    if not rows or rows[0]["media_ms"] != anchor["media_ms"] or _iou(rows[0].get("box"), anchor.get("box")) < .9999:
+        return default
+    last = None
+    for row in rows:
+        if (not _measured_touch_ball(row) or row.get("cut_barrier") or row.get("identity_rejection")
+                or row.get("remote_spare_ball_used") is True or row.get("scene_id", strike.get("scene_id")) != strike.get("scene_id")
+                or last is not None and not 0 < row["media_ms"]-last <= tracking.RELEASE_MAX_MEASURED_GAP_MS):
+            break
+        last = row["media_ms"]
+    if last is None:
+        return default
+    return int(min(context["end_ms"], max(default, last+fix10a_occluded_goal.MAX_OCCLUSION_SPAN_MS)))
+
+
 def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: dict | None,
                                     goal_geometry=None, role_evidence=None) -> dict:
     """Build physical outcome evidence for one release/strike candidate."""
     if not isinstance(strike, dict) or not _num(strike.get("media_ms")):
         return {"version": VERSION, "status": "invalid", "reason": "INVALID_STRIKE"}
     start = int(strike["media_ms"])
-    end = start + MAX_POST_STRIKE_MS
-    rows = _trajectory_rows(ball_trajectory, start, end, strike.get("scene_id"))
+    trajectory = list(ball_trajectory or [])
+    end = _measured_outcome_end(strike, trajectory)
+    rows = _trajectory_rows(trajectory, start, end, strike.get("scene_id"))
     crossing = _goal_crossing_evidence(
         rows, goal_geometry, strike_ms=start, touch_graph=touch_graph,
         strike_actor=strike.get("player_track_id"),
+        observation_end_ms=end,
     )
-    other_touch = _first_other_touch(touch_graph, strike, rows=rows)
+    other_touch = _first_other_touch(touch_graph, strike, max_ms=max(0, end-start), rows=rows)
     intervention = _intervention_evidence(other_touch, rows)
     role = _role_resolution(role_evidence, intervention.get("player_track_id"))
     moves_away = (
@@ -834,5 +872,6 @@ def reconstruct_post_strike_outcome(strike: dict, ball_trajectory, touch_graph: 
         "moves_away_after_intervention": bool(moves_away),
         "terminal_ball_state": rows[-1].get("state") if rows else "NO_BALL_ROWS",
         "trajectory_rows_reviewed": len(rows),
+        "observation_end_ms": end,
         "canonical_event_type": None,
     }

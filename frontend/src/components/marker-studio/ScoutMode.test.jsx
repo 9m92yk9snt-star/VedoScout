@@ -285,7 +285,7 @@ test("uses the cached displayed frame even when the decoder is at the end of the
   fireEvent.load(screen.getByTestId("scout-presented-frame"));
   await mark(); await mark();
   fireEvent.click(screen.getByTestId("scout-finish-early"));
- 
+
   fireEvent.click(screen.getByTestId("scout-submit"));
   await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   const payload = onConfirm.mock.calls[0][0];
@@ -300,7 +300,7 @@ test("ten guided selections are ready without another manual check", async () =>
   for (let i = 0; i < 10; i++) await mark();
   expect(screen.getByTestId("scout-selection-done")).toBeInTheDocument();
   expect(screen.queryByTestId("scout-verify-confirm")).not.toBeInTheDocument();
- 
+
   fireEvent.click(screen.getByTestId("scout-submit"));
   await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
   expect(onConfirm.mock.calls[0][0].anchors).toHaveLength(10);

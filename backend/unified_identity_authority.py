@@ -191,10 +191,12 @@ def _fix04_rows(fix04_track, scenes) -> list[dict]:
     return sorted(rows, key=lambda r: r["media_ms"])
 
 
-def _nearest(rows, ms, tol_ms=FUSE_TOL_MS):
+def _nearest(rows, ms, tol_ms=FUSE_TOL_MS, *, scene_id=None):
     best = None
     best_d = None
     for r in rows:
+        if scene_id is not None and r.get("scene_id") is not None and r["scene_id"] != scene_id:
+            continue
         d = abs(r["media_ms"] - ms)
         if d <= tol_ms and (best_d is None or d < best_d):
             best, best_d = r, d
@@ -238,9 +240,89 @@ def _canonical(source, row, *, strength, sources, tap_authority=False,
     }
 
 
+def selected_jersey_reference(frames, consensus, stated_number, source_sha256):
+    """Remember an actually read number on the already selected body.
+
+    A declared number or a model's event claim cannot create this reference.
+    It is local to one source video and never contains a reusable local ID.
+    """
+    import jersey_consensus
+    if not source_sha256:
+        return None
+    number = _normalise_jersey_number(stated_number)
+    if number is None:
+        return None
+    for track, row in (consensus or {}).items():
+        if row.get("status") != "VERIFIED" or _normalise_jersey_number(row.get("number")) != number:
+            continue
+        evidence = []
+        for vote in row.get("votes") or []:
+            if (vote.get("readable") is not True or _normalise_jersey_number(vote.get("number")) != number
+                    or vote.get("confidence") not in {"high", "medium"} or not _is_num(vote.get("media_ms"))):
+                continue
+            frame = next((f for f in frames if f.get("media_ms") == vote["media_ms"]), None)
+            if not frame or frame.get("time_authority") != "ACTUAL_MEDIA_PTS" or any(frame.get(k) for k in ("cut", "cut_barrier", "used_fallback")):
+                continue
+            target = frame.get("global_target") or {}
+            bodies = [p for p in frame.get("players") or [] if p.get("local_track_id") == track
+                      and p.get("association_state") == "VERIFIED_LOCAL"]
+            if (target.get("proof_eligible") is not True or target.get("local_track_id") != track
+                    or len(bodies) != 1 or bodies[0].get("team") != "target_team"
+                    or bodies[0].get("team_source") != "KIT_CHROMA_DENSE_TAP_CLUSTER"):
+                continue
+            evidence.append((frame["media_ms"], frame.get("scene_id")))
+        chosen = []
+        for ms, scene in sorted(set(evidence)):
+            if chosen and (scene != chosen[0][1] or ms-chosen[-1][0] < jersey_consensus.MIN_TEMPORAL_SEPARATION_MS):
+                continue
+            chosen.append((ms, scene))
+        if len(chosen) >= 2:
+            return {"source": "MEASURED_SELECTED_JERSEY_REFERENCE", "source_video_sha256": source_sha256,
+                    "number": number, "evidence_ms": [p[0] for p in chosen], "scene_id": chosen[0][1],
+                    "team_source": "KIT_CHROMA_DENSE_TAP_CLUSTER"}
+    return None
+
+
+def _fresh_reference_reid(reference, source_sha, number, track, media_ms, local_votes, frames, candidate_body):
+    """New images establish identity after a cut; old coordinates never cross it."""
+    import jersey_consensus
+    if (not isinstance(reference, dict) or reference.get("source") != "MEASURED_SELECTED_JERSEY_REFERENCE"
+            or not source_sha or reference.get("source_video_sha256") != source_sha
+            or reference.get("number") != number or not reference.get("evidence_ms")
+            or max(reference["evidence_ms"]) >= media_ms
+            or candidate_body.get("team") != "target_team"
+            or candidate_body.get("team_source") != reference.get("team_source")
+            or not _is_num(candidate_body.get("team_confidence")) or candidate_body["team_confidence"] < .70):
+        return False
+    times = []
+    for vote in sorted(local_votes, key=lambda v: v["media_ms"]):
+        ms = vote["media_ms"]
+        if times and ms-times[-1] < jersey_consensus.MIN_TEMPORAL_SEPARATION_MS:
+            continue
+        times.append(ms)
+    if len(times) < 2:
+        return False
+    lo, hi = min(media_ms, min(times)), max(media_ms, max(times))
+    path = sorted([f for f in frames if lo <= f["media_ms"] <= hi], key=lambda f: f["media_ms"])
+    if not path or path[0]["media_ms"] != lo or path[-1]["media_ms"] != hi:
+        return False
+    scene = path[0].get("scene_id")
+    previous = None
+    for frame in path:
+        if (frame.get("scene_id") != scene or frame.get("time_authority") != "ACTUAL_MEDIA_PTS"
+                or any(frame.get(k) for k in ("cut", "cut_barrier", "used_fallback"))):
+            return False
+        bodies = [p for p in frame.get("players") or [] if p.get("local_track_id") == track
+                  and p.get("association_state") == "VERIFIED_LOCAL" and _valid_box(p.get("box"))]
+        if len(bodies) != 1 or previous and not boxes_agree(previous["box"], bodies[0]["box"]):
+            return False
+        previous = bodies[0]
+    return all(0 < b["media_ms"]-a["media_ms"] <= 80 for a, b in zip(path, path[1:]))
+
+
 def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
                                   touch_graph: dict | None,
-                                  consensus_by_track: dict | None) -> dict:
+                                  consensus_by_track: dict | None, *, source_sha256=None) -> dict:
     """Bind a split local track to GLOBAL_TARGET through independent jersey proof.
 
     This is a narrow re-identification handoff owned by the canonical identity
@@ -250,6 +332,7 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
     user tap, and must not conflict with an existing verified dense target.
     """
     authority = identity_authority if isinstance(identity_authority, dict) else {}
+    source_sha256 = source_sha256 or authority.get("_reid_source_video_sha256")
     frames = [row for row in (dense_frames or [])
               if isinstance(row, dict) and _is_num(row.get("media_ms"))]
     graph = deepcopy(touch_graph) if isinstance(touch_graph, dict) else {"touches": []}
@@ -389,8 +472,6 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
             if abs(media_ms - int(round(float(tap["media_ms"])))) <= JERSEY_HANDOFF_MAX_TAP_GAP_MS
             and same_scene_as_tap(tap, media_ms, scene)
         ]
-        if not nearby_taps:
-            continue
         frame = nearest_frame(media_ms)
         if not isinstance(frame, dict):
             continue
@@ -415,6 +496,11 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
         # A jersey number seen on a confidently opposing kit cannot re-identify
         # the target, even when both teams happen to use that shirt number.
         if candidate_team_reliable and candidate_team == "opponent":
+            continue
+        reference_reid = (not nearby_taps and _fresh_reference_reid(
+            authority.get("automatic_jersey_reference"), source_sha256, stated, track_id, media_ms,
+            local_votes, frames, candidate_body))
+        if not nearby_taps and not reference_reid:
             continue
         # Duplicate shirt numbers are common. Refuse only a *simultaneous*
         # second body that independently has two matching time-local reads;
@@ -467,12 +553,13 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
             and dense_target.get("local_track_id") != track_id
         ):
             continue
-        tap = min(nearby_taps, key=lambda row: abs(media_ms - int(row["media_ms"])))
+        tap = min(nearby_taps, key=lambda row: abs(media_ms - int(row["media_ms"]))) if nearby_taps else None
         touch["global_target_id"] = GLOBAL_TARGET_ID
         touch["global_target_resolution"] = {
             "global_target_id": GLOBAL_TARGET_ID,
             "status": "VERIFIED",
-            "reason": "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP",
+            "reason": ("UNIQUE_MULTI_FRAME_JERSEY_REID_FROM_VERIFIED_REFERENCE" if reference_reid
+                       else "UNIQUE_MULTI_FRAME_JERSEY_REID_AFTER_USER_TAP"),
             "stated_jersey_number": stated,
             "verified_jersey_number": stated,
             "agreeing_frames": int(consensus[track_id].get("agreeing_frames") or 0),
@@ -480,10 +567,11 @@ def apply_verified_jersey_handoff(identity_authority: dict | None, dense_frames,
             "time_local_vote_radius_ms": JERSEY_HANDOFF_LOCAL_VOTE_RADIUS_MS,
             "nearest_vote_gap_ms": nearest_vote_gap_ms,
             "nearest_vote_max_ms": JERSEY_HANDOFF_NEAREST_VOTE_MAX_MS,
-            "tap_media_ms": int(tap["media_ms"]),
+            "tap_media_ms": int(tap["media_ms"]) if tap else None,
             "scene_binding": "CANONICAL_TIME_BOUNDS_AND_PHYSICAL_CUTS",
             "touch_media_ms": media_ms,
-            "gap_ms": abs(media_ms - int(tap["media_ms"])),
+            "gap_ms": abs(media_ms - int(tap["media_ms"])) if tap else None,
+            **({"reference_evidence": deepcopy(authority["automatic_jersey_reference"])} if reference_reid else {}),
         }
         diagnostic["bound_touch_ids"].append(touch.get("touch_id"))
 
@@ -589,7 +677,7 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
 
     # FIX09A rows carry the whole-video scene-aware identity spine.
     for a in arows:
-        f = _nearest(frows, a["media_ms"])
+        f = _nearest(frows, a["media_ms"], scene_id=a.get("scene_id"))
         near_pin = _near_matching_tap(a["media_ms"], f["box"] if f else a["box"],
                                      tap_rows, taps, a.get("scene_id"))
         if a["predicted"]:
@@ -628,7 +716,7 @@ def build_unified_identity_authority(fix04_track=None, identity_timeline=None,
     # Keep FIX04's denser local samples as trusted local evidence. They extend
     # event-contact geometry without pretending to provide whole-video identity.
     for f in frows:
-        a = _nearest(arows, f["media_ms"])
+        a = _nearest(arows, f["media_ms"], scene_id=f.get("scene_id"))
         near_pin = _near_matching_tap(f["media_ms"], f["box"], tap_rows, taps,
                                      f.get("scene_id"))
         ff = dict(f)

@@ -51,6 +51,12 @@ def _same_contact(a, b):
 
 def _context(job):
     ms, window = int(job["strike"]["media_ms"]), job["window"]
+    measured = job.get("attack_review_context") or {}
+    if (measured.get("source") == "CONTIGUOUS_MEASURED_ATTACK_CONTEXT"
+            and measured.get("canonical_authority") is False
+            and all(_num(measured.get(k)) for k in ("start_ms", "end_ms"))
+            and window["start_ms"] <= measured["start_ms"] <= ms <= measured["end_ms"] <= window["end_ms"]):
+        return int(measured["start_ms"]), int(measured["end_ms"])
     return (max(int(window.get("start_ms") or 0), ms - 150),
             min(int(window.get("end_ms") or ms + 2600), ms + 2600))
 
@@ -103,7 +109,11 @@ def ordered_requests(requests, analysis):
             job["strike"].update(_review_episode_id=episode_id,
                                  _review_lane=original["review"].get("lane"),
                                  _review_context={"start_ms": start, "end_ms": end,
-                                                  "media_ms": int(context_job["strike"]["media_ms"])})
+                                                  "media_ms": int(original["strike"]["media_ms"])})
+            if isinstance(context_job.get("sequence_context"), dict):
+                job["sequence_context"] = deepcopy(context_job["sequence_context"])
+            if isinstance(context_job.get("attack_review_context"), dict):
+                job["strike"]["_attack_review_context"] = deepcopy(context_job["attack_review_context"])
             job["review"] = {**original["review"], "physical_review_id": episode_id,
                              "overlap_jobs": len(group)}
             (representatives if original is representative else repeats).append(job)

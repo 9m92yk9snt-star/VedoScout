@@ -32,6 +32,7 @@ import action_evidence_review
 import evidence_feedback
 import goal_review_scheduler
 import goal_review_sampling
+import sequence_observation_context
 import fix10a_occluded_goal
 import goal_reappearance
 import native_goal_review
@@ -84,11 +85,13 @@ def _num(value) -> bool:
 
 
 def _goal_review_times(strike_ms: int, end_ms: int, budget: int, start_ms: int = 0,
-                       *, focus_end_ms=None, anchor_ms=None):
+                       *, focus_end_ms=None, anchor_ms=None, include_terminal=False):
     """Keep release, terminal context and dense early frames within the budget."""
     offsets = (-150, 0, 50, 100, 150, 200, 300, 450, 650, 900, 1350, 1700, 2200, 2600)
     candidates = sorted({max(0, strike_ms + offset) for offset in offsets
                          if start_ms <= strike_ms + offset <= end_ms})
+    if include_terminal and start_ms <= strike_ms <= end_ms:
+        candidates = sorted(set(candidates) | {end_ms})
     if not candidates or budget <= 0:
         return []
     # A chronological head slice loses the terminal outcome. Prioritize both
@@ -158,6 +161,9 @@ def _model_audit(raw, prompt, paths, times=None):
             "media_ms": list(times or [])}
 
 
+_DEFAULT_FRAME_READER = video_timebase.read_frame_at
+
+
 def _read_frames(video_path: str, requested_ms) -> dict[int, tuple[int, object]]:
     """Read exact/nearest frames by canonical media time; values are actual PTS."""
     wanted = sorted({max(0, int(round(float(ms)))) for ms in requested_ms if _num(ms)})
@@ -170,6 +176,10 @@ def _read_frames(video_path: str, requested_ms) -> dict[int, tuple[int, object]]
     fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
     out = {}
     try:
+        if video_timebase.read_frame_at is _DEFAULT_FRAME_READER:
+            return video_timebase.read_frames_at(cap, wanted, fps=fps)
+        # Preserve the existing injected-reader contract for integrations and
+        # tests that intentionally replace random access.
         for ms in wanted:
             ok, frame, actual_s = video_timebase.read_frame_at(cap, ms / 1000.0, fps=fps)
             if ok and frame is not None:
@@ -726,7 +736,8 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
 
 
 async def read_goal_scene_evidence(api_key: str, session_id: str,
-                                   frame_paths: list[str], media_ms: list[int], ball_reference=None) -> dict:
+                                   frame_paths: list[str], media_ms: list[int], ball_reference=None,
+                                   sequence_context=None) -> dict:
     """Independent multi-frame goal geometry, ball/occlusion and reaction audit.
 
     Reactions are deliberately returned as support-only observations.  They do
@@ -834,6 +845,14 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             '"ball_classification_protocol":"ALL_VISIBLE_BALLS_V1",'
             '"reason":"<short visual reason>"}'
         )
+        if isinstance(sequence_context, dict) and sequence_context.get("source") == sequence_observation_context.SOURCE:
+            prompt += ("\nShared measured sequence context: " + json.dumps(sequence_observation_context.reader_view(sequence_context), separators=(",", ":"))
+                + '. Follow contacts, bodies and the ball in time. Compare GOAL_AFTER_OCCLUSION, KEEPER_CONTACT, OUTSIDE_GOAL and OTHER_BALL. '
+                  'A possible hidden crossing needs before/after observations of the same ball; do not invent an exact crossing time. '
+                  'Return the existing per-image observations plus optional "outcome_explanations":[{"hypothesis":"GOAL_AFTER_OCCLUSION|KEEPER_CONTACT|OUTSIDE_GOAL|OTHER_BALL|UNRESOLVED",'
+                  '"supporting_indices":[1],"contradicting_indices":[],"missing_observation":"what distinguishes this explanation"}], '
+                  'and optional "review_requests":[{"idx":1,"question":"CONTACT|RECEIVER|SHOT|OUTCOME|IDENTITY|BALL_REAPPEARANCE","direction":"BEFORE|AFTER|AROUND"}]. '
+                  'All references are to supplied images. These explanations are not crossing certificates.')
         msg = UserMessage(
             text=prompt,
             file_contents=[ImageContent(image_base64=_b64(path)) for path, _ms in pairs],
@@ -851,7 +870,13 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         resp = await asyncio.wait_for(chat.send_message(msg), timeout=90)
         text = resp if isinstance(resp, str) else getattr(resp, "text", None) or str(resp)
         audit = _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs])
-        return parse_goal_scene_response(text, [ms for _, ms in pairs], audit)
+        times = [ms for _, ms in pairs]
+        result = parse_goal_scene_response(text, times, audit)
+        if isinstance(sequence_context, dict) and sequence_context.get("source") == sequence_observation_context.SOURCE:
+            parsed = _extract_json(text)
+            result["outcome_explanations"] = sequence_observation_context.outcome_explanations(parsed, times)
+            result["goal_review_requests"] = sequence_observation_context.parse_reasoning(parsed, times, [])["review_requests"]
+        return result
     except Exception:
         failed = dict(empty)
         failed["proof_reason"] = "goal_scene_reader_error"
@@ -866,6 +891,9 @@ def _first_post_strike_other_touches(strikes, touch_graph) -> dict[str, int]:
         if not isinstance(strike, dict) or not _num(strike.get("media_ms")):
             continue
         start = int(strike["media_ms"])
+        context = strike.get("_measured_attack_limit") or {}
+        end = (int(context["end_ms"]) if context.get("source") == "CONTIGUOUS_MEASURED_ATTACK_CONTEXT"
+               and _num(context.get("end_ms")) and context["end_ms"] >= start else start+3000)
         actor = strike.get("player_track_id")
         scene = strike.get("scene_id")
         candidates = [
@@ -875,7 +903,7 @@ def _first_post_strike_other_touches(strikes, touch_graph) -> dict[str, int]:
             and t.get("player_track_id") != actor
             and t.get("scene_id") == scene
             and _num(t.get("media_ms"))
-            and start < int(t["media_ms"]) <= start + 3000
+            and start < int(t["media_ms"]) <= end
         ]
         if not candidates:
             continue
@@ -1007,7 +1035,7 @@ def _action_pixel_response(parsed, media_ms):
             "protocol_errors": sorted(set(errors))}
 
 
-async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_candidates=None):
+async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_candidates=None, sequence_context=None):
     """Locate visible pixels for independent re-detection/crop review only."""
     import hashlib
     if not paths or len(paths) != len(media_ms):
@@ -1015,6 +1043,7 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_
     if not api_key or LlmChat is None:
         return {"status": "UNAVAILABLE", "reason": "action_pixel_reader_unavailable", "frames": []}
     timeline = ", ".join(f"image {i + 1}={ms}ms" for i, ms in enumerate(media_ms))
+    reasoning = isinstance(sequence_context, dict) and sequence_context.get("source") == sequence_observation_context.SOURCE
     prompt = (
         f"Chronological football images: {timeline}. Inspect visible pixels only. "
         "No selected player, jersey number, action label or expected result is supplied. "
@@ -1032,14 +1061,30 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_
         '"confidence":"high"|"medium"|"low"}],"selected_body_ids":["body_1"]}]} . Empty lists are valid. '
         + "Measured search regions per image: " + json.dumps(body_candidates or [], separators=(",", ":"))
     )
+    if reasoning:
+        prompt = prompt.replace("No selected player, jersey number, action label or expected result is supplied.",
+            "No expected jersey number, action label or result is supplied. Known body mappings have measured time-bound provenance.")
+        prompt = prompt.replace("Do not infer identity, a pass, a shot, a goal, an assist, ball ownership or an outcome.",
+            "Describe possible receive/control/turn/release/shot chains as hypotheses. Distinguish observations from unproved ownership or outcome.")
+        prompt += ("\nShared measured sequence context: " + json.dumps(sequence_observation_context.reader_view(sequence_context), separators=(",", ":"))
+            + '. Shared boxes use source-video coordinates; the supplied body manifest uses displayed image coordinates. '
+              'Trace possible chains forward from contacts AND backward from the terminal action. A missing initial contact should lead to a search question. '
+              'In the SAME response optionally add "hypotheses":[{"kind":"PASS_CHAIN|SHOT_CHAIN|SAVE_POSSIBILITY|GOAL_POSSIBILITY|UNKNOWN",'
+              '"steps":[{"idx":1,"body_id":"body_1"|null,"observation":"RECEIVE|CONTROL|TURN|RELEASE|SHOT_MOTION|INTERVENTION|BALL_NEAR_GOAL|UNRESOLVED"}]}], '
+              'and "review_requests":[{"idx":1,"question":"CONTACT|RECEIVER|SHOT|OUTCOME|IDENTITY|BALL_REAPPEARANCE","direction":"BEFORE|AFTER|AROUND"}]. '
+              'Only supplied image indices and body labels are valid. No expected action count, event time or shirt number is given. '
+              'Keep the ordinary frame rows and pixel boxes in the same response.')
     try:
         chat = LlmChat(api_key=api_key, session_id=session_id,
-                       system_message="Inspect visible pixel locations only. Return strict JSON.").with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
+                       system_message=("Inspect pixels and temporal sequences. Separate hypotheses from observations. Return strict JSON."
+                                       if reasoning else "Inspect visible pixel locations only. Return strict JSON.")).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         response = await asyncio.wait_for(chat.send_message(UserMessage(
             text=prompt, file_contents=[ImageContent(image_base64=_b64(p)) for p in paths])), timeout=90)
         raw = response if isinstance(response, str) else getattr(response, "text", None) or str(response)
         parsed = _extract_json(raw)
-        return {**_action_pixel_response(parsed, media_ms), "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
+        return {**_action_pixel_response(parsed, media_ms),
+                **({"sequence_reasoning": sequence_observation_context.parse_reasoning(parsed, media_ms, body_candidates)} if reasoning else {}),
+                "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
                 "raw_response": raw[:50000], "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
                 "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest()}
     except Exception as exc:
@@ -1298,10 +1343,12 @@ class ShadowVisionProviders:
         source_frames = {f["media_ms"]: f for f in dense_frames if f.get("media_ms") in requested
                     and f.get("scene_id") == job["scene_id"] and not f.get("cut_barrier")
                     and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"}
-        measured = {ms: action_evidence_review.measured_body_candidates(f) for ms, f in source_frames.items()}
+        body_labels = sequence_observation_context.labels(dense_frames)
+        measured = {ms: action_evidence_review.measured_body_candidates(f, body_labels=body_labels) for ms, f in source_frames.items()}
+        context = job.get("sequence_context") or sequence_observation_context.build(job, dense_frames, times=requested)
         search_geometry = {ms: [p.get("box") for p in f.get("players") or []] for ms, f in source_frames.items()}
         body_hash = hashlib.sha256(json.dumps([measured, search_geometry], sort_keys=True).encode()).hexdigest()
-        cache_key = (str(video_path), job["inspection_id"], tuple(requested), body_hash)
+        cache_key = (str(video_path), job["inspection_id"], tuple(requested), body_hash, context.get("fingerprint"))
         if cache_key in self._inspection_cache:
             return deepcopy(self._inspection_cache[cache_key])
         feedback = job.get("phase") == "FEEDBACK"
@@ -1334,9 +1381,11 @@ class ShadowVisionProviders:
             self.inspection_calls += 1
             self.feedback_inspection_calls += int(feedback)
             try:
+                kwargs = {"body_candidates": body_manifest}
+                if "sequence_context" in inspect.signature(read_action_pixel_evidence).parameters:
+                    kwargs["sequence_context"] = context
                 review = support_vision_runner.run_support_vision(read_action_pixel_evidence, [(
-                    (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}", paths, times),
-                    {"body_candidates": body_manifest})],
+                    (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}-{self.inspection_calls}", paths, times), kwargs)],
                     deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="action_pixels")[0]
             except Exception as exc:
                 review = {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
@@ -1408,6 +1457,8 @@ class ShadowVisionProviders:
                   "native_neighbor_decoded_ms": neighbor_actual,
                   "native_neighbor_roi_attempts": roi_attempts,
                   "body_search_regions": body_manifest, "body_selection_version": 2,
+                  "sequence_context_fingerprint": context.get("fingerprint"),
+                  "shared_sequence_context_used": bool(context.get("related_sequence")),
                   "canonical_authority": False, "ball_corroboration": "NATIVE_CLASS_32_DETECTOR"}
         self._inspection_cache[cache_key] = deepcopy(result)
         return result
@@ -1541,7 +1592,8 @@ class ShadowVisionProviders:
         review_path = goal_review_sampling.contact_bound_native_path(strike, strike.get("_goal_review_ball_path"))
         focus_end_ms = review_path["rows"][-1]["media_ms"] if review_path is not None else None
         requested = _goal_review_times(strike_ms, end_ms, MAX_GOAL_FRAMES, start_ms=start_ms,
-            focus_end_ms=focus_end_ms, anchor_ms=review_path["seed_ms"] if review_path is not None else None)
+            focus_end_ms=focus_end_ms, anchor_ms=review_path["seed_ms"] if review_path is not None else None,
+            include_terminal=(strike.get("_attack_review_context") or {}).get("source") == "CONTIGUOUS_MEASURED_ATTACK_CONTEXT")
         anchor = strike.get("active_ball_anchor") or {}
         anchor_valid = bool(_num(anchor.get("media_ms")) and _valid_box(anchor.get("box"))
                             and anchor.get("proof_eligible") is True and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
@@ -1559,9 +1611,10 @@ class ShadowVisionProviders:
         anchor_key = (int(anchor["media_ms"]), tuple(float(anchor["box"][k]) for k in ("x", "y", "w", "h"))) if anchor_valid else None
         path_key = hashlib.sha256(json.dumps(review_path, sort_keys=True).encode()).hexdigest() if review_path else None
         cache_key = (str(window.get("dense_window_id") if isinstance(window, dict) else ""), strike_ms, tuple(requested),
-                     (requires_reference, anchor_key), path_key, MAX_DENSE_GOAL_FRAMES)
+                     (requires_reference, anchor_key), path_key, MAX_DENSE_GOAL_FRAMES,
+                     (strike.get("_sequence_context") or {}).get("fingerprint"))
         if cache_key in self._goal_cache:
-            return self._goal_cache[cache_key]
+            return deepcopy(self._goal_cache[cache_key])
         frames = _read_frames(video_path, requested)
         if len(frames) < 2:
             self._goal_cache[cache_key] = None
@@ -1606,8 +1659,10 @@ class ShadowVisionProviders:
                              "media_ms": int(anchor["media_ms"]), "box": deepcopy(anchor["box"])} \
                     if anchor_valid and int(anchor["media_ms"]) in actual_times else None
                 kwargs = {"ball_reference": reference} if "ball_reference" in inspect.signature(read_goal_scene_evidence).parameters else {}
+                if "sequence_context" in inspect.signature(read_goal_scene_evidence).parameters:
+                    kwargs["sequence_context"] = strike.get("_sequence_context")
                 review = support_vision_runner.run_support_vision(read_goal_scene_evidence, [(
-                    (self.api_key, f"{self.session_prefix}-goal-{strike_ms}", paths, actual_times), kwargs)],
+                    (self.api_key, f"{self.session_prefix}-goal-{strike_ms}-{self.goal_calls}", paths, actual_times), kwargs)],
                     deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="goal_scene")[0]
             except Exception as exc:
                 review = support_vision_runner.fail_closed_diagnostic(exc)
@@ -1640,6 +1695,9 @@ class ShadowVisionProviders:
                     "reader_image_budget":MAX_DENSE_GOAL_FRAMES if dense_requested is not None else MAX_GOAL_FRAMES,
                     "native_path_end_ms": focus_end_ms, "canonical_authority": False},
                 "model_review_audit": (review or {}).get("model_review_audit"),
+                "outcome_explanations": deepcopy((review or {}).get("outcome_explanations") or []),
+                "goal_review_requests": deepcopy((review or {}).get("goal_review_requests") or []),
+                "sequence_context_fingerprint": (strike.get("_sequence_context") or {}).get("fingerprint"),
                 "response_coverage": (review or {}).get("response_coverage"),
                 "contextual_support_evidence": deepcopy((review or {}).get("contextual_support_evidence") or
                     goal_context_observations.parse(None,actual_times)),
@@ -1671,7 +1729,7 @@ class ShadowVisionProviders:
                 result["ball_reappearance_audit"] = deepcopy(review["ball_reappearance_audit"])
             if isinstance(review, dict) and "native_reappearance_gap_scan" in review:
                 result["native_reappearance_gap_scan"] = deepcopy(review["native_reappearance_gap_scan"])
-            self._goal_cache[cache_key] = result
+            self._goal_cache[cache_key] = deepcopy(result)
             if requires_reference:
                 result["visual_crossing_audit"]["active_ball_link"] = link
             return result
@@ -1696,6 +1754,9 @@ class ShadowVisionProviders:
                     "reader_image_budget":MAX_DENSE_GOAL_FRAMES if dense_requested is not None else MAX_GOAL_FRAMES,
                 "native_path_end_ms": focus_end_ms, "canonical_authority": False},
             "model_review_audit": (review or {}).get("model_review_audit"),
+            "outcome_explanations": deepcopy((review or {}).get("outcome_explanations") or []),
+            "goal_review_requests": deepcopy((review or {}).get("goal_review_requests") or []),
+            "sequence_context_fingerprint": (strike.get("_sequence_context") or {}).get("fingerprint"),
             "response_coverage": (review or {}).get("response_coverage"),
             "contextual_support_evidence": deepcopy((review or {}).get("contextual_support_evidence") or
                 goal_context_observations.parse(None,actual_times)),
@@ -1741,7 +1802,7 @@ class ShadowVisionProviders:
             if link["status"] != "VERIFIED":
                 result["visual_crossing_audit"].update(status="UNRESOLVED", proof_ready=False,
                     reason=link["reason"], proof_reason=link["reason"], same_ball_continuity=False)
-        self._goal_cache[cache_key] = result
+        self._goal_cache[cache_key] = deepcopy(result)
         return result
 
     def bind_video_path(self, video_path: str):

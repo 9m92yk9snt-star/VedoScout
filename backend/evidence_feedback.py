@@ -7,6 +7,8 @@ import os
 
 import action_evidence_review as inspection
 import goal_review_scheduler as scheduler
+import attack_sequence_search
+import sequence_observation_context
 
 MAX_FEEDBACK_REVIEWS = min(8, max(0, int(os.environ.get("FIX13_MAX_FEEDBACK_REVIEWS", "8"))))
 
@@ -52,6 +54,12 @@ def build_plan(traces, budget=None, analysis=None):
     limit = MAX_FEEDBACK_REVIEWS if budget is None else min(8, max(0, int(budget)))
     candidates, rejected = [], []
     hints = defaultdict(list)
+    requests = {id(t): sequence_observation_context.model_requests(t) + attack_sequence_search.questions(t) for t in traces}
+    shared_requests = defaultdict(list)
+    for trace in traces:
+        sha = (trace.get("source_video") or {}).get("sha256")
+        if sha:
+            shared_requests[(sha, (trace.get("window") or {}).get("scene_id"))].extend(requests[id(trace)])
     for sequence in (analysis or {}).get("sequences") or []:
         for action in sequence.get("actions") or []:
             ms = action.get("contact_ms")
@@ -67,9 +75,12 @@ def build_plan(traces, budget=None, analysis=None):
                          if inspection._num(f.get("media_ms"))], key=lambda f: f["media_ms"])
         if not frames or not window.get("scene_id"):
             continue
+        before = gaps(trace)
         valid = lambda f: f.get("scene_id") == window["scene_id"] and not f.get("cut_barrier") \
             and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"
-        centers = []
+        sha = (trace.get("source_video") or {}).get("sha256")
+        centers = sequence_observation_context.requested_centers(trace, frames,
+            shared_requests.get((sha, window["scene_id"]), []) if sha else attack_sequence_search.questions(trace))
         for job in trace.get("action_inspections") or []:
             if job.get("selected") and job.get("status") == "PARTIAL_RESPONSE":
                 centers.extend((1, ms, "PIXEL_RESPONSE_COVERAGE_GAP")
@@ -93,7 +104,7 @@ def build_plan(traces, budget=None, analysis=None):
             focused = _target_contact_search(contact, frames, window["scene_id"])
             centers.append((0 if focused else 2, contact.get("media_ms"),
                             "TARGET_CONTACT_EVIDENCE_GAP" if focused else "PHYSICAL_CONTACT_GAP"))
-        if gaps(trace)["target_ball_frames"]:
+        if before["target_ball_frames"]:
             path = {b.get("media_ms"): b for b in trace.get("ball_trajectory") or []}
             for touch in (trace.get("touch_graph") or {}).get("touches") or []:
                 ms = touch.get("media_ms")
@@ -104,7 +115,7 @@ def build_plan(traces, budget=None, analysis=None):
                     role = touch.get("contact_role") or {}
                     release = isinstance(role, dict) and role.get("status") == "VERIFIED" and role.get("role") == "RELEASE"
                     centers.append((0 if release else 3, ms, "TARGET_RELEASE_OR_BALL_GAP"))
-        if gaps(trace)["identity_frames"] or not (trace.get("contacts") or {}).get("accepted"):
+        if before["identity_frames"] or not (trace.get("contacts") or {}).get("accepted"):
             for job in trace.get("action_inspections") or []:
                 if job.get("selected") and job.get("status") not in {"ERROR", "UNAVAILABLE", "NOT_CONFIGURED", "DEFERRED"}:
                     centers.append((3, job.get("center_ms"), "IDENTITY_OR_CONTACT_GAP"))
@@ -116,7 +127,10 @@ def build_plan(traces, budget=None, analysis=None):
             rank, ms, _ = candidate
             distance = min((abs(ms - hint) for hint in search_times), default=0) if inspection._num(ms) else float("inf")
             return rank, distance, ms if inspection._num(ms) else -1
-        for priority, center, reason in sorted(centers, key=candidate_priority):
+        selected_searches = []
+        for priority, center, reason in sorted(set(centers), key=candidate_priority):
+            if selected_searches and (priority >= 0 or any(abs(center-old) < 700 for old in selected_searches)):
+                continue
             if not inspection._num(center):
                 continue
             index = min(range(len(frames)), key=lambda i: abs(frames[i]["media_ms"] - center))
@@ -135,7 +149,7 @@ def build_plan(traces, budget=None, analysis=None):
             job = {"dense_window_id": trace["trace_id"], "scene_id": window["scene_id"],
                    "start_ms": int(start), "end_ms": int(end), "center_ms": int(center),
                    "has_contact_time": True, "source_action_ids": [], "phase": "FEEDBACK",
-                   "reason": reason, "priority": priority, "before": gaps(trace)}
+                   "reason": reason, "priority": priority, "before": before}
             requested = inspection.frame_times(job, frames)
             if any(requested == old.get("requested_media_ms") for old in trace.get("action_inspections") or []):
                 rejected.append({"trace_id": trace["trace_id"], "reason": "NO_NEW_REVIEW_INPUT", "center_ms": center})
@@ -144,7 +158,9 @@ def build_plan(traces, budget=None, analysis=None):
                 [trace["trace_id"], reason, start, end, requested]).encode()).hexdigest()[:20]
             job["requested_media_ms"] = requested
             candidates.append(job)
-            break
+            selected_searches.append(center)
+            if priority >= 0 or len(selected_searches) >= 2:
+                break
     # Overlapping dense/recall windows can request the identical source pixels.
     # Keep the most specific search once, rather than spending two reader calls.
     unique, seen_inputs = [], set()

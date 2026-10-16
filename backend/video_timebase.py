@@ -96,6 +96,46 @@ def read_frame_at(cap, seconds: float, fps=None, max_forward: int = 240):
     return False, None, t
 
 
+def read_frames_at(cap, requested_ms, fps=None, max_forward=240):
+    """Read ordered requests in nearby groups using actual post-grab PTS.
+
+    Adjacent requests reuse forward decoding. Large gaps still seek, so a
+    handful of late crops does not decode an entire video. A repeated source
+    frame remains the same PTS; fallback timestamps are not returned as proof.
+    """
+    import math
+    wanted = sorted({max(0, int(round(ms))) for ms in requested_ms
+                     if isinstance(ms, (int, float)) and not isinstance(ms, bool) and math.isfinite(ms)})
+    result, ready, current_pixels = {}, False, None
+    t, fallback = 0., False
+    for ms in wanted:
+        target = ms / 1000.
+        if not ready or target-t > 1.:
+            ready, t, fallback = seek_with_preroll(cap, target, fps)
+            current_pixels = None
+        if not ready:
+            continue
+        for _ in range(max_forward):
+            if fallback:
+                ready = False
+                break
+            if t >= target-1e-3:
+                if current_pixels is None:
+                    ok, current_pixels = cap.retrieve()
+                    if not ok:
+                        current_pixels = None
+                if current_pixels is not None:
+                    result[ms] = (int(round(t*1000)), current_pixels)
+                break
+            ready, t, fallback = grab_frame_time_seconds(cap, fps)
+            current_pixels = None
+            if not ready:
+                break
+        else:
+            ready = False
+    return result
+
+
 def nearest_slot_choice(slot, prev_local, cur_local) -> bool:
     """CFR resampling lookahead: True when the CURRENT source frame is
     strictly nearer to the output slot than the previous one."""

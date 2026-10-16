@@ -1,0 +1,134 @@
+{
+  "scope": "READ_ONLY_FOUNDATION_IDENTITY_REPLAY_NOT_FULL_EVENT_ANALYSIS",
+  "base_commit": "e570aba1e9dfc6b794b7272440f96a7a893b3741",
+  "source_video_sha256": "0e6c68902aa3d01971f7f327b0fa432e5c526c60654062cc6f01276646884abb",
+  "baseline_matches_saved_target_points": true,
+  "baseline_points": 145,
+  "patched_points": 135,
+  "identity_authority_queries": [
+    {
+      "variant": "baseline",
+      "media_ms": 30765,
+      "reason": "UNRESOLVED_IDENTITY",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "baseline",
+      "media_ms": 30832,
+      "reason": "UNRESOLVED_IDENTITY",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "baseline",
+      "media_ms": 30982,
+      "reason": "OK_EXACT",
+      "proof_eligible": true,
+      "box": {
+        "x": 0.825,
+        "y": 0.6495,
+        "w": 0.0708,
+        "h": 0.0645
+      }
+    },
+    {
+      "variant": "baseline",
+      "media_ms": 23680,
+      "reason": "SCENE_CUT",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "baseline",
+      "media_ms": 43190,
+      "reason": "SCENE_CUT",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "baseline",
+      "media_ms": 49440,
+      "reason": "SCENE_CUT",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "baseline",
+      "media_ms": 56440,
+      "reason": "UNRESOLVED_IDENTITY",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 30765,
+      "reason": "TARGET_GAP",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 30832,
+      "reason": "TARGET_GAP",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 30982,
+      "reason": "TARGET_GAP",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 23680,
+      "reason": "SCENE_CUT",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 43190,
+      "reason": "SCENE_CUT",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 49440,
+      "reason": "SCENE_CUT",
+      "proof_eligible": false,
+      "box": null
+    },
+    {
+      "variant": "patched",
+      "media_ms": 56440,
+      "reason": "UNRESOLVED_IDENTITY",
+      "proof_eligible": false,
+      "box": null
+    }
+  ],
+  "network_calls": 0,
+  "remote_model_calls": 0,
+  "new_manual_taps": 0,
+  "full_physical_reconstruction_repeated": false,
+  "five_action_acceptance": "NOT_RETESTED_NOT_ESTABLISHED",
+  "artifact_sha256": {
+    "baseline-identity.json": "bce25ecbb66ec67ca6aaf4da8872b6157a3a4a360232f2aba90c271369b2f096",
+    "observations.pkl": "70c2d73817853bf8197caf26888b33d201f5f3fcac5a8124bc4aea2dea7aee94",
+    "replayed-identity.json": "44b898cdc203c08b1f3bb50346337c2005c5cb4391d8796400b692d86af66009"
+  },
+  "regression_tests": {
+    "passed": 286,
+    "failed": 0,
+    "forbidden_network_sdk_video_attempts": 0
+  },
+  "limits": [
+    "Identity-only replay; physical contacts/outcomes not recomputed",
+    "Baseline and patched queries use the current unified authority implementation",
+    "No new full analysis or five-action acceptance",
+    "Raw model conflicts are historical observations, not verified event truth"
+  ]
+}

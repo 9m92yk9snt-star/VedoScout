@@ -220,7 +220,9 @@ class GoalDirectionProvider:
         ball_key = (int(anchor["media_ms"]), tuple(round(float(anchor["box"][k]), 5) for k in ("x", "y", "w", "h"))) \
             if _num(anchor.get("media_ms")) and _valid_box(anchor.get("box")) else None
         cache_key = (scene_id or str((window or {}).get("dense_window_id") or ""),
-                     strike.get("_review_episode_id") or (strike_ms, ball_key))
+                     strike.get("_review_episode_id") or (strike_ms, ball_key),
+                     (strike.get("_sequence_context") or {}).get("fingerprint"),
+                     hashlib.sha256(json.dumps(strike.get("_goal_review_ball_path"), sort_keys=True).encode()).hexdigest())
         for saved_start, saved_end, saved in self._cache.get(cache_key, []):
             if saved_start <= start_ms and saved_end >= end_ms:
                 result = deepcopy(saved)

@@ -680,7 +680,7 @@ def _resume_trim(samples, ident_fn, pin_ms_list, neg_fn=None):
         s = samples[k]
         gap_ms = s["ms"] - samples[k - 1]["ms"]
         if s["gap_before"] >= 2 or gap_ms > 500:
-            if any(p >= s["ms"] - PIN_WINDOW_MS for p in pin_ms_list):
+            if any(abs(p - s["ms"]) <= PIN_WINDOW_MS for p in pin_ms_list):
                 out.append(s)
                 continue
             sims, seps = [], []
@@ -1442,6 +1442,35 @@ def assemble_timeline(observations, taps=None, identity_sim=None,
                     base = 0.0
                 return max(base, _bank_sim(e, bank, pair_sim))
             ident_used = _ident2
+            # The enriched profile changes which samples count as target
+            # evidence. Re-split before aggregating it: otherwise a few late
+            # matches can promote an earlier, different body on the same MOT
+            # track. Preserve tap ownership at its original sample only.
+            for sd in scene_data:
+                old_tracks = sd["tracks"]
+                refined, crossings = _apply_identity_splits(
+                    old_tracks, sd["crossings"], _ident2, neg_fn)
+                owner = {id(s): tr.tid for tr in refined for s in tr.samples}
+                fragments = {tr.tid: {owner[id(s)] for s in tr.samples if id(s) in owner}
+                             for tr in old_tracks}
+                by_tid = {tr.tid: tr for tr in old_tracks}
+                scene_no = sd["no"]
+                pins = []
+                for ms, tid in pins_by_scene.get(scene_no, []):
+                    tr = by_tid.get(tid)
+                    nearest = min(tr.samples, key=lambda s: abs(s["ms"] - ms)) if tr else None
+                    mapped = owner.get(id(nearest)) if nearest is not None else None
+                    if mapped is not None:
+                        pins.append((ms, mapped))
+                pins_by_scene[scene_no] = pins
+                if scene_no in restrict_by_scene:
+                    restrict_by_scene[scene_no] = set().union(*(
+                        fragments.get(tid, set()) for tid in restrict_by_scene[scene_no]))
+                if scene_no in tap_hyps_by_scene:
+                    tap_hyps_by_scene[scene_no] = [
+                        (ms, frozenset().union(*(fragments.get(tid, set()) for tid in tids)))
+                        for ms, tids in tap_hyps_by_scene[scene_no]]
+                sd.update(tracks=refined, crossings=crossings)
             stats = {}
             results = _chain_all(_ident2, guard=ident_fn,
                                  shape_sig=target_shape, stats=stats)

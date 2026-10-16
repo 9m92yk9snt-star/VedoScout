@@ -18,6 +18,12 @@ QUALITY_NOTE = (
 _GOAL = re.compile(r"\b(?:goals?|scor(?:es|ed|ing)|finishing|finisher|goal[- ]scorer|find(?:s|ing)? the (?:net|back of the net)|clinical)\b|\bscore\b(?!\s+(?:of|is|was|:))", re.I)
 _ASSIST = re.compile(r"\bassist(?:s|ed)?\b", re.I)
 _SAVE = re.compile(r"\b(?:save[sd]?|saved|forces? a save)\b", re.I)
+_COUNT_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+                "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+_SCORING_COUNT = re.compile(
+    r"\b(?P<count>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+    r"(?:(?:well[- ]taken|excellent|superb|fine|clinical|decisive|powerful|impressive)\s+){0,2}"
+    r"(?P<kind>goals?|assists?)\b", re.I)
 _TIMESTAMP = re.compile(r"\b(\d{1,2}):(\d{2})\b")
 _CATEGORIES = ("technical", "tactical", "physical", "mentality")
 _ADVICE = {"training_plan", "next_match_missions", "development_roadmap",
@@ -65,10 +71,21 @@ def _matching(events, row):
 def _supports(text, events):
     if text in {NEUTRAL, MISSING_ACTIONS, QUALITY_NOTE}:
         return True
-    if _ASSIST.search(text):
-        return any(e.get("canonical_event_type") == "ASSIST" and e.get("causal_verified") is True for e in events)
-    if _SAVE.search(text):
-        return any(e.get("canonical_outcome") == "SAVED" for e in events)
+    for claim in _SCORING_COUNT.finditer(text):
+        count_text = claim["count"].lower()
+        count = int(count_text) if count_text.isdigit() else _COUNT_WORDS[count_text]
+        kind = "GOAL" if claim["kind"].lower().startswith("goal") else "ASSIST"
+        if count > sum(e.get("canonical_event_type") == kind and e.get("causal_verified") is True
+                       for e in events):
+            return False
+    # A supported clause cannot authorize the other outcomes in the same
+    # sentence. Each mentioned outcome needs its own canonical evidence.
+    if _ASSIST.search(text) and not any(
+            e.get("canonical_event_type") == "ASSIST" and e.get("causal_verified") is True
+            for e in events):
+        return False
+    if _SAVE.search(text) and not any(e.get("canonical_outcome") == "SAVED" for e in events):
+        return False
     if _GOAL.search(text):
         # Finishing assessments can use verified shots; an actual goal claim
         # requires the verified scoring outcome, never a model story.
