@@ -604,8 +604,13 @@ def reconstruct_physical_match(
                     diagnostics=provider_diagnostics, name="action_pixels")
                 observation = observation if isinstance(observation, dict) else {"status": "NO_EVIDENCE", "frames": []}
                 applied = action_evidence_review.apply_observations(dense_frames, observation, job["inspection_id"])
-                dense_frames = dense_identity_continuity.apply_reference_matches(applied["frames"], observation)
-                dense_frames = dense_identity_continuity.apply(dense_frames)["frames"]
+                dense_frames = applied["frames"]
+                if observation.get("target_observations"):
+                    identified = dense_identity_continuity.apply_reference_matches(dense_frames, observation)
+                    if any((new.get("global_target") or {}).get("proof_eligible") is True
+                           and (old.get("global_target") or {}).get("proof_eligible") is not True
+                           for old, new in zip(dense_frames, identified)):
+                        dense_frames = dense_identity_continuity.apply(identified)["frames"]
                 inspection_requests.extend(applied["jersey_requests"])
                 inspection_rows.append({**job, **observation, "added_ball_candidates": applied["added_ball_candidates"],
                                         "binding_rejections": applied["binding_rejections"],
@@ -757,6 +762,7 @@ def reconstruct_physical_match(
                 window_roles.update(deepcopy(role_evidence))
 
             outcomes = []
+            inspection_search_hints = sequence_observation_context.review_search_hints(inspection_rows, dense_with_jersey)
             goal_reviews_requested = 0
             goal_reviews_skipped = 0
             goal_clarifications_requested = 0
@@ -778,7 +784,7 @@ def reconstruct_physical_match(
                         "window": window, "strike": request_strike, "review": review,
                         "eligibility": eligibility, "shot_track": shot_track,
                         "touch_graph": touch_with_jersey, "roles": window_roles,
-                        "inspection_search_hints": sequence_observation_context.review_search_hints(inspection_rows, dense_with_jersey),
+                        "inspection_search_hints": inspection_search_hints,
                         "intervention": a7, "outcome_index": len(outcomes),
                         "diagnostics": provider_diagnostics,
                     })
