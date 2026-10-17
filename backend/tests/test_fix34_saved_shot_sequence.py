@@ -290,6 +290,34 @@ async def test_production_motion_reader_connects_stages_in_its_single_existing_c
     assert response["status"] == "COMPLETED"
 
 
+@pytest.mark.parametrize("detail", ["omitted", "empty", "duplicate", "bad_jersey_field", "spare_conflict"])
+async def test_optional_pixel_rows_do_not_veto_the_production_video_action_protocol(monkeypatch, detail):
+    import json
+    import fix10a_vision_providers as vision
+    trace, parsed = structured_save()
+    obs = trace["action_inspections"][0]
+    if detail == "omitted": parsed.pop("frames")
+    elif detail == "empty": parsed["frames"] = []
+    elif detail == "duplicate": parsed["frames"].append(deepcopy(parsed["frames"][14]))
+    elif detail == "bad_jersey_field": parsed["frames"][14].pop("selected_body_ids")
+    elif detail == "spare_conflict":
+        parsed["frames"][0]["balls"][0]["ball_id"] = "active"
+        parsed["frames"][14].pop("selected_body_ids")  # another pixel-field error must not hide the spare
+    async def read(*_args, **_kwargs):
+        return {"raw_response": json.dumps(parsed), "video_input": {**obs["video_input"], "reference_sha256": []}}
+    monkeypatch.setattr(vision.video_model_input, "read_video", read)
+    response = await vision.read_action_video_evidence("test-only", "optional", "clip.mp4",
+        obs["motion_clip"]["frame_source_ms"], obs["body_search_regions"])
+    assert response["status"] == "COMPLETED"
+    obs.update(response)
+    events = dense.resolve_motion_observations(trace)["events"]
+    if detail == "spare_conflict":
+        assert not any(e["canonical_outcome"] == "SAVED" for e in events)
+    else:
+        event, = events
+        assert event["canonical_outcome"] == "SAVED" and event["causal_verified"]
+
+
 def test_keeper_missed_by_detector_is_observed_without_inventing_a_track():
     trace, parsed = structured_save()
     obs = trace["action_inspections"][0]

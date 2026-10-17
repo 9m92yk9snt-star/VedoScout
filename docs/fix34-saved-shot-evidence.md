@@ -46,6 +46,10 @@ only prevents that read from suppressing other coverage work. An arbitrary
 250 ms source-sampling gap alone no longer rejects video continuity.
 The prompt requests only useful frame observation rows, rather than mandatory
 empty rows for every supplied source frame. Source image coverage is unchanged.
+The production reader treats optional pixel/crop rows separately: omitted rows,
+duplicate rows or malformed jersey fields do not discard valid video actions.
+Native pixel proposals still use their own parser; explicit spare/ball conflicts
+remain visible to the video adapter even if an auxiliary pixel field is invalid.
 
 The resulting visual observations remain distinct from native physical evidence.
 The shared resolver and projections publish one shot/on-target outcome only
@@ -188,15 +192,15 @@ balls, contradictory controls and actual cuts remain separate controls. The
 production adapter/driver tests use explicit test doubles, not new perception.
 Source timestamps can be shifted without changing classification logic.
 
-The focused identity/video/save group passed 193 tests after the simplification.
+The focused identity/video/save group passed 198 tests after the simplification.
 This deliberately gives source-video observations more authority instead of
 recertifying them through native geometry. Unchanged perception accuracy or
 full-report latency cannot be claimed without a fresh real model run.
 
-After the simplification, 122 backend regression files passed 2,415 cases with
-one skip in 30.90 s (the process-runner module is checked separately in CI).
+After the simplification, 122 backend regression files passed 2,420 cases with
+one skip in 28.99 s (the process-runner module is checked separately in CI).
 All 379 backend Python files parse and diff whitespace checks pass. The focused
-193-case group overlaps this sweep; the counts must not be added together.
+198-case group overlaps this sweep; the counts must not be added together.
 Direct-transport controls include source-byte/reference preservation, actual
 video-part sampling, no SDK dependency, HTTP failure, timeout, blocked output
 and token truncation. HTTP/reader replies in those controls are explicit test

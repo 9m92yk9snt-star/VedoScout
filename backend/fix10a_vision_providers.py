@@ -1251,9 +1251,20 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
     parsed = _extract_json(raw)
     pixels = _action_pixel_response(parsed, media_ms)
     import saved_shot_sequence
-    actions = saved_shot_sequence.connect((parsed or {}).get("actions"), pixels["frames"],
+    parsed_actions = parsed.get("actions") if isinstance(parsed, dict) else None
+    detail_rows = parsed.get("frames") if isinstance(parsed, dict) else None
+    detail_rows = [r for r in detail_rows if isinstance(r, dict) and type(r.get("idx")) is int
+                   and 1 <= r["idx"] <= len(media_ms)] if isinstance(detail_rows, list) else []
+    actions = saved_shot_sequence.connect(parsed_actions, detail_rows,
         media_ms, body_candidates, _native_search_box)
     return {**pixels,
+            # Optional pixel/crop rows are not the temporal action protocol.
+            # A malformed extra row cannot erase an otherwise observed play.
+            "status": ("COMPLETED" if parsed.get("reviewed_entire_clip") is True else "PARTIAL_RESPONSE")
+                      if isinstance(parsed_actions, list) else pixels["status"],
+            "reason": "TEMPORAL_VIDEO_OBSERVATIONS" if isinstance(parsed_actions, list) else pixels["reason"],
+            "pixel_observation_status": pixels["status"],
+            "pixel_observation_reason": pixels["reason"],
             "clip_review_complete": (parsed or {}).get("reviewed_entire_clip") is True,
             "target_observations": _target_observations(parsed, media_ms, body_candidates) if refs else [],
             "video_actions": actions,
