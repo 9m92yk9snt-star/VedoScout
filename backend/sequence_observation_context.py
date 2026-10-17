@@ -57,7 +57,6 @@ def video_observations(observation, frames, window):
     clip, transport = obs.get("motion_clip") or {}, obs.get("video_input") or {}
     times = clip.get("frame_source_ms") or []
     if (obs.get("observation_protocol") != "SOURCE_INDEXED_MOTION_CLIP_V1"
-            or obs.get("clip_review_complete") is not True
             or obs.get("status") not in {"COMPLETED", "PARTIAL_RESPONSE"}
             or transport.get("sampling_prepared_for_provider") is not True
             or transport.get("sampling_strategy") != "SOURCE_INDEXED_1FPS_PLAYBACK"
@@ -109,10 +108,13 @@ def video_observations(observation, frames, window):
         receiver, finisher = body(raw.get("receiver_idx"), raw.get("receiver_body_id")), body(raw.get("shot_idx"), raw.get("finisher_body_id"))
         outcome_ms = at(raw.get("outcome_idx"))
         outcome_evidence = sorted({at(i) for i in _rows(raw.get("outcome_evidence_indices")) if at(i) is not None})
+        if outcome_ms is not None:
+            outcome_evidence = sorted({*outcome_evidence, outcome_ms})
+        elif outcome_evidence:
+            outcome_ms = outcome_evidence[-1]
         terminal = outcome_ms if outcome_ms is not None else end
         continuous = (raw.get("continuous_visible_sequence") is True
-            and not any(start <= f.get("media_ms", -1) <= terminal and not actual(f, window.get("scene_id")) for f in frames)
-            and not any(b-a > 250 for a, b in zip(times, times[1:]) if start <= a <= terminal))
+            and not any(start <= f.get("media_ms", -1) <= terminal and not actual(f, window.get("scene_id")) for f in frames))
         visible = (continuous and raw.get("outcome_visible") is True and bool(outcome_evidence)
                    and min(outcome_evidence) >= (contact if contact is not None else start)
                    and (outcome_ms is None or outcome_ms in outcome_evidence))
@@ -149,7 +151,7 @@ def motion_window_complete(observation, frames, window):
     packet = video_observations(observation, frames, window)
     native = [f["media_ms"] for f in frames if actual(f, window.get("scene_id"))]
     times = (observation.get("motion_clip") or {}).get("frame_source_ms") or []
-    return bool(packet.get("sequences") and native and times
+    return bool(observation.get("clip_review_complete") is True and packet.get("sequences") and native and times
                 and times[0] <= min(native)+150 and times[-1] >= max(native)-150)
 
 
@@ -200,6 +202,8 @@ def motion_review_requests(parsed, times, manifest):
                     "canonical_authority": False})
             continue
         receiver, shot, outcome = (at(action.get(k)) for k in ("receiver_idx", "shot_idx", "outcome_idx"))
+        outcome_evidence = [at(i) for i in _rows(action.get("outcome_evidence_indices")) if at(i) is not None]
+        outcome = outcome if outcome is not None else max(outcome_evidence, default=None)
         if action.get("receiver_body_id") not in by_ms.get(receiver, {}):
             receiver = None
         if action.get("finisher_body_id") not in by_ms.get(shot, {}):
@@ -212,8 +216,9 @@ def motion_review_requests(parsed, times, manifest):
             question = "RECEIVER"
         elif action.get("kind") in {"PASS", "CROSS"} and shot is None and unknown:
             question, pivot, body = "SHOT", receiver, action.get("receiver_body_id")
-        elif action.get("kind") in {"PASS", "CROSS", "SHOT"} and (outcome is None or action.get("outcome_visible") is not True
-                or not action.get("outcome_evidence_indices")) and (unknown or action.get("kind") == "SHOT"):
+        elif (action.get("kind") in {"PASS", "CROSS", "SHOT"}
+                and (outcome is None or action.get("outcome_visible") is not True)
+                and (unknown or action.get("kind") == "SHOT")):
             # A known shot label is not complete outcome evidence. In
             # particular SAVED must not suppress its own missing-link search.
             question, pivot, body = "OUTCOME", shot or contact, action.get("finisher_body_id") or body

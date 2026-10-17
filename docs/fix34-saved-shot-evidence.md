@@ -7,28 +7,45 @@ the net must not supply the shot's outcome.
 
 ## Changes
 
-The existing temporal action reader observes the full play once. Its response
-now includes frame-specific shooter labels and a response-local ball ID linking
-four visible stages: strike, incoming ball, goalkeeper intervention and aftermath.
+The existing temporal action reader observes the full play once. Frame-specific
+shooter labels follow the observed person when native track IDs change. A direct
+high-confidence comparison with the original selected-player reference is an
+identity anchor; the video path no longer demands two comparisons separated by
+150 ms under every ID, a fixed feature count, isolated native torso crops, or a
+second continuous native identity proof. Coarse unknown/team labels do not veto
+this direct reference observation. Static image-only reads retain their existing
+multi-frame rules.
 
-`saved_shot_sequence.connect` maps every cited box through that frame's existing
-source ROI. It checks the source clock, chronological order, shooter/ball contact,
-keeper/ball proximity, and consistent active-ball identity. A ball marked as a
-stationary spare anywhere in this response cannot complete that active sequence.
-A keeper absent from native detections can be located by a visible source box;
-this creates no native measurement, player track or physical certificate.
+`saved_shot_sequence.connect` retains a source-video SAVED observation without
+demanding four extra ball boxes, native keeper identification, prescribed
+ball-to-body pixel distances, or a separate held-ball keeper box. Detail boxes
+are optional audit data and map through the actual source ROI when available.
+Explicit stage observations of the same active ball, keeper intervention and
+aftermath can also resolve UNKNOWN without four independent ball detections.
+A known stationary spare or a different observed ball/actor remains a
+contradiction. No native measurement or physical certificate is fabricated.
 
 An earlier dribbling touch cannot serve as the shot if another visible control
 of the same ball occurs before the keeper's intervention. That contradiction
-opens the existing bounded backward CONTACT search. An incomplete save chain
-cannot retain a bare SAVED approval; it uses the existing missing-link feedback
-budget. This adds no reader, feedback round, changed model or detector.
+opens the existing bounded backward CONTACT search. An observed outcome need
+not be rediscovered because an optional detail form is absent. This adds no
+reader, feedback round, changed model or detector.
 
 Per-frame shooter labels enter the existing canonical identity resolver.
-Different labels are accepted as one actor only when every cited visible sample
-already maps exactly to verified GLOBAL_TARGET on the actual source clock, with
-no cut, fallback or competing verified target. The keeper need not be the target
-and the shooter need not stay in view after his strike.
+One directly identified sample can anchor the same person followed by the video
+reader across the action's other labels. Those labels do not each require a new
+GLOBAL_TARGET proof. Explicit evidence that a cited actor is a different selected
+body, actual cuts, source mismatches and fallback source times remain unresolved.
+The keeper need not be the target and the shooter need not stay in view after
+his strike.
+
+Outcome indices are alternatives: either `outcome_idx` or a source-indexed
+`outcome_evidence_indices` list suffices. The duplicate field is not required.
+A missing whole-clip completion flag no longer discards an observed action; it
+only prevents that read from suppressing other coverage work. An arbitrary
+250 ms source-sampling gap alone no longer rejects video continuity.
+The prompt requests only useful frame observation rows, rather than mandatory
+empty rows for every supplied source frame. Source image coverage is unchanged.
 
 The resulting visual observations remain distinct from native physical evidence.
 The shared resolver and projections publish one shot/on-target outcome only
@@ -42,10 +59,13 @@ window `dense_e29df0078338b31c`, source interval 19.466–25.466 seconds.
 These are diagnostic input identifiers, never production event rules.
 
 The saved older model response describes SAVED but cites contact at 20.600 s.
-Visual inspection of the source places the final kicking motion around
-23.6–23.8 s. The older trace also has no measured player body during the keeper's
-dive. Repeating its label or demanding an existing keeper ID cannot establish
-a correct new source-bound event.
+Visual inspection places the final kicking motion around 23.6–23.8 s; buildup
+belongs to the same play. This timing mismatch is not itself the resolver's
+rejection reason. Replaying the unchanged, checksummed real response returns
+SHOT/SAVED from causal resolution and INSUFFICIENT_PHYSICAL_IDENTITY_EVIDENCE
+from actor resolution. The trace stores zero selected-reference comparisons.
+Removing a duplicate proof demand cannot create a missing comparison in an old
+response. No replayed observation is relabelled as a new model result.
 
 The new input-only review successfully reconstructed:
 
@@ -159,22 +179,28 @@ validation; no end-to-end performance or quality claim follows from this audit.
 
 ## Validation and limits
 
-Regression coverage includes local-label changes, camera-followed outcomes,
-wrong players, cuts and wrong clocks, spare balls, switching/duplicate ball IDs,
-unbound striker/keeper boxes, an untracked keeper, held-ball geometry, missing
-source stages, later touches, conflicting goals and missing-link requests. The
+Regression coverage now explicitly admits source-video identity across local
+labels with one selected-reference comparison, optional save detail boxes,
+untracked keepers, held balls without another keeper box, either outcome-index
+format, partial-clip observations and wider source-sampling intervals. Different
+selected bodies, wrong source clocks/hashes, known spares, different active
+balls, contradictory controls and actual cuts remain separate controls. The
 production adapter/driver tests use explicit test doubles, not new perception.
 Source timestamps can be shifted without changing classification logic.
 
-The main local regression group passed 2,488 tests with one skip in 27.12 s
-(the process-runner module was exercised separately). All 379 backend Python
-files parse and the diff whitespace checks pass.
+The focused identity/video/save group passed 193 tests after the simplification.
+This deliberately gives source-video observations more authority instead of
+recertifying them through native geometry. Unchanged perception accuracy or
+full-report latency cannot be claimed without a fresh real model run.
 
-After the direct-transport change, the focused video/saved-shot/performance/export
-group passed 167 tests in 4.35 s. Its HTTP replies are explicitly test doubles,
-including source-byte/reference preservation, actual video-part sampling,
-no SDK dependency, HTTP failure, timeout, blocked output and token truncation.
-This is transport/code validation, not model perception.
+After the simplification, 122 backend regression files passed 2,415 cases with
+one skip in 30.90 s (the process-runner module is checked separately in CI).
+All 379 backend Python files parse and diff whitespace checks pass. The focused
+193-case group overlaps this sweep; the counts must not be added together.
+Direct-transport controls include source-byte/reference preservation, actual
+video-part sampling, no SDK dependency, HTTP failure, timeout, blocked output
+and token truncation. HTTP/reader replies in those controls are explicit test
+doubles. This is code validation, not new model perception.
 
 The actual source-input preparation was repeated: the same 81-frame source
 input and original reference hashes were reconstructed in 9.335 s, with zero

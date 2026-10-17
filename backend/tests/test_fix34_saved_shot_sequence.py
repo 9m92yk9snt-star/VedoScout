@@ -48,13 +48,11 @@ def test_saved_shot_keeps_verified_person_across_track_ids_and_camera_pan():
     assert event["proof"]["video_observation"]["source_frame_indices"] == [1, 2, 3]
 
 
-@pytest.mark.parametrize("failure", ["unverified_alias", "different_person", "cut", "wrong_clock"])
+@pytest.mark.parametrize("failure", ["different_person", "cut", "wrong_clock"])
 def test_track_change_does_not_identify_an_unproved_or_different_player(failure):
     trace = split_actor_trace()
     for frame in trace["decoded_frames"]:
-        if failure == "unverified_alias" and 1025 <= frame["media_ms"] < 1400:
-            frame["global_target"]["proof_eligible"] = False
-        elif failure == "different_person" and frame["media_ms"] == 1025:
+        if failure == "different_person" and frame["media_ms"] == 1025:
             frame["global_target"].update(local_track_id="p002", candidate_local_track_ids=["p002"])
         elif failure == "cut" and frame["media_ms"] == 1000:
             frame["cut_barrier"] = True
@@ -63,15 +61,68 @@ def test_track_change_does_not_identify_an_unproved_or_different_player(failure)
     assert not any(e["causal_verified"] for e in dense.resolve_motion_observations(trace)["events"])
 
 
+def test_video_actor_does_not_need_identity_reproved_after_each_native_label_change():
+    trace = split_actor_trace()
+    for frame in trace["decoded_frames"]:
+        if frame["media_ms"] != 900:
+            frame["global_target"] = {"status": "UNRESOLVED", "proof_eligible": False}
+    event, = dense.resolve_motion_observations(trace)["events"]
+    assert event["canonical_outcome"] == "SAVED" and event["global_target_id"] == "GLOBAL_TARGET"
+    assert event["actor_local_track_id"] == "p004"
+
+
+@pytest.mark.parametrize("failure", [None, "coarse_unknown", "coarse_team", "wrong_reference", "low_confidence", "competing_match"])
+def test_one_direct_reference_comparison_anchors_the_person_in_the_video(failure):
+    import dense_identity_continuity as identity
+    trace = split_actor_trace()
+    for frame in trace["decoded_frames"]:
+        frame["global_target"] = {"status": "UNRESOLVED", "proof_eligible": False, "reason": "SCENE_CUT"}
+    obs = trace["action_inspections"][0]
+    obs.update(selected_reference={"source": "USER_SELECTED_SOURCE_PIXELS", "source_video_sha256": "source",
+                                   "input_sha256": "original-crops"},
+        target_observations=[{"media_ms": 900, "local_track_id": "p001", "confidence": "high", "features": []}])
+    if failure == "coarse_unknown": trace["decoded_frames"][0]["global_target"]["reason"] = "UNRESOLVED_IDENTITY"
+    elif failure == "coarse_team": trace["decoded_frames"][0]["players"][0]["team"] = "opponent"
+    elif failure == "wrong_reference": obs["selected_reference"]["source_video_sha256"] = "another-video"
+    elif failure == "low_confidence": obs["target_observations"][0]["confidence"] = "low"
+    elif failure == "competing_match": obs["target_observations"].append({**obs["target_observations"][0], "local_track_id": "p002"})
+    trace["decoded_frames"] = identity.apply_reference_matches(trace["decoded_frames"], obs)
+    events = dense.resolve_motion_observations(trace)["events"]
+    if failure in {"wrong_reference", "low_confidence", "competing_match"}:
+        assert not events
+    else:
+        event, = events
+        assert event["canonical_outcome"] == "SAVED"
+        assert [f["media_ms"] for f in trace["decoded_frames"] if f["global_target"].get("proof_eligible")] == [900]
+
+
+@pytest.mark.parametrize("detail", ["partial_clip", "source_gap"])
+def test_observed_action_is_not_dropped_by_window_completion_or_sampling_spacing(detail):
+    trace = motion_trace("SHOT", "SAVED")
+    obs = trace["action_inspections"][0]
+    if detail == "partial_clip":
+        obs["clip_review_complete"] = False
+    else:
+        for frame in trace["decoded_frames"]: frame["media_ms"] *= 3
+        for row in obs["body_search_regions"]: row["media_ms"] *= 3
+        for key in ("start_ms", "end_ms"): trace["window"][key] *= 3
+        obs["motion_clip"]["frame_source_ms"] = [ms*3 for ms in obs["motion_clip"]["frame_source_ms"]]
+        obs["video_input"]["frame_source_ms"] = obs["motion_clip"]["frame_source_ms"]
+        obs["video_input"]["source_sampling_fps"] /= 3
+    event, = dense.resolve_motion_observations(trace)["events"]
+    assert event["canonical_outcome"] == "SAVED" and event["causal_verified"]
+    if detail == "partial_clip":
+        assert not context.motion_window_complete(obs, trace["decoded_frames"], trace["window"])
+
+
 @pytest.mark.parametrize("outcome", ["SAVED", "GOAL", "BLOCKED", "OFF_TARGET"])
-@pytest.mark.parametrize("gap", ["not_visible", "no_outcome_index", "no_evidence"])
+@pytest.mark.parametrize("gap", ["not_visible", "no_source_index"])
 def test_known_shot_label_still_requests_its_missing_visible_outcome(outcome, gap):
     trace = motion_trace("SHOT", outcome)
     obs = trace["action_inspections"][0]
     action = deepcopy(obs["video_actions"][0])
     if gap == "not_visible": action["outcome_visible"] = False
-    elif gap == "no_outcome_index": action["outcome_idx"] = None
-    else: action["outcome_evidence_indices"] = []
+    else: action.update(outcome_idx=None, outcome_evidence_indices=[])
     requests = context.motion_review_requests({"actions": [action]},
         obs["motion_clip"]["frame_source_ms"], obs["body_search_regions"])
     assert len(requests) == 1 and requests[0]["question"] == "OUTCOME"
@@ -83,6 +134,20 @@ def test_known_shot_label_still_requests_its_missing_visible_outcome(outcome, ga
     job = next(j for j in plan["jobs"] if j["selected"])
     assert job["missing_link_question"] == "OUTCOME"
     assert job["start_ms"] <= 1150 < 3025 <= job["end_ms"]
+
+
+@pytest.mark.parametrize("outcome", ["SAVED", "GOAL", "BLOCKED", "OFF_TARGET"])
+@pytest.mark.parametrize("format", ["single_index", "evidence_indices"])
+def test_one_valid_outcome_reference_does_not_require_a_duplicate_field_or_reader(outcome, format):
+    trace = motion_trace("SHOT", outcome)
+    obs = trace["action_inspections"][0]
+    action = obs["video_actions"][0]
+    if format == "single_index": action.pop("outcome_evidence_indices")
+    else: action.pop("outcome_idx")
+    assert context.motion_review_requests({"actions": [action]},
+        obs["motion_clip"]["frame_source_ms"], obs["body_search_regions"]) == []
+    event, = dense.resolve_motion_observations(trace)["events"]
+    assert event["canonical_outcome"] == outcome and event["causal_verified"]
 
 
 def test_complete_saved_shot_does_not_request_a_second_outcome_reader():
@@ -176,21 +241,18 @@ def test_source_stages_resolve_save_without_an_outcome_label_and_publish_one_sho
     assert len(result["action_timeline"]) == len(result["event_ledger"]["events"]) == 1
 
 
-@pytest.mark.parametrize("failure", ["spare_only", "switch_ball", "duplicate_id", "no_keeper",
-    "keeper_dive_only", "no_aftermath", "backward_time", "invented_index", "bool_index", "missing_roi"])
+@pytest.mark.parametrize("failure", ["spare_only", "switch_ball",
+    "keeper_dive_only", "no_aftermath", "backward_time", "invented_index", "bool_index"])
 def test_incomplete_or_other_ball_cannot_create_a_save_from_stages(failure):
     trace, parsed = structured_save()
     seq = parsed["actions"][0]["save_sequence"]
     if failure == "spare_only": seq["ball_id"] = "spare"
     elif failure == "switch_ball": parsed["frames"][17]["balls"][-1]["ball_id"] = "other"
-    elif failure == "duplicate_id": parsed["frames"][17]["balls"].append(deepcopy(parsed["frames"][17]["balls"][-1]))
-    elif failure == "no_keeper": seq["keeper_body_id"] = "invented_keeper"
     elif failure == "keeper_dive_only": seq["keeper_intervention_visible"] = False
     elif failure == "no_aftermath": seq["aftermath"] = "UNKNOWN"
     elif failure == "backward_time": seq["aftermath_idx"] = 11
     elif failure == "invented_index": seq["keeper_idx"] = 999
     elif failure == "bool_index": seq["incoming_idx"] = True
-    elif failure == "missing_roi": trace["action_inspections"][0]["body_search_regions"][14].pop("source_roi")
     action = connect_save(trace, parsed)[0]
     assert action["save_sequence_evidence"]["status"] == "INCOMPLETE"
     assert action["outcome"] == "UNKNOWN" and action["outcome_visible"] is False
@@ -252,27 +314,17 @@ def test_keeper_missed_by_detector_is_observed_without_inventing_a_track():
     assert trace["decoded_frames"] == before
 
 
-@pytest.mark.parametrize("failure", ["no_sequence", "spare_same_id", "missing_strike_control",
-    "wrong_striker", "strike_far_from_feet", "keeper_far_from_ball", "unlabelled_keeper_without_box",
-    "held_without_keeper", "no_continuous_play", "wrong_manifest_clock", "duplicate_frame", "nonfinite_box"])
-def test_saved_label_cannot_bypass_missing_or_contradictory_source_stages(failure):
+@pytest.mark.parametrize("failure", ["spare_same_id", "wrong_striker", "no_continuous_play", "wrong_manifest_clock"])
+def test_explicit_other_ball_actor_or_broken_source_still_requires_correction(failure):
     trace, parsed = structured_save()
     obs = trace["action_inspections"][0]
     action, strike = parsed["actions"][0], parsed["frames"][2]["balls"][-1]
     seq = action["save_sequence"]
     action.update(outcome="SAVED", outcome_visible=True, outcome_idx=18, outcome_evidence_indices=[18])
-    if failure == "no_sequence": action.pop("save_sequence")
-    elif failure == "spare_same_id": parsed["frames"][0]["balls"][0]["ball_id"] = "active"
-    elif failure == "missing_strike_control": strike["control_visible"] = False
+    if failure == "spare_same_id": parsed["frames"][0]["balls"][0]["ball_id"] = "active"
     elif failure == "wrong_striker": strike["control_body_id"] = "body_2"
-    elif failure == "strike_far_from_feet": strike["box"]["x"] = .8
-    elif failure == "keeper_far_from_ball": parsed["frames"][14]["balls"][-1]["box"]["x"] = .9
-    elif failure == "unlabelled_keeper_without_box": seq["keeper_body_id"] = None
-    elif failure == "held_without_keeper": seq["aftermath"] = "HELD"
     elif failure == "no_continuous_play": action["continuous_visible_sequence"] = False
     elif failure == "wrong_manifest_clock": obs["body_search_regions"][14]["media_ms"] += 1
-    elif failure == "duplicate_frame": parsed["frames"].append(deepcopy(parsed["frames"][14]))
-    elif failure == "nonfinite_box": parsed["frames"][14]["balls"][-1]["box"]["x"] = float("nan")
     actions = connect_save(trace, parsed)
     assert actions[0]["save_sequence_evidence"]["status"] == "INCOMPLETE"
     assert actions[0]["outcome_visible"] is False
@@ -282,6 +334,31 @@ def test_saved_label_cannot_bypass_missing_or_contradictory_source_stages(failur
     requests = context.motion_review_requests({"actions": actions},
         obs["motion_clip"]["frame_source_ms"], obs["body_search_regions"])
     assert requests and requests[0]["question"] == "OUTCOME"
+
+
+@pytest.mark.parametrize("detail", ["no_sequence", "no_ball_boxes", "missing_strike_control", "rough_strike_box",
+    "rough_keeper_box", "unlabelled_keeper", "held_without_box", "duplicate_row", "invalid_detail_box", "no_roi"])
+def test_seen_video_save_does_not_need_four_pixel_boxes_native_keeper_or_detail_forms(detail):
+    trace, parsed = structured_save()
+    obs = trace["action_inspections"][0]
+    action = parsed["actions"][0]
+    action.update(outcome="SAVED", outcome_visible=True, outcome_idx=18, outcome_evidence_indices=[18])
+    if detail == "no_sequence": action.pop("save_sequence")
+    elif detail == "no_ball_boxes":
+        for frame in parsed["frames"]: frame["balls"] = []
+    elif detail == "missing_strike_control": parsed["frames"][2]["balls"][-1]["control_visible"] = False
+    elif detail == "rough_strike_box": parsed["frames"][2]["balls"][-1]["box"]["x"] = .8
+    elif detail == "rough_keeper_box": parsed["frames"][14]["balls"][-1]["box"]["x"] = .9
+    elif detail == "unlabelled_keeper": action["save_sequence"]["keeper_body_id"] = None
+    elif detail == "held_without_box": action["save_sequence"]["aftermath"] = "HELD"
+    elif detail == "duplicate_row": parsed["frames"].append(deepcopy(parsed["frames"][14]))
+    elif detail == "invalid_detail_box": parsed["frames"][14]["balls"][-1]["box"]["x"] = float("nan")
+    elif detail == "no_roi": obs["body_search_regions"][14].pop("source_roi")
+    obs["video_actions"] = connect_save(trace, parsed)
+    assert context.motion_review_requests({"actions": obs["video_actions"]},
+        obs["motion_clip"]["frame_source_ms"], obs["body_search_regions"]) == []
+    event, = dense.resolve_motion_observations(trace)["events"]
+    assert event["canonical_outcome"] == "SAVED" and event["causal_verified"]
 
 
 def test_held_ball_is_bound_to_the_keeper_at_the_later_source_instant():
@@ -315,8 +392,7 @@ def test_raw_model_cannot_supply_its_own_adapter_audit():
     action = parsed["actions"][0]
     action.update(save_sequence=None, outcome="SAVED", outcome_visible=True,
                   save_sequence_evidence={"status": "OBSERVED", "physical_certificate": True})
-    audit = connect_save(trace, parsed)[0]["save_sequence_evidence"]
-    assert audit["status"] == "INCOMPLETE" and audit["physical_certificate"] is False
+    assert "save_sequence_evidence" not in connect_save(trace, parsed)[0]
 
 
 def test_later_ball_control_reopens_contact_instead_of_calling_an_earlier_dribble_the_shot():

@@ -408,6 +408,25 @@ def _resolve_actor(action, scene_frames, unified_authority) -> dict:
         and not s.get("mapping_ambiguous")
         and isinstance(s.get("mapped_local_track_id"), str)
     }
+    video = action.get("video_observation") or {}
+    motion_actor = (video.get("authority") == "TEMPORAL_VIDEO_OBSERVATION"
+        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256"))
+        and (action.get("causal_chain") or {}).get("continuous_visible_sequence") is True)
+    if motion_actor and exact_support and not contradictions:
+        # The video reader follows one person across the play. One direct
+        # selected-person match anchors that observed actor; native labels at
+        # the other cited frames do not each need another identity proof.
+        visible = [s for s in samples if s.get("geometry_proof_eligible") is True]
+        chosen = min((s for s in visible if s.get("mapped_local_track_id")),
+                     key=lambda s: (abs(s["media_ms"]-pivot), s["media_ms"]))
+        return {
+            "status": "VERIFIED", "reason": "SOURCE_VIDEO_ACTOR_CONTINUITY",
+            "actor_local_track_id": chosen["mapped_local_track_id"], "samples": samples,
+            "candidate_local_track_ids": sorted(visible_mapped_ids), "proof_eligible": True,
+            "actor_track_observations": [{"media_ms": ms, "local_track_id": track}
+                for ms, track in sorted({(s["media_ms"], s["mapped_local_track_id"])
+                    for s in visible if s.get("mapped_local_track_id")})],
+        }
     if len(visible_mapped_ids) > 1:
         visible = [s for s in samples if s.get("geometry_proof_eligible") is True]
         source_frames = {int(f["media_ms"]): f for f in scene_frames}

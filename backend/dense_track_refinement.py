@@ -654,7 +654,7 @@ def _is_team_reference_target(frame):
     appearance = target.get("appearance_evidence") or {}
     return _is_direct_tap_target(frame) or bool(
         target.get("status") == "VERIFIED" and target.get("proof_eligible") is True
-        and target.get("reason") == "MULTI_FRAME_SELECTED_APPEARANCE"
+        and target.get("reason") in {"MULTI_FRAME_SELECTED_APPEARANCE", "SOURCE_VIDEO_SELECTED_PERSON"}
         and appearance.get("source") == "USER_SELECTED_SOURCE_PIXELS"
         and appearance.get("source_video_sha256") and appearance.get("input_sha256"))
 

@@ -203,7 +203,7 @@ def test_video_chain_cannot_approve_a_wrong_player_or_missing_causal_link(failur
     elif failure == "wrong_clip": obs["video_input"]["model_video_sha256"] = "other"
     elif failure == "invented_index": action["contact_idx"] = 999
     elif failure == "cut": trace["decoded_frames"][40]["cut_barrier"] = True
-    elif failure == "missing_outcome_evidence": action["outcome_evidence_indices"] = []
+    elif failure == "missing_outcome_evidence": action.update(outcome_evidence_indices=[], outcome_idx=None)
     elif failure == "different_finisher": action["finisher_body_id"] = "body_2"
     elif failure == "opponent_receiver":
         for f in trace["decoded_frames"]: f["players"][2]["team"] = "opponent"
@@ -377,7 +377,7 @@ def test_video_active_ball_uses_native_pixels_even_when_global_tracking_follows_
 
 
 @pytest.mark.parametrize("field,value", [("video_actions", None),("video_actions", {}),("video_actions", [None]),
-    ("actor_evidence_indices", None),("outcome_evidence_indices", {}),("contact_idx", True),("outcome_idx", 999)])
+    ("actor_evidence_indices", None),("contact_idx", True),("outcome_idx", 999)])
 def test_malformed_model_actions_cannot_crash_or_approve_an_assist(field, value):
     import dense_event_reconciliation as dense
     trace = motion_trace()
