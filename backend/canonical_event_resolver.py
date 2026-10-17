@@ -668,6 +668,38 @@ def _causal_resolution(action, scene_frames) -> dict:
     def _contact_matches(chain_contact) -> bool:
         return _num(chain_contact) and (contact is None or int(chain_contact) == int(contact))
 
+    if kind in SCORING_PASS_ACTIONS:
+        video = action.get("video_observation") or {}
+        roles = video.get("assist_roles") or {}
+        source_transfer = (_source_video_observation(video)
+                           and chain.get("continuous_visible_sequence") is True)
+        intercepted = (roles.get("receiver_team") == "OPPONENT"
+                       and outcome in {"COMPLETED", "TEAMMATE_SHOT", "TEAMMATE_GOAL", "UNKNOWN"})
+        indirect = (roles.get("receiver_team") == "TEAMMATE"
+                    and roles.get("receiver_finisher_same_player") is False
+                    and outcome in {"TEAMMATE_SHOT", "TEAMMATE_GOAL"})
+        if source_transfer and (intercepted or indirect):
+            # These are roles observed by the SAME video read, not another
+            # native kit/ball approval. Keep the underlying pass and distinguish
+            # an interception from a completed pass before a different finish.
+            receipt, receiver = chain.get("receiver_ms"), chain.get("receiver_local_track_id")
+            observed = (action.get("outcome_visible") is True and contact is not None
+                        and _contact_matches(chain.get("target_contact_ms"))
+                        and start <= contact <= end and _num(receipt)
+                        and sequence_start <= contact <= receipt <= sequence_end
+                        and (not receiver or receiver != action.get("actor_local_track_id")))
+            return {
+                "canonical_event_type": kind, "canonical_action_type": kind,
+                "canonical_outcome": ("INCOMPLETE" if intercepted else "COMPLETED") if observed else "UNKNOWN",
+                "causal_verified": bool(observed),
+                "reason": ("VISIBLE_PASS_INTERCEPTED" if intercepted else "VISIBLE_PASS_DIFFERENT_FINISHER")
+                          if observed else "PASS_RECEIVER_ROLE_CHAIN_INCOMPLETE",
+                "receiver_team_resolution": {"status": "REJECTED" if intercepted else "VERIFIED",
+                    "reason": "SOURCE_VIDEO_RECEIVER_NOT_TEAMMATE" if intercepted else "SOURCE_VIDEO_DIFFERENT_FINISHER",
+                    "source": video["authority"], "receiver_local_track_id": receiver,
+                    "receiver_ms": receipt, "physical_certificate_required": False},
+            }
+
     if kind == "SHOT" and outcome == "GOAL":
         goal_ms = chain.get("goal_outcome_ms")
         target_contact = chain.get("target_contact_ms")

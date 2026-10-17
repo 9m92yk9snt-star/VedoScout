@@ -162,7 +162,8 @@ def video_observations(observation, frames, window):
                     "continuous_visible_actor": match.get("continuous_visible_actor") is True}
         if isinstance(raw.get("save_sequence_evidence"), dict):
             action["video_observation"]["save_sequence"] = deepcopy(raw["save_sequence_evidence"])
-        if raw.get("outcome") == "TEAMMATE_GOAL":
+        if (action.get("kind") in {"PASS", "CROSS", "KEY_PASS"}
+                and any(k in raw for k in ("receiver_team", "receiver_finisher_same_player"))):
             action["video_observation"]["assist_roles"] = {
                 k: raw[k] for k in ("receiver_team", "receiver_finisher_same_player") if k in raw}
         actions.append(action)

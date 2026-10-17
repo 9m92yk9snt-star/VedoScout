@@ -1,4 +1,4 @@
-# Reconcile the selected body once
+# Reconcile the selected body and observed passing roles once
 
 ## Observed failure
 
@@ -38,6 +38,16 @@ supplied actor frames. Explicit other-player or incompatible-kit observations
 cannot bootstrap a positive dense identity. No additional model call, approval
 stage, video pass or production module is introduced.
 
+The same normalization now preserves explicitly observed receiver-team and
+receiver/finisher roles for all passing actions, not only a claimed teammate
+goal. The existing canonical resolver uses those roles from the same video read:
+a visible receipt by an opponent cannot remain a completed pass, key pass or
+assist. A visible teammate receipt followed by a different finisher retains the
+completed underlying pass instead of discarding it with the direct-assist claim.
+This does not require another native receiver identity or kit approval. Missing
+contact, receipt or visibility evidence cannot invent a completed transfer or an
+interception. Already observed incomplete passes keep their existing handling.
+
 ## Verification and limits
 
 Replaying the actual stored source frame's measured bodies through dense target
@@ -54,9 +64,20 @@ Model-reply controls exercise explicit negative identity, valid positive identit
 without another native approval, source/reference binding, masks, exclusions,
 ambiguous candidates and unchanged ordinary point selections.
 
-Local validation: 653 passed and one optional LiteLLM conversion test skipped
-across 20 relevant modules in 4.50 seconds. Plugin autoload and ONNX Runtime
-were disabled and Python socket connections blocked. All 384 backend Python
+The stored motion observation at source contact 20,083 ms explicitly reports
+`receiver_team=OPPONENT` but labels the pass `COMPLETED`. Replaying that actual
+observation and its unchanged frames/identity authority through the updated
+normalizer and resolver produces `INCOMPLETE`, reason
+`VISIBLE_PASS_INTERCEPTED`, rather than the old `COMPLETED`. This is documented
+consistency with the existing model observation, with zero new model calls;
+it does not independently prove that the model perceived that play correctly.
+Eighteen additional synthetic-response controls cover role contradictions,
+missing evidence, direct assists, both video paths and final report counts.
+
+Final local validation: 671 passed and one optional LiteLLM conversion test skipped
+across 21 relevant modules in 4.42 seconds; overlapping earlier totals are not
+added. Plugin autoload and ONNX Runtime were disabled and Python socket
+connections blocked. All 385 backend Python
 files parse, and the whitespace check passes. Test runtime is not video runtime.
 
 No new full-video model run or end-to-end speed measurement has been performed.
