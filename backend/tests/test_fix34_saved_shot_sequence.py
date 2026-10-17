@@ -375,10 +375,15 @@ def test_focused_driver_uses_one_reader_original_taps_and_no_old_responses(tmp_p
             obs = deepcopy(trace["action_inspections"][0])
             obs.update(model="TEST_DOUBLE_NOT_REAL_MODEL", frames=[])
             return obs
-    monkeypatch.setattr(vision, "build_shadow_providers", lambda *_: Bundle())
+    transports = []
+    def provider(*_args, **kwargs):
+        transports.append(kwargs["motion_transport"])
+        return Bundle()
+    monkeypatch.setattr(vision, "build_shadow_providers", provider)
     output = tmp_path/"review"
     result = driver.review(root, video, trace["trace_id"], output, run_model=True, api_key="test-only-secret")
     assert result["new_model_calls"] == len(calls) == 1
+    assert transports == ["gemini-rest"] and result["transport"] == "gemini-rest"
     assert calls[0]["start_ms"] == trace["window"]["start_ms"]
     assert calls[0]["end_ms"] == trace["window"]["end_ms"] and calls[0]["has_contact_time"] is False
     assert "expected_outcome" not in calls[0] and calls[0]["source_action_ids"] == []

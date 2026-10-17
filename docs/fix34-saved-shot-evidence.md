@@ -67,17 +67,27 @@ python scripts/review_source_window.py EXPORT VIDEO TRACE_ID OUTPUT
 ```
 
 The default builds the source input and original tap references with network
-access blocked. It cannot return a fresh model success. On a runtime with the
-existing production SDK and configured model key, run one fresh window read:
+access blocked. It cannot return a fresh model success. With `GEMINI_API_KEY`
+configured in the runtime, run one fresh window read directly against Gemini:
 
 ```bash
 python scripts/review_source_window.py EXPORT VIDEO TRACE_ID OUTPUT --run-model
 ```
 
-`--key-env` selects a configured environment variable; the key is never an
-argument value or output. The default uses the same `EMERGENT_LLM_KEY` setting
-as production. No Emergent agent, database write, payment, notification, report
-mutation, merge or deployment is performed.
+The default transport is `gemini-rest`: the existing video transport posts the
+same model (`gemini-2.5-pro`), clip, prompt and selected-player references to
+Google's native `generateContent` endpoint. It attaches `videoMetadata.fps` to
+the video part, requests JSON, records model version/response ID/token usage,
+and rejects incomplete, blocked or failed responses. It uses standard-library
+HTTP, without Emergent, LiteLLM, uploads or retries. Inline requests above
+20 MB stop before network access. A response does not certify which frames
+the provider internally inspected; the audit keeps that distinction.
+
+`--transport sdk` retains the existing production transport and defaults to
+`EMERGENT_LLM_KEY`. `--key-env` selects a configured variable name; the key is
+never an argument value or output. Production transport defaults are unchanged.
+There is no database write, payment, notification, report mutation, merge or
+deployment in either focused mode.
 
 The fresh mode uses one existing action-reader call, applies the same source
 identity handoff, and sends only that fresh observation to the canonical
@@ -85,6 +95,67 @@ resolver. It retains `fresh_observation.json`, `fresh_trace.json`, and
 `review_summary.json`. A positive `qualified_saved_shot_count` must be assessed
 with its contact time, ball stages, source hashes and original-player proof.
 A qualified carry/run alone does not count as a verified saved shot.
+
+Native request format and sampling follow the official
+[GenerateContent / Part reference](https://ai.google.dev/api/generate-content)
+and [video-understanding documentation](https://ai.google.dev/gemini-api/docs/video-understanding).
+
+## Active pipeline and recorded cost
+
+FIX numbers describe the project's history, not 36 sequential runtime stages.
+The current `generate_full_report_task` calls these paths:
+
+| Phase | Active path | Work and evidence responsibility |
+|---|---|---|
+| Player selection/tracking | `player_tracking` | Source taps and measured player path; audio runs alongside it. |
+| Identity preparation | `player_identity_timeline`, `unified_analysis_engine.prepare_analysis` | Reconcile selected-player identity and build the native scene graph/sequence plan. These include additional video work. |
+| Broad temporal read | `call_gemini_with_video` | Find actions across the video; one bounded retry can request incomplete windows. |
+| Detailed reconstruction | `physical_match_reconstruction` | Dense tracking, source-window action read, ball/contact work, identity handoff, jersey/role/goal work and bounded feedback. Dense tracking currently precedes the action read. |
+| Shared resolution | Canonical resolver and FIX10B reconciliation | Bind actor/contact/outcome, merge observations, and project report facts. |
+| Report writing | `call_gemini_with_facts` | Write from the resolved observations without another video discovery pass. |
+
+FIX08 remains a fallback if the unified route cannot run. It is not a second
+full route always run after the unified analysis. Selection UI, training/test
+files, exports and historical FIX documentation are not separate live readers.
+
+The existing exported run records **4,138.355 s** for physical reconstruction
+(68.97 minutes). These figures are from the old export, not a new PR-head run:
+
+| Provider diagnostic rows | Rows | Recorded elapsed seconds |
+|---|---:|---:|
+| Action pixel inspection | 24 | 465.304 |
+| Jersey inspection | 23 | 260.426 |
+| Intervention role | 23 | 237.804 |
+| Goal geometry | 312 | 1,379.742 |
+| Total recorded provider time | 382 | 2,343.276 |
+| Physical time not assigned to these rows | — | 1,795.079 |
+
+These are diagnostic rows, **not counts of paid model calls**. In particular,
+258 goal rows have elapsed time rounded to zero, consistent with cache/reuse
+paths. The export does not assign the remaining 29.92 minutes precisely enough
+to claim that any particular module consumed it.
+
+The 15 stored windows contain 6,165 decoded-frame rows but 4,551 unique source
+timestamps, 192 physical strike/control-release candidates and 34 inspection
+records including feedback. Overlap is real, but this is not a claim that the
+current branch still repeats all of that work: prior shared-window, pixel,
+detector and resolved-outcome reuse already change its scheduling.
+
+The saved-shot window specifically contains 361 frames, all with unresolved
+GLOBAL_TARGET, and 19 physical strike candidates, none bound to GLOBAL_TARGET.
+The old semantic SHOT at 20.600 s precedes the visually observed final kicking
+motion. The missing correct actor/contact and the keeper detection gap are
+perception/binding failures. Deleting approval checks cannot supply those pixels
+or turn an earlier dribble into the final shot.
+
+The focused driver avoids a fresh full-report rebuild: it reads the original
+six-second source interval once using the existing measured context and taps,
+then sends the fresh response through the same identity and event resolver.
+One source-bound temporal response should carry the player, final strike,
+active ball, keeper and aftermath together. A failed response must identify the
+missing link before further fallback work is justified. Changing the full
+pipeline to run this way before dense detection still requires real perception
+validation; no end-to-end performance or quality claim follows from this audit.
 
 ## Validation and limits
 
@@ -98,6 +169,19 @@ Source timestamps can be shifted without changing classification logic.
 The main local regression group passed 2,488 tests with one skip in 27.12 s
 (the process-runner module was exercised separately). All 379 backend Python
 files parse and the diff whitespace checks pass.
+
+After the direct-transport change, the focused video/saved-shot/performance/export
+group passed 167 tests in 4.35 s. Its HTTP replies are explicitly test doubles,
+including source-byte/reference preservation, actual video-part sampling,
+no SDK dependency, HTTP failure, timeout, blocked output and token truncation.
+This is transport/code validation, not model perception.
+
+The actual source-input preparation was repeated: the same 81-frame source
+input and original reference hashes were reconstructed in 9.335 s, with zero
+new model calls. The attempted `--run-model` invocation stopped before network
+or output creation with `GEMINI_API_KEY is not configured`. No fresh response
+exists, so the real saved shot remains unapproved here. The old model's SAVED
+label is not reused as acceptance evidence.
 
 The real source-input preparation succeeded. A fresh production-model response
 for this shot is still unavailable because no live model key is configured in

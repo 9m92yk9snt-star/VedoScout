@@ -431,6 +431,75 @@ def test_model_error_categories_preserve_budget_and_timeout_without_exposing_ups
         assert marker not in str(error.value)
 
 
+async def test_direct_gemini_uses_source_clip_and_references_without_loading_sdk(monkeypatch, tmp_path):
+    """Transport contract only: the HTTP response is a labelled test double."""
+    import base64
+    import builtins
+    import io
+    import urllib.request
+    import cv2
+    import numpy as np
+    still, reference, clip = tmp_path/"source.jpg", tmp_path/"reference.jpg", tmp_path/"motion.mp4"
+    cv2.imwrite(str(still), np.zeros((160, 100, 3), np.uint8))
+    reference.write_bytes(still.read_bytes())
+    clock = [250, 375, 500]
+    video.write_motion_clip([still]*3, clock, clip)
+    original_import = builtins.__import__
+    def without_sdk(name, *args, **kwargs):
+        if name.startswith(("emergentintegrations", "litellm")):
+            pytest.fail("direct transport loaded SDK state")
+        return original_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", without_sdk)
+    requests = []
+    def send(request, *, timeout):
+        requests.append(request)
+        assert timeout == 12
+        assert request.full_url.endswith("/models/gemini-2.5-pro:generateContent")
+        assert "fixture-secret" not in request.full_url
+        assert request.get_header("X-goog-api-key") == "fixture-secret"
+        parts = json.loads(request.data)["contents"][0]["parts"]
+        assert base64.b64decode(parts[0]["inlineData"]["data"]) == reference.read_bytes()
+        assert base64.b64decode(parts[1]["inlineData"]["data"]) == clip.read_bytes()
+        assert parts[1]["videoMetadata"] == {"fps": 1}
+        assert parts[2] == {"text": "Read the source labels"}
+        return io.BytesIO(json.dumps({"modelVersion": "TEST_DOUBLE", "responseId": "fixture-id",
+            "usageMetadata": {"promptTokenCount": 123}, "candidates": [{"finishReason": "STOP",
+            "content": {"parts": [{"text": "private thought", "thought": True}, {"text": '{"actions":[]}'}]}}]}).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", send)
+    result = await video.read_video("fixture-secret", "session", "Read the source labels", clip, [reference],
+                                    source_clock=clock, timeout_s=12, transport="gemini-rest")
+    assert len(requests) == 1 and result["raw_response"] == '{"actions":[]}'
+    audit = result["video_input"]
+    assert audit["transport"] == "GEMINI_REST" and audit["frame_source_ms"] == clock
+    assert audit["sampling_attached_to_provider_payload"] and not audit["provider_receipt_confirmed"]
+    assert audit["model_version"] == "TEST_DOUBLE" and audit["usage_metadata"]["promptTokenCount"] == 123
+    assert "fixture-secret" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("failure", ["http", "timeout", "truncated", "blocked", "malformed", "empty"])
+def test_direct_gemini_never_publishes_partial_or_failed_http_reply(monkeypatch, tmp_path, failure):
+    import io
+    import urllib.error
+    import urllib.request
+    clip = tmp_path/"clip.mp4"
+    clip.write_bytes(b"transport-fixture-not-a-video")
+    def send(*_args, **_kwargs):
+        if failure == "http":
+            raise urllib.error.HTTPError("https://example.invalid", 403, "private upstream error", {},
+                                         io.BytesIO(b"private response body"))
+        if failure == "timeout":
+            raise urllib.error.URLError(TimeoutError("private timeout detail"))
+        if failure == "malformed":
+            return io.BytesIO(b"not JSON")
+        return io.BytesIO(json.dumps({"candidates": [{"finishReason":
+            {"truncated": "MAX_TOKENS", "blocked": "SAFETY", "empty": "STOP"}[failure],
+            "content": {"parts": [] if failure == "empty" else [{"text": '{"actions":[]}'}]}}]}).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", send)
+    result = video._direct_gemini_video("fixture-secret", "Observe", clip, [], 1., "JSON", 2.)
+    assert result.get("error_code") and "raw_response" not in result
+    assert "fixture-secret" not in json.dumps(result) and "private" not in json.dumps(result)
+
+
 def test_resolved_source_clip_outcome_is_reused_by_physical_orchestration(monkeypatch):
     import physical_match_reconstruction as pmr
     import fix10b_runtime as runtime

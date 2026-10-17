@@ -1165,7 +1165,7 @@ _DEFAULT_ACTION_PIXEL_READER = read_action_pixel_evidence
 
 
 async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, body_candidates,
-                                     sequence_context=None, selected_reference=None):
+                                     sequence_context=None, selected_reference=None, video_transport="sdk"):
     """One motion read supplies identity, action roles and pixel search proposals."""
     timeline = [{"idx": i+1, "source_ms": ms,
                  "views": (row.get("source_roi") or {}).get("views"),
@@ -1241,8 +1241,13 @@ async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, b
             path = Path(directory)/f"reference_{i}.jpg"
             path.write_bytes(base64.b64decode(data))
             refs.append(str(path))
+        transport = {"transport": video_transport} if video_transport != "sdk" else {}
         result = await video_model_input.read_video(api_key, session_id, prompt, clip_path, refs,
-                                                   timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms)
+            timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms, **transport)
+    if video_transport == "gemini-rest" and result.get("error_code"):
+        return {"status": "ERROR", "reason": "DIRECT_GEMINI_"+result["error_code"],
+                "frames": [], "video_input": result["video_input"],
+                "provider": "gemini", "model": video_model_input.MODEL}
     raw = video_model_input.response_text(result)
     parsed = _extract_json(raw)
     pixels = _action_pixel_response(parsed, media_ms)
@@ -1460,8 +1465,11 @@ def _active_ball_link(review, reference):
 class ShadowVisionProviders:
     """Stateful/cached sync callbacks used inside the FIX10A worker thread."""
 
-    def __init__(self, api_key: str | None, session_prefix: str):
+    def __init__(self, api_key: str | None, session_prefix: str, *, motion_transport="sdk"):
+        if motion_transport not in {"sdk", "gemini-rest"}:
+            raise ValueError("UNKNOWN_VIDEO_TRANSPORT")
         self.api_key = str(api_key or "")
+        self.motion_transport = motion_transport
         self.session_prefix = str(session_prefix or "fix10a")
         self._goal_cache = {}
         self._jersey_cache = {}
@@ -1757,7 +1765,8 @@ class ShadowVisionProviders:
                     clip_manifest["sampling_plan"] = {k: v for k, v in sampling.items() if k != "media_ms"}
                     review = support_vision_runner.run_support_vision(read_action_video_evidence, [(
                         (self.api_key, f"{self.session_prefix}-motion-{job['inspection_id']}", str(clip_path), times, body_manifest),
-                        {"sequence_context": context, "selected_reference": reference})],
+                        {"sequence_context": context, "selected_reference": reference,
+                         **({"video_transport": self.motion_transport} if self.motion_transport != "sdk" else {})})],
                         deadline_s=video_model_input.VIDEO_TIMEOUT_S + 5 + support_vision_runner.DEADLINE_MARGIN_S,
                         label="action_video")[0]
                     review["motion_clip"] = clip_manifest
@@ -2242,8 +2251,9 @@ class ShadowVisionProviders:
         return self
 
 
-def build_shadow_providers(api_key: str | None, session_prefix: str, video_path: str | None = None) -> ShadowVisionProviders:
-    bundle = ShadowVisionProviders(api_key, session_prefix)
+def build_shadow_providers(api_key: str | None, session_prefix: str, video_path: str | None = None,
+                           *, motion_transport="sdk") -> ShadowVisionProviders:
+    bundle = ShadowVisionProviders(api_key, session_prefix, motion_transport=motion_transport)
     if video_path:
         bundle.bind_video_path(video_path)
     return bundle

@@ -1,7 +1,8 @@
 """Review one existing source window with its original taps; no upload or DB.
 
 Default: prepare the exact production video input, with no model call.
---run-model: use one production action reader and the shared identity/resolver.
+--run-model: use one action reader and the shared identity/resolver, with a
+direct Gemini request by default (no Emergent SDK or proxy).
 No expected event types, player numbers or reference contact times are inputs.
 This focused review is not a full-report latency measurement.
 """
@@ -18,7 +19,8 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def review(export_dir, video_path, trace_id, output_dir, *, run_model=False, api_key=None):
+def review(export_dir, video_path, trace_id, output_dir, *, run_model=False, api_key=None,
+           transport="gemini-rest"):
     import action_evidence_review as inspection
     import canonical_event_resolver as resolver
     import dense_event_reconciliation as reconciliation
@@ -50,7 +52,8 @@ def review(export_dir, video_path, trace_id, output_dir, *, run_model=False, api
     points = [{**row, "primary_source": "USER_TAP", "tap_authority": True,
                "proof_eligible": not row.get("partial")}
               for row in authority._tap_rows(anchors.get("anchors"), anchors.get("anchor_time_offset"), scenes)]
-    bundle = vision.build_shadow_providers(api_key, "source-window-review", str(video_path))
+    bundle = vision.build_shadow_providers(api_key, "source-window-review", str(video_path),
+                                           motion_transport=transport)
     bundle.bind_selected_reference({"target_points": points})
     reference = bundle._reference_for_window(trace["window"])
     if not reference or reference.get("source_video_sha256") != digest:
@@ -60,7 +63,7 @@ def review(export_dir, video_path, trace_id, output_dir, *, run_model=False, api
         "reference_source": reference["source"], "reference_sha256": reference["input_sha256"],
         "reference_source_ms": reference["evidence_ms"], "new_model_calls": 0,
         "full_report_latency_measured": False, "fresh_model_response_recorded": False,
-        "qualified_saved_shot_count": 0}
+        "qualified_saved_shot_count": 0, "transport": transport}
     if not run_model:
         from scripts.audit_temporal_video_inputs import audit
         summary["input_audit"] = audit(root, video_path, output/"input", [trace_id])
@@ -86,6 +89,7 @@ def review(export_dir, video_path, trace_id, output_dir, *, run_model=False, api
         qualified = [e for e in resolved.get("events") or [] if resolver.has_motion_proof(e)]
         summary.update(new_model_calls=bundle.inspection_calls, model=observation.get("model"),
             observation_status=observation.get("status"),
+            observation_reason=observation.get("reason"),
             fresh_model_response_recorded=bool(observation.get("input_sha256") and observation.get("response_sha256")),
             qualified_saved_shot_count=sum(e.get("canonical_event_type") == "SHOT"
                 and e.get("canonical_outcome") == "SAVED" for e in qualified), qualified_events=qualified,
@@ -105,19 +109,28 @@ def main():
     parser.add_argument("trace_id")
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--run-model", action="store_true")
-    parser.add_argument("--key-env", default="EMERGENT_LLM_KEY")
+    parser.add_argument("--transport", choices=("gemini-rest", "sdk"), default="gemini-rest")
+    parser.add_argument("--key-env", help="Configured variable name, never the key value")
     args = parser.parse_args()
     os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     if args.run_model:
-        from dotenv import load_dotenv
-        load_dotenv(Path(__file__).resolve().parents[1]/".env")
+        try:
+            from dotenv import load_dotenv
+        except ImportError:
+            pass
+        else:
+            load_dotenv(Path(__file__).resolve().parents[1]/".env")
+        key_env = args.key_env or ("GEMINI_API_KEY" if args.transport == "gemini-rest" else "EMERGENT_LLM_KEY")
+        if not os.environ.get(key_env):
+            parser.error(key_env+" is not configured; no model request or production analysis was started")
     else:
         import socket
         def blocked(*_args, **_kwargs):
             raise RuntimeError("SOURCE_INPUT_PREPARATION_CANNOT_ACCESS_NETWORK")
         socket.socket.connect = socket.create_connection = blocked
     result = review(args.export_dir, args.video_path, args.trace_id, args.output_dir,
-                    run_model=args.run_model, api_key=os.environ.get(args.key_env) if args.run_model else None)
+                    run_model=args.run_model, api_key=os.environ.get(key_env) if args.run_model else None,
+                    transport=args.transport)
     print(json.dumps(result, indent=2))
 
 
