@@ -3,11 +3,11 @@ import { render, screen, within, fireEvent, waitFor, act } from "@testing-librar
 import "@testing-library/jest-dom";
 import ScoutMode from "./ScoutMode";
 import authority from "./videoFrameAuthority.cjs";
-import { detectSceneCuts, distributeHints } from "./sceneDetect";
+import { detectSceneCuts, selectTapHints } from "./sceneDetect";
 
 jest.mock("./sceneDetect", () => ({
   detectSceneCuts: jest.fn(async () => ({ cuts: [20, 40], samples: [] })),
-  distributeHints: jest.fn(() => Array.from({ length: 10 }, (_, i) => i * 6 + 3)),
+  selectTapHints: jest.fn(() => Array.from({ length: 10 }, (_, i) => i * 6 + 3)),
 }));
 jest.mock("./videoFrameAuthority.cjs", () => ({
   seekPresentedFrame: jest.fn(), resetPresentedFrame: jest.fn(),
@@ -40,7 +40,7 @@ beforeEach(() => {
   jest.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(() => "data:image/jpeg;base64,FRAME" + (++jpeg));
   authority.seekPresentedFrame.mockReset();
   detectSceneCuts.mockImplementation(async () => ({ cuts: [20, 40], samples: [] }));
-  distributeHints.mockImplementation(() => Array.from({ length: 10 }, (_, i) => i * 6 + 3));
+  selectTapHints.mockImplementation(() => Array.from({ length: 10 }, (_, i) => i * 6 + 3));
   authority.seekPresentedFrame.mockImplementation(async (v, t) => {
     v.currentTime = t - 0.011;
     return { mediaTime: t - 0.011, source: "PRESENTED_FRAME_CALLBACK" };

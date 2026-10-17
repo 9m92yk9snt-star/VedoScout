@@ -58,6 +58,25 @@ function chiSquared(a, b) {
   return s / 6;
 }
 
+// Compare actual decoded clarity in the field band, rather than rewarding a
+// sharp tree/sky at the top of a portrait clip. This ranks frames, not players.
+function frameClarity(ctx, w, h) {
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const gray = (x, y) => {
+    const i = (y * w + x) * 4;
+    return (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
+  };
+  let energy = 0, usable = 0, n = 0;
+  for (let y = Math.max(1, Math.floor(h * 0.35)); y < h * 0.9 - 1; y += 2) {
+    for (let x = 1; x < w - 1; x += 2) {
+      const value = gray(x, y);
+      energy += Math.abs(gray(x - 1, y) + gray(x + 1, y) + gray(x, y - 1) + gray(x, y + 1) - 4 * value);
+      usable += value > 0.04 && value < 0.96 ? 1 : 0; n++;
+    }
+  }
+  return n ? (energy / n) * (usable / n) : 0;
+}
+
 /** Seek to a positively acknowledged presented frame. */
 function seek(v, t, signal) {
   return videoFrameAuthority.seekPresentedFrame(v, t, { signal });
@@ -84,7 +103,7 @@ export async function detectSceneCuts(videoEl, opts = {}) {
   const ts = [];
   for (let i = 0; i < N; i++) ts.push(Math.min(dur - 0.04, (dur * i) / (N - 1)));
 
-  const w = 160, h = 90; // tiny downsample for speed
+  const w = 160, h = Math.max(32, Math.round(w * (v.videoHeight || 9) / (v.videoWidth || 16)));
   const canvas = document.createElement("canvas");
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -93,6 +112,7 @@ export async function detectSceneCuts(videoEl, opts = {}) {
   let prevHist = null;
   let prevTime = null;
   const sampled = [];
+  const qualitySamples = [];
   const cuts = [];
   const wasPlaying = !v.paused;
   v.pause();
@@ -110,6 +130,7 @@ export async function detectSceneCuts(videoEl, opts = {}) {
     let h1;
     try { h1 = frameHistogram(ctx, w, h); } catch { prevHist = null; continue; }
     sampled.push(frame.mediaTime);
+    qualitySamples.push({ t: frame.mediaTime, clarity: frameClarity(ctx, w, h) });
     if (prevHist) {
       const d = chiSquared(prevHist, h1);
       if (d > threshold && ts[i] > 1.0) {
@@ -127,7 +148,26 @@ export async function detectSceneCuts(videoEl, opts = {}) {
     onProgress?.((i + 1) / ts.length);
   }
   if (wasPlaying && !signal?.aborted) v.play().catch(() => {});
-  return { cuts, samples: sampled };
+  return { cuts, samples: sampled, qualitySamples };
+}
+
+/** Reuse sampled source pixels to choose clear moments in each coverage slot. */
+export function selectTapHints(duration, cuts, samples, count = 10) {
+  const baseline = distributeHints(duration, cuts, count);
+  const safeCuts = (cuts || []).filter(t => Number.isFinite(t) && t > 0 && t < duration);
+  const segment = t => safeCuts.filter(c => c <= t).length;
+  const used = new Set();
+  return baseline.map((t, i) => {
+    const lo = i ? (baseline[i - 1] + t) / 2 : 0;
+    const hi = i + 1 < baseline.length ? (t + baseline[i + 1]) / 2 : duration;
+    const candidates = (samples || []).filter(s => Number.isFinite(s.t) && Number.isFinite(s.clarity)
+      && s.clarity > 0 && s.t > lo && s.t < hi && !used.has(s.t)
+      && segment(s.t) === segment(t) && safeCuts.every(c => Math.abs(c - s.t) > 0.35));
+    candidates.sort((a, b) => b.clarity - a.clarity || Math.abs(a.t - t) - Math.abs(b.t - t));
+    const chosen = candidates[0]?.t ?? t;
+    used.add(chosen);
+    return chosen;
+  });
 }
 
 /**
@@ -176,4 +216,4 @@ export function distributeHints(duration, cuts, count = 10) {
   return out.slice(0, count);
 }
 
-export const __testing__ = { frameHistogram, chiSquared, seek };
+export const __testing__ = { frameHistogram, chiSquared, frameClarity, seek };

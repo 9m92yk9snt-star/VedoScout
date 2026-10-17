@@ -649,8 +649,18 @@ def _is_direct_tap_target(frame):
     )
 
 
+def _is_team_reference_target(frame):
+    target = frame.get("global_target") or {}
+    appearance = target.get("appearance_evidence") or {}
+    return _is_direct_tap_target(frame) or bool(
+        target.get("status") == "VERIFIED" and target.get("proof_eligible") is True
+        and target.get("reason") == "MULTI_FRAME_SELECTED_APPEARANCE"
+        and appearance.get("source") == "USER_SELECTED_SOURCE_PIXELS"
+        and appearance.get("source_video_sha256") and appearance.get("input_sha256"))
+
+
 def _dense_target_kit_samples(frames, *, authority_ms=None):
-    """Collect kit chroma only along a direct-tap body's contiguous local track."""
+    """Collect kit chroma along a tap/selected-appearance body's contiguous track."""
     rows = sorted(
         [frame for frame in (frames or [])
          if isinstance(frame, dict) and _num(frame.get("media_ms"))],
@@ -660,7 +670,7 @@ def _dense_target_kit_samples(frames, *, authority_ms=None):
     seen = set()
     anchors = [
         (index, frame) for index, frame in enumerate(rows)
-        if _is_direct_tap_target(frame)
+        if _is_team_reference_target(frame)
         and (authority_ms is None or int(frame["media_ms"]) == authority_ms)
     ]
     for index, anchor in anchors:
@@ -707,7 +717,7 @@ def _apply_dense_team_labels(frames):
     if diagnostic.get("status") != "ok":
         # Different tap episodes can have different lighting or body crops.
         # A failed pooled model must not erase independently proven local kits.
-        # Fit each bounded direct-tap episode under the SAME team gates, then
+        # Fit each bounded reference episode under the SAME team criteria, then
         # publish only labels on which all successful overlapping models agree.
         indexed = sorted(((i, f) for i, f in enumerate(frames or [])
                           if isinstance(f, dict) and _num(f.get("media_ms"))),
@@ -715,7 +725,7 @@ def _apply_dense_team_labels(frames):
         proposals, models = {}, []
         for anchor_index, (_, anchor) in enumerate(indexed):
             ms = int(anchor["media_ms"])
-            if not _is_direct_tap_target(anchor):
+            if not _is_team_reference_target(anchor):
                 continue
             region = []
             for direction in (1, -1):
@@ -833,8 +843,13 @@ def _resolve_dense_target(identity_authority: dict, media_ms: int, players: list
             max_interp_ms=TARGET_NEAR_MS,
         )
     if not isinstance(resolved, dict) or not _valid_box(resolved.get("box")):
+        barrier_reasons = sorted({str(r.get("reason") or "UNKNOWN")
+            for r in authority.get("unresolved_intervals") or []
+            if isinstance(r, dict) and _num(r.get("start_ms")) and _num(r.get("end_ms"))
+            and min(r["start_ms"], r["end_ms"]) <= media_ms <= max(r["start_ms"], r["end_ms"])})
         return {
             "status": "UNRESOLVED", "reason": why,
+            "identity_barrier_reasons": barrier_reasons,
             "local_track_id": None, "candidate_local_track_ids": [],
             "proof_eligible": False,
         }

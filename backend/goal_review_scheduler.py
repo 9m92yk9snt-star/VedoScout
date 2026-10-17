@@ -9,13 +9,44 @@ from copy import deepcopy
 import hashlib
 import json
 import math
+import goal_review_sampling
 
 TIME_CELL_MS = 4000
+GOAL_TIME_CELL_MS = 2000
 OVERLAP_CONTACT_MS = 50
 
 
 def _num(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def motion_fallback_requests(ordered):
+    """One clarification per unresolved clip action, plus an independent recall.
+
+    A completed motion review replaces repeated scrutiny of every control as
+    a possible goal. Missing/failed video reads retain the existing native
+    review policy. No event or physical proof is created/deleted here.
+    """
+    selected, deferred, groups = [], [], {}
+    for job in ordered:
+        context = job.get("motion_review") or {}
+        if context.get("complete") is not True:
+            selected.append(job)
+            continue
+        ms = job["strike"]["media_ms"]
+        pivots = [v for v in context.get("unresolved_contact_ms") or [] if _num(v)]
+        pivot = min(pivots, key=lambda p: abs(p-ms), default=None)
+        # A separate native recall remains available when the motion reader
+        # missed a release; expected events never select these jobs.
+        group = (job["window"].get("dense_window_id"), pivot if pivot is not None and abs(pivot-ms) <= 800 else "native_recall")
+        if group not in groups:
+            groups[group] = job
+            selected.append(job)
+        elif job["review"].get("physical_review_id") == groups[group]["review"].get("physical_review_id"):
+            selected.append(job)  # same contact consumes the existing geometry cache
+        else:
+            deferred.append(job)
+    return selected, deferred
 
 
 def _iou(a, b):
@@ -70,14 +101,25 @@ def ordered_requests(requests, analysis):
             if not _num(ms) and _num(action.get("start_ms")) and _num(action.get("end_ms")):
                 ms = (action["start_ms"] + action["end_ms"]) / 2
             if _num(ms):
-                contacts.append((seq.get("scene_id"), int(ms)))
+                terminal = str(action.get("action_type") or action.get("kind") or "").upper() in {"SHOT", "PASS", "CROSS", "KEY_PASS"}
+                contacts.append((seq.get("scene_id"), int(ms), terminal))
 
     def relevance(job):
         strike = job["strike"]
         ms = int(strike.get("media_ms") or 0)
-        distance = min((abs(ms - t) for scene, t in contacts if scene == strike.get("scene_id")), default=1000000)
+        distance = min((abs(ms - t) for scene, t, _ in contacts if scene == strike.get("scene_id")), default=1000000)
+        terminal_distance = min((abs(ms-t) for scene, t, terminal in contacts
+                                 if scene == strike.get("scene_id") and terminal), default=1000000)
         role = strike.get("contact_role") or {}
-        return (0 if role.get("role") == "RELEASE" else 1,
+        pixel_distance = min((abs(ms-h["media_ms"]) for h in job.get("inspection_search_hints") or []
+                              if h.get("scene_id") == strike.get("scene_id")
+                              and h.get("player_track_id") == strike.get("player_track_id")
+                              and _num(h.get("media_ms"))), default=1000000)
+        return (0 if goal_review_sampling.has_contact_reference(strike, job["window"]) else 1,
+                0 if pixel_distance <= 800 else 1,
+                0 if terminal_distance <= 1600 else 1,
+                0 if role.get("role") == "RELEASE" else 1,
+                terminal_distance,
                 0 if distance <= 1200 else 1, distance,
                 -float(strike.get("post_speed") or 0), ms)
 
@@ -119,26 +161,30 @@ def ordered_requests(requests, analysis):
             (representatives if original is representative else repeats).append(job)
 
     result = []
-    for lane in ("VERIFIED_CHAIN", "CLARIFICATION"):
-        scenes = defaultdict(lambda: defaultdict(list))
-        visits = defaultdict(int)
-        for job in representatives:
-            if job["review"].get("lane") == lane:
-                scenes[str(job["window"].get("scene_id") or "")][int(job["strike"]["media_ms"]) // TIME_CELL_MS].append(job)
-        for cells in scenes.values():
-            for group in cells.values():
-                group.sort(key=relevance)
-        while scenes:
-            # Visit each scene before its next time cell; within a scene,
-            # visit each occupied time cell before repeating one noisy cell.
-            scene_order = sorted(scenes, key=lambda scene: (min(relevance(g[0]) for g in scenes[scene].values()), scene))
-            for scene in scene_order:
-                cells = scenes[scene]
-                cell = min(cells, key=lambda c: (visits[(scene, c)], relevance(cells[c][0]), c))
-                result.append(cells[cell].pop(0))
-                visits[(scene, cell)] += 1
-                if not cells[cell]:
-                    del cells[cell]
-                if not cells:
-                    del scenes[scene]
+    # One shared work queue: lack of identity must not reserve a useful
+    # contact behind all early already-known target contacts.
+    scenes = defaultdict(lambda: defaultdict(list))
+    visits = defaultdict(int)
+    for job in representatives:
+        if job["review"].get("lane") in {"VERIFIED_CHAIN", "CLARIFICATION"}:
+            scenes[str(job["window"].get("scene_id") or "")][int(job["strike"]["media_ms"]) // GOAL_TIME_CELL_MS].append(job)
+    for cells in scenes.values():
+        for group in cells.values():
+            group.sort(key=relevance)
+    while scenes:
+        # Visit every occupied time cell before repeating a noisy one.
+        minimum = min(visits[(s, c)] for s, cells in scenes.items() for c in cells)
+        scene_order = sorted((s for s in scenes if any(visits[(s, c)] == minimum for c in scenes[s])),
+                             key=lambda scene: (min(relevance(g[0]) for c, g in scenes[scene].items()
+                                                    if visits[(scene, c)] == minimum), scene))
+        for scene in scene_order:
+            cells = scenes[scene]
+            cell = min((c for c in cells if visits[(scene, c)] == minimum),
+                       key=lambda c: (relevance(cells[c][0]), c))
+            result.append(cells[cell].pop(0))
+            visits[(scene, cell)] += 1
+            if not cells[cell]:
+                del cells[cell]
+            if not cells:
+                del scenes[scene]
     return result + repeats

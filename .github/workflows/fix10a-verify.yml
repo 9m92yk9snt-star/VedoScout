@@ -96,12 +96,16 @@ jobs:
             backend/physical_match_reconstruction.py \
             backend/action_evidence_review.py \
             backend/report_fact_authority.py \
+            backend/video_model_input.py \
+            backend/dense_event_reconciliation.py \
+            backend/sequence_observation_context.py \
             backend/cross_window_evidence.py \
             backend/evidence_feedback.py \
             backend/goal_review_scheduler.py \
             backend/goal_review_sampling.py \
             backend/scripts/replay_report_evidence.py \
             backend/scripts/reference_action_review.py \
+            backend/scripts/audit_temporal_video_inputs.py \
             backend/open_observation_compat.py \
             backend/fix10a_vision_providers.py \
             backend/fix10a_goal_direction.py \
@@ -118,7 +122,7 @@ jobs:
         working-directory: backend
         env:
           PYTHONPATH: /tmp/ci_stubs:.
-        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py tests/test_fix15_temporal_goal_context.py tests/test_fix15_contact_role_seed_handoff.py tests/test_fix15_independent_ball_review.py tests/test_fix15_dense_reader_coverage.py tests/test_fix15_direct_goal_transport.py
+        run: pytest --asyncio-mode=auto -q tests/test_fix09b2_sequence_intelligence.py tests/test_fix10a*.py tests/test_fix10b*.py tests/test_fix13*.py tests/test_fix14_orman10_recovery.py tests/test_fix15_native_goal_reappearance.py tests/test_fix15_native_goal_review.py tests/test_fix15_temporal_goal_context.py tests/test_fix15_contact_role_seed_handoff.py tests/test_fix15_independent_ball_review.py tests/test_fix15_dense_reader_coverage.py tests/test_fix15_direct_goal_transport.py tests/test_fix15_r6_multiball_search.py tests/test_fix31_temporal_video.py tests/test_fix32_edited_portrait_video.py
 
   backend_regression:
     runs-on: ubuntu-latest

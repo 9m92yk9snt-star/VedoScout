@@ -110,7 +110,7 @@ def _nearest_player_foot_h(candidate_box: dict, players, x_scale=1.0) -> float |
 
 
 def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int,
-                          *, geometry=None) -> dict | None:
+                          *, geometry=None, search_only=False) -> dict | None:
     if (not _valid_box(candidate.get("box"))
             or candidate.get("proof_eligible") is False or candidate.get("used_fallback") is True
             or candidate.get("state") not in {None,"MEASURED","MEASURED_REACQUISITION"}
@@ -186,7 +186,11 @@ def _candidate_from_prior(candidate: dict, prior: dict | None, media_ms: int,
             pvx, pvy = geometry["transform_velocity"](prior["velocity"], last_measured_ms)
         accel = ((velocity[0] - pvx) / dt, (velocity[1] - pvy) / dt)
         accel_mag = math.hypot(accel[0] * x_scale, accel[1])
-        if accel_mag > MAX_ACCEL_NORM_S2 * 1.75:
+        # The independent search must not lose repeated native proposals just
+        # because upload-time acceleration exceeds a real-time prior (edited
+        # playback and actual kicks both do this). This NEVER changes the
+        # authoritative trajectory: search points remain SEARCH_ONLY.
+        if accel_mag > MAX_ACCEL_NORM_S2 * 1.75 and not (search_only and native):
             return None
         acceleration_score = max(0.0, 1.0 - accel_mag / MAX_ACCEL_NORM_S2)
     score = 0.50 * conf + 0.27 * continuity + 0.13 * scale_ratio + 0.10 * acceleration_score
@@ -296,7 +300,7 @@ def _search_hypotheses(candidates, previous, media_ms, geometry):
     scale = geometry["x_scale"] if geometry and geometry.get("transform") is not None else 1.0
     for ci, candidate in enumerate(candidates):
         for hi, prior in enumerate(previous):
-            row = _candidate_from_prior(candidate, prior, media_ms, geometry=geometry)
+            row = _candidate_from_prior(candidate, prior, media_ms, geometry=geometry, search_only=True)
             if row is None:
                 continue
             predicted = (geometry["predict_box"](prior, media_ms)
@@ -427,7 +431,9 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
               if isinstance(frame, dict) and _num(frame.get("media_ms"))]
     for index, frame in enumerate(frames):
         media_ms = int(round(float(frame["media_ms"])))
-        cut = frame.get("cut_barrier") is True or frame.get("cut") is True
+        scene_changed = bool(index and frame.get("scene_id") and frames[index-1].get("scene_id")
+                             and frame["scene_id"] != frames[index-1]["scene_id"])
+        cut = frame.get("cut_barrier") is True or frame.get("cut") is True or scene_changed
         if cut:
             hypotheses = []
             search = []
@@ -453,6 +459,8 @@ def reconstruct_ball_trajectory(dense_frames) -> list[dict]:
                 "FRAME_INDEX_FPS_FALLBACK" if used_fallback else "ACTUAL_MEDIA_PTS"
             ),
             "cut_barrier": bool(cut),
+            "motion_time_basis": "UPLOADED_MEDIA_SECONDS",
+            "real_time_speed_calibrated": False,
         }
         if "frame_dimensions" in frame:
             common["frame_dimensions"] = deepcopy(frame["frame_dimensions"])

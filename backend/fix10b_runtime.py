@@ -75,7 +75,7 @@ def _summary(canonical: dict) -> dict:
         "version": VERSION,
         "status": (
             "applied"
-            if int((reconciliation or {}).get("proposals_applied") or 0) > 0
+            if int((reconciliation or {}).get("proposals_applied") or 0) > 0 or (reconciliation or {}).get("changes")
             else "no_change"
         ),
         "mode": "production",
@@ -86,6 +86,7 @@ def _summary(canonical: dict) -> dict:
             (reconciliation or {}).get("proposals_contradictory") or 0
         ),
         "changes": deepcopy((reconciliation or {}).get("changes") or []),
+        "shot_role_conflicts_reopened": int((reconciliation or {}).get("shot_role_conflicts_reopened") or 0),
         "counts": deepcopy(canonical.get("counts") or {}) if isinstance(canonical, dict) else {},
     }
 
@@ -96,9 +97,9 @@ def reconcile_unified_result(
 ) -> dict:
     """Build the complete production unified result without mutating inputs.
 
-    A partial FIX10A run may contribute only from successful traces. Every
-    proposal still has to pass FIX10B's strict physical-proof gates. Failed or
-    ambiguous windows therefore cannot invent events.
+    A partial FIX10A run may contribute physical proposals from successful
+    traces and complete source-video chains through the shared actor resolver.
+    Unresolved physical reconstruction does not veto qualified visual evidence.
     """
     source = deepcopy(unified_result) if isinstance(unified_result, dict) else {}
     canonical_before = (

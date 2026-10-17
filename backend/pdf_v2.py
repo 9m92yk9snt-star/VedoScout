@@ -336,6 +336,7 @@ def derive_v2(report):
     if _sm_rows and (full.get("snapshot_moments_authority") or len(_sm_rows) >= 4):
         snapshot_moments = [{
             "key": x.get("key"), "title": x.get("title") or "—", "desc": x.get("desc") or "—",
+            "label": x.get("label") or ("Verified involvement" if full.get("snapshot_moments_authority") else None),
             "timestamp": x.get("timestamp"), "thumb": x.get("frame_url"),
             "annot": x.get("annot") or "circle",
         } for x in _sm_rows[:4]]
@@ -412,6 +413,11 @@ def derive_v2(report):
         "longTerm": so.get("long_term_potential") or ("High" if re.search(r"very high|high", dev_pot, re.I) else "Medium"),
         "longTermNote": so.get("long_term_note") or first_sentences(dev_pot, 140),
     }
+    if ((full.get("report_fact_authority") or {}).get("status") == "REVIEW_REQUIRED"
+            and not isinstance((full.get("scores") or {}).get("overall_development"), (int, float))):
+        scout_outlook = {"currentLabel": "Insufficient verified evidence", "currentDots": 0,
+            "potentialLabel": "Not assessed", "potentialDots": 0, "readiness": "Not assessed",
+            "longTerm": "Not assessed", "longTermNote": "Further verified match evidence is needed for this assessment."}
 
     ms = full.get("match_stats") or None
     match_stats = None
@@ -421,6 +427,10 @@ def derive_v2(report):
             return (int(m.group(1)) / int(m.group(2)) * 100) if m and int(m.group(2)) > 0 else 50
 
         rows = [
+            {"label": "Goals" if ms.get("coverage_status") == "COMPLETE" else "Verified Goals",
+             "value": ms.get("goals") if ms.get("goals") is not None else ms.get("observed_goals"), "pct": 0},
+            {"label": "Assists" if ms.get("coverage_status") == "COMPLETE" else "Verified Assists",
+             "value": ms.get("assists") if ms.get("assists") is not None else ms.get("observed_assists"), "pct": 0},
             {"label": "Total Actions", "value": ms.get("total_actions"), "pct": min(100, (ms.get("total_actions") or 0) / 80 * 100)},
             {"label": "Successful Dribbles", "value": ms.get("successful_dribbles"), "pct": min(100, (ms.get("successful_dribbles") or 0) / 12 * 100)},
             {"label": "Key Passes", "value": ms.get("key_passes"), "pct": min(100, (ms.get("key_passes") or 0) / 8 * 100)},
@@ -457,7 +467,9 @@ def derive_v2(report):
         "trainingWeek": training_week, "parentSummary": parent_summary,
         "parentTips": parent_tips, "coachNotes": coach_notes, "scoutOutlook": scout_outlook,
         "matchStats": match_stats, "videoHighlight": video_highlight,
+        "matchStatsCoverage": (ms or {}).get("coverage_note") or (full.get("verified_stats") or {}).get("coverage_note"),
         "identityNote": _identity_note(report),
+        "evidenceQualityNote": full.get("evidence_quality_note"),
         "actionTimeline": _action_timeline(full),
         "parentsPackage": _parents_package(full),
         "parentMetrics": _parent_metrics(full),
@@ -809,6 +821,8 @@ def _overall_score_card(c, d, x, y, w, h, ctx=None, bracket=None):
     draw_stars_row(c, cx, ty - 13, d["stars"])
     line = (ctx or {}).get("line") or ("This score reflects the current level compared to other players "
                                        "of the same age in this position.")
+    if overall is None:
+        line = "Score unavailable: the verified player/action evidence is incomplete."
     draw_par(c, esc(line), x + PAD + 4, ty - 24, w - 2 * PAD - 8,
              _style(F_BODY, 6.8, HexColor("#68766B"), leading=9.4, align=TA_CENTER),
              max_h=ty - 24 - y - PAD + 6)
@@ -853,65 +867,6 @@ def _snap_icon(c, key, cx, cy, r=4.4):
     c.restoreState()
 
 
-def _snap_arrowhead(c, x, y, angle, size=4.2):
-    c.saveState()
-    c.translate(x, y)
-    c.rotate(angle)
-    p = c.beginPath()
-    p.moveTo(-size, size * 0.7)
-    p.lineTo(0, 0)
-    p.lineTo(-size, -size * 0.7)
-    c.drawPath(p, stroke=1, fill=0)
-    c.restoreState()
-
-
-def _snap_annot(c, kind, x, y, w, h):
-    """Generic tactical overlay on top of the frame (mirrors web SnapshotAnnot)."""
-    if not kind:
-        return
-    kind = "circle" if kind == "space" else kind
-    c.saveState()
-    c.setLineJoin(1)
-    c.setLineCap(1)
-    if kind in ("path", "arrow"):
-        c.setStrokeColor(HexColor("#7ED321"))
-        c.setLineWidth(1.6)
-        x1, y1 = x + 0.38 * w, y + 0.36 * h
-        x2, y2 = x + 0.58 * w, y + 0.54 * h
-        c.line(x1, y1, x2, y2)
-        _snap_arrowhead(c, x2, y2, math.degrees(math.atan2(y2 - y1, x2 - x1)))
-        if kind == "path":
-            c.setDash(4, 3)
-            c.ellipse(x + 0.14 * w, y + 0.10 * h, x + 0.46 * w, y + 0.24 * h, stroke=1, fill=0)
-    elif kind == "scan":
-        c.setStrokeColor(HexColor("#FFFFFF"))
-        c.setLineWidth(1.5)
-        yy = y + 0.79 * h
-        c.setDash(4, 4)
-        c.line(x + 0.72 * w, yy, x + 0.48 * w, yy)
-        c.setDash()
-        _snap_arrowhead(c, x + 0.46 * w, yy, 180)
-        c.setFillColor(HexColor("#FFFFFF"))
-        c.circle(x + 0.75 * w, yy, 1.6, stroke=0, fill=1)
-    elif kind == "run":
-        c.setStrokeColor(HexColor("#F5A623"))
-        c.setLineWidth(1.6)
-        c.setDash(5, 4)
-        p = c.beginPath()
-        p.moveTo(x + 0.20 * w, y + 0.16 * h)
-        p.curveTo(x + 0.34 * w, y + 0.34 * h, x + 0.46 * w, y + 0.46 * h, x + 0.58 * w, y + 0.62 * h)
-        c.drawPath(p, stroke=1, fill=0)
-        c.ellipse(x + 0.58 * w, y + 0.66 * h, x + 0.72 * w, y + 0.82 * h, stroke=1, fill=0)
-        c.setDash()
-        _snap_arrowhead(c, x + 0.58 * w, y + 0.62 * h, 55)
-    else:  # circle
-        c.setStrokeColor(HexColor("#E8442E"))
-        c.setLineWidth(1.6)
-        c.setDash(5, 4)
-        c.ellipse(x + 0.44 * w, y + 0.10 * h, x + 0.78 * w, y + 0.26 * h, stroke=1, fill=0)
-    c.restoreState()
-
-
 def _snapshot_moment_card(c, m, x, y, w, h, resolve):
     HB = 24.0   # colored header bar
     TXT = 72.0  # text block under the photo
@@ -935,7 +890,7 @@ def _snapshot_moment_card(c, m, x, y, w, h, resolve):
     _snap_icon(c, m.get("key"), x + 13, hy)
     c.setFillColor(HexColor("#FFFFFF"))
     c.setFont(F_BOLD, 7.2)
-    c.drawString(x + 22, hy - 2.6, SNAP_LABELS.get(m.get("key"), ""))
+    c.drawString(x + 22, hy - 2.6, str(m.get("label") or SNAP_LABELS.get(m.get("key"), "")).upper())
     ts = m.get("timestamp")
     if ts:
         c.setFont(F_BLACK, 9)
@@ -961,7 +916,7 @@ def _snapshot_moment_card(c, m, x, y, w, h, resolve):
         c.line(x + 1, py + ph / 2, x + w - 1, py + ph / 2)
         c.circle(x + w / 2, py + ph / 2, min(w, ph) * 0.18, stroke=1, fill=0)
         c.restoreState()
-    _snap_annot(c, m.get("annot"), x + 1, py, w - 2, ph)
+    # Only measured telestration already present in the image is displayed.
     # title + description
     ty = y + TXT - 10
     ty -= draw_par(c, f"<b>{esc(m.get('title'))}</b>", x + 12, ty, w - 24,
@@ -1053,11 +1008,12 @@ def _snapshot_page(c, d, report_doc, page_no, total_pages, resolve):
     c.showPage()
 
 
-def _match_stats_card(c, stats, x, y, w, h):
+def _match_stats_card(c, stats, x, y, w, h, coverage_note=None):
     card(c, x, y, w, h)
     ty = y + h - PAD
     ty -= card_title(c, x + PAD, ty, "Match Stats", w - 2 * PAD)
-    row_h = (ty - y - 10) / max(1, len(stats))
+    note_h = 23 if coverage_note else 0
+    row_h = (ty - y - 10 - note_h) / max(1, len(stats))
     for r in stats:
         c.setFillColor(BODY)
         c.setFont(F_BODY, 7.2)
@@ -1067,6 +1023,10 @@ def _match_stats_card(c, stats, x, y, w, h):
         c.drawRightString(x + w - PAD, ty - 8, str(r["value"]))
         draw_bar(c, x + PAD, ty - 16, w - 2 * PAD, 3.6, r["pct"])
         ty -= row_h
+
+    if coverage_note:
+        draw_par(c, esc(coverage_note), x + PAD, y + 22, w - 2 * PAD,
+                 _style(F_BODY, 5.6, MUTED, leading=7), max_h=21)
 
 
 def _age_comparison_card(c, comp, bracket, x, y, w, h):
@@ -2963,7 +2923,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     h2 = 240
     if d["matchStats"]:
         cw2 = (CW - GAP) / 2
-        _match_stats_card(c, d["matchStats"], M, row2_top - h2, cw2, h2)
+        _match_stats_card(c, d["matchStats"], M, row2_top - h2, cw2, h2, d.get("matchStatsCoverage"))
         _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M + cw2 + GAP, row2_top - h2, cw2, h2)
     else:
         _age_comparison_card(c, d["ageComparison"], d["ageBracket"], M, row2_top - h2, CW, h2)
@@ -2972,7 +2932,11 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
     strip_top = row2_top - h2 - GAP
     if strip_top - M > 46:
         sh = 44
-        if prog:
+        if d.get("evidenceQualityNote"):
+            card(c, M, strip_top - sh, CW, sh, fill=SOFT)
+            draw_par(c, esc(d["evidenceQualityNote"]), M + 12, strip_top - 8, CW - 24,
+                     _style(F_BODY, 7.0, BODY, leading=9), max_h=sh - 12)
+        elif prog:
             _progress_strip(c, prog, M, strip_top - sh, CW, sh)
         else:
             c.saveState()
@@ -3120,7 +3084,7 @@ def build_pdf_v2(report_doc: dict, output_path: str, image_resolver=None, promo:
                 yy -= cols_h + GAP
         if pm and yy - M - 20 >= h_pm:
             _parent_metrics_strip(c, pm, M, yy - h_pm, CW, h_pm)
-        _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if sctx else 0) + (1 if gyg else 0), total_pages)
+        _page_footer(c, 5 + (1 if has_p4 else 0) + (1 if (sm or sctx) else 0) + (1 if gyg else 0), total_pages)
         c.showPage()
 
     # ── PAGE — Printables (mission card + training week planner) ──

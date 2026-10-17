@@ -593,6 +593,7 @@ def build_snapshot_moments(full: dict, max_moments: int = 4):
         et = str(e.get("canonical_event_type") or "").upper()
         moments.append({
             "key": snap_keys[len(moments)],
+            "label": "Scoring contribution" if et in {"GOAL", "ASSIST"} else "Verified involvement",
             "title": str(e.get("title") or _SAFE_TITLE.get(et, "Key moment")),
             "desc": str(e.get("description") or "").strip()[:200],
             "timestamp": e.get("timestamp"),

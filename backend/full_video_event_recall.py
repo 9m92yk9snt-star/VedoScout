@@ -356,7 +356,12 @@ def _merge_metadata(target: dict, source: dict) -> None:
 
 
 def union_dense_windows(existing, recall) -> list[dict]:
-    """Union semantic FIX10 windows with FIX11 recall windows conservatively."""
+    """Join connected scene intervals BEFORE splitting the shared work.
+
+    Splitting the semantic and recall lanes independently left two shifted
+    grids over the same scene. A detection cache cannot remove duplicated
+    tracking, contacts, jersey crops and outcome reconstruction in those grids.
+    """
     rows = [
         deepcopy(x) for x in [*(existing or []), *(recall or [])]
         if isinstance(x, dict)
@@ -374,11 +379,6 @@ def union_dense_windows(existing, recall) -> list[dict]:
             last is not None
             and str(last.get("scene_id")) == str(row.get("scene_id"))
             and int(row["start_ms"]) <= int(last["end_ms"]) + UNION_GAP_MS
-            and (
-                max(int(last["end_ms"]), int(row["end_ms"]))
-                - min(int(last["start_ms"]), int(row["start_ms"]))
-                <= MAX_RECALL_WINDOW_MS
-            )
         ):
             last["start_ms"] = min(int(last["start_ms"]), int(row["start_ms"]))
             last["end_ms"] = max(int(last["end_ms"]), int(row["end_ms"]))
@@ -394,4 +394,6 @@ def union_dense_windows(existing, recall) -> list[dict]:
             row.setdefault("trigger_ms", [])
             row.setdefault("recall_window", False)
             merged.append(row)
-    return merged
+    return sorted([piece for row in merged for piece in (
+        _split(row) if row["end_ms"]-row["start_ms"] > MAX_RECALL_WINDOW_MS else [row])],
+        key=lambda w: (w["start_ms"], w["end_ms"]))

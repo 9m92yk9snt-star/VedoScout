@@ -24,6 +24,8 @@ const TASKS = {
   physical_reconstruction_start: "Connecting touches, passes and subsequent play",
   physical_reconstruction_complete: "Reconciling actions with the evidence",
   canonical_reconciliation: "Reconciling actions with the evidence",
+  report_synthesis_start: "Writing your player assessment from the reviewed evidence",
+  report_synthesis_complete: "Completing the player assessment",
   legacy_fallback: "Continuing with the alternative analysis path",
   evidence_assets_start: "Preparing video evidence for the report",
   evidence_assets_complete: "Completing the report checks",

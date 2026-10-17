@@ -101,24 +101,31 @@ async def model_call(collection, chat, message, *, session_id, video_path, promp
 
     if lease:
         try:
-            source_hash = await asyncio.to_thread(file_sha256, video_path)
+            source_hash = await asyncio.to_thread(file_sha256, video_path) if video_path else None
         except Exception:
             source_hash = None
         await persist({"status": "started", "started_at": utc_now().isoformat(),
-                       "video_sha256": source_hash, "video_role": "MODEL_RENDITION",
-                       "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()})
+                       "video_sha256": source_hash, "video_role": "MODEL_RENDITION" if video_path else None,
+                       "input_type": "VIDEO" if video_path else "CANONICAL_FACTS",
+                       "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+                       **({"video_input": dict(chat.video_input_audit)}
+                          if isinstance(getattr(chat, "video_input_audit", None), dict) else {})})
     try:
         response = await asyncio.wait_for(chat.send_message(message), timeout=timeout_s)
     except BaseException as exc:
         await persist({"status": "cancelled" if isinstance(exc, asyncio.CancelledError) else "error",
-                       "error_type": type(exc).__name__, "finished_at": utc_now().isoformat()})
+                       "error_type": type(exc).__name__, "finished_at": utc_now().isoformat(),
+                       **({"video_input": dict(chat.video_input_audit)}
+                          if isinstance(getattr(chat, "video_input_audit", None), dict) else {})})
         raise
     if lease:
         payload = (response if isinstance(response, str) else str(response)).encode()
         await persist({"status": "responded", "finished_at": utc_now().isoformat(),
                        "response_sha256": hashlib.sha256(payload).hexdigest(), "response_bytes": len(payload),
                        "raw_response": payload[:8 * 1024 * 1024].decode(errors="ignore"),
-                       "raw_response_truncated": len(payload) > 8 * 1024 * 1024})
+                       "raw_response_truncated": len(payload) > 8 * 1024 * 1024,
+                       **({"video_input": dict(chat.video_input_audit)}
+                          if isinstance(getattr(chat, "video_input_audit", None), dict) else {})})
     return response
 
 

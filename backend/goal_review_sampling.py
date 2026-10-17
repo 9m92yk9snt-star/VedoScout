@@ -9,6 +9,22 @@ MAX_NATIVE_REAPPEARANCE_FRAMES = 56
 MAX_DENSE_READER_FRAMES = 64
 
 
+def has_contact_reference(strike, window):
+    """The geometry adapter cannot bind a contact without its measured ball.
+
+    Skip that dead-end request before decoding or spending a model budget.
+    Legacy geometry-only callers without a physical status remain supported.
+    """
+    if strike.get("status") not in {"VERIFIED_PHYSICAL_RELEASE", "VERIFIED_PHYSICAL_SCORING_CONTACT"}:
+        return True
+    anchor = strike.get("active_ball_anchor") or {}
+    return bool(ball_trajectory._proof_measured_ball(anchor)
+                and type(anchor.get("media_ms")) is int
+                and anchor.get("time_authority") == "ACTUAL_MEDIA_PTS"
+                and not anchor.get("used_fallback")
+                and window.get("start_ms", 0) <= anchor["media_ms"] <= window.get("end_ms", float("inf")))
+
+
 def dense_reader_times(original, strike, path, scan, images_by_ms, *, budget, start_ms, end_ms):
     """Retain a complete, already decoded short loss in one reader call.
 

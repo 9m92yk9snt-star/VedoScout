@@ -37,6 +37,7 @@ import fix10a_occluded_goal
 import goal_reappearance
 import native_goal_review
 import goal_context_observations
+import video_model_input
 try:  # Supporting vision is optional and always fails closed when unavailable.
     from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 except ImportError:  # pragma: no cover - availability is deployment-specific
@@ -450,6 +451,30 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
                 "confidence": confidence,
             })
         geometry_verified = len(cleaned_frames) >= 2
+        # Goalposts and playable pitch are read from the same source images.
+        # A second model must not independently redraw this coordinate system.
+        # The optional protocol preserves older saved/injected reader schemas.
+        field_side = {}
+        if data.get("field_side_protocol") == "VISIBLE_PLAYABLE_PITCH_V1":
+            points = []
+            geometry_indices = {r["idx"] for r in cleaned_frames}
+            for row in data.get("frames") or []:
+                if not isinstance(row, dict) or row.get("idx") not in geometry_indices:
+                    continue
+                point = row.get("field_side")
+                if (row.get("field_side_visible") is not True or not isinstance(point, dict)
+                        or str(row.get("field_side_confidence") or "low").lower() not in {"high", "medium"}
+                        or any(not _num(point.get(k)) or not math.isfinite(point[k])
+                               or not 0 <= point[k] <= 1 for k in ("x", "y"))):
+                    continue
+                points.append({"media_ms": media_ms[row["idx"]-1],
+                    "point": {k: float(point[k]) for k in ("x", "y")},
+                    "confidence": str(row["field_side_confidence"]).lower()})
+            field_side = {"field_side_status": "VERIFIED" if len(points) >= 2 else "UNRESOLVED",
+                "field_side_by_ms": points, "field_side_source": "SHARED_GOAL_SCENE_PLAYABLE_PITCH",
+                "field_side_model_audit": {"audit_ref": "model_review_audit"},
+                "field_side_reason": "MULTI_FRAME_FIELD_SIDE_VISIBLE" if len(points) >= 2
+                                     else "FIELD_SIDE_VISIBILITY_INSUFFICIENT"}
 
         crossing = str(data.get("crossing") or "UNRESOLVED").upper()
         crossing_conf = str(data.get("crossing_confidence") or "low").lower()
@@ -709,6 +734,7 @@ def parse_goal_scene_response(raw_response: str, media_ms, model_review_audit=No
 
         return {
             "geometry_status": "VERIFIED" if geometry_verified else "UNRESOLVED",
+            **field_side,
             "model_review_audit": audit,
             "response_coverage": coverage,
             "frames": cleaned_frames,
@@ -777,6 +803,11 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "GEOMETRY: For every image where the SAME relevant goal mouth is clearly visible, return the two goalpost "
             "BASE points where each post meets the ground/goal line, normalized 0..1. Do not estimate a hidden post. "
             "visible=false when both bases are not clear.\n"
+            "PLAYABLE PITCH: In that SAME image and coordinate system, independently of the ball or outcome, "
+            "mark one clearly visible point on playable pitch immediately IN FRONT OF that goal line. "
+            "The point must not lie on the line, inside/behind the net or on an ambiguous surface. "
+            "Set field_side_visible=false when the pitch side is unclear. Player reactions and ball movement "
+            "must not decide the pitch side.\n"
             "AIRBORNE BALL: Screen position above the ground line alone cannot establish goal depth. "
             "Use visible goal structure and temporal context; report UNKNOWN depth if front/behind relation is unclear. "
             "For every visible ball state whether it is airborne and whether it is IN_FRONT_OF_GOAL or INSIDE_GOAL_VOLUME. "
@@ -814,7 +845,10 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
             "possession or an unseen save. None of these fields alone supplies a goal verdict.\n"
             'Respond ONLY: {"geometry_status":"VERIFIED"|"UNRESOLVED", "frames":['
             '{"idx":1,"visible":true|false,"p1":{"x":0.0,"y":0.0}|null,'
-            '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low"}],'
+            '"p2":{"x":0.0,"y":0.0}|null,"confidence":"high"|"medium"|"low",'
+            '"field_side_visible":true|false,"field_side":{"x":0.0,"y":0.0}|null,'
+            '"field_side_confidence":"high"|"medium"|"low"}],'
+            '"field_side_protocol":"VISIBLE_PLAYABLE_PITCH_V1",'
             '"ball_evidence":[{"idx":1,"ball_visible":true|false,'
             '"relation":"FIELD_SIDE"|"ON_OR_STRADDLING_LINE"|"BEYOND_LINE_INSIDE_MOUTH"|'
             '"OCCLUDED_GOAL_MOUTH"|"OTHER"|"UNRESOLVED",'
@@ -872,6 +906,14 @@ async def read_goal_scene_evidence(api_key: str, session_id: str,
         audit = _model_audit(text, prompt, [p for p, _ in pairs], [ms for _, ms in pairs])
         times = [ms for _, ms in pairs]
         result = parse_goal_scene_response(text, times, audit)
+        # This reader requested pitch-side observations in the same image
+        # pass. Missing fields stay missing; they do not trigger another model
+        # to redraw the geometry. Legacy/custom providers retain their adapter.
+        if "field_side_source" not in result:
+            result.update(field_side_status="UNRESOLVED", field_side_by_ms=[],
+                field_side_source="SHARED_GOAL_SCENE_PLAYABLE_PITCH",
+                field_side_model_audit={"audit_ref": "model_review_audit"},
+                field_side_reason="FIELD_SIDE_VISIBILITY_INSUFFICIENT")
         if isinstance(sequence_context, dict) and sequence_context.get("source") == sequence_observation_context.SOURCE:
             parsed = _extract_json(text)
             result["outcome_explanations"] = sequence_observation_context.outcome_explanations(parsed, times)
@@ -1035,7 +1077,8 @@ def _action_pixel_response(parsed, media_ms):
             "protocol_errors": sorted(set(errors))}
 
 
-async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_candidates=None, sequence_context=None):
+async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_candidates=None, sequence_context=None,
+                                     selected_reference=None):
     """Locate visible pixels for independent re-detection/crop review only."""
     import hashlib
     if not paths or len(paths) != len(media_ms):
@@ -1074,22 +1117,134 @@ async def read_action_pixel_evidence(api_key, session_id, paths, media_ms, body_
               'and "review_requests":[{"idx":1,"question":"CONTACT|RECEIVER|SHOT|OUTCOME|IDENTITY|BALL_REAPPEARANCE","direction":"BEFORE|AFTER|AROUND"}]. '
               'Only supplied image indices and body labels are valid. No expected action count, event time or shirt number is given. '
               'Keep the ordinary frame rows and pixel boxes in the same response.')
+    refs = (selected_reference or {}).get("images") or []
+    if refs:
+        prompt = prompt.replace("No selected player, jersey number, action label or expected result is supplied.",
+                                "No expected action label, number or result is supplied.")
+        prompt = prompt.replace("Do not infer identity, a pass, a shot, a goal, an assist, ball ownership or an outcome.",
+                                "Do not infer a pass, a shot, a goal, an assist, ball ownership or an outcome.")
+        prompt += (f"\nAFTER the {len(paths)} chronological images are {len(refs)} reference crops "
+            "of the one player selected by the user from this source video. These are not extra timeline images. "
+            "Compare that individual with the outlined bodies, including when the shirt number is hidden. "
+            "Use hair, build, socks, boots and sleeves; kit colour alone cannot distinguish teammates. "
+            "Do not let the action story determine who the player is. Do not guess digits. "
+            'Optionally add "target_observations":[{"idx":1,"body_id":"body_1",'
+            '"confidence":"high","features":["hair","build","socks","boots","sleeves"]}]. '
+            'Use confidence "high", "medium" or "low". '
+            "List only features actually compared in the pixels. Return [] when indistinguishable.")
     try:
         chat = LlmChat(api_key=api_key, session_id=session_id,
                        system_message=("Inspect pixels and temporal sequences. Separate hypotheses from observations. Return strict JSON."
                                        if reasoning else "Inspect visible pixel locations only. Return strict JSON.")).with_model(VERIFY_PROVIDER, VERIFY_MODEL).with_params(timeout=VERIFY_REQUEST_TIMEOUT_S, num_retries=0, max_retries=0)
         response = await asyncio.wait_for(chat.send_message(UserMessage(
-            text=prompt, file_contents=[ImageContent(image_base64=_b64(p)) for p in paths])), timeout=90)
+            text=prompt, file_contents=[*[ImageContent(image_base64=_b64(p)) for p in paths],
+                                      *[ImageContent(image_base64=b) for b in refs]])), timeout=90)
         raw = response if isinstance(response, str) else getattr(response, "text", None) or str(response)
         parsed = _extract_json(raw)
         return {**_action_pixel_response(parsed, media_ms),
+                "target_observations": _target_observations(parsed, media_ms, body_candidates) if refs else [],
                 **({"sequence_reasoning": sequence_observation_context.parse_reasoning(parsed, media_ms, body_candidates)} if reasoning else {}),
                 "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
                 "raw_response": raw[:50000], "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
-                "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)).hexdigest()}
+                "input_sha256": hashlib.sha256(prompt.encode() + b"".join(Path(p).read_bytes() for p in paths)
+                                                + b"".join(base64.b64decode(b) for b in refs)).hexdigest()}
     except Exception as exc:
         return {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
                 "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER}
+
+
+_DEFAULT_ACTION_PIXEL_READER = read_action_pixel_evidence
+
+
+async def read_action_video_evidence(api_key, session_id, clip_path, media_ms, body_candidates,
+                                     sequence_context=None, selected_reference=None):
+    """One motion read supplies identity, action roles and pixel search proposals."""
+    timeline = [{"idx": i+1, "source_ms": ms,
+                 "views": (row.get("source_roi") or {}).get("views"),
+                 "bodies": [b["body_id"] for b in row.get("bodies") or []]}
+                for i, (ms, row) in enumerate(zip(media_ms, body_candidates))]
+    prompt = (
+        "Review the complete chronological football video, including buildup and aftermath. "
+        "Its frame labels are source-video milliseconds. Playback is deliberately slowed: each source view lasts one second, "
+        "Source sampling is variable: an overview plus closer views around possible contacts. "
+        "Use the exact source-index map for elapsed time. Playback seconds are NOT source time. "
+        "The upload may be sped up; source milliseconds do not establish real-world running or ball speed. "
+        "When two panels are present, OVERVIEW retains the entire source image and DETAIL enlarges a measured body "
+        "at the SAME source instant. DETAIL may reframe between views: use OVERVIEW for travel and continuity. "
+        "A detail body is a search choice, not a confirmed target. Ball boxes must use the entire displayed canvas "
+        "coordinates, inside one of the supplied canvas_roi panels. Never connect the duplicate ball views as two balls. "
+        "Use only the supplied integer frame indices in your answer. Body labels follow measured tracks; "
+        "they are not shirt numbers. Some body labels disappear during overlaps; use labels from clear frames to track the person "
+        "through the play, and cite the actual labelled evidence frames. A local track label can switch people: compare the pixels, not just the label. "
+        "Compare the selected player's reference crops using hair, build, "
+        "socks, boots and sleeves even when the shirt number is hidden. Kit colour alone cannot identify a teammate. "
+        "Keep passer, receiver and finisher separate. Follow each active-ball sequence forward from the pass "
+        "and backward from the outcome. A player leaving the picture after his pass does not erase that pass. "
+        "A briefly hidden ball can reappear; describe the visible before/after evidence rather than inventing its hidden path. "
+        "continuous_visible_sequence means the same uninterrupted play, not that the ball must be visible in every frame. "
+        "For a goal identify the active ball inside the goal after the strike, excluding stationary spare balls; "
+        "keeper gaze or celebration alone is not enough. For a save identify the keeper intervention and subsequent ball movement. "
+        "Report visible actions and their outcome; don't replace an observed pass by the receiver's shot. "
+        "No expected event count, event times, shirt number or result is provided. "
+        "For every input frame return a frames row; empty ball proposals are fine. Ball boxes use the displayed video coordinates. "
+        "Mark active_ball=true only for the ball followed in the current play, not stationary spares. "
+        "For visible ball-foot/body contact or clear ball control, also supply control_body_id and control_visible=true. "
+        "This needs a visible ball at that body, not gaze, proximity alone or the action label. Otherwise use null/false. "
+        "Select only visibly exposed jersey bodies for separate digit reading; do not guess digits. "
+        "Return JSON: {\"reviewed_entire_clip\":true,\"frames\":[{\"idx\":1,\"balls\":[{\"box\":{\"x\":0,\"y\":0,\"w\":0.01,\"h\":0.01},\"confidence\":\"high\",\"active_ball\":true,\"control_body_id\":null,\"control_visible\":false}],\"selected_body_ids\":[]}],"
+        "\"target_observations\":[{\"idx\":1,\"body_id\":\"body_1\",\"confidence\":\"high\",\"features\":[\"hair\",\"boots\"]}],"
+        "\"actions\":[{\"kind\":\"PASS|CROSS|SHOT|RECEIVE|CARRY|DRIBBLE|DUEL|RUN|OTHER\","
+        "\"start_idx\":1,\"contact_idx\":2,\"end_idx\":3,\"actor_body_id\":\"body_1\",\"actor_evidence_indices\":[1,2],"
+        "\"contact_visibility\":\"VISIBLE|PARTIAL|OCCLUDED|UNKNOWN\",\"foot\":\"LEFT|RIGHT|UNKNOWN\","
+        "\"outcome\":\"GOAL|SAVED|BLOCKED|OFF_TARGET|COMPLETED|INCOMPLETE|TEAMMATE_SHOT|TEAMMATE_GOAL|UNKNOWN\","
+        "\"outcome_visible\":true,\"outcome_idx\":null,\"receiver_body_id\":null,\"receiver_idx\":null,"
+        "\"finisher_body_id\":null,\"shot_idx\":null,\"continuous_visible_sequence\":true,"
+        "\"outcome_evidence_indices\":[],\"details\":[\"visible evidence\"]}]}. "
+        "Use null when a contact/role/outcome was not observed. For a teammate goal include receiver, finisher, shot and outcome indices. "
+        "If the shared context specifies a requested_search, inspect that missing connection in the supplied play. "
+        "The search question is not an expected answer: report a pass without a subsequent shot or an unsuccessful outcome when visible. "
+        "Only list target matches actually distinguishable in the source pixels. "
+        "Source-index map: " + json.dumps(timeline, separators=(",", ":"))
+        + "\nShared measured context (not an expected action story): "
+        + json.dumps(sequence_observation_context.motion_reader_context(sequence_context), separators=(",", ":"))
+    )
+    with tempfile.TemporaryDirectory(prefix="motion_references_") as directory:
+        refs = []
+        for i, data in enumerate((selected_reference or {}).get("images") or []):
+            path = Path(directory)/f"reference_{i}.jpg"
+            path.write_bytes(base64.b64decode(data))
+            refs.append(str(path))
+        result = await video_model_input.read_video(api_key, session_id, prompt, clip_path, refs,
+                                                   timeout_s=video_model_input.VIDEO_TIMEOUT_S, source_clock=media_ms)
+    raw = video_model_input.response_text(result)
+    parsed = _extract_json(raw)
+    return {**_action_pixel_response(parsed, media_ms),
+            "clip_review_complete": (parsed or {}).get("reviewed_entire_clip") is True,
+            "target_observations": _target_observations(parsed, media_ms, body_candidates) if refs else [],
+            "video_actions": (parsed or {}).get("actions") if isinstance((parsed or {}).get("actions"), list) else [],
+            "sequence_reasoning": {"review_requests": sequence_observation_context.motion_review_requests(parsed, media_ms, body_candidates),
+                                   "canonical_authority": False},
+            "observation_protocol": "SOURCE_INDEXED_MOTION_CLIP_V1",
+            "provider": "gemini", "model": video_model_input.MODEL, "video_input": result["video_input"],
+            "raw_response": raw[:262144], "response_sha256": hashlib.sha256(raw.encode()).hexdigest(),
+            "input_sha256": hashlib.sha256((prompt+result["video_input"]["model_video_sha256"]+
+                "".join(result["video_input"]["reference_sha256"])).encode()).hexdigest()}
+
+
+def _target_observations(parsed, times, manifest):
+    result = []
+    rows = parsed.get("target_observations") if isinstance(parsed, dict) else None
+    by_ms = {r["media_ms"]: {b["body_id"] for b in r.get("bodies") or []} for r in manifest or []}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or type(row.get("idx")) is not int or not 1 <= row["idx"] <= len(times):
+            continue
+        ms = times[row["idx"]-1]
+        if not isinstance(row.get("body_id"), str) or row["body_id"] not in by_ms.get(ms, set()):
+            continue
+        features = row.get("features")
+        result.append({"media_ms": ms, "body_id": row["body_id"], "confidence": row.get("confidence"),
+                       "features": [f for f in features if isinstance(f, str)] if isinstance(features, list) else []})
+    return result
 
 
 def _outline_search_bodies(image, candidates):
@@ -1136,8 +1291,72 @@ def _native_search_box(box, roi):
     if not _valid_box(box):
         return None
     box = {k: float(box[k]) for k in ("x", "y", "w", "h")}
+    if roi.get("views"):
+        matches = [v for v in roi["views"] if all(_valid_box(v.get(k)) for k in ("canvas_roi", "source_roi"))
+            and v["canvas_roi"]["x"] <= box["x"] and v["canvas_roi"]["y"] <= box["y"]
+            and box["x"]+box["w"] <= v["canvas_roi"]["x"]+v["canvas_roi"]["w"]+1e-9
+            and box["y"]+box["h"] <= v["canvas_roi"]["y"]+v["canvas_roi"]["h"]+1e-9]
+        if len(matches) != 1:
+            return None
+        view = matches[0]; viewport = view["canvas_roi"]
+        local = {"x": (box["x"]-viewport["x"])/viewport["w"],
+                 "y": (box["y"]-viewport["y"])/viewport["h"],
+                 "w": box["w"]/viewport["w"], "h": box["h"]/viewport["h"]}
+        return _native_search_box(local, view["source_roi"])
     return {"x": roi["x"] + box["x"] * roi["w"], "y": roi["y"] + box["y"] * roi["h"],
             "w": box["w"] * roi["w"], "h": box["h"] * roi["h"]}
+
+
+def motion_search_view(image, frame, candidates, focus_track_id=None):
+    """Portrait overview plus a synchronized, measured-body detail pane.
+
+    Source-to-canvas maps keep model proposals bound to native pixels. The
+    entire source view, including a distant keeper/goal, is always retained.
+    No body detail is an identity decision and no pixels are synthesized.
+    """
+    height, width = image.shape[:2]
+    if height < 96 or height <= 1.5*width:
+        return _action_search_view(image, frame, candidates)
+    import numpy as np
+    detail_width = max(2, int(round(height*.4375)))
+    canvas_width = width+detail_width
+    canvas = np.zeros((height, canvas_width, 3), dtype=image.dtype)
+    canvas[:, :width] = _outline_search_bodies(image, candidates)
+    overview = {"x": 0., "y": 0., "w": width/canvas_width, "h": 1.}
+    views = [{"view_id": "OVERVIEW", "canvas_roi": overview,
+              "source_roi": {"x": 0., "y": 0., "w": 1., "h": 1.}}]
+    target = frame.get("global_target") or {}
+    tracks = [focus_track_id, target.get("local_track_id"), *(target.get("candidate_local_track_ids") or [])]
+    focus = next((c for track in tracks if track for c in candidates if c.get("local_track_id") == track), None)
+    if focus is None:
+        # A contact detail is useful even before target identification. A
+        # nearby native ball chooses the search body, never its causal role.
+        balls = [b for b in frame.get("ball_candidates") or [] if _valid_box(b.get("box"))]
+        if balls and candidates:
+            def proximity(c):
+                b = c["box"]; foot = (b["x"]+b["w"]/2, b["y"]+b["h"])
+                return min(((ball["box"]["x"]+ball["box"]["w"]/2-foot[0])*width/height)**2
+                    +(ball["box"]["y"]+ball["box"]["h"]/2-foot[1])**2 for ball in balls)/b["h"]**2
+            focus = min(candidates, key=proximity)
+    if focus:
+        b = focus["box"]
+        x0, x1 = max(0, int((b["x"]-.6*b["w"])*width)), min(width, int((b["x"]+1.6*b["w"])*width))
+        y0, y1 = max(0, int((b["y"]-.12*b["h"])*height)), min(height, int((b["y"]+1.25*b["h"])*height))
+        if x1 > x0 and y1 > y0:
+            # Letterbox the native crop: never stretch the player or feet.
+            scale = min(detail_width/(x1-x0), (height-64)/(y1-y0))
+            dw, dh = max(1, int((x1-x0)*scale)), max(1, int((y1-y0)*scale))
+            dx, dy = width+(detail_width-dw)//2, 64+(height-64-dh)//2
+            canvas[dy:dy+dh, dx:dx+dw] = cv2.resize(image[y0:y1, x0:x1], (dw, dh))
+            views.append({"view_id": "DETAIL", "body_id": focus["body_id"],
+                "canvas_roi": {"x": dx/canvas_width, "y": dy/height, "w": dw/canvas_width, "h": dh/height},
+                "source_roi": {"x": x0/width, "y": y0/height, "w": (x1-x0)/width, "h": (y1-y0)/height}})
+    cv2.putText(canvas, "OVERVIEW", (8, 56), cv2.FONT_HERSHEY_SIMPLEX, .7, (255,255,255), 2)
+    cv2.putText(canvas, "DETAIL "+(focus["body_id"] if focus else "unavailable"),
+                (width+8, 56), cv2.FONT_HERSHEY_SIMPLEX, .65, (255,255,255), 2)
+    displayed = [{**c, "box": {"x": c["box"]["x"]*overview["w"], "y": c["box"]["y"],
+                  "w": c["box"]["w"]*overview["w"], "h": c["box"]["h"]}} for c in candidates]
+    return canvas, {"x": 0., "y": 0., "w": 1., "h": 1., "views": views}, displayed
 
 
 def _native_ball_roi(detector, image, proposal):
@@ -1145,13 +1364,14 @@ def _native_ball_roi(detector, image, proposal):
     if not _valid_box(proposal):
         return [], None
     proposal = {key: float(proposal[key]) for key in ("x", "y", "w", "h")}
-    if proposal["w"] > .08 or proposal["h"] > .04:
+    if proposal["w"] > .25 or proposal["h"] > .15:
         return [], None
     import dense_track_refinement
     height, width = image.shape[:2]
     cx = (proposal["x"] + proposal["w"] / 2) * width
     cy = (proposal["y"] + proposal["h"] / 2) * height
-    half_w, half_h = max(.09 * width, 4 * proposal["w"] * width), max(.045 * height, 4 * proposal["h"] * height)
+    half_w = max(.09 * width, min(.18 * width, 4 * proposal["w"] * width))
+    half_h = max(.045 * height, min(.10 * height, 4 * proposal["h"] * height))
     x0, y0 = max(0, int(cx - half_w)), max(0, int(cy - half_h))
     x1, y1 = min(width, int(cx + half_w)), min(height, int(cy + half_h))
     if x1 - x0 < 16 or y1 - y0 < 16:
@@ -1178,9 +1398,18 @@ def corroborate_ball_pixels(detector, image, proposal):
         return []
     proposal = {key: float(proposal[key]) for key in ("x", "y", "w", "h")}
     balls, _roi = _native_ball_roi(detector, image, proposal)
-    return [{**ball, "source": "NATIVE_REVIEW_ROI_DETECTOR", "pixel_corroborated": True,
+    precise = [{**ball, "source": "NATIVE_REVIEW_ROI_DETECTOR", "pixel_corroborated": True,
              "proposal_box": deepcopy(proposal)} for ball in balls
             if goal_review_scheduler._iou(ball["box"], proposal) >= .20]
+    if precise:
+        return precise
+    inside = [b for b in balls if proposal["x"] <= b["box"]["x"]+b["box"]["w"]/2 <= proposal["x"]+proposal["w"]
+              and proposal["y"] <= b["box"]["y"]+b["box"]["h"]/2 <= proposal["y"]+proposal["h"]]
+    if len(inside) != 1:
+        return []
+    return [{**inside[0], "source": "NATIVE_REVIEW_ROI_DETECTOR", "pixel_corroborated": True,
+             "proposal_box": deepcopy(proposal), "search_roi": _roi,
+             "proposal_corroboration": "UNIQUE_NATIVE_BALL_INSIDE_SEARCH_REGION"}]
 
 
 def _active_ball_link(review, reference):
@@ -1213,7 +1442,94 @@ class ShadowVisionProviders:
         self.role_calls = 0
         self.goal_calls = 0
         self._native_goal_detector = None
+        self._native_goal_session = None
         self._native_video_fingerprint = None
+        self._selected_reference = None
+        self._reference_gallery = None
+
+    def bind_selected_reference(self, authority):
+        """Prepare source pixels once; never require an OCR bootstrap to re-ID."""
+        self._selected_reference = None
+        self._reference_gallery = None
+        taps = {r["media_ms"]: r for r in (authority or {}).get("target_points") or []
+                if type(r.get("media_ms")) is int and _valid_box(r.get("box"))
+                and r.get("tap_authority") is True and r.get("proof_eligible") is True
+                and r.get("primary_source") == "USER_TAP"}
+        if not taps or not getattr(self, "video_path", None):
+            return self
+        # Keep the existing user views across scene cuts. Source quality and
+        # visible variation select references; no digit bootstrap is needed.
+        times = sorted(taps)
+        decoded = _read_frames(self.video_path, times)
+        images, evidence, features = [], [], []
+        for ms in times:
+            got = decoded.get(ms)
+            if not got or abs(got[0]-ms) > 20:
+                continue
+            actual, image = got; b = taps[ms]["box"]; h, w = image.shape[:2]
+            x0, y0 = max(0, math.ceil(b["x"]*w)), max(0, math.ceil(b["y"]*h))
+            x1, y1 = min(w, math.floor((b["x"]+b["w"])*w)), min(h, math.floor((b["y"]+b["h"])*h))
+            crop = image[y0:y1, x0:x1]
+            if crop.size == 0:
+                continue
+            import player_selection
+            mask = player_selection.decode_mask(taps[ms].get("visible_mask"))
+            if mask is not None:
+                mask = cv2.resize(mask, (x1-x0, y1-y0), interpolation=cv2.INTER_NEAREST)
+                crop = crop.copy()
+                crop[mask == 0] = 128
+            ok, encoded = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            if ok:
+                images.append(base64.b64encode(encoded.tobytes()).decode())
+                evidence.append(int(actual))
+                grey = cv2.cvtColor(cv2.resize(crop, (24, 48), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+                small = cv2.resize(grey, (8, 12), interpolation=cv2.INTER_AREA).astype(float)
+                contrast = float(small.std())
+                features.append({"sharpness": float(cv2.Laplacian(grey, cv2.CV_64F).var()),
+                    "native_height_px": crop.shape[0], "aspect": crop.shape[1]/crop.shape[0],
+                    "descriptor": ((small-small.mean())/max(16., contrast)).round(3).ravel().tolist()})
+        if images:
+            path = Path(self.video_path)
+            with path.open("rb") as handle:
+                sha = hashlib.file_digest(handle, "sha256").hexdigest()
+            self._selected_reference = {"source": "USER_SELECTED_SOURCE_PIXELS", "source_video_sha256": sha,
+                "evidence_ms": evidence, "images": images, "_reference_descriptors": features,
+                "input_sha256": hashlib.sha256(b"".join(base64.b64decode(b) for b in images)).hexdigest()}
+            self._reference_gallery = deepcopy(self._selected_reference)
+            self._selected_reference = self._reference_for_window({"start_ms": evidence[0], "end_ms": evidence[-1]})
+        return self
+
+    def _reference_for_window(self, job):
+        gallery = self._reference_gallery or self._selected_reference
+        if not gallery:
+            return None
+        result = deepcopy(gallery)
+        times, images = result.get("evidence_ms") or [], result.get("images") or []
+        features = result.pop("_reference_descriptors", [])
+        if len(times) == len(images) and len(times) > 3:
+            center = (job["start_ms"]+job["end_ms"])/2
+            if len(features) == len(times):
+                sharp_max = max(math.log1p(r["sharpness"]) for r in features)
+                quality = [.8*math.log1p(r["sharpness"])/max(1., sharp_max)
+                           +.2*min(1., r["native_height_px"]/240) for r in features]
+                good = [i for i in range(len(times)) if quality[i] >= max(quality)*.5]
+                chosen = [min(good, key=lambda i: (abs(times[i]-center), -quality[i], times[i]))]
+                def diversity(i):
+                    a = features[i]
+                    return min(min(1., sum(abs(x-y) for x,y in zip(a["descriptor"], features[j]["descriptor"]))
+                        /max(1, len(a["descriptor"])) +abs(a["aspect"]-features[j]["aspect"])) for j in chosen)
+                while len(chosen) < 3:
+                    chosen.append(max((i for i in range(len(times)) if i not in chosen), key=lambda i: (
+                        .5*diversity(i)+.3*quality[i]+.2/(1+abs(times[i]-center)/5000), -times[i])))
+                chosen.sort()
+                result["selection_strategy"] = "SOURCE_QUALITY_DIVERSITY_PROXIMITY"
+            else:
+                chosen = sorted(sorted(range(len(times)), key=lambda i: (abs(times[i]-center), times[i]))[:3])
+                result["selection_strategy"] = "LEGACY_SOURCE_PROXIMITY"
+            result["evidence_ms"] = [times[i] for i in chosen]
+            result["images"] = [images[i] for i in chosen]
+            result["input_sha256"] = hashlib.sha256(b"".join(base64.b64decode(b) for b in result["images"])).hexdigest()
+        return {**result, "global_target_id": "GLOBAL_TARGET", "number_required": False}
 
     def _native_goal_context(self):
         import dense_track_refinement as dense
@@ -1222,6 +1538,9 @@ class ShadowVisionProviders:
         detector = self._native_goal_detector
         if detector is None or not getattr(detector, "ok", False):
             return None
+        if self._native_goal_session is None:
+            self._native_goal_session = dense.NativeDetectionSession()
+        self._native_goal_session.detector = detector
         path = Path(self.video_path)
         st = path.stat()
         key = (str(path.resolve()), st.st_size, st.st_mtime_ns)
@@ -1231,7 +1550,10 @@ class ShadowVisionProviders:
             self._native_video_fingerprint = (key, digest)
 
         def detect_frame(image, proposal):
-            people, balls = dense._detect_dense_people_and_ball(detector, image)
+            # Gap search and reappearance validation often revisit identical
+            # pixels. Reuse only raw native proposals; each path/actor decision
+            # is still computed from its own measured contact and source PTS.
+            people, balls, _support = self._native_goal_session.detect(image)
             local, _roi = _native_ball_roi(detector, image, proposal)
             return people, [*balls, *local]
 
@@ -1337,18 +1659,29 @@ class ShadowVisionProviders:
                 "status": "UNRESOLVED", "reason": "NATIVE_GOAL_REAPPEARANCE_MEASUREMENT_FAILED"})
 
     def action_evidence_provider(self, video_path, job, dense_frames):
-        requested = action_evidence_review.frame_times(job, dense_frames)
+        temporal = read_action_pixel_evidence is _DEFAULT_ACTION_PIXEL_READER
+        reference = self._reference_for_window(job)
+        sampling = action_evidence_review.motion_sampling_plan(job, dense_frames) if temporal else None
+        requested = (sampling["media_ms"] if temporal else
+                     action_evidence_review.frame_times(job, dense_frames))
         if len(requested) < 2:
             return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_FRAMES_UNAVAILABLE", "frames": []}
         source_frames = {f["media_ms"]: f for f in dense_frames if f.get("media_ms") in requested
                     and f.get("scene_id") == job["scene_id"] and not f.get("cut_barrier")
                     and not f.get("used_fallback") and f.get("time_authority") == "ACTUAL_MEDIA_PTS"}
         body_labels = sequence_observation_context.labels(dense_frames)
-        measured = {ms: action_evidence_review.measured_body_candidates(f, body_labels=body_labels) for ms, f in source_frames.items()}
+        candidate_reader = action_evidence_review.motion_body_candidates if temporal else action_evidence_review.measured_body_candidates
+        measured = {ms: candidate_reader(f, body_labels=body_labels) for ms, f in source_frames.items()}
         context = job.get("sequence_context") or sequence_observation_context.build(job, dense_frames, times=requested)
-        search_geometry = {ms: [p.get("box") for p in f.get("players") or []] for ms, f in source_frames.items()}
+        search_geometry = {ms: {"players": [p.get("box") for p in f.get("players") or []],
+            "balls": [b.get("box") for b in f.get("ball_candidates") or []],
+            "target": {k: (f.get("global_target") or {}).get(k) for k in ("local_track_id", "candidate_local_track_ids")},
+            "focus_track_id": job.get("focus_track_id")} for ms, f in source_frames.items()}
         body_hash = hashlib.sha256(json.dumps([measured, search_geometry], sort_keys=True).encode()).hexdigest()
-        cache_key = (str(video_path), job["inspection_id"], tuple(requested), body_hash, context.get("fingerprint"))
+        cache_key = ("MOTION_V2" if temporal else "PIXELS", str(video_path), tuple(requested), body_hash,
+                     hashlib.sha256(json.dumps(sequence_observation_context.motion_reader_context(context), sort_keys=True).encode()).hexdigest()
+                     if temporal else context.get("fingerprint"),
+                     (reference or {}).get("input_sha256"))
         if cache_key in self._inspection_cache:
             return deepcopy(self._inspection_cache[cache_key])
         feedback = job.get("phase") == "FEEDBACK"
@@ -1362,6 +1695,8 @@ class ShadowVisionProviders:
         images = {}
         with tempfile.TemporaryDirectory(prefix="action_pixels_") as directory:
             paths, times, body_manifest, search_rois = [], [], [], {}
+            # Keep the whole portrait scene. A separately mapped detail pane
+            # may follow a measured body without replacing the camera view.
             for index, requested_ms in enumerate(requested):
                 got = decoded.get(requested_ms)
                 if not got or got[0] in images:
@@ -1371,31 +1706,57 @@ class ShadowVisionProviders:
                     continue
                 path = Path(directory) / f"pixels_{index:03d}.jpg"
                 candidates = measured.get(actual_ms, [])
-                view, roi, displayed = _action_search_view(image, source_frames.get(actual_ms, {}), candidates)
+                view, roi, displayed = (motion_search_view(image, source_frames.get(actual_ms, {}), candidates,
+                    job.get("focus_track_id")) if temporal else
+                    _action_search_view(image, source_frames.get(actual_ms, {}), candidates))
                 if _write_jpg(path, view):
                     paths.append(str(path)); times.append(int(actual_ms)); images[int(actual_ms)] = image
                     search_rois[int(actual_ms)] = roi
-                    body_manifest.append({"media_ms": int(actual_ms), "source_roi": roi, "bodies": displayed})
+                    body_manifest.append({"media_ms": int(actual_ms), "source_roi": roi, "bodies": displayed,
+                                          "source_bodies": candidates})
             if len(paths) < 2:
                 return {"status": "UNRESOLVED", "reason": "ACTION_INSPECTION_DECODE_INSUFFICIENT", "frames": []}
             self.inspection_calls += 1
             self.feedback_inspection_calls += int(feedback)
             try:
-                kwargs = {"body_candidates": body_manifest}
-                if "sequence_context" in inspect.signature(read_action_pixel_evidence).parameters:
-                    kwargs["sequence_context"] = context
-                review = support_vision_runner.run_support_vision(read_action_pixel_evidence, [(
-                    (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}-{self.inspection_calls}", paths, times), kwargs)],
-                    deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="action_pixels")[0]
+                if temporal:
+                    clip_path = Path(directory)/"motion.mp4"
+                    clip_manifest = video_model_input.write_motion_clip(paths, times, clip_path,
+                        max_dimension=1920 if any(r.get("views") for r in search_rois.values()) else 1280)
+                    clip_manifest["sampling_plan"] = {k: v for k, v in sampling.items() if k != "media_ms"}
+                    review = support_vision_runner.run_support_vision(read_action_video_evidence, [(
+                        (self.api_key, f"{self.session_prefix}-motion-{job['inspection_id']}", str(clip_path), times, body_manifest),
+                        {"sequence_context": context, "selected_reference": reference})],
+                        deadline_s=video_model_input.VIDEO_TIMEOUT_S + 5 + support_vision_runner.DEADLINE_MARGIN_S,
+                        label="action_video")[0]
+                    review["motion_clip"] = clip_manifest
+                else:
+                    kwargs = {"body_candidates": body_manifest}
+                    if "sequence_context" in inspect.signature(read_action_pixel_evidence).parameters:
+                        kwargs["sequence_context"] = context
+                    if "selected_reference" in inspect.signature(read_action_pixel_evidence).parameters:
+                        kwargs["selected_reference"] = reference
+                    review = support_vision_runner.run_support_vision(read_action_pixel_evidence, [(
+                        (self.api_key, f"{self.session_prefix}-pixels-{job['inspection_id']}-{self.inspection_calls}", paths, times), kwargs)],
+                        deadline_s=90 + support_vision_runner.DEADLINE_MARGIN_S, label="action_pixels")[0]
             except Exception as exc:
                 review = {"status": "ERROR", "reason": "action_pixel_reader_error", "error_type": type(exc).__name__,
                           "frames": [], "model": VERIFY_MODEL, "provider": VERIFY_PROVIDER,
                           **support_vision_runner.fail_closed_diagnostic(exc)}
+        return self._apply_action_review(video_path, job, dense_frames, review, requested, times, images,
+                                         search_rois, measured, body_manifest, body_labels, context, cache_key, reference)
+
+    def _apply_action_review(self, video_path, job, dense_frames, review, requested, times, images,
+                             search_rois, measured, body_manifest, body_labels, context, cache_key, reference):
         import dense_track_refinement
-        detector = dense_track_refinement._default_detector()
+        if self._native_goal_detector is None:
+            self._native_goal_detector = dense_track_refinement._default_detector()
+        detector = self._native_goal_detector
         rows = []
+        visual_controls = []
         seen_indices = set()
-        for row in (review.get("frames") or [])[:action_evidence_review.MAX_ACTION_FRAMES]:
+        frame_limit = action_evidence_review.MAX_ACTION_VIDEO_FRAMES if review.get("motion_clip") else action_evidence_review.MAX_ACTION_FRAMES
+        for row in (review.get("frames") or [])[:frame_limit]:
             if not isinstance(row, dict) or not isinstance(row.get("idx"), int) or isinstance(row.get("idx"), bool):
                 continue
             index = row["idx"] - 1
@@ -1408,7 +1769,19 @@ class ShadowVisionProviders:
             for ball in proposals[:3]:
                 if isinstance(ball, dict) and ball.get("confidence") in {"high", "medium"}:
                     native_box = _native_search_box(ball.get("box"), search_rois[media_ms])
-                    balls.extend(corroborate_ball_pixels(detector, images[media_ms], native_box))
+                    if (review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1"
+                            and ball.get("active_ball") is True and ball.get("control_visible") is True
+                            and ball.get("confidence") == "high" and _valid_box(native_box)):
+                        body = next((c for c in measured.get(media_ms, [])
+                                     if c["body_id"] == ball.get("control_body_id")), None)
+                        if body:
+                            visual_controls.append({"media_ms": media_ms, "local_track_id": body["local_track_id"],
+                                "ball_box": native_box, "confidence": "high", "control_visible": True,
+                                "source": "SOURCE_VIDEO_VISIBLE_BALL_CONTROL"})
+                    measured_balls = corroborate_ball_pixels(detector, images[media_ms], native_box)
+                    if review.get("observation_protocol") == "SOURCE_INDEXED_MOTION_CLIP_V1" and ball.get("active_ball") is True:
+                        measured_balls = [{**b, "video_active_ball": True} for b in measured_balls]
+                    balls.extend(measured_balls)
             selected = row.get("selected_body_ids") if isinstance(row.get("selected_body_ids"), list) else []
             # A reader choice opens a crop request only. Coordinates and the
             # local body binding come from the exact measured source frame.
@@ -1451,7 +1824,14 @@ class ShadowVisionProviders:
                         "pixel_corroborated": True, "seed_media_ms": seed_ms, "seed_box": deepcopy(seed_box),
                         "search_roi": roi})
         rows = sorted(rows_by_time.values(), key=lambda row: row["media_ms"])
+        body_tracks = {label: track for track, label in body_labels.items()}
+        matches = [{**row, "local_track_id": body_tracks.get(row.get("body_id"))}
+                   for row in review.get("target_observations") or []]
         result = {**review, "frames": rows, "time_authority": "ACTUAL_MEDIA_PTS",
+                  "video_control_observations": visual_controls,
+                  "target_observations": matches,
+                  "selected_reference": {k: v for k, v in (reference or {}).items() if k != "images"},
+                  "source_video_sha256": context.get("source_video_sha256"),
                   "requested_media_ms": requested, "decoded_media_ms": times,
                   "native_neighbor_requested_ms": neighbor_requested,
                   "native_neighbor_decoded_ms": neighbor_actual,
@@ -1580,6 +1960,8 @@ class ShadowVisionProviders:
     def goal_geometry_provider(self, window: dict, strike: dict):
         if not self.api_key or not isinstance(strike, dict) or not _num(strike.get("media_ms")):
             return None
+        if not goal_review_sampling.has_contact_reference(strike, window):
+            return {"status": "UNRESOLVED", "reason": "CONTACT_BALL_REFERENCE_UNAVAILABLE", "line_by_ms": []}
         video_path = str(getattr(self, "video_path", "") or "")
         if not video_path:
             return None
@@ -1684,11 +2066,15 @@ class ShadowVisionProviders:
             native_audit = self._measure_goal_reappearance(review, review_path, images_by_ms)
             if native_audit is not None:
                 review["ball_reappearance_audit"] = native_audit
+        shared_field_side = {k: deepcopy(review[k]) for k in (
+            "field_side_status", "field_side_by_ms", "field_side_source",
+            "field_side_model_audit", "field_side_reason") if isinstance(review, dict) and k in review}
         rows = review.get("frames") or [] if isinstance(review, dict) else []
         link = _active_ball_link(review, reference) if requires_reference else None
         if not rows:
             result = {
                 "status": "UNRESOLVED",
+                **shared_field_side,
                 "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
                     "original_requested_ms": original_requested,"native_appearance_focus_used":dense_requested is None and requested!=original_requested,
                     "dense_native_coverage_used":dense_requested is not None,
@@ -1748,6 +2134,7 @@ class ShadowVisionProviders:
         )
         result = {
             "status": "VERIFIED" if (review or {}).get("geometry_status") == "VERIFIED" else "UNRESOLVED",
+            **shared_field_side,
             "sampling_audit": {"requested_ms": requested, "actual_ms": actual_times,
                 "original_requested_ms": original_requested,"native_appearance_focus_used":dense_requested is None and requested!=original_requested,
                     "dense_native_coverage_used":dense_requested is not None,
@@ -1808,7 +2195,13 @@ class ShadowVisionProviders:
     def bind_video_path(self, video_path: str):
         if str(video_path or "") != str(getattr(self, "video_path", "")):
             self._goal_cache.clear()
+            self._jersey_cache.clear()
+            self._role_cache.clear()
+            self._native_goal_session = None
             self._native_video_fingerprint = None
+            self._selected_reference = None
+            self._reference_gallery = None
+            self._inspection_cache.clear()
         self.video_path = str(video_path or "")
         return self
 

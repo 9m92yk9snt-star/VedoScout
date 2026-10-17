@@ -412,6 +412,11 @@ export default function PremiumReportV2({ report, assetBase, onDownloadPdf, down
           </div>
 
           {/* Row 2b — match stats / age comparison */}
+          {d.evidenceQualityNote && (
+            <p data-testid="v2-evidence-quality-note" className="mb-4 rounded-lg bg-[#EFF5EC] px-4 py-3 text-sm text-[#12402A]">
+              {d.evidenceQualityNote}
+            </p>
+          )}
           <div className={`grid gap-4 mb-4 ${d.matchStats ? "lg:grid-cols-2" : ""}`}>
             <MatchStatsCard matchStats={d.matchStats} coverageNote={d.matchStatsCoverage} />
             <AgeComparisonCard ageComparison={d.ageComparison} ageBracket={d.ageBracket} />

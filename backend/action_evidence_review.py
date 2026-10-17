@@ -16,6 +16,9 @@ import sequence_observation_context
 
 MAX_ACTION_REVIEWS = max(0, int(os.environ.get("FIX13_MAX_ACTION_REVIEWS", "16")))
 MAX_ACTION_FRAMES = 12
+MAX_CONTEXT_VIDEO_FRAMES = 65  # retain the complete eight-second overview
+MAX_DETAIL_VIDEO_FRAMES = 32
+MAX_ACTION_VIDEO_FRAMES = MAX_CONTEXT_VIDEO_FRAMES + MAX_DETAIL_VIDEO_FRAMES
 MAX_SEARCH_CONTEXT_MS = 8000
 MAX_FRAME_ALIGNMENT_MS = 20
 NATIVE_NEIGHBOR_RADIUS_MS = 120
@@ -80,11 +83,17 @@ def build_plan(windows, analysis, budget=None):
     groups = []
     for job in sorted(candidates, key=lambda j: j["center_ms"]):
         previous = next((old for old in groups if old["scene_id"] == job["scene_id"]
-                         and abs(old["center_ms"] - job["center_ms"]) <= 120), None)
+                         and (abs(old["center_ms"] - job["center_ms"]) <= 120
+                              or (old["dense_window_id"] == job["dense_window_id"]
+                                  and old["start_ms"] == job["start_ms"] and old["end_ms"] == job["end_ms"]
+                                  and len(old.get("search_centers_ms") or []) < 3))), None)
         if previous is None:
+            job["search_centers_ms"] = [job["center_ms"]]
             groups.append(job)
         else:
             previous["source_action_ids"].extend(job["source_action_ids"])
+            previous["search_centers_ms"] = sorted(set(previous["search_centers_ms"] + [job["center_ms"]]))
+            previous["has_contact_time"] = previous["has_contact_time"] or job["has_contact_time"]
     scenes = defaultdict(lambda: defaultdict(list))
     for job in groups:
         scenes[str(job["scene_id"])][job["center_ms"] // scheduler.TIME_CELL_MS].append(job)
@@ -115,6 +124,70 @@ def build_plan(windows, analysis, budget=None):
 
 def frame_times(job, frames):
     return sequence_observation_context.sampling_plan(job, frames, MAX_ACTION_FRAMES)["media_ms"]
+
+
+def motion_sampling_plan(job, frames):
+    """Keep the overview and spend a bounded supplement on contact details.
+
+    Search hints choose pixels only. All selected times belong to decoded source
+    frames; a higher requested cadence never invents missing frames or contacts.
+    """
+    available = sorted({f["media_ms"] for f in frames
+                        if sequence_observation_context.actual(f, job.get("scene_id"))
+                        and job["start_ms"] <= f["media_ms"] <= job["end_ms"]})
+    if len(available) < 2:
+        return {"media_ms": available, "focuses": [], "detail_frames": 0, "canonical_authority": False}
+    nearest = lambda t: min(available, key=lambda ms: (abs(ms-t), ms))
+    count = min(MAX_CONTEXT_VIDEO_FRAMES, max(2, math.ceil((available[-1]-available[0])/125)+1))
+    selected = {nearest(available[0]+(available[-1]-available[0])*i/(count-1)) for i in range(count)}
+    baseline = len(selected)
+    packet = job.get("sequence_context") or {}
+    contacts = [r for r in packet.get("verified_contacts") or [] if isinstance(r, dict)]
+    hints = list(job.get("search_centers_ms") or [])
+    if job.get("has_contact_time"):
+        hints.append(job.get("center_ms"))
+    native = sequence_observation_context.native_focuses(job,
+        [f for f in frames if _num(f.get("media_ms")) and available[0] <= f["media_ms"] <= available[-1]], limit=12)
+    focuses = []
+    for value in hints:
+        if (_num(value) and available[0] <= value <= available[-1]
+                and all(abs(value-old) >= 300 for old in focuses)):
+            focuses.append(nearest(value))
+        if len(focuses) == 4:
+            break
+    # Saved graphs can contain many early contacts (including irrelevant balls).
+    # Do not let chronological list order consume all four detail neighborhoods.
+    pool = [(r.get("media_ms"), 2*int(r.get("global_target_id") == "GLOBAL_TARGET")
+             +int(isinstance(r.get("contact_role"), dict) and r["contact_role"].get("role") == "RELEASE")) for r in contacts]
+    pool.extend((r["media_ms"], 1) for r in native)
+    while len(focuses) < 4:
+        eligible = [(nearest(ms), priority) for ms, priority in pool if _num(ms)
+            and available[0] <= ms <= available[-1] and all(abs(ms-old) >= 300 for old in focuses)]
+        if not eligible:
+            break
+        span = max(1, available[-1]-available[0])
+        def utility(row):
+            ms, priority = row
+            coverage = min(abs(ms-old) for old in focuses)/span if focuses else \
+                .5-abs(ms-(available[0]+available[-1])/2)/span
+            return coverage+.15*priority, -ms
+        focuses.append(max(eligible, key=utility)[0])
+    # Round-robin details around each focus: do not spend all frames on the
+    # first target touch and starve a receiver or a later finishing contact.
+    for offset in (0, -40, 40, -80, 80, -120, 120, -160, 160, -200, 200, -240, 240):
+        for center in focuses:
+            if len(selected) >= min(MAX_ACTION_VIDEO_FRAMES, baseline+MAX_DETAIL_VIDEO_FRAMES):
+                break
+            desired = center+offset
+            if available[0] <= desired <= available[-1]:
+                selected.add(nearest(desired))
+    return {"media_ms": sorted(selected), "focuses": focuses,
+            "detail_frames": len(selected)-baseline, "context_target_fps": 8,
+            "detail_target_fps": 25, "canonical_authority": False}
+
+
+def motion_frame_times(job, frames):
+    return motion_sampling_plan(job, frames)["media_ms"]
 
 
 def neighbor_times(seed_ms, frames, scene_id):
@@ -149,6 +222,19 @@ def _native_ball(ball):
                 and 0 < box["w"] <= .08 and 0 < box["h"] <= .04)
 
 
+def matches_ball_search(ball):
+    """A rough search rectangle need not have the ball's exact measured size."""
+    box, proposal = ball.get("box") or {}, ball.get("proposal_box") or {}
+    if scheduler._iou(box, proposal) >= .20:
+        return True
+    if ball.get("proposal_corroboration") != "UNIQUE_NATIVE_BALL_INSIDE_SEARCH_REGION":
+        return False
+    return bool(all(_num(b.get(k)) for b in (box, proposal) for k in ("x", "y", "w", "h"))
+                and 0 < proposal["w"] <= .25 and 0 < proposal["h"] <= .15
+                and proposal["x"] <= box["x"]+box["w"]/2 <= proposal["x"]+proposal["w"]
+                and proposal["y"] <= box["y"]+box["h"]/2 <= proposal["y"]+proposal["h"])
+
+
 def bind_body(frame, box):
     players = [p for p in frame.get("players") or [] if scheduler._iou(p.get("box"), box) >= .60]
     if len(players) != 1:
@@ -176,6 +262,24 @@ def measured_body_candidates(frame, *, body_labels=None):
              "local_track_id": p["local_track_id"]} for i, p in enumerate(bodies[:12])]
 
 
+def motion_body_candidates(frame, *, body_labels=None):
+    """Video body labels do not require an isolated, readable jersey crop.
+
+    An overlap can hide digits while the person remains visible in motion.
+    Measured local identity and visible-target comparison remain separate.
+    """
+    import unified_identity_authority as uia
+    bodies = [p for p in frame.get("players") or [] if isinstance(p.get("local_track_id"), str)
+        and p.get("association_state") == "VERIFIED_LOCAL" and uia._valid_box(p.get("box"))]
+    counts = defaultdict(int)
+    for p in bodies:
+        counts[p["local_track_id"]] += 1
+    return [{"body_id": (body_labels or {}).get(p["local_track_id"], p["local_track_id"]),
+        "local_track_id": p["local_track_id"], "box": deepcopy(p["box"]),
+        "number_crop_eligible": bind_body(frame, p["box"]) is p}
+        for p in sorted(bodies, key=lambda p: (p["box"]["x"], p["local_track_id"])) if counts[p["local_track_id"]] == 1]
+
+
 def apply_observations(frames, observations, inspection_id):
     """Copy only independently corroborated pixels, never model event labels."""
     result, requests = deepcopy(frames), []
@@ -183,7 +287,7 @@ def apply_observations(frames, observations, inspection_id):
     added = 0
     seeds = [(row, ball) for row in (observations or {}).get("frames") or [] for ball in row.get("ball_candidates") or []
              if ball.get("source") == "NATIVE_REVIEW_ROI_DETECTOR" and _native_ball(ball)
-             and scheduler._iou(ball.get("box"), ball.get("proposal_box")) >= .20
+             and matches_ball_search(ball)
              and any(f.get("media_ms") == row.get("media_ms") and f.get("scene_id") == row.get("scene_id")
                      and not f.get("used_fallback") and not f.get("cut_barrier")
                      and f.get("time_authority") == "ACTUAL_MEDIA_PTS" for f in result)]
@@ -218,7 +322,7 @@ def apply_observations(frames, observations, inspection_id):
                 continue
             if (ball.get("source") != "NATIVE_REVIEW_ROI_DETECTOR" or ball.get("pixel_corroborated") is not True
                     or not _num(ball.get("confidence"))
-                    or scheduler._iou(ball.get("box"), ball.get("proposal_box")) < .20):
+                    or not matches_ball_search(ball)):
                 rejected["BALL_NOT_CORROBORATED"] += 1
                 continue
             import dense_track_refinement

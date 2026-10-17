@@ -115,7 +115,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 # Bump this whenever PDF rendering changes (new sections, layout shifts, etc.).
 # Each PDF is cached on disk keyed by report_id + this version, so a bump
 # invalidates every stale PDF without losing the current ones.
-PDF_RENDER_VERSION = 26  # v26 = "Scout's First Impression" title (was Parent Summary)
+PDF_RENDER_VERSION = 27  # Remove template markers; show evidence coverage and score availability.
 
 
 def _pdf_cache_path(report_id: str, shared: bool = False) -> Path:
@@ -3423,6 +3423,22 @@ def extract_json(text: str) -> dict:
     raise ValueError(f"ALL_CANDIDATES_FAILED: tried {len(candidates)} candidate(s); last error: {last_err}. First 300 chars: {cleaned[:300]!r}")
 
 
+async def call_gemini_with_facts(session_id: str, prompt: str) -> dict:
+    """Write the existing dossier schema without another video/identity pass."""
+    import video_model_input
+    for attempt in range(2):
+        sid = session_id if attempt == 0 else session_id + "-json-retry"
+        chat = video_model_input.IsolatedTextChat(EMERGENT_LLM_KEY, sid, timeout_s=180.)
+        raw = await analysis_jobs.model_call(getattr(db, "analysis_model_calls", None), chat, prompt,
+            session_id=sid, video_path=None, prompt=prompt, timeout_s=210.)
+        try:
+            return extract_json(raw)
+        except ValueError:
+            if attempt:
+                raise
+            prompt = "Return ONLY one valid JSON object, without markdown.\n" + prompt
+
+
 async def call_gemini_with_video(
     session_id: str,
     prompt: str,
@@ -3439,68 +3455,35 @@ async def call_gemini_with_video(
     They go FIRST in file_contents so Gemini sees the player from every angle before
     being given the wide marker frame and full video.
     """
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=session_id,
-        system_message=(
+    import video_model_input
+    system_message = (
             "You are an experienced football scout. ALWAYS respond with valid JSON only. "
             "State visible actions precisely. Preserve uncertainty when identity, ball "
             "contact or the outcome is unclear; a missing observation is not a zero total. "
             "If the locked player is not visible, write OFF-CAMERA. Never describe a "
             "different player or invent proof to satisfy the response schema."
-        ),
-    ).with_model("gemini", "gemini-2.5-pro")
-
-    file_contents = []
+        )
+    reference_paths = []
     # Multi-anchor crops first — these are the same player at different moments
     if anchor_crops:
         for p in anchor_crops:
             try:
                 if p and Path(p).exists():
-                    file_contents.append(
-                        FileContentWithMimeType(file_path=p, mime_type="image/jpeg")
-                    )
+                    reference_paths.append(p)
             except Exception:
                 pass
     # Subject crop (legacy single-anchor) — only if no multi-anchor ensemble provided
     if not anchor_crops and crop_path and Path(crop_path).exists():
-        file_contents.append(
-            FileContentWithMimeType(file_path=crop_path, mime_type="image/jpeg")
-        )
+        reference_paths.append(crop_path)
     if marker_path and Path(marker_path).exists():
-        file_contents.append(
-            FileContentWithMimeType(file_path=marker_path, mime_type="image/jpeg")
-        )
+        reference_paths.append(marker_path)
     video_path = await asyncio.to_thread(_ensure_analysis_video, video_path)
-    video_file = FileContentWithMimeType(
-        file_path=video_path,
-        mime_type="video/mp4",
-    )
-    file_contents.append(video_file)
-
-    user_message = UserMessage(text=prompt, file_contents=file_contents)
-    # Hard wall-clock timeout to prevent the analysis pipeline from hanging
-    # indefinitely if Gemini stalls. 8 min gives generous headroom for a 1-min
-    # video while still failing fast enough to surface a "try again" state.
-    #
-    # We ALSO set litellm's own request-level timeout below (via chat.extra_params)
-    # so that httpx cancels the underlying network syscall, not just the asyncio
-    # future — some litellm versions don't respect asyncio.CancelledError
-    # cleanly if the HTTP request is buffering a large base64 body.
+    chat = video_model_input.IsolatedVideoChat(EMERGENT_LLM_KEY, session_id, video_path,
+        reference_paths, timeout_s=timeout_s, system_message=system_message)
+    user_message = prompt
+    # The adapter owns the SDK in a bounded child process, including request
+    # timeouts and disabled retries. Keep the existing durable model-call audit.
     try:
-        # LiteLLM accepts a `timeout` kwarg on acompletion — we plumb it via
-        # extra_params which _build_completion_params merges into the final call.
-        # Session 124: tightened from 240 → 150 s (httpx socket timeout) and
-        # 300 → 180 s (asyncio outer cancel) so worst-case retry is 6 min not 10.
-        # Session 134: that 150/180 default is for the SHORT calls (content gate,
-        # preview). The FULL-report call passes timeout_s=420 — the dossier prompt
-        # over a full match video takes 3-7 min and 180 s made every full report
-        # fail with "Generation was interrupted".
-        # temperature 0.0 → maximum determinism: the same video should
-        # produce the same scores run-to-run (score-stability requirement).
-        # NOTE: `seed` is NOT supported for gemini through the LLM proxy
-        # (verified Aug 5 2026 — UnsupportedParamsError) — do not re-add it.
-        chat.extra_params = {**(chat.extra_params or {}), "timeout": timeout_s, "temperature": 0.0}
         response = await analysis_jobs.model_call(
             getattr(db, "analysis_model_calls", None), chat, user_message, session_id=session_id,
             video_path=video_path, prompt=prompt, timeout_s=timeout_s + 30)
@@ -3563,17 +3546,15 @@ async def call_gemini_with_video(
         "end with `}`. No exceptions.\n\n"
         + prompt
     )
-    retry_chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"{session_id}-retry",
-        system_message=(
+    retry_chat = video_model_input.IsolatedVideoChat(
+        EMERGENT_LLM_KEY, f"{session_id}-retry", video_path, reference_paths,
+        timeout_s=timeout_s, system_message=(
             "You are an experienced football scout. Respond with a SINGLE "
             "valid JSON object — nothing else. No prose, no code fences, no "
             "commentary."
         ),
-    ).with_model("gemini", "gemini-2.5-pro")
-    retry_chat.extra_params = {"timeout": timeout_s, "temperature": 0.0}
-    retry_message = UserMessage(text=strict_prompt, file_contents=file_contents)
+    )
+    retry_message = strict_prompt
 
     # Session 124: retry-transparency — surface to the frontend that we are
     # doing a second attempt. The parent `analyze_preview_task` scope has the
@@ -9632,24 +9613,27 @@ async def generate_full_report_task(report_id: str) -> None:
                 logger.exception(f"movement/pace metrics failed for {report_id}")
 
         # ── Full-report prompt (shared verbatim with corrective-only recovery) ──
-        full_prompt = await _compose_full_prompt(
-            doc, audio_events_full, anchor_payload_list, crop_path_str,
-            _geometry_authority_track, gt_t_off,
-            event_ledger_obj=event_ledger_obj,
-            canonical_events=_unified_result.get("canonical_events") if isinstance(_unified_result, dict) else None)
-        # Phase B — Gemini full analysis ∥ movement/pace metrics (independent).
+        if isinstance(_unified_result, dict):
+            import report_fact_authority
+            full_prompt = report_fact_authority.assessment_prompt(FULL_REPORT_PROMPT,
+                _unified_result.get("canonical_events") or {}, doc.get("player_details") or {}, doc.get("content_gate") or {})
+            report_observation = call_gemini_with_facts(f"full-{report_id}", full_prompt)
+        else:
+            full_prompt = await _compose_full_prompt(
+                doc, audio_events_full, anchor_payload_list, crop_path_str,
+                _geometry_authority_track, gt_t_off, event_ledger_obj=event_ledger_obj)
+            report_observation = call_gemini_with_video(
+                session_id=f"full-{report_id}", prompt=full_prompt, video_path=str(file_path),
+                marker_path=marker_path, crop_path=crop_path_str,
+                anchor_crops=anchor_crops_full if anchor_crops_full else None, timeout_s=420.0)
+        # Phase B — report writing/assessment ∥ movement/pace metrics.
+        # Canonical actions are already resolved; this model cannot replace them.
+        await _trace(report_id, "report_synthesis_start")
         full, _mm_done = await asyncio.gather(
-            call_gemini_with_video(
-                session_id=f"full-{report_id}",
-                prompt=full_prompt,
-                video_path=str(file_path),
-                marker_path=marker_path,
-                crop_path=crop_path_str,
-                anchor_crops=anchor_crops_full if anchor_crops_full else None,
-                timeout_s=420.0,
-            ),
+            report_observation,
             _movement_pace_core(),
         )
+        await _trace(report_id, "report_synthesis_complete")
         full = scrub_hedging(full)
         if isinstance(_unified_result, dict):
             full = unified_analysis_engine.apply_result_to_report(full, _unified_result)
@@ -12283,7 +12267,7 @@ async def download_player_card(report_id: str, user=Depends(get_current_user)):
 
 # ============== SHAREABLE SNAPSHOT MOMENT CARD (PNG, 1080x1350) ==============
 
-SNAP_CARD_VERSION = 1
+SNAP_CARD_VERSION = 2  # Render evidence labels instead of position-based skill claims.
 _SNAP_KEYS = {"strength", "noticed", "hidden", "develop"}
 
 

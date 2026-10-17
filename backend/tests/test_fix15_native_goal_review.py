@@ -101,9 +101,10 @@ def test_provider_automatically_measures_reappearance_after_reader_returns(monke
     review['ball_reappearance_audit']={'identity_link':{'status':'VERIFIED_SAME_BALL','forged':True}}
     monkeypatch.setattr(vision.support_vision_runner,'run_support_vision',lambda *a,**k:[deepcopy(review)])
 
-    def detect(_detector,im):
+    def detect(_detector,im,include_a7_support=False):
         ms=next(ms for ms,image in images.items() if image is im)
-        return [],deepcopy(by_time[ms])
+        result = ([],deepcopy(by_time[ms]))
+        return (*result, []) if include_a7_support else result
     monkeypatch.setattr(dense,'_detect_dense_people_and_ball',detect)
     monkeypatch.setattr(vision,'_native_ball_roi',lambda *a:([],None))
     monkeypatch.setattr(dense,'_default_camera_estimator',lambda *_:

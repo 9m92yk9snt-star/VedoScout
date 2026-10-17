@@ -1106,13 +1106,15 @@ def _tap_continuity_support_recoveries(frames, contact_result, video_path,
                 continue
             _cx, _cy, seed, geometry = clustered[0]
             release_ms = int(release_frame["media_ms"])
+            detector_paths = _support_detector_paths(frames, release_frame, seed)
+            if not detector_paths:
+                continue  # No independently measured endpoint can use this flow.
             flow = _track_support_with_flow(
                 video_path, release_ms, seed["box"],
                 flow_frame_provider=flow_frame_provider,
             )
             if flow.get("status") != "VERIFIED_PATH":
                 continue
-            detector_paths = _support_detector_paths(frames, release_frame, seed)
             for detector_path in detector_paths:
                 strong = next((
                     node for node in detector_path["nodes"][1:]
@@ -1270,6 +1272,11 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
             continue
 
         seed = unambiguous[0]
+        paths = _support_detector_paths(frames, frame, seed["candidate"])
+        if not paths:
+            unresolved.append({"media_ms": media_ms, "reason": "NO_A3_REACQUISITION_DETECTOR_PATH",
+                               "mode": "EXACT_TARGET_SUPPORT_PATH"})
+            continue
         flow = _track_support_with_flow(
             video_path, media_ms, seed["candidate"]["box"],
             flow_frame_provider=flow_frame_provider,
@@ -1281,7 +1288,6 @@ def _exact_tap_support_recoveries(frames, contact_result, video_path, flow_frame
                 "mode": "EXACT_TARGET_SUPPORT_PATH",
             })
             continue
-        paths = _support_detector_paths(frames, frame, seed["candidate"])
         candidates = []
         for path in paths:
             strong = next(
@@ -1491,6 +1497,7 @@ def _exact_tap_measured_release_recoveries(
             and str(row.get("player_association_state") or "") != "HYPOTHESES"
         ]
         candidates = []
+        body_flow, ball_flow = None, None
         for release_row in release_rows:
             release_ms = int(release_row["media_ms"])
             release_frame = _frame_near(frames, release_ms, max_ms=25)
@@ -1499,12 +1506,14 @@ def _exact_tap_measured_release_recoveries(
             if _scene_cut_between(frames, anchor_ms, release_ms, frame.get("scene_id")):
                 continue
 
-            body_flow = _track_support_with_flow(
-                video_path, anchor_ms, actor["box"], flow_frame_provider=flow_frame_provider
-            )
-            ball_flow = _track_support_with_flow(
-                video_path, anchor_ms, anchor_ball["box"], flow_frame_provider=flow_frame_provider
-            )
+            # Every release candidate uses this same source/body/ball seed.
+            # A completed measurement can be shared; transient failures retry.
+            if body_flow is None or body_flow.get("status") != "VERIFIED_PATH":
+                body_flow = _track_support_with_flow(
+                    video_path, anchor_ms, actor["box"], flow_frame_provider=flow_frame_provider)
+            if ball_flow is None or ball_flow.get("status") != "VERIFIED_PATH":
+                ball_flow = _track_support_with_flow(
+                    video_path, anchor_ms, anchor_ball["box"], flow_frame_provider=flow_frame_provider)
             if body_flow.get("status") != "VERIFIED_PATH" or ball_flow.get("status") != "VERIFIED_PATH":
                 continue
             body_last = (body_flow.get("nodes") or [])[-1]

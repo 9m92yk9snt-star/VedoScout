@@ -484,9 +484,11 @@ def test_F29_rejected_interval_splits_burst():
 # ------------------------------ F30 — FIX06 path zero verifier (C03)
 
 def test_F30_fix06_path_zero_verifier():
+    import ast
     src = (BACKEND / "server.py").read_text()
-    body = src.split("async def _movement_pace_core", 1)[1]
-    body = body.split("full_prompt = await _compose_full_prompt", 1)[0]
+    function = next(n for n in ast.walk(ast.parse(src))
+                    if isinstance(n, ast.AsyncFunctionDef) and n.name == "_movement_pace_core")
+    body = ast.unparse(function)
     for token in ("_trusted_fastest_moment", "verify_frame_identity",
                   "call_gemini", "LlmChat"):
         assert token not in body, f"FIX06 movement path can invoke {token}"

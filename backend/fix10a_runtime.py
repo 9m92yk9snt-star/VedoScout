@@ -74,6 +74,7 @@ def _compact_physical_result(result: dict | None) -> dict:
         "evidence_feedback_plan": row.get("evidence_feedback_plan") or {},
         "goal_review_plan": row.get("goal_review_plan") or {},
         "cross_window_evidence": row.get("cross_window_evidence") or {},
+        "native_detection_cache": row.get("native_detection_cache") or {},
         "metrics": row.get("metrics") or {},
         "audit_storage_complete": row.get("audit_storage_complete"),
         "dense_traces_persisted_in_mongo": False,
@@ -197,6 +198,9 @@ async def run(*, report_id: str, video_path: str, unified_result: dict,
                     session_prefix,
                     str(video_path),
                 )
+                bind_reference = getattr(bundle, "bind_selected_reference", None)
+                if callable(bind_reference):
+                    await asyncio.to_thread(bind_reference, result.get("identity_authority") or {})
                 if jersey_vote_provider is None:
                     jersey_vote_provider = bundle.jersey_vote_provider
                 if goal_geometry_provider is None:

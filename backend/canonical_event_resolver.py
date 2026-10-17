@@ -197,6 +197,7 @@ def _receiver_team_resolution(scene_frames, chain, actor_local_track_id) -> dict
                 "media_ms": int(fr["media_ms"]),
                 "relation": relation,
                 "possession_status": pos.get("status"),
+                "source": pos.get("source"),
             })
         likely = sum(x["relation"] == "LIKELY_HOLDER" for x in evidence)
         return {
@@ -216,7 +217,7 @@ def _receiver_team_resolution(scene_frames, chain, actor_local_track_id) -> dict
         label = p.get("team")
         confidence = p.get("team_confidence")
         source = p.get("team_source")
-        if (source != fsg.TEAM_SOURCE or not _num(confidence)
+        if (source not in {fsg.TEAM_SOURCE, fsg.DENSE_TEAM_SOURCE} or not _num(confidence)
                 or float(confidence) < fsg.TEAM_LABEL_MIN_CONFIDENCE):
             continue
         if label not in {"target_team", "opponent", "other"}:
@@ -655,6 +656,8 @@ def _proof_payload(action, actor_resolution, causal) -> dict:
         "proof_eligible": bool(actor_resolution.get("proof_eligible")),
         "causal_verified": bool(causal.get("causal_verified")),
         "receiver_team_evidence": deepcopy(causal.get("receiver_team_resolution")),
+        **({"video_observation": deepcopy(action["video_observation"])}
+           if isinstance(action.get("video_observation"), dict) else {}),
     }
 
 
@@ -670,6 +673,21 @@ def _overlap_ratio(a, b) -> float:
     inter = max(0, hi - lo)
     den = max(1, min(int(a["end_ms"]) - int(a["start_ms"]), int(b["end_ms"]) - int(b["start_ms"])))
     return inter / den
+
+
+def has_motion_proof(event) -> bool:
+    """Shared qualification of an already resolved source-video observation.
+
+    Perception enters through video_observations and resolve_canonical_events;
+    downstream projections must not demand an additional physical certificate
+    for the same complete visual chain.
+    """
+    proof = event.get("proof") or {}
+    video = proof.get("video_observation") or {}
+    return bool(event.get("global_target_id") == GLOBAL_TARGET_ID
+        and event.get("causal_verified") is True and proof.get("proof_eligible") is True
+        and video.get("authority") == "TEMPORAL_VIDEO_OBSERVATION"
+        and all(video.get(k) for k in ("input_sha256", "response_sha256", "source_video_sha256", "clip_sha256")))
 
 
 def _same_real_action(a, b) -> bool:

@@ -413,7 +413,8 @@ def _likely_holder(frame, ball_box):
         return None
     return ranked[0][1]
 
-def _possession_transition(track_id, cur_frame, prev_frame, prev_ball, next_frame, next_ball, trajectory_score):
+def _possession_transition(track_id, cur_frame, prev_frame, prev_ball, next_frame, next_ball, trajectory_score,
+                           *, holder_lookup=None):
     if not isinstance(track_id, str):
         return {"score": 0.0, "kind": "UNRESOLVED", "before_holder": None, "after_holder": None}
     if prev_frame is None or prev_ball is None or next_frame is None or next_ball is None:
@@ -422,8 +423,10 @@ def _possession_transition(track_id, cur_frame, prev_frame, prev_ball, next_fram
     if frame_geometry.compatible_scale(cur_frame, prev_frame, next_frame) is None:
         return {"score": 0.0, "kind": "FRAME_GEOMETRY_UNAVAILABLE",
                 "before_holder": None, "after_holder": None}
-    before_holder = _likely_holder(prev_frame, prev_ball.get("box"))
-    after_holder = _likely_holder(next_frame, next_ball.get("box"))
+    before_holder = (holder_lookup(prev_frame, prev_ball) if holder_lookup is not None
+                     else _likely_holder(prev_frame, prev_ball.get("box")))
+    after_holder = (holder_lookup(next_frame, next_ball) if holder_lookup is not None
+                    else _likely_holder(next_frame, next_ball.get("box")))
     actor_key = _actor_identity_key(cur_frame, track_id) or f"LOCAL:{track_id}"
 
     # Exact local-id continuity is still hard physical evidence even when a
@@ -503,18 +506,34 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
     frames.sort(key=lambda f: int(f["media_ms"]))
     trajectory = [r for r in (ball_trajectory or []) if isinstance(r, dict) and _num(r.get("media_ms"))]
     trajectory.sort(key=lambda r: int(r["media_ms"]))
+    # These inputs stay unchanged throughout candidate generation. The holder
+    # is a property of a frame/ball pair, not of each player being considered.
+    # Keep the cache local: later identity/ball evidence must be evaluated anew.
+    holder_cache = {}
+    def holder_at(frame, ball):
+        key = (id(frame), id(ball))
+        if key not in holder_cache:
+            holder_cache[key] = _likely_holder(frame, ball.get("box"))
+        return holder_cache[key]
+
+    exact_frames = {}
+    for frame in frames:
+        exact_frames.setdefault(int(frame["media_ms"]), frame)
+    def frame_at(media_ms):
+        return exact_frames.get(int(media_ms)) or _frame_near(frames, media_ms)
+
     out = []
     for i, ball in enumerate(trajectory):
         if ball.get("state") not in {"MEASURED", "PREDICTED_SHORT_GAP"} or not _valid_box(ball.get("box")):
             continue
         media_ms = int(ball["media_ms"])
-        cur_frame = _frame_near(frames, media_ms)
+        cur_frame = frame_at(media_ms)
         if cur_frame is None:
             continue
         prev_ball = _nearest_trajectory_side(trajectory, i, -1)
         next_ball = _nearest_trajectory_side(trajectory, i, +1)
-        prev_frame = _frame_near(frames, prev_ball["media_ms"]) if prev_ball else None
-        next_frame = _frame_near(frames, next_ball["media_ms"]) if next_ball else None
+        prev_frame = frame_at(prev_ball["media_ms"]) if prev_ball else None
+        next_frame = frame_at(next_ball["media_ms"]) if next_ball else None
         has_both_sides = (
             prev_ball is not None and next_ball is not None
             and prev_frame is not None and next_frame is not None
@@ -533,7 +552,8 @@ def detect_contact_candidates(dense_frames, ball_trajectory) -> list[dict]:
             geometry = _best_lower_geometry(player, ball["box"], cur_frame)
             continuity = _player_continuity(track_id, prev_frame, cur_frame, next_frame)
             possession = _possession_transition(
-                track_id, cur_frame, prev_frame, prev_ball, next_frame, next_ball, trajectory_evidence["score"]
+                track_id, cur_frame, prev_frame, prev_ball, next_frame, next_ball, trajectory_evidence["score"],
+                holder_lookup=holder_at,
             )
             exact_time = (
                 ball.get("proof_eligible") is True

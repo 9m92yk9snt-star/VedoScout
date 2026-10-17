@@ -37,6 +37,40 @@ _ABSENCE_AS_WEAKNESS = re.compile(
     r"\b(?:weak(?:ness)?|poor|underdeveloped|not (?:yet )?developed|lacking|needs? (?:development|improvement)|svag(?:hed)?|ikke udviklet)\b", re.I)
 
 
+def assessment_prompt(template, canonical, player_details, content=None):
+    """Retain the report schema/rubric, removing the second perception task."""
+    import json
+    schema_start = template.index("Produce a JSON object EXACTLY in this format:")
+    schema_end = template.index("\nRULES FOR TOP-LEVEL", schema_start)
+    schema = template[schema_start:schema_end].replace("THE CIRCLED PLAYER", "the identified player")
+    rubric_start = template.index("🎯 BENCHMARK CALIBRATION")
+    rubric_end = template.index("🎯 PLAYER DETAILS", rubric_start)
+    rubric = template[rubric_start:rubric_end]
+    facts = [{k: deepcopy(e.get(k)) for k in ("event_id", "canonical_ms", "start_ms", "end_ms",
+              "canonical_event_type", "canonical_action_type", "canonical_outcome", "causal_verified",
+              "actor_local_track_id", "foot", "pressure", "details", "causal_chain")}
+             for e in (canonical or {}).get("events") or [] if (e.get("proof") or {}).get("proof_eligible") is True
+             and e.get("global_target_id") == "GLOBAL_TARGET"]
+    return (
+        "Write the full development report from this resolved observation packet. No video or images are attached. "
+        "Player identity and action roles have already been resolved: do not re-identify the player or discover actions. "
+        "Use only these events for factual claims, including who passed, who shot and what the outcome was. "
+        "A teammate's finish is not the target's shot. Missing observations do not establish zero actions or poor ability. "
+        "Assess only qualities supported by the recorded action details; do not infer speed, scanning, balance or mentality "
+        "merely from an event label. Leave an unsupported skill unrated. Use plain football coaching language. "
+        "Every skill evidence row needs event_id, timestamp and what. Use the source timestamp, never clip playback time. "
+        "The application supplies the canonical action_timeline, so return action_timeline=[]. "
+        "Each sub-skill object uses score (1-10 or null), notes, confidence, confidence_reason, observations_used, "
+        "evidence, cannot_evaluate, evaluable_reason, why_this_score, tier_for_age, benchmarks and verdict. "
+        "When evidence is absent use score=null, cannot_evaluate=true, evidence=[] and an honest reason. "
+        "Category scores average only observable skills and stay null when most skills are unobserved. "
+        "Do not invent percentile measurements or physical attributes. Personal advice must follow the recorded evidence. "
+        "Return a single valid JSON object.\nPlayer details: " + json.dumps(player_details or {}, ensure_ascii=False)
+        + "\nVideo content metadata: " + json.dumps(content or {}, ensure_ascii=False)
+        + "\nResolved observations: " + json.dumps(facts, ensure_ascii=False, separators=(",", ":"))
+        + "\n" + rubric + "\n" + schema + prompt_block(canonical))
+
+
 def _skill_supports(name, events):
     if str(name).lower() in {"shooting", "finishing"}:
         return any(e.get("canonical_event_type") in {"SHOT", "GOAL"} for e in events)

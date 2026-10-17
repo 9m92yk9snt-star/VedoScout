@@ -87,8 +87,10 @@ def _pair(left, right):
 
 def _anchor_bound(strike, trace, links):
     a = strike.get('active_ball_anchor') or {}
+    source = {'VERIFIED_PHYSICAL_RELEASE': 'VERIFIED_RELEASE_CONTACT_BALL_AFTER',
+              'VERIFIED_PHYSICAL_SCORING_CONTACT': 'VERIFIED_SCORING_CONTROL_BALL_AFTER'}.get(strike.get('status'))
     valid = bool(_ball(a) and a.get('remote_spare_ball_used') is False
-                and a.get('source') == 'VERIFIED_RELEASE_CONTACT_BALL_AFTER'
+                and source and a.get('source') == source
                 and any(_ball(row) and row['media_ms'] == a['media_ms'] and _iou(row.get('box'), a.get('box')) >= .75
                         for row in trace.get('ball_trajectory') or []))
     if not valid:
